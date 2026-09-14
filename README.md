@@ -8,7 +8,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 主界面是一块可滚动的仪表盘，从上到下依次是：性能模式、实时遥测、显卡模式、屏幕、电池、液冷系统、灯光、更多开关。底部工具条提供悬浮窗、设置、检查更新、赞助与退出。每个分组标题右侧的箭头可以折叠或展开该分组，折叠状态会被记住。
 
-![主界面仪表盘](docs/images/1-dashboard.png)
+<img src="docs/images/1-dashboard.png" width="420" alt="主界面仪表盘">
 
 ## 功能特性
 
@@ -30,7 +30,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 在主界面点「自定义」打开独立窗口。窗口顶部有四个槽位按钮（自定义 1～4），各自保存一套完整参数，点选即切换整套参数，当前槽位会显示「自定义 N 已激活」。
 
-![自定义性能模式](docs/images/2-custom-mode.png)
+<img src="docs/images/2-custom-mode.png" width="420" alt="自定义性能模式">
 
 每个槽位可设置：
 
@@ -50,19 +50,19 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 在自定义模式窗口点「风扇曲线」打开编辑器。CPU 与 GPU 各一条曲线，横轴是温度（°C），纵轴是风扇占空比（%），共 16 个固定温度档，鼠标拖动曲线点即实时保存。窗口内可开「风扇独立控制」：关 = 双风扇跟随 GPU 曲线（默认），开 = CPU / GPU 各自独立。改完点「保存」。
 
-![风扇曲线](docs/images/5-fan-curve.png)
+<img src="docs/images/5-fan-curve.png" width="760" alt="风扇曲线">
 
 ### 灯光
 
 主界面「灯光」分组按灯通道分行：键盘、灯条、Logo。每行有电源开关、效果下拉和「编辑」按钮：下拉直接切换效果，「编辑」打开对应窗口调参数。灯条与 Logo 两行只在机器带对应硬件时显示；分组标题右侧实时显示摘要（如「3 通道 · 1 开启」）。
 
-![键盘灯效](docs/images/3-keyboard.png)
+<img src="docs/images/3-keyboard.png" width="480" alt="键盘灯效">
 
 - **键盘灯效**：10 种软件渲染效果：流畅彩虹、静态、呼吸、闪烁、按键反应、彩虹轮、闪电、火焰、雨滴、矩阵。每种效果带专属参数（亮度、帧率、角度、速度、颜色等，随效果不同而不同）。效果由程序内置渲染器逐帧写入键盘 HID，不依赖固件灯效。
 - **灯条灯效**：单色、呼吸、波浪、冲击、流星，带亮度（4 档）、速度（慢 / 中 / 快）与单色颜色。
 - **Logo 灯效**：单色、呼吸、混合，参数同灯条。
 
-![灯条灯效](docs/images/4-lightbar.png)
+<img src="docs/images/4-lightbar.png" width="520" alt="灯条灯效">
 
 灯光分组顶部还有两个全局设置：
 
@@ -79,7 +79,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 未连接时分组显示「未连接」，可尝试重新连接；GCU 通道不可用时支持蓝牙直连。整组只在检测到水冷机时显示。
 
-![液冷系统](docs/images/6-liquid.png)
+<img src="docs/images/6-liquid.png" width="420" alt="液冷系统">
 
 ### 屏幕
 
@@ -91,7 +91,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 - **亮度**：Windows 标准亮度滑条。
 - **响应加速（Overdrive）**：在底部工具条「设置」弹窗中，机型支持时显示。
 
-![屏幕](docs/images/7-screen.png)
+<img src="docs/images/7-screen.png" width="420" alt="屏幕">
 
 另有「息屏（不睡眠）」开关，位于「更多开关 → 电源与系统」：一次性压暗屏幕并顶住待机，动鼠标或键盘即恢复亮屏，系统不会进入睡眠。
 
@@ -114,9 +114,11 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 - **键盘与热键**：Win键锁、Fn键锁、Copilot键锁、OSD提示。
 - **电源与系统**：USB充电、来电自启、高性能电源、风扇增强、深度睡眠、游戏白名单、CPU高级性能、任务栏自动隐藏、透明效果、深色主题、息屏（不睡眠）、开机自启动。
 
-![更多开关：输入设备与键盘热键](docs/images/8-more-switches-1.png)
+| 更多开关：输入设备与键盘热键 | 更多开关：电源与系统 |
+|---|---|
+| <img src="docs/images/8-more-switches-1.png" width="390" alt="更多开关：输入设备与键盘热键"> | <img src="docs/images/8-more-switches-2.png" width="390" alt="更多开关：电源与系统"> |
 
-![更多开关：电源与系统](docs/images/8-more-switches-2.png)
+
 
 每个开关点按即下发命令，命令确认前开关短暂禁用。深度睡眠改动需重启才生效，程序会弹窗提示。所有开关按机型能力显示：服务端没有上报对应字段的项整项隐藏，整组都没有可见项时连组标题一起收起。
 
@@ -193,7 +195,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 程序启动后会静默检测新版本，有新版时「检查更新」按钮出现角标。点开更新窗口可查看更新说明，点「下载并安装」自动下载、校验并拉起更新器；网盘发布的版本点「打开下载页」手动下载。
 
-![检查更新](docs/images/9-update.png)
+<img src="docs/images/9-update.png" width="720" alt="检查更新">
 
 ## 常见问题
 
