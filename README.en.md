@@ -8,7 +8,7 @@ L-Mechrevo is an open-source control center for Mechrevo laptops (Mechrevo / Uni
 
 The main window is a scrollable dashboard. Top to bottom: performance modes, live telemetry, GPU mode, display, battery, liquid cooling, lighting, and extra switches. The footer holds the hardware overlay toggle, settings, update check, donate, and exit. Each section header has an arrow that collapses or expands it, and the collapsed state is remembered.
 
-![Main dashboard](docs/images/1-dashboard.png)
+<img src="docs/images/1-dashboard.png" width="420" alt="Main dashboard">
 
 ## Features
 
@@ -30,7 +30,7 @@ The tray right-click menu can switch modes too, with entries "Silent (Office)", 
 
 Tap "Custom" on the dashboard to open a separate window. Four slot buttons (Custom 1 to 4) sit at the top; each slot stores a complete parameter set and selecting a slot applies it. The active slot shows "Custom N active".
 
-![Custom performance mode](docs/images/2-custom-mode.png)
+<img src="docs/images/2-custom-mode.png" width="420" alt="Custom performance mode">
 
 Each slot can hold:
 
@@ -50,19 +50,19 @@ The bottom of the window reads "Parameters are saved to the selected custom slot
 
 Tap "Fan curve" in the custom mode window to open the editor. CPU and GPU each get a curve: temperature (°C) on the X axis, fan duty (%) on the Y axis, 16 fixed temperature points. Drag a point and it saves in real time. A "Independent fan control" toggle sits in the window: off = both fans follow the GPU curve (default), on = CPU and GPU fans run their own curves. Tap "Save" when done.
 
-![Fan curve editor](docs/images/5-fan-curve.png)
+<img src="docs/images/5-fan-curve.png" width="760" alt="Fan curve editor">
 
 ### Lighting
 
 The lighting section lists one row per channel: keyboard, lightbar, logo. Each row has a power switch, an effect dropdown, and an "Edit" button. The dropdown switches effects directly; "Edit" opens a window with that effect's parameters. The lightbar and logo rows only appear when the machine has that hardware. The section header shows a live summary such as "3 channels · 1 on".
 
-![Keyboard lighting](docs/images/3-keyboard.png)
+<img src="docs/images/3-keyboard.png" width="480" alt="Keyboard lighting">
 
 - **Keyboard lighting**: 10 software-rendered effects: smooth rainbow, static, breathing, sparkle, reactive, rainbow wheel, lightning, flame, rain, matrix. Each effect carries its own parameters (brightness, frame rate, angle, speed, colors, depending on the effect). Frames are rendered in-app and written to the keyboard over HID, independent of the firmware effects.
 - **Lightbar lighting**: single color, breathing, wave, impact, meteor, with brightness (4 levels), speed (slow / medium / fast), and a single color.
 - **Logo lighting**: single color, breathing, mix, same parameters as the lightbar.
 
-![Lightbar lighting](docs/images/4-lightbar.png)
+<img src="docs/images/4-lightbar.png" width="520" alt="Lightbar lighting">
 
 Two global settings sit at the top of the lighting section:
 
@@ -79,7 +79,7 @@ With an external water cooler connected, the liquid cooling section header shows
 
 When disconnected the section shows "Not connected" and can retry; if the GCU channel fails it can fall back to a direct Bluetooth connection. The whole section only appears when a water cooler is detected.
 
-![Liquid cooling](docs/images/6-liquid.png)
+<img src="docs/images/6-liquid.png" width="420" alt="Liquid cooling">
 
 ### Display
 
@@ -91,7 +91,7 @@ The display section gathers screen controls:
 - **Brightness**: the standard Windows brightness slider.
 - **Overdrive**: lives in the "Settings" dialog on the footer, shown when the model supports it.
 
-![Display](docs/images/7-screen.png)
+<img src="docs/images/7-screen.png" width="420" alt="Display">
 
 There is also a "Screen off (no sleep)" switch under "Extra switches → Power & system": it dims the panel once and holds off standby. Move the mouse or press a key to wake the screen; the system does not sleep.
 
@@ -114,9 +114,11 @@ The extra switches section holds 22 toggles in three subgroups; the header shows
 - **Keyboard & hotkeys**: Win key lock, Fn lock, Copilot key lock, OSD hints.
 - **Power & system**: USB charging, power-on auto start, high performance power, fan boost, deep sleep, game whitelist, advanced CPU performance, taskbar auto-hide, transparency effects, dark theme, screen off (no sleep), launch at login.
 
-![Extra switches: input devices and keyboard hotkeys](docs/images/8-more-switches-1.png)
+| Extra switches: input devices and keyboard hotkeys | Extra switches: power and system |
+|---|---|
+| <img src="docs/images/8-more-switches-1.png" width="390" alt="Extra switches: input devices and keyboard hotkeys"> | <img src="docs/images/8-more-switches-2.png" width="390" alt="Extra switches: power and system"> |
 
-![Extra switches: power and system](docs/images/8-more-switches-2.png)
+
 
 Every toggle sends its command on tap and disables briefly until the command is confirmed. Deep sleep needs a reboot to take effect and the app says so in a dialog. All switches are gated by model capability: items the service doesn't report hide entirely, and when a whole subgroup has nothing to show its heading collapses too.
 
@@ -193,7 +195,7 @@ The extra switches card has three subgroups: input devices, keyboard & hotkeys, 
 
 The app checks for new versions silently at startup; the "Check updates" button grows a badge when one exists. Open the update window for release notes, then tap "Download and install" to download, verify, and launch the updater. Versions published on a file host show an "Open download page" button instead.
 
-![Update window](docs/images/9-update.png)
+<img src="docs/images/9-update.png" width="720" alt="Update window">
 
 ## FAQ
 
