@@ -193,6 +193,8 @@ The extra switches card has three subgroups: input devices, keyboard & hotkeys, 
 
 The app checks for new versions silently at startup; the "Check updates" button grows a badge when one exists. Open the update window for release notes, then tap "Download and install" to download, verify, and launch the updater. Versions published on a file host show an "Open download page" button instead.
 
+![Update window](docs/images/9-update.png)
+
 ## FAQ
 
 **It says GCU is not connected. What now?**
