@@ -742,7 +742,7 @@ internal static class DiagnosticBaolongdaInfo
 			bool lockOk = EcLpcIo.TryReadByte(0x1060, out int lockReg);
 			sb.AppendLine("   0x1060（解锁寄存器现值）= " + (lockOk
 				? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(lockReg) + (((lockReg & 0x80) != 0)
-					? " ⇒ ⭐ bit7 **已置位**（已解锁）✅"
+					? " ⇒ ⚠️ bit7 **字面**置位 —— ⚠️ 但 0xFF 与「未映射填充值」**无法区分** ⇒ ⭐ 只有 0x2000 == 0x55 时该结论才可信"
 					: " ⇒ ⚠️ bit7 **未置位**（未解锁）"))
 				: "⛔ 读不到"));
 			sb.AppendLine("   ⇒ ⭐ **若 0x2000 == 0x55 且 bit7 未置位 ⇒ 下面读到的 0xFF 可能是「未解锁」所致** ⚠️");
