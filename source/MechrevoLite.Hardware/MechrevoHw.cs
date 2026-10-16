@@ -3497,12 +3497,19 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **意向方法** —— "⭐ 应用一组 CPU 功耗/温度墙" ✅
 	/// <para>⭐ 宝龙达协议（⭐ 功能号 23 `CpuPower` ✅）：
-	/// ⭐ 写**单字节** ⭐ <c>1</c> = 开启自定义 / ⭐ <c>0</c> = 关闭 ✅；
-	/// ⭐ 写**两字节** `[子命令, 值]`：⭐ `2` = PL1(瓦) · ⭐ `3` = PL2(瓦) · ⭐ `4` = 温度墙(℃) ✅</para>
-	/// <para>⚠️⚠️ <b>重要的协议限制</b>：⭐ 功能号 23 ⭐ **只能写、读不回 PL1/PL2/温度墙的当前值** ⚠️
-	/// ⇒ ⭐ 所以本方法 ⭐ **只能"写后回读是否已开启"来确认**（⭐ 不能确认具体数值 ✅）
-	/// ⇒ ⭐ 调用方若要在界面上显示数值，⭐ **必须自己记住**（⭐ 本地记忆、⭐ 并明确标注 ⛔ 非从机器读回 ⚠️）。</para>
-	/// <para>⚠️ 合理性上限（⭐ 防手滑）：⭐ PL1/PL2 夹在 ⭐ `[5, 200]` 瓦 · ⭐ 温度墙夹在 ⭐ `[60, 105]` ℃ ✅。</para>
+	/// ⭐ 写**两字节** `[子命令, 值]`：⭐ `2` = PL1(瓦) · ⭐ `3` = PL2(瓦) · ⭐ `4` = 温度墙(℃) ✅；
+	/// ⭐ 写**单字节** ⭐ <c>1</c> = 开启自定义 / ⭐ <c>0</c> = 关闭 ✅（⭐ 只在 <paramref name="enable" /> = false 时用 ✅）。</para>
+	/// <para>⭐⭐ 2026-10-16（开源相互印证）：⭐ **不再"最后 enable"** ✅
+	/// ⭐ 依据（⭐ 两处独立印证）：⭐ ① 厂商控制台 = 直接写 `[2,值]/[3,值]/[4,值]`、**没有 enable 步骤** ✅；
+	/// ⭐ ② 蛟龙开源控制台 UI = `PL1 → PL2 → 温度墙 → 最大频率 → 睿频`、**全程不调用** `SetCustomMode`
+	/// （⭐ 它导出了但**没有任何页面调用** ⇒ ⭐ 死代码 ✅）。</para>
+	/// <para>⭐⭐ 2026-10-16（"未设置"）：⭐ 三项都**可跳过** —— ⭐ 传 <c>≤0</c> 表示"⭐ 这一项未设置"，
+	/// ⭐ 那就**不发**这个子命令（⭐ 让机器保持原样 ✅），⛔ **不拿编造值去凑满三项** ✅。</para>
+	/// <para>⚠️⚠️ <b>协议限制（诚实边界）</b>：⭐ 功能号 23 ⭐ **只能写、读不回 PL1/PL2/温度墙的当前值** ⚠️
+	/// ⇒ ⭐ 所以 <paramref name="confirmed" /> 的语义**只是"⭐ 已发出的子命令都写成功了"**
+	/// （⭐ = WMI 没报错 ⚠️），⛔ **不是**"数值已生效"、⛔ **更不是**"机器上的值等于我们写的值" ⚠️。</para>
+	/// <para>⭐ 合理性范围（⭐ 防手滑 · 依据见上面常量注释）：⭐ PL1 `[5,120]` · ⭐ PL2 `[5,150]` ·
+	/// ⭐ 温度墙 `[60,105]` ✅。</para>
 	/// </summary>
 	internal bool TryApplyCpuPowerLimitViaBackend(bool enable, int pl1Watts, int pl2Watts, int tempWallC, out bool confirmed)
 	{
@@ -3521,45 +3528,59 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteError($"宝龙达 功耗墙：⭐ 已关闭自定义 ⇒ 回读确认={confirmed}");
 				return true;
 			}
-			// ⭐ 顺序：⭐ 先设三个值 ⇒ ⭐ 最后才"开启" ✅（⭐ 免得中途以默认值生效一瞬间 ⚠️）
-			int pl1 = Math.Max(5, Math.Min(200, pl1Watts));
-			int pl2 = Math.Max(5, Math.Min(200, pl2Watts));
-			int wall = Math.Max(60, Math.Min(105, tempWallC));
-			bool ok1 = wmi.TrySetCpuLongPower((byte)pl1);
-			bool ok2 = wmi.TrySetCpuShortPower((byte)pl2);
-			bool ok3 = wmi.TrySetCpuTempWall((byte)wall);
+			// ⭐ "未设置"（≤0）⇒ ⭐ 夹取后仍是 0 ⇒ ⭐ 后面会跳过它 ✅
+			int pl1 = (pl1Watts > 0) ? Math.Clamp(pl1Watts, BaolongdaPlMinWatts, BaolongdaPl1MaxWatts) : BaolongdaUnset;
+			int pl2 = (pl2Watts > 0) ? Math.Clamp(pl2Watts, BaolongdaPlMinWatts, BaolongdaPl2MaxWatts) : BaolongdaUnset;
+			int wall = (tempWallC > 0) ? Math.Clamp(tempWallC, BaolongdaTccMinCelsius, BaolongdaTccMaxCelsius) : BaolongdaUnset;
+			if (pl1 <= BaolongdaUnset && pl2 <= BaolongdaUnset && wall <= BaolongdaUnset)
+			{
+				// ⭐⭐ 三项都没设过 ⇒ ⭐ **一个子命令都不发** ✅（⭐ 而不是拿编造值去填 ✅）
+				//   ⚠️ 返回 true = "⭐ 已接管、⛔ 不走 GCU" ✅（⭐ 与既有约定一致 ✅）
+				Logger.WriteError("宝龙达 功耗墙：⚠️ PL1／PL2／温度墙**三项都未设置**"
+					+ " ⇒ ⭐ 本次**不下发任何子命令**（⛔ 不编造默认值）✅ —— ⭐ 这是如实行为、⛔ 不是失败 ✅");
+				return true;
+			}
+			// ⭐ 顺序照蛟龙 UI：⭐ PL1 → ⭐ PL2 → ⭐ 温度墙 ✅；⛔ **不再"最后 enable"** ✅
+			bool ok1 = (pl1 <= BaolongdaUnset) || wmi.TrySetCpuLongPower((byte)pl1);
+			bool ok2 = (pl2 <= BaolongdaUnset) || wmi.TrySetCpuShortPower((byte)pl2);
+			bool ok3 = (wall <= BaolongdaUnset) || wmi.TrySetCpuTempWall((byte)wall);
 			if (!(ok1 && ok2 && ok3))
 			{
 				Logger.WriteError($"宝龙达 功耗墙：⚠️ 有子命令写入失败（⭐ PL1={ok1} · ⭐ PL2={ok2} · ⭐ 温度墙={ok3}）⇒ 如实报告");
 			}
-			bool okOn = wmi.TrySetCpuCustomEnabled(true);
-			// ⭐ 回读确认（⭐ 只能确认"已开启"，⛔ 确认不了数值 ⚠️）
-			for (int attempt = 0; attempt < 5; attempt++)
+			// ⭐⭐ 2026-10-16（第 3 步）：⭐ **更新本地记忆** ⇒ ⭐ 这样
+			//   `MechrevoService` 的校验（⭐ `_hw.Pl1 == result`）⭐ **同一次请求就能通过** ✅
+			//   ⚠️ 前提：⭐ 这是在**同一个锁/线程模型**下改的属性 ⚠️
+			//      ⇒ ⭐ 属性是 `{ get; private set; }`（⭐ int，⭐ 非 volatile ⚠️）
+			//      ⇒ ⭐ 与 GCU 那条支的写法一致（⭐ 那里也是直接从 MQTT 回调线程写 ✅）
+			//      ⇒ ⭐ 保持同款约定，⛔ 不引入新的同步机制 ✅
+			//   ⭐ 只记**真正写下去且写成功**的那几项（⭐ 没写的保持"未设置" ✅）
+			if (ok1 && pl1 > BaolongdaUnset)
 			{
-				if (wmi.TryReadCpuCustomEnabled(out bool now) && now)
-				{
-					confirmed = true;
-					// ⭐⭐ 2026-10-16（第 3 步）：⭐ **更新本地记忆** ⇒ ⭐ 这样
-					//   `MechrevoService` 的校验（⭐ `_hw.Pl1 == result`）⭐ **同一次请求就能通过** ✅
-					//   ⚠️ 前提：⭐ 这是在**同一个锁/线程模型**下改的属性 ⚠️
-					//      ⇒ ⭐ 属性是 `{ get; private set; }`（⭐ int，⭐ 非 volatile ⚠️）
-					//      ⇒ ⭐ 与 GCU 那条支的写法一致（⭐ 那里也是直接从 MQTT 回调线程写 ✅）
-					//      ⇒ ⭐ 保持同款约定，⛔ 不引入新的同步机制 ✅
-					_baolongdaMemPl1 = pl1;
-					_baolongdaMemPl2 = pl2;
-					_baolongdaMemTempWall = wall;
-					Pl1 = pl1;
-					Pl2 = pl2;
-					TccTarget = wall;
-					// ⭐⭐ 2026-10-16：⭐ 真机验证功耗墙的**成功证据** ⚠️ ⇒ ⭐ 必须 WriteError（⭐ 默认级别可见 ✅）
-					Logger.WriteError($"宝龙达 功耗墙：⭐ 已应用并确认开启 ✅（⭐ PL1={pl1}W · ⭐ PL2={pl2}W · ⭐ 温度墙={wall}℃"
-						+ " —— ⚠️ 数值是**我们下发的**，⭐ 协议读不回来 ⚠️；⭐ 已写入本地记忆供校验使用 ✅）");
-					return true;
-				}
-				Thread.Sleep(150);
+				_baolongdaMemPl1 = pl1;
+				Pl1 = pl1;
 			}
-			// ⭐⭐ 2026-10-16：⭐ 真机验证功耗墙的**未确认证据** ⚠️ ⇒ ⭐ 必须 WriteError（⭐ 默认级别可见 ✅）
-			Logger.WriteError($"宝龙达 功耗墙：⚠️ 写入完成但回读未确认（⭐ 开启写成功={okOn}）⇒ 如实报告 ⚠️");
+			if (ok2 && pl2 > BaolongdaUnset)
+			{
+				_baolongdaMemPl2 = pl2;
+				Pl2 = pl2;
+			}
+			if (ok3 && wall > BaolongdaUnset)
+			{
+				_baolongdaMemTempWall = wall;
+				TccTarget = wall;
+			}
+			// ⭐ "写成功"就是本方法能给出的**全部**结论 ⚠️ ⇒ ⭐ 如实命名、⛔ 不冒充"数值确认" ✅
+			confirmed = ok1 && ok2 && ok3;
+			// ⭐ 顺带**只读**一次"自定义开关"状态 —— ⭐ 仅作**信息**报告，
+			//   ⛔ **不**当作"数值已生效"的依据 ✅（⭐ 我们不写它、⭐ 它也证明不了数值 ⚠️）
+			string switchInfo = (wmi.TryReadCpuCustomEnabled(out bool nowOn) ? (nowOn ? "1" : "0") : "读不到");
+			// ⭐⭐ 2026-10-16：⭐ 真机验证功耗墙的**主要证据** ⚠️ ⇒ ⭐ 必须 WriteError（⭐ 默认级别可见 ✅）
+			Logger.WriteError($"宝龙达 功耗墙：⭐ 已下发（⭐ 顺序 PL1→PL2→温度墙 · ⛔ 未做 enable）"
+				+ $" ⇒ ⭐ ① 写成功={confirmed}（⭐ PL1={ok1} · ⭐ PL2={ok2} · ⭐ 温度墙={ok3}）"
+				+ $" · ⭐ 下发值 PL1={ShowUnset(pl1, "W")} PL2={ShowUnset(pl2, "W")} 温度墙={ShowUnset(wall, "℃")}"
+				+ $" · ⭐ 自定义开关（只读、仅参考）={switchInfo}"
+				+ " ⇒ ⚠️ ② 数值**是否真生效我们测不到**（⭐ 协议读不回 ⚠️）⇒ ⭐ 需目视/实测确认 ⚠️");
 			return true;
 		}
 		catch (Exception ex)
@@ -3567,6 +3588,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			Logger.WriteLine("宝龙达 功耗墙：⭐ 操作异常（已吞掉）：" + ex.Message);
 			return true;
 		}
+	}
+
+	/// <summary>⭐ 把"未设置"（⭐ = <see cref="BaolongdaUnset" />）如实打成「未设置」、⛔ 不打成 0 ✅。</summary>
+	private static string ShowUnset(int value, string unit)
+	{
+		return (value > BaolongdaUnset) ? (value.ToString() + unit) : "未设置";
 	}
 
 	/// <summary>
@@ -3695,21 +3722,33 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//   ⚠️ 为什么必须"本地记忆"：⭐ 真机实测（⭐ 机器 C）⭐ 功能号 23 **只能读到"是否已开启"**，
 	//      ⭐ **PL1 / PL2 / 温度墙的具体数值协议里读不回来** ⚠️（⭐ 这是协议限制 ✅）
 	//   ⇒ ⭐ 所以界面上的当前值 ⭐ **只能是我们上次下发的值** ✅（⭐ 审查阶段要决定是否加说明小字 ⚠️）
-	//   ⭐ 范围取常数（⭐ 保守）：⭐ PL1/PL2 ⭐ 5~200W · ⭐ 温度墙 ⭐ 60~105℃ ✅
+	//   ⭐ 范围取常数：⭐ PL1 ⭐ 5~120W · ⭐ PL2 ⭐ 5~150W · ⭐ 温度墙 ⭐ 60~105℃ ✅
+	//      ⭐ 依据（⭐ 2026-10-16 开源相互印证 · 用户指导「⭐ 开源的都有方案的不是吗」）：
+	//         ⭐ 蛟龙开源控制台 Server 的 `ConfigRange` —— ⭐ `CpuLongPower [5,120]` ·
+	//         ⭐ `CpuShortPower [5,150]` · ⭐ `CpuTempWall [60,105]` ✅
+	//      ⚠️ **不采用**它 UI 滑块的 `30~255`（⭐ 那是 byte 上限、⭐ 写 255 到 PL1 有风险 ❌）✅
 	//      ⚠️ 而门面层的写入还会再夹一次（⭐ 见 `TryApplyCpuPowerLimitViaBackend` ✅）
 	private const int BaolongdaPlMinWatts = 5;
-	private const int BaolongdaPlMaxWatts = 200;
+	private const int BaolongdaPl1MaxWatts = 120;
+	private const int BaolongdaPl2MaxWatts = 150;
 	private const int BaolongdaTccMinCelsius = 60;
 	private const int BaolongdaTccMaxCelsius = 105;
 
-	// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **从未设过时填的保守建议默认** ✅
-	//   ⚠️ 为什么需要它们：⭐ 本地记忆初始为 0 ⇒ 直接填进 `Pl1`/`Pl2`/`TccTarget` 会被
-	//      `CustomModeForm.DeviceRange` 钳到**下界** ⇒ ⭐ 界面显示 `PL1=5W`、温度墙 `60℃` ❌
-	//      —— ⭐ 那既不是真值（⭐ 协议结构上读不回 ⚠️）、⭐ 也不是建议值 ⇒ ⭐ 纯误导 ❌
-	//   ⭐ 与 `MechrevoService.TryApplyPowerLimitViaBackend` 里"⭐ 还没设过时用的保守默认"⭐ 保持一致 ✅
-	private const int BaolongdaDefaultPl1Watts = 45;
-	private const int BaolongdaDefaultPl2Watts = 65;
-	private const int BaolongdaDefaultTempWallCelsius = 95;
+	// ⭐⭐ 2026-10-16（"未设置"语义 · 用户指导「⭐ 开源的都有方案的不是吗」）：⭐ **不再编造默认值** ✅
+	//   ⚠️ 为什么删掉原来那组 `45/65/95`：⭐ 它是**从蛟龙两个不同层级各取一个数拼出来的**
+	//      （⭐ PL1 两处都 45 · ⭐ PL2 抄 Server 的 `Default` · ⭐ 温度墙抄的是**字段默认** ⚠️）
+	//      ⇒ ⭐ **没有任何一处完整支持它** ⇒ ⭐ 那就是我们自己编的数字 ❌
+	//   ⭐ 而蛟龙自己两处**互相矛盾**（⭐ Server `Default` = 45/65/90 ｖｓ Client = 45/60/85；
+	//      Server 字段默认 = 45/55/95 ⚠️）⇒ ⭐ 也不能直接采用其中任何一套 ✅
+	//   ⭐ 采用**斗战者的做法**（⭐ 只取做法、⛔ 不抄代码 —— 它是 GPL-3.0 ✅）：
+	//      ⭐ **全可空 · ⭐ 只记用户覆盖过的那几项 · ⭐ 没改过的保持机器原样 · ⛔ 绝不猜默认值** ✅
+	//   ⇒ ⭐ 这恰好绕开"⭐ 功能号 23 读不回原值"这个根本难题 —— ⭐ **不预设就不需要猜** ✅
+	//   ⇒ ⭐ 也完全符合铁律「⭐ 读不到就显示未知 · ⛔ 绝不编数字」✅
+	//   ⭐ 实现：⭐ `_baolongdaMem*` 的 **0 = 未设置**（⭐ 沿用既有语义 ✅）：
+	//      ⭐ ① ⭐ 界面对未设置的行显示「（未设置）」（⭐ 见 `CustomModeForm` ✅）
+	//      ⭐ ② ⭐ 下发时**跳过**未设置的项（⭐ 见 `TryApplyCpuPowerLimitViaBackend` ✅）
+	//      ⭐ ③ ⭐ 未设置时**一个子命令都不发**（⭐ 而不是拿编造值去凑满三项 ✅）
+	private const int BaolongdaUnset = 0;
 	private int _baolongdaMemPl1;
 	private int _baolongdaMemPl2;
 	private int _baolongdaMemTempWall;
@@ -3721,22 +3760,37 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private void ApplyBaolongdaPowerRanges()
 	{
 		Pl1Minimum = BaolongdaPlMinWatts;
-		Pl1Maximum = BaolongdaPlMaxWatts;
+		Pl1Maximum = BaolongdaPl1MaxWatts;
 		Pl2Minimum = BaolongdaPlMinWatts;
-		Pl2Maximum = BaolongdaPlMaxWatts;
+		Pl2Maximum = BaolongdaPl2MaxWatts;
 		TccMinimum = BaolongdaTccMinCelsius;
 		TccMaximum = BaolongdaTccMaxCelsius;
 		// ⭐ PL4 本机协议里没有（⭐ 参考实现的功能号表里也没这一项 ✅）⇒ ⭐ 保持 -1（⭐ 即不可调 ✅）
-		// ⭐ PL1 / PL2 / 温度墙的当前值 = 本地记忆（⭐ 0 = 还从没设过 ⇒ ⭐ 见下 ✅）
-		// ⭐⭐ 2026-10-16（修"从未设过就显示边界值"的误导）：⭐ 从未设过（≤0）⇒ ⭐ 填**保守建议默认** ✅
-		//   ⚠️ 原来直接填 0 ⇒ ⭐ `CustomModeForm.DeviceRange` 会 `Math.Clamp(0, 下界, 上界)` ⇒
-		//      ⭐ 界面显示 **PL1=5W · PL2=5W · 温度墙=60℃** ❌ —— ⭐ 那是**下界**、⭐ 纯误导 ⚠️
-		//   ⚠️ ⭐ **语义如实说明**：⭐ 宝龙达协议对功耗墙**只写不读** ⚠️ ⇒ ⭐ 界面上的数字**只能**是
-		//      "⭐ 我们最近一次下发的值 / ⭐ 建议默认值" ✅ —— ⛔ **不是从机器回读的真值** ⚠️
-		Pl1 = (_baolongdaMemPl1 > 0) ? _baolongdaMemPl1 : BaolongdaDefaultPl1Watts;
-		Pl2 = (_baolongdaMemPl2 > 0) ? _baolongdaMemPl2 : BaolongdaDefaultPl2Watts;
-		TccTarget = (_baolongdaMemTempWall > 0) ? _baolongdaMemTempWall : BaolongdaDefaultTempWallCelsius;
+		// ⭐⭐ 2026-10-16（"未设置"）：⭐ 当前值 = 本地记忆，**0 就是 0**（⭐ = 未设置 ✅）
+		//   ⛔ **不再**填"建议默认 45/65/95" —— ⭐ 那是我自己编的（⭐ 依据见上面那段注释 ⚠️）
+		//   ⭐ 界面据此显示「（未设置）」（⭐ `CustomModeForm` 读 `BaolongdaPl1Unset` 等 ✅），
+		//      ⛔ 不再假装知道机器上的值 ✅ —— ⭐ 协议读不回 ⇒ ⭐ 我们**本来就不该知道** ✅
+		//   ⚠️ 副作用（⭐ 如实记录）：⭐ `CustomModeForm.DeviceRange` 会把 0 钳到**下界**
+		//      ⇒ ⭐ 滑块初始停在 `5W`／`60℃` ⚠️ —— ⭐ 但标题写明「（未设置）」
+		//      ⇒ ⭐ 不会把那两个数当成真值 ✅（⭐ 这也正是不再编中间值的原因：⭐ 编了更像真的 ⚠️）
+		Pl1 = _baolongdaMemPl1;
+		Pl2 = _baolongdaMemPl2;
+		TccTarget = _baolongdaMemTempWall;
 	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"未设置"）：⭐ PL1 是否**未设置**（⭐ = 本次运行还没下发过 ✅）
+	/// —— ⭐ 供界面把标题显示成「（未设置）」✅（⭐ 铁律：⭐ 读不到就显示未知 · ⛔ 绝不编数字 ✅）。
+	/// <para>⚠️ 语义**如实**：⭐ 宝龙达协议对功耗墙**只写不读** ⚠️ ⇒ ⭐ "未设置"的含义是
+	/// **"本次运行我们还没下发过"**，⛔ **不是**"机器上没设过"（⭐ 机器上有没有、⭐ 是多少，⭐ 我们读不回 ⚠️）✅</para>
+	/// </summary>
+	public bool BaolongdaPl1Unset => UsesBaolongda && _baolongdaMemPl1 <= BaolongdaUnset;
+
+	/// <summary>⭐ 同 <see cref="BaolongdaPl1Unset" />：⭐ PL2 是否**未设置** ✅。</summary>
+	public bool BaolongdaPl2Unset => UsesBaolongda && _baolongdaMemPl2 <= BaolongdaUnset;
+
+	/// <summary>⭐ 同 <see cref="BaolongdaPl1Unset" />：⭐ 温度墙是否**未设置** ✅。</summary>
+	public bool BaolongdaTempWallUnset => UsesBaolongda && _baolongdaMemTempWall <= BaolongdaUnset;
 
 	// ══════════════════════════════════════════════════════════════════════════
 	// ⭐⭐ 2026-10-16（"全部接入"第 4 步 · 风扇**软件闭环曲线** · ⭐ 骨架）

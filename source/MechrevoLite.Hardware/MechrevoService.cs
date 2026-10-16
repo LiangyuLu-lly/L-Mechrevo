@@ -3698,9 +3698,14 @@ public class MechrevoService
 	/// <para>⭐ 处理哪些键：⭐ `PL1`（⭐ PL1 瓦数 ✅）· ⭐ `PL2` ✅ · ⭐ `CpuTccOffset`（⭐ 温度墙 ✅）</para>
 	/// <para>⭐ 返回 <c>true</c> ⇒ ⭐ 已由非 GCU 后端处理完（⭐ 调用方 ⛔ 不要再发 MQTT ✅）；
 	/// ⭐ 返回 <c>false</c> ⇒ ⭐ 不归它管（⭐ GCU / 老同方 ⭐ **恒返回 false** ⇒ ⭐ 行为逐位不变 ✅）。</para>
-	/// <para>⚠️ 数值语义：⭐ 界面的 PL1/PL2 是**瓦**、⭐ 温度墙走的是 ⭐ `TccOffset`（⭐ 与 GCU 同口径 ✅）
-	/// —— ⭐ 宝龙达协议里那个是**绝对温度 ℃** ⚠️ ⇒ ⭐ 这里做一次换算：
-	/// ⭐ **温度墙 ℃ = `TccMaximum` − `TccOffset`** ✅（⭐ `TccMaximum` 我们填的是 105 ✅）</para>
+	/// <para>⚠️ 数值语义（⭐ 2026-10-16 更正 —— 旧注释描述的是**已被删掉的双重换算** ⚠️）：
+	/// ⭐ 界面的 PL1/PL2 是**瓦** ✅；⭐ 温度墙这一项 ⭐ 界面与门面层**同口径**、⭐ 都是**绝对温度 ℃** ✅
+	/// ⇒ ⭐ 本方法 ⭐ **直接原样传下去**、⛔ **不做任何换算** ✅
+	/// （⭐ 依据：⭐ 界面 slider 的范围就是 `[hw.TccMinimum, hw.TccMaximum]` = `[60,105]`、⭐ 当前值就是
+	/// `hw.TccTarget` ✅；⭐ 且既有的校验 `"CpuTccOffset" => _hw.TccTarget == result` 也说明两者可直接比较 ✅）</para>
+	/// <para>⭐⭐ 2026-10-16（"未设置"）：⭐ 未设置的项（⭐ `≤0` ✅）⭐ **原样传"未设置"下去**，
+	/// ⛔ **不再**补一个"保守默认值"（⭐ 那组 45/65/95 是我们自己编的 ⚠️ —— ⭐ 见
+	/// `MechrevoHw` 里 `BaolongdaUnset` 那段注释的依据 ✅）。</para>
 	/// <para>⚠️ 实现取舍（⭐ 如实说明）：⭐ 这几个键是**分别**到达的 ⇒ ⭐ 每个都会**各触发一次写入** ⚠️
 	/// ⇒ ⭐ 结果是"⭐ 最后一个生效 ✅、⭐ 总开销多几次只读回读 ✅" —— ⭐ 功能正确、⛔ 不是最优 ✅
 	/// ⭐ （⭐ 更优做法是把它们**攒成一次**应用 ⚠️ ⇒ ⭐ 留待审查阶段优化 ✅）</para>
@@ -3754,26 +3759,33 @@ public class MechrevoService
 			int max = (hw.TccMaximum > 0) ? hw.TccMaximum : 105;
 			tempWallC = (result <= 0) ? max : Math.Max(60, Math.Min(max, result));
 		}
-		// ⭐ 写之前：⭐ 若还没设过（⭐ 本地记忆为 0 ✅）⭐ 用一个保守默认值，⛔ 免得上电就写 0 ✅
-		if (pl1 <= 0)
-		{
-			pl1 = 45;
-		}
-		if (pl2 <= 0)
-		{
-			pl2 = 65;
-		}
-		if (tempWallC <= 0)
-		{
-			tempWallC = 95;
-		}
+		// ⭐⭐ 2026-10-16（"未设置" · 用户指导「⭐ 开源的都有方案的不是吗」）：
+		//   ⛔ **删掉了原来的"保守默认 45/65/95"** —— ⭐ 那是**我们自己编的**（⭐ 依据：⭐ 开源里
+		//      没有任何一处完整支持那组数；⭐ 蛟龙自己两处还互相矛盾 ⚠️ ⇒ ⭐ 不能编 ✅）
+		//   ⭐ 现在把"未设置"如实**传下去**（⭐ `≤0` = 未设置 ✅）⇒ ⭐ 门面层会**跳过**那一项、
+		//      ⛔ 不拿编造值去凑满三项 ✅（⭐ 这正是斗战者的做法：⭐ 只写用户覆盖过的 ✅）
+		//   ⭐ 全部未设置时 ⭐ 一个子命令都不发（⭐ 见 `TryApplyCpuPowerLimitViaBackend` ✅）
 		_ = hw.TryApplyCpuPowerLimitViaBackend(enable: true, pl1, pl2, tempWallC, out bool confirmed);
 		// ⭐⭐ 2026-10-16：⭐ 这条是**真机验证功耗墙下发**的主要证据 ⚠️ ⇒ ⭐ 必须用 `WriteError` ✅
 		//   （⭐ `Logger.WriteLine` 的级别由**消息内容**判定 ⇒ ⭐ 默认「仅错误」级别下**可能不落盘** ❌）
 		//   ⭐ 每次"应用"最多 3 行（⭐ PL1 / PL2 / 温度墙各一次 ✅）⇒ ⭐ 不需要额外去重 ✅
-		Logger.WriteError($"宝龙达 功耗墙（⭐ 非 GCU 后端路径）：⭐ key={key} · ⭐ 下发 PL1={pl1}W PL2={pl2}W 温度墙={tempWallC}℃"
-			+ $" · ⭐ 确认={confirmed} ⇒ ⭐ 该项未发 MQTT ✅");
+		//   ⚠️ 措辞如实：⭐ 打印的是"⭐ 写成功"（⭐ = WMI 没报错 ⚠️），⛔ **不写"已确认生效"** ✅
+		Logger.WriteError($"宝龙达 功耗墙（⭐ 非 GCU 后端路径）：⭐ key={key}"
+			+ $" · ⭐ 下发 PL1={ShowPowerValue(pl1)} PL2={ShowPowerValue(pl2)} 温度墙={ShowTempValue(tempWallC)}"
+			+ $" · ⭐ 写成功={confirmed}（⚠️ ⛔ 非「数值已生效」）⇒ ⭐ 该项未发 MQTT ✅");
 		return true;
+	}
+
+	/// <summary>⭐ 把"未设置"（⭐ ≤0）如实打成「未设置」、⛔ 不打成 0 ✅。</summary>
+	private static string ShowPowerValue(int watts)
+	{
+		return (watts > 0) ? (watts + "W") : "未设置";
+	}
+
+	/// <summary>⭐ 同 <see cref="ShowPowerValue" />：⭐ 温度墙 ✅。</summary>
+	private static string ShowTempValue(int celsius)
+	{
+		return (celsius > 0) ? (celsius + "℃") : "未设置";
 	}
 
 	private bool TryApplyKeyboardViaBackend(string effect, int light0to4, Color? singleColor)

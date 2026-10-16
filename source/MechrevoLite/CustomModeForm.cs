@@ -306,6 +306,30 @@ public class CustomModeForm : RForm
 
 	private Label _powerWallStatus;
 
+	// ⭐⭐ 2026-10-16（"未设置"标记 · 用户指导「⭐ 开源的都有方案的不是吗」）：
+	//   ⚠️ 宝龙达协议对功耗墙**只写不读**（⭐ 功能号 23 ⚠️）⇒ ⭐ 机器上的值我们**读不回来** ✅
+	//   ⇒ ⭐ 那就 ⛔ **不许编一个数**（⭐ 原来那组 45/65/95 是我们自己拼的 ⚠️）✅
+	//   ⇒ ⭐ 没下发过的行 ⇒ ⭐ 标题追加「（未设置）」（⭐ 见 `UnsetMark` ✅）
+	//   ⚠️ 为什么放标题而不是数字框：⭐ `NumericUpDown` **拒绝非数字文本**
+	//      （⭐ 本机探针实测：⭐ 赋 `Text = "未设置"` 被忽略、⭐ 值仍是原数字 ❌）
+	//      ⇒ ⭐ 标题是唯一能显示文字的既有位置 ✅；⭐ `MakeLabel` 会把**最终文本**记进 `_rowLabels`
+	//      ⇒ ⭐ 标题列宽**自动容纳**它、⛔ 不会裁字 ✅（⭐ 代价：⭐ 标题列随之变宽，⭐ 如实记录 ✅）
+	private Label _pl1Label;
+
+	private Label _pl2Label;
+
+	private Label _tccLabel;
+
+	/// <summary>⭐「未设置」标记（⭐ 见 <see cref="_pl1Label" /> 的注释 ✅）。</summary>
+	private const string UnsetMark = "（未设置）";
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"未设置"）：⭐ 功耗墙三行的**完整语义**（⭐ 悬浮提示用 ✅）。
+	/// <para>⚠️ 如实说明：⭐ 宝龙达协议对功耗墙**只写不读** ⚠️ ⇒ ⭐「未设置」的含义是
+	/// **"本次运行我们还没下发过"**，⛔ **不是**"机器上没设过" ✅ —— ⭐ 机器上到底是多少，我们读不回来 ⚠️。</para>
+	/// </summary>
+	private const string PowerWallUnsetHint = "本机协议读不回功耗墙的当前值（只写不读）。标题带「（未设置）」= 本次运行还没下发过，不代表机器上没设过。拖动滑块并点【应用】后，这里显示的就是我们下发的值。";
+
 	private readonly System.Windows.Forms.Timer _powerWallTimer = new System.Windows.Forms.Timer
 	{
 		Interval = 2000
@@ -688,18 +712,22 @@ public class CustomModeForm : RForm
 		AddComboRow(Strings.BoostMode, _boostCombo);
 		(int, int, int, bool) tuple2 = DeviceRange(hw?.Pl1Minimum ?? (-1), hw?.Pl1Maximum ?? (-1), hw?.Pl1 ?? 0);
 		(int, int, int, bool) tuple3 = DeviceRange(hw?.Pl2Minimum ?? (-1), hw?.Pl2Maximum ?? (-1), hw?.Pl2 ?? 0);
-		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(Strings.CpuPl1, tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
+		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl1, hw?.BaolongdaPl1Unset ?? false), tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
 		{
 			Queue("PL1", v.ToString());
 		});
 		_pl1 = tuple4.Item1;
 		_pl1Val = tuple4.Item2;
-		tuple4 = AddSliderRow(Strings.CpuPl2, tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+		_pl1Label = RowLabelOf(_pl1);
+		AttachPowerWallUnsetHint(_pl1, _pl1Val, _pl1Label);
+		tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
 		{
 			Queue("PL2", v.ToString());
 		});
 		_pl2 = tuple4.Item1;
 		_pl2Val = tuple4.Item2;
+		_pl2Label = RowLabelOf(_pl2);
+		AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
 		(int, int, int, bool) tuple5 = DeviceRange(hw?.Pl4Minimum ?? (-1), hw?.Pl4Maximum ?? (-1), hw?.Pl4 ?? 0);
 		tuple4 = AddSliderRow((hw != null && hw.UsesAmdPowerFields) ? Strings.CpuFppt : Strings.CpuPl4, tuple5.Item1, tuple5.Item2, tuple5.Item3, (int v) =>
 		{
@@ -713,10 +741,12 @@ public class CustomModeForm : RForm
 			_tcc.Enabled = on;
 		});
 		(int, int, int, bool) tuple6 = DeviceRange(hw?.TccMinimum ?? (-1), hw?.TccMaximum ?? (-1), hw?.TccTarget ?? 0);
-		(_tcc, _tccVal) = AddSliderRow(Strings.TempWallValue, tuple6.Item1, tuple6.Item2, tuple6.Item3, (int v) =>
+		(_tcc, _tccVal) = AddSliderRow(PowerWallRowLabel(Strings.TempWallValue, hw?.BaolongdaTempWallUnset ?? false), tuple6.Item1, tuple6.Item2, tuple6.Item3, (int v) =>
 		{
 			Queue("CpuTccOffset", v.ToString());
 		});
+		_tccLabel = RowLabelOf(_tcc);
+		AttachPowerWallUnsetHint(_tcc, _tccVal, _tccLabel);
 		_tccChk.Enabled = tuple6.Item4;
 		(int, int, int, bool) tuple8 = DeviceRange(hw?.GpuTgpMinimum ?? (-1), hw?.GpuTgpMaximum ?? (-1), hw?.GpuTgp ?? 0);
 		tuple4 = AddSliderRow(Strings.GpuTgp, tuple8.Item1, tuple8.Item2, tuple8.Item3, (int v) =>
@@ -1147,6 +1177,36 @@ public class CustomModeForm : RForm
 				row.Height = Math.Max(row.Height, combo.Height);
 			}
 		}
+		// ⭐ 未设置时给行标题追加「（未设置）」（⭐ 见 `_pl1Label` 的注释 ✅）
+		string PowerWallRowLabel(string baseText, bool unset)
+		{
+			return unset ? (baseText + UnsetMark) : baseText;
+		}
+
+		// ⭐⭐ 2026-10-16（"未设置"）：⭐ 行标题（第 0 列）—— `AddSliderRow` 把**行面板**挂在 `bar.Tag` 上 ✅
+		//   ⚠️ 故意**不改 `AddSliderRow` 的返回签名**（⭐ 它有 9 个调用点 ⚠️）⇒ ⭐ 从行面板取风险更小 ✅
+		Label RowLabelOf(RSlider bar)
+		{
+			return (bar.Tag as TableLayoutPanel)?.GetControlFromPosition(0, 0) as Label;
+		}
+
+		// ⭐⭐ 2026-10-16（"未设置"）：⭐ 把完整语义挂成悬浮提示 ✅（⭐ 零布局代价 ✅）
+		void AttachPowerWallUnsetHint(Control bar, Control val, Control label)
+		{
+			if (bar != null)
+			{
+				_tips.SetToolTip(bar, PowerWallUnsetHint);
+			}
+			if (val != null)
+			{
+				_tips.SetToolTip(val, PowerWallUnsetHint);
+			}
+			if (label != null)
+			{
+				_tips.SetToolTip(label, PowerWallUnsetHint);
+			}
+		}
+
 		(RSlider bar, RNumericUpDown valueInput) AddSliderRow(string label, int min, int max, int value2, Action<int> onChanged)
 		{
 			TableLayoutPanel tableLayoutPanel2 = MakeRow();
@@ -3668,6 +3728,25 @@ public class CustomModeForm : RForm
 		ProcessHelper.RunAsAdmin();
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"未设置"）：⭐ 该行**已下发过** ⇒ ⭐ 把标题里的「（未设置）」去掉 ✅。
+	/// <para>⚠️ <b>只减不增</b>：⭐ 标题列宽是建窗体时按**最长**标题算好的
+	/// （⭐ 见 <c>_pl1Label</c> 的注释 ⚠️）⇒ ⭐ 变短一定安全、⭐ 变长会**裁字** ❌
+	/// ⇒ ⭐ 所以这里**只移除**标记、⛔ 绝不添加（⭐ 标记只由构造期按当时状态决定 ✅）。</para>
+	/// </summary>
+	private void SyncUnsetMark(Label label, bool unset)
+	{
+		if (label == null || unset)
+		{
+			return;
+		}
+		string text = label.Text;
+		if (text != null && text.EndsWith(UnsetMark, StringComparison.Ordinal))
+		{
+			label.Text = text.Substring(0, text.Length - UnsetMark.Length);
+		}
+	}
+
 	private void OnCustomChanged()
 	{
 		try
@@ -3703,8 +3782,14 @@ public class CustomModeForm : RForm
 			{
 				ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1);
 				ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2);
+				// ⭐⭐ 2026-10-16（"未设置"）：⭐ 值一旦下发过 ⇒ ⭐ 把标题里的「（未设置）」**去掉** ✅
+				//   ⚠️ **只减不增** —— ⭐ 标题列宽是**建窗体时**按最长标题算好的（⭐ 见 `_pl1Label` 的注释 ⚠️）
+				//      ⇒ ⭐ 变短安全、⛔ 变长会裁字 ⇒ ⭐ 本方法只允许移除标记、⛔ 绝不添加 ✅
+				SyncUnsetMark(_pl1Label, hw.BaolongdaPl1Unset);
+				SyncUnsetMark(_pl2Label, hw.BaolongdaPl2Unset);
 				ApplyRange(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, hw.Pl4);
 				bool flag = ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, hw.TccTarget);
+				SyncUnsetMark(_tccLabel, hw.BaolongdaTempWallUnset);
 				bool enabled = ApplyRange(_tgp, _tgpVal, hw.GpuTgpMinimum, hw.GpuTgpMaximum, hw.GpuTgp);
 				bool flag2 = ApplyRange(_db, _dbVal, hw.GpuDbMinimum, hw.GpuDbMaximum, hw.GpuDb);
 				bool supportsGpuOverclock = hw.SupportsGpuOverclock;
