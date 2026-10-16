@@ -419,9 +419,24 @@ internal static class DiagnosticBaolongdaInfo
 	//     ⛔ 既不引入 WinRing0（签名 2007–2014 已过期 ＋ 在微软易受攻击驱动列表里）
 	//     ⛔ 也不引入 inpoutx64（许可只自由用于个人/非商业）✅。
 	//   ⛔ **全程只读**：只发 0x92 读命令 · ⛔ 绝不发 0x93 写 · ⛔ 不改任何寄存器 ✅（限充仍【暂缓】）。
-	//   ⭐ 与 ②b 的**关键差别**：端口通道**会超时**（等 IBF/OBF 超过 250ms 即失败并置「中毒」），
+	//   ⭐ 与 ②b 的**关键差别**：端口通道**会超时**（等 IBF/OBF 超过 250ms 即失败），
 	//     ⇒ ⭐ 它能**明确区分**「地址不可达」与「通道根本不通」；
 	//       而 ②b 那条 H2RAM 通道对窗口外地址**静默回填充值**、两种失败长得一模一样 ⚠️。
+	//
+	// ⭐⭐ 2026-10-16 修正（⭐ **真机实测暴露的两个设计缺陷** · 诊断包 …-233138）：
+	//   实测原文：0x8410 ✅ 0xAE · 0x8411 ✅ 0x13 · 0x8412 ✅ 0x00 · 0x8413 ⛔（等 OBF 超时）
+	//             ⇒ ⭐ 通道**立刻全局中毒** ⇒ ⭐ SOC / 模式两条交叉校验**全部丢失** ⚠️
+	//   ⚠️ 注意：前三个字节**值各不相同、且非全 0xFF** ⇒ ⭐ 端口通道机制**确实在工作** ✅
+	//      （对照 ②b：那条 H2RAM 通读回来四个全 0xFF = 未映射填充值 ⚠️）
+	//
+	//   缺陷①（**读取顺序**）：交叉校验（SOC / 模式）才是**最有价值**的判据 ——
+	//     ⭐ 版本号可能是任意数据，而 **SOC 必须 0~100、模式必须 0/2/0x48**；
+	//     这两个对不上就说明**地址映射根本没对**，版本号再「合理」也不能当真 ⚠️
+	//     ⇒ ⭐ **改为先读交叉校验、再读版本号** ✅（这样即使后面某个字节超时，最关键证据也已到手 ✅）
+	//   缺陷②（**中毒条件**）：⭐ **读是安全操作**，不该因一个地址超时就让整节失效 ⚠️
+	//     ⇒ ⭐ 读软失败**只标记该地址失败、继续读后面的**；连续读失败达
+	//       <see cref="EcPortIo.MaxConsecutiveReadFailures"/> 次才升级为全局中毒 ✅
+	//     ⇒ ⚠️ 写路径 / 白名单违规 / 异常 ⇒ **仍立即中毒**（保守，护栏不动）✅
 	private static void AppendEcPortIoProbe(StringBuilder sb)
 	{
 		sb.AppendLine();
@@ -434,37 +449,69 @@ internal static class DiagnosticBaolongdaInfo
 		sb.AppendLine("   ⭐ 模块本身**只放行端口 0x62/0x66**，超出即拒绝 ✅");
 		sb.AppendLine("⛔ 全程只读：只发 0x92 读命令 · ⛔ 绝不发 0x93 写 · ⛔ 不改任何寄存器 ✅");
 		sb.AppendLine();
+		sb.AppendLine("⭐⭐ **读取顺序（2026-10-16 修正）**：⭐ **先读交叉校验（SOC / 模式）、再读版本号** ⚠️");
+		sb.AppendLine("   理由：⭐ 版本号可能是任意数据，而 **SOC 必须落在 0~100、模式必须是 0/2/0x48** ——");
+		sb.AppendLine("   这两个才是「**是不是真的在跟一颗 IT5570 对话**」的判据 ⇒ ⭐ 最有价值、必须最先拿到 ✅");
+		sb.AppendLine("   ⚠️ 原顺序把版本号放前面：实测第 4 个版本字节超时后，两条交叉校验**全部丢失** —— 已修正 ✅");
+		sb.AppendLine("⭐⭐ **中毒条件（2026-10-16 修正）**：⭐ 读的软失败**只标记该地址、继续读后面的** ✅");
+		sb.AppendLine("   （⭐ 连续读失败达 " + EcPortIo.MaxConsecutiveReadFailures
+			+ " 次才升级为全局中毒 ⇒ ⭐ 未达上限说明只是**个别地址**不响应，⛔ 不是通道坏了 ✅）");
+		sb.AppendLine("   ⚠️ 写路径 / 白名单违规 / 异常 ⇒ **仍立即中毒**（保守，护栏不动）✅");
+		sb.AppendLine("⭐⭐ **第 4 字节「间歇超时」的排查结论（2026-10-16 A/B 实测）**：");
+		sb.AppendLine("   ⚠️ 曾怀疑「背靠背连发导致命令被丢弃」（ACPI 规范确有事务间隔要求）⇒ ⭐ 于是做了 A/B：");
+		sb.AppendLine("      · 加 5ms 间隔：4 字节全读到 ✅（1 次）");
+		sb.AppendLine("      · 不加间隔：4 字节全读到 ✅（2 次）· 第 4 字节超时 ⛔（1 次）");
+		sb.AppendLine("   ⇒ ⭐ **加不加都会间歇性超时** ⇒ ⭐ 延迟**不是**成因、也**不是**有效缓解");
+		sb.AppendLine("      ⇒ ⛔ **未采用**该缓解（当前事务间隔 = " + EcPortIo.InterTransactionDelayMs + "ms ⇒ 即**不做额外等待**）");
+		sb.AppendLine("   ⭐ 决定性旁证：**超时那一刻 `0x66` 的状态字节 = `0x00`（OBF=0 且 IBF=0）**");
+		sb.AppendLine("      ⇒ ⭐ **EC 已取走我们写入的字节（IBF 已清），只是没给出数据字节（OBF 从未置位）**");
+		sb.AppendLine("      ⇒ ⭐ 这是「**EC 未在 " + EcPortIo.TimeoutMs + "ms 内应答**」的签名，⛔ 不是「命令被丢弃」的签名 ⚠️");
+		sb.AppendLine("   ⇒ ⭐ 故**不改**超时逻辑；⭐ 真正的保障是上面的**分级中毒**：");
+		sb.AppendLine("      即使某地址超时，⭐ 交叉校验也已先拿到、且**不会作废整节** ✅");
+		sb.AppendLine("   ⚠️ 若在蛟龙真机上仍复现 ⇒ ⭐ 候选方向是**放长超时**（" + EcPortIo.TimeoutMs + "→500ms）或该地址未实现；");
+		sb.AppendLine("      ⚠️ 两者都要**真机再加证据**，⛔ 不在这里猜 ⚠️");
+		sb.AppendLine();
 		try
 		{
-			sb.AppendLine("PawnIO 驱动 = " + EcPortIo.DescribePawnInstalled());
+			// ⭐ 局部函数：把「读到 / 读不到」写成一行，供下面两处复用 ✅
+			static string DescribeRead(bool ok, int value)
+			{
+				return ok ? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(value)) : "⛔ 读不到";
+			}
 
-			// ① 读 EC 版本 4 字节（XRAM 0x8410~0x8413）
+			sb.AppendLine("PawnIO 驱动 = " + EcPortIo.DescribePawnInstalled());
+			sb.AppendLine();
+
+			// ── ① 交叉校验读（**最先**，见上面的顺序说明）──
+			sb.AppendLine("① **交叉校验**（⭐ 先读：它才是「地址映射对不对」的判据 ✅）");
+			bool socOk = EcPortIo.TryReadByte(0x847C, out int soc);
+			sb.AppendLine("   0x847C（SOC，合理区间 0~100）= " + DescribeRead(socOk, soc)
+				+ (socOk
+					? ((soc >= 0 && soc <= 100) ? " ⇒ ✅ **在合理区间**" : " ⇒ ⚠️ **超出合理区间**（地址映射可疑）")
+					: ("　（原因：" + EcPortIo.LastReadFailure + "）")));
+			bool modeOk = EcPortIo.TryReadByte(0x83C0, out int mode);
+			sb.AppendLine("   0x83C0（模式，合理值 0/2/0x48）= " + DescribeRead(modeOk, mode)
+				+ (modeOk
+					? ((mode == 0 || mode == 2 || mode == 0x48) ? " ⇒ ✅ **命中合理值**" : " ⇒ ⚠️ **未命中合理值**（地址映射可疑）")
+					: ("　（原因：" + EcPortIo.LastReadFailure + "）")));
+			bool mappingConfirmed = socOk && soc >= 0 && soc <= 100
+				&& modeOk && (mode == 0 || mode == 2 || mode == 0x48);
+			sb.AppendLine("   ⇒ **地址映射判据** = " + (mappingConfirmed
+				? "✅ **已确认**（SOC 与模式双双落在合理值内 ⇒ ⭐ 确实在与 EC 对话 ✅）"
+				: "⚠️ **未确认** ⇒ ⭐ 下面即使读到「看似合理」的版本号，也**不能当真** ⚠️"));
+			sb.AppendLine();
+
+			// ── ② 再读 EC 版本 4 字节（XRAM 0x8410~0x8413）──
+			sb.AppendLine("② **EC 版本**（XRAM 0x8410~0x8413）");
 			int[] version = new int[4];
-			EcPortIo.TryReadBytes(EcChargeLimit.XramEcVersionRegister, 4, out version);
+			int okCount = 0;
+			int ffCount = 0;
 			for (int i = 0; i < version.Length; i++)
 			{
 				int addr = EcChargeLimit.XramEcVersionRegister + i;
-				sb.AppendLine("试读 XRAM 0x" + addr.ToString("X4") + " = "
-					+ ((version[i] >= 0) ? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(version[i])) : "⛔ 读不到"));
-			}
-
-			// ② 交叉校验读（⭐ 作用：判断「是不是真的在跟一颗 IT5570 对话」，而不只是「调用没报错」⚠️）
-			bool socOk = EcPortIo.TryReadByte(0x847C, out int soc);
-			sb.AppendLine("交叉校验 · XRAM 0x847C（SOC，合理区间 0~100）= "
-				+ (socOk ? ("✅ 读得 " + soc + ((soc < 0 || soc > 100) ? " ⚠️ 超出合理区间" : " ✅ 在合理区间")) : "⛔ 读不到"));
-			bool modeOk = EcPortIo.TryReadByte(0x83C0, out int mode);
-			sb.AppendLine("交叉校验 · XRAM 0x83C0（模式，合理值 0/2/0x48）= "
-				+ (modeOk ? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(mode)) : "⛔ 读不到"));
-
-			sb.AppendLine("通道 = " + EcPortIo.DescribeChannel());
-			sb.AppendLine();
-
-			// ③ 结论 —— ⚠️ 判据是「值本身合理」，⛔ 不是「调用没报错」（⭐ 这正是 ②b 得到的教训 ✅）
-			int okCount = 0;
-			int ffCount = 0;
-			foreach (int v in version)
-			{
-				if (v >= 0)
+				bool ok = EcPortIo.TryReadByte(addr, out int v);
+				version[i] = (ok ? v : (-1));
+				if (ok)
 				{
 					okCount++;
 					if (v == 0xFF)
@@ -472,9 +519,38 @@ internal static class DiagnosticBaolongdaInfo
 						ffCount++;
 					}
 				}
+				sb.AppendLine("   0x" + addr.ToString("X4") + " = " + DescribeRead(ok, v)
+					+ (ok ? "" : ("　（原因：" + EcPortIo.LastReadFailure + "）")));
 			}
+			sb.AppendLine();
+
+			sb.AppendLine("通道 = " + EcPortIo.DescribeChannel());
+			int lastStatus = EcPortIo.LastStatusSeen;
+			if (lastStatus >= 0)
+			{
+				sb.AppendLine("   最近一次 0x66 状态字节 = " + ChargeLimitEcProbe.FormatRaw(lastStatus)
+					+ "（bit0=OBF「EC 已给出可读字节」· bit1=IBF「EC 未取走我们写入的字节」）");
+				sb.AppendLine("   ⭐ 用途：把「EC 根本不响应」与「EC 卡住不取走」分开 ✅");
+			}
+			sb.AppendLine();
+
+			// ── ③ 结论 —— ⭐ **先看地址映射是否确认、再看版本号** ⚠️
+			//    判据是「**值本身合理**」，⛔ 不是「调用没报错」（⭐ 这正是 ②b 得到的教训 ✅）
 			bool allFf = okCount == 4 && ffCount == 4;
-			if (okCount == 4 && !allFf)
+			if (!mappingConfirmed)
+			{
+				sb.AppendLine("结论 = ⚠️ **地址映射未确认** ⇒ ⭐ 本节的版本号**不足以判定 EC 版本** ⚠️");
+				sb.AppendLine("   ⇒ 判据是**值本身合理**（SOC 0~100 · 模式 0/2/0x48），⛔ 不是「调用没报错」");
+				sb.AppendLine("      —— ⭐ 这正是 ②b 那条「全 0xFF 填充值」教训的延伸 ✅");
+				if (okCount > 0)
+				{
+					sb.AppendLine("   ⇒ ⚠️ 但版本字节读到了 " + okCount + "/4（值见上）⇒ ⭐ **端口通道机制是工作的** ✅；");
+					sb.AppendLine("      只是**该机的 XRAM 布局与本节的假设不一致** ⚠️");
+					sb.AppendLine("      （⭐ 本机是同方翼龙15Pro · EC 未必是蛟龙的 IT5570 ⇒ ⭐ 对本机而言这可能是**正常**结果 ✅）");
+				}
+				sb.AppendLine("   ⇒ ⭐ **请以蛟龙（宝龙达）真机的结果为准** ✅");
+			}
+			else if (okCount == 4 && !allFf)
 			{
 				StringBuilder ver = new StringBuilder();
 				for (int i = 0; i < version.Length; i++)
@@ -485,31 +561,27 @@ internal static class DiagnosticBaolongdaInfo
 					}
 					ver.Append(version[i].ToString("X2"));
 				}
-				sb.AppendLine("结论 = ✅ **EC 版本可读（端口通道）** ⇒ EC 版本 = " + ver);
+				sb.AppendLine("结论 = ✅ **地址映射已确认 ＋ EC 版本可读（端口通道）** ⇒ EC 版本 = " + ver);
 				if (ffCount > 0)
 				{
-					sb.AppendLine("   ⚠️ 但其中有 " + ffCount + " 个字节是 0xFF ⇒ 疑似填充值混入，⭐ 请以**原始字节**为准 ⚠️");
+					sb.AppendLine("   ⚠️ 但其中有 " + ffCount + " 个字节是 0xFF ⇒ ⭐ 请以**原始字节**为准 ⚠️");
 				}
 				sb.AppendLine("   ⇒ ⭐ 这正是 ②b 那条 H2RAM 通道**读不到**的东西 ⇒ ⭐ **端口通道是有效通路** ✅");
+				sb.AppendLine("   ⚠️ 版本号口径提醒：⭐ 以**真机读数**为准 —— 那个开源项目实测记 `00.21`、");
+				sb.AppendLine("      README 却写 `00.28`、脚本支持列表里连 `00.21` 都没有 ⇒ ⛔ 别只认某一个版本 ⚠️");
 			}
 			else if (allFf)
 			{
-				sb.AppendLine("结论 = ⚠️ **端口通道通了、但四个字节全是 0xFF** ⚠️");
-				sb.AppendLine("   ⇒ ⭐ 说明**端口读写机制本身是工作的**（没有超时、没中毒）✅");
-				sb.AppendLine("   ⇒ 但该地址**读不到真实版本**，两种可能：");
-				sb.AppendLine("      ① 本机 EC **不是 IT5570**（⚠️ 本机是同方翼龙15Pro，蛟龙才是 IT5570）");
-				sb.AppendLine("         ⇒ ⭐ 该 XRAM 地址在本机**未映射**（对本机而言这是**正常**结果、⛔ 不是故障）");
-				sb.AppendLine("      ② 该地址真实值就是 0xFF（⚠️ 四个字节全 FF 不像版本号）");
+				sb.AppendLine("结论 = ⚠️ **地址映射已确认、但四个版本字节全是 0xFF** ⚠️");
+				sb.AppendLine("   ⇒ ⭐ 说明**端口读写机制与地址映射都是工作的**（SOC/模式已落在合理值内）✅");
+				sb.AppendLine("   ⇒ 但 0x8410~0x8413 在该机**读不到真实版本**（该固件未实现该处、或值本就是 FF）");
 				sb.AppendLine("   ⇒ ⭐ 请以**蛟龙（宝龙达）真机**的结果为准 ✅");
-				if (socOk && soc >= 0 && soc <= 100)
-				{
-					sb.AppendLine("   ⚠️ 但交叉校验读到了**合理**的 SOC（" + soc + "）⇒ ⭐ 该机地址映射可能**部分可用**，");
-					sb.AppendLine("      建议把本节输出整段发回 ⚠️");
-				}
 			}
 			else if (okCount > 0)
 			{
 				sb.AppendLine("结论 = ⚠️ **部分可读（" + okCount + "/4 字节）** ⇒ 版本号无法可靠解析，请以上面原始字节为准 ⚠️");
+				sb.AppendLine("   ⭐ 未读到的字节见上面的「原因：」—— ⭐ 它**不影响**已读到的字节、也**不影响**交叉校验 ✅");
+				sb.AppendLine("      （⭐ 这正是本次修正的目的：⛔ 不再让一个地址超时就作废整节 ⚠️）");
 			}
 			else
 			{

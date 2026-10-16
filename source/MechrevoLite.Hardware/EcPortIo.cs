@@ -48,7 +48,7 @@ internal static class EcPortIo
 
 	private const byte StatusIbf = 2;  // Input Buffer Full：EC 尚未取走我们写入的字节
 
-	private const int TimeoutMs = 250; // 照开源实现（250ms 超时、不做 flush/retry）
+	internal const int TimeoutMs = 250; // 照开源实现（250ms 超时、不做 flush/retry）
 
 	private const string ModuleResourceName = "LMechrevo.LpcACPIEC.bin";
 
@@ -67,6 +67,42 @@ internal static class EcPortIo
 	private static string _poisonReason = "";
 
 	private static int _ioCount;
+
+	// ── 读失败的分级处理（2026-10-16 修正）──
+	//  ⚠️ 原实现「**任何**超时/异常都立即全局中毒」经**真机实测暴露缺陷** ⚠️：
+	//    本机 ②d 实测（诊断包 …-233138）：0x8410/0x8411/0x8412 **三字节成功**（0xAE/0x13/0x00，
+	//    值各不相同 ⇒ ⭐ 端口通道机制**确实在工作** ✅），而第 4 字节 0x8413 等 OBF 超时
+	//    ⇒ ⭐ 立刻全局中毒 ⇒ ⭐ 后面 SOC / 模式两条**最有价值的交叉校验全部丢失** ⚠️。
+	//  ⇒ ⭐ 代价过大：**读是安全操作**（Poisoned 机制的初衷是防「盲目重试**写**」造成损害）✅
+	//  ⇒ 改为**分级**：
+	//    ① 读路径**软失败**（超时 / Execute 返回 false）⇒ ⭐ 只标记该地址失败、**继续读后面的** ✅，
+	//       并累计「连续读失败」；达到 <see cref="MaxConsecutiveReadFailures"/> 才升级为全局中毒
+	//       （⭐ 防止通道真坏时无休止地试 ✅）
+	//    ② 写路径失败 / 白名单违规 / 异常 ⇒ ⭐ **仍立即中毒**（保守，护栏不动）⚠️
+	internal const int MaxConsecutiveReadFailures = 3;
+
+	// ── 事务间隔（⭐ 机制保留、**当前置 0 未启用** —— 见下方 A/B 实测结论）──
+	//  ⚠️ 曾据 ACPI 规范（`ACPI_EC_DELAY`）猜测「背靠背连发导致命令被丢弃」，
+	//    但 2026-10-16 **A/B 实测否定了这个猜测** ⚠️：
+	//      · delay=5ms：4 字节全读到 ✅（1 次）
+	//      · delay=0ms：4 字节全读到 ✅（2 次）、第 4 字节超时 ⛔（1 次）
+	//    ⇒ ⭐ **加不加延迟都会间歇性超时** ⇒ ⭐ 延迟**不是**该超时的成因、也**不是**有效缓解 ⚠️
+	//  ⭐ 更关键的旁证：超时那一刻 `0x66` 的状态字节 = `0x00`（OBF=0 且 IBF=0）
+	//    ⇒ ⭐ **EC 已取走我们写入的字节（IBF 已清），只是没给出数据字节（OBF 从未置位）**
+	//    ⇒ ⭐ 这是「**EC 未在 250ms 内应答**」的签名，⛔ 不是「命令被丢弃」的签名 ⚠️
+	//  ⇒ 故**不采用**延迟缓解（⛔ 不引入无依据的等待）；
+	//    ⭐ 真正的保障是**分级中毒**：即使超时，⭐ 交叉校验也已先拿到、且不会作废整节 ✅
+	//  ⚠️ 若在蛟龙真机上仍复现，候选方向是**放长 <see cref="TimeoutMs"/>**（250→500ms），
+	//    或该地址本就未实现 —— 两者都要**真机再加证据**，⛔ 不在这里猜 ⚠️
+	internal const int InterTransactionDelayMs = 0;
+
+	private static int _consecutiveReadFailures;
+
+	private static string _lastReadFailure = "";
+
+	private static string _pendingSoftFailure = "";
+
+	private static int _lastStatusSeen = -1;
 
 	/// <summary>是否已中毒。中毒后拒绝一切 I/O（<b>失败不自动恢复</b>，保留现场）。</summary>
 	internal static bool IsPoisoned
@@ -97,7 +133,14 @@ internal static class EcPortIo
 			{
 				return "⛔ 模块未装载（" + _loadFailure + "）";
 			}
-			return "✅ 模块已装载（LpcACPIEC · 端口白名单仅 0x62/0x66）· 已发端口 I/O " + _ioCount + " 次";
+			string text = "✅ 模块已装载（LpcACPIEC · 端口白名单仅 0x62/0x66）· 已发端口 I/O " + _ioCount + " 次";
+			if (_consecutiveReadFailures > 0)
+			{
+				text = text + " · ⚠️ 当前已**连续读失败** " + _consecutiveReadFailures + "/" + MaxConsecutiveReadFailures
+					+ " 次（⭐ 达到 " + MaxConsecutiveReadFailures + " 次才升级为全局中毒 ⇒ ⭐ 读到 " + MaxConsecutiveReadFailures
+					+ " 次仍失败说明通道确实坏了；未达上限说明只是**个别地址**不响应 ✅）";
+			}
+			return text;
 		}
 	}
 
@@ -132,10 +175,14 @@ internal static class EcPortIo
 		{
 			if (_poisoned)
 			{
+				// ⭐ 让诊断能拿到「为什么读不到」——已中毒时后续每读都拒，如实落因 ✅
+				_lastReadFailure = "通道已中毒：" + _poisonReason;
 				return false;
 			}
 			if (!EnsureModule())
 			{
+				// ⭐ 同上：模块未装载时后续每读必失败，把装载失败原因落到 _lastReadFailure ✅
+				_lastReadFailure = "模块未装载：" + _loadFailure;
 				return false;
 			}
 			if (!TryEnterEcMutex(out Mutex mutex, out bool held))
@@ -145,10 +192,15 @@ internal static class EcPortIo
 			}
 			try
 			{
-				return ReadByteCore(address, out value);
+				bool ok = ReadByteCore(address, out value);
+				// ⭐ 分级收尾：软失败只累计「连续读失败」计数（原因已由等待/端口层记入 _pendingSoftFailure）；
+				//    ⚠️ 硬失败（白名单违规 / 异常 / 写路径）已直接中毒，此处不会再计数 ✅
+				NoteReadOutcome(ok);
+				return ok;
 			}
 			catch (Exception ex)
 			{
+				// ⚠️ 异常仍**立即**中毒（保守，护栏不动）
 				Poison("读 0x" + address.ToString("X4") + " 抛异常：" + ex.GetType().Name);
 				return false;
 			}
@@ -228,15 +280,16 @@ internal static class EcPortIo
 	private static bool ReadByteCore(int address, out int value)
 	{
 		value = -1;
-		if (!WriteCommand(EcCmdRead))
+		SettleBeforeTransaction();
+		if (!WriteCommand(EcCmdRead, IoKind.Read))
 		{
 			return false;
 		}
-		if (!WriteData((byte)((address >> 8) & 0xFF)))
+		if (!WriteData((byte)((address >> 8) & 0xFF), IoKind.Read))
 		{
 			return false;
 		}
-		if (!WriteData((byte)(address & 0xFF)))
+		if (!WriteData((byte)(address & 0xFF), IoKind.Read))
 		{
 			return false;
 		}
@@ -250,78 +303,77 @@ internal static class EcPortIo
 
 	private static bool WriteByteCore(int address, int value)
 	{
-		if (!WriteCommand(EcCmdWrite))
+		SettleBeforeTransaction();
+		if (!WriteCommand(EcCmdWrite, IoKind.Write))
 		{
 			return false;
 		}
-		if (!WriteData((byte)((address >> 8) & 0xFF)))
+		if (!WriteData((byte)((address >> 8) & 0xFF), IoKind.Write))
 		{
 			return false;
 		}
-		if (!WriteData((byte)(address & 0xFF)))
+		if (!WriteData((byte)(address & 0xFF), IoKind.Write))
 		{
 			return false;
 		}
-		return WriteData((byte)(value & 0xFF));
+		return WriteData((byte)(value & 0xFF), IoKind.Write);
 	}
 
 	/// <summary>向 0x66 发命令（先等 IBF 清空）。<paramref name="command"/> 受命令白名单约束。</summary>
-	private static bool WriteCommand(byte command)
+	private static bool WriteCommand(byte command, IoKind kind)
 	{
 		if (command != EcCmdRead && command != EcCmdWrite)
 		{
 			Poison("命令 0x" + command.ToString("X2") + " 不在白名单（只允许 0x92/0x93）");
 			return false;
 		}
-		if (!WaitIbfClear())
+		if (!WaitIbfClear(kind))
 		{
 			return false;
 		}
-		if (!PortOut(PortStatus, command))
-		{
-			return false;
-		}
-		return true;
+		return PortOut(PortStatus, command, kind);
 	}
 
 	/// <summary>向 0x62 写一个数据字节（先等 IBF 清空）。</summary>
-	private static bool WriteData(byte data)
+	private static bool WriteData(byte data, IoKind kind)
 	{
-		if (!WaitIbfClear())
+		if (!WaitIbfClear(kind))
 		{
 			return false;
 		}
-		return PortOut(PortData, data);
+		return PortOut(PortData, data, kind);
 	}
 
 	/// <summary>从 0x62 读一个数据字节（先等 OBF 置位）。</summary>
 	private static bool ReadData(out byte data)
 	{
 		data = 0;
-		if (!WaitObfSet())
+		if (!WaitObfSet(IoKind.Read))
 		{
 			return false;
 		}
-		return PortIn(PortData, out data);
+		return PortIn(PortData, out data, IoKind.Read);
 	}
 
 	/// <summary>轮询 0x66 直到 IBF（bit1）为 0，即 EC 已取走我们上一次写入的字节。</summary>
-	private static bool WaitIbfClear()
+	private static bool WaitIbfClear(IoKind kind)
 	{
 		long deadline = Environment.TickCount64 + TimeoutMs;
 		while (true)
 		{
-			if (!PortIn(PortStatus, out byte status))
+			if (!PortIn(PortStatus, out byte status, kind))
 			{
 				return false;
 			}
+			_lastStatusSeen = status;
 			if ((status & StatusIbf) == 0)
 			{
 				return true;
 			}
 			if (Environment.TickCount64 >= deadline)
 			{
-				Poison("等 IBF 清空超时（" + TimeoutMs + "ms）");
+				ReportSoftFailure(kind, "等 IBF 清空超时（" + TimeoutMs + "ms · 最后状态 = 0x"
+					+ status.ToString("X2") + " ⇒ EC 未取走我们写入的字节）");
 				return false;
 			}
 			Thread.Sleep(1);
@@ -329,22 +381,24 @@ internal static class EcPortIo
 	}
 
 	/// <summary>轮询 0x66 直到 OBF（bit0）为 1，即 EC 已准备好一个可读字节。</summary>
-	private static bool WaitObfSet()
+	private static bool WaitObfSet(IoKind kind)
 	{
 		long deadline = Environment.TickCount64 + TimeoutMs;
 		while (true)
 		{
-			if (!PortIn(PortStatus, out byte status))
+			if (!PortIn(PortStatus, out byte status, kind))
 			{
 				return false;
 			}
+			_lastStatusSeen = status;
 			if ((status & StatusObf) != 0)
 			{
 				return true;
 			}
 			if (Environment.TickCount64 >= deadline)
 			{
-				Poison("等 OBF 置位超时（" + TimeoutMs + "ms）");
+				ReportSoftFailure(kind, "等 OBF 置位超时（" + TimeoutMs + "ms · 最后状态 = 0x"
+					+ status.ToString("X2") + " ⇒ EC 未给出可读字节）");
 				return false;
 			}
 			Thread.Sleep(1);
@@ -352,11 +406,12 @@ internal static class EcPortIo
 	}
 
 	/// <summary>读一个端口字节（白名单双重校验：即便模块已限制，这里再挡一次）。</summary>
-	private static bool PortIn(ushort port, out byte value)
+	private static bool PortIn(ushort port, out byte value, IoKind kind)
 	{
 		value = 0;
 		if (!IsPortAllowed(port))
 		{
+			// ⚠️ 白名单违规是**硬失败**（代码缺陷/越界）⇒ 立即中毒，与读写路径无关
 			Poison("端口 0x" + port.ToString("X2") + " 不在白名单（只允许 0x62/0x66）");
 			return false;
 		}
@@ -365,6 +420,7 @@ internal static class EcPortIo
 			ulong[] output = new ulong[1];
 			if (!_pawn.Execute("ioctl_pio_read", new ulong[1] { port }, output))
 			{
+				ReportSoftFailure(kind, "端口读 0x" + port.ToString("X2") + " 失败（Execute 返回 false）");
 				return false;
 			}
 			_ioCount++;
@@ -373,13 +429,14 @@ internal static class EcPortIo
 		}
 		catch (Exception ex)
 		{
+			// ⚠️ 异常是**硬失败** ⇒ 立即中毒
 			Poison("端口读 0x" + port.ToString("X2") + " 抛异常：" + ex.GetType().Name);
 			return false;
 		}
 	}
 
 	/// <summary>写一个端口字节（白名单双重校验）。</summary>
-	private static bool PortOut(ushort port, byte value)
+	private static bool PortOut(ushort port, byte value, IoKind kind)
 	{
 		if (!IsPortAllowed(port))
 		{
@@ -394,6 +451,7 @@ internal static class EcPortIo
 				value
 			}, null))
 			{
+				ReportSoftFailure(kind, "端口写 0x" + port.ToString("X2") + " 失败（Execute 返回 false）");
 				return false;
 			}
 			_ioCount++;
@@ -516,6 +574,99 @@ internal static class EcPortIo
 		}
 		catch (Exception)
 		{
+		}
+	}
+
+	// ── 失败分级 / 供诊断的只读视图（2026-10-16）──
+
+	/// <summary>端口 I/O 所属的**事务类型** —— 决定失败时是「只计数」还是「立即中毒」。</summary>
+	private enum IoKind
+	{
+		/// <summary>读事务（⭐ 安全：软失败只累计计数，达到上限才升级为全局中毒）。</summary>
+		Read,
+
+		/// <summary>写事务（⚠️ 危险：任何软失败立即中毒）。</summary>
+		Write
+	}
+
+	/// <summary>软失败上报：读 ⇒ 只记录原因（由连续失败计数决定是否升级）；写 ⇒ 立即中毒。</summary>
+	private static void ReportSoftFailure(IoKind kind, string reason)
+	{
+		if (kind == IoKind.Write)
+		{
+			Poison("写路径 · " + reason);
+		}
+		else
+		{
+			_pendingSoftFailure = reason;
+		}
+	}
+
+	/// <summary>读事务收尾：成功清零计数；软失败累计，达到上限才升级为全局中毒。</summary>
+	private static void NoteReadOutcome(bool ok)
+	{
+		if (ok)
+		{
+			_consecutiveReadFailures = 0;
+			_lastReadFailure = "";
+			_pendingSoftFailure = "";
+			return;
+		}
+		if (_poisoned)
+		{
+			// ⚠️ 硬失败（白名单违规 / 异常）已直接中毒 ⇒ 不必再计数
+			return;
+		}
+		_consecutiveReadFailures++;
+		_lastReadFailure = ((_pendingSoftFailure.Length > 0) ? _pendingSoftFailure : "读失败（未记录具体原因）");
+		_pendingSoftFailure = "";
+		if (_consecutiveReadFailures >= MaxConsecutiveReadFailures)
+		{
+			Poison("连续读失败 " + _consecutiveReadFailures + " 次（最后一次：" + _lastReadFailure + "）");
+		}
+	}
+
+	/// <summary>
+	/// 事务开始前的**可选**间隔（见 <see cref="InterTransactionDelayMs"/> 的说明）。
+	/// ⭐ 当前该常量为 0 ⇒ **直接返回、不做任何等待**（2026-10-16 A/B 实测证明该延迟无益）✅
+	/// 保留此机制是为了将来在**真机证据**支持下可以只改一个数字重新启用。绝不抛出。
+	/// </summary>
+	private static void SettleBeforeTransaction()
+	{
+		if (InterTransactionDelayMs <= 0)
+		{
+			return;
+		}
+		try
+		{
+			Thread.Sleep(InterTransactionDelayMs);
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	/// <summary>供诊断：最近一次读失败的原因（成功会清空）⭐ 用于如实标注「哪个地址为何失败」。</summary>
+	internal static string LastReadFailure
+	{
+		get
+		{
+			lock (Gate)
+			{
+				return _lastReadFailure;
+			}
+		}
+	}
+
+	/// <summary>供诊断：最近一次在 0x66 上看到的状态字节（-1 = 尚未读过）。</summary>
+	internal static int LastStatusSeen
+	{
+		get
+		{
+			lock (Gate)
+			{
+				return _lastStatusSeen;
+			}
 		}
 	}
 
