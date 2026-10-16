@@ -12,6 +12,19 @@
 //    ⭐ ④ ⭐ **`\\.\ACPIDriver` 只读探测**（⭐ 判断限充那条 EC 通道在不在 ✅）
 //    ⭐ ⑤ ⭐ **HID 事件如实说明**（⭐ 我们**没实现** ✅ —— ⭐ ⛔ 不假装 ✅）
 //
+// ⭐ 2026-10-16 追加（⭐ 用户批准：「⭐ 先把诊断功能加入EC版本的读取 ⭐ 限制充电暂缓」✅）：
+//    ⭐ ②b ⭐ **EC 版本只读试读**（⭐ XRAM `0x8410~0x8413` ✅）—— ⭐ 限充调研确认「蛟龙上能做限充」，
+//       但**只核对过 EC `00.28.00.00` 这一个版本** ⚠️，而 XRAM 地址会随固件重构变化 ⇒ 做限充前先核对版本 ✅
+//       ⚠️ `0x8410` 属 **XRAM**，与既有 H2RAM `0x700–0x7FF` 是**两套地址空间** ⇒ 本节**实测它读不读得到** ✅
+//       ⭐ 且**用一条对照读**（H2RAM 已知可读的门控 `0x07C3`）把「通道不通」与「地址不可达」分开 ⚠️
+//    ⭐ ②c ⭐ **`AcpiTest_MULong` 探索结论**（⭐ 架构表里「Legacy Tongfang Mulong」那条免驱 WMI ✅）——
+//       ⚠️ 本机实测（2026-10-16 实跑）：**类存在、实例数 = 10** ⚠️ ——
+//          ⛔ 而 `Get-CimInstance` 口径查不到任何实例 ⇒ ⭐ **那个口径是假否定、不能用** ⚠️（本段改用 `ManagementObjectSearcher` ✅）
+//       ⇒ ⭐ 但**仍不可用**：⭐ 它的方法签名（GetULong/SetULong/FireULong/GetSetULong/GetButton）
+//          **没有「地址＋值」结构** ⇒ ⭐ 那是 ACPI **通用测试钩子**、⛔ 不是 EC 读写接口 ✅
+//       ⚠️ 其中 `FireULong(Hack)` 是**有副作用**的钩子 ⇒ ⛔ 绝不能调用 ✅
+//    ⚠️ 以上两项**全程只读**：⛔ 不写任何寄存器、⛔ 不改限充行为（⭐ 限充当前【暂缓】✅）
+//
 // ⚠️⚠️ **隐私**：⭐ 本段 ⛔ **不含**序列号 / ⭐ 用户名 / ⭐ 机器名 / ⭐ MAC ✅
 //    ⭐ 只含 ⭐ 主板型号（⭐ 它已在诊断包里用于机型判定 ✅）
 //
@@ -43,6 +56,7 @@ internal static class DiagnosticBaolongdaInfo
 			AppendWhitelist(sb);
 			AppendWmiClassProbe(sb);
 			AppendDriverProbe(sb);
+			AppendEcVersionProbe(sb);
 			AppendFunctionProbe(sb);
 			AppendHidNote(sb);
 		}
@@ -231,6 +245,166 @@ internal static class DiagnosticBaolongdaInfo
 		sb.AppendLine("⭐ 说明：⭐ 设备对象那条路径用 `File.Exists` 查不到是**正常**的 ✅"
 			+ "（⭐ 它要走 `CreateFile` 打开 ✅）⇒ ⭐ 限充到底可不可用，"
 			+ "⭐ 以设置页「限充」那一项**能不能点**、⭐ 以及运行日志里 `EcChargeLimit` 的探测行为为准 ✅");
+	}
+
+	// ── ②b EC 版本（XRAM 0x8410~0x8413）只读试读 ＋ ②c `AcpiTest_MULong` 探索结论 ──
+	// 2026-10-16（用户批准：「先把诊断功能加入EC版本的读取 限制充电暂缓」）：
+	//   限充可行性调研已确认「蛟龙上能做限充」，但**只核对过 EC 00.28.00.00 这一个版本** ⚠️，
+	//   而那个项目的原理文档指出 XRAM 地址会随固件重构变化
+	//   ⇒ ⭐ 做任何限充相关工作前，必须先知道机主的 EC 版本对不对得上 ✅。
+	// ⚠️⚠️ 地址空间：0x8410 属 **XRAM**，而我们既有的 `\\.\ACPIDriver` 通道按文档只覆盖
+	//   **H2RAM 0x700–0x7FF**（见 `EcChargeLimit.ProbeRegisters` 的 channelNote）
+	//   ⇒ ⭐ 本节就是**实测这个地址到底读不读得到**（⛔ 全程只读 · ⛔ 不写任何寄存器）✅。
+	// ⚠️ 而且**必须能把两种失败分开**（⭐ 否则以后查不出卡在哪 ⚠️）：
+	//   · 对照读（H2RAM 已知可读的 0x07C3）也失败 ⇒ 设备/IOCTL 这条链本身不通（与地址无关）
+	//   · 对照读成功、而 0x8410 全失败 ⇒ 地址不在当前通道可达范围（⭐ 这正是本节最想知道的 ✅）
+	private static void AppendEcVersionProbe(StringBuilder sb)
+	{
+		sb.AppendLine();
+		sb.AppendLine("── ②b EC 版本（XRAM 0x8410~0x8413）只读试读 ──");
+		sb.AppendLine("⭐ 用途：限充可行性调研确认「蛟龙上能做限充」，但**只核对过 EC 00.28.00.00 这一个版本** ⚠️");
+		sb.AppendLine("   ⇒ 那个项目的原理文档指出 XRAM 地址会随固件重构变化 ⇒ 做限充前必须先核对版本 ✅");
+		sb.AppendLine("⚠️ 地址空间说明：0x8410 属 **XRAM**，而我们的 `\\.\\ACPIDriver` 通道按文档只覆盖 **H2RAM 0x700–0x7FF** ⚠️");
+		sb.AppendLine("   ⇒ 本节**实测该地址到底读不读得到**（⛔ 只读 · ⛔ 不写任何寄存器）✅");
+		sb.AppendLine();
+		try
+		{
+			// ① 对照读：H2RAM 里一个已知可读的寄存器（门控 0x07C3）—— 用来把两种失败区分开 ✅
+			bool controlOk = EcChargeLimit.TryReadByteAt(EcChargeLimit.GateRegister, out int controlValue);
+			sb.AppendLine("对照读（H2RAM 已知可读 · 0x" + EcChargeLimit.GateRegister.ToString("X3") + "）= "
+				+ (controlOk ? ("✅ 可读，值 = " + ChargeLimitEcProbe.FormatRaw(controlValue)) : "⛔ 读不到"));
+			sb.AppendLine("   （⭐ 对照读的作用：把「通道不通」与「地址不可达」分开 —— ⛔ 否则两种失败长得一样 ⚠️）");
+
+			// ② 逐个试读 XRAM 0x8410~0x8413
+			int[] bytes = new int[4];
+			int okCount = 0;
+			for (int i = 0; i < bytes.Length; i++)
+			{
+				int address = EcChargeLimit.XramEcVersionRegister + i;
+				bool ok = EcChargeLimit.TryReadByteAt(address, out int v);
+				bytes[i] = (ok ? v : (-1));
+				if (ok)
+				{
+					okCount++;
+				}
+				sb.AppendLine("试读 XRAM 0x" + address.ToString("X4") + " = "
+					+ (ok ? ("✅ 可读，原始字节 = " + ChargeLimitEcProbe.FormatRaw(v)) : "⛔ 读不到"));
+			}
+			sb.AppendLine();
+
+			// ③ 结论（⭐ 五态分明 ✅ —— ⚠️ 多出的那一态正是**实跑实测**发现的「全 0xFF 填充值」✅）
+			// ⚠️⚠️【本节实测得到的关键判据】全 0xFF **不等于**读到了真实版本 ⚠️：
+			//   本机（同方翼龙15Pro · 2026-10-16 实跑）实测：对照读 0x07C3 得到真实值 0x07 ✅，
+			//   而 0x8410~0x8413 **四个字节全部返回 0xFF** —— 与既有的 0x0770 / 0x087F 的 0xFF 是**同一个签名**
+			//   （`EcChargeLimit` 里那段注释早就写过：0xFF 更可能是「该地址未映射时的填充值」）。
+			//   ⇒ ⭐ **IOCTL 返回成功 ≠ 地址可达** —— 本通道对窗口外的地址**不报错**、而是回填充值 ⚠️
+			//   ⇒ ⭐ 所以**只有「不是全 0xFF」才算真正读到了版本** ✅
+			//      （⛔ 否则会把 `FF.FF.FF.FF` 当成版本号报出去 —— 那是**编造读数** ⚠️）
+			int ffCount = 0;
+			for (int i = 0; i < bytes.Length; i++)
+			{
+				if (bytes[i] == 255)
+				{
+					ffCount++;
+				}
+			}
+			bool allFf = (okCount == bytes.Length && ffCount == bytes.Length);
+			if (okCount == bytes.Length && !allFf)
+			{
+				StringBuilder ver = new StringBuilder();
+				for (int i = 0; i < bytes.Length; i++)
+				{
+					if (i > 0)
+					{
+						ver.Append('.');
+					}
+					ver.Append(bytes[i].ToString("X2"));
+				}
+				sb.AppendLine("结论 = ✅ **EC 版本可读** ⇒ EC 版本 = " + ver);
+				if (ffCount > 0)
+				{
+					sb.AppendLine("   ⚠️ **但其中有 " + ffCount + " 个字节是 0xFF** ⇒ 疑似填充值混入，请以**原始字节**为准、⛔ 别直接当版本号用 ⚠️");
+				}
+				sb.AppendLine("   ⚠️ 解析口径：按 4 字节【十六进制】逐字节拼（如 00.28.00.00）—— ⛔ 不做 BCD/十进制猜测 ✅");
+			}
+			else if (allFf)
+			{
+				sb.AppendLine("结论 = ⚠️ **读到了、但四个字节全是 0xFF ⇒ 疑似「未映射填充值」，⛔ 不能当成 EC 版本** ⚠️");
+				sb.AppendLine("   ⇒ ⭐ 关键结论：**IOCTL 返回成功并不代表地址可达** —— 本通道对窗口外的地址");
+				sb.AppendLine("      不报错、而是回 0xFF ✅（与既有 0x0770 / 0x087F 的 0xFF 是同一个签名 ⚠️）");
+				sb.AppendLine("   ⇒ ⚠️ 两种可能、**本通道分不开**：");
+				sb.AppendLine("      ① 该地址在本机**未映射**（⚠️ 本机是同方翼龙15Pro，EC 未必是蛟龙的 IT5570）；");
+				sb.AppendLine("      ② 该地址真实值就是 0xFF（⚠️ 四个字节全 FF 不像版本号）。");
+				sb.AppendLine("   ⇒ ⭐ 因此本通道**无法回答「EC 版本是多少」**；要拿到真值需要：");
+				sb.AppendLine("      ① ⭐ 在**蛟龙（宝龙达）真机**上跑本节（那才是该地址的目标机型 ✅）；");
+				sb.AppendLine("      ② ⭐ 或改用**端口 I/O** 通道（0x62/0x66 · 需 PawnIO 自建模块）⚠️");
+				sb.AppendLine("         ⛔ 不要为此引入 WinRing0 / inpoutx64（合规不允许）⚠️");
+			}
+			else if (okCount > 0)
+			{
+				sb.AppendLine("结论 = ⚠️ **部分可读（" + okCount + "/4 字节）** ⇒ 版本号无法可靠解析，请以上面的原始字节为准 ⚠️");
+			}
+			else if (controlOk)
+			{
+				sb.AppendLine("结论 = ⛔ **地址不可达** —— 对照读成功而 0x8410 全失败 ⚠️");
+				sb.AppendLine("   ⇒ ⭐ 说明现有 `\\.\\ACPIDriver`（H2RAM 0x700–0x7FF）通道**到不了 XRAM 0x8410** ✅");
+				sb.AppendLine("   ⇒ ⭐ 要读它需要【另一条通路】：EC 端口 I/O（0x62/0x66 · 需 PawnIO 自建模块）");
+				sb.AppendLine("      ⛔ 不是我们现在这条 —— 也 ⛔ 不要为此引入 WinRing0/inpoutx64（合规不允许）⚠️");
+			}
+			else
+			{
+				sb.AppendLine("结论 = ⛔ **通道不可用** —— `\\.\\ACPIDriver` 打不开、或 IOCTL 读全线失败 ⚠️");
+				sb.AppendLine("   ⇒ ⭐ 这与地址无关：先解决驱动（`UWACPIDriver.sys` 未装/未加载，或权限不足）✅");
+				sb.AppendLine("   ⇒ ⚠️ 蛟龙（宝龙达）真机**预期就是这一条**（`CreateFile` 返回 `Win32 error 2`）✅");
+			}
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("EC 版本试读异常 = " + ex.Message);
+		}
+
+		// ④ `AcpiTest_MULong`（⭐ 用户架构表里「Legacy Tongfang Mulong」那条免驱 WMI）—— ⭐ 如实给探索结论 ⛔ 不假装能用 ✅
+		//    ⚠️ 本机（同方翼龙15Pro）2026-10-16 **实跑**：**类存在、实例数 = 10** ⚠️
+		//       ⛔ 而 `Get-CimInstance` 口径查不到任何实例 ⇒ ⭐ **那是假否定、不能用那个口径** ⚠️
+		//       （本段因此改用 `ManagementObjectSearcher` ✅ —— ⭐ 与 PNP0C14 那节同款 ✅）
+		//    ⇒ ⭐ 但**仍不可用**：⭐ 它的方法签名（GetULong / SetULong / FireULong / GetSetULong / GetButton）
+		//      **没有「地址 ＋ 值」的结构** ⇒ ⭐ 那是 ACPI **通用测试钩子**、⛔ 不是 EC 读写接口 ✅
+		//      `FireULong(Hack)` 更是一个**有副作用**的钩子 ⇒ ⛔ 绝不能调用 ⚠️。
+		//    ⚠️ 本探测**只枚举实例数**（元数据）· ⛔ 不调用任何方法 ✅
+		sb.AppendLine();
+		sb.AppendLine("── ②c `AcpiTest_MULong`（⭐ 架构表里「Legacy Tongfang Mulong」那条免驱 WMI）──");
+		sb.AppendLine("⭐ 待答问题：⭐ 它能不能用来读写 EC 寄存器（⭐ 若能 ⇒ ⭐ 是一条比端口 I/O 干净的第三条路 ✅）");
+		try
+		{
+			int instances = 0;
+			using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM AcpiTest_MULong"))
+			{
+				using ManagementObjectCollection rows = searcher.Get();
+				foreach (ManagementBaseObject row in rows)
+				{
+					instances++;
+				}
+			}
+			sb.AppendLine("实例数 = " + instances);
+			if (instances == 0)
+			{
+				sb.AppendLine("结论 = ⛔ **不可用**：类定义在、但**实例数为 0** ⚠️");
+				sb.AppendLine("   ⇒ ⭐ WMI 方法调用**必须有实例** ⇒ ⭐ 无法调用它 ⇒ ⭐ **不构成可用的 EC 通路** ✅");
+			}
+			else
+			{
+				sb.AppendLine("结论 = ⚠️ **有实例**，但**仍不建议**用它读 EC ⚠️：");
+				sb.AppendLine("   ⇒ 它的方法签名（GetULong/SetULong/FireULong/GetSetULong/GetButton）**没有「地址＋值」结构** ⇒");
+				sb.AppendLine("     ⭐ 那是 ACPI **通用测试钩子**、⛔ 不是 EC 读写接口 ✅");
+				sb.AppendLine("   ⇒ ⚠️ 其中 `FireULong(Hack)` 是**有副作用**的钩子 ⇒ ⛔ 绝不能调用 ⚠️");
+			}
+			sb.AppendLine("⭐ 如实说明：⭐ 本项**只枚举实例数**（元数据），⛔ **没有调用任何方法** ✅（⭐ 避免副作用）");
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("AcpiTest_MULong 实例查询失败 = " + ex.Message);
+			sb.AppendLine("   （⭐ 类不存在也会走到这里 ⇒ ⭐ 那同样说明本机没有这条通路 ✅）");
+		}
 	}
 
 	// ── ③ 功能号 8~23 逐个试读 ──

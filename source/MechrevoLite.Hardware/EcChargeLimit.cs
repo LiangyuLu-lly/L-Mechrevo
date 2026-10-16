@@ -678,6 +678,48 @@ internal static class EcChargeLimit
 		}
 	}
 
+	// ── XRAM：EC 版本号（⭐ 只读试读 · 2026-10-16）──
+	// 蛟龙限充项目实测：EC 版本在 **XRAM 0x8410~0x8413**（4 字节，形如 00.28.00.00）。
+	// ⚠️⚠️ 那是**另一套地址空间** —— 我们既有的 \\.\ACPIDriver 通道按文档只覆盖
+	//   **H2RAM 0x700–0x7FF**（见 ProbeRegisters 的 channelNote），0x8410 远超该窗口。
+	//   ⇒ ⭐ 这个地址**能不能读到 {由驱动决定}，必须实测**，⛔ 不能想当然（用户批准的诊断项）。
+	// ⚠️ 只读：只发 IoctlEcRead，⛔ 绝不发 IoctlEcWrite、⛔ 不改任何寄存器。
+	// ⛔ 任何调用方都不得据此改变限充行为（限充当前【暂缓】）。
+	internal const int XramEcVersionRegister = 33808;
+
+	/// <summary>
+	/// 只读试读任意 EC 地址（⭐ 诊断用）。⛔ 不写任何寄存器。
+	/// <para>⚠️ 复用本类既有的 <c>\\.\ACPIDriver</c> IOCTL 封装（⛔ 不新造 IOCTL ✅）。</para>
+	/// <para>⚠️ 本方法**不保证**地址可达：现有通道按文档只覆盖 H2RAM 0x700–0x7FF，
+	/// 超出该窗口的地址（例如 XRAM 0x8410）能否读到由驱动决定 ⇒ 返回 false 只代表「这次没读到」✅。</para>
+	/// </summary>
+	/// <param name="address">EC 地址（H2RAM 或 XRAM 的完整 16 位地址）。</param>
+	/// <param name="value">读到的原始字节；失败时为 -1。</param>
+	internal static bool TryReadByteAt(int address, out int value)
+	{
+		value = -1;
+		if (address < 0)
+		{
+			return false;
+		}
+		lock (Gate)
+		{
+			nint handle = CreateFile("\\\\.\\ACPIDriver", 3221225472u, 3u, IntPtr.Zero, 3u, 0u, IntPtr.Zero);
+			if (handle == new IntPtr(-1))
+			{
+				return false;
+			}
+			try
+			{
+				value = Read(handle, address);
+				return value >= 0;
+			}
+			finally
+			{
+				CloseHandle(handle);
+			}
+		}
+	}
 	private static void EnsureGateExitHook()
 	{
 		if (System.Threading.Interlocked.Exchange(ref _gateExitHookRegistered, 1) != 0)
