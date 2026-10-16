@@ -263,6 +263,27 @@ internal static class EcChargeLimit
 		{
 			return true;
 		}
+		// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机上限充没隐藏"）：
+		//   ⚠️ 根因：⭐ 下面那条 ⭐ **机型白名单**（⭐ `IsSupportedMachine(...)` ✅）⭐ 的语义是"或" ✅，
+		//      本来是为"⭐ 有 GCU 但没装 ACPIDriver"⭐ 的同方机型放宽用的 ✅。
+		//   ⚠️ 但 ⭐ 我们给宝龙达加了 ⭐ `RuntimeModelSupport` 的 Supported 分支 ⚠️
+		//      ⇒ ⭐ 白名单**命中** ⇒ ⭐ 本方法**直接 return true** ❌
+		//      ⇒ ⭐ ⭐ **限充 UI 照样显示** ❌ —— ⭐ 而蛟龙上 `\\.\ACPIDriver` **打不开**
+		//      （⭐ 真机诊断包实锤：⭐ `Win32 error 2 系统找不到指定的文件` ❌）
+		//      ⇒ ⭐ ⭐ **"能点但没用" = ⭐ 违反铁律** ⚠️
+		//   ⭐ 修法：⭐ **宝龙达直接判不可用** ✅ —— ⭐ 该模具【本来就没有】`UWACPIDriver`
+		//      （⭐ 真机已证实 ✅）⇒ ⭐ 限充物理上做不到 ⇒ ⭐ 整块限充 UI 隐藏 ✅
+		//   ⚠️ 安全性：⭐ 这一支**只对宝龙达生效** ⇒ ⭐ 同方/GCU 机型（⭐ 含"有 GCU 但没装
+		//      ACPIDriver"⭐ 那些 ✅）**逐位不变** ✅
+		//   ⚠️ 位置：⭐ 在 ⭐ `ec_charge_limit` 配置覆盖**之后** ✅ ⇒ ⭐ 需要强行打开时
+		//      仍可用 `ec_charge_limit=1` 逃生 ✅（⭐ 与既有设计一致 ✅）
+		if (Program.hw?.UsesBaolongda == true)
+		{
+			Logger.WriteLineIfChanged("charge-limit-baolongda",
+				"限充可用性：本机是宝龙达模具（该模具没有 UWACPIDriver，真机诊断包已证实 \\\\.\\ACPIDriver 打不开）"
+				+ " ⇒ 判定不可用 ⇒ 限充 UI 隐藏（同方/GCU 机型不受本判断影响）");
+			return false;
+		}
 		// ⚠️ 语义是**或**、不是替换（用户批准的修法②：「ModelSupport 白名单**保留**…但**不再作为唯一门**」）：
 		//   ① 既有判据（机型白名单 / GCU 已服务）判支持 ⇒ 支持 —— 与改前逐字一致；
 		//   ② 否则再看**能力探测**（设备真能打开）⇒ 白名单外的可用机型也能进（正是用户报的「很多机型」）。

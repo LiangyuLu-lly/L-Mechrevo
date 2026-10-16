@@ -335,27 +335,41 @@ public static class HardwareControl
 		// ── ② GPU 温度：⭐⭐ 同样 **厂商优先、⭐ LHM ⇒ ⭐ NVML 兜底** ✅ ──
 		try
 		{
+			bool gpuTempFilled = false;
 			if (hw.GpuTemp > 0)
 			{
 				gpuTemp = hw.GpuTemp; // ⭐ 厂商（⭐ GCU ✅）优先 ⇒ ⭐ 与改动前一致 ✅
+				gpuTempFilled = true;
 			}
 			else
 			{
-				bool filled = false;
 				float? lhmGpu = lhmMonitor.GpuTemperature;
 				if (lhmGpu.HasValue && lhmGpu.Value > 0f)
 				{
 					gpuTemp = (int)Math.Round(lhmGpu.Value);
-					filled = true;
+					gpuTempFilled = true;
 				}
-				if (!filled && !NvmlHelper.Unavailable)
+				if (!gpuTempFilled && !NvmlHelper.Unavailable)
 				{
 					float? fromNvml = NvmlHelper.GetGpuTemperature();
 					if (fromNvml.HasValue && fromNvml.Value > 0f)
 					{
 						gpuTemp = (int)Math.Round(fromNvml.Value);
+						gpuTempFilled = true;
 					}
 				}
+			}
+			// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机型 GPU 温度显示为「—」"）：
+			//   ⭐ 界面那格 GPU 温度的判据是 ⭐ `IsSensorInfoFresh(cpu: false)` ⚠️
+			//      ⇒ ⭐ 它读 `_gpuInfoReceivedAt` ⚠️ —— ⭐ 而那个时间戳**只有 GCU/MQTT 推送会写** ❌
+			//      ⇒ ⭐ 宝龙达（⭐ 没有 GCU 推送 ⚠️）恒判"不新鲜" ⇒ ⭐ **显示「—」** ❌
+			//   ⚠️ 反证：⭐ `_cpuInfoReceivedAt` ⭐ **宝龙达那条路会写** ✅（⭐ `RefreshBaolongdaSensors` ✅）
+			//      ⇒ ⭐ ⭐ **所以真机上 CPU 温度正常、GPU 温度是「—」** ✅ —— ⭐ 这个不对称就是证据 ✅
+			//   ⭐ 修法：⭐ **这次真拿到 GPU 温度了** ⇒ ⭐ 才打时间戳 ✅
+			//      ⚠️ 只在 `gpuTempFilled` 为真时打 ⇒ ⭐ 没拿到就不打 ⇒ ⭐ 界面照旧显示「—」✅（⛔ 不谎报 ✅）
+			if (gpuTempFilled)
+			{
+				hw.MarkGpuInfoReceived();
 			}
 		}
 		catch

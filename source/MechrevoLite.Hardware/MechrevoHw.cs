@@ -2335,6 +2335,32 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		return (double)(((now >= 0) ? now : Environment.TickCount64) - num) <= maximumAge.TotalMilliseconds;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机型 GPU 温度显示为「—」"）：⭐ **外部取到 GPU 温度时打时间戳** ✅
+	/// <para>⚠️ 根因：⭐ 界面那格 GPU 温度的判据是 ⭐ <see cref="IsSensorInfoFresh" />(<c>cpu: false</c>)，
+	/// 而它读的是 <c>_gpuInfoReceivedAt</c> ⚠️ —— ⭐ 那个时间戳**原来只有 GCU/MQTT 推送会写** ❌。</para>
+	/// <para>⭐ 而 <c>_cpuInfoReceivedAt</c> ⭐ **宝龙达那条路是会写的** ✅（⭐ 见 `RefreshBaolongdaSensors` ✅）
+	/// ⇒ ⭐ ⭐ **所以真机上 CPU 温度显示正常（56℃）、⭐ GPU 温度却是「—」** ✅
+	/// —— ⭐ 这个不对称正是证据 ✅。</para>
+	/// <para>⭐ 宝龙达协议里**没有 GPU 温度**（⭐ 只有一个 CPU 温度 ⭐ 功能号 22 ✅）⇒
+	/// GPU 温度只能来自 ⭐ LHM / ⭐ NVML ⇒ ⭐ 所以由调用方（<c>HardwareControl.ApplySensorPriority</c> ✅）
+	/// **取到值之后**调本方法 ✅。⛔ 本方法**只打时间戳**、⭐ 不写温度值、⭐ 不碰 GCU 的字段语义 ✅。</para>
+	/// </summary>
+	internal void MarkGpuInfoReceived()
+	{
+		Interlocked.Exchange(ref _gpuInfoReceivedAt, Environment.TickCount64);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（同上）：⭐ **外部取到风扇转速时打时间戳** ✅（⭐ 与 <see cref="MarkGpuInfoReceived" /> 同款 ✅）
+	/// <para>⚠️ 说明：⭐ 宝龙达那条路已在 `RefreshBaolongdaSensors` 内部直接打了 ⚠️；
+	/// 本方法是给"⭐ 别的来源也算数"⭐ 留的口子（⭐ 目前**没有**调用方，⭐ 保留以免将来重现同类漏打 ✅）。</para>
+	/// </summary>
+	internal void MarkFanInfoReceived()
+	{
+		Interlocked.Exchange(ref _fanInfoReceivedAt, Environment.TickCount64);
+	}
+
 	internal int Pl4ToWire(int watts)
 	{
 		return ModeDetailEncoding.Pl4WireWatts(watts, UsesAmdPowerFields, Pl4Scale);
