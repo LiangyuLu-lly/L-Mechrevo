@@ -2766,8 +2766,20 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				if (wmi.TryReadCpuCustomEnabled(out bool now) && now)
 				{
 					confirmed = true;
+					// ⭐⭐ 2026-10-16（第 3 步）：⭐ **更新本地记忆** ⇒ ⭐ 这样
+					//   `MechrevoService` 的校验（⭐ `_hw.Pl1 == result`）⭐ **同一次请求就能通过** ✅
+					//   ⚠️ 前提：⭐ 这是在**同一个锁/线程模型**下改的属性 ⚠️
+					//      ⇒ ⭐ 属性是 `{ get; private set; }`（⭐ int，⭐ 非 volatile ⚠️）
+					//      ⇒ ⭐ 与 GCU 那条支的写法一致（⭐ 那里也是直接从 MQTT 回调线程写 ✅）
+					//      ⇒ ⭐ 保持同款约定，⛔ 不引入新的同步机制 ✅
+					_baolongdaMemPl1 = pl1;
+					_baolongdaMemPl2 = pl2;
+					_baolongdaMemTempWall = wall;
+					Pl1 = pl1;
+					Pl2 = pl2;
+					TccTarget = wall;
 					Logger.WriteLine($"宝龙达 功耗墙：⭐ 已应用并确认开启 ✅（⭐ PL1={pl1}W · ⭐ PL2={pl2}W · ⭐ 温度墙={wall}℃"
-						+ " —— ⚠️ 数值是**我们下发的**，⭐ 协议读不回来 ⚠️）");
+						+ " —— ⚠️ 数值是**我们下发的**，⭐ 协议读不回来 ⚠️；⭐ 已写入本地记忆供校验使用 ✅）");
 					return true;
 				}
 				Thread.Sleep(150);
@@ -2873,6 +2885,39 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 	}
 
+	// ⭐⭐ 2026-10-16（第 3 步 · 功耗墙）：⭐ 本地记忆 + ⭐ 我们自己的范围
+	//   ⚠️ 为什么必须"本地记忆"：⭐ 真机实测（⭐ 机器 C）⭐ 功能号 23 **只能读到"是否已开启"**，
+	//      ⭐ **PL1 / PL2 / 温度墙的具体数值协议里读不回来** ⚠️（⭐ 这是协议限制 ✅）
+	//   ⇒ ⭐ 所以界面上的当前值 ⭐ **只能是我们上次下发的值** ✅（⭐ 审查阶段要决定是否加说明小字 ⚠️）
+	//   ⭐ 范围取常数（⭐ 保守）：⭐ PL1/PL2 ⭐ 5~200W · ⭐ 温度墙 ⭐ 60~105℃ ✅
+	//      ⚠️ 而门面层的写入还会再夹一次（⭐ 见 `TryApplyCpuPowerLimitViaBackend` ✅）
+	private const int BaolongdaPlMinWatts = 5;
+	private const int BaolongdaPlMaxWatts = 200;
+	private const int BaolongdaTccMinCelsius = 60;
+	private const int BaolongdaTccMaxCelsius = 105;
+	private int _baolongdaMemPl1;
+	private int _baolongdaMemPl2;
+	private int _baolongdaMemTempWall;
+
+	/// <summary>
+	/// ⭐ 把**我们自己的**功耗墙范围与本地记忆值填进那些"原本等 GCU 上报"的属性里 ✅
+	/// <para>⭐ 依据：⭐ 见方案文档第 17 节 —— ⭐ 填属性即可，⛔ 不用动 UI ✅</para>
+	/// </summary>
+	private void ApplyBaolongdaPowerRanges()
+	{
+		Pl1Minimum = BaolongdaPlMinWatts;
+		Pl1Maximum = BaolongdaPlMaxWatts;
+		Pl2Minimum = BaolongdaPlMinWatts;
+		Pl2Maximum = BaolongdaPlMaxWatts;
+		TccMinimum = BaolongdaTccMinCelsius;
+		TccMaximum = BaolongdaTccMaxCelsius;
+		// ⭐ PL4 本机协议里没有（⭐ 参考实现的功能号表里也没这一项 ✅）⇒ ⭐ 保持 -1（⭐ 即不可调 ✅）
+		// ⭐ 当前值 = 本地记忆（⭐ 0 = 还从没设过 ⇒ ⭐ 界面显示 0，⭐ 用户拖到哪就是哪 ✅）
+		Pl1 = _baolongdaMemPl1;
+		Pl2 = _baolongdaMemPl2;
+		TccTarget = _baolongdaMemTempWall;
+	}
+
 	/// <summary>
 	/// 把本会话切到**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
 	/// <para>⭐ 与 <see cref="ApplyLegacyBackendAsync" /> 是**同一套路**（⭐ 替换能力位 ⇒ 起 3 s 定时刷新 ⇒ 立刻读一次 ⇒ 宣布就绪 ✅），
@@ -2889,6 +2934,20 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//    ⇒ ⭐ 现在统一走 `BuildCapabilities()` ✅（⭐ 与 GCU 那条支的风格一致：⭐
 		//      ⭐ `RefreshDeviceCapabilities` 也是从 `MechrevoDeviceCapabilities` 一处产出 ✅）
 		Capabilities = backend.BuildCapabilities();
+		// ⭐⭐ 2026-10-16（"全部接入"第 3 步 · 功耗墙 · ⭐ 方案文档第 17 节）：
+		//   ⭐ **关键洞察**：⭐ 界面上的滑块读的是**已有属性**
+		//      （⭐ `Pl1Minimum`/`Pl1Maximum`/`Pl1` ＋ ⭐ PL2 / Tcc 那一组 ✅）
+		//   ⭐ 而它们默认 **-1**（⭐ 那是等 GCU 上报的 ⚠️）⇒ ⭐ `Pl1Adjustable` = false ⇒ ⭐ **滑块不能动** ❌
+		//   ⇒ ⭐ ⭐ **只要在这里把它们填上【我们自己的范围】＋【本地记忆的当前值】**：
+		//      ⭐ ① ⭐ `Pl1Adjustable` **自动变 true** ⇒ ⭐ 滑块能动 ✅
+		//      ⭐ ② ⭐ 范围就是我们给的 ✅
+		//      ⭐ ③ ⭐ 校验（⭐ `_hw.Pl1 == result`）**自动成立** —— ⭐ 因为 `Pl1` 现在是**我们自己记的** ✅
+		//      ⭐ ④ ⭐ ⛔ **`CustomModeForm` 一行都不用改** ✅✅（⭐ 风险从"改 UI 模型"降到"填几个属性" ✅）
+		//   ⚠️ 诚实性：⭐ 协议**读不回**这些数值 ⇒ ⭐ 界面显示的是"⭐ 上次下发的值" ⚠️
+		//      ⇒ ⭐ 是否加一行说明小字 ⭐ **留待审查阶段决定**（⭐ 方案 17.3 ✅）
+		ApplyBaolongdaPowerRanges();
+		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath});"
+			+ $" 功耗墙范围 PL1/PL2=[{Pl1Minimum},{Pl1Maximum}]W · 温度墙=[{TccMinimum},{TccMaximum}]℃（⭐ 本地记忆 PL1={Pl1} PL2={Pl2} 温度墙={TccTarget} ⚠️ 非从机器读回）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
 			+ $" fans={backend.Wmi.FanCount} modes={backend.Wmi.ModeCount}");
 		// ⭐⭐ 2026-10-16（"接传感器"）：⭐ 同一个 3 s 定时器里**顺便刷一遍传感器** ✅

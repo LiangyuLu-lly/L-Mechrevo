@@ -186,6 +186,23 @@ internal sealed class BaolongdaBackend : IDisposable
 			}
 		}
 		Logger.WriteLine($"宝龙达：键盘灯运行时自检 ⇒ {(keyboardAvailable ? "✅ 功能号 10 可读 ⇒ 开放 Keyboard 能力位" : "⚠️ 功能号 10 读不到 ⇒ Keyboard 能力位保持 false（UI 不显示，避免点了没反应）")}");
+		// ⭐⭐ 2026-10-16（"全部接入"第 3 步 · 功耗墙）：⭐ 同样用**运行时自检** ✅
+		//   ⭐ 真机已实测（⭐ 机器 C）：⭐ 功能号 23 ⭐ **可读**（⭐ 读到"自定义是否已开启" ✅）
+		//   ⇒ ⭐ 这台蛟龙上 ⭐ 会开出来 ✅
+		//   ⭐ 而"写了不能校验数值"这件事 ⭐ 已用**本地记忆**解决 ✅（⭐ 方案第 17 节 ✅）
+		bool powerWallAvailable = false;
+		if (_wmi != null)
+		{
+			try
+			{
+				powerWallAvailable = _wmi.TryReadCpuCustomEnabled(out bool _);
+			}
+			catch (Exception ex2)
+			{
+				Logger.WriteLine("宝龙达：功耗墙自检异常（按不支持处理）：" + ex2.Message);
+			}
+		}
+		Logger.WriteLine($"宝龙达：功耗墙运行时自检 ⇒ {(powerWallAvailable ? "✅ 功能号 23 可读 ⇒ 开放 CpuPerformanceTuning" : "⚠️ 功能号 23 读不到 ⇒ 保持 false（UI 不显示）")}");
 		return new MechrevoDeviceCapabilities
 		{
 			ProjectId = "Baolongda",
@@ -203,6 +220,20 @@ internal sealed class BaolongdaBackend : IDisposable
 			//   —— ⭐ 宝龙达只有"模式 16 / 颜色 17 / 亮度 18"三件套 ✅，
 			//   ⭐ 那些复杂效果（⭐ 波浪/涟漪/跑马灯…）它**不支持** ⇒ ⭐ 开了只会出现点了没反应的选项 ❌
 			Keyboard = keyboardAvailable,
+			// ⭐⭐ 2026-10-16（第 3 步 · 功耗墙）：⚠️ **暂时保持 false** ⚠️
+			//   ⭐ 为什么：⭐ 按铁律 ⭐"能力位 = 已接好下发路径" ⇒ ⭐ 而 `MechrevoService` 那处
+			//      **下发分派还没接**（⭐ 方案第 17.2 节第 ② 件 ✅）
+			//      ⇒ ⭐ 若现在就开 ⇒ ⭐ 用户设了值 ⇒ ⭐ 会走到 `Publish("Fan/Control", …)` ❌
+			//        ⇒ ⭐ 而宝龙达**没有 GCU** ⇒ ⭐ **静默失败** ⇒ ⭐ **正好违反铁律** ⚠️
+			//   ⭐ 已完成的部分（⭐ **都已就位** ✅）：
+			//      ① ⭐ `MechrevoHw.ApplyBaolongdaPowerRanges()` ⇒ ⭐ 范围与本地记忆已填 ✅
+			//      ② ⭐ `TryApplyCpuPowerLimitViaBackend()` ⇒ ⭐ 协议写入＋回读＋记忆更新已写好 ✅
+			//      ③ ⭐ `powerWallAvailable` 自检已就位（⭐ 只是**先不用它**）✅
+			//   ⇒ ⭐ **待办**：⭐ 把 `MechrevoService` 那处下发分派接上（⭐ 一行 `continue` ✅）
+			//      ⇒ ⭐ 接上之后 ⭐ 把下面这行改成 ⭐ `CpuPerformanceTuning = powerWallAvailable,` ⭐ 即可 ✅
+			//   ⚠️ 且 ⛔ **不开** `OverclockSettings`（⭐ 那是 GPU 超频那一组，
+			//      ⭐ 宝龙达协议里**没有**对应功能号 ⚠️ ⇒ ⭐ 开了就是点了没反应 ❌）
+			CpuPerformanceTuning = false,
 			AmdPlatform = PawnIO.CpuInfo.IsAMD
 		};
 	}
