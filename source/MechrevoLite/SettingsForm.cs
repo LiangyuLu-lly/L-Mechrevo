@@ -140,6 +140,20 @@ public class SettingsForm : RForm
 	/// </summary>
 	internal const string TelemetryWidestSample = "123W 4567rpm 100%";
 
+	/// <summary>
+	/// 2026-10-16（遥测排版方案 A）：**拆列之后每列各自的预留样本**。
+	/// ⚠️ 拆列前只有一片（功耗 空格 转速 空格 占空比 拼在一起）、共用一份样本
+	///（<see cref="TelemetryReserveSampleFor" /> 当时的 "1234rpm 100%"）⇒ 片宽只跟这一份样本走，
+	/// 于是两行的字段个数不同时（宝龙达 CPU 行没有功耗、GPU 行有 "14W"），同一片里的文本
+	/// 宽窄不一、而片内文本是居中的 ⇒ **两行的转速数字左右错开**（机主原话「感觉不太统一」）。
+	/// 拆成三列后每列各有样本 ⇒ 同名列在两行里宽度一致 ⇒ 数字列逐列对齐。
+	/// </summary>
+	internal const string TelemetryPowerSample = "123W";
+
+	internal const string TelemetryRpmSample = "1234rpm";
+
+	internal const string TelemetryDutySample = "100%";
+
 	internal const int CompactOfficialConsoleLogicalHeight = 56;
 
 	internal const int LiquidCoolingLogicalHeight = 112;
@@ -344,7 +358,14 @@ public class SettingsForm : RForm
 
 	private Label? _telemetryCpuTemp;
 
-	private Label? _telemetryCpuRest;
+	// ⚠️ 2026-10-16（方案 A）：下面 6 个新字段**刻意不写 `Label?` 注解** —— 本文件不在 `#nullable`
+	// 上下文里（见 BuildPerfModeRow 里关于 `object?` 的同一处说明），每写一个引用类型注解就多一条
+	// CS8632 警告，而本轮要求「警告基线一个不增」。语义与相邻的 `Label?` 字段完全相同（都允许为 null）。
+	private Label _telemetryCpuPower;
+
+	private Label _telemetryCpuRpm;
+
+	private Label _telemetryCpuDuty;
 
 	private Label? _telemetrySeparator;
 
@@ -352,7 +373,11 @@ public class SettingsForm : RForm
 
 	private Label? _telemetryGpuTemp;
 
-	private Label? _telemetryGpuRest;
+	private Label _telemetryGpuPower;
+
+	private Label _telemetryGpuRpm;
+
+	private Label _telemetryGpuDuty;
 
 	private bool _telemetryLayingOut;
 
@@ -9520,10 +9545,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			switches += shortcut.Visible ? (shortcut.Width + shortcut.Margin.Horizontal) : 0;
 		}
 		int readings = 0;
-		Font monoFont = _telemetryCpuRest?.Font ?? _telemetryCpuName?.Font;
+		Font monoFont = _telemetryCpuRpm?.Font ?? _telemetryCpuName?.Font;
 		if (monoFont != null)
 		{
-			readings = TelemetryTextWidth(TelemetryWidestSample, monoFont, ContentAlignment.MiddleRight);
+			// 2026-10-16（方案 A）：拆列后是三列各自的样本，⛔ 不再是拼在一起的那一份。
+			readings = TelemetryTextWidth(TelemetryPowerSample, monoFont, ContentAlignment.MiddleRight) + TelemetryTextWidth(TelemetryRpmSample, monoFont, ContentAlignment.MiddleRight) + TelemetryTextWidth(TelemetryDutySample, monoFont, ContentAlignment.MiddleRight);
 		}
 		readings += TelemetryTextWidth(_telemetryCpuName?.Text ?? "CPU", _telemetryCpuName?.Font ?? Font, ContentAlignment.MiddleLeft);
 		readings += TelemetryTextWidth(_telemetryCpuTemp?.Text ?? "—", _telemetryCpuTemp?.Font ?? Font, ContentAlignment.MiddleRight);
@@ -9586,10 +9612,10 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			}
 		}
 		int num4 = 0;
-		Font font = _telemetryCpuRest?.Font ?? _telemetryCpuName?.Font;
+		Font font = _telemetryCpuRpm?.Font ?? _telemetryCpuName?.Font;
 		if (font != null)
 		{
-			num4 = TelemetryTextWidth(TelemetryWidestSample, font, ContentAlignment.MiddleRight);
+			num4 = TelemetryTextWidth(TelemetryPowerSample, font, ContentAlignment.MiddleRight) + TelemetryTextWidth(TelemetryRpmSample, font, ContentAlignment.MiddleRight) + TelemetryTextWidth(TelemetryDutySample, font, ContentAlignment.MiddleRight);
 		}
 		num4 += TelemetryTextWidth(_telemetryCpuName?.Text ?? "CPU", _telemetryCpuName?.Font ?? Font, ContentAlignment.MiddleLeft);
 		num4 += TelemetryTextWidth(_telemetryCpuTemp?.Text ?? "—", _telemetryCpuTemp?.Font ?? Font, ContentAlignment.MiddleRight);
@@ -13988,21 +14014,57 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		base.PerformLayout();
 	}
 
-	/// <summary>是否见过有效风扇转速（30 系 GCU 恒为 -1，见 <see cref="TelemetryReserveSample" />）。</summary>
+	/// <summary>是否见过有效风扇转速（30 系 GCU 恒为 -1，见 <see cref="TelemetryReserveSampleFor" />）。</summary>
 	private bool _telemetryRpmSeen;
 
+	/// <summary>2026-10-16（方案 A）：功耗列是否见过有效值 —— 没见过就不为它预留宽度
+	///（否则在根本没有功耗读数的机器上白留一列；见 <see cref="TelemetryReserveSampleFor" />）。</summary>
+	private bool _telemetryPowerSeen;
+
+	/// <summary>2026-10-16（方案 A）：占空比列是否见过有效值 —— 同上（宝龙达下 duty 恒 null ⇒ 永不预留）。</summary>
+	private bool _telemetryDutySeen;
+
 	/// <summary>
-	/// 读数片的**预留样本**（防跳动用的典型值，恒不小于当前实际文本的形状）：
-	/// <c>_telemetryCpuRest/_telemetryGpuRest</c>（功耗/转速/占空比那一片）按
-	/// "见到过有效转速 ? 1234rpm 100% : 100%" 预留；名字片（CPU/GPU）与温度片（"58°C"）不预留。
+	/// 读数片的**预留样本**（防跳动用的典型值，恒不小于当前实际文本的形状）。
+	/// 2026-10-16（遥测排版方案 A）起**按片**给（原来只有一片、只有一份样本）：
+	/// **名字片**（CPU/GPU）两片共用「更宽的那个」⇒ 两行的名字列等宽（否则后面所有列整体错开 1px）；
+	/// **温度片**不预留（与原实现一致：宽度只跟当前文本走，两行正常情况下都是 "NN°C"、本身等宽）；
+	/// **功耗 / 转速 / 占空比**三列各自预留（"123W" / "1234rpm" / "100%"），各自**见过有效值**才预留，
+	/// 且**同一个 seen 旗标对两行同时生效** ⇒ CPU 行与 GPU 行的同名列宽度必然相等 ⇒ 逐列对齐。
+	/// ⚠️ 用 seen 旗标而不是无条件预留：宝龙达下 duty 恒 null、有的机器没有功耗读数，
+	/// 无条件预留会在那些机器上白留两列（历史教训：读数一变宽就把左组挤到裁字）。
 	/// ⚠️ 这套"按机型能力升级预留"的逻辑（30 系 GCU 不报转速 ⇒ 只按占空比预留，避免留一段空档）
-	/// 与原实现一字不差，只是从"写进 MinimumSize"改成"存成样本"来表达 —— 因为
+	/// 与原实现同源，只是从"写进 MinimumSize"改成"存成样本"来表达 —— 因为
 	/// <see cref="Control.MinimumSize" /> 是**棘轮**（只能调大）：原实现把预留写进 MinimumSize，
 	/// 见到转速后它被抬到含 rpm 的宽、之后再也降不下来（30 系机型的空档因此永久存在）。
 	/// </summary>
-	private string? TelemetryReserveSample()
+	private string? TelemetryReserveSampleFor(Label piece)
 	{
-		return _telemetryRpmSeen ? "1234rpm 100%" : "100%";
+		// 2026-10-16（方案 A）：**名字片也要预留**，而且两片共用同一份 —— 取「CPU / GPU 里更宽的那个」。
+		// ⚠️ 为什么必须：`GPU` 比 `CPU` 宽 1px（本机 96 DPI 实测 52 vs 51）。名字列不等宽 ⇒ 它后面
+		// **所有**列都整体错开 1px（拆列后本机日志实测确实如此）⇒ 「两行严格对齐」就差这一口气。
+		// 取两者更宽的那个 ⇒ 无论字体里谁更宽，两行的名字列都等于同一宽度。
+		if (piece == _telemetryCpuName || piece == _telemetryGpuName)
+		{
+			if (TelemetryTextWidth("CPU", piece.Font, ContentAlignment.MiddleCenter) >= TelemetryTextWidth("GPU", piece.Font, ContentAlignment.MiddleCenter))
+			{
+				return "CPU";
+			}
+			return "GPU";
+		}
+		if (piece == _telemetryCpuPower || piece == _telemetryGpuPower)
+		{
+			return _telemetryPowerSeen ? TelemetryPowerSample : null;
+		}
+		if (piece == _telemetryCpuRpm || piece == _telemetryGpuRpm)
+		{
+			return _telemetryRpmSeen ? TelemetryRpmSample : null;
+		}
+		if (piece == _telemetryCpuDuty || piece == _telemetryGpuDuty)
+		{
+			return _telemetryDutySeen ? TelemetryDutySample : null;
+		}
+		return null;
 	}
 
 	/// <summary>
@@ -14024,10 +14086,13 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	/// </summary>
 	private int TelemetryPieceDesiredWidth(Label piece)
 	{
-		int num = TelemetryPieceWidth(piece.Text, piece.Font);
-		if (piece == _telemetryCpuRest || piece == _telemetryGpuRest)
+		// ⚠️ 2026-10-16（方案 A）：按**该片自己的对齐方式**量宽 —— 右对齐片的末位字形贴右缘，
+		// 安全余量比居中/左对齐片多 1px（见 TelemetryTextWidth）；⛔ 仍不能写死 MiddleCenter。
+		int num = TelemetryPieceWidth(piece.Text, piece.Font, piece.TextAlign);
+		string text = TelemetryReserveSampleFor(piece);
+		if (text != null)
 		{
-			num = Math.Max(num, TelemetryPieceWidth(TelemetryReserveSample(), piece.Font));
+			num = Math.Max(num, TelemetryPieceWidth(text, piece.Font, piece.TextAlign));
 		}
 		return num;
 	}
@@ -14048,10 +14113,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	/// ⚠️ 右侧取 max 是"只加不减"：既保住原来给右对齐末位字形的那份安全余量，又保证两侧的**片内留白相等**
 	/// （文本居中 ⇒ 相邻两片文本之间的空档仍是 2 × GapLogical）。
 	/// </summary>
-	private static int TelemetryPieceWidth(string? text, Font font)
+	private static int TelemetryPieceWidth(string? text, Font font, ContentAlignment align)
 	{
 		int pad = Math.Max(TelemetryGapLogical, TextSafetyRightLogical);
-		return TelemetryTextWidth(text, font, ContentAlignment.MiddleCenter) + TelemetryGapLogical + pad;
+		return TelemetryTextWidth(text, font, align) + TelemetryGapLogical + pad;
 	}
 
 	/// <summary>
@@ -14091,6 +14156,47 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	/// <summary>右对齐读数片的安全余量（逻辑像素）：末位字形贴右缘，留够半个字形宽（1px 实测会切掉半边）。</summary>
 	private const int TextSafetyRightLogical = 2;
 
+	/// <summary>
+	/// 2026-10-16（遥测排版方案 A）：**十片**读数（CPU/GPU 各五片：名字/温度/功耗/转速/占空比）。
+	/// ⚠️ 拆列前是六片（每行三片，第三片把功耗/转速/占空比用空格拼在一起）—— 见
+	/// <see cref="TelemetryReserveSampleFor" /> 与 <see cref="TelemetryPieceAlign" /> 的说明。
+	/// 顺序 = 行内从左到右，且 CPU 行在前、GPU 行在后（与 BuildTitleRow 的两次调用一致）。
+	/// </summary>
+	private Label[] TelemetryPieceArray()
+	{
+		return new Label[10]
+		{
+			_telemetryCpuName, _telemetryCpuTemp, _telemetryCpuPower, _telemetryCpuRpm, _telemetryCpuDuty,
+			_telemetryGpuName, _telemetryGpuTemp, _telemetryGpuPower, _telemetryGpuRpm, _telemetryGpuDuty
+		};
+	}
+
+	/// <summary>2026-10-16（方案 A）：某一行（CPU 或 GPU）的五片读数，按行内顺序。</summary>
+	private Label[] TelemetryRowPieces(bool isCpu)
+	{
+		if (isCpu)
+		{
+			return new Label[5] { _telemetryCpuName, _telemetryCpuTemp, _telemetryCpuPower, _telemetryCpuRpm, _telemetryCpuDuty };
+		}
+		return new Label[5] { _telemetryGpuName, _telemetryGpuTemp, _telemetryGpuPower, _telemetryGpuRpm, _telemetryGpuDuty };
+	}
+
+	/// <summary>
+	/// 2026-10-16（遥测排版方案 A）：**片内文本的对齐方式**。
+	/// 名字/温度片沿用 <c>MiddleCenter</c>（2026-10-11「间隔统一」那一轮的口径：片内留白左右相等 ⇒
+	/// 相邻两片文本之间的空档恒为 <c>2 × TelemetryGapLogical</c>，⛔ 不动它）。
+	/// 功耗/转速/占空比三片改成 <c>MiddleRight</c>：数字列惯用右对齐，位数变化时**右缘恒对齐**
+	///（例如 <c>999rpm</c> 与 <c>1790rpm</c> 居中对齐会左右各差半个字宽）。
+	/// </summary>
+	private ContentAlignment TelemetryPieceAlign(Label piece)
+	{
+		if (piece == _telemetryCpuPower || piece == _telemetryGpuPower || piece == _telemetryCpuRpm || piece == _telemetryGpuRpm || piece == _telemetryCpuDuty || piece == _telemetryGpuDuty)
+		{
+			return ContentAlignment.MiddleRight;
+		}
+		return ContentAlignment.MiddleCenter;
+	}
+
 	private void BuildTelemetryRow()
 	{
 		// 2026-10-11（UI 重排第二轮 · 用户原话「性能模式旁边的指示性能的文字删除，把 CPU 的读数放在性能模式
@@ -14112,13 +14218,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		// 重新解析（旧主题的主文字色是近灰色，chroma < 48），⛔ 不需要在 ApplyThemeMode 里另加一条。
 		_telemetryCpuName = MakeTelemetryPiece("CPU");
 		_telemetryCpuTemp = MakeTelemetryPiece("—");
-		_telemetryCpuRest = MakeTelemetryPiece("");
+		_telemetryCpuPower = MakeTelemetryPiece("");
+		_telemetryCpuRpm = MakeTelemetryPiece("");
+		_telemetryCpuDuty = MakeTelemetryPiece("");
 		_telemetryGpuName = MakeTelemetryPiece("GPU");
 		_telemetryGpuTemp = MakeTelemetryPiece("—");
-		_telemetryGpuRest = MakeTelemetryPiece("");
-		foreach (Label restPiece in new Label[2] { _telemetryCpuRest, _telemetryGpuRest })
+		_telemetryGpuPower = MakeTelemetryPiece("");
+		_telemetryGpuRpm = MakeTelemetryPiece("");
+		_telemetryGpuDuty = MakeTelemetryPiece("");
+		// 2026-10-16（方案 A）：对齐方式在建片时先落一次（宽度计算要用它），
+		// 之后 AppendTelemetryPieces 会用同一个 TelemetryPieceAlign 再下发一次（幂等）。
+		foreach (Label alignPiece in TelemetryPieceArray())
 		{
-			restPiece.TextAlign = ContentAlignment.MiddleRight;
+			alignPiece.TextAlign = TelemetryPieceAlign(alignPiece);
 		}
 		// 2026-10-11（真机「配置编辑右缘被裁」修复 · 空间回收）：读数片自己**清掉 Label 的内边距**
 		// （默认 3px 左右 + 3px 顶部）。理由：读数片是"固定宽 + 右对齐 + 自绘单行"的紧凑数字片，
@@ -14130,7 +14242,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//   * 列改 AutoSize 后列宽 = 控件 PreferredWidth = 文本宽，不再把左组挤到没余量。
 		// ⚠️ 预留宽**不写进 MinimumSize**（MinimumSize 是棘轮、只增不减，会把 30 系机型本可省下的
 		// 空档永久留在行里）：预留改由 TelemetryPieceDesiredWidth 每帧"取大"表达。
-		foreach (Label piece in new Label[6] { _telemetryCpuName, _telemetryCpuTemp, _telemetryCpuRest, _telemetryGpuName, _telemetryGpuTemp, _telemetryGpuRest })
+		foreach (Label piece in TelemetryPieceArray())
 		{
 			piece.Padding = Padding.Empty;
 			piece.AutoSize = false;
@@ -14139,7 +14251,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			piece.MinimumSize = Size.Empty;
 		}
 		LayoutTelemetryPieces();
-		foreach (Label piece in new Label[6] { _telemetryCpuName, _telemetryCpuTemp, _telemetryCpuRest, _telemetryGpuName, _telemetryGpuTemp, _telemetryGpuRest })
+		foreach (Label piece in TelemetryPieceArray())
 		{
 			// 读数可点击强制刷新传感器（沿袭原 labelCPUFan/labelGPUFan 的点击语义）
 			piece.Click += LabelCPUFan_Click;
@@ -14234,7 +14346,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//（构造期 oc/cfg 都还是默认可见，之后能力位会把它们关掉，见 SyncPerfShortcutsVisibility）。
 		SyncPerfShortcutsVisibility();
 		// ① 标题行：[图标 | 「性能模式」 | 三个快捷开关（左对齐紧跟标题）… 弹性余量 … CPU 读数（右对齐）]
-		_perfHeaderRow = BuildTitleRow("perfHeaderRow", picturePerf, labelPerf, new Control[1] { _perfShortcuts }, _telemetryCpuName, _telemetryCpuTemp, _telemetryCpuRest);
+		_perfHeaderRow = BuildTitleRow("perfHeaderRow", picturePerf, labelPerf, new Control[1] { _perfShortcuts }, TelemetryRowPieces(isCpu: true));
 		// ② 按钮行：**只有**模式按钮（本轮用户原话：「按钮行是不被挤占的」），按钮按百分比列占满整行宽度
 		BufferedTableLayoutPanel perfModeRow = new BufferedTableLayoutPanel
 		{
@@ -14420,7 +14532,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			oldHead.Dispose();
 		}
 		// ① 标题行：[图标 | 「显卡模式」 | 状态文字 … 弹性余量 … GPU 读数（右对齐）]
-		_gpuHeaderRow = BuildTitleRow("gpuHeaderRow", pictureGPU, labelGPU, new Control[1] { labelGPUFan }, _telemetryGpuName, _telemetryGpuTemp, _telemetryGpuRest);
+		_gpuHeaderRow = BuildTitleRow("gpuHeaderRow", pictureGPU, labelGPU, new Control[1] { labelGPUFan }, TelemetryRowPieces(isCpu: false));
 		// ② 按钮行：**只有**三颗模式按钮，占满整行宽度
 		BufferedTableLayoutPanel gpuModeRow = new BufferedTableLayoutPanel
 		{
@@ -14486,7 +14598,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			piece.AutoSize = false;
 			piece.Dock = DockStyle.Fill;
-			piece.TextAlign = ContentAlignment.MiddleCenter;
+			// 2026-10-16（方案 A）：对齐按片下发（名字/温度居中；功耗/转速/占空比右对齐）——
+			// 见 TelemetryPieceAlign。原来这里把**所有**片一律设成 MiddleCenter，
+			// 连 BuildTelemetryRow 里给旧 rest 片设的 MiddleRight 也被它覆盖掉了。
+			piece.TextAlign = TelemetryPieceAlign(piece);
 			piece.Width = TelemetryPieceDesiredWidth(piece);
 			head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 			head.Controls.Add(piece, num, 0);
@@ -14533,13 +14648,11 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		if (_telemetryCpuName != null && _telemetryGpuName != null && !IsDisposed)
 		{
 			MechrevoHw? hw = Program.hw;
-			(string name, string temp, string rest) tuple = TelemetryParts(hw, isCpu: true);
-			string item = tuple.temp;
-			string item2 = tuple.rest;
-			(string name, string temp, string rest) tuple2 = TelemetryParts(hw, isCpu: false);
-			string item3 = tuple2.temp;
-			string item4 = tuple2.rest;
-			if ((0u | (SetTelemetryPiece(_telemetryCpuTemp, item) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuRest, item2) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuTemp, item3) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuRest, item4) ? 1u : 0u)) != 0)
+			(string name, string temp, string power, string rpm, string duty) tuple = TelemetryParts(hw, isCpu: true);
+			(string name, string temp, string power, string rpm, string duty) tuple2 = TelemetryParts(hw, isCpu: false);
+			// 2026-10-16（方案 A）：十片**逐字段**下发 —— 拆列后每个字段各自一片，
+			// ⛔ 不再把功耗/转速/占空比拼成一个字符串（那正是两行数字错开的根因）。
+			if ((0u | (SetTelemetryPiece(_telemetryCpuTemp, tuple.temp) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuPower, tuple.power) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuRpm, tuple.rpm) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuDuty, tuple.duty) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuTemp, tuple2.temp) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuPower, tuple2.power) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuRpm, tuple2.rpm) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuDuty, tuple2.duty) ? 1u : 0u)) != 0)
 			{
 				LayoutTelemetryPieces();
 			}
@@ -14558,7 +14671,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 
 	private void LayoutTelemetryPieces()
 	{
-		if (_telemetryCpuRest == null || _telemetryGpuRest == null)
+		if (_telemetryCpuRpm == null || _telemetryGpuRpm == null)
 		{
 			return;
 		}
@@ -14570,6 +14683,23 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			_telemetryRpmSeen = true;
 			flag |= SyncTelemetryReserveWidth();
+		}
+		// 2026-10-16（方案 A）：功耗列/占空比列的预留闸 —— 判据是「这个字段**真的被显示出来了**」
+		//（复用 TelemetryParts 那一套同一个格式化入口 ⇒ ⛔ 不会出现「预留了但永远不显示」的空列）。
+		if (hw != null)
+		{
+			bool fanFresh = hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L);
+			bool zeroIsMeaningful = hw.FanZeroIsMeaningful;
+			if (!_telemetryPowerSeen && (TelemetryPower(HardwareControl.cpuPower).Length > 0 || TelemetryPower(HardwareControl.gpuPower).Length > 0))
+			{
+				_telemetryPowerSeen = true;
+				flag |= SyncTelemetryReserveWidth();
+			}
+			if (!_telemetryDutySeen && (TelemetryDuty(hw.CpuFanDuty, fanFresh, zeroIsMeaningful).Length > 0 || TelemetryDuty(hw.GpuFanDuty, fanFresh, zeroIsMeaningful).Length > 0))
+			{
+				_telemetryDutySeen = true;
+				flag |= SyncTelemetryReserveWidth();
+			}
 		}
 		if (flag)
 		{
@@ -14597,7 +14727,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	private void LogTelemetryWidths()
 	{
 		System.Text.StringBuilder stringBuilder = new System.Text.StringBuilder();
-		foreach (Label piece in new Label[6] { _telemetryCpuName, _telemetryCpuTemp, _telemetryCpuRest, _telemetryGpuName, _telemetryGpuTemp, _telemetryGpuRest })
+		foreach (Label piece in TelemetryPieceArray())
 		{
 			if (piece != null)
 			{
@@ -14760,7 +14890,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	private bool SyncTelemetryReserveWidth()
 	{
 		bool changed = false;
-		foreach (Label piece in new Label[6] { _telemetryCpuName, _telemetryCpuTemp, _telemetryCpuRest, _telemetryGpuName, _telemetryGpuTemp, _telemetryGpuRest })
+		foreach (Label piece in TelemetryPieceArray())
 		{
 			if (piece == null)
 			{
@@ -14913,11 +15043,11 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		Panel_GPU_ApplyHeight();
 	}
 
-	private static (string name, string temp, string rest) TelemetryParts(MechrevoHw? hw, bool isCpu)
+	private static (string name, string temp, string power, string rpm, string duty) TelemetryParts(MechrevoHw? hw, bool isCpu)
 	{
 		if (hw == null)
 		{
-			return (name: isCpu ? "CPU" : "GPU", temp: "—", rest: "");
+			return (name: isCpu ? "CPU" : "GPU", temp: "—", power: "", rpm: "", duty: "");
 		}
 		int temp = (isCpu ? hw.CpuTemp : hw.GpuTemp);
 		int rpm = (isCpu ? hw.CpuFanRpm : hw.GpuFanRpm);
@@ -14936,7 +15066,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//      ⭐ 下面的判据一字未改 ⇒ ⭐ <b>行为逐位不变</b> ✅（⭐ 含"⭐ duty=0 时照旧显示 <c>0%</c>"⚠️）
 		int? duty = hw.UsesBaolongda ? (int?)null : (isCpu ? hw.CpuFanDuty : hw.GpuFanDuty);
 		float? power = (isCpu ? HardwareControl.cpuPower : HardwareControl.gpuPower);
-		return (name: isCpu ? "CPU" : "GPU", temp: TelemetryTemp(temp, hw.IsSensorInfoFresh(isCpu, MechrevoHw.FanInfoMaximumAge, -1L)), rest: TelemetryRest(power, rpm, duty, hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L), hw.FanZeroIsMeaningful));
+		// 2026-10-16（方案 A）：三个字段**分开**返回（各占一片）；⛔ 不再在 TelemetryRest 里拼接。
+		bool fanFresh = hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L);
+		bool zeroIsMeaningful = hw.FanZeroIsMeaningful;
+		return (name: isCpu ? "CPU" : "GPU", temp: TelemetryTemp(temp, hw.IsSensorInfoFresh(isCpu, MechrevoHw.FanInfoMaximumAge, -1L)), power: TelemetryPower(power), rpm: TelemetryRpm(rpm, fanFresh, zeroIsMeaningful), duty: TelemetryDuty(duty, fanFresh, zeroIsMeaningful));
 	}
 
 	internal static string TelemetryTemp(int temp, bool fresh)
@@ -14954,25 +15087,75 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	/// <b><c>int?</c></b> ✅ —— ⭐ <c>null</c> = ⭐ <b>这个后端根本给不出占空比</b> ⚠️
 	/// ⇒ ⭐ 那就**不显示百分比** ✅（⭐ 宝龙达 ✅）。⭐ 有值时的判据一字未改 ✅。</para>
 	/// </summary>
+	/// <summary>
+	/// 2026-10-16（遥测排版方案 A）：**功耗段**的格式化 —— 与拆列前的判据逐字相同
+	///（<c>power.HasValue &amp;&amp; power &gt; 0</c> ⇒ 整数 W）。
+	/// </summary>
+	internal static string TelemetryPower(float? power)
+	{
+		if (!power.HasValue || power.GetValueOrDefault() <= 0f)
+		{
+			return "";
+		}
+		return $"{(int)Math.Round(power.Value)}W";
+	}
+
+	/// <summary>2026-10-16（方案 A）：**转速段**的格式化（判据与拆列前逐字相同）。</summary>
+	internal static string TelemetryRpm(int rpm, bool fanFresh, bool zeroIsMeaningful)
+	{
+		if (!fanFresh)
+		{
+			return "";
+		}
+		int num = ((!zeroIsMeaningful) ? 1 : 0);
+		if (rpm < num)
+		{
+			return "";
+		}
+		return $"{rpm}rpm";
+	}
+
+	/// <summary>
+	/// 2026-10-16（方案 A）：**占空比段**的格式化。
+	/// ⚠️ <paramref name="duty" /> 是 <c>int?</c>（0.291.9.1 起）：<c>null</c> = 这个后端根本给不出占空比
+	/// ⇒ **不打百分比**（宝龙达）；有值时的判据与改动前逐字相同。
+	/// </summary>
+	internal static string TelemetryDuty(int? duty, bool fanFresh, bool zeroIsMeaningful)
+	{
+		if (!fanFresh || !duty.HasValue)
+		{
+			return "";
+		}
+		int num = ((!zeroIsMeaningful) ? 1 : 0);
+		if (duty.GetValueOrDefault() < num)
+		{
+			return "";
+		}
+		return $"{duty.GetValueOrDefault()}%";
+	}
+
+	/// <summary>
+	/// 2026-10-16（方案 A）：拆列前的「后半段拼串」（功耗 空格 转速 空格 占空比）。
+	/// ⚠️ 主界面**已不再用它**（十片各自渲染）；保留它只为兼容既有调用面 / 取证口径，
+	/// 输出与拆列前**逐字相同**（三段都由上面三个同一入口产出，空段不参与拼接）。
+	/// </summary>
 	internal static string TelemetryRest(float? power, int rpm, int? duty, bool fanFresh, bool zeroIsMeaningful)
 	{
 		List<string> list = new List<string>(3);
-		if (power.HasValue && power.GetValueOrDefault() > 0f)
+		string text = TelemetryPower(power);
+		if (text.Length > 0)
 		{
-			list.Add($"{(int)Math.Round(power.Value)}W");
+			list.Add(text);
 		}
-		if (fanFresh)
+		string text2 = TelemetryRpm(rpm, fanFresh, zeroIsMeaningful);
+		if (text2.Length > 0)
 		{
-			int num = ((!zeroIsMeaningful) ? 1 : 0);
-			if (rpm >= num)
-			{
-				list.Add($"{rpm}rpm");
-			}
-			// ⭐ duty 未知（⭐ null ✅）⇒ ⭐ 不打百分比 ✅；⭐ 有值 ⇒ ⭐ 判据与改动前逐字相同 ✅
-			if (duty.HasValue && duty.GetValueOrDefault() >= num)
-			{
-				list.Add($"{duty.GetValueOrDefault()}%");
-			}
+			list.Add(text2);
+		}
+		string text3 = TelemetryDuty(duty, fanFresh, zeroIsMeaningful);
+		if (text3.Length > 0)
+		{
+			list.Add(text3);
 		}
 		return string.Join(" ", list);
 	}
