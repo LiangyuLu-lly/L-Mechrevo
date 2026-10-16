@@ -2772,6 +2772,170 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 灯光效果 · ⭐ 机主反馈「键盘灯 logo灯不可用」的**颜色/亮度**那半边）：
+	/// ⭐ 把 <c>MechrevoService.SetLightEffect(topic, effect, light, speed, direction, singleColor, save)</c>
+	/// 这一步**分派给非 GCU 后端** ✅
+	/// <para>⚠️ 根因：<c>SettingsForm.cs</c> · <c>Program.cs</c> · <c>LightForm.cs</c> 三处都**直接**调
+	/// <c>service.SetLightEffect(...)</c> ⇒ 它**直发 MQTT** ⇒ 宝龙达没有 GCU ⇒ 换颜色/调亮度全都发不出去 ❌
+	/// （⭐ 开关那半边已由 <see cref="TrySetLightPowerViaBackend" /> 接上 ✅，
+	/// ⭐ 但那条入口**不带颜色/亮度** ⚠️ ⇒ 所以必须在本入口再补一层 ✅）。</para>
+	/// <para>⭐ 协议（⭐ 参考 <c>_refs\JiaolongControl</c> · MIT · ⭐ 只取协议事实 ✅）：
+	/// ⭐ 键盘灯 ＝ 功能号 <b>17</b> 颜色（<c>byte[3]{R,G,B}</c>）⇒ <b>16</b> 模式
+	/// （<c>Mode_Off=0</c> / <c>Mode_RGBFixedMode=2</c>）⇒ <b>18</b> 亮度
+	/// （<c>Level_0..Level_3</c> ＝ 0~3，⭐ 共 4 级 ✅）；
+	/// ⭐ LOGO 灯 ＝ 功能号 <b>15</b>，⭐ **只有 开/关**（<c>ResultState: OFF=0 / ON=1</c>）
+	/// ⇒ ⭐ 没有颜色/亮度 ✅。</para>
+	/// <para>⚠️⚠️ <b>诚实边界（⭐ 一定写进日志 ✅）</b>：⭐ 宝龙达固件**只支持「关 ／ RGB 固定色」** ⚠️
+	/// ⇒ ⭐ 呼吸 · 波浪 · 彩虹 · 涟漪 · 雨滴 · 跑马灯 · 极光 · 游戏 等**动态效果一律【降级为固定色】** ✅
+	/// （⭐ 日志里明确写「降级」✅，⛔ 不假装支持 ⚠️）；⭐ <c>speed</c> ／ <c>direction</c>
+	/// **在宝龙达协议里没有对应字段** ⇒ ⭐ 忽略并记日志 ✅。</para>
+	/// <para>⭐ 返回 <c>true</c> ⇒ 已由本后端处理（⭐ 调用方 ⛔ 不要再发 MQTT ✅）；
+	/// ⭐ <c>false</c> ⇒ 不归它管 ⇒ 调用方**原路走** ✅（⭐ 非宝龙达恒 false ⇒ 逐位不变 ✅）。</para>
+	/// </summary>
+	/// <param name="topic">⭐ 灯光主题（⭐ 只认 <c>Keyboard/*</c> 与**含 Logo** 的灯条主题 ✅）。</param>
+	/// <param name="effect">⭐ 效果 ID（⭐ 例如 <c>Single</c> ／ <c>Breathing</c> ／ <c>Manual</c> ✅）。</param>
+	/// <param name="light">⭐ 亮度档（⭐ 界面口径 0~4；⭐ 宝龙达只到 3 ⇒ ⭐ 会夹紧并记日志 ✅）。</param>
+	/// <param name="colorArgb">⭐ 单色（<c>null</c> ＝ 界面没给色 ⇒ ⭐ 先试读当前值、⭐ 读不到才用白色 ✅）。</param>
+	/// <param name="confirmed">⭐ 回读确认后的实际状态 ✅。</param>
+	internal bool TrySetLightEffectViaBackend(string topic, string effect, int light, int? colorArgb, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false; // ⭐ 不是宝龙达在管事 ⇒ 交给原来的 GCU 路径 ✅
+		}
+		if (string.IsNullOrEmpty(topic))
+		{
+			return false;
+		}
+		try
+		{
+			// ⭐ 统一口径：⭐ 「关」 ＝ ⭐ 效果是 Off ／ None ／ 空 ⭐ 或 ⭐ 亮度 ≤ 0 ✅
+			bool off = IsLightEffectOff(effect) || light <= 0;
+			// ── ⭐ LOGO 灯（⭐ 功能号 15：⭐ 只有 开 ／ 关 ✅）──
+			if (topic.IndexOf("Logo", StringComparison.OrdinalIgnoreCase) >= 0)
+			{
+				if (!off)
+				{
+					Logger.WriteError("宝龙达 LOGO 灯：⭐ 本机只有【开 ／ 关】（⭐ 功能号 15）⚠️ ⇒ 界面给的效果「"
+						+ effect + "」／亮度 " + light + " ⭐ **没有对应字段 ⇒ 已忽略** ✅");
+				}
+				return TrySetLogoLightViaBackend(!off, out confirmed);
+			}
+			// ── ⭐ 键盘灯（⭐ 功能号 16 ／ 17 ／ 18 ✅）──
+			if (!topic.StartsWith("Keyboard/", StringComparison.OrdinalIgnoreCase))
+			{
+				return false; // ⭐ 其余灯条主题（⭐ Lightbar ／ Hinge ／ Sync ⚠️）不归它管 ⇒ 交回原路 ✅
+			}
+			if (off)
+			{
+				// ⭐ 关灯：⭐ 只写「模式 0」（关）✅ —— ⭐ 不需要颜色/亮度 ✅
+				if (!wmi.TrySetKeyboardMode(0))
+				{
+					Logger.WriteError("宝龙达 键盘灯效：⚠️ 关灯写入失败（详见上一行）⇒ 本次未生效");
+					return true; // ⭐ 已接管（只是失败）⇒ ⛔ 别让调用方再发 GCU ✅
+				}
+			}
+			else
+			{
+				// ⭐ ① 颜色（⭐ 功能号 17，⭐ 三字节 R,G,B ✅）
+				int argb;
+				if (colorArgb.HasValue)
+				{
+					argb = colorArgb.Value & 0xFFFFFF;
+				}
+				else if (TryReadKeyboardColorViaBackend(wmi, out int currentArgb))
+				{
+					argb = currentArgb;
+					Logger.WriteError("宝龙达 键盘灯效：⭐ 界面没给颜色 ⇒ ⭐ **沿用当前回读值** #"
+						+ argb.ToString("X6") + " ✅（⛔ 不拿白色去冲掉用户已设的色 ✅）");
+				}
+				else
+				{
+					argb = 0xFFFFFF;
+					Logger.WriteError("宝龙达 键盘灯效：⚠️ 界面没给颜色、⭐ **回读也读不到当前值** ⇒"
+						+ " 用保守默认**白色** 0xFFFFFF ✅（⭐ 如实记录 ⚠️）");
+				}
+				// ⚠️ 动态效果 ⇒ ⭐ 降级为固定色（⭐ 写明 ✅；⛔ 不假装支持 ⚠️）
+				if (!IsFixedColorEffect(effect))
+				{
+					Logger.WriteError("宝龙达 键盘灯效：⭐ 效果「" + effect + "」在本机 **降级为固定色** ✅"
+						+ "（⚠️ 宝龙达固件只支持 关 ／ RGB 固定色 ⇒ 呼吸·波浪·彩虹·涟漪 等**动态效果无法下发** ⚠️；"
+						+ "⭐ speed/direction 在宝龙达协议里没有对应字段 ⇒ ⭐ 已忽略 ✅）");
+				}
+				int brightness = Math.Max(0, Math.Min(3, light));
+				if (light > 3)
+				{
+					Logger.WriteError("宝龙达 键盘灯效：⭐ 亮度 " + light + " 超出本机范围 ⇒ ⭐ **夹紧到 "
+						+ brightness + "**（⭐ 宝龙达只有 0~3 共 4 级 ✅）");
+				}
+				if (!TrySetKeyboardLightingViaBackend(true, argb, brightness, out confirmed))
+				{
+					return false; // ⭐ 理论上不会发生 ⇒ 交回原路更安全 ✅
+				}
+				if (confirmed)
+				{
+					return true; // ⭐ 里面已经记好日志了 ✅
+				}
+			}
+			// ⭐ 回读确认（⭐ 与 LOGO 灯 ／ 灯光电源同款：⭐ 5 次 × 150 ms ✅）
+			for (int attempt = 0; attempt < 5; attempt++)
+			{
+				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte _))
+				{
+					confirmed = true;
+					Logger.WriteError("宝龙达 键盘灯效：⭐ 已" + (off ? "关" : "应用")
+						+ "并回读确认 ✅（第 " + (attempt + 1) + " 次）");
+					return true;
+				}
+				Thread.Sleep(150);
+			}
+			Logger.WriteError("宝龙达 键盘灯效：⚠️ 写入完成但 " + (5 * 150)
+				+ " ms 内**回读不一致** ⇒ 如实报告未确认 ⚠️");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("宝龙达 键盘灯效：⭐ 操作异常（已吞掉，不影响别处）：" + ex.Message);
+			return true; // ⭐ 已接管 ⇒ ⛔ 不让调用方再走 GCU ✅
+		}
+	}
+
+	/// <summary>⭐ 判「关灯」—— ⭐ 界面口径：⭐ 效果是 Off ／ None ／ 空 ✅。</summary>
+	private static bool IsLightEffectOff(string? effect)
+	{
+		return string.IsNullOrWhiteSpace(effect)
+			|| effect.Equals("Off", StringComparison.OrdinalIgnoreCase)
+			|| effect.Equals("None", StringComparison.OrdinalIgnoreCase);
+	}
+
+	/// <summary>⭐ 判「固定色」效果 —— ⭐ 宝龙达固件**只支持这一种** ✅（⭐ 其余一律降级 ✅）。</summary>
+	private static bool IsFixedColorEffect(string? effect)
+	{
+		return !string.IsNullOrWhiteSpace(effect)
+			&& (effect.Equals("Single", StringComparison.OrdinalIgnoreCase)
+				|| effect.Equals("Static", StringComparison.OrdinalIgnoreCase)
+				|| effect.Equals("Fixed", StringComparison.OrdinalIgnoreCase));
+	}
+
+	/// <summary>
+	/// ⭐ 回读键盘灯颜色（⭐ 功能号 17 ⇒ ⭐ <c>OutData[4],[5],[6]</c> ＝ R,G,B ✅）。
+	/// ⭐ 读不到 ⇒ <c>false</c> ✅（⭐ 调用方据此退回保守默认 ⚠️）。
+	/// </summary>
+	private static bool TryReadKeyboardColorViaBackend(BaolongdaWmi wmi, out int argb)
+	{
+		argb = 0;
+		if (!wmi.TryReadBytesChecked(BaolongdaWmi.Function.RgbKeyboardColor, 3, out byte[] rgb)
+			|| rgb == null || rgb.Length < 3)
+		{
+			return false;
+		}
+		argb = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+		return true;
+	}
+
+	/// <summary>
 	/// ⭐ 读一次宝龙达 LOGO 灯状态（⭐ 只读 ✅）。⭐ 非宝龙达时返回 <c>false</c> ✅。
 	/// </summary>
 	internal bool TryReadLogoLightViaBackend(out bool on)

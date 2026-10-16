@@ -3843,6 +3843,15 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			{
 				return false;
 			}
+			// ⭐⭐ 2026-10-16（宝龙达 · 灯光效果）：⭐ 把**颜色 ／ 亮度 ／ 效果**这条也分派给非 GCU 后端 ✅
+			//    ⚠️ 三个调用点（⭐ SettingsForm ／ Program ／ LightForm ✅）都**直接**调本方法
+			//    ⇒ 它原来**直发 MQTT** ⇒ 宝龙达上换颜色 ／ 调亮度发不出去 ⚠️
+			//    ⭐ 非宝龙达 ⇒ 分派返回 false ⇒ ⭐ 下面原路**逐位不变** ✅
+			if (_hw.TrySetLightEffectViaBackend(topic, effect, light,
+				singleColor.HasValue ? singleColor.Value.ToArgb() : (int?)null, out bool _))
+			{
+				return true;
+			}
 			Dictionary<string, object> color = new Dictionary<string, object>();
 			// ⚠️ 2026-10-16（owner 明确指示「键盘灯是正常的不用动」）：⭐ 本方法**只服务键盘**
 			// （唯一调用方是 SetKeyboardBrightnessPreservingEffect ⇒ topic 恒为 "Keyboard/Ctrl"）
@@ -3965,6 +3974,15 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			if (!SupportsLightTopic(topic))
 			{
 				return false;
+			}
+			// ⭐⭐ 2026-10-16（宝龙达 · 灯光效果）：⭐ 把**颜色 ／ 亮度 ／ 效果**这条也分派给非 GCU 后端 ✅
+			//    ⚠️ 三个调用点（⭐ SettingsForm ／ Program ／ LightForm ✅）都**直接**调本方法
+			//    ⇒ 它原来**直发 MQTT** ⇒ 宝龙达上换颜色 ／ 调亮度发不出去 ⚠️
+			//    ⭐ 非宝龙达 ⇒ 分派返回 false ⇒ ⭐ 下面原路**逐位不变** ✅
+			if (_hw.TrySetLightEffectViaBackend(topic, effect, light,
+				singleColor.HasValue ? singleColor.Value.ToArgb() : (int?)null, out bool _))
+			{
+				return true;
 			}
 			Dictionary<string, object> dictionary = new Dictionary<string, object>();
 			// ⭐⭐ 2026-10-16（0.291.8.1 · 按厂商反编译校正）：`isCircular` **不能恒为 true**。
