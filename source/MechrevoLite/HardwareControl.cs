@@ -24,6 +24,37 @@ public static class HardwareControl
 	/// </summary>
 	private static int _gpuTempNoneLogged;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（修"GPU 温度闪「—」"· 方案 A）：⭐ **外部来源**（LHM / 加固过的 NVML ✅）
+	/// 最后一次给出**有效** GPU 温度的时刻（<see cref="Environment.TickCount64"/> ✅）。
+	/// <para>⚠️ 为什么需要它：⭐ <c>TryStep("lhm-read")</c> 那道闸门失败时
+	/// <c>RefreshLocalMonitoringCore</c> 会**直接 return** ⚠️ ⇒ <c>ApplySensorPriority</c> 根本不跑
+	/// ⇒ ⭐ 时间戳不刷新 ⇒ ⭐ 界面**闪成「—」** ❌（⭐ 明明几秒前还读到了值 ✅）。</para>
+	/// <para>⭐ 修法（⭐ 与上游开源项目一致 ✅）：⭐ 闸门失败时**只碰托管状态**地续一下时间戳，
+	/// ⭐ **在上限之内**继续显示上一次的好值 ✅ ⇒ ⛔ 不闪「—」。</para>
+	/// <para>⚠️ <b>0 = 本次会话还没有过外部好值</b> ⇒ ⭐ **不续命** ✅
+	/// （⭐ 没有旧值可显示 ⇒ ⭐ 该显示「—」就显示「—」⇒ ⛔ 不伪造 ⚠️）。</para>
+	/// <para>⭐ <b>只由"厂商没给值、⭐ LHM/NVML 给了"那一条支路写</b> ✅
+	/// ⇒ ⭐ GCU 机型（⭐ 厂商值恒有效 ✅）**永不写它** ⇒ ⭐ <b>行为逐位不变</b> ✅。</para>
+	/// </summary>
+	private static long _gpuTempExternalGoodTick;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（同上）：⭐ **GPU 温度续命上限**（毫秒 ✅）。
+	/// <para>⚠️ 为什么必须有上限：⭐ 采样若**长期**失败（⭐ 例如 LHM 被禁用、⭐ GPU 进了低功耗态 ⚠️），
+	/// 无限期显示旧值就是**撒谎** ❌ ⇒ ⭐ 超过这个时长就**停止续命** ⇒ ⭐ 界面照旧显示「—」✅，
+	/// 并**默认级别可见地记一行**（⭐ 说明"⭐ 续命到期"⭐ ✅）。</para>
+	/// <para>⭐ 上限**会被新的好值重置** ✅（⭐ 见 <see cref="_gpuTempExternalGoodTick"/> 的写入点 ✅）。</para>
+	/// </summary>
+	private const int GpuTempKeepAliveLimitMs = 30000;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（同上）：⭐ 续命**状态翻转位**（⭐ 0=未续命 · ⭐ 1=续命中 ✅）。
+	/// <para>⚠️ 为什么要它：⭐ 本状态机每 3 秒跑一次 ⚠️ ⇒ ⭐ 直接写日志就是刷屏 ❌；
+	/// ⭐ 而"⭐ 续命"⭐ 与"⭐ 续命到期"⭐ 这两件事**各自只该记一次** ✅ ⇒ ⭐ 按状态翻转记 ✅。</para>
+	/// </summary>
+	private static int _gpuTempKeepAliveState;
+
 	public static int cpuTemp;
 
 	public static int? cpuUsage;
@@ -400,6 +431,12 @@ public static class HardwareControl
 					//      `hw.CpuFanRpm`（⭐ 门面层属性 ✅），⭐ 两条路**根本不是同一处** ✅
 					//   ⇒ ⭐ 修法：⭐ **把外部来源的值写回门面层** ✅（⭐ 连值带时间戳 ✅）
 					hw.MarkExternalGpuTemp(gpuTemp);
+					// ⭐⭐ 2026-10-16（方案 A）：⭐ 记下"⭐ 外部来源最后一次给出有效值的时刻" ✅
+					//   ⇒ ⭐ 闸门失败时可以在此基础上**在上限之内**续命（⛔ 不闪「—」）✅
+					//   ⭐ 同时把续命状态复位 ⇒ ⭐ "⭐ 恢复过、⭐ 之后又失败"⭐ 会重新记一次
+					//      （⭐ 不刷屏：⭐ 必须真的恢复过一次才会重记 ✅）
+					Interlocked.Exchange(ref _gpuTempExternalGoodTick, Environment.TickCount64);
+					Interlocked.Exchange(ref _gpuTempKeepAliveState, 0);
 					Logger.WriteLineIfChanged("bd-gpu-temp-ext",
 						$"GPU 温度（⭐ 非 GCU 来源）：⭐ 厂商未提供 ⇒ ⭐ 由 LHM/NVML 取到 {gpuTemp}℃"
 						+ " ⇒ ⭐ 已写回 hw.GpuTemp ＋ ⭐ 打时间戳 ✅（⭐ 主界面那行读的就是它 ✅）");
@@ -609,6 +646,80 @@ public static class HardwareControl
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（修"GPU 温度闪「—」"· 方案 A）：⭐
+	/// <c>TryStep("lhm-read")</c> 闸门失败时，**只碰托管状态**地给 GPU 温度续一下时间戳 ✅。
+	///
+	/// <para>⚠️⚠️ <b>为什么只能碰托管状态</b>：⭐ <c>TryStep("lhm-read")</c> 那道闸门的注释写着
+	/// 「⭐ 所有可能进入原生层（LHM / NVML / EC / WMI）的采样都从这里走」⚠️ ——
+	/// ⭐ 本方法**绝不进入任何原生层** ✅（⭐ 只读一个 <c>long</c> 字段 ＋ ⭐ 调
+	/// <see cref="MechrevoHw.MarkGpuInfoReceived"/> 打时间戳 ✅）
+	/// ⇒ ⭐ 所以可以安全地放在**失败分支**里，⛔ 不需要 <c>TryStep</c> 包裹，
+	/// ⛔ 也不会削弱那道闸门的原生层 AV 防护 ✅。</para>
+	///
+	/// <para>⭐ <b>语义</b>：⭐ "⭐ 我几秒前确实读到过有效温度 ✅ ⇒ ⭐ 这一次没读到
+	/// ⭐ 不足以判定传感器没了 ⚠️ ⇒ ⭐ 先沿用上一次的好值 ✅" ——
+	/// ⭐ 与斗战者（<c>_lastGpuTemp</c> ＋ ⭐ 短 TTL ✅）／蛟龙（⭐ 沿用上次值 ✅）
+	/// 等上游开源项目的做法一致 ✅。</para>
+	///
+	/// <para>⚠️ <b>三条硬边界</b>：
+	/// ⭐ ① ⭐ <c>_gpuTempExternalGoodTick == 0</c>（⭐ 本次会话还没有过外部好值 ⚠️）⇒ ⭐ **不续命**
+	/// （⭐ 没有旧值可显示 ⇒ ⭐ 该显示「—」就显示「—」⇒ ⛔ 不伪造 ✅）；
+	/// ⭐ ② ⭐ 超过 <see cref="GpuTempKeepAliveLimitMs"/> ⇒ ⭐ **停止续命** ⇒ ⭐ 照旧「—」✅；
+	/// ⭐ ③ ⭐ 门面层里没有可用值（⭐ <c>hw.GpuTemp &lt;= 0</c> ⚠️）⇒ ⭐ 不续命 ✅。</para>
+	/// </summary>
+	private static void KeepAliveGpuTempOnSampleFailure()
+	{
+		// (a) 本方法整体再兜一层：只碰托管状态 ⇒ 理论上不会抛，但绝不冒泡到 UI 线程。
+		try
+		{
+			long lastGoodTick = Interlocked.Read(in _gpuTempExternalGoodTick);
+			if (lastGoodTick == 0L)
+			{
+				// ⭐ 本次会话还没有过外部来源的好值 ⇒ ⛔ 没有旧值可显示 ⇒ 不续命 ✅
+				return;
+			}
+			MechrevoHw hw;
+			try
+			{
+				hw = Program.hw;
+			}
+			catch
+			{
+				return;
+			}
+			if (hw == null || hw.GpuTemp <= 0)
+			{
+				// ⭐ 门面层里没有可用值 ⇒ ⛔ 不续命（⭐ 免得把「—」变成假的有效 ✅）
+				return;
+			}
+			long ageMs = Environment.TickCount64 - lastGoodTick;
+			if (ageMs > GpuTempKeepAliveLimitMs)
+			{
+				// ── 超过上限 ⇒ 停止续命 ⇒ 界面照旧显示「—」⇒ 只记一次（状态翻转）──
+				if (Interlocked.Exchange(ref _gpuTempKeepAliveState, 0) == 1)
+				{
+					Logger.WriteError($"GPU 温度：⚠️ **续命已到期**（⭐ 最近一次【外部来源】的有效读数是 {ageMs / 1000} 秒前 ⚠️）"
+						+ $" ⇒ ⭐ **不再沿用旧值**（⛔ 不再无限期显示它 ⚠️，⭐ 上限 {GpuTempKeepAliveLimitMs / 1000} 秒）；"
+						+ "⭐ 若此刻没有别的来源，界面就显示「—」✅（⭐ 下次一取到新的有效值就恢复 ✅）");
+				}
+				return;
+			}
+			// ── 在上限之内 ⇒ 打时间戳 ⇒ 界面继续显示上一次的好值（⛔ 不闪「—」）──
+			hw.MarkGpuInfoReceived();
+			if (Interlocked.Exchange(ref _gpuTempKeepAliveState, 1) == 0)
+			{
+				Logger.WriteError($"GPU 温度：⭐ 本次采样失败（⭐ lhm-read 闸门 ⚠️）⇒ **暂用上一次的好值"
+					+ $" {hw.GpuTemp}℃ 继续显示** ✅（⭐ 已续命 {ageMs / 1000} 秒，"
+					+ $"⭐ 上限 {GpuTempKeepAliveLimitMs / 1000} 秒 ⚠️；"
+					+ "⛔ 未进入 LHM/NVML/EC/WMI 等原生层 ✅）；⭐ 本条只记一次 ✅");
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>
 	/// 采样主干（由 <see cref="RefreshLocalMonitoring"/> 在同一次持锁内调用）：
 	/// 每一步各自兜底（LHM 更新 / LHM 读值 / NVML 采样 / 性能计数器回退），任何一步失败只跳过本次采样。
 	/// </summary>
@@ -653,6 +764,13 @@ public static class HardwareControl
 			num7 = lhmMonitor.GpuMemoryTotalMb;
 		}, "lhm-read"))
 		{
+			// ⭐⭐ 2026-10-16（修"GPU 温度闪「—」"· 方案 A）：⭐ 闸门失败 ⇒
+			//   ⭐ **只碰托管状态**地给 GPU 温度续一下时间戳 ✅（⛔ 本调用不进原生层 ⚠️）。
+			//   ⚠️ 以前这里**直接 return** ⇒ `ApplySensorPriority` 根本不跑 ⇒ ⭐ 时间戳不刷新
+			//      ⇒ ⭐ 界面**闪成「—」** ❌（⭐ 明明几秒前还读到了值 ✅）。
+			//   ⭐⭐ 注意：⭐ **闸门本身与它的位置【一字未动】** ✅ ——
+			//      ⛔ 没有把 `ApplySensorPriority` 提到闸门之前（⭐ 那会削弱原生层 AV 防护 ❌）。
+			KeepAliveGpuTempOnSampleFailure();
 			return;
 		}
 		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配 · "接传感器"）：⭐ 非 GCU 后端的传感器补值 ✅
