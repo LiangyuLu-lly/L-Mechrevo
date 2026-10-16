@@ -10969,6 +10969,22 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		MarkGpuRestartPending(targetMode);
 		Logger.WriteLine("宝龙达 显卡模式切换：⭐ 已写入功能号 9 ⇒ ⭐ 记为「待重启生效」"
 			+ "（⭐ 宝龙达不走 GCU 重启路由 ⇒ ⭐ 请用户在方便时手动重启 ✅）");
+		// ⭐⭐ 2026-10-16（0.291.9.3 · 机主真机反馈「⭐ 显卡模式切换后没有重启提示，⭐ 我也不知道切换成功没」⚠️）：
+		//   ⚠️⚠️ 上一次（⭐ `740951c`）把 GCU 那条**错误的**弹窗去掉了 ✅ ——
+		//      ⭐ 但**只剩「⭐ 界面橙色高亮待切换状态」**（⭐ `MarkGpuRestartPending` ✅）⚠️
+		//      ⇒ ⭐ ⭐ **机主说看不到** ❌ ⇒ ⭐ 所以那次等于"⭐ 点了没反应"⚠️
+		//   ⇒ ⭐ ⭐ **现在补一条明确的用户可见提示** ✅ —— ⭐ 用既有的 `ToastForm.ShowNotice`
+		//      （⭐ 它内部 `RunToast(..., essential: true)` ✅ ⇒ ⭐ **即使「OSD 提示」快捷开关关掉也照样弹** ✅
+		//       —— ⭐ 因为这是"**功能结果告知**"、⭐ 不是装饰性 OSD ✅ 与 `ToastForm` 的既有设计一致 ✅）
+		//   ⭐ 文案走**行内**（⛔ 不动 `Strings*.resx`：⭐ 它是**混合行尾** ⚠️、⭐ 加串要同改 3 个文件；
+		//      ⭐ 且本文件/本项目**已有行内文案先例** ✅ —— ⭐ 例如 `CustomModeForm.HardwareStateUnavailableText`）
+		//   ⭐ ⭐ **必须区分成功与未确认** ✅（⭐ 诚实性铁律 ⚠️）：
+		//      ⭐ `confirmed` 为真 ⇒ ⭐ 回读已确认功能号 9 写对了 ✅ ⇒ ⭐ 才敢说「已切到」
+		//      ⚠️ 未确认 ⇒ ⭐ **不谎报"已切换"** ⚠️ ⇒ ⭐ 换一句"未确认"的说法 ✅
+		//   ⭐ 语义：⭐ 宝龙达的「应用」＝ ⭐ **它自己的固件下次开机读功能号 9** ✅ ⇒ ⭐ 重启才生效 ✅
+		ToastForm.ShowNotice(confirmed
+			? $"已切到{modeName}，重启后生效"
+			: $"已请求切到{modeName}，但回读未确认，重启后请再确认");
 	}
 
 	private async Task<GpuModeStatusReadback> RefreshGpuModeUiStateAsync()
@@ -11193,7 +11209,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			gpuTemp = (hwSensors.IsSensorInfoFresh(cpu: false, fanInfoMaximumAge, -1L) ? ": " + TempHelper.FormatTemp(HardwareControl.gpuTemp) : ": —");
 		}
 		bool fanInfoFresh = hwSensors?.IsFanInfoFresh(fanInfoMaximumAge, -1L) ?? false;
-		int? cpuFan = HardwareControl.cpuFan;
+		// ⭐⭐ 2026-10-16（0.291.9.3 · 机主反馈"⭐ 托盘显示 `风扇: 0% (1790 rpm)`、⭐ 而主界面只显示 `1790rpm`"⚠️）：
+		//   ⚠️⚠️ 根因：⭐ 主界面那行遥测（⭐ `TelemetryParts` ✅）已在 `94dcba6` 修成
+		//      ⭐ **宝龙达下把 duty 当"未知"（`null`）** ✅ —— 但**这里（⭐ 托盘/悬浮窗 ✅）
+		//      ⭐ 走的是【另一套拼装】** ❌ ⇒ ⭐ 它仍拿 `HardwareControl.cpuFan/gpuFan`（⭐ = `hw.*FanDuty` ⚠️）
+		//      ⇒ ⭐ 宝龙达**没有 GCU 推送** ⇒ 那两个 duty **恒为 0** ⚠️
+		//      ⇒ ⭐ 于是显示 ❌ **误导性的 `0%`**（⭐ 而同一行 RPM 明明有值 ✅）
+		//   ⇒ ⭐ 修法：⭐ 与主界面**同一口径** ✅ —— 宝龙达下把 duty 当"未知" ⇒
+		//      ⭐ 不满足下面那支 ⇒ ⭐ 落到"⭐ 只有 RPM"那一支 ⇒ ⭐ 显示 `风扇: 1790 rpm` ✅
+		//      ⇒ ⭐ 托盘与主界面**就一致了** ✅（⭐ 机主反馈的"没有同时"✅）
+		//   ⚠️ 非宝龙达（⭐ GCU/同方 ✅）⇒ `dutyUnknown` 为假 ⇒ ⭐ **判据一字不变** ✅
+		//      ⇒ ⭐ **行为逐位不变** ✅（⭐ 含"⭐ duty=0 时照旧显示 `0%`"⚠️）
+		bool dutyUnknown = hwSensors != null && hwSensors.UsesBaolongda;
+		int? cpuFan = dutyUnknown ? (int?)null : HardwareControl.cpuFan;
 		if (fanInfoFresh && cpuFan.HasValue && cpuFan.GetValueOrDefault() >= 0)
 		{
 			string[] array = new string[6]
@@ -11234,7 +11262,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			text2 = Strings.FanSpeed + ": " + HardwareControl.cpuFanRPM + " rpm";
 		}
-		cpuFan = HardwareControl.gpuFan;
+		cpuFan = dutyUnknown ? (int?)null : HardwareControl.gpuFan;
 		if (fanInfoFresh && cpuFan.HasValue && cpuFan.GetValueOrDefault() >= 0)
 		{
 			string[] array2 = new string[6]
