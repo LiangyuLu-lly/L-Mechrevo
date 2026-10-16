@@ -742,6 +742,14 @@ internal static class EcPortIo
 		{
 			return;
 		}
+		// ⚠️ 2026-10-16：下面这段在 <see cref="InterTransactionDelayMs" /> 取当前值 0 时**编译期即不可达**
+		//    ⇒ 编译器报 CS0162「检测到无法访问的代码」。但这是**有意保留**的机制，⛔ 不是死代码遗留：
+		//    见该常量自己的说明 —— 延迟被 2026-10-16 的 A/B 实测否定后才关成 0，
+		//    保留整段是为了将来在**真机证据**支持下"只改一个数字"即可重新启用
+		//    （诊断段仍在读它的值，`DiagnosticBaolongdaInfo` 会如实打印"当前事务间隔 = 0ms"）。
+		//    ⇒ 因此用 pragma **只静默该告警**：⛔ 不删代码、⛔ 不改逻辑、⛔ 不动任何安全护栏。
+		//    ⭐ 将来把常量改成 > 0 时这段自然被启用，届时可一并移除本 pragma。
+#pragma warning disable CS0162
 		try
 		{
 			Thread.Sleep(InterTransactionDelayMs);
@@ -749,6 +757,7 @@ internal static class EcPortIo
 		catch (Exception)
 		{
 		}
+#pragma warning restore CS0162
 	}
 
 	/// <summary>供诊断：最近一次读失败的原因（成功会清空）⭐ 用于如实标注「哪个地址为何失败」。</summary>
