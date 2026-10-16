@@ -133,9 +133,37 @@ internal sealed class BaolongdaBackend : IDisposable
 	}
 
 	/// <summary>
-	/// 本后端的能力集。
-	/// <para>⚠️ 与 <c>ApplyLegacyBackendAsync</c> 同口径：⭐ 凡"要靠上报才知道"的能力一律 false（⛔ 不假装可写）。</para>
-	/// <para>⭐ 本轮**只开放最小集**（性能档）—— ⭐ 风扇/灯效/功耗墙等**等真机验证过再逐个放开**（⭐ 见文件头"下一步"）✅</para>
+	/// 本后端的能力集 —— ⭐⭐ **本类的能力位是【唯一来源】** ✅
+	/// （⭐ <c>MechrevoHw.ApplyBaolongdaBackendAsync</c> 直接用它赋值，⛔ 不再另写一份 ✅）。
+	///
+	/// <para>⭐⭐ <b>铁律（⭐ 2026-10-16 定稿 · ⭐ 见 docs\notes\宝龙达-全部接入实施方案-20261016.md）</b>：
+	/// ⭐ <b>能力位 = "已经接好下发路径"的证明</b>，⛔ **不是"硬件支持"的声明** ⚠️。
+	/// ⭐ 因为 UI 只认能力位 ⇒ ⭐ 一旦开出去，⭐ 用户点下去就会走到**已有的 GCU 下发代码**上 ⚠️，
+	/// ⭐ 而宝龙达**没有 GCU**（⭐ 没有 MQTT 13688 ✅）⇒ ⭐ 必然失败/静默无效 ❌。
+	/// ⇒ ⭐ ⭐ **每开一个能力位，⭐ 必须先把它的下发路径分派到宝龙达 WMI** ✅。</para>
+	///
+	/// <para>⭐⭐ <b>这条铁律同时保证了"不影响同方"</b> ✅：
+	/// ⭐ 宝龙达的能力位**只在本方法里产出**、⭐ 且只在 <c>ApplyBaolongdaBackendAsync</c> 里被用；
+	/// ⭐ 老同方走 <c>ApplyLegacyBackendAsync</c>（⭐ 未被改动 ✅）、
+	/// ⭐ GCU 机型走 <c>RefreshDeviceCapabilities</c>（⭐ 未被改动 ✅）
+	/// ⇒ ⭐ 三者**互不干扰** ✅。</para>
+	///
+	/// <para>⭐ <b>当前已开放</b>（⭐ 已完成并真机验证的）：
+	/// <list type="bullet">
+	/// <item>⭐ <c>ProfileAvailable</c> / ⭐ <c>TurboMode</c> —— ⭐ 性能档（功能号 8，⭐ 真机验证 ✅）</item>
+	/// </list></para>
+	///
+	/// <para>⚠️ <b>尚未开放</b>（⭐ 待接下发分派，⭐ 顺序见方案文档第 4 节）：
+	/// <list type="bullet">
+	/// <item>⚠️ <c>LogoLight</c> —— 功能号 15；⭐ 协议已真机验证（读到 1 = 开 ✅），⭐ **只差下发分派** ✅</item>
+	/// <item>⚠️ <c>Keyboard</c> —— 功能号 16/17/18；⚠️ **这三个功能号真机还没验证过** ⚠️（⭐ 方案 2.3）</item>
+	/// <item>⚠️ <c>CpuPerformanceTuning</c> —— 功能号 23；⚠️ **只能写、读不回来** ⚠️（⭐ 方案 2.2，⭐ 建议先做"开关+预设"）</item>
+	/// <item>⚠️ <c>FanSettings</c> —— 功能号 20/21；⚠️⚠️ **风险最高**：⭐ 会真正改散热行为 ⚠️，
+	/// ⭐ 且**风扇通道归属还没确认**（⭐ 猜的 `[4..5]`=GPU · ⭐ `[6..7]`=CPU ⚠️）
+	/// ⇒ ⭐ **必须最后做** ✅（⭐ 方案 2.4）</item>
+	/// <item>⛔ <c>Lightbar</c> / ⛔ <c>RgbLightbar</c> —— ⭐ 宝龙达功能号 15 **只有开关、⛔ 没有颜色/效果**
+	/// ⇒ ⭐ **永远不要开**（⭐ 开了 UI 会显示颜色/效果选项 ⇒ ⭐ 点下去没反应 ❌）✅</item>
+	/// </list></para>
 	/// </summary>
 	internal MechrevoDeviceCapabilities BuildCapabilities()
 	{

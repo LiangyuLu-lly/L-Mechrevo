@@ -2564,14 +2564,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private async Task ApplyBaolongdaBackendAsync(BaolongdaBackend backend)
 	{
 		_activeBackend = MechrevoBackendKind.Baolongda;
-		Capabilities = new MechrevoDeviceCapabilities
-		{
-			ProjectId = "Baolongda",
-			IsMechrevo = true,
-			ProfileAvailable = true,
-			TurboMode = true,
-			AmdPlatform = PawnIO.CpuInfo.IsAMD
-		};
+		// ⭐⭐ 2026-10-16：⭐ 能力位**只认一个来源** —— <see cref="BaolongdaBackend.BuildCapabilities" /> ✅
+		//    ⚠️ 起因：⭐ 我先前在两个地方各写了一份（⭐ 这里 ＋ ⭐ `BuildCapabilities`）⇒ ⭐ **必然有一天只改一处** ⚠️
+		//    ⇒ ⭐ 现在统一走 `BuildCapabilities()` ✅（⭐ 与 GCU 那条支的风格一致：⭐
+		//      ⭐ `RefreshDeviceCapabilities` 也是从 `MechrevoDeviceCapabilities` 一处产出 ✅）
+		Capabilities = backend.BuildCapabilities();
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
 			+ $" fans={backend.Wmi.FanCount} modes={backend.Wmi.ModeCount}");
 		// ⭐⭐ 2026-10-16（"接传感器"）：⭐ 同一个 3 s 定时器里**顺便刷一遍传感器** ✅
