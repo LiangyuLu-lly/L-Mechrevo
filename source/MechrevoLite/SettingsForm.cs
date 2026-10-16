@@ -7181,7 +7181,37 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		int num = BatteryControl.SelectedModePercent();
 		int[] array = new int[3] { 100, 80, 60 };
 		int currentMode = -1;
-		if (EcChargeLimit.IsSupportedLimit(num))
+		// ⭐⭐ 2026-10-16（参考 beta18 / 0.289.1.0 旧代码，修「GCU 三档点不动」）：
+		// 旧代码（存档 archive/checkpoints/存档_20260924/source_modified/SettingsForm.cs:3747）的高亮判据是
+		// **优先读 GCU 上报的档位**：
+		//     if (hw != null && hw.BatteryProtection >= 0 && hw.BatteryProtection <= 2)
+		//         currentMode = hw.BatteryProtection;
+		//     else { int limit = AppConfig.Get("charge_limit", 100);
+		//            currentMode = (limit >= 95) ? 0 : ((limit >= 80) ? 1 : 2); }
+		// ⚠️ 而「三种传输方式」那次改造把它换成了**只读 EC 侧** BatteryControl.SelectedModePercent() ——
+		//    于是 GCU 传输（EC 限充关 ⇒ 三档交给 GCU 官方 BatteryProtection/Control）时，
+		//    高亮依据的是 **EC 0x7B9 的残留值**，与 GCU 真实档位无关
+		//    ⇒ 点完高亮不挪窝 ⇒ 用户的主观结论必然是「点不动」（真机日志恰好印证：请求已下发且已被 GCU 回读确认）。
+		// 修法（**只补 GCU 这一层取数，⛔ 不改传输闸门 / EC 写入 / 滑块互斥 / Enabled 任何一处**）：
+		//   · EC 直写方式**未生效** ⇒ **优先用 GCU 上报的档位**（0=长效 / 1=平衡 / 2=工作站，与数组下标一一对应）；
+		//   · EC 直写方式**生效** ⇒ 跳过本块，**下面原逻辑一字不变**（那时 GCU 值本就不同步，不能拿来当准）。
+		if (!ChargeLimitEcPathActive())
+		{
+			MechrevoHw hwTier = Program.hw;
+			if (hwTier != null && hwTier.BatteryProtection >= 0 && hwTier.BatteryProtection <= 2)
+			{
+				currentMode = hwTier.BatteryProtection;
+			}
+			// ⚠️ 诊断日志必须用 **WriteError**（Logger.WriteLine 的级别由**消息内容**判定，默认「仅错误」
+			// 级别下不保证落盘 ⇒ 机主按默认配置看不到）；并用**状态翻转**去重，⛔ 不刷屏、⛔ 不让 ErrorCount 疯涨。
+			string tierHighlightNote = $"[charge-limit] 三档高亮=按 GCU 上报档位 BatteryProtection={currentMode}"
+				+ $"（EC 直写未生效 ⇒ 高亮以 GCU 真值为准，与 beta18 旧行为一致）；EC 侧值={num}（仅供参考，⛔ 不再决定高亮）";
+			if (Logger.TryMarkChanged("charge-limit-tier-gcu-highlight", tierHighlightNote))
+			{
+				Logger.WriteError(tierHighlightNote);
+			}
+		}
+		if (currentMode < 0 && EcChargeLimit.IsSupportedLimit(num))
 		{
 			for (int i = 0; i < 3; i++)
 			{
