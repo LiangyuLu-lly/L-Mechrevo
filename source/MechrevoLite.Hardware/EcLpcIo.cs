@@ -1,0 +1,510 @@
+using System;
+using System.IO;
+using System.Threading;
+using PawnIO;
+
+namespace MechrevoLite.Hardware;
+
+/// <summary>
+/// LPC / SuperIO EC 寄存器窗口通道（经 PawnIO 的 <c>LpcIO</c> 模块，slot 1 = <c>0x4E</c>/<c>0x4F</c>）。
+///
+/// <para><b>为什么再开一条通道</b>：EC 的访问方式<b>不止一套</b>，实测与上游共确认四条：
+/// ① ACPI EC 标准端口 <c>0x62</c>/<c>0x66</c>（命令 <c>0x92</c> 读 XRAM / <c>0x80</c> 读标准空间）
+/// —— 由 <see cref="EcPortIo"/> 走 <c>LpcACPIEC</c> 模块；
+/// ② <b>LPC/SuperIO 寄存器窗口（本类）</b> —— 索引/数据端口对 <c>0x2E</c>/<c>0x2F</c>（slot 0）
+/// 或 <c>0x4E</c>/<c>0x4F</c>（slot 1），子寄存器 <c>0x11</c> 地址高 / <c>0x10</c> 地址低 / <c>0x12</c> 数据；
+/// ③ 厂商控制台 7.3 的 <c>0x2E</c>/<c>0x2F</c> ＋ <c>Write_EC_Init</c> 解锁前置；
+/// ④ 斗战者的物理内存窗口 <c>0xFE800400</c>（长 <c>0xFF</c>，只覆盖标准空间）。</para>
+///
+/// <para>⚠️ <b>四套的地址空间不同，绝不能跨套搬地址。</b> 例：两个上游都自称在读「EC 版本」，
+/// 但一个说 <c>0xC411</c>、一个说 <c>0x8410~0x8413</c> —— 这不可能是笔误，只能是两套空间。
+/// 本类存在的意义就是把第 ② 套打通，从而能<b>只读验证</b> <c>0xC4xx</c>/<c>0xC8xx</c> 段
+/// （蛟龙控制台口径：EC 版本 <c>0xC411</c>、风扇 <c>0xC834</c>/<c>0xC835</c>）。</para>
+///
+/// <para><b>槽位选择</b>：上游 <c>LpcIO.p</c> 注释写明
+/// <i>"Slot 0 is at 0x2e/0x2f, slot 1 at 0x4e/0x4f"</i>。
+/// 本类固定用 <b>slot 1</b>，因为 <c>JiaolongControl</c> 的 <c>ECMemoryTable</c> 用的就是
+/// <c>EC_ADDR_PORT = 0x4E</c> / <c>EC_DATA_PORT = 0x4F</c>（厂商控制台走的是 slot 0）。
+/// <c>ioctl_select_slot</c> 会 reset 模块内部状态，故<b>每次事务前都重新选择一次</b>。</para>
+///
+/// <para><b>⚠️ 诚实边界：本类的「只读」包含对 SuperIO 窗口寄存器的写。</b>
+/// 读一个 EC 字节必须先向子寄存器 <c>0x11</c>/<c>0x10</c> 写「地址高/低字节」（这是<b>寻址</b>），
+/// 再读子寄存器 <c>0x12</c>。那两个写是<b>窗口寄存器</b>，不是修改 EC 数据；
+/// 而本类<b>没有任何写 EC 数据的路径</b>（不写 <c>0x12</c>、不发 <c>0x93</c>）。</para>
+///
+/// <para><b>安全约束</b>（与 <see cref="EcPortIo"/> <b>同构</b>，逐条对齐 —— 两套护栏松紧必须一致）：
+/// ① 槽位固定 slot 1；模块本身只允许<b>所选槽位</b>的 <c>+0</c>/<c>+1</c> 两个端口（外加 ASUS 的
+/// <c>0x25C</c>/<c>0x25D</c> 与枚举出的 BAR），故到不了无关端口；
+/// ② <b>子寄存器白名单</b>（只放 <c>0x10</c>/<c>0x11</c>/<c>0x12</c>），C# 侧再挡一次；
+/// ③ <b>Poisoned 机制</b>：读<b>软失败</b>（Execute 返回 false）只累计「连续读失败」，
+/// 达 <see cref="MaxConsecutiveReadFailures"/> 次才升级为全局中毒；
+/// <b>异常 / 白名单违规立即中毒</b>；失败<b>不自动恢复</b>（保留现场，杜绝盲目重试）；
+/// ④ 单实例互斥（<c>Access_ISABUS.HTP.Method</c>，best-effort：拿不到也继续，但记录）；
+/// ⑤ <b>惰性装载</b>（启动时不装载，只在真要读 LPC EC 时才装载）；
+/// ⑥ 全程 try/catch，<b>绝不把异常抛给调用方</b>。</para>
+///
+/// <para><b>为什么不并入 <see cref="EcPortIo"/></b>：<see cref="PawnIOWrapper"/> 的模块装载是
+/// <b>一次性</b>的（<c>_loaded</c> 置位后不再接受第二个模块），而两条通道用的模块不同
+/// （<c>LpcIO</c> vs <c>LpcACPIEC</c>）、端口白名单不同、互斥体也不同
+/// （<c>Access_ISABUS.HTP.Method</c> vs <c>Access_EC</c>）⇒ 只能是两个 wrapper 实例。
+/// 拆成独立类是为了让<b>安全策略保持同构</b>，避免出现「两套松紧不一」的护栏。</para>
+///
+/// <para>⚠️ 本类<b>只用于诊断只读</b>。刻意<b>不提供</b> <c>TryWriteXxx</c>：写 EC 数据须先报方案
+/// （限充仍按用户指示暂缓）。</para>
+/// </summary>
+internal static class EcLpcIo
+{
+	// ── LPC/SuperIO 槽位 1（= 蛟龙控制台的 EC_ADDR_PORT / EC_DATA_PORT）──
+	private const ushort SlotIndexPort = 0x4E;
+
+	private const ushort SlotDataPort = 0x4F;
+
+	private const ulong SlotNumber = 1;
+
+	// ── SuperIO 子寄存器（协议事实：只取端口对/寄存器号/访问顺序，未抄任何代码）──
+	private const byte SubRegAddressHigh = 0x11;
+
+	private const byte SubRegAddressLow = 0x10;
+
+	private const byte SubRegData = 0x12;
+
+	private const string ModuleResourceName = "LMechrevo.LpcIO.bin";
+
+	// ⚠️ 与 EcPortIo 的 "Global\Access_EC" 不同：上游 LpcIO.p 的注释点名了这个互斥体
+	private const string MutexName = "Global\\Access_ISABUS.HTP.Method";
+
+	internal const int TimeoutMs = 250;
+
+	private static readonly object Gate = new object();
+
+	private static PawnIOWrapper _pawn;
+
+	private static bool _loadAttempted;
+
+	private static string _loadFailure = "";
+
+	private static bool _poisoned;
+
+	private static string _poisonReason = "";
+
+	private static int _ioCount;
+
+	/// <summary>连续读失败达此次数才升级为全局中毒（软失败）。与 <see cref="EcPortIo"/> 同值。</summary>
+	internal const int MaxConsecutiveReadFailures = 3;
+
+	private static int _consecutiveReadFailures;
+
+	private static string _lastReadFailure = "";
+
+	private static string _pendingSoftFailure = "";
+
+	/// <summary>是否已中毒。中毒后拒绝一切 I/O（<b>失败不自动恢复</b>，保留现场）。</summary>
+	internal static bool IsPoisoned
+	{
+		get
+		{
+			lock (Gate)
+			{
+				return _poisoned;
+			}
+		}
+	}
+
+	/// <summary>供诊断：最后一次读失败的具体原因（成功时为空串）。</summary>
+	internal static string LastReadFailure
+	{
+		get
+		{
+			lock (Gate)
+			{
+				return _lastReadFailure;
+			}
+		}
+	}
+
+	/// <summary>供诊断：通道可用性的一句话描述（不含任何隐私）。</summary>
+	internal static string DescribeChannel()
+	{
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				return "⛔ 已中毒 ⇒ 后续拒绝一切 I/O（原因：" + _poisonReason + "）";
+			}
+			if (!_loadAttempted)
+			{
+				return "· 尚未尝试（惰性装载：只在真要读 LPC EC 时才装载模块）";
+			}
+			if (_pawn == null || !_pawn.IsModuleLoaded)
+			{
+				return "⛔ 模块未装载（" + _loadFailure + "）";
+			}
+			string text = "✅ 模块已装载（LpcIO · slot " + SlotNumber + " = 0x"
+				+ SlotIndexPort.ToString("X2") + "/0x" + SlotDataPort.ToString("X2")
+				+ " · 子寄存器白名单仅 0x10/0x11/0x12）· 已发 Execute " + _ioCount + " 次";
+			if (_consecutiveReadFailures > 0)
+			{
+				text = text + " · ⚠️ 当前已**连续读失败** " + _consecutiveReadFailures + "/"
+					+ MaxConsecutiveReadFailures + " 次（⭐ 达到 " + MaxConsecutiveReadFailures
+					+ " 次才升级为全局中毒 ⇒ ⭐ 未达上限说明只是**个别地址**不响应 ✅）";
+			}
+			return text;
+		}
+	}
+
+	/// <summary>供诊断：PawnIO 驱动本身是否已安装（不装载模块、不发 I/O，代价极低）。</summary>
+	internal static string DescribePawnInstalled()
+	{
+		try
+		{
+			using PawnIOWrapper probe = new PawnIOWrapper();
+			return probe.Connect() switch
+			{
+				PawnIOWrapper.ConnectResult.OK => "✅ 已安装（设备可打开）",
+				PawnIOWrapper.ConnectResult.NotInstalled => "⛔ 未安装（需用户**显式点击**安装，见 Install-PawnIO.ps1）",
+				PawnIOWrapper.ConnectResult.AccessDenied => "⚠️ 已安装但拒绝访问（Win32 error 5 —— 需以管理员运行）",
+				_ => "⚠️ 连接失败：其它错误",
+			};
+		}
+		catch (Exception ex)
+		{
+			return "⚠️ 检测失败：" + ex.GetType().Name;
+		}
+	}
+
+	/// <summary>
+	/// 只读：经 LPC/SuperIO 窗口读 EC 一个字节。
+	/// <para>任何失败都返回 false，并按需标记中毒（软失败计数 / 硬失败立即）。<b>绝不抛出</b>。</para>
+	/// </summary>
+	internal static bool TryReadByte(int address, out int value)
+	{
+		value = -1;
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				_lastReadFailure = "通道已中毒：" + _poisonReason;
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				_lastReadFailure = "模块未装载：" + _loadFailure;
+				return false;
+			}
+			if (!TryEnterMutex(out Mutex mutex, out bool held))
+			{
+				Poison("无法获取 " + MutexName + " 互斥体");
+				return false;
+			}
+			try
+			{
+				bool ok = ReadByteCore(address, out value);
+				NoteReadOutcome(ok);
+				return ok;
+			}
+			catch (Exception ex)
+			{
+				Poison("读 LPC EC 0x" + address.ToString("X4") + " 抛异常：" + ex.GetType().Name);
+				return false;
+			}
+			finally
+			{
+				ReleaseMutex(mutex, held);
+			}
+		}
+	}
+
+	/// <summary>只读：连续读若干字节（逐字节走同一时序）。</summary>
+	internal static bool TryReadBytes(int address, int count, out int[] values)
+	{
+		values = new int[count];
+		bool allOk = true;
+		for (int i = 0; i < count; i++)
+		{
+			if (!TryReadByte(address + i, out int v))
+			{
+				values[i] = -1;
+				allOk = false;
+			}
+			else
+			{
+				values[i] = v;
+			}
+		}
+		return allOk;
+	}
+
+	// ══════════════════════════════════════════════════════════════════
+	//  LPC/SuperIO 时序（调用方必须已持锁 + 已确保模块 + 已取互斥体）
+	//
+	//  读一个 EC 字节：
+	//    ① 选槽位（ioctl_select_slot 1 ⇒ 内部 g_register_port = 0x4E）
+	//    ② 子寄存器 0x11 ← 地址高字节        （寻址，不是写 EC 数据）
+	//    ③ 子寄存器 0x10 ← 地址低字节        （寻址，不是写 EC 数据）
+	//    ④ 读子寄存器 0x12 ⇒ 数据字节
+	//
+	//  上游 superio_outb(reg,val) 的实现 =
+	//      io_out_byte(g_register_port, reg); io_out_byte(g_register_port + 1, val);
+	//  与 JiaolongControl 的 WritePort(0x4E, reg); WritePort(0x4F, val) 逐字对应。
+	//  （只取协议事实；未抄任何第三方代码）
+	// ══════════════════════════════════════════════════════════════════
+
+	private static bool ReadByteCore(int address, out int value)
+	{
+		value = -1;
+		// ⭐ 每次事务前重选槽位：ioctl_select_slot 会 reset 模块内部状态，
+		//    且其他调用方可能改过它 ⇒ 重设一次最稳（代价 1 次 Execute）
+		if (!SelectSlot())
+		{
+			return false;
+		}
+		if (!SuperIoOutb(SubRegAddressHigh, (byte)((address >> 8) & 0xFF), "地址高字节"))
+		{
+			return false;
+		}
+		if (!SuperIoOutb(SubRegAddressLow, (byte)(address & 0xFF), "地址低字节"))
+		{
+			return false;
+		}
+		if (!SuperIoInb(SubRegData, out byte data))
+		{
+			return false;
+		}
+		value = data;
+		return true;
+	}
+
+	/// <summary>选择 LPC/SuperIO 槽位（幂等；每次事务前调用）。</summary>
+	private static bool SelectSlot()
+	{
+		try
+		{
+			if (!_pawn.Execute("ioctl_select_slot", new ulong[1] { SlotNumber }, null))
+			{
+				ReportSoftFailure("选择 LPC 槽位 " + SlotNumber + " 失败（ioctl_select_slot）");
+				return false;
+			}
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Poison("ioctl_select_slot 抛异常：" + ex.GetType().Name);
+			return false;
+		}
+	}
+
+	/// <summary>写 SuperIO 子寄存器（<b>仅用于寻址窗口</b>；受子寄存器白名单约束）。</summary>
+	private static bool SuperIoOutb(byte reg, byte val, string what)
+	{
+		if (!IsSubRegAllowed(reg))
+		{
+			Poison("子寄存器 0x" + reg.ToString("X2") + " 不在白名单（只允许 0x10/0x11/0x12）");
+			return false;
+		}
+		try
+		{
+			if (!_pawn.Execute("ioctl_superio_outb", new ulong[2] { reg, val }, null))
+			{
+				ReportSoftFailure("SuperIO 写子寄存器 0x" + reg.ToString("X2") + "（" + what + "）失败");
+				return false;
+			}
+			_ioCount++;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Poison("SuperIO 写 0x" + reg.ToString("X2") + " 抛异常：" + ex.GetType().Name);
+			return false;
+		}
+	}
+
+	/// <summary>读 SuperIO 子寄存器（受子寄存器白名单约束）。</summary>
+	private static bool SuperIoInb(byte reg, out byte val)
+	{
+		val = 0;
+		if (!IsSubRegAllowed(reg))
+		{
+			Poison("子寄存器 0x" + reg.ToString("X2") + " 不在白名单（只允许 0x10/0x11/0x12）");
+			return false;
+		}
+		try
+		{
+			ulong[] output = new ulong[1];
+			if (!_pawn.Execute("ioctl_superio_inb", new ulong[1] { reg }, output))
+			{
+				ReportSoftFailure("SuperIO 读子寄存器 0x" + reg.ToString("X2") + " 失败");
+				return false;
+			}
+			_ioCount++;
+			val = (byte)(output[0] & 0xFF);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Poison("SuperIO 读 0x" + reg.ToString("X2") + " 抛异常：" + ex.GetType().Name);
+			return false;
+		}
+	}
+
+	/// <summary>子寄存器白名单（C# 侧的第二道校验；模块本身只按槽位放行端口）。</summary>
+	private static bool IsSubRegAllowed(byte reg)
+	{
+		return reg == SubRegAddressHigh || reg == SubRegAddressLow || reg == SubRegData;
+	}
+
+	// ── 模块惰性装载 ──
+
+	private static bool EnsureModule()
+	{
+		if (_pawn != null && _pawn.IsModuleLoaded)
+		{
+			return true;
+		}
+		if (_loadAttempted)
+		{
+			return false;
+		}
+		_loadAttempted = true;
+		PawnIOWrapper pawn = null;
+		try
+		{
+			pawn = new PawnIOWrapper();
+			PawnIOWrapper.ConnectResult connect = pawn.Connect();
+			if (connect != PawnIOWrapper.ConnectResult.OK)
+			{
+				_loadFailure = connect switch
+				{
+					PawnIOWrapper.ConnectResult.NotInstalled => "PawnIO 驱动未安装（Win32 error 2/3）",
+					PawnIOWrapper.ConnectResult.AccessDenied => "PawnIO 设备拒绝访问（Win32 error 5，需管理员）",
+					_ => "PawnIO 连接失败：" + connect,
+				};
+				pawn.Dispose();
+				return false;
+			}
+			byte[] blob = LoadModuleResource();
+			if (blob == null || blob.Length == 0)
+			{
+				_loadFailure = "内嵌资源缺失（" + ModuleResourceName + "）";
+				pawn.Dispose();
+				return false;
+			}
+			if (!pawn.LoadModule(blob))
+			{
+				_loadFailure = "LpcIO 模块装载被拒（LoadModule 返回 false）";
+				pawn.Dispose();
+				return false;
+			}
+			_pawn = pawn;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			_loadFailure = "装载抛异常：" + ex.GetType().Name;
+			try
+			{
+				pawn?.Dispose();
+			}
+			catch (Exception)
+			{
+			}
+			return false;
+		}
+	}
+
+	private static byte[] LoadModuleResource()
+	{
+		using Stream stream = typeof(EcLpcIo).Assembly.GetManifestResourceStream(ModuleResourceName);
+		if (stream == null)
+		{
+			return null;
+		}
+		using MemoryStream memoryStream = new MemoryStream();
+		stream.CopyTo(memoryStream);
+		return memoryStream.ToArray();
+	}
+
+	// ── 互斥体（best-effort：拿不到也继续，但记录）──
+
+	private static bool TryEnterMutex(out Mutex mutex, out bool held)
+	{
+		mutex = null;
+		held = false;
+		try
+		{
+			mutex = new Mutex(initiallyOwned: false, MutexName);
+			held = mutex.WaitOne(TimeoutMs);
+			if (!held)
+			{
+				mutex.Dispose();
+				mutex = null;
+				return false;
+			}
+			return true;
+		}
+		catch (Exception)
+		{
+			// Global\ 命名空间可能因权限而无法创建 —— 不因此否决整条通道
+			mutex?.Dispose();
+			mutex = null;
+			held = false;
+			return true;
+		}
+	}
+
+	private static void ReleaseMutex(Mutex mutex, bool held)
+	{
+		try
+		{
+			if (held)
+			{
+				mutex.ReleaseMutex();
+			}
+			mutex?.Dispose();
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	// ── 失败分级 ──
+
+	/// <summary>
+	/// 收尾一次读事务：成功则清零；<b>软失败</b>只累计计数（达上限才升级为全局中毒）；
+	/// <b>硬失败</b>（白名单违规 / 异常）已直接中毒 ⇒ 此处不再计数。与 <see cref="EcPortIo"/> 同构。
+	/// </summary>
+	private static void NoteReadOutcome(bool ok)
+	{
+		if (ok)
+		{
+			_consecutiveReadFailures = 0;
+			_lastReadFailure = "";
+			_pendingSoftFailure = "";
+			return;
+		}
+		if (_poisoned)
+		{
+			return;
+		}
+		_consecutiveReadFailures++;
+		_lastReadFailure = ((_pendingSoftFailure.Length > 0) ? _pendingSoftFailure : "读失败（未记录具体原因）");
+		_pendingSoftFailure = "";
+		if (_consecutiveReadFailures >= MaxConsecutiveReadFailures)
+		{
+			Poison("连续读失败 " + _consecutiveReadFailures + " 次（最后一次：" + _lastReadFailure + "）");
+		}
+	}
+
+	private static void ReportSoftFailure(string what)
+	{
+		_pendingSoftFailure = what;
+	}
+
+	private static void Poison(string reason)
+	{
+		if (!_poisoned)
+		{
+			_poisoned = true;
+			_poisonReason = reason;
+		}
+	}
+}

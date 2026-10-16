@@ -59,6 +59,7 @@ internal static class DiagnosticBaolongdaInfo
 			AppendEcVersionProbe(sb);
 			AppendEcPortIoProbe(sb);
 			AppendEcStandardSpaceProbe(sb);
+			AppendEcLpcIoProbe(sb);
 			AppendFunctionProbe(sb);
 			AppendHidNote(sb);
 		}
@@ -691,6 +692,100 @@ internal static class DiagnosticBaolongdaInfo
 	}
 
 	// ── ③ 功能号 8~23 逐个试读 ──
+	// ── ②f EC **LPC/SuperIO 寄存器窗口**（PawnIO LpcIO · slot 1 = 0x4E/0x4F）只读试读 ──
+	//
+	//   ⭐ 为什么再加一条：EC 的访问方式已确认【不止一套】，四条各自的**地址空间不同** ⚠️
+	//     · ① 0x62/0x66 ＋ 命令 0x92/0x93 → 厂商 XRAM mailbox（0x8150 限充 / 0x8410 EC版本 / 0x847C SOC）← ②d
+	//     · ② 0x62/0x66 ＋ 命令 0x80      → ACPI 标准空间（0x9A 键盘背光 / 0x20 Fn锁 / 0xE4 散热模式）← ②e
+	//     · ③ 0x4E/0x4F SuperIO 索引/数据窗口 → 蛟龙控制台口径（0xC411 EC版本 / 0xC834~0xC83D 风扇）← 本节
+	//     · ④ 0x2E/0x2F ＋ Write_EC_Init 解锁前置 → 厂商控制台 7.3
+	//   ⭐ 关键疑点：两个上游**都自称在读「EC 版本」**，但一个说 0xC411、一个说 0x8410~0x8413 ⚠️
+	//     这不可能是笔误 ⇒ ⭐ 若本节能读到合理的值，就印证「两套地址空间」的判断 ✅
+	//   ⚠️ 诚实边界：本节的「只读」**包含对 SuperIO 窗口寄存器的写** ——
+	//     读一个字节必须先向子寄存器 0x11/0x10 写「地址高/低字节」（那是**寻址**），再读子寄存器 0x12；
+	//     ⛔ 本通道**没有任何写 EC 数据的路径**（不写 0x12、不发 0x93/0x81）✅
+	//   ⚠️ 本机（同方翼龙15Pro）EC **不是 IT5570** ⇒ 读到的值**不能当蛟龙的真值**；
+	//     本节能验证的是「**这条通道 ＋ 这套时序是否工作**」✅
+	//   ⛔ 全程只读：不写 EC 数据 · 不改任何寄存器 ✅
+	private static void AppendEcLpcIoProbe(StringBuilder sb)
+	{
+		sb.AppendLine();
+		sb.AppendLine("── ②f EC **LPC/SuperIO 寄存器窗口**（slot 1 = 0x4E/0x4F · 只读）──");
+		sb.AppendLine("⭐ 与 ②d/②e 的关系：**第三条独立通道**，地址空间与它们都不同 ⚠️");
+		sb.AppendLine("   端口对 0x4E/0x4F（SuperIO 索引/数据）＋ 子寄存器 0x11 地址高 · 0x10 地址低 · 0x12 数据");
+		sb.AppendLine("   ⭐ 口径来源：JiaolongControl（蛟龙开源控制台，MIT）的 ECMemoryTable ——");
+		sb.AppendLine("      EC_ADDR_PORT = 0x4E / EC_DATA_PORT = 0x4F ⇒ ⭐ 正是上游 LpcIO.p 所说的 slot 1 ✅");
+		sb.AppendLine("   ⭐ 与厂商控制台 7.3 的关系：厂商走 **slot 0（0x2E/0x2F）**、**同一套子寄存器语义** ✅");
+		sb.AppendLine("     ⇒ ⭐ 两条只是**端口基址不同**，协议同一套（已逐字对照确认）✅");
+		sb.AppendLine("⚠️ 合规：PawnIO `LpcIO` 模块 LGPL-2.1-or-later（**可分发** · 已内嵌 ＋ NOTICE ＋ LICENSES\\LGPL-2.1.txt）");
+		sb.AppendLine("   ⛔ 不引入 JiaoLongDriver64（蛟龙控制台自带的内核驱动）· ⛔ 不引入 WinRing0 / inpoutx64 ✅");
+		sb.AppendLine("⛔ 全程只读：⛔ 不写 EC 数据（不写子寄存器 0x12）· ⛔ 不发 0x93/0x81 · ⛔ 不改任何寄存器 ✅");
+		sb.AppendLine("⚠️ 诚实边界：本节为**寻址**而写子寄存器 0x11/0x10（窗口寄存器，**不是** EC 数据）✅");
+		sb.AppendLine();
+		try
+		{
+			sb.AppendLine("PawnIO 驱动 = " + EcLpcIo.DescribePawnInstalled());
+			sb.AppendLine();
+			sb.AppendLine("⓪ **解锁前置探测（只读）** —— ⭐ 上游在访问 XRAM 前**必须先解锁** ⚠️");
+			sb.AppendLine("   依据（两处独立一致 ✅）：");
+			sb.AppendLine("     · JiaolongControl `EC_init()`：读 0x2000 芯片 ID；若 == 0x55 ⇒ 再读 0x1060、置 bit7、**写回**");
+			sb.AppendLine("     · 厂商控制台 7.3 `Write_EC_Init()`：读 0x2000/0x2001；若 == 0x55 ⇒ 0x1060 置 bit7");
+			sb.AppendLine("   ⛔ 本节**只读**：⛔ **不执行解锁写**（0x1060 的写是写操作，须先拍板）✅");
+			bool id1Ok = EcLpcIo.TryReadByte(0x2000, out int chipId1);
+			sb.AppendLine("   0x2000（芯片 ID）= " + (id1Ok
+				? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(chipId1) + (chipId1 == 0x55
+					? " ⇒ ⭐ **命中 0x55** ⇒ 该 EC 需要解锁才能读 XRAM ⚠️"
+					: " ⇒ ⚠️ 非 0x55 ⇒ 本机 EC 不是上游那一款（或未进入配置态）"))
+				: ("⛔ 读不到（原因：" + EcLpcIo.LastReadFailure + "）")));
+			bool id2Ok = EcLpcIo.TryReadByte(0x2001, out int chipId2);
+			sb.AppendLine("   0x2001（芯片 ID 2）= " + (id2Ok ? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(chipId2)) : "⛔ 读不到"));
+			bool lockOk = EcLpcIo.TryReadByte(0x1060, out int lockReg);
+			sb.AppendLine("   0x1060（解锁寄存器现值）= " + (lockOk
+				? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(lockReg) + (((lockReg & 0x80) != 0)
+					? " ⇒ ⭐ bit7 **已置位**（已解锁）✅"
+					: " ⇒ ⚠️ bit7 **未置位**（未解锁）"))
+				: "⛔ 读不到"));
+			sb.AppendLine("   ⇒ ⭐ **若 0x2000 == 0x55 且 bit7 未置位 ⇒ 下面读到的 0xFF 可能是「未解锁」所致** ⚠️");
+			sb.AppendLine("      ⇒ ⚠️ 那就**不能**据 0xFF 断定该地址不存在 ⚠️ —— 解锁需写 0x1060，⛔ 本轮不做（只读）✅");
+			sb.AppendLine();			sb.AppendLine("① **EC 版本（蛟龙控制台口径 · 单字节）** 0xC411");
+			bool verOk = EcLpcIo.TryReadByte(0xC411, out int ver);
+			sb.AppendLine("   0xC411 = " + (verOk
+				? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(ver))
+				: "⛔ 读不到"));
+			if (!verOk)
+			{
+				sb.AppendLine("      （原因：" + EcLpcIo.LastReadFailure + "）");
+			}
+			sb.AppendLine("   ⚠️ 判据提醒：**读到 ≠ 合理**（②b 的教训：IOCTL 成功也可能回填充值）");
+			sb.AppendLine("      ⇒ ⭐ 本机 EC 不是 IT5570 ⇒ 本行的值**不能当蛟龙的真值**，只能证明「通道 ＋ 时序」是否工作 ⚠️");
+			sb.AppendLine();
+			sb.AppendLine("② **风扇转速（蛟龙控制台口径 · 单字节）** 0xC834 / 0xC835");
+			bool fan1Ok = EcLpcIo.TryReadByte(0xC834, out int fan1);
+			sb.AppendLine("   0xC834（上游 Fan1_RPM）= " + (fan1Ok
+				? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(fan1))
+				: "⛔ 读不到"));
+			bool fan2Ok = EcLpcIo.TryReadByte(0xC835, out int fan2);
+			sb.AppendLine("   0xC835（上游 Fan2_RPM）= " + (fan2Ok
+				? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(fan2))
+				: "⛔ 读不到"));
+			sb.AppendLine("   ⚠️ 语义未定：上游把这两个标为 RPM，但**单字节**装不下真实转速（几千 rpm）");
+			sb.AppendLine("      ⇒ ⭐ 可能是「等级 / RPM÷100 / 高字节」之一 —— ⛔ 未真机确认前**不下结论**，只报原始字节 ⚠️");
+			sb.AppendLine();
+			sb.AppendLine("③ **与 ②d（XRAM 口径）的并列对照** —— ⭐ 本节的意义就在这一行 ⚠️");
+			sb.AppendLine("   · ②d 的 EC 版本取 0x8410~0x8413（**四字节**，限充项目口径）");
+			sb.AppendLine("   · 本节的 EC 版本取 0xC411（**单字节**，蛟龙控制台口径）");
+			sb.AppendLine("   ⭐ 若两者**都能读到合理值** ⇒ ⭐ 说明它们确属**两套地址空间**（同一台 EC 上并存）✅");
+			sb.AppendLine("   ⚠️ 若本节读到的是 0xFF / 0x00 这类**恒定填充值** ⇒ ⭐ 说明该地址在本机根本不存在");
+			sb.AppendLine("      ⇒ ⚠️ 那就**不能**据此否定蛟龙上的存在性（⭐ 本机 EC 型号不同）⚠️");
+			sb.AppendLine();
+			sb.AppendLine("④ **通道状态** = " + EcLpcIo.DescribeChannel());
+			sb.AppendLine("⛔ 本节只读：只读子寄存器 0x12 · 只写窗口寄存器 0x11/0x10（寻址）· ⛔ 未写任何 EC 数据 ✅");
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("⚠️ ②f 诊断异常（已吞掉，不影响本节其余部分）：" + ex.GetType().Name + " · " + ex.Message);
+		}
+	}
 	private static void AppendFunctionProbe(StringBuilder sb)
 	{
 		sb.AppendLine();

@@ -1,0 +1,46 @@
+LMechrevo.LpcIO.bin
+===================
+
+This file is the PawnIO LpcIO module, embedded into L-Mechrevo as a managed resource
+(L-Mechrevo.csproj) and therefore redistributed as part of L-Mechrevo.
+
+Upstream : https://github.com/namazso/PawnIO.Modules
+Licence  : GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later)
+Copyright: (C) 2023 namazso <admin@namazso.eu>
+Licence text: ../LICENSES/LGPL-2.1.txt  (= upstream COPYING, byte-identical)
+Module source: LpcIO.p in the upstream repository, at tag 0.2.11 (the tag this binary was built from).
+
+This copy is unmodified. SHA-256 of this file:
+  B3896A1CAB0D808FCA31FE2EBCAE045D59DAC690DA87B17C858BB8DA357EB45E
+
+Interface exposed by the module (verbatim from upstream LpcIO.p):
+  ioctl_select_slot  (in: slot)            -- slot 0 = 0x2e/0x2f, slot 1 = 0x4e/0x4f.
+                                              Resets module state; must be called before other calls.
+  ioctl_find_bars    (no args)             -- enumerate SuperIO BARs (NOT used by L-Mechrevo)
+  ioctl_superio_inb  (in: reg ; out: val)  -- SuperIO register read (byte)
+  ioctl_superio_inw  (in: reg ; out: val)  -- SuperIO register read (word)
+  ioctl_superio_outb (in: reg, val)        -- SuperIO register write (byte)
+  ioctl_pio_inb      (in: port ; out: val) -- raw port read  (allowlist: selected slot +0/+1,
+                                              0x25C/0x25D, and BARs found by ioctl_find_bars)
+  ioctl_pio_outb     (in: port, val)       -- raw port write (same allowlist; 0x0CF8-0x0CFF is
+                                              blacklisted)
+  Callers should acquire the "\BaseNamedObjects\Access_ISABUS.HTP.Method" mutant before calling.
+
+The LPC/SuperIO EC register-window transport implemented in
+../source/MechrevoLite.Hardware/EcLpcIo.cs follows the register-window convention used by the
+JiaoLongControl project and by the vendor control centre:
+
+  sub-register 0x11 -> address high byte
+  sub-register 0x10 -> address low byte
+  sub-register 0x12 -> data byte (read/write)
+  written through the SuperIO index/data pair (slot 1 = 0x4e/0x4f)
+
+Only protocol facts (port pair, sub-register numbers, access order) were taken; no third-party code
+was copied. JiaoLongControl is MIT-licensed ((C) 2025 GaoXanSheng); attribution is recorded in
+THIRD-PARTY-NOTICES.md.
+
+⚠️ This module grants raw SuperIO access for the selected slot only. Slot 1 (0x4e/0x4f) is selected
+   explicitly before every transaction, so no other slot's ports can be reached. The module is loaded
+   lazily, only while a caller actually needs LPC EC access, and is never used for writes in this
+   revision (read-only diagnostic use). WinRing0 / inpoutx64 / JiaoLongDriver64 are deliberately NOT
+   used (their drivers are non-compliant to redistribute).
