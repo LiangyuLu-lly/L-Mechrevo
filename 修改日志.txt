@@ -1,3 +1,72 @@
+r59（2026-10-16 · **baolongda 分支**）★★ 动手写代码：宝龙达 WMI 协议层（`BaolongdaWmi`）+ 后端接上真实探测
+用户原话：「先开始写」。
+① ⚠️⚠️ **先纠正我自己上一轮的一个【错误结论】**（⭐ r57/笔记 4.1 曾写"静音/狂暴会颠倒"）：
+   ⭐ 逐跳读完 UI 链路后发现**那个结论是错的** ❌ —— ⭐ 我把 `OperatingMode` 当成了"0=turbo"，
+   ⭐ 实际它是 ⭐ **`ConsoleOperatingMode`（⭐ 0=Office · 1=Gaming · 2=Turbo ✅）**。
+   ⭐⭐ **完整链路（⭐ 四跳，⭐ 逐条实证）**：
+      ⭐ `buttonSilent`（视觉 2）→ Office(0) → `BuildModeRequest` → ⭐ **MIFS 2 = Quiet（静音）** ✅
+      ⭐ `buttonBalanced`（视觉 0）→ Gaming(1) → ⭐ **MIFS 0 = Balance（平衡）** ✅
+      ⭐ `buttonTurbo`（视觉 1）→ Turbo(2) → ⭐ **MIFS 1 = Performance（增强）** ✅
+   ⇒ ⭐ ⭐ **三项全部对得上** ⇒ ⭐ **现有 `LegacyMifsWmi` 的模式映射本来就是对的** ✅
+   ⇒ ⭐ **接宝龙达不需要改模式映射**，⛔ 也不需要"平台语义"参数 ✅
+   ⭐ 回读侧也兼容：⭐ MIFS 2→Office · 0→Gaming · ⭐ **1/3→Turbo**（⭐ 顺手兼容联想 4 档机型 ✅）
+   ⚠️ 已把笔记 4.1 **改写为带"更正说明"的版本**（⭐ 保留错误记录当教训：⭐ **结论要逐跳到 UI 再下** ✅），
+      ⭐ 并新增 4.2 节把"真正的风险"改指回 ⭐ **实例发现方式（GUID 硬校验）** ✅
+② ⭐⭐ **新增 `source\MechrevoLite.Hardware\BaolongdaWmi.cs`**（⭐ 约 700 行，⭐ 本轮主体）：
+   ⭐ 完整实现宝龙达 WMI 协议（⭐ 三份开源实现交叉验证过的协议）：
+   * ⭐ 常量：⭐ `root\WMI : MICommonInterface` · ⭐ 方法 `MiInterface` · ⭐ 实例 ⭐ `ACPI\PNP0C14\MIFS_0`
+     · ⭐ `InData[32]` · ⭐ **250=Get / 251=Set** · ⭐ `[3]`=功能号 ✅
+   * ⭐ **功能号枚举（8~23）逐项照抄蛟龙16Pro 的 `SysEnums.MethodName`**：
+     ⭐ 8 SystemPerMode · 9 GpuMode · 10 RgbKeyboardStatus · 11 FnLock · 12 TPLock ·
+     ⭐ 13 CpuGpuFanSpeed · 14 GpuFanSpeedNotUse · ⭐ 15 AmbientLight(LOGO灯) · 16 RgbKeyboardMode ·
+     ⭐ 17 RgbKeyboardColor · 18 RgbKeyboardBrightness · 19 SystemAcType ·
+     ⭐ 20 MaxFanSpeedSwitch · 21 MaxFanSpeed · ⭐ 22 CpuThermometer · ⭐ 23 CpuPower ✅
+   * ⭐ **`CpuPowerSub` 子命令**（⭐ 蛟龙独有）：⭐ 0 关 · 1 开 · 2 PL1 · 3 PL2 · 4 温度墙 ✅
+   * ⭐ **探测（⭐ 全程只读）**：⭐ ① 先确认**类存在**（⭐ 不存在就**静默返回** —— ⚠️ 关键：
+        ⭐ 非宝龙达机型每次启动都会走到这里，⛔ 一行日志都不该打 ✅）
+        ⇒ ⭐ ② **实例名直指 `MIFS_0`**（⭐ 宝龙达三份实现的做法 ✅）
+        ⇒ ⭐ ③ 失败再**枚举**（⭐ 兼容实例名不同的机型 ✅）
+        ⇒ ⭐ ④ 活体证明：⭐ **真读一次 CPU 温度**（⭐ 读不到就不接管 ✅）
+        ⇒ ⭐ ⑤ ⭐ **实测风扇个数与模式档数**（⭐ 见下 ✅）
+   * ⭐⭐ **平台自适应（⭐ 不写死）**：
+     ⭐ 风扇个数：⭐ 靠 ⭐ **功能号 13 的返回长度与 `[10..11]` 是否有值** 判断 ⇒ ⭐ **2 个 or 3 个** ✅
+        （⭐ 蛟龙 `[4..5]`=GPU扇 `[6..7]`=CPU扇 · ⭐ 联想还有 `[10..11]`=小扇 ✅）
+     ⭐ 模式档数：⭐ 靠 ⭐ **试读值** 判断（⭐ `raw==3` 才算 4 档，⭐ 否则按 3 档 ⚠️ 保守）
+        ⇒ ⭐ 且 ⭐ **我们不主动写 3**（⭐ 写错档可能让机器进不期望状态 ⚠️）✅
+   * ⭐ 能力方法（⭐ 全部 `TryXxx`，⭐ 调用方按能力位决定要不要调）：
+     ⭐ 性能档读写 · ⭐ 风扇转速读 · ⭐ 风扇手动开关读/写 · ⭐ 风扇上限写（⭐ x100 RPM ✅）·
+     ⭐ CPU 温度读（⭐ **带 `0`/`255` 无效判定** —— ⭐ 取自 Bellator 的做法 ✅）·
+     ⭐ 功耗墙（⭐ PL1/PL2/温度墙/开关）· ⭐ LOGO 灯读写 · ⭐ 键盘灯颜色/亮度/模式 ✅
+   * ⭐⭐ **`PrepareFanManualControl()`**：⭐ 写风扇前 ⭐ **先关掉** `MaxFanSpeedSwitch`
+        —— ⭐ 依据参考实现原话「**为避免官方控制台冲突设计**」 ✅
+   * ⭐ **诊断信息全部外露**：⭐ `InstancePath` · ⭐ `ClassGuid` · ⭐ `FanCount` · ⭐ `ModeCount`
+     ⇒ ⭐ **一次真机运行就能定案**（⭐ 这正是我们当前最缺的证据 ✅）
+   * ⚠️ 安全边界：⭐ **只走 WMI**（⭐ 官方控制台也是 ⭐ —— Bellator README 原话「不是直接写 EC 端口」✅）
+     ⭐ ⛔ 不碰 EC · ⛔ 不装内核驱动 · ⛔ 不写注册表 ✅
+③ ⭐ **`BaolongdaBackend.cs` 重写**（⭐ 从空骨架 ⇒ 接上真实协议层）：
+   * ⭐ `IsImplemented` 由 `false` ⇒ ⭐ **`true`**（⭐ 协议层真写完了 ✅）
+   * ⭐ `TryCreate()`：⭐ 真实只读探测 ⇒ ⭐ 探到就 ⭐ **打一行完整诊断**（⭐ 实例 · ⭐ 类GUID ·
+     ⭐ 风扇个数 · ⭐ 模式档数 ⭐ ＋ ⭐ **与老同方 GUID 的对比结论** ✅）
+     ⇒ ⭐ 然后 ⭐ **只有设了 `LMECHREVO_BAOLONGDA_BACKEND=1` 才接管** ✅
+   * ⭐⚠️ **为什么默认仍不接管**：⭐ ① 还没有真机（⭐ 手上没有蛟龙16Pro）· ⭐ ② 一旦接管，
+     ⭐ 性能档/风扇就由我们下发 ⇒ ⭐ **没验证就接管是不负责任的** ⚠️
+     ⇒ ⭐ **默认行为 = 只读探测 + 记诊断 + 继续走原候选表** ⇒ ⭐ **对现有任何机型零影响** ✅
+   * ⭐ 能力集仍只开**最小集**（⭐ 性能档）⇒ ⭐ 风扇/灯效/功耗墙 ⭐ **等真机验证过再逐个放开** ✅
+④ ⭐ **`LegacyMifsWmi.cs` 一处极小改动**：⭐ `InterfaceGuid` 从 `private` ⇒ ⭐ **`internal`**
+   （⭐ 仅供 `BaolongdaBackend` 做**只读对比诊断**：⭐ 看宝龙达机型的类 GUID 与老同方那份是否相同 ✅）
+   ⚠️ ⭐ **只是编译期可见性，⛔ 不改变任何运行时行为**（⭐ 值一字未动 ✅）
+⑤ ⭐ **编译与实测**：
+   ⭐ 编译 ⭐ **0 错误**（⭐ 1450 警告 = 基线 1449 + 新增文件 1 ⚠️ 其中一条是未用字段，⭐ 已在重写时用上 ✅）
+   ⭐ `ilspycmd` 确认 ⭐ **`BaolongdaWmi` 与 `BaolongdaBackend` 都已进程序集** ✅
+   ⭐ ⭐ **本机实测（⭐ 关键：⭐ 验证"零影响"）**：⭐ 部署后 ⭐ **log.txt 里"宝龙达"条数 = 0** ✅
+      ⇒ ⭐ **本机（无该接口）完全静默、无噪音** ✅ —— ⭐ 这条正是我最担心的回归点，⭐ 已证实 ✅
+      ⭐ 版本核验：⭐ 已安装 DLL `FileVersion = 0.291.9` ✅ · ⭐ 进程响应正常 ✅
+   ⚠️ 过程中踩了两个自己的老坑（⭐ 都已修）：⭐ ① `ManagementBaseObject` 没有 `Path`（⭐ 要转 `ManagementObject` ✅）；
+      ⭐ ② ⭐ C# 双引号字符串里写了 ASCII 双引号（⭐ 又踩一次 ⚠️ ⇒ 已改用「」✅）
+⑥ ⏭ **下一步**：⭐ ① ⭐ 抓包收材料（⭐ 确认实例名/GUID/功能号 ✅）；
+   ⭐ ② ⭐ 实现 `MechrevoHw.ApplyBaolongdaBackendAsync`（⭐ 仿 `ApplyLegacyBackendAsync` ✅）；
+   ⭐ ③ ⭐ 按能力位逐个接通：⭐ 性能档 → ⭐ 风扇 → ⭐ CPU 温度 → ⭐ 键盘灯/LOGO → ⭐ 功耗墙 ✅；
+   ⭐ ④ ⭐ 真机验证通过后去掉"默认不接管"这层开关 ✅
 r58（2026-10-16 · **baolongda 分支**）★★ 三份宝龙达实现**逐项对照** ⇒ 定下我们的实现路线（WMI 优先、EC 不做）
 用户原话：「斗战者和蛟龙的都看看 都是宝龙达模具接口应该差不多的」。
 ① ⭐ **照做的对照**（⭐ 写入接口笔记新增第 6b 节，⭐ 含 20 项逐项对照表 ✅）：
