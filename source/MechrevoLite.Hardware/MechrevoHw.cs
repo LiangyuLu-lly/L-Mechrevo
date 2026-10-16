@@ -2818,33 +2818,64 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
+			// ⭐⭐ 2026-10-16（审查修复 B2）：⭐ 本方法原先 `confirmed` **只看写入调用是否没抛异常** ⚠️
+			//    ⇒ ⭐ 会**高报成功** ❌ —— ⭐ 与另外三个 `Try…` 方法（⭐ 都有回读 ✅）**不一致** ✅
+			//    ⇒ ⭐ 现在补上**回读校验** ✅：
+			//       ⭐ ① ⭐ 写完后 ⭐ **回读功能号 20**（⭐ 手动开关状态 ✅）⇒ ⭐ 与期望一致才算 confirmed ✅
+			//       ⭐ ② ⭐ 回读**读不到** ⇒ ⭐ `confirmed=false`（⭐ ⛔ 不谎报 ✅），⭐ 日志如实写明 ⚠️
+			//    ⚠️ **诚实的边界**（⭐ 必须记下）：⭐ 转速**数值本身读不回来** ⚠️
+			//       —— ⭐ 功能号 13 给的是 ⭐ **实际转速**（⭐ 会延迟、⭐ 且受负载影响 ⚠️），
+			//       ⭐ ⛔ 不是"⭐ 我们刚设的目标值" ⇒ ⭐ 所以这里**只能确认开关** ✅，⭐ 数值只能靠写入成功 ✅
 			if (!enable)
 			{
 				// ⭐ 交回固件：⭐ 两个通道都写 0 ⇒ ⭐ 再关手动开关 ✅（⭐ 顺序与参考实现的"恢复"一致 ✅）
 				wmi.TrySetMaxFanSpeed(0, 0);
 				wmi.TrySetMaxFanSpeed(1, 0);
 				wmi.TrySetMaxFanSpeedSwitch(false);
-				confirmed = true;
-				Logger.WriteLine("宝龙达 风扇：⭐ 已交回固件自动控制（⭐ 两通道归零 ＋ ⭐ 手动开关关闭 ✅）");
+				// ⭐ 回读校验：⭐ 期望"关" ✅
+				bool readOk = wmi.TryReadMaxFanSpeedSwitch(out bool nowOn);
+				confirmed = readOk && !nowOn;
+				if (!readOk)
+				{
+					Logger.WriteLine("宝龙达 风扇：⚠️ 已下发「交回固件」，⭐ 但**回读不到手动开关状态** ⇒ ⭐ 如实报告未确认 ⚠️");
+				}
+				else if (!confirmed)
+				{
+					Logger.WriteLine("宝龙达 风扇：⚠️ 已下发「交回固件」，⭐ 但**回读显示手动开关仍是开的** ⇒ ⭐ 如实报告未确认 ⚠️");
+				}
+				else
+				{
+					Logger.WriteLine("宝龙达 风扇：⭐ 已交回固件自动控制并回读确认（⭐ 两通道归零 ＋ ⭐ 手动开关=关 ✅）");
+				}
 				return true;
 			}
 			// ⭐ 保险 ①：⭐ 先关官方控制台的手动开关（⭐ 参考实现的要求 ✅）
-			wmi.PrepareFanManualControl();
+			//   ⚠️ 审查补记：⭐ 这一步的返回值原先被丢弃 ⚠️ ⇒ ⭐ 现在记进日志（⭐ 它失败不致命，⭐ 但要看得到 ✅）
+			bool prepared = wmi.PrepareFanManualControl();
 			int a = Math.Max(0, Math.Min(60, firstChannelUnits100Rpm));
 			int b = Math.Max(0, Math.Min(60, secondChannelUnits100Rpm));
 			// ⚠️ 通道归属未确认 ⇒ 日志把"我们按什么理解"写全，⭐ 便于真机对照 ✅
 			bool okA = wmi.TrySetMaxFanSpeed(0, (byte)a);
 			bool okB = wmi.TrySetMaxFanSpeed(1, (byte)b);
 			bool okSw = wmi.TrySetMaxFanSpeedSwitch(true);
-			if (okA && okB && okSw)
+			bool writeOk = okA && okB && okSw;
+			// ⭐ 回读校验：⭐ 期望"开" ✅
+			bool readBackOk = wmi.TryReadMaxFanSpeedSwitch(out bool isOn);
+			confirmed = readBackOk && isOn;
+			if (writeOk && confirmed)
 			{
-				confirmed = true;
-				Logger.WriteLine($"宝龙达 风扇：⭐ 已接管（⭐ 通道0={a * 100} RPM · ⭐ 通道1={b * 100} RPM ✅"
-					+ " · ⚠️ 通道归属按参考实现理解：0=大扇/GPU · 1=小扇/CPU ⚠️ 尚未真机交叉验证 ⚠️）");
+				Logger.WriteLine($"宝龙达 风扇：⭐ 已接管并回读确认（⭐ 通道0={a * 100} RPM · ⭐ 通道1={b * 100} RPM · ⭐ 手动开关=开 ✅"
+					+ $" · ⭐ 预先关官方开关={prepared} · ⚠️ 通道归属按参考实现理解：0=大扇/GPU · 1=小扇/CPU ⚠️ 尚未真机交叉验证 ⚠️"
+					+ " · ⚠️ 转速**数值**读不回来，⭐ 只能确认开关 ⚠️）");
+			}
+			else if (writeOk && !readBackOk)
+			{
+				Logger.WriteLine($"宝龙达 风扇：⚠️ 写入完成但**回读不到手动开关状态** ⇒ ⭐ 如实报告未确认 ⚠️"
+					+ $"（⭐ 通道0={a * 100} RPM · ⭐ 通道1={b * 100} RPM · ⭐ 预先关官方开关={prepared}）");
 			}
 			else
 			{
-				Logger.WriteLine($"宝龙达 风扇：⚠️ 写入不完整（⭐ 通道0={okA} · ⭐ 通道1={okB} · ⭐ 开关={okSw}）⇒ 如实报告 ⚠️");
+				Logger.WriteLine($"宝龙达 风扇：⚠️ 写入不完整或回读不一致（⭐ 通道0={okA} · ⭐ 通道1={okB} · ⭐ 开关写={okSw} · ⭐ 开关回读={(readBackOk ? isOn.ToString() : "读不到")}）⇒ 如实报告 ⚠️");
 			}
 			return true;
 		}
@@ -2918,6 +2949,241 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		TccTarget = _baolongdaMemTempWall;
 	}
 
+	// ══════════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-16（"全部接入"第 4 步 · 风扇**软件闭环曲线** · ⭐ 骨架）
+	//
+	//  ⭐⭐ 为什么是"软件闭环"（⭐ 用户 2026-10-16：「四 宝龙达是风扇曲线是吗 能不能接我们的曲线里面」）：
+	//     ⭐ 我们的曲线（`FanCurveForm`）⭐ 是"⭐ **上传表给 GCU 固件**"的 ✅ ⇒ ⭐ 固件自己按温度调 ✅
+	//     ⚠️ 宝龙达协议（⭐ 功能号 20/21）⭐ **只有**「⭐ 手动开关 ＋ ⭐ 固定转速」，⭐ **没有曲线表** ⚠️
+	//     ⇒ ⭐ ⭐ 所以只能 ⭐ **我们的程序读温度 → ⭐ 查曲线 → ⭐ 写功能号 21** ✅
+	//
+	//  ⚠️⚠️ **本骨架【故意不可用】**（⭐ 硬闸）⚠️ —— ⭐ 原因只有一个：
+	//     ⚠️ **风扇两通道的归属还没确认** ⚠️
+	//        ⭐ 参考实现（蛟龙16Pro）说 ⭐ `FanType=0` = 大扇/**GPU** · ⭐ `1` = 小扇/**CPU** ⚠️
+	//        ⭐ 但真机两组读数太接近（⭐ 3054 / 3098 ✅）⭐ **分不出来** ⚠️
+	//        ⇒ ⭐ ⚠️ 搞反的后果：⭐ **CPU 风扇会按 GPU 温度转** ⚠️ ⇒ ⭐ 散热逻辑完全错 ❌
+	//     ⇒ ⭐ 所以 ⭐ `FanChannelMappingConfirmed` ⭐ **恒为 false** ⇒ ⭐ `ApplyBaolongdaFanCurveStep()`
+	//        ⭐ **只记一行日志、⭐ 什么都不写** ✅
+	//     ⇒ ⭐ ⭐ **待办**：⭐ 用 `--fan-watch` 确认归属后 ⇒ ⭐ 把下面那个常量改成 `true` ⇒ ⭐ 闭环即生效 ✅
+	//        （⭐ 这是**唯一**的开关点，⭐ 故意做成一个常量，⭐ 便于审查时一眼看到 ✅）
+	// ══════════════════════════════════════════════════════════════════════════
+
+	/// <summary>
+	/// ⭐⚠️ **风扇两通道归属是否已确认** ⚠️
+	/// <para>⭐ <b>必须是 false 直到真机确认</b>（⭐ 用 `--fan-watch` 在 CPU/GPU 分别加载下观察 ✅）。</para>
+	/// <para>⚠️ 改成 <c>true</c> 之前请先读 <c>docs\notes\宝龙达-全部接入实施方案-20261016.md</c>
+	/// 里关于通道归属的那一节 —— ⭐ **搞反会让 CPU 风扇按 GPU 温度转** ⚠️。</para>
+	/// </summary>
+	internal const bool FanChannelMappingConfirmed = false;
+
+	/// <summary>
+	/// ⭐ 参考实现的通道口径（⚠️ **未确认**，⭐ 等 `--fan-watch` 的结论 ✅）：
+	/// ⭐ 宝龙达 ⭐ <c>FanType = 0</c> ⇒ ⭐ **大扇 / GPU** · ⭐ <c>FanType = 1</c> ⇒ ⭐ **小扇 / CPU** ⚠️
+	/// </summary>
+	internal const int BaolongdaFanTypeLarge = 0;
+
+	/// <summary>⭐ 见 <see cref="BaolongdaFanTypeLarge" /> ⚠️（⭐ 未确认 ✅）。</summary>
+	internal const int BaolongdaFanTypeSmall = 1;
+
+	// ⚠️ 占空比 → `x100RPM` 需要"该通道最大转速" ⚠️
+	//    ⭐ 参考实现（`BellatorFanControl`，⭐ 联想 N176）用的是 ⭐ 大扇 4400 / ⭐ 小扇 8200 ⚠️
+	//    ⚠️ **蛟龙的这两个数没有来源** ⚠️ ⇒ ⭐ 先用参考值，⭐ 并**在日志里标明"未确认"** ✅
+	private const int BaolongdaLargeFanMaxRpm = 4400;
+
+	/// <summary>⭐ 见 <see cref="BaolongdaLargeFanMaxRpm" /> ⚠️（⭐ 未确认 ✅）。</summary>
+	private const int BaolongdaSmallFanMaxRpm = 8200;
+
+	private volatile bool _baolongdaFanCurveApplied;
+
+	/// <summary>⭐ 软件闭环当前是否已接管风扇（⭐ 用于"退出/关闭时交回固件" ✅）。</summary>
+	internal bool BaolongdaFanCurveApplied => _baolongdaFanCurveApplied;
+
+	/// <summary>⭐ 宝龙达软件闭环曲线的门面层入口（⭐ 供 UI 读设置 ✅）。数据来源 <see cref="BaolongdaFanCurveStore" /> ✅。</summary>
+	internal BaolongdaFanCurveSettings LoadBaolongdaFanCurve()
+	{
+		return BaolongdaFanCurveStore.Load();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 保存软件闭环曲线（⭐ 只落盘 ＋ ⭐ 立即应用一次 ✅）。
+	/// <para>⚠️ 若 <c>Enabled</c>=false ⇒ ⭐ **同时交回固件控制** ✅
+	/// （⭐ 不能"关了开关却还让风扇停在我们上次写的转速上" ⚠️）。</para>
+	/// </summary>
+	internal bool SaveBaolongdaFanCurve(BaolongdaFanCurveSettings settings)
+	{
+		if (settings == null)
+		{
+			return false;
+		}
+		bool ok = BaolongdaFanCurveStore.Save(settings);
+		if (!settings.Enabled)
+		{
+			RestoreBaolongdaFanFirmwareControl();
+		}
+		else
+		{
+			ApplyBaolongdaFanCurveStep();
+		}
+		return ok;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 软件闭环的**一步**：⭐ 读温度 ⇒ ⭐ 查曲线 ⇒ ⭐ 写功能号 21 ✅
+	/// <para>⚠️⚠️ <b>未确认通道归属前，本方法【什么都不写】** ⚠️（⭐ 见
+	/// <see cref="FanChannelMappingConfirmed" /> ✅）—— ⭐ 只记一行日志，⭐ 便于审查者确认闸门有效 ✅。</para>
+	/// <para>⭐ 非宝龙达后端 ⇒ ⭐ 直接返回 false（⭐ GCU/同方**一行不改** ✅）。</para>
+	/// </summary>
+	internal bool ApplyBaolongdaFanCurveStep()
+	{
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		// ⚠️⚠️ 硬闸：⭐ 通道归属没确认 ⇒ ⭐ **绝不写** ⚠️（⭐ 写错会让 CPU 风扇按 GPU 温度转 ❌）
+		if (!FanChannelMappingConfirmed)
+		{
+			Logger.WriteLineIfChanged("baolongda-fancurve-gate",
+				"宝龙达风扇曲线：⚠️ **通道归属尚未确认**（⭐ 用 --fan-watch 在 CPU/GPU 分别加载下观察 ✅）"
+				+ " ⇒ ⭐ 软件闭环**已就绪但【拒绝执行】**，⛔ 一个字节都不写 ✅"
+				+ "（⭐ 确认后把 MechrevoHw.FanChannelMappingConfirmed 改成 true 即生效 ✅）");
+			return false;
+		}
+		try
+		{
+			BaolongdaFanCurveSettings settings = BaolongdaFanCurveStore.Load();
+			if (!settings.Enabled)
+			{
+				return false;
+			}
+			// ⭐ 温度来源：⭐ 用**已有的属性**（⭐ 它们已是"⭐ LHM/NVML 优先、⭐ 厂商兜底"⭐ 的结果 ✅）
+			int cpuTemp = CpuTemp;
+			int gpuTemp = GpuTemp;
+			if (cpuTemp <= 0 && gpuTemp <= 0)
+			{
+				Logger.WriteLineIfChanged("baolongda-fancurve-notemp", "宝龙达风扇曲线：⚠️ 两个温度都没有有效值 ⇒ 本轮跳过（⛔ 不瞎写风扇 ✅）");
+				return false;
+			}
+			int cpuDuty = InterpolateDuty(settings.CpuTemperatures, settings.CpuDuties, cpuTemp);
+			int gpuDuty = InterpolateDuty(settings.GpuTemperatures, settings.GpuDuties, gpuTemp);
+			int gpuUnits = Math.Clamp(gpuDuty * BaolongdaLargeFanMaxRpm / 100 / 100, 0, 60);
+			int cpuUnits = Math.Clamp(cpuDuty * BaolongdaSmallFanMaxRpm / 100 / 100, 0, 60);
+			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致：
+			//    ⭐ ch0 = `FanType 0` = 大扇/GPU · ⭐ ch1 = `FanType 1` = 小扇/CPU ⚠️（⭐ 未确认 ✅）
+			if (!TrySetFanManualViaBackend(enable: true, gpuUnits, cpuUnits, out bool confirmed))
+			{
+				return false;
+			}
+			_baolongdaFanCurveApplied = true;
+			Logger.WriteLineIfChanged("baolongda-fancurve-step",
+				$"宝龙达风扇曲线（⭐ 软件闭环）：⭐ CPU {cpuTemp}℃ → ⭐ {cpuDuty}%（⭐ {cpuUnits * 100} RPM）· ⭐ GPU {gpuTemp}℃ → ⭐ {gpuDuty}%（⭐ {gpuUnits * 100} RPM）"
+				+ $" · ⭐ 确认={confirmed} ⚠️（⭐ 最大转速按参考值 {BaolongdaSmallFanMaxRpm}/{BaolongdaLargeFanMaxRpm}、⭐ 通道归属待确认 ⚠️）");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达风扇曲线：⭐ 单步异常（已吞掉，⛔ 不影响别处）：" + ex.Message);
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 把风扇**交回固件**控制（⭐ 两通道归零 ＋ ⭐ 关手动开关 ✅）。
+	/// <para>⭐⭐ <b>必须在这些时机调用</b>（⭐ 否则风扇会**停在我们上次写的转速上** ⚠️）：
+	/// ⭐ ① ⭐ 用户关掉软件曲线 ✅ · ⭐ ② ⭐ 程序退出 ✅ · ⭐ ③ ⭐ **程序启动时**（⭐ 清理上次残留 ✅）。</para>
+	/// ⚠️ 进程被强杀时来不及调用 ⚠️ ⇒ ⭐ 所以 ③ 很重要 ✅。</para>
+	/// </summary>
+	internal void RestoreBaolongdaFanFirmwareControl()
+	{
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null)
+		{
+			return;
+		}
+		try
+		{
+			// ⭐⭐ 先**读一次**手动开关 ⚠️ ⇒ ⭐ **只有它真的是"开"⭐ 才写** ✅
+			//    ⭐ 理由：⭐ 这是每次启动都会走的路 ⇒ ⭐ 常见情况（⭐ 手动本就关着）⛔ **一个字节都不该写** ✅
+			bool alreadyManual = false;
+			try
+			{
+				if (wmi.TryReadMaxFanSpeedSwitch(out bool on))
+				{
+					alreadyManual = on;
+				}
+			}
+			catch
+			{
+			}
+			if (!alreadyManual)
+			{
+				_baolongdaFanCurveApplied = false;
+				Logger.WriteLineIfChanged("baolongda-fanrestore-skip",
+					"宝龙达风扇曲线：⭐ 启动自检 ⇒ ⭐ 手动风扇开关**本来就是关的** ⇒ ⛔ 不写任何东西（⭐ 交回固件已成立 ✅）");
+				return;
+			}
+			Logger.WriteLine("宝龙达风扇曲线：⚠️ 启动自检发现**手动风扇开关是开的**（⭐ 可能是上次被强杀留下的 ⚠️）⇒ ⭐ 现在交回固件控制 ✅");
+			if (TrySetFanManualViaBackend(enable: false, 0, 0, out bool confirmed))
+			{
+				_baolongdaFanCurveApplied = false;
+				Logger.WriteLine($"宝龙达风扇曲线：⭐ 已交回固件控制（⭐ 两通道归零 ＋ ⭐ 关手动开关 · ⭐ 确认={confirmed} ✅）");
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达风扇曲线：⭐ 交回固件失败（已吞掉）：" + ex.Message);
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 在"⭐ (温度, ⭐ 占空比)"曲线上按**线性插值**求占空比（⭐ 单位 % ✅）。
+	/// <para>⭐ 边界：⭐ 低于第一点 ⇒ ⭐ 取第一点；⭐ 高于最后一点 ⇒ ⭐ 取最后一点 ✅（⭐ 不外推 ✅）。</para>
+	/// <para>⚠️ 曲线点**假定按温度升序** ⇒ ⭐ 这里**再排一次序**（⭐ 只排索引、⛔ 不动原数组 ✅），
+	/// ⭐ 免得手改配置文件写乱了导致乱转 ⚠️。</para>
+	/// </summary>
+	internal static int InterpolateDuty(int[] temperatures, int[] duties, int temperature)
+	{
+		if (temperatures == null || duties == null
+			|| temperatures.Length != duties.Length || temperatures.Length == 0)
+		{
+			return 0;
+		}
+		int n = temperatures.Length;
+		int[] order = new int[n];
+		for (int i = 0; i < n; i++)
+		{
+			order[i] = i;
+		}
+		Array.Sort(order, (int a, int b) => temperatures[a].CompareTo(temperatures[b]));
+		if (temperature <= temperatures[order[0]])
+		{
+			return Math.Clamp(duties[order[0]], 0, 100);
+		}
+		if (temperature >= temperatures[order[n - 1]])
+		{
+			return Math.Clamp(duties[order[n - 1]], 0, 100);
+		}
+		for (int i = 0; i < n - 1; i++)
+		{
+			int lo = order[i];
+			int hi = order[i + 1];
+			int tLo = temperatures[lo];
+			int tHi = temperatures[hi];
+			if (temperature >= tLo && temperature <= tHi)
+			{
+				if (tHi == tLo)
+				{
+					return Math.Clamp(duties[hi], 0, 100);
+				}
+				int dLo = duties[lo];
+				int dHi = duties[hi];
+				int value = dLo + (int)Math.Round((double)(temperature - tLo) * (dHi - dLo) / (tHi - tLo));
+				return Math.Clamp(value, 0, 100);
+			}
+		}
+		return Math.Clamp(duties[order[n - 1]], 0, 100);
+	}
+
 	/// <summary>
 	/// 把本会话切到**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
 	/// <para>⭐ 与 <see cref="ApplyLegacyBackendAsync" /> 是**同一套路**（⭐ 替换能力位 ⇒ 起 3 s 定时刷新 ⇒ 立刻读一次 ⇒ 宣布就绪 ✅），
@@ -2946,6 +3212,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//   ⚠️ 诚实性：⭐ 协议**读不回**这些数值 ⇒ ⭐ 界面显示的是"⭐ 上次下发的值" ⚠️
 		//      ⇒ ⭐ 是否加一行说明小字 ⭐ **留待审查阶段决定**（⭐ 方案 17.3 ✅）
 		ApplyBaolongdaPowerRanges();
+		// ⭐⭐ 2026-10-16（第 4 步 · 风扇软件闭环）：⭐ **启动自检**（⭐ 交回固件 ✅）
+		//   ⚠️ 为什么在**启动**就要做：⭐ 上次若是**被强杀**（⭐ 任务管理器 / ⭐ 崩溃 ✅）
+		//      ⇒ ⭐ 风扇会**停在我们上次写的转速上** ⚠️（⭐ 因为"手动开关"是写在 EC 里的、⭐ 会留着 ✅）
+		//   ⭐ 本方法**先读再决定**：⭐ 手动开关本来就关着 ⇒ ⛔ **一个字节都不写** ✅
+		RestoreBaolongdaFanFirmwareControl();
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath});"
 			+ $" 功耗墙范围 PL1/PL2=[{Pl1Minimum},{Pl1Maximum}]W · 温度墙=[{TccMinimum},{TccMaximum}]℃（⭐ 本地记忆 PL1={Pl1} PL2={Pl2} 温度墙={TccTarget} ⚠️ 非从机器读回）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
@@ -6742,6 +7013,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_legacyMifs?.Dispose();
 		_legacyMifs = null;
 		// ⭐ 2026-10-16：⭐ 宝龙达后端同样要放（⭐ 它持有 WMI 实例 ✅）
+		//   ⭐⭐ 而且在放之前 ⭐ **必须先把风扇交回固件** ⚠️
+		//      （⭐ 否则风扇会**停在我们上次写的转速上** ⚠️ —— ⭐ 那是用户在关机前会明显感到的问题 ✅）
+		RestoreBaolongdaFanFirmwareControl();
 		_baolongda?.Dispose();
 		_baolongda = null;
 		DataChanged = null;
