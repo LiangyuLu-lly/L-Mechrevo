@@ -168,10 +168,23 @@ internal sealed class BaolongdaBackend : IDisposable
 	/// ⭐ 白名单：⭐ ① ⭐ <c>MRID6-23</c> ⭐ **精确命中**（⭐ 三台真机证据 ✅）·
 	/// ⭐ ② ⭐ <c>MRID6-</c> ⭐ **前缀**（⚠️ **30 系板号未知 ⇒ 标为待验证** ⚠️）。</para>
 	///
-	/// <para>⚠️ <b>失败一律按"不是宝龙达"处理</b> ✅（⭐ 读不到/抛异常 ⇒ <c>false</c> ✅）
+	/// <para>⭐⭐ <b>白名单安全性的真机依据（⭐ 用户 2026-10-16 提供 ✅）</b>：
+	/// ⭐ 扫了 **28 个诊断包**（⭐ 共 6 个不同机型 ✅），⭐ 板号分布为 ——
+	/// ⭐ 宝龙达：⭐ <c>MRID6-23</c> ✅；
+	/// ⭐ 同方：⭐ <c>GM5HG0A</c>（⭐ RTX 4060 ✅）· ⭐ <c>GM6IX8B</c>（⭐ RTX 4080 ✅）·
+	/// ⭐ <c>KUANGSHI-JIGUANG Series-X6AR55xW</c>（⭐ RTX **5070** ✅）·
+	/// ⭐ <c>YAOSHI Series-X6AR55xY</c>（⭐ RTX **5070** ✅）· ⭐ <c>Standard</c>（⭐ 板号读不到 ✅）
+	/// ⇒ ⭐ ⭐ **同方机型【没有一个】用 `MRID6-` 前缀** ✅ ⇒ ⭐ 本白名单**不会误伤它们** ✅
+	/// ⇒ ⭐ ⭐ 且 **50 系（5070）明确是同方、板号完全不同** ✅ ⇒ ⭐ **也不会误伤 50 系** ✅</para>
+	/// <para>⚠️ <b>仍如实保留的一条不确定</b>：⭐ **30 系蛟龙的板号仍未证实** ⚠️
+	/// ⇒ ⭐ `MRID6-` 前缀放行对它是"⭐ 赌它也是 `MRID6-*`"⚠️；
+	/// ⭐ 若实际不同 ⇒ ⭐ 它仍会**装 GCU、走 GCU** ⇒ ⭐ **保守无害** ✅</para>
+	/// <para>⚠️ ⭐ 并且 ⭐ **用户已确认：有 30/40 系的【蛟龙】板号是 `GM5*` ⇒ ⭐ 那些是同方模具** ✅
+	/// ⇒ ⭐ ⭐ 所以**判宝龙达只能看板号** ⛔ **不能**用"蛟龙 ＋ 30/40 系"❌、
+	/// ⛔ **不能**用 `SystemProductName` 含 `Jiaolong` ❌（⭐ 否则 `GM5*` 的同方蛟龙会被误判 ⚠️⚠️）。</para>	/// <para>⚠️ <b>失败一律按"不是宝龙达"处理</b> ✅（⭐ 读不到/抛异常 ⇒ <c>false</c> ✅）
 	/// —— ⭐ 这是**安全方向**：⭐ 落回老接口/GCU ⭐ 总比误伤好 ✅。</para>
 	/// </summary>
-	private static bool IsBaolongdaModelWhitelisted(out string note)
+	internal static bool IsBaolongdaModelWhitelisted(out string note)
 	{
 		note = string.Empty;
 		string board = string.Empty;

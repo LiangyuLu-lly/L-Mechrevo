@@ -59,7 +59,18 @@ internal static class DiagnosticSystemInfo
 		stringBuilder.Append(DiagnosticGcuInventoryInfo.Build());
 		// 2026-10-09（诊断增强）：把显示器枚举 / 活动路径 / 适配器刷新率 / EDID 标识 /
 		// GCU 侧 HzList·CurrentHz 一并写进包 —— 只加采集，失败也只写"该项读取失败"。
-		stringBuilder.Append(DiagnosticDisplayInfo.Build());
+		// ⭐⭐ 2026-10-16（宝龙达适配 · ⭐ 用户「⭐ 把宝龙达的扫临时写入诊断里面」✅）：
+		//   ⭐ 临时诊断段 ✅ —— ⭐ 机型白名单取证 ＋ ⭐ 功能号 8~23 逐个试读 ＋ ⭐ 结论清单
+		//   ＋ ⭐ `\\.\ACPIDriver` 只读探测 ＋ ⭐ HID 事件如实说明 ✅
+		//   ⚠️ 全程**只读**（⭐ 只发 Get=250 ✅）· ⭐ 出错只记一行、⛔ 不影响诊断包其余部分 ✅
+		try
+		{
+			stringBuilder.Append(DiagnosticBaolongdaInfo.Build());
+		}
+		catch (Exception exBaolongda)
+		{
+			stringBuilder.AppendLine("⚠️ 宝龙达诊断段追加失败（已吞掉）：" + exBaolongda.Message);
+		}		stringBuilder.Append(DiagnosticDisplayInfo.Build());
 		AppendLiquidCooling(stringBuilder);
 		AppendCapabilities(stringBuilder);
 		AppendPowerInput(stringBuilder);
