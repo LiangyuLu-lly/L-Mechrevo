@@ -367,6 +367,14 @@ public class SettingsForm : RForm
 
 	private long _hzFallbackRatesAt;
 
+	// ⭐ 2026-10-16（宝龙达 · 「屏幕刷新率没显示」）：Win32 档位枚举为**空**这件事的**状态翻转哨兵**
+	//   （0 = 上一次非空/未记录，1 = 上一次为空且已记过一次）。
+	//   ⚠️ 为什么需要：这个枚举在启动 / 每 2s 显示 tick / DisplaySettingsChanged 上都会被调 ⇒
+	//   直接 `WriteError` 会**刷屏**；按状态翻转只在「空 ⇒ 非空」或「非空 ⇒ 空」时各记一行。
+	//   ⚠️ 为什么用 `WriteError`：`Logger.WriteLine` 的级别按**消息内容**推断 ⇒ 默认「仅错误」
+	//   级别下这类信息行不落盘（真机上"日志里没有"会被误读成"没发生"）—— 见 Logger.ClassifySeverity。
+	private int _hzEmptyLogged;
+
 	/// <summary>⭐ 2026-10-15（用户拍板「根因治掉吧」）：**是否已向 GCU 补送过"固件侧自动切换 = 关"**。
 	/// 老版本会把"自动开着"告诉固件（<c>SwitchAutoRefreshRate(1)</c>），而那在**固件侧是持久的** ——
 	/// 本轮改成"恒发 false"后，只有用户再拨一次开关才会送出去；这里在 GCU 可用后**主动补送一次 0**，
@@ -400,7 +408,40 @@ public class SettingsForm : RForm
 		IReadOnlyList<int> readOnlyList;
 		try
 		{
-			readOnlyList = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(MechrevoLite.Display.ScreenNative.FindLaptopScreen(log: false));
+			// ⭐⭐ 2026-10-16（宝龙达 · 「屏幕刷新率没显示」）：
+			// 真机诊断包实证 —— 蛟龙16Pro（MRID6-23）接着 HDMI 外接屏时**内屏识别为 None**
+			// （活动显示路径里没有内屏）⇒ 原来的 `laptopScreen == null ⇒ 返回空列表`
+			//         ⇒ `_hzButtons.Count == 0` ⇒ **「刷新率」整行消失**（用户报的现象）。
+			//   而同一台机上 `GetRefreshRate` 因已有「退化为当前显示设备」的兜底 ⇒ 能读到 144Hz
+			//         ⇒ 症状正是「亮度有、刷新率没有」。
+			// ⚠️ 只在**宝龙达**机型上开启这条兜底 ⇒ GCU / 老接口机型**逐位不变**。
+			// ⚠️ 它只影响**界面显示与即时切换**；落盘/档位校正那条路仍走
+			//    `MechrevoHw` 里 `confidence == Embedded` 之后的调用（默认参数 = 原行为）。
+			bool allowCurrentDeviceFallback = Program.hw?.UsesBaolongda == true;
+			readOnlyList = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(MechrevoLite.Display.ScreenNative.FindLaptopScreen(log: false), allowCurrentDeviceFallback);
+			// ⭐ 诊断（2026-10-16）：**空列表**是「刷新率整行消失」的直接原因，而它在默认
+			//   「仅错误」级别下过去看不到（`Logger.WriteLine` 的级别按消息内容推断）
+			//   ⇒ 这里用 `WriteError` 保证**默认级别也落盘**；⚠️ 按状态翻转只记一次，避免刷屏。
+			if (readOnlyList.Count == 0)
+			{
+				if (Interlocked.Exchange(ref _hzEmptyLogged, 1) == 0)
+				{
+					// ⚠️ 诊断值先在**洞外**算好再插值：洞内写具名实参（`log: false`）会被当成
+					//    格式串的 `:` 截断，洞内写字符串字面量也易踩引号坑 —— 两者都避开。
+					string hzScreen = MechrevoLite.Display.ScreenNative.FindLaptopScreen(log: false) ?? "(null)";
+					bool hzAuto = AppConfig.Is("screen_auto");
+					int hzMax = ScreenGateProbe.Win32MaxRefreshRate();
+					Logger.WriteError("screen-hz: Win32 刷新率档位枚举为**空** ⇒ 刷新率整行会消失"
+						+ " · 内屏识别=" + hzScreen
+						+ " · 宝龙达兜底=" + (allowCurrentDeviceFallback ? "on" : "off")
+						+ " · screen_auto=" + (hzAuto ? "1" : "0")
+						+ " · Win32Max=" + hzMax);
+				}
+			}
+			else if (Interlocked.Exchange(ref _hzEmptyLogged, 0) == 1)
+			{
+				Logger.WriteError("screen-hz: Win32 刷新率档位**已恢复**（" + readOnlyList.Count + " 档）⇒ 刷新率行应正常显示");
+			}
 		}
 		catch (Exception ex)
 		{
