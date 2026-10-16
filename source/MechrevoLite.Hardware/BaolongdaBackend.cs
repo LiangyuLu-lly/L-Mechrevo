@@ -203,6 +203,21 @@ internal sealed class BaolongdaBackend : IDisposable
 			}
 		}
 		Logger.WriteLine($"宝龙达：功耗墙运行时自检 ⇒ {(powerWallAvailable ? "✅ 功能号 23 可读 ⇒ 开放 CpuPerformanceTuning" : "⚠️ 功能号 23 读不到 ⇒ 保持 false（UI 不显示）")}");
+		// ⭐⭐ 2026-10-16（用户「⭐ GPUmode接入 宝龙达机器就显示两个按钮就行」）：
+		//   ⭐ **显卡模式（⭐ 功能号 9 ✅）运行时自检** ✅ —— ⚠️ 功能号 9 **真机未验证** ⚠️
+		//   ⭐ 读得到才认为"⭐ 这套接口真的在" ✅（⭐ 协议层还带 `OutData[3]` 回显校验 ✅ 双重保护）
+		//   ⚠️ 但 ⭐ **能力位这一轮【仍然不开】** ⚠️ —— ⭐ 因为 UI 的"两按钮"分支还没接 ✅（⭐ 见下方注释）
+		bool gpuModeAvailable = false;
+		try
+		{
+			gpuModeAvailable = _wmi != null && _wmi.TryReadGpuMode(out int _);
+		}
+		catch (Exception exGpu)
+		{
+			Logger.WriteLine("宝龙达：显卡模式自检异常（按不支持处理）：" + exGpu.Message);
+		}
+		Logger.WriteLine($"宝龙达：显卡模式运行时自检 ⇒ {(gpuModeAvailable ? "✅ 功能号 9 可读（⭐ 混合/独显直连 ✅）" : "⚠️ 功能号 9 读不到")}"
+			+ " ⇒ ⚠️ 能力位**本轮暂不开**（⭐ 待 UI 两按钮分派接好 ✅）");
 		return new MechrevoDeviceCapabilities
 		{
 			ProjectId = "Baolongda",
@@ -234,6 +249,25 @@ internal sealed class BaolongdaBackend : IDisposable
 			//   ⚠️ 且 ⛔ **不开** `OverclockSettings`（⭐ 那是 GPU 超频那一组，
 			//      ⭐ 宝龙达协议里**没有**对应功能号 ⚠️ ⇒ ⭐ 开了就是点了没反应 ❌）
 			CpuPerformanceTuning = powerWallAvailable,
+			// ⭐⭐ 2026-10-16（用户要求「⭐ GPUmode接入 宝龙达机器就显示两个按钮就行」）：
+			//   ⭐ **显卡模式**（⭐ 功能号 9 ✅）—— ⚠️ **能力位暂不开**（⭐ 铁律 ✅）⚠️
+			//   ⭐ 为什么暂不开：⭐ 按铁律「⭐ 能力位 = 已接好下发路径的证明」✅
+			//      ⚠️ 而 ⭐ UI 那一侧**还没有"只显示两个按钮"的分支** ⚠️
+			//      ⭐ 现在 UI 是 `GPUModeControl`，⭐ 它有**三档**（⭐ Eco / 标准 / 极致 ⚠️）
+			//      ⇒ ⚠️ 若此刻开位 ⇒ ⭐ `CanOfferGpuModeSwitch` 可能变真 ⇒ ⭐ 界面出现**三档**，
+			//         ⭐ 其中"⭐ Eco/极致"⭐ 会走到**没接的 GCU 路径** ❌ ⇒ ⭐ **正好违反铁律** ✅
+			//   ⭐ **已完成的部分（⭐ 都已就位 ✅）**：
+			//      ① ⭐ `BaolongdaWmi.TryReadGpuMode` / ⭐ `TrySetGpuMode`
+			//         （⭐ 含写前试读保护 ＋ ⭐ `OutData[3]` 回显校验 ✅）
+			//      ② ⭐ `MechrevoHw.TryReadGpuModeViaBackend` / ⭐ `TrySetGpuModeViaBackend`
+			//         （⭐ 含写后回读确认 ＋ ⭐ 非宝龙达返回 false ✅）
+			//      ③ ⭐ `gpuModeAvailable` 自检已就位（⭐ 只是**先不用它** ✅）
+			//   ⇒ ⭐ **待办（⭐ 顺序不能反 ✅）**：
+			//      ⭐ ① ⭐ 先给 `GPUModeControl` 加"⭐ 宝龙达只显示两个按钮（混合/独显直连）"⭐ 的分支
+			//         （⭐ 必须以 `Program.hw.UsesBaolongda` 开头 ⇒ ⭐ 同方/GCU 走 else 原路 ✅）
+			//      ⭐ ② ⭐ 把那两个按钮的点击分派到 `TrySetGpuModeViaBackend` ✅
+			//      ⭐ ③ ⭐ **然后**才把下面这行改成 ⭐ `DgpuDirect = gpuModeAvailable,` ✅
+			DgpuDirect = false,
 			AmdPlatform = PawnIO.CpuInfo.IsAMD
 		};
 	}

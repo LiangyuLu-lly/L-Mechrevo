@@ -404,10 +404,82 @@ internal sealed class BaolongdaWmi : IDisposable
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"回读"需求）：⭐ **带回显校验**的单字节读 ✅
+	/// <para>⭐⭐ 依据（⭐ 真机实测出来的技巧，⭐ 见决策笔记）：⭐ 宝龙达的回应头是
+	/// ⭐ <c>00 80 00 &lt;功能号&gt;</c> ⇒ ⭐ **`OutData[3]` 会回显功能号** ✅
+	/// ⇒ ⭐ 所以可以拿它确认"⭐ 这次回应**是不是我要的那一条**" ⚠️
+	/// —— ⭐ 防止"⭐ 读 A 却拿到 B 的值"⭐ 这种静默错配 ❌。</para>
+	/// <para>⚠️ **回显不符 ⇒ 返回 false**（⭐ ⛔ 不把可疑值当有效值 ✅），⭐ 并记一行日志 ✅。</para>
+	/// <para>⭐ 用途：⭐ **状态回读/周期同步**（⭐ Fn 锁 · ⭐ 触摸板锁 · ⭐ 键盘灯状态 · ⭐ LOGO 灯 ·
+	/// ⭐ 风扇手动开关 · ⭐ 功耗墙开关 · ⭐ 显卡模式 · ⭐ 交流类型 ✅）。</para>
+	/// </summary>
+	internal bool TryReadByteChecked(Function function, out byte value)
+	{
+		value = 0;
+		try
+		{
+			byte[] outData = Invoke(MethodGet, function);
+			if (outData == null || outData.Length <= 4)
+			{
+				return false;
+			}
+			// ⭐ 回显校验：⭐ 期望 OutData[3] == 功能号 ✅
+			if (outData[3] != (byte)function)
+			{
+				Logger.WriteLine($"宝龙达 WMI：⚠️ 回显不符 —— 读功能号 {(byte)function}，"
+					+ $"但回应里是 {(int)outData[3]}（⭐ OutData[3]）⇒ ⭐ **本次读数作废**（⛔ 不当有效值 ✅）");
+				return false;
+			}
+			value = outData[4];
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineIfChanged("baolongda-readchecked", $"宝龙达 WMI：回读功能号 {(byte)function} 失败：{ex.Message}");
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"回读"需求）：⭐ **多字节**带回显校验读 ✅ —— ⭐ 用于 ⭐ 功能号 17（⭐ 键盘灯颜色 R,G,B ✅）
+	/// <para>⭐ <paramref name="count" /> 是要取的字节数（⭐ 从 `OutData[4]` 起 ✅）。</para>
+	/// <para>⚠️ 同样做 ⭐ `OutData[3]` **回显校验** ✅ —— ⭐ 不符就作废（⛔ 不返回可疑数据 ✅）。</para>
+	/// </summary>
+	internal bool TryReadBytesChecked(Function function, int count, out byte[] values)
+	{
+		values = null;
+		if (count <= 0 || count > 8)
+		{
+			return false;
+		}
+		try
+		{
+			byte[] outData = Invoke(MethodGet, function);
+			if (outData == null || outData.Length < 4 + count)
+			{
+				return false;
+			}
+			if (outData[3] != (byte)function)
+			{
+				Logger.WriteLine($"宝龙达 WMI：⚠️ 回显不符 —— 读功能号 {(byte)function}，"
+					+ $"但回应里是 {(int)outData[3]}（⭐ OutData[3]）⇒ ⭐ **本次读数作废**（⛔ 不当有效值 ✅）");
+				return false;
+			}
+			byte[] array = new byte[count];
+			Array.Copy(outData, 4, array, 0, count);
+			values = array;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineIfChanged("baolongda-readbyteschecked", $"宝龙达 WMI：回读功能号 {(byte)function}（{count} 字节）失败：{ex.Message}");
+			return false;
+		}
+	}
 	/// <summary>写一个功能号的单字节值（<c>InData[4]</c>）。</summary>
 	internal bool TryWriteByte(Function function, byte value)
-	{
-		try
+	{		try
 		{
 			Invoke(MethodSet, function, new byte[1] { value });
 			return true;
@@ -747,7 +819,73 @@ internal sealed class BaolongdaWmi : IDisposable
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
-	//  ⑤ 灯效（⭐ 蛟龙16Pro 独有）
+	//  ⑤ 显卡模式（⭐ 2026-10-16 · 用户要求「⭐ GPUmode接入 宝龙达机器就显示两个按钮就行」✅）
+	//     ⭐ 协议：⭐ 功能号 9 ✅ · ⭐ 读 `InData[1]=250` / ⭐ 写 `251` ⇒ ⭐ `InData[4]` = 值 ✅
+	//     ⭐ 取值（⭐ 参考实现 `GpuMode` 枚举 ✅）：⭐ **0 = 混合模式（Hybrid）** ·
+	//        ⭐ **1 = 独显直连（Discrete）** ⇒ ⭐ **只有这两个** ✅
+	//     ⚠️ 真机**尚未验证**功能号 9 ⚠️ ⇒ ⭐ 所以调用方必须**先读一次**再写 ✅
+	//        （⭐ 与键盘灯那套同一个保护思路 ✅）
+	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>⭐ 混合模式（⭐ 参考实现 `GpuMode.HybridMode = 0` ✅）。</summary>
+	internal const int GpuModeHybrid = 0;
+
+	/// <summary>⭐ 独显直连（⭐ 参考实现 `GpuMode.DiscreteMode = 1` ✅）。</summary>
+	internal const int GpuModeDiscrete = 1;
+
+	/// <summary>
+	/// ⭐ 读显卡模式（⭐ 功能号 9 ✅）。
+	/// <para>⭐ 返回值：⭐ 0 = 混合 · ⭐ 1 = 独显直连 ✅（⭐ 其它值一律当读失败 —— ⭐ 因为我们只知道这两个 ✅）。</para>
+	/// <para>⭐ 用 <see cref="TryReadByteChecked" /> ⇒ ⭐ 带 **`OutData[3]` 回显校验** ✅。</para>
+	/// </summary>
+	internal bool TryReadGpuMode(out int mode)
+	{
+		mode = -1;
+		if (!TryReadByteChecked(Function.GpuMode, out byte raw))
+		{
+			return false;
+		}
+		if (raw != GpuModeHybrid && raw != GpuModeDiscrete)
+		{
+			// ⚠️ 未知取值：⭐ 如实记下来（⭐ 说不定别的机型有第三档 ⚠️），⭐ 但⛔ 不当作有效值 ✅
+			Logger.WriteLineIfChanged("baolongda-gpumode-unknown",
+				$"宝龙达 显卡模式：⚠️ 读到**未知取值** {raw}（⭐ 已知只有 0=混合 / 1=独显直连 ⚠️）⇒ ⭐ 当作读不到 ✅");
+			return false;
+		}
+		mode = raw;
+		return true;
+	}
+
+	/// <summary>
+	/// ⭐ 写显卡模式（⭐ 功能号 9 ✅）。
+	/// <para>⚠️ <b>写前保护</b>：⭐ 先 <see cref="TryReadGpuMode" /> 试读一次 ⇒ ⭐ **读不到就拒绝盲写** ✅
+	/// （⭐ 因为功能号 9 真机未验证 ⚠️ —— ⭐ 与键盘灯先读功能号 10 是同一个道理 ✅）。</para>
+	/// <para>⭐ 只接受 ⭐ <see cref="GpuModeHybrid" /> / ⭐ <see cref="GpuModeDiscrete" /> ✅（⭐ 其它一律拒绝 ✅）。</para>
+	/// </summary>
+	internal bool TrySetGpuMode(int mode)
+	{
+		if (mode != GpuModeHybrid && mode != GpuModeDiscrete)
+		{
+			Logger.WriteLine($"宝龙达 显卡模式：⭐ 拒绝写入不支持的值 {mode}（⭐ 只接受 0=混合 / 1=独显直连 ✅）");
+			return false;
+		}
+		// ⭐ 写前保护：⭐ 读得到才写 ✅
+		if (!TryReadGpuMode(out int current))
+		{
+			Logger.WriteLine("宝龙达 显卡模式：⚠️ **读不到当前模式** ⇒ ⭐ 拒绝盲写（⭐ 功能号 9 真机未验证 ⚠️）"
+				+ " ⇒ ⭐ 本次不动，⛔ 一个字节都不写 ✅");
+			return false;
+		}
+		if (current == mode)
+		{
+			Logger.WriteLine($"宝龙达 显卡模式：⭐ 已经是目标值 {mode} ⇒ ⛔ 无需写入 ✅");
+			return true;
+		}
+		return TryWriteByte(Function.GpuMode, (byte)mode);
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	//  ⑥ 灯效（⭐ 蛟龙16Pro 独有）
 	// ══════════════════════════════════════════════════════════════════════
 
 	/// <summary>⭐ LOGO 灯开/关（功能号 15）。</summary>

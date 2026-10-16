@@ -3184,6 +3184,83 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		return Math.Clamp(duties[order[n - 1]], 0, 100);
 	}
 
+	// ══════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-16（用户要求「⭐ GPUmode接入 宝龙达机器就显示两个按钮就行」）：
+	//     ⭐ 显卡模式（⭐ 宝龙达 WMI 功能号 9 ✅）的**意向方法** ✅
+	//     ⭐ 取值只有两个（⭐ 参考实现 `GpuMode` 枚举 ✅）：⭐ 0 = 混合 · ⭐ 1 = 独显直连 ✅
+	//     ⚠️ 功能号 9 **真机未验证** ⚠️ ⇒ ⭐ 门面层与协议层**都先试读再写**（⭐ 读不到就拒绝 ✅）
+	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>
+	/// ⭐ 读一次显卡模式（⭐ 只读 ✅）。⭐ 非宝龙达时返回 <c>false</c> ⇒ ⭐ 调用方走原路 ✅。
+	/// <para>⭐ <paramref name="mode" />：⭐ 0 = 混合模式 · ⭐ 1 = 独显直连 ✅。</para>
+	/// </summary>
+	internal bool TryReadGpuModeViaBackend(out int mode)
+	{
+		mode = -1;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		try
+		{
+			return wmi.TryReadGpuMode(out mode);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 显卡模式：⭐ 读取异常：" + ex.Message);
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ **意向方法**：⭐ 切显卡模式（✅ 含**写后回读确认**，⭐ 最多 5 次 · ⭐ 150 ms，⭐ 与档位/LOGO 同款 ✅）
+	/// <para>⭐ <paramref name="mode" />：⭐ 0 = 混合 · ⭐ 1 = 独显直连 ✅；⭐ 其它值**直接拒绝** ✅。</para>
+	/// <para>⚠️ 非宝龙达 ⇒ ⭐ **返回 false** ⇒ ⭐ 调用方**照原路走 GCU**（⭐ 那条路一字不改 ✅）。</para>
+	/// <para>⚠️ 日志**如实区分**：⭐ 已确认 ✅ / ⭐ 写入完成但回读不一致 ⚠️ / ⭐ 回读不到 ⚠️ ✅。</para>
+	/// </summary>
+	internal bool TrySetGpuModeViaBackend(int mode, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		if (mode != BaolongdaWmi.GpuModeHybrid && mode != BaolongdaWmi.GpuModeDiscrete)
+		{
+			Logger.WriteLine($"宝龙达 显卡模式：⭐ 拒绝不支持的值 {mode}（⭐ 只接受 0=混合 / 1=独显直连 ✅）");
+			return true; // ⭐ 已接管：⭐ 不让调用方再去发 GCU ✅
+		}
+		try
+		{
+			if (!wmi.TrySetGpuMode(mode))
+			{
+				Logger.WriteLine("宝龙达 显卡模式：⚠️ 写入未执行（⭐ 详见协议层日志 —— ⭐ 多半是「读不到当前模式」⭐ 而拒绝盲写 ⚠️）");
+				return true;
+			}
+			for (int attempt = 0; attempt < 5; attempt++)
+			{
+				if (wmi.TryReadGpuMode(out int now) && now == mode)
+				{
+					confirmed = true;
+					Logger.WriteLine($"宝龙达 显卡模式：⭐ 已切到 {(mode == BaolongdaWmi.GpuModeDiscrete ? "独显直连" : "混合模式")}"
+						+ $"（⭐ {mode}）并回读确认 ✅（⭐ 第 {attempt + 1} 次）");
+					return true;
+				}
+				Thread.Sleep(150);
+			}
+			Logger.WriteLine($"宝龙达 显卡模式：⚠️ 写入完成但 {5 * 150} ms 内**回读不一致或读不到** ⇒ ⭐ 如实报告未确认 ⚠️");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 显卡模式：⭐ 操作异常（已吞掉，⛔ 不影响别处）：" + ex.Message);
+			return true;
+		}
+	}
+
 	/// <summary>
 	/// 把本会话切到**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
 	/// <para>⭐ 与 <see cref="ApplyLegacyBackendAsync" /> 是**同一套路**（⭐ 替换能力位 ⇒ 起 3 s 定时刷新 ⇒ 立刻读一次 ⇒ 宣布就绪 ✅），
