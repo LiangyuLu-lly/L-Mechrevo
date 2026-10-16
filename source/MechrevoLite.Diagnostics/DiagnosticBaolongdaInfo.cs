@@ -57,6 +57,7 @@ internal static class DiagnosticBaolongdaInfo
 			AppendWmiClassProbe(sb);
 			AppendDriverProbe(sb);
 			AppendEcVersionProbe(sb);
+			AppendEcPortIoProbe(sb);
 			AppendFunctionProbe(sb);
 			AppendHidNote(sb);
 		}
@@ -404,6 +405,125 @@ internal static class DiagnosticBaolongdaInfo
 		{
 			sb.AppendLine("AcpiTest_MULong 实例查询失败 = " + ex.Message);
 			sb.AppendLine("   （⭐ 类不存在也会走到这里 ⇒ ⭐ 那同样说明本机没有这条通路 ✅）");
+		}
+	}
+
+	// ── ②d EC 端口 I/O（PawnIO LpcACPIEC 模块）只读试读 ──
+	// 2026-10-16（用户批准：「先把诊断功能加入EC版本的读取」）：
+	//   ⭐ ②b 已**实测证明**既有 `\\.\ACPIDriver`（H2RAM 0x700–0x7FF）**到不了 XRAM** ⚠️
+	//     （对照读 0x07C3 得真实值 0x07，而 0x8410~0x8413 四字节全回 0xFF = 「未映射填充值」签名）
+	//   ⇒ 本节走**第二条通路**：PawnIO `LpcACPIEC` 模块提供的 **ACPI EC 端口 I/O**
+	//     （端口 0x62 数据 / 0x66 状态·命令；命令 0x92 读 / 0x93 写）——
+	//     ⭐ 这正是开源限充项目与厂商控制台碰 XRAM 用的那类通道 ✅。
+	//   ⚠️ 合规：PawnIO **模块**是 LGPL-2.1-or-later（**可分发**：已内嵌 + NOTICE + LICENSES\LGPL-2.1.txt）；
+	//     ⛔ 既不引入 WinRing0（签名 2007–2014 已过期 ＋ 在微软易受攻击驱动列表里）
+	//     ⛔ 也不引入 inpoutx64（许可只自由用于个人/非商业）✅。
+	//   ⛔ **全程只读**：只发 0x92 读命令 · ⛔ 绝不发 0x93 写 · ⛔ 不改任何寄存器 ✅（限充仍【暂缓】）。
+	//   ⭐ 与 ②b 的**关键差别**：端口通道**会超时**（等 IBF/OBF 超过 250ms 即失败并置「中毒」），
+	//     ⇒ ⭐ 它能**明确区分**「地址不可达」与「通道根本不通」；
+	//       而 ②b 那条 H2RAM 通道对窗口外地址**静默回填充值**、两种失败长得一模一样 ⚠️。
+	private static void AppendEcPortIoProbe(StringBuilder sb)
+	{
+		sb.AppendLine();
+		sb.AppendLine("── ②d EC 端口 I/O（PawnIO LpcACPIEC 模块 · 只读）──");
+		sb.AppendLine("⭐ 与 ②b 的关系：②b 已实测证明既有 `\\.\\ACPIDriver`（H2RAM 0x700–0x7FF）**到不了 XRAM** ⚠️");
+		sb.AppendLine("   ⇒ 本节走**第二条通路**：PawnIO `LpcACPIEC` 模块的 **ACPI EC 端口 I/O**");
+		sb.AppendLine("     （0x62 数据 · 0x66 状态/命令 · 命令 0x92 读）—— ⭐ 开源限充项目与厂商控制台用的就是这类通道 ✅");
+		sb.AppendLine("⚠️ 合规：PawnIO 模块 LGPL-2.1-or-later（**可分发** · 已内嵌 ＋ NOTICE ＋ LICENSES\\LGPL-2.1.txt）");
+		sb.AppendLine("   ⛔ 不引入 WinRing0（签名已过期 ＋ 微软易受攻击驱动列表）· ⛔ 不引入 inpoutx64（非商业许可）✅");
+		sb.AppendLine("   ⭐ 模块本身**只放行端口 0x62/0x66**，超出即拒绝 ✅");
+		sb.AppendLine("⛔ 全程只读：只发 0x92 读命令 · ⛔ 绝不发 0x93 写 · ⛔ 不改任何寄存器 ✅");
+		sb.AppendLine();
+		try
+		{
+			sb.AppendLine("PawnIO 驱动 = " + EcPortIo.DescribePawnInstalled());
+
+			// ① 读 EC 版本 4 字节（XRAM 0x8410~0x8413）
+			int[] version = new int[4];
+			EcPortIo.TryReadBytes(EcChargeLimit.XramEcVersionRegister, 4, out version);
+			for (int i = 0; i < version.Length; i++)
+			{
+				int addr = EcChargeLimit.XramEcVersionRegister + i;
+				sb.AppendLine("试读 XRAM 0x" + addr.ToString("X4") + " = "
+					+ ((version[i] >= 0) ? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(version[i])) : "⛔ 读不到"));
+			}
+
+			// ② 交叉校验读（⭐ 作用：判断「是不是真的在跟一颗 IT5570 对话」，而不只是「调用没报错」⚠️）
+			bool socOk = EcPortIo.TryReadByte(0x847C, out int soc);
+			sb.AppendLine("交叉校验 · XRAM 0x847C（SOC，合理区间 0~100）= "
+				+ (socOk ? ("✅ 读得 " + soc + ((soc < 0 || soc > 100) ? " ⚠️ 超出合理区间" : " ✅ 在合理区间")) : "⛔ 读不到"));
+			bool modeOk = EcPortIo.TryReadByte(0x83C0, out int mode);
+			sb.AppendLine("交叉校验 · XRAM 0x83C0（模式，合理值 0/2/0x48）= "
+				+ (modeOk ? ("✅ 读得 " + ChargeLimitEcProbe.FormatRaw(mode)) : "⛔ 读不到"));
+
+			sb.AppendLine("通道 = " + EcPortIo.DescribeChannel());
+			sb.AppendLine();
+
+			// ③ 结论 —— ⚠️ 判据是「值本身合理」，⛔ 不是「调用没报错」（⭐ 这正是 ②b 得到的教训 ✅）
+			int okCount = 0;
+			int ffCount = 0;
+			foreach (int v in version)
+			{
+				if (v >= 0)
+				{
+					okCount++;
+					if (v == 0xFF)
+					{
+						ffCount++;
+					}
+				}
+			}
+			bool allFf = okCount == 4 && ffCount == 4;
+			if (okCount == 4 && !allFf)
+			{
+				StringBuilder ver = new StringBuilder();
+				for (int i = 0; i < version.Length; i++)
+				{
+					if (i > 0)
+					{
+						ver.Append('.');
+					}
+					ver.Append(version[i].ToString("X2"));
+				}
+				sb.AppendLine("结论 = ✅ **EC 版本可读（端口通道）** ⇒ EC 版本 = " + ver);
+				if (ffCount > 0)
+				{
+					sb.AppendLine("   ⚠️ 但其中有 " + ffCount + " 个字节是 0xFF ⇒ 疑似填充值混入，⭐ 请以**原始字节**为准 ⚠️");
+				}
+				sb.AppendLine("   ⇒ ⭐ 这正是 ②b 那条 H2RAM 通道**读不到**的东西 ⇒ ⭐ **端口通道是有效通路** ✅");
+			}
+			else if (allFf)
+			{
+				sb.AppendLine("结论 = ⚠️ **端口通道通了、但四个字节全是 0xFF** ⚠️");
+				sb.AppendLine("   ⇒ ⭐ 说明**端口读写机制本身是工作的**（没有超时、没中毒）✅");
+				sb.AppendLine("   ⇒ 但该地址**读不到真实版本**，两种可能：");
+				sb.AppendLine("      ① 本机 EC **不是 IT5570**（⚠️ 本机是同方翼龙15Pro，蛟龙才是 IT5570）");
+				sb.AppendLine("         ⇒ ⭐ 该 XRAM 地址在本机**未映射**（对本机而言这是**正常**结果、⛔ 不是故障）");
+				sb.AppendLine("      ② 该地址真实值就是 0xFF（⚠️ 四个字节全 FF 不像版本号）");
+				sb.AppendLine("   ⇒ ⭐ 请以**蛟龙（宝龙达）真机**的结果为准 ✅");
+				if (socOk && soc >= 0 && soc <= 100)
+				{
+					sb.AppendLine("   ⚠️ 但交叉校验读到了**合理**的 SOC（" + soc + "）⇒ ⭐ 该机地址映射可能**部分可用**，");
+					sb.AppendLine("      建议把本节输出整段发回 ⚠️");
+				}
+			}
+			else if (okCount > 0)
+			{
+				sb.AppendLine("结论 = ⚠️ **部分可读（" + okCount + "/4 字节）** ⇒ 版本号无法可靠解析，请以上面原始字节为准 ⚠️");
+			}
+			else
+			{
+				sb.AppendLine("结论 = ⛔ **端口通道不通** —— 4 个字节一个都没读到 ⚠️");
+				sb.AppendLine("   ⇒ ⭐ 与 ②b 的失败**不同**：端口通道有超时与中毒机制，");
+				sb.AppendLine("     ⭐ 具体卡在哪看上面「通道 =」那一行（驱动未装 / 模块未装载 / 已中毒）✅");
+				sb.AppendLine("   ⇒ ⭐ 若「PawnIO 驱动 = ⛔ 未安装」⇒ ⭐ 需用户**显式点击**安装（见 Install-PawnIO.ps1）");
+				sb.AppendLine("     ⛔ 我们**不分发** PawnIO 驱动本体（GPL-2.0），只分发 LGPL 的**模块** ✅");
+			}
+			sb.AppendLine("⭐ 如实说明：本节**只读**（只发 0x92）· ⛔ 未发 0x93 写 · ⛔ 未改任何寄存器 ✅");
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("EC 端口 I/O 试读异常 = " + ex.Message);
 		}
 	}
 

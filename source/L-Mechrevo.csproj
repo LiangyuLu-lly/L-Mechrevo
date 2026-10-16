@@ -37,6 +37,17 @@
          许可/署名：namazso/PawnIO.Modules（LGPL-2.1-or-later，与 RyzenSMU.bin 同一个上游、同一份 LICENSES\LGPL-2.1.txt）；
          协议来源 kitsunyan/intel-undervolt（GPL-3.0）见 THIRD-PARTY-NOTICES.md §1.2 B4 与 §1.3。 -->
     <EmbeddedResource Include="LMechrevo.IntelMSR.bin" LogicalName="LMechrevo.IntelMSR.bin" />
+    <None Remove="LMechrevo.LpcACPIEC.bin" />
+    <!-- 2026-10-16 合规：LMechrevo.LpcACPIEC.bin 是 namazso/PawnIO.Modules 的 LpcACPIEC 模块
+         （LGPL-2.1-or-later，Copyright (C) 2023 namazso），**原样未修改**地内嵌分发。
+         用途：PawnIOWrapper.LoadModule() 载入后由 MechrevoLite.Hardware\EcPortIo.cs 走 ACPI EC
+         端口 I/O（模块仅放行端口 0x62/0x66），用于读 XRAM（如 EC 版本 0x8410~0x8413）；
+         既有的 \\.\ACPIDriver（H2RAM 0x700-0x7FF）机制上到不了 XRAM。
+         上游版本：PawnIO.Modules tag 0.2.11（release_0_2_11.zip）· 2612 B
+         SHA-256 C38FD116E7AFF4D1FDB0A494E296BE0A6708E5A22FC72F14587442FB7F8F7906
+         许可文本：LICENSES\LGPL-2.1.txt（= 上游 COPYING）；署名见 LMechrevo.LpcACPIEC.bin.NOTICE.txt。
+         ⚠️ 仅在需要读 XRAM 时惰性装载，启动不装载；⛔ 不使用 WinRing0 / inpoutx64（合规不允许）。 -->
+    <EmbeddedResource Include="LMechrevo.LpcACPIEC.bin" LogicalName="LMechrevo.LpcACPIEC.bin" />
     <EmbeddedResource Include="LMechrevo.model-registry.json" LogicalName="LMechrevo.model-registry.json" />
     <!-- 2026-10-09（75:00）：按变体选择的 GCU 载荷落地基线（由 tmp_gcu_baseline.ps1 从 installer-src\files\GCU\payload 生成）。
          内容 = 每个变体逐文件 相对路径+字节数；[载荷落地] 一节按注册表 GcuVariant 选表，不再拿 40A 硬编码套所有机型。
