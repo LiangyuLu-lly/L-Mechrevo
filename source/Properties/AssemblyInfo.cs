@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -11,7 +11,7 @@ using System.Security.Permissions;
 [assembly: AssemblyCompany("L-Mechrevo")]
 [assembly: AssemblyConfiguration("Release")]
 [assembly: AssemblyFileVersion("0.291.9")]
-[assembly: AssemblyInformationalVersion("0.291.9-beta22.9")]
+[assembly: AssemblyInformationalVersion("0.291.9-beta22.10")]
 [assembly: AssemblyProduct("L-Mechrevo")]
 [assembly: AssemblyTitle("L-Mechrevo")]
 [assembly: TargetPlatform("Windows10.0.19041.0")]
