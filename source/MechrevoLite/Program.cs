@@ -622,7 +622,29 @@ internal static class Program
 		}
 		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配）：⭐ 传感器能力转储（⭐ 落实"LHM 能读温度就优先用它"✅）
 		//    ⭐ 用法：⭐ `L-Mechrevo.exe --sensor-dump [输出目录]` ✅
-		if (text == "--sensor-dump")
+		// ⭐⭐ 2026-10-16（宝龙达 · 风扇前置）：⭐ 只读观察两个风扇通道 ＋ ⭐ CPU/GPU 温度
+		//    ⭐ 用法：⭐ `L-Mechrevo.exe --fan-watch [秒数] [输出目录]` ✅
+		//    ⭐ 目的：⭐ 确认"⭐ 哪个通道是 CPU、⭐ 哪个是 GPU"⭐（⭐ 搞反会导致散热逻辑全错 ⚠️）
+		if (text == "--fan-watch")
+		{
+			int seconds = 60;
+			string watchOut = null;
+			if (args.Length > 1 && int.TryParse(args[1], out int parsedSeconds))
+			{
+				seconds = parsedSeconds;
+				if (args.Length > 2)
+				{
+					watchOut = Path.GetFullPath(args[2]);
+				}
+			}
+			else if (args.Length > 1)
+			{
+				watchOut = Path.GetFullPath(args[1]);
+			}
+			Environment.ExitCode = MechrevoLite.Hardware.FanWatchRunner.Run(seconds, watchOut);
+			Logger.Close();
+			return;
+		}		if (text == "--sensor-dump")
 		{
 			Environment.ExitCode = MechrevoLite.Hardware.SensorDumpRunner.Run((args.Length > 1) ? Path.GetFullPath(args[1]) : null);
 			Logger.Close();
