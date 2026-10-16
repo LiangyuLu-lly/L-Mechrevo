@@ -67,6 +67,49 @@ public class LhmMonitor : IDisposable
 	public string CpuTemperatureSensorName { get; private set; }
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（"接传感器"）：⭐ **GPU 温度（摄氏度）** —— 同样来自 LM 自带的 LHM ✅。
+	/// <para>⚠️⚠️ <b>生产上多半是 <c>null</c></b>：⭐ 因为本类一旦检测到 NVIDIA 就
+	/// <c>IsGpuEnabled = false</c>（⭐ 历史上的 NVML 原生崩溃修复 ⚠️）
+	/// ⇒ ⭐ **NVIDIA 机型拿不到** ✅；⭐ **AMD/Intel 独显或无独显机型可以拿到** ✅。</para>
+	/// <para>⭐ 这正是"LHM 能读就用 LHM、⭐ 读不到才用厂商接口/⭐ NVML"⭐ 这条通用规则里的"读不到"情形 ✅
+	/// ⇒ ⭐ 调用方（<c>HardwareControl.ApplySensorPriority</c>）会自动回退 ✅。</para>
+	/// </summary>
+	public float? GpuTemperature { get; private set; }
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"接传感器"）：⭐ **GPU 核心频率（MHz）** —— 同样来自 LM 自带的 LHM ✅。
+	/// <para>⭐ 依据用户 2026-10-16：「⭐ 显卡 / cpu 频率温度 LHM 应该都能读」✅</para>
+	/// <para>⚠️ 与 <see cref="GpuTemperature" /> 同一个限制：⭐ NVIDIA 机型下 LHM 的 GPU 那支被关
+	/// ⇒ ⭐ 那些机型由加固过的 <c>NvmlHelper</c> 提供 ✅（⭐ 见 <c>HardwareControl.ApplySensorPriority</c> ✅）</para>
+	/// </summary>
+	public float? GpuClockMhz { get; private set; }
+
+	/// <summary>
+	/// ⭐ 判断某个 GPU 温度传感器名是不是我们要的（⭐ 取"核心"那一个 ✅）。
+	/// <para>⭐ 实测（⭐ `--sensor-dump`）：⭐ NVIDIA = ⭐ <c>GPU Core</c> ✅；
+	/// ⭐ AMD 核显 = ⭐ <c>GPU VR SoC</c> ✅。</para>
+	/// <para>⚠️ **刻意不取** <c>Hot Spot</c> / ⭐ <c>Memory Junction</c>（⭐ 那是热点与显存结温，
+	/// ⭐ 比核心高十几度 ⚠️）⇒ ⭐ 界面要的是**核心温度**，⭐ 混用会让人以为过热 ✅。</para>
+	/// </summary>
+	internal static bool IsGpuTemperatureSensorName(string? name)
+	{
+		if (string.IsNullOrEmpty(name))
+		{
+			return false;
+		}
+		if (name.IndexOf("Hot Spot", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Hotspot", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Junction", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Memory", StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			return false;
+		}
+		return name.IndexOf("GPU Core", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("GPU VR SoC", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("GPU", StringComparison.OrdinalIgnoreCase) >= 0;
+	}
+
+	/// <summary>
 	/// ⭐ 判断某个 CPU 温度传感器名是不是我们要的。
 	/// <para>⭐ 依据实测（⭐ `--sensor-dump`）：⭐ AMD 上是 ⭐ <c>Core (Tctl/Tdie)</c> ✅；
 	/// ⭐ Intel 上通常是 ⭐ <c>CPU Package</c> / ⭐ <c>Core Average</c> / ⭐ <c>Core Max</c> ✅。</para>
@@ -282,6 +325,18 @@ public class LhmMonitor : IDisposable
 						{
 							CpuTemperature = sensor.Value;
 							CpuTemperatureSensorName = sensor.Name;
+						}
+						// ⭐⭐ 2026-10-16：⭐ GPU 温度（⭐ 只在 LHM 的 GPU 那支启用时才可能命中 ✅）
+						else if (sensor.SensorType == SensorType.Temperature && IsGpuHardwareType(item.HardwareType)
+							&& !GpuTemperature.HasValue && IsGpuTemperatureSensorName(sensor.Name))
+						{
+							GpuTemperature = sensor.Value;
+						}
+						// ⭐⭐ 2026-10-16：⭐ GPU 核心频率（⭐ 同上，⭐ 只在 GPU 那支启用时 ✅）
+						else if (sensor.SensorType == SensorType.Clock && IsGpuHardwareType(item.HardwareType)
+							&& !GpuClockMhz.HasValue && sensor.Name.IndexOf("Core", StringComparison.OrdinalIgnoreCase) >= 0)
+						{
+							GpuClockMhz = sensor.Value;
 						}
 						else if (sensor.SensorType == SensorType.SmallData && IsGpuMemoryTotalSensorName(sensor.Name))
 						{

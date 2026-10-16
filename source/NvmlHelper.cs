@@ -121,6 +121,23 @@ public static class NvmlHelper
 	/// <summary>⭐ `NVML_TEMPERATURE_GPU`（⭐ NVML 头文件里的枚举值 = 0 ✅）。</summary>
 	private const int NvmlTemperatureGpu = 0;
 
+	// ⭐⭐ 2026-10-16（"接传感器" · ⭐ 用户 2026-10-16 明确）：⭐ "显卡 / cpu 频率温度 LHM 应该都能读" ✅
+	//    ⚠️ 但**生产里 LHM 的 GPU 那支被我们主动关掉**（⭐ `_nvidiaGpuSkipped`，⭐ NVML 原生崩溃修复 ⚠️）
+	//    ⇒ ⭐ NVIDIA 机型的 **GPU 频率**也得从这里补 ✅
+	//    ⭐（⭐ 温度已经补了，⭐ 见 `GetGpuTemperature` ✅）—— ⭐ 数据与 LHM 同源、⭐ 路径更安全 ✅
+	private static uint? _snapshotClockMhz;
+
+	/// <summary>
+	/// ⭐ <c>nvmlDeviceGetClockInfo</c>（⭐ NVML 官方导出 ✅）。
+	/// <para>⭐ <paramref name="clockType" /> 传 ⭐ <see cref="NvmlClockGraphics" />=<c>0</c>
+	/// （⭐ `NVML_CLOCK_GRAPHICS` = 核心频率 ✅）。</para>
+	/// </summary>
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetClockInfo(nint device, int clockType, out uint clockMhz);
+
+	/// <summary>⭐ `NVML_CLOCK_GRAPHICS`（⭐ NVML 头文件枚举值 = 0 ✅）。</summary>
+	private const int NvmlClockGraphics = 0;
+
 	/// <summary>(c) 已降级：隔离期内或模块已失效，调用方应完全跳过本类（一次原生调用都不要发）。</summary>
 	internal static bool Unavailable
 	{
@@ -156,6 +173,26 @@ public static class NvmlHelper
 	/// <para>⭐ 沿用本类加固：⭐ 快照 TTL 复用 · ⭐ 失败计数与隔离 · ⭐ 拿不到句柄就绝不往下传 ✅
 	/// ⇒ ⭐ 取不到时返回 <c>null</c>（⭐ 调用方跳过即可，⛔ 不会抛 ✅）。</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-16：⭐ **GPU 核心频率（MHz）** —— ⭐ 补 NVIDIA 机型上"LHM 读不到"的那一项 ✅
+	/// <para>⭐ 依据用户 2026-10-16：⭐ "显卡/cpu 频率温度 LHM 应该都能读" ✅
+	/// —— ⭐ LHM **库**确实能读，⭐ 但**我们的用法**在检测到 NVIDIA 时关掉了 GPU 那支
+	/// （⭐ NVML 原生崩溃修复 ⚠️）⇒ ⭐ 所以 NVIDIA 机型由本方法提供 ✅，⭐ 数据同源 ✅</para>
+	/// <para>⭐ 取不到返回 <c>null</c>（⭐ 调用方跳过即可 ✅）。</para>
+	/// </summary>
+	public static float? GetGpuClockMhz(uint gpuIndex = 0u)
+	{
+		lock (_lock)
+		{
+			RefreshLocked(gpuIndex);
+			if (!_snapshotClockMhz.HasValue)
+			{
+				return null;
+			}
+			return _snapshotClockMhz.Value;
+		}
+	}
+
 	public static float? GetGpuTemperature(uint gpuIndex = 0u)
 	{
 		lock (_lock)
@@ -427,13 +464,20 @@ public static class NvmlHelper
 			{
 				_snapshotTempCelsius = tempCelsius;
 			}
+			// ⭐⭐ 2026-10-16：⭐ GPU 核心频率（⭐ 与上面同一把句柄、同一次快照 ✅）
+			//    ⭐ 合理性：(0, 4000] MHz —— ⭐ 取不到时 NVML 常返回 0 ⚠️，⭐ 那不算有效频率 ✅
+			int num8 = nvmlDeviceGetClockInfo(device, NvmlClockGraphics, out uint clockMhz);
+			if (num8 == NVML_SUCCESS && clockMhz > 0 && clockMhz <= 4000)
+			{
+				_snapshotClockMhz = clockMhz;
+			}
 			// 只要有一个查询成功就说明句柄/上下文是活的（功耗返回 0 是低功耗态，不是失败）。
-			if (num2 == NVML_SUCCESS || num3 == NVML_SUCCESS || num4 == NVML_SUCCESS)
+			if (num2 == NVML_SUCCESS || num3 == NVML_SUCCESS || num4 == NVML_SUCCESS || num8 == NVML_SUCCESS)
 			{
 				NoteSuccessLocked();
 				return;
 			}
-			NoteFailureLocked("nvmlDeviceGetPowerUsage/nvmlDeviceGetMemoryInfo/nvmlDeviceGetTemperature", num2);
+			NoteFailureLocked("nvmlDeviceGetPowerUsage/nvmlDeviceGetMemoryInfo/nvmlDeviceGetTemperature/nvmlDeviceGetClockInfo", num2);
 		}
 		catch (SEHException ex)
 		{
@@ -491,8 +535,9 @@ public static class NvmlHelper
 		_snapshotPower = null;
 		_snapshotUsedMb = null;
 		_snapshotTotalMb = null;
-		// ⭐ 2026-10-16：⭐ 温度同样要作废（⭐ 否则会拿旧温度冒充新读数 ⚠️）
+		// ⭐ 2026-10-16：⭐ 温度与频率同样要作废（⭐ 否则会拿旧值冒充新读数 ⚠️）
 		_snapshotTempCelsius = null;
+		_snapshotClockMhz = null;
 	}
 
 	internal static string DisabledReason => _disabledReason;

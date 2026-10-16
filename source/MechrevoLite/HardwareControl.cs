@@ -11,6 +11,9 @@ namespace MechrevoLite;
 
 public static class HardwareControl
 {
+	// ⭐⭐ 2026-10-16：⭐ "CPU 温度已切到 LHM" 只记一次（⭐ 免得 3 秒一行刷爆日志 ⚠️）
+	private static int _lhmCpuTempLogged;
+
 	public static int cpuTemp;
 
 	public static int? cpuUsage;
@@ -246,29 +249,37 @@ public static class HardwareControl
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配 · "接传感器"）：⭐ 给"**非 GCU 后端**"补上传感器值。
+	/// ⭐⭐ 2026-10-16（0.291.9 · "接传感器"）：⭐ **传感器取值优先级** —— ⭐ **对所有机型生效** ✅
 	///
-	/// <para>⭐ 为什么需要：⭐ GCU 机型上 <c>cpuTemp</c> / <c>gpuTemp</c> / 风扇是 MQTT 推送
-	/// （<see cref="AttachMechrevoHw" /> 里的 <c>DataChanged</c>）填的；⭐ 宝龙达**没有 GCU**
-	/// ⇒ ⭐ 那条路永远不触发 ⇒ ⭐ 界面上的温度/风扇会一直是 0 ❌。</para>
+	/// <para>⭐⭐ <b>用户定的规则</b>（2026-10-16 两次确认，⭐ 第二次明确了适用范围）：
+	/// 「⭐ 前面说的就是**所有机型**优先用 LHM 的传感器数据，⭐ 读不到的再用它们**自己接口**的」✅
+	/// ⇒ ⭐ 即：⭐ <b>LHM 第一优先</b>，⭐ LHM 读不到的部分才回退到 ⭐ **各家自己的厂商接口**
+	/// （⭐ GCU/同方 走 MQTT，⭐ 宝龙达走 WMI ✅）。</para>
 	///
-	/// <para>⭐⭐ <b>取数优先级</b>（⭐ 严格照用户 2026-10-16 的要求）：
-	/// <list type="number">
-	/// <item>⭐ <b>温度</b> ⇒ ⭐ **先用 LM 自带的 LibreHardwareMonitor**（<see cref="LhmMonitor.CpuTemperature" />）✅</item>
-	/// <item>⭐ LHM 读不到（⭐ null / ⭐ ≤0，⭐ 例如驱动未起 / ⭐ 非管理员 ✅）
-	/// ⇒ ⭐ 才回退**宝龙达功能号 22**（<c>MechrevoHw.BaolongdaCpuTemp</c>）✅</item>
-	/// <item>⭐ <b>风扇</b> ⇒ ⭐ **只能用宝龙达**（⭐ 实测：⭐ LHM 在本机风扇传感器 = 0 个 ❌；
-	/// ⭐ 真机已验证宝龙达功能号 13 能读 ✅）⇒ ⭐ 没有竞争，⭐ 直接用 ✅</item>
+	/// <para>⭐⭐ <b>实测得到的"LHM 能读 / 读不到"清单</b>（⭐ `--sensor-dump` · ⭐ 用户确认所有机型一致）：
+	/// <list type="bullet">
+	/// <item>⭐ <b>CPU 温度</b> ⇒ ⭐ **LHM 能读** ✅ ⇒ ⭐ **用 LHM** ✅</item>
+	/// <item>⭐ <b>GPU 温度</b> ⇒ ⚠️ LHM 检测到 NVIDIA 就关掉 GPU 那支（⭐ NVML 崩溃修复 ⚠️）
+	/// ⇒ ⭐ **AMD/Intel 独显或无独显机型 LHM 可读** ✅，⭐ NVIDIA 机型读不到 ⇒ ⭐ 回退（⭐ 见下 ✅）</item>
+	/// <item>⭐ <b>风扇转速</b> ⇒ ❌ ⭐ **LHM 一个都读不到**（⭐ 实测 = 0 个 ✅）
+	/// ⇒ ⭐ **必须用厂商接口**（⭐ GCU 推送 / ⭐ 宝龙达功能号 13 ✅）</item>
 	/// </list></para>
 	///
-	/// <para>⚠️ <b>未解决的一项</b>（⭐ 如实记下）：⭐ <b>GPU 温度</b>在宝龙达机型上**暂时拿不到** ⚠️
-	/// —— ⭐ 因为生产里 <see cref="LhmMonitor" /> 一旦检测到 NVIDIA 就**关掉 GPU 那支**
-	/// （⭐ 历史上的 NVML 原生崩溃修复 ⚠️），⭐ 而宝龙达协议里**没有 GPU 温度功能号** ⚠️。
-	/// ⭐ 将来的路子：⭐ 用已被加固的 <c>NvmlHelper</c> 取（⭐ 它已有句柄自愈与隔离 ✅）。</para>
+	/// <para>⭐⭐ <b>本方法的取值顺序</b>：
+	/// <list type="number">
+	/// <item>⭐ <b>CPU 温度</b>：⭐ **LHM** ⇒ ⭐ 读不到才用 ⭐ <c>hw.CpuTemp</c>（⭐ GCU 或宝龙达已填 ✅）</item>
+	/// <item>⭐ <b>GPU 温度</b>：⭐ **LHM** ⇒ ⭐ 读不到才用 ⭐ <c>hw.GpuTemp</c>（⭐ GCU ✅）
+	/// ⇒ ⭐ 再不行才用 ⭐ **加固过的 NVML**（⭐ 补"所有机型共同的缺口" ✅）</item>
+	/// <item>⭐ <b>风扇转速</b>：⭐ 直接用 ⭐ <c>hw.CpuFanRpm</c> / ⭐ <c>hw.GpuFanRpm</c>
+	/// （⭐ 厂商接口填的 ✅）；⭐ 且 ⚠️ **只在当前为 0 时才填** —— ⭐ 免得覆盖 GCU 刚推来的值 ✅</item>
+	/// </list></para>
 	///
-	/// <para>⚠️ 只在 <c>UsesBaolongda</c> 时为真时动作 ⇒ ⭐ **GCU 机型 / ⭐ 老同方机型行为逐位不变** ✅。</para>
+	/// <para>⚠️ <b>对 GCU 机型的影响</b>（⭐ 如实说明，⭐ 这是**用户明确要求的**行为改变 ⚠️）：
+	/// ⭐ 以前 GCU 机型的 CPU 温度**只**来自 GCU 推送；⭐ 现在**只要 LHM 读得到就用 LHM** ⚠️
+	/// ⇒ ⭐ 数值可能与以前略有差异（⭐ 传感器点位不同 ✅），⭐ 这是**按用户要求**改的 ✅。
+	/// ⭐ 首次生效时会 ⭐ **记一行日志**（⭐ 便于回查"显示的温度怎么换了来源" ✅）。</para>
 	/// </summary>
-	private static void ApplyBuiltInBackendSensors(LhmMonitor lhmMonitor)
+	private static void ApplySensorPriority(LhmMonitor lhmMonitor)
 	{
 		MechrevoHw hw;
 		try
@@ -279,53 +290,143 @@ public static class HardwareControl
 		{
 			return;
 		}
-		if (hw == null || !hw.UsesBaolongda)
+		if (hw == null)
 		{
 			return;
 		}
-		// ── ① 风扇：⭐ 宝龙达（⭐ LHM 读不到 ⇒ ⭐ 没有优先级问题 ✅）──
-		try
-		{
-			cpuFanRPM = hw.CpuFanRpm;
-			gpuFanRPM = hw.GpuFanRpm;
-		}
-		catch
-		{
-		}
-		// ── ② CPU 温度：⭐ 先 LHM，⭐ 不行再宝龙达 ✅ ──
+		bool isBaolongda = hw.UsesBaolongda;
+		// ── ① CPU 温度：⭐ LHM 优先（⭐ 所有机型 ✅）⇒ ⭐ 读不到才用厂商的 ✅ ──
 		try
 		{
 			float? fromLhm = lhmMonitor.CpuTemperature;
 			if (fromLhm.HasValue && fromLhm.Value > 0f)
 			{
-				// ⭐ 用 LM 自带的传感器（⭐ 用户要求的优先项 ✅）
-				cpuTemp = (int)Math.Round(fromLhm.Value);
+				int celsius = (int)Math.Round(fromLhm.Value);
+				if (cpuTemp != celsius)
+				{
+					cpuTemp = celsius;
+				}
+				// ⭐ 首次（或来源变化后首次）记一行，⭐ 便于回查"温度来源变成了 LHM" ✅
+				if (Interlocked.Exchange(ref _lhmCpuTempLogged, 1) == 0)
+				{
+					Logger.WriteLine($"传感器优先级：⭐ CPU 温度改用 **LM 自带的 LHM**（传感器={lhmMonitor.CpuTemperatureSensorName}，"
+						+ $"值={celsius}℃）⇒ ⭐ 按用户要求「所有机型优先用 LHM」✅（后端={(isBaolongda ? "宝龙达" : (hw.UsesBuiltInModes ? "老同方" : "GCU"))}）");
+				}
 			}
-			else if (hw.BaolongdaCpuTemp > 0)
+			else
 			{
-				// ⭐ 回退：宝龙达功能号 22 ✅
-				cpuTemp = hw.BaolongdaCpuTemp;
+				// ⭐ LHM 读不到 ⇒ ⭐ 回退厂商接口 ✅
+				//   ⭐ 宝龙达：`RefreshBaolongdaSensors` 已把值放进 `CpuTemp`/`BaolongdaCpuTemp` ✅
+				//   ⭐ GCU / ⭐ 老同方：`CpuTemp` 由推送或老接口填 ✅
+				int fromVendor = (hw.BaolongdaCpuTemp > 0) ? hw.BaolongdaCpuTemp : hw.CpuTemp;
+				if (fromVendor > 0)
+				{
+					cpuTemp = fromVendor;
+					// ⭐ 备注：⭐ 宝龙达机型上 `RefreshBaolongdaSensors` 也会写 `CpuTemp`，
+					//    所以这里两条路都通；⭐ 不重复记账 ✅
+				}
 			}
 		}
 		catch
 		{
 		}
-		// ── ③ GPU 温度：⭐ 从加固过的 NVML 取 ✅ ──
-		//   ⭐⭐ 依据用户 2026-10-16 的确认：⭐ 「⭐ 对于所有机型都是这样子」——
-		//      ⭐ 即"⭐ LHM 检测到 NVIDIA 就关掉 GPU 那支 ⚠️ ＋ ⭐ 宝龙达协议没有 GPU 温度功能号 ⚠️"
-		//      ⭐ **是所有机型共同的缺口** ⇒ ⭐ 所以补在**通用**位置（⭐ 与后端无关 ✅）：
-		//      ⭐ 只要装了 NVIDIA 驱动、⭐ NVML 可用，⭐ 任何后端下都能拿到 GPU 核心温度 ✅
-		//   ⚠️ 仅当当前没有别的来源（⭐ 即 `gpuTemp <= 0`）时才填 —— ⭐ GCU 机型若 GCU 报了温度，
-		//      ⭐ 那个更"官方"、⭐ 优先保留 ✅
+		// ── ② GPU 温度：⭐ LHM 优先 ⇒ ⭐ 厂商（GCU）⇒ ⭐ 再不行 NVML ✅ ──
 		try
 		{
-			if (gpuTemp <= 0 && !NvmlHelper.Unavailable)
+			bool filled = false;
+			float? lhmGpu = lhmMonitor.GpuTemperature;
+			if (lhmGpu.HasValue && lhmGpu.Value > 0f)
 			{
+				gpuTemp = (int)Math.Round(lhmGpu.Value);
+				filled = true;
+			}
+			if (!filled && hw.GpuTemp > 0)
+			{
+				// ⭐ 厂商接口（⭐ GCU 推送 ✅）
+				gpuTemp = hw.GpuTemp;
+				filled = true;
+			}
+			if (!filled && !NvmlHelper.Unavailable)
+			{
+				// ⭐ 通用缺口兜底：⭐ 加固过的 NVML（⭐ NVIDIA 机型 ✅）
 				float? fromNvml = NvmlHelper.GetGpuTemperature();
 				if (fromNvml.HasValue && fromNvml.Value > 0f)
 				{
 					gpuTemp = (int)Math.Round(fromNvml.Value);
 				}
+			}
+		}
+		catch
+		{
+		}
+		// ── ③ 风扇转速：⭐ LHM 读不到 ⇒ ⭐ 厂商接口（⭐ 且只补 0，⛔ 不覆盖已有值 ✅）──
+		try
+		{
+			if (cpuFanRPM <= 0)
+			{
+				int cpuFanFromHw = hw.CpuFanRpm;
+				if (cpuFanFromHw > 0)
+				{
+					cpuFanRPM = cpuFanFromHw;
+				}
+			}
+			if (gpuFanRPM <= 0)
+			{
+				int gpuFanFromHw = hw.GpuFanRpm;
+				if (gpuFanFromHw > 0)
+				{
+					gpuFanRPM = gpuFanFromHw;
+				}
+			}
+		}
+		catch
+		{
+		}
+		// ── ④ GPU 频率：⭐ LHM 优先 ⇒ ⭐ 厂商 ⇒ ⭐ 再不行 NVML ✅ ──
+		//   ⭐ 依据用户 2026-10-16：「⭐ 显卡 / cpu 频率温度 LHM 应该都能读」✅
+		//   ⚠️ 但 NVIDIA 机型上**我们主动关掉了 LHM 的 GPU 那支**（⭐ NVML 崩溃修复 ⚠️）
+		//      ⇒ ⭐ 那种情况由 ⭐ 加固过的 NVML 提供（⭐ 数据同源 ✅）
+		//   ⭐ 依据用户 2026-10-16 最新指示：「⭐ 除了风扇先尽量不依赖各家自己的接口」
+		//      ⇒ ⭐ 所以 ⭐ **LHM → NVML（我们自己的加固层）→ 厂商**⭐ 这个顺序，
+		//        ⭐ 厂商标本只当**最后兜底** ✅
+		try
+		{
+			bool gpuClockFilled = false;
+			float? lhmGpuClock = lhmMonitor.GpuClockMhz;
+			if (lhmGpuClock.HasValue && lhmGpuClock.Value > 0f)
+			{
+				gpuCoreFreq = (int)Math.Round(lhmGpuClock.Value);
+				gpuClockFilled = true;
+			}
+			if (!gpuClockFilled && !NvmlHelper.Unavailable)
+			{
+				float? fromNvmlClock = NvmlHelper.GetGpuClockMhz();
+				if (fromNvmlClock.HasValue && fromNvmlClock.Value > 0f)
+				{
+					gpuCoreFreq = (int)Math.Round(fromNvmlClock.Value);
+					gpuClockFilled = true;
+				}
+			}
+			if (!gpuClockFilled && hw.GpuCoreFreq > 0)
+			{
+				// ⭐ 最后兜底：厂商标本 ✅（⭐ 遵照"尽量不依赖各家接口"⇒ ⭐ 放最后 ✅）
+				gpuCoreFreq = hw.GpuCoreFreq;
+			}
+		}
+		catch
+		{
+		}
+		// ── ⑤ CPU 频率：⭐ LHM 优先（⭐ 本方法上方已有同源采样 ✅）⇒ ⭐ 读不到才用厂商 ✅ ──
+		try
+		{
+			float? lhmCpuClock = lhmMonitor.CpuClockMhz;
+			if (lhmCpuClock.HasValue && lhmCpuClock.Value > 0f)
+			{
+				cpuFrequency = (int)Math.Round(lhmCpuClock.Value);
+			}
+			else if (hw.CpuFrequency > 0)
+			{
+				cpuFrequency = hw.CpuFrequency;
 			}
 		}
 		catch
@@ -490,7 +591,7 @@ public static class HardwareControl
 		//   ⭐⭐ 温度优先级（⭐ 用户 2026-10-16 原话）：
 		//      「⭐ 接 传感器如果 LM 自带的那个 dll 能读温度**优先用 LM 的传感器**，⭐ 不能的再接」
 		//      ⇒ ⭐ **先试 LHM**（⭐ 我们自带的 LibreHardwareMonitor ✅）⇒ ⭐ 读不到才用宝龙达功能号 22 ✅
-		ApplyBuiltInBackendSensors(lhmMonitor);
+		ApplySensorPriority(lhmMonitor);
 		if (num5.HasValue && num5.Value > 0f)
 		{
 			cpuFrequency = (int)num5.Value;
