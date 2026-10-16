@@ -3257,6 +3257,80 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 修「显卡模式切换不行」⚠️ 真机症状：弹窗
+	/// 「未能读取当前显卡模式。为避免依据旧状态切换，请稍后重试。」❌）：
+	/// ⭐ **把 WMI 功能号 9 读到的显卡模式，同步进 <see cref="GpuMode" />** ✅
+	///
+	/// <para>⭐⭐ <b>为什么必须这么做（根因链，已逐行核实 ✅）</b>：
+	/// ⭐ ① 界面点按钮后走 <c>SettingsForm.SwitchGpuModeFromUi</c> ⇒ 先调
+	/// <c>RefreshGpuModeUiStateAsync</c> ⇒ <c>MechrevoService.RefreshGpuModeStatus</c> ✅；
+	/// ⭐ ② 而 <c>RefreshGpuModeStatus</c>（约 <c>MechrevoService.cs:2428</c>）**第一句就是**
+	/// <c>if (!_hw.IsGcuConnected) return GpuModeStatusReadback.Unavailable;</c> ⚠️；
+	/// ⭐ ③ ⇒ ⭐ 宝龙达**没有 GCU** ⇒ 恒 <c>Unavailable</c> ⇒ ⭐ 界面判"读不到当前模式"
+	/// ⇒ ⭐ ⭐ **弹窗并【直接 return】，切换被挡住** ❌；
+	/// ⭐ ④ ⚠️ 而**我们那条读法本身是通的** ✅（真机日志：⭐「宝龙达状态：… 显卡=独显直连(1) …」✅）
+	/// ⇒ ⭐ ⭐ **只是从没写进 <see cref="GpuMode" />** ⚠️。</para>
+	///
+	/// <para>⭐ <b>模式值映射</b>（⭐ 与 <c>GPUModeControl.SetGPUMode</c> 的宝龙达分派**同一口径** ✅）：
+	/// ⭐ 宝龙达 <c>0 = 混合</c> ⇒ ⭐ 本属性 <c>1</c> · ⭐ 宝龙达 <c>1 = 独显直连</c> ⇒ ⭐ 本属性 <c>2</c>
+	/// ⭐（⭐ 本属性口径：⭐ <c>0 = 核显(Eco)</c> · ⭐ <c>1 = 混合(标准)</c> · ⭐ <c>2 = 独显直连(极致)</c> ✅）</para>
+	///
+	/// <para>⚠️ 非宝龙达 / ⭐ 未知取值 ⇒ ⭐ **返回 false 且【不动】 <see cref="GpuMode" />** ✅
+	/// —— ⭐ 宝龙达协议只有两个取值 ⚠️ ⇒ ⭐ 读到别的值说明回应不对 ✅ ⇒
+	/// ⭐ ⭐ **绝不拿旧值或猜测值冒充**（⭐ 那正是这个弹窗要防的事 ✅）。</para>
+	/// <para>⭐ 带**重试**（⭐ 最多 3 次 · ⭐ 60 ms）：⭐ 真机上偶发读失败时不该一次就报错 ⚠️。</para>
+	/// </summary>
+	internal bool TrySyncGpuModeViaBackend()
+	{
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		for (int attempt = 0; attempt < 3; attempt++)
+		{
+			try
+			{
+				if (wmi.TryReadGpuMode(out int raw))
+				{
+					int mapped;
+					if (raw == BaolongdaWmi.GpuModeHybrid)
+					{
+						mapped = 1; // ⭐ 混合
+					}
+					else if (raw == BaolongdaWmi.GpuModeDiscrete)
+					{
+						mapped = 2; // ⭐ 独显直连
+					}
+					else
+					{
+						Logger.WriteLine($"宝龙达 显卡模式：⭐ 功能号 9 读到未知取值 raw={raw} ⇒ ⭐ 不认（⛔ 不用旧值冒充 ✅）");
+						return false;
+					}
+					if (GpuMode != mapped)
+					{
+						GpuMode = mapped;
+						Logger.WriteLine($"宝龙达 显卡模式：⭐ 回读成功 ⇒ raw={raw} ⇒ 界面口径={mapped}"
+							+ "（⭐ 1=混合 · ⭐ 2=独显直连 ✅）⇒ ⭐ 已同步进 GpuMode ✅");
+					}
+					return true;
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("宝龙达 显卡模式：⭐ 同步异常：" + ex.Message);
+				return false;
+			}
+			if (attempt < 2)
+			{
+				Thread.Sleep(60);
+			}
+		}
+		Logger.WriteLine("宝龙达 显卡模式：⭐ 功能号 9 重试 3 次仍读不到 ⇒ ⭐ 本次不同步（⚠️ 界面会如实报「读不到」✅）");
+		return false;
+	}
+
+	/// <summary>
 	/// ⭐⭐ **意向方法**：⭐ 切显卡模式（✅ 含**写后回读确认**，⭐ 最多 5 次 · ⭐ 150 ms，⭐ 与档位/LOGO 同款 ✅）
 	/// <para>⭐ <paramref name="mode" />：⭐ 0 = 混合 · ⭐ 1 = 独显直连 ✅；⭐ 其它值**直接拒绝** ✅。</para>
 	/// <para>⚠️ 非宝龙达 ⇒ ⭐ **返回 false** ⇒ ⭐ 调用方**照原路走 GCU**（⭐ 那条路一字不改 ✅）。</para>

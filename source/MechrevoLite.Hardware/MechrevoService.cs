@@ -2425,6 +2425,25 @@ public class MechrevoService
 		try
 		{
 			// 2026-10-15（C-1 第 2 步分类 ①）：GPU 模式状态回读（GCU 上报）⇒ 真正需要 GCU。
+			// ⭐⭐ 2026-10-16（宝龙达 · 修「显卡模式切换不行」⚠️ 真机症状：弹窗
+			//   「未能读取当前显卡模式。为避免依据旧状态切换，请稍后重试。」❌）：
+			//   ⚠️ 原来**第一句**就是这个 GCU 门槛 ⇒ ⭐ 宝龙达没有 GCU ⇒ 恒 Unavailable ❌
+			//      ⇒ ⭐ 界面（`SettingsForm.SwitchGpuModeFromUi` 约 :10890 ✅）判「读不到当前模式」
+			//      ⇒ ⭐ ⭐ **弹窗并直接 return ⇒ 切换被挡住** ❌
+			//   ⇒ ⭐ 所以 ⭐ **在 GCU 门槛【之前】**补一条**非 GCU 后端**的读法 ✅
+			//      ⭐ 我们那条读法**本来就读得通**（真机日志：⭐「宝龙达状态：… 显卡=独显直连(1) …」✅）
+			//      ⭐ ⇒ ⭐ 这里把它同步进 `_hw.GpuMode` ⇒ ⭐ 下游（`CurrentGpuMode` / ⭐ 界面高亮 /
+			//        ⭐ `GpuSwitchPolicy` ✅）**全部自然可用** ✅
+			//   ⚠️ 非宝龙达 ⇒ ⭐ `UsesBaolongda` 为假 ⇒ ⭐ **不进这一支** ⇒
+			//      ⭐ ⭐ **GCU 机型行为逐位不变** ✅（⭐ 下面那一整段一个字未改 ✅）
+			if (_hw.UsesBaolongda)
+			{
+				bool ok = _hw.TrySyncGpuModeViaBackend();
+				Logger.WriteLine($"RefreshGpuModeStatus（宝龙达路径）：⭐ 读功能号 9 ⇒ {(ok ? "成功" : "失败")}"
+					+ $" ⇒ 当前模式={CurrentGpuMode}（⭐ 1=混合 · ⭐ 2=独显直连 ✅）"
+					+ (ok ? " ⇒ ⭐ 放行切换 ✅" : " ⇒ ⚠️ 界面会如实报「读不到」（⛔ 不拿旧值冒充 ✅）"));
+				return ok ? GpuModeStatusReadback.Fresh : GpuModeStatusReadback.Unavailable;
+			}
 			if (!_hw.IsGcuConnected)
 			{
 				return GpuModeStatusReadback.Unavailable;
