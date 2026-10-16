@@ -45,5 +45,18 @@ public sealed record PerfModeCapabilities
 	/// </summary>
 	public bool SupportsFirmwareSlot { get; init; } = true;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）：⭐ <b>本后端能不能用【非 GCU 的 WMI】写 CPU 功耗墙（PL1 / PL2 / 温度墙）</b> ✅。
+	/// <para>⚠️ <b>为什么需要它</b>：⭐ 这三项原本长在「固件字段步」里（<c>WriteFirmwareField</c> ⇒ <c>SetCustomDetail</c> ⇒ MQTT ❌）
+	/// ⇒ ⭐ 被 <see cref="PerfModeCapabilities.SupportsFirmwareSlot" /> 那条判据一起关掉了 ⚠️。
+	/// ⭐ 但它们在宝龙达上<b>有另一条可用通路</b>：<c>MechrevoService.SetCustomDetail</c> 开头的
+	/// <c>TryApplyPowerLimitViaBackend</c> 会把这几个键<b>就地摘出来</b>、改写 WMI 功能号 23（子命令 2/3/4 ✅）
+	/// ⇒ ⭐ 所以它们<b>不该</b>跟着固件槽一起被关 ❌。</para>
+	/// <para>⭐ <b>语义</b>：⭐ <c>true</c> ⇒ ⭐ 规划器<b>单独</b>生成 PL1 / PL2 / CpuTccOffset 三步（<b>不依赖</b>写得了固件槽 ✅）；
+	/// ⭐ <c>false</c> ⇒ ⭐ 这三步仍留在原来的固件字段块里（⭐ 行为逐位不变 ✅）。</para>
+	/// <para>⚠️ 默认 <c>false</c> ⇒ ⭐ <see cref="All" /> 与所有既有后端<b>逐位不变</b> ✅。</para>
+	/// </summary>
+	public bool SupportsWmiPowerFields { get; init; }
+
 	public static readonly PerfModeCapabilities All = new PerfModeCapabilities();
 }

@@ -3452,6 +3452,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private const int BaolongdaPlMaxWatts = 200;
 	private const int BaolongdaTccMinCelsius = 60;
 	private const int BaolongdaTccMaxCelsius = 105;
+
+	// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **从未设过时填的保守建议默认** ✅
+	//   ⚠️ 为什么需要它们：⭐ 本地记忆初始为 0 ⇒ 直接填进 `Pl1`/`Pl2`/`TccTarget` 会被
+	//      `CustomModeForm.DeviceRange` 钳到**下界** ⇒ ⭐ 界面显示 `PL1=5W`、温度墙 `60℃` ❌
+	//      —— ⭐ 那既不是真值（⭐ 协议结构上读不回 ⚠️）、⭐ 也不是建议值 ⇒ ⭐ 纯误导 ❌
+	//   ⭐ 与 `MechrevoService.TryApplyPowerLimitViaBackend` 里"⭐ 还没设过时用的保守默认"⭐ 保持一致 ✅
+	private const int BaolongdaDefaultPl1Watts = 45;
+	private const int BaolongdaDefaultPl2Watts = 65;
+	private const int BaolongdaDefaultTempWallCelsius = 95;
 	private int _baolongdaMemPl1;
 	private int _baolongdaMemPl2;
 	private int _baolongdaMemTempWall;
@@ -3469,10 +3478,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		TccMinimum = BaolongdaTccMinCelsius;
 		TccMaximum = BaolongdaTccMaxCelsius;
 		// ⭐ PL4 本机协议里没有（⭐ 参考实现的功能号表里也没这一项 ✅）⇒ ⭐ 保持 -1（⭐ 即不可调 ✅）
-		// ⭐ 当前值 = 本地记忆（⭐ 0 = 还从没设过 ⇒ ⭐ 界面显示 0，⭐ 用户拖到哪就是哪 ✅）
-		Pl1 = _baolongdaMemPl1;
-		Pl2 = _baolongdaMemPl2;
-		TccTarget = _baolongdaMemTempWall;
+		// ⭐ PL1 / PL2 / 温度墙的当前值 = 本地记忆（⭐ 0 = 还从没设过 ⇒ ⭐ 见下 ✅）
+		// ⭐⭐ 2026-10-16（修"从未设过就显示边界值"的误导）：⭐ 从未设过（≤0）⇒ ⭐ 填**保守建议默认** ✅
+		//   ⚠️ 原来直接填 0 ⇒ ⭐ `CustomModeForm.DeviceRange` 会 `Math.Clamp(0, 下界, 上界)` ⇒
+		//      ⭐ 界面显示 **PL1=5W · PL2=5W · 温度墙=60℃** ❌ —— ⭐ 那是**下界**、⭐ 纯误导 ⚠️
+		//   ⚠️ ⭐ **语义如实说明**：⭐ 宝龙达协议对功耗墙**只写不读** ⚠️ ⇒ ⭐ 界面上的数字**只能**是
+		//      "⭐ 我们最近一次下发的值 / ⭐ 建议默认值" ✅ —— ⛔ **不是从机器回读的真值** ⚠️
+		Pl1 = (_baolongdaMemPl1 > 0) ? _baolongdaMemPl1 : BaolongdaDefaultPl1Watts;
+		Pl2 = (_baolongdaMemPl2 > 0) ? _baolongdaMemPl2 : BaolongdaDefaultPl2Watts;
+		TccTarget = (_baolongdaMemTempWall > 0) ? _baolongdaMemTempWall : BaolongdaDefaultTempWallCelsius;
 	}
 
 	// ══════════════════════════════════════════════════════════════════════════

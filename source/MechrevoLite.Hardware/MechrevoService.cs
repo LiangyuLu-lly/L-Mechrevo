@@ -3727,7 +3727,14 @@ public class MechrevoService
 		// ⭐ 三个值取"现值（⭐ 本地记忆 ✅）"，⭐ 只覆盖这次要改的那一个 ✅
 		int pl1 = hw.Pl1;
 		int pl2 = hw.Pl2;
-		int tempWallC = (hw.TccMaximum > 0) ? (hw.TccMaximum - hw.TccTarget) : 0;
+		// ⭐⭐ 2026-10-16（修温度墙"双重换算"）：⭐ `hw.TccTarget` 存的就是**绝对温度 ℃** ✅
+		//   ⭐ 依据：⭐ 宝龙达门面层 `TryApplyCpuPowerLimitViaBackend` 里写的是 `TccTarget = wall`
+		//      （⭐ `wall` 是绝对温度 60~105 ✅）；⭐ 而 GCU 路径也把它夹在 `[TccMinimum, TccMaximum]`
+		//      = `[85, 95]` 这种绝对温度区间里 ✅ —— ⭐ 两处一致 ✅
+		//   ⚠️ 原来写 `TccMaximum - TccTarget` ⇒ ⭐ 等于**又减了一次** ⇒ ⭐ 第二次应用时
+		//      温度墙会被算成 `105 − 95 = 10` ❌ ⇒ ⭐ 再被 `Math.Max(60, …)` 抬到 **60℃** ❌
+		//      ⇒ ⭐ 用户设的 95℃ 被悄悄改成最保守的 60℃ ⚠️
+		int tempWallC = (hw.TccTarget > 0) ? hw.TccTarget : 0;
 		if (isPl1)
 		{
 			pl1 = result;
@@ -3738,10 +3745,14 @@ public class MechrevoService
 		}
 		else if (isTempWall)
 		{
-			// ⭐ 界面给的是 TccOffset（⭐ 0 = 不限制 ⇒ 越大约束越强 ⚠️）⇒ ⭐ 换算成绝对温度 ✅
-			//   ⭐ 0 ⇒ ⭐ 不设温度墙（⭐ 用上限 105 ✅）；⭐ N ⇒ ⭐ 105 − N ✅
+			// ⭐⭐ 2026-10-16（同上）：⭐ 界面那个 `CpuTccOffset` 与 `hw.TccTarget` **同口径** ——
+			//   ⭐ 都是**绝对温度 ℃** ✅（⭐ 依据：⭐ 界面 slider 的范围就是 `[TccMinimum, TccMaximum]`
+			//     = `[60, 105]`、⭐ 当前值就是 `TccTarget` ✅；⭐ 且 `MechrevoService` 的校验
+			//     `"CpuTccOffset" => _hw.TccTarget == result` 也说明两者可直接比较 ✅）
+			//   ⚠️ 原来这里把它当 offset 处理（⭐ `max - result` ⚠️）⇒ ⭐ 同上，⭐ 等于又减一次 ❌
+			//   ⭐ 现在：⭐ `0` ⇒ ⭐ 不限制（⭐ 用上限 ✅）；⭐ 正数 ⇒ ⭐ 直接用，⭐ 并夹进 `[60, 105]` ✅
 			int max = (hw.TccMaximum > 0) ? hw.TccMaximum : 105;
-			tempWallC = (result <= 0) ? max : Math.Max(60, max - result);
+			tempWallC = (result <= 0) ? max : Math.Max(60, Math.Min(max, result));
 		}
 		// ⭐ 写之前：⭐ 若还没设过（⭐ 本地记忆为 0 ✅）⭐ 用一个保守默认值，⛔ 免得上电就写 0 ✅
 		if (pl1 <= 0)

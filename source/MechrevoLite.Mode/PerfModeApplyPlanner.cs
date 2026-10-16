@@ -70,11 +70,16 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("FanSwitchSpeedEnabled", settings.FanSwitchSpeedOn.Value ? 1 : 0));
 			}
-			if (settings.Pl1.HasValue)
+			// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙真下发）：⭐ 下面这三项（PL1 / PL2 / CpuTccOffset）
+			//   ⭐ 在"能用 WMI 写功耗墙"的后端（宝龙达 ✅）下【改到本方法末尾单独生成】✅
+			//   ⭐ 原因：⭐ 它们在宝龙达上**不走固件槽**、而是走 WMI 功能号 23 ✅
+			//      ⇒ ⭐ 所以这里加反向条件、避免与那一支重复生成 ✅
+			//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ ⭐ 所有既有后端【逐位不变】✅
+			if (!caps.SupportsWmiPowerFields && settings.Pl1.HasValue)
 			{
 				list.Add(Field("PL1", settings.Pl1.Value, PerfApplyVerify.CpuPackagePower));
 			}
-			if (settings.Pl2.HasValue)
+			if (!caps.SupportsWmiPowerFields && settings.Pl2.HasValue)
 			{
 				list.Add(Field("PL2", settings.Pl2.Value, PerfApplyVerify.CpuPackagePower));
 			}
@@ -82,7 +87,7 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("PL4", settings.Pl4.Value, PerfApplyVerify.CpuPackagePower));
 			}
-			if (settings.TccTarget.HasValue)
+			if (!caps.SupportsWmiPowerFields && settings.TccTarget.HasValue)
 			{
 				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
@@ -139,6 +144,31 @@ public static class PerfModeApplyPlanner
 			{
 				bool flag3 = settings.GpuOverclockOn ?? true;
 				list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyGpuOverclock, null, null, flag3 ? 1 : 0, IsCpuCurve: false, null, PerfApplyVerify.GpuClockOffset, flag3 ? (settings.GpuCoreOffset.GetValueOrDefault(), settings.GpuMemoryOffset.GetValueOrDefault()) : (0, 0)));
+			}
+		}
+		// ⭐⭐ 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）：⭐ 把 CPU 功耗墙三项【单独生成】✅
+		//   ⭐ 为什么单独：⭐ 它们与"固件槽"无关 —— 后端在 `MechrevoService.SetCustomDetail` 开头
+		//      就把这几个键就地摘出来、改写 WMI 功能号 23 ✅
+		//      （⭐ 见 `PerfModeCapabilities.SupportsWmiPowerFields` 的注释 ⚠️）
+		//   ⭐ 为什么仍要求 `NeedsParameterWrite`：⭐ 那是"⭐ 本次应用确实要改参数"⭐ 的语义 ⚠️
+		//      ⇒ ⭐ 只读 / 守卫场景（⭐ `NeedsParameterWrite = false` ✅）**不会**真去写功耗墙 ✅
+		//   ⭐ 为什么放这里（if/else 链之外）：⭐ 宝龙达下 `canWriteFirmwareSlot = false` ⇒
+		//      上面那个 FirmwareSlot 大块整块跳过（⭐ 连同那些**只走 MQTT**的字段一起 ✅）
+		//      ⇒ ⭐ 而功耗墙这三项**另有 WMI 通路**、不该被一起关掉 ✅ —— 这就是本次修的东西 ✅
+		//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ ⭐ 所有既有后端【逐位不变】✅
+		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite)
+		{
+			if (settings.Pl1.HasValue)
+			{
+				list.Add(Field("PL1", settings.Pl1.Value, PerfApplyVerify.CpuPackagePower));
+			}
+			if (settings.Pl2.HasValue)
+			{
+				list.Add(Field("PL2", settings.Pl2.Value, PerfApplyVerify.CpuPackagePower));
+			}
+			if (settings.TccTarget.HasValue)
+			{
+				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
 		}
 		if (settings.FanBoost.HasValue)

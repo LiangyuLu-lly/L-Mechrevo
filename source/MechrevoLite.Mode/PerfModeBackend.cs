@@ -49,7 +49,14 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//   ⇒ ⭐ 所以按后端【如实申报】：⭐ 宝龙达 ⇒ false ⇒ ⭐ 规划器不生成那两步 ✅
 			//      ⇒ ⭐ 不再出现"注定失败"的档位步（⭐ 它会让 Runner 提前 break、把后面所有步骤一起废掉 ❌）✅
 			//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda == false` ⇒ true ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsFirmwareSlot = !hw.UsesBaolongda
+			SupportsFirmwareSlot = !hw.UsesBaolongda,
+			// ⭐⭐ 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）：⭐ 功耗墙三项（PL1 / PL2 / 温度墙）
+			//   ⭐ 在宝龙达上【不走固件槽】、而是走 WMI 功能号 23 ✅
+			//      （⭐ 通路：⭐ `PerfModeBackend.WriteDetailFieldAsync` ⇒ `MechrevoService.SetCustomDetail`
+			//        ⇒ 它开头那个 `TryApplyPowerLimitViaBackend` ⇒ `TryApplyCpuPowerLimitViaBackend` ✅）
+			//   ⇒ ⭐ 所以单独申报：⭐ 宝龙达 ⇒ true ⇒ ⭐ 规划器额外生成那三步 ✅
+			//   ⚠️ 非宝龙达 ⇒ false ⇒ ⭐ 那三步仍留在原固件字段块里 ⇒ ⭐ 步骤列表【一个字节都不变】✅
+			SupportsWmiPowerFields = hw.UsesBaolongda
 		};
 	}
 
