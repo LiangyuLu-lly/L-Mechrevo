@@ -173,6 +173,23 @@ public class MechrevoHw : IDisposable
 	//     ⇒ ⭐ 因此**复用老接口那一整套刷新/切档管线**（⭐ 见 ReadBuiltInMode / SwitchBuiltInModeAsync ✅）。
 	private BaolongdaBackend _baolongda;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（0.291.9.1）：⭐ **宝龙达是否已经成功读到过风扇转速** ✅。
+	/// <para>⭐ 用途：⭐ 喂给 <see cref="FanZeroIsMeaningful" /> ✅ —— ⭐ 没读到过就不要把
+	/// <c>0rpm</c> 当成"⭐ 风扇停了" ⚠️，⭐ 那只是"⭐ 没数据" ✅。</para>
+	/// <para>⭐ 一旦读到过就置 true 并**不再回落** ✅（⭐ 风扇值本身每 3 秒刷新 ✅）。</para>
+	/// </summary>
+	private volatile bool _baolongdaFanSeen;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（0.291.9.1）：⭐ 宝龙达**读风扇失败**是否已经记过日志 ✅（⭐ 0=没记过 · ⭐ 1=记过 ✅）。
+	/// <para>⚠️ 目的：⭐ 读失败时用 <c>Logger.WriteError</c> ⭐ —— ⭐ 那是
+	/// <b>默认「仅错误」级别下也可见</b> 的唯一可靠方式 ✅（⭐ <c>WriteLine</c> 要看消息里有没有
+	/// 错误关键词才判级别 ⚠️ ⇒ ⭐ 不能保证可见 ❌）。⭐ 而本方法每 3 秒跑一次 ⚠️
+	/// ⇒ ⭐ 必须**按状态翻转只记一次** ⇒ ⭐ 否则就是每 3 秒刷一行 ❌。</para>
+	/// </summary>
+	private int _bdFanFailLogged;
+
 	private Timer _legacyTimer;
 
 	private long _legacySnapshotVersion;
@@ -368,7 +385,17 @@ public class MechrevoHw : IDisposable
 
 	public int CpuFanDuty { get; private set; }
 
-	public bool FanZeroIsMeaningful => true;
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（0.291.9.1 · 修"⭐ 宝龙达机型风扇读数显示 <c>0rpm 0%</c>"⭐）：
+	/// <para>⚠️ <b>根因</b>：⭐ 本属性原来 ⭐ <b>恒为 <c>true</c></b> ⚠️ ⇒ ⭐ 展示层
+	/// （⭐ <c>SettingsForm.TelemetryRest</c> ✅）会把 ⭐ "⭐ 值 = 0" ⭐ 也当成
+	/// <b>有意义的读数</b>打出来 ❌ ⇒ ⭐ 界面上就出现 ⭐ <c>0rpm 0%</c> ⚠️
+	/// —— ⭐ 而那个 0 ⭐ 其实只是 ⭐ <c>int</c> 的**默认值**（⭐ = "⭐ 一个字节都没读到" ⚠️）❌</para>
+	/// <para>⭐ <b>修法</b>：⭐ 只在 ⭐ <b>真的读到过风扇</b> ⭐ 之后才认为 0 有意义 ✅。
+	/// ⭐ 宝龙达：⭐ 由 <c>RefreshBaolongdaSensors</c> 读成功时置 <c>_baolongdaFanSeen</c> ✅；
+	/// ⭐ 其余后端（⭐ GCU / ⭐ 老同方 ✅）⭐ <b>恒 <c>true</c></b> ⇒ ⭐ <b>行为逐位不变</b> ✅。</para>
+	/// </summary>
+	public bool FanZeroIsMeaningful => !UsesBaolongda || _baolongdaFanSeen;
 
 	public bool MidFanSeen => false;
 
@@ -2352,6 +2379,30 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（0.291.9.1 · 修"⭐ 宝龙达机型界面上 GPU 温度恒为「—」"⭐）：
+	/// ⭐ <b>把外部来源（⭐ LHM / ⭐ 加固过的 NVML ✅）取到的 GPU 温度写回门面层</b> ✅。
+	/// <para>⚠️⚠️ <b>根因</b>：⭐ 主界面那行遥测（⭐ <c>SettingsForm.TelemetryParts</c> ✅）
+	/// 读的是 ⭐ <b><c>hw.GpuTemp</c></b> ⚠️，⭐ 而 <c>HardwareControl.ApplySensorPriority</c>
+	/// 原来**只写自己那个 <c>HardwareControl.gpuTemp</c> 静态字段** ❌ ⇒ ⭐ 于是
+	/// ⭐ LHM/NVML 明明取到了温度、⭐ <b>却永远送不到主界面</b> ⚠️ ⇒ ⭐ 恒显示 「—」 ❌。</para>
+	/// <para>⭐ <b>调用时机</b>：⭐ 只由 <c>ApplySensorPriority</c> 在
+	/// ⭐ <b>"⭐ 厂商没给值（<c>hw.GpuTemp &lt;= 0</c> ⚠️）⭐ 且 ⭐ LHM/NVML 取到了"</b>
+	/// 这一支里调用 ✅ ⇒ ⭐ <b>GCU 机型（⭐ 厂商值恒有效 ✅）永远走不到</b> ⇒
+	/// ⭐ <b>行为逐位不变</b> ✅。⛔ 本方法**不参与**任何 GCU 字段语义 ✅。</para>
+	/// <para>⚠️ 与 <see cref="MarkGpuInfoReceived" /> 的区别：⭐ 本方法**连值一起写** ✅
+	/// （⭐ 因为主界面读的是值本身 ⚠️）；⭐ 那个只打时间戳 ✅。⭐ 本方法内部**也会打时间戳** ✅。</para>
+	/// </summary>
+	internal void MarkExternalGpuTemp(int celsius)
+	{
+		if (celsius <= 0)
+		{
+			return; // ⛔ 无效值不写、⭐ 也不打时间戳（⭐ 免得把「—」变成假的有效 ✅）
+		}
+		GpuTemp = celsius;
+		Interlocked.Exchange(ref _gpuInfoReceivedAt, Environment.TickCount64);
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-16（同上）：⭐ **外部取到风扇转速时打时间戳** ✅（⭐ 与 <see cref="MarkGpuInfoReceived" /> 同款 ✅）
 	/// <para>⚠️ 说明：⭐ 宝龙达那条路已在 `RefreshBaolongdaSensors` 内部直接打了 ⚠️；
 	/// 本方法是给"⭐ 别的来源也算数"⭐ 留的口子（⭐ 目前**没有**调用方，⭐ 保留以免将来重现同类漏打 ✅）。</para>
@@ -3544,6 +3595,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					GpuFanRpm = gpu;
 					CpuFanRpm = cpu;
 					FanStatusSeen = true;
+					// ⭐⭐ 2026-10-16（0.291.9.1）：⭐ 标记"⭐ 真的读到过风扇" ✅ ⇒
+					//   ⭐ 之后 <see cref="FanZeroIsMeaningful" /> 才会承认 0 有意义 ✅
+					_baolongdaFanSeen = true;
 					// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机型界面看不到风扇转速"）：
 					//   ⚠️ 根因之一：⭐ 界面上那行风扇读数由 ⭐ `MechrevoHw.IsFanInfoFresh(...)` 把关 ✅，
 					//      而它读的是 ⭐ `_fanInfoReceivedAt` ⚠️ —— ⭐ 那个时间戳**原来只有 GCU/MQTT
@@ -3553,11 +3607,38 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					//      ⇒ ⭐ 与其他"厂商值"（⭐ 如 `CpuTemp` 那条 ⭐ 见本方法 ② 段 ✅）**同一口径** ✅
 					Interlocked.Exchange(ref _fanInfoReceivedAt, Environment.TickCount64);
 				}
+				// ⭐⭐ 2026-10-16（0.291.9.1 · 定性日志）：⭐ 记**原始两个值** ✅ ——
+				//   ⭐ 这样真机日志里一眼能看出"⭐ 读到了什么 / ⭐ 谁映射到谁" ⚠️
+				//   ⭐ 用 `WriteLineIfChanged` 去重 ⇒ ⭐ 值不变时**不会刷屏** ✅
+				Logger.WriteLineIfChanged("bd-fan-ok",
+					$"宝龙达 风扇（⭐ 非 GCU 路径）：⭐ 读成功 ✅ ⇒ ⭐ First={speeds.First} Second={speeds.Second}"
+					+ $" Third={speeds.Third} ⇒ ⭐ 映射 First→GpuFanRpm={gpu} · Second→CpuFanRpm={cpu}");
+				// ⭐ 失败→成功 的**状态翻转**：⭐ 用默认级别也可见的方式记一行 ✅（⭐ 只翻转时记一次 ✅）
+				if (Interlocked.Exchange(ref _bdFanFailLogged, 0) == 1)
+				{
+					Logger.WriteError("宝龙达 风扇（⭐ 非 GCU 路径）：⭐ 已恢复正常 ✅ —— 现在能读到 "
+						+ speeds.First + "/" + speeds.Second + " rpm ✅（⭐ 之前有一段读不到 ⚠️）");
+				}
+			}
+			else
+			{
+				// ⭐⭐ 2026-10-16（0.291.9.1 · 定性日志）：⚠️ **读失败这条以前是完全静默的** ⚠️
+				//   ⇒ ⭐ 真机上"⭐ 界面显示 0rpm"⭐ 时**根本看不出到底是没读到、⭐ 还是读到了 0** ⚠️
+				//   ⭐⚠️ 用 `WriteError` ⇒ ⭐ **在默认的「仅错误」日志级别下也会落盘** ✅
+				//     （⭐ 机主不用特意开 All 级就能定位 ⚠️；⭐ 而 `WriteLine` 要看消息里有没有
+				//      ⭐ 错误关键词才判定级别 ⚠️ ⇒ ⭐ 不能保证可见 ❌）
+				//   ⭐ 用"⭐ 状态翻转"⭐ 只记一次 ⇒ ⚠️ **不会每 3 秒刷屏** ✅
+				if (Interlocked.Exchange(ref _bdFanFailLogged, 1) == 0)
+				{
+					Logger.WriteError("宝龙达 风扇（⭐ 非 GCU 路径）：⚠️ TryReadFanSpeeds 返回 false ⇒ "
+						+ "CpuFanRpm/GpuFanRpm **保持原值不变**（⭐ 界面会显示 0rpm ⚠️）；"
+						+ "⭐ 本条只在「读不到」开始的那一刻记一次 ✅");
+				}
 			}
 		}
 		catch (Exception ex)
 		{
-			Logger.WriteLineIfChanged("baolongda-fan", "宝龙达读风扇转速失败: " + ex.Message);
+			Logger.WriteError("宝龙达 风扇（⭐ 非 GCU 路径）：⭐ 读风扇转速抛异常 ⇒ " + ex.Message);
 		}
 		// ── ② CPU 温度兜底（⭐ 功能号 22）—— ⚠️ 只放进 BaolongdaCpuTemp，⛔ 不覆盖 CpuTemp ✅ ──
 		try

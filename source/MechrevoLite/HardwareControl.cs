@@ -14,6 +14,16 @@ public static class HardwareControl
 	// ⭐⭐ 2026-10-16：⭐ "CPU 温度已切到 LHM" 只记一次（⭐ 免得 3 秒一行刷爆日志 ⚠️）
 	private static int _lhmCpuTempLogged;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（0.291.9.1 · 定性日志）：⭐ GPU 温度**三个来源都没给**是否已记过 ✅
+	/// （⭐ 0=没记过 · ⭐ 1=记过 ✅）。
+	/// <para>⚠️ 为什么要它：⭐ 本状态机每 3 秒跑一次 ⚠️ ⇒ ⭐ 若直接 <c>Logger.WriteError</c>
+	/// 就是每 3 秒刷一行 ❌；⭐ 而"⭐ 取不到 GPU 温度"⭐ 这件事**只在默认「仅错误」级别下
+	/// 用 <c>WriteError</c> 才保证可见** ⚠️（⭐ <c>WriteLine</c> 要看消息里有没有错误关键词
+	/// 才判级别 ⚠️）⇒ ⭐ 所以按**状态翻转只记一次** ✅。</para>
+	/// </summary>
+	private static int _gpuTempNoneLogged;
+
 	public static int cpuTemp;
 
 	public static int? cpuUsage;
@@ -336,10 +346,15 @@ public static class HardwareControl
 		try
 		{
 			bool gpuTempFilled = false;
+			// ⭐⭐ 2026-10-16（0.291.9.1）：⭐ 记录"⭐ 这个值是不是厂商给的" ✅ ——
+			//   ⭐ 只有**不是**厂商给的（⭐ = LHM/NVML 补的 ✅）才需要写回门面层 ✅
+			//   ⇒ ⭐ GCU 机型（⭐ 厂商值恒有效 ✅）走老分支 ⇒ ⭐ 行为逐位不变 ✅
+			bool gpuTempFromVendor = false;
 			if (hw.GpuTemp > 0)
 			{
 				gpuTemp = hw.GpuTemp; // ⭐ 厂商（⭐ GCU ✅）优先 ⇒ ⭐ 与改动前一致 ✅
 				gpuTempFilled = true;
+				gpuTempFromVendor = true;
 			}
 			else
 			{
@@ -369,7 +384,46 @@ public static class HardwareControl
 			//      ⚠️ 只在 `gpuTempFilled` 为真时打 ⇒ ⭐ 没拿到就不打 ⇒ ⭐ 界面照旧显示「—」✅（⛔ 不谎报 ✅）
 			if (gpuTempFilled)
 			{
-				hw.MarkGpuInfoReceived();
+				if (gpuTempFromVendor)
+				{
+					// ⭐ 老路：⭐ 厂商值已经在 `hw` 里 ✅ ⇒ ⭐ 只需要时间戳（⭐ 与改动前逐字一致 ✅）
+					hw.MarkGpuInfoReceived();
+				}
+				else
+				{
+					// ⭐⭐ 2026-10-16（0.291.9.1 · 真机反馈"⭐ 风扇转速好了、⭐ GPU 温度还是「—」"⚠️）：
+					//   ⚠️⚠️ **根因**：⭐ 主界面那行遥测（⭐ `SettingsForm.TelemetryParts` ✅）读的是
+					//      ⭐ ⭐ **`hw.GpuTemp`** ⚠️ —— ⭐ 而本方法原来**只写自己这个
+					//      `HardwareControl.gpuTemp` 静态字段** ❌ ⇒ ⭐ LHM/NVML 明明取到了温度、
+					//      ⭐ ⭐ **却永远送不到主界面** ⇒ ⭐ 恒显示「—」 ❌
+					//      ⚠️ 而风扇能好、⭐ 温度不好 ⚠️ —— ⭐ 因为风扇那条走的是
+					//      `hw.CpuFanRpm`（⭐ 门面层属性 ✅），⭐ 两条路**根本不是同一处** ✅
+					//   ⇒ ⭐ 修法：⭐ **把外部来源的值写回门面层** ✅（⭐ 连值带时间戳 ✅）
+					hw.MarkExternalGpuTemp(gpuTemp);
+					Logger.WriteLineIfChanged("bd-gpu-temp-ext",
+						$"GPU 温度（⭐ 非 GCU 来源）：⭐ 厂商未提供 ⇒ ⭐ 由 LHM/NVML 取到 {gpuTemp}℃"
+						+ " ⇒ ⭐ 已写回 hw.GpuTemp ＋ ⭐ 打时间戳 ✅（⭐ 主界面那行读的就是它 ✅）");
+					// ⭐ 状态翻转（⭐ 之前三个来源都没给 ⇒ 现在有了 ✅）⇒ ⭐ 默认级别可见地记一行 ✅
+					if (Interlocked.Exchange(ref _gpuTempNoneLogged, 0) == 1)
+					{
+						Logger.WriteError($"GPU 温度：⭐ 已恢复 ✅ —— 现在能取到 {gpuTemp}℃"
+							+ "（⭐ 由 LHM/NVML 提供 ✅；⭐ 之前有一段三个来源都没给 ⚠️）");
+					}
+				}
+			}
+			else
+			{
+				// ⭐⭐ 2026-10-16（0.291.9.1 · 定性日志）：⭐ 三个来源全没给 ⇒ ⭐ 界面会显示「—」✅
+				//   ⭐⚠️ 用 `WriteError` ⇒ ⭐ **默认「仅错误」级别下也会落盘** ✅
+				//     （⭐ 机主不用特意开 All 级 ✅；⭐ 而 `WriteLine` 要看消息里有没有错误关键词
+				//      ⭐ 才判级别 ⚠️ ⇒ ⭐ 不能保证可见 ❌）
+				//   ⭐ 用"⭐ 状态翻转"⭐ 只记一次 ⇒ ⚠️ **不会每 3 秒刷屏** ✅
+				if (Interlocked.Exchange(ref _gpuTempNoneLogged, 1) == 0)
+				{
+					Logger.WriteError($"GPU 温度：⚠️ 厂商/LHM/NVML **三个来源都没给值** ⇒ 界面会显示「—」"
+						+ $"（⭐ 厂商值={hw.GpuTemp} · ⭐ LHM={(lhmMonitor.GpuTemperature.HasValue ? lhmMonitor.GpuTemperature.Value.ToString("F0") : "无")}"
+						+ $" · ⭐ NVML已隔离={NvmlHelper.Unavailable}）；⭐ 本条只在开始取不到的那一刻记一次 ✅");
+				}
 			}
 		}
 		catch

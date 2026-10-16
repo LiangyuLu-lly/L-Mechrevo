@@ -14893,7 +14893,20 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 		int temp = (isCpu ? hw.CpuTemp : hw.GpuTemp);
 		int rpm = (isCpu ? hw.CpuFanRpm : hw.GpuFanRpm);
-		int duty = (isCpu ? hw.CpuFanDuty : hw.GpuFanDuty);
+		// ⭐⭐ 2026-10-16（0.291.9.1 · 修"⭐ 宝龙达机型百分比恒为 <c>0%</c>"⭐）：
+		//   ⚠️⚠️ <b>根因</b>：⭐ <c>CpuFanDuty</c>/<c>GpuFanDuty</c> ⭐ <b>只有 GCU 载荷会填</b> ❌
+		//      ⇒ ⭐ 宝龙达（⭐ 没有 GCU 推送 ⚠️）下**恒为 0** ⚠️ ⇒ ⭐ 于是界面上跟着显示 ⭐ <c>0%</c> ❌
+		//   ⚠️ 而 <c>0%</c> 是 ⭐ <b>误导性的</b> ⚠️：⭐ 用户会以为"⭐ 风扇没转" ❌，
+		//      而实际那一行同时显示着 ⭐ <c>1836rpm</c> ⭐ —— ⭐ <b>风扇正在转</b> ✅
+		//   ⇒ ⭐ <b>修法</b>：⭐ **宝龙达路径下把 duty 当作"未知"（<c>null</c>）** ✅
+		//      ⇒ ⭐ 展示层就不打那个百分比 ✅（⭐ 只显示 <c>1836 rpm</c> ✅）
+		//   ⚠️ 为什么**不用** <c>RPM ÷ 最大转速</c> 算一个：⭐ 宝龙达协议里
+		//      ⭐ <b>没有"风扇最大转速"这个东西</b> ⚠️；⭐ 代码里那对参考值 <c>4400/8200</c>
+		//      ⭐ 是 ⭐ <b>联想 N176</b> 的 ⚠️ ⇒ ⭐ <b>不能套到蛟龙</b> ❌
+		//      ⇒ ⭐ <b>宁可不显示，⭐ 也不显示错的</b> ✅（⭐ 与"⭐ 不许谎报"⭐ 同一原则 ✅）
+		//   ⚠️ 对 GCU 机型：⭐ <c>UsesBaolongda</c> 为假 ⇒ ⭐ 照旧传真实 duty ✅ ⇒
+		//      ⭐ 下面的判据一字未改 ⇒ ⭐ <b>行为逐位不变</b> ✅（⭐ 含"⭐ duty=0 时照旧显示 <c>0%</c>"⚠️）
+		int? duty = hw.UsesBaolongda ? (int?)null : (isCpu ? hw.CpuFanDuty : hw.GpuFanDuty);
 		float? power = (isCpu ? HardwareControl.cpuPower : HardwareControl.gpuPower);
 		return (name: isCpu ? "CPU" : "GPU", temp: TelemetryTemp(temp, hw.IsSensorInfoFresh(isCpu, MechrevoHw.FanInfoMaximumAge, -1L)), rest: TelemetryRest(power, rpm, duty, hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L), hw.FanZeroIsMeaningful));
 	}
@@ -14907,7 +14920,13 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		return $"{temp}°C";
 	}
 
-	internal static string TelemetryRest(float? power, int rpm, int duty, bool fanFresh, bool zeroIsMeaningful)
+	/// <summary>
+	/// ⭐ 主界面那行遥测的"⭐ 后半段"（⭐ 功耗 / ⭐ 转速 / ⭐ 百分比 ✅）。
+	/// <para>⚠️ 2026-10-16（0.291.9.1）：⭐ <paramref name="duty" /> 由 <c>int</c> 改成
+	/// <b><c>int?</c></b> ✅ —— ⭐ <c>null</c> = ⭐ <b>这个后端根本给不出占空比</b> ⚠️
+	/// ⇒ ⭐ 那就**不显示百分比** ✅（⭐ 宝龙达 ✅）。⭐ 有值时的判据一字未改 ✅。</para>
+	/// </summary>
+	internal static string TelemetryRest(float? power, int rpm, int? duty, bool fanFresh, bool zeroIsMeaningful)
 	{
 		List<string> list = new List<string>(3);
 		if (power.HasValue && power.GetValueOrDefault() > 0f)
@@ -14921,9 +14940,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			{
 				list.Add($"{rpm}rpm");
 			}
-			if (duty >= num)
+			// ⭐ duty 未知（⭐ null ✅）⇒ ⭐ 不打百分比 ✅；⭐ 有值 ⇒ ⭐ 判据与改动前逐字相同 ✅
+			if (duty.HasValue && duty.GetValueOrDefault() >= num)
 			{
-				list.Add($"{duty}%");
+				list.Add($"{duty.GetValueOrDefault()}%");
 			}
 		}
 		return string.Join(" ", list);
