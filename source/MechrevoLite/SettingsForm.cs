@@ -264,6 +264,25 @@ public class SettingsForm : RForm
 	private Label _chargeSliderLabel;
 	private int _chargeSliderRowIndex = -1;
 	private int _chargeSliderRowHeight;
+	// 2026-10-16（EC 直写逃生口 · 补回被删掉的 UI 出口）：用户要求「保留『关闭 EC 直写』的出口」——
+	// 原来唯一写 `ec_charge_limit` 的「EC 三档限充(实验性)」开关已随 b93baef 删除 ⇒ 该键只剩代码在读、
+	// 界面上**没有任何入口**，用户失去了「EC 直写行为异常时把它关掉」的手段。
+	// ⚠️ 语义（与本键既有读法逐项对齐，见 EcChargeLimit.IsAvailableOnThisMachine / IsFirmwareLimitSupported）：
+	//   勾选 ⇒ 写 "0" ＝ **显式关闭 EC 直写**（TrySet 直接拒绝、通道层面判不可用）；
+	//   取消 ⇒ **删键** ＝ 回到自动判定。⛔ **刻意不写 "1"** —— "1" 是「强制放行」覆盖，会绕过通道探测，
+	//   用户只是想恢复默认时写 "1" 等于偷偷开后门。
+	// ⚠️ 它只影响「直写 EC」这一条路：GCU 三档（BatteryProtection/Control）不受影响。
+	// ⚠️ 这一行**永不参与** ApplyChargeLimitRowVisibility 的收放，否则用户勾上就等于把自己的撤销入口藏掉。
+	// ⚠️ 与上面几个字段同样**故意不写可空注解**（本文件无 #nullable，写了会各多一条 CS8632）。
+	private RCheckBox _checkEcDirectWriteOff;
+	private int _ecDirectWriteOffRowIndex = -1;
+	private int _ecDirectWriteOffRowHeight;
+	private const string EcDirectWriteOffConfigKey = "ec_charge_limit";
+	// ⚠️ 面向界面的两条新文案**放在代码里**（与 PerfModeRunner.WriteRejectedDetail / StepErrorDetail 同一先例）：
+	//   `Strings*.resx` 是**混合行尾**（CRLF=14 ＋ 裸 LF=5343），`edit` 会把整个文件改写成 LF ⇒ diff 爆成全文；
+	//   且新增一条要同改 Strings.resx ＋ Strings.zh-CN.resx ＋ Strings.cs 三处。故沿用既有先例。
+	private const string EcDirectWriteOffSwitchText = "关闭 EC 直写充电上限（写入异常时用）";
+	private const string EcDirectWriteOffSwitchTip = "只关闭「直写 EC」这一条限充通路：\n· 勾上后本机不再向 EC 写充电上限（滑块与档位的 EC 直写一律被拒）；\n· GCU 官方三档（BatteryProtection）不受影响，仍可按；\n· 取消勾选即恢复自动判定（本机能不能直写由程序自己探）。\n⚠️ 仅在本机 EC 写入表现异常（写入无效、反复回退）时兜底用。";
 	// 2026-10-15（隐藏规则 A/B · 用户原话「对不支持的机型直接隐藏掉按钮就行 滑块和EC三档的开关都隐藏
 	// 10系-30系用这个可能损坏硬件必须强制隐藏EC三档和滑块 只保留GCU路(注意不删三个按钮)」）：
 	// 下面这几个引用 + 行高记录，供 ApplyChargeLimitRowVisibility 把「EC 直写方式专属」的几行收起来
@@ -7411,18 +7430,23 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// 2026-10-10（限充安全警告）：开关正下方第 4 行＝红色警告行（34），滑块行顺延到第 5 行。
 		int num6 = _chargeSliderSupported ? ResponsiveLayout.LogicalToDevice(this, 34) : 0;
 		int num5 = _chargeSliderSupported ? ResponsiveLayout.LogicalToDevice(this, 32) : 0;
-		host.RowCount = _chargeSliderSupported ? 6 : 3;
+		// 2026-10-16（EC 直写逃生口）：新增第 6 行＝「关闭 EC 直写充电上限（写入异常时用）」。
+		// ⚠️ 行数固定 7（0/1 空行 · 2 三档 · 3 无极限充开关 · 4 警告 · 5 滑块 · 6 逃生口）：
+		//    代际门控的 30 系分支 num4/num6/num5 本来就是 0 ⇒ 高度与改前逐像素一致，
+		//    但**行号不再随分支漂移** ⇒ 逃生口恒为第 6 行，不会被既有下标逻辑误伤。
+		int num7 = ResponsiveLayout.LogicalToDevice(this, 26);
+		_ecDirectWriteOffRowHeight = num7;
+		_ecDirectWriteOffRowIndex = 6;
+		host.RowCount = 7;
 		host.RowStyles.Clear();
 		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num));
 		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num2));
 		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num3));
-		if (_chargeSliderSupported)
-		{
-			host.RowStyles.Add(new RowStyle(SizeType.Absolute, num4));
-			host.RowStyles.Add(new RowStyle(SizeType.Absolute, num6));
-			host.RowStyles.Add(new RowStyle(SizeType.Absolute, num5));
-		}
-		host.Height = num + num2 + num3 + num4 + num6 + num5;
+		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num4));
+		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num6));
+		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num5));
+		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num7));
+		host.Height = num + num2 + num3 + num4 + num6 + num5 + num7;
 		// 2026-10-15（限充真效果判据上屏 · 用户批准的修法④；同时按用户要求删掉原来那颗白色「实验」小胶囊）：
 		// 把上游口径的 0x0742 bit2 判定（ChargeLimitEffectEvidence.Latest：生效 / 未生效 / 无法判定）从
 		// 「只进日志」搬到限充区**用户看得到**的位置 —— 复用原角标所在的那一格（第 1 行容器的第 1 列）。
@@ -7531,6 +7555,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			host.Controls.Add(chargeSliderRow, 0, 5);
 			host.SetColumnSpan(chargeSliderRow, 3);
 		}
+		// 2026-10-16（EC 直写逃生口）：在既有两条布局（含/不含无极限充滑块行）都建完之后挂第 6 行。
+		BuildEcDirectWriteOffRow(host, _ecDirectWriteOffRowIndex);
 		ApplyChargeSliderVisibility();
 		panelBattery.MinimumSize = new Size(0, host.Bottom + panelBattery.Padding.Bottom);
 		RefreshBatteryModeButtons();
@@ -7545,6 +7571,73 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	/// 打开＝显示「限充」滑块（无级上限 40–100%）；关闭（默认）＝滑块不上屏、并收掉它占的行高。
 	/// 位置：50 系＝滑块行下面的第 1 行；非 50 系＝三档行下面的第 3 行（不挤占三档按钮）。
 	/// </summary>
+	/// <summary>
+	/// 2026-10-16（EC 直写逃生口 · 补回被删掉的 UI 出口）：电池卡片最下面一行的**两态开关**——
+	/// 勾上即写 <c>ec_charge_limit="0"</c>（显式关闭 EC 直写）、取消即**删键**（回到自动判定）。
+	/// <para>⛔ 只写 config ＋ 触发一次既有能力刷新：不写 EC、不发 MQTT、不碰任何寄存器。</para>
+	/// <para>⛔ 外观与 <see cref="BuildChargeSliderToggleRow"/> 同款（RCheckBox 开关外观、⛔ 非三选一）。</para>
+	/// <para>⚠️ 本行**永不参与** <see cref="ApplyChargeLimitRowVisibility"/> 的收放：那个方法收的是
+	/// 「EC 直写方式专属」的行，而本行正是**关闭 EC 直写**的入口 —— 一旦跟着被收掉，用户勾上就再也撤销不了。</para>
+	/// </summary>
+	private void BuildEcDirectWriteOffRow(TableLayoutPanel host, int row)
+	{
+		_checkEcDirectWriteOff = new RCheckBox
+		{
+			Name = "checkEcDirectWriteOff",
+			Text = EcDirectWriteOffSwitchText,
+			AutoSize = true,
+			Appearance = Appearance.Normal,
+			Anchor = AnchorStyles.Left,
+			SwitchOnRight = false,
+			TabStop = false,
+			Cursor = Cursors.Hand,
+			ForeColor = UiVisualStyle.Text,
+			BackColor = panelBattery.BackColor,
+			Font = UiStyleCaptionFont(),
+			Margin = Padding.Empty
+		};
+		// 顺序要紧：先把 Checked 对齐存储值，再挂事件 —— 反了会把「启动时同步」当成一次用户点击去写配置。
+		_checkEcDirectWriteOff.Checked = IsEcDirectWriteOffConfigured();
+		_checkEcDirectWriteOff.AccessibleName = EcDirectWriteOffSwitchText;
+		toolTip.SetToolTip(_checkEcDirectWriteOff, EcDirectWriteOffSwitchTip);
+		_checkEcDirectWriteOff.CheckedChanged += (_, _) => OnEcDirectWriteOffToggled();
+		host.Controls.Add(_checkEcDirectWriteOff, 0, row);
+		host.SetColumnSpan(_checkEcDirectWriteOff, 3);
+	}
+
+	/// <summary>
+	/// 勾上 ⇒ <c>ec_charge_limit="0"</c>（显式关闭 EC 直写）；取消 ⇒ **删键**（回自动判定）。
+	/// <para>⚠️ 刻意<b>不写 "1"</b>：那是「强制放行」覆盖，会绕过通道探测与固件判据（见
+	/// <c>EcChargeLimit.IsAvailableOnThisMachine</c> / <c>IsFirmwareLimitSupported</c>）；
+	/// 用户只是想恢复默认时写 "1" 等于偷偷开后门。</para>
+	/// <para>改完立刻 <see cref="RefreshDeviceCapabilities"/>：面板可见性、行收放、三档启用态全都挂在
+	/// <see cref="ApplyChargeLimitSliderGating"/> 这一条既有汇聚点上（构造后它还会再跑一次）⇒ 不另造刷新路径。</para>
+	/// </summary>
+	private void OnEcDirectWriteOffToggled()
+	{
+		if (IsDisposed || _checkEcDirectWriteOff == null)
+		{
+			return;
+		}
+		bool off = _checkEcDirectWriteOff.Checked;
+		if (off)
+		{
+			AppConfig.Set(EcDirectWriteOffConfigKey, "0");
+		}
+		else
+		{
+			AppConfig.Remove(EcDirectWriteOffConfigKey);
+		}
+		Logger.WriteError($"[charge-limit] EC 直写逃生口：用户{(off ? "关闭" : "恢复")} EC 直写（{EcDirectWriteOffConfigKey}={(off ? "写 0" : "已删键，回自动判定")}）⇒ 立刻重刷能力位（⛔ 未写 EC、⛔ 未发 MQTT）");
+		RefreshDeviceCapabilities();
+	}
+
+	/// <summary>是否已由用户显式关闭 EC 直写（<c>ec_charge_limit="0"</c>）。只读配置，⛔ 不碰硬件。</summary>
+	private static bool IsEcDirectWriteOffConfigured()
+	{
+		return AppConfig.GetString(EcDirectWriteOffConfigKey) == "0";
+	}
+
 	private void BuildChargeSliderToggleRow(TableLayoutPanel host, int row)
 	{
 		checkChargeSlider = new RCheckBox
@@ -8404,9 +8497,29 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	{
 		bool flag = EcChargeLimit.IsAvailableOnThisMachine() && !unsupportedModel;
 		sliderBattery.Enabled = flag;
+		// 2026-10-16（EC 直写逃生口）：`ec_charge_limit=0` 时 `IsAvailableOnThisMachine()` 恒 false ⇒ flag=false
+		// ⇒ 整张电池卡片被隐藏 —— 而「关闭 EC 直写」的那颗开关**就在这张卡片里**（第 6 行）⇒ 用户勾上之后
+		// 连撤销入口一起消失，等于把自己锁在门外。⇒ 这一支**保卡片可见**：此时 EC 各行已由
+		// ApplyChargeLimitRowVisibility 收起、滑块也被 sliderBattery.Enabled=false 置灰，界面上只剩
+		// 三档按钮 ＋ 逃生口本身 —— 正是用户要的「只保留 GCU 路」。
+		// ⚠️ 三档在 `=0` 下仍可点：ApplyChargeLimitStageEnablement 的判据含「GCU 通路可用」那一支
+		//    （2026-10-12 用户报 bug ② 的修法），故三档不因 EC 通道关闭而置灰。
+		// ⚠️ 只对「用户显式写 0」这一支放宽，且**机型本身不支持时不放宽**（unsupportedModel 仍整卡隐藏）：
+		//    通道打不开 / 只读降级 等自动判据**逐位不变**。
+		bool explicitEcOff = IsEcDirectWriteOffConfigured();
+		if (explicitEcOff)
+		{
+			// 本支是「用户显式关掉 EC 直写」这一种状态，只在状态翻转时记一次（⛔ 不刷屏）；
+			// 用 WriteError ⇒ 默认「仅错误」级别也能看到，便于机主/用户自证"卡片没被自己关掉"。
+			string msg = $"[charge-limit] EC 直写已被用户显式关闭（{EcDirectWriteOffConfigKey}=0）⇒ 电池卡片**保持可见**（撤销入口就在卡片最下面一行），EC 直写各行已收起、滑块置灰；三档是否可点仍按既有判据（GCU 通路可用即可点）";
+			if (Logger.TryMarkChanged("charge-limit-ec-off-panel-kept", msg))
+			{
+				Logger.WriteError(msg);
+			}
+		}
 		if (panelBattery != null)
 		{
-			panelBattery.Visible = flag || Program.UiAuditMode;
+			panelBattery.Visible = flag || (explicitEcOff && !unsupportedModel) || Program.UiAuditMode;
 		}
 		// 2026-10-08 17:00：非 50 系滑块不上屏，这两句不会被人看到（50 系滑块的行内说明与开关共用同一条措辞）。
 		toolTip.SetToolTip(sliderBattery, flag ? Strings.ChargeLimitWindowsNote : ChargeLimitDisabledReason(RuntimeModelSupport.Current()));
