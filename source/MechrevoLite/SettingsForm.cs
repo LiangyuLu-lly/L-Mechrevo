@@ -7386,8 +7386,20 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// 2026-10-15（隐藏规则 A/B）：记下宿主表，供 ApplyChargeLimitRowVisibility 收放开关行/副标题行
 		// （老机型上 _chargeSliderTable 为 null，但这两行仍要能收起来）。
 		_chargeLimitHostTable = host;
-		int num = ResponsiveLayout.LogicalToDevice(this, 26);
-		int num2 = ResponsiveLayout.LogicalToDevice(this, 26);
+		// 2026-10-16（空档删除 · 用户原话「空挡删除」）：删掉「EC 三档限充(实验性)」开关之后，
+		// 第 0 行（原「EC 开关 +「实验」角标」行）与第 1 行（原副文案「通过直写 EC 限电（不走 GCU）」行）
+		// **已经没有任何控件落在上面**（`host.Controls.Add(..., 0, 0/1)` 的那两处已随开关一起删除），
+		// 但行高仍是 D(26) + D(26) ⇒ 卡片顶部留下一块 **52 逻辑像素的空白**（用户截图里的「空档」）。
+		// ⇒ 两行行高归零：**行号保持不变**（⛔ 不动第 2 行三档、第 3 行无极限充开关、第 4 行警告、第 5 行滑块），
+		//    因此 `_chargeSliderRowIndex`/`_chargeSliderWarningRowIndex`/`ApplyChargeLimitRowVisibility`
+		//    里的既有下标**一个都不用改**；表高由下方 `host.Height = num + num2 + …` 与
+		//    `ApplyChargeSliderVisibility` 末尾的逐行求和自动跟上。
+		// ⚠️ 已核对：`_chargeLimitHeadRowHeight`/`_chargeLimitDescRowHeight` 两个字段**从未被赋值**
+		//    （只有定义 + `ApplyChargeLimitRowVisibility` 里的 `> 0` 读取）⇒ 那两个 `if` 恒假、
+		//    ⛔ 不会把这两行再恢复成 26。两行的控件字段（`_chargeLimitHeadRow`/`_chargeLimitDescLabel`/
+		//    `_chargeLimitEffectLabel`）都仍存在判空保护，归零后它们只是不再占位，不影响任何逻辑。
+		int num = 0;
+		int num2 = 0;
 		int num3 = ResponsiveLayout.LogicalToDevice(this, 36);
 		// 2026-10-09（无极限充滑块）：新增第 3 行＝「启用无极限充功能(实验性)」两态开关（26 逻辑像素）、
 		// 第 4 行＝「限充」滑块行（32，默认关 ⇒ 由 ApplyChargeSliderVisibility() 收到 0，不留占位）。

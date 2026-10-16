@@ -627,7 +627,7 @@
   
   </data>
 <data name="ChargeModeTip" xml:space="preserve">
-    <value>{0}：上限 {1}%。开关打开时按所选档位直写 EC（不依赖 GCU），写后回读确认</value>
+    <value>{0}：上限 {1}%。按所选档位设置充电上限（经 GCU 官方电池保护 BatteryProtection），写后回读确认</value>
   </data>
 <data name="CheckUpdates" xml:space="preserve">
     
