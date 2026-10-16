@@ -10892,6 +10892,20 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 					MessageBox.Show(Strings.GpuModeUnreadable, "L-Mechrevo", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					return;
 				}
+				// ⭐⭐ 2026-10-16（宝龙达 · 修「显卡模式切换不行」第二步）：
+				//   ⚠️ 上面那道「读不到当前模式」我已经修了 ✅（`RefreshGpuModeStatus` 加了宝龙达分派 ✅）
+				//      ⭐ 但 ⭐ **真正"写下去"的那一步也还没接给宝龙达** ❌：
+				//      ⭐ 下面 `GpuSwitchPolicy.Resolve` 之后 ⭐ 要么走
+				//         `Program.service.SwitchGpuMode(...)`（⭐ GCU MQTT ❌）、
+				//         ⭐ 要么只 `ShowGpuRestartPromptAsync`（⭐ 从不真的写 ❌）
+				//      ⇒ ⭐ ⭐ **所以必须在这里插一条宝龙达自己的分支** ✅
+				//   ⭐ 分支**以 `UsesBaolongda` 开头** ⇒ ⭐ 非宝龙达**逐位不变** ✅（⭐ 下面一个字未改 ✅）
+				MechrevoHw bdHw = Program.hw;
+				if (bdHw != null && bdHw.UsesBaolongda)
+				{
+					await SwitchGpuModeBaolongdaAsync(targetMode, modeName, requestSeq);
+					return;
+				}
 				GpuSwitchPlan gpuSwitchPlan = GpuSwitchPolicy.Resolve(Program.service.CurrentGpuMode, targetMode, gpuModeStatusReadback == GpuModeStatusReadback.Fresh);
 				Logger.WriteLine($"GpuSwitch UI: target={targetMode} route={gpuSwitchPlan.Route} current={Program.service.CurrentGpuMode} gen={Program.hw.DgpuGeneration} allowsRestart={DisplayRouteMatrix.AllowsRestart(Program.hw.DgpuGeneration)} pendingRestart={HasPendingGpuRestart()} seq={requestSeq}");
 				if (gpuSwitchPlan.Route == GpuSwitchRoute.NoChange)
@@ -10918,6 +10932,67 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			}
 		}
 		MessageBox.Show(Strings.GcuServiceNotReady, "L-Mechrevo", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 修「显卡模式切换不行」）：⭐ **宝龙达自己的显卡模式切换** ✅
+	///
+	/// <para>⭐ 流程：⭐ ① 校验目标值（⭐ 宝龙达**只有两个**：⭐ <c>1 = 混合</c> · ⭐ <c>2 = 独显直连</c> ✅）
+	/// ⇒ ⭐ ② 写 WMI 功能号 9（⭐ `TrySetGpuModeViaBackend`，⭐ 含**写后回读确认** ✅）
+	/// ⇒ ⭐ ③ 刷新界面 ⇒ ⭐ ④ ⭐ **提示「重启以应用」** ✅。</para>
+	///
+	/// <para>⭐⭐ <b>为什么⛔不能走原来那条 GCU 的路</b>：⭐ 原来那条会
+	/// <c>Publish("Setting/Control", …)</c> ⭐ 发「重启路由」（<c>BuildGpuRestartRoute</c> ✅）
+	/// ⚠️ ⇒ ⭐ 宝龙达**没有 GCU** ⇒ ⭐ 路由为空 ⇒ ⭐ <c>GpuRestartRequestOutcome.Unsupported</c> ❌
+	/// ⇒ ⭐ 用户只会看到「点了没反应」❌。⭐ 宝龙达的「应用」就是**它自己的固件在下次开机时读功能号 9** ✅
+	/// ⇒ ⭐ ⭐ **所以只需写 9 ＋ ⭐ 提示重启** ✅。</para>
+	///
+	/// <para>⚠️ <c>targetMode</c> 是**界面口径**（⭐ <c>0 = 核显</c> · ⭐ <c>1 = 混合</c> · ⭐ <c>2 = 独显直连</c> ✅）；
+	/// ⭐ 宝龙达**不支持核显档** ⇒ ⭐ <c>0</c> ⭐ **明确拒绝并如实报错** ✅（⛔ 不静默 ✅）。
+	/// ⭐ 且 UI 侧已隐藏那颗按钮 ⇒ ⭐ 正常路径上点不到 ✅。</para>
+	/// </summary>
+	private async Task SwitchGpuModeBaolongdaAsync(int targetMode, string modeName, int requestSeq)
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null)
+		{
+			return;
+		}
+		if (targetMode != 1 && targetMode != 2)
+		{
+			Logger.WriteLine($"宝龙达 显卡模式切换：⭐ 拒绝界面口径 {targetMode}（⭐ 宝龙达不支持核显档，⭐ 只接受 1=混合 / 2=独显直连 ✅）");
+			MessageBox.Show(Strings.GpuModeUnsupported, "L-Mechrevo", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+			return;
+		}
+		int backendMode = ((targetMode == 2) ? BaolongdaWmi.GpuModeDiscrete : BaolongdaWmi.GpuModeHybrid);
+		bool ok = hw.TrySetGpuModeViaBackend(backendMode, out bool confirmed);
+		Logger.WriteLine($"宝龙达 显卡模式切换：⭐ 界面={targetMode}（{modeName}）⇒ ⭐ 后端功能号 9={backendMode}"
+			+ $" ⇒ ⭐ 写入={(ok ? "成功" : "失败")} · ⭐ 回读确认={confirmed}"
+			+ "（⭐ 界面口径：⭐ 1=混合 · ⭐ 2=独显直连 ✅）");
+		if (!ok)
+		{
+			if (requestSeq == _gpuSwitchRequestSeq)
+			{
+				MessageBox.Show(Strings.GpuModeUnsupported, "L-Mechrevo", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+			}
+			return;
+		}
+		await RefreshGpuModeUiStateAsync();
+		if (requestSeq != _gpuSwitchRequestSeq || IsDisposed)
+		{
+			return;
+		}
+		// ⭐ MUX 切换**要重启才生效** ⚠️ ⇒ ⭐ 必须提示（⛔ 不能「点了没反应也没提示」✅）
+		if (DisplayRouteMatrix.AllowsRestart(hw.DgpuGeneration))
+		{
+			await ShowGpuRestartPromptAsync(targetMode, modeName, requestSeq);
+		}
+		else
+		{
+			MarkGpuRestartPending(targetMode);
+			Logger.WriteLine("宝龙达 显卡模式切换：⭐ 已写入功能号 9 ⇒ ⭐ 记为「待重启生效」"
+				+ "（⭐ 该代际不支持由我们主动重启 ⇒ ⭐ 请用户在方便时手动重启 ✅）");
+		}
 	}
 
 	private async Task<GpuModeStatusReadback> RefreshGpuModeUiStateAsync()
