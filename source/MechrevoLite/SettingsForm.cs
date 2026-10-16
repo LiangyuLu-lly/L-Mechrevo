@@ -14253,12 +14253,29 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	/// 2026-10-16（遥测排版方案 A）：**片内文本的对齐方式**。
 	/// 名字/温度片沿用 <c>MiddleCenter</c>（2026-10-11「间隔统一」那一轮的口径：片内留白左右相等 ⇒
 	/// 相邻两片文本之间的空档恒为 <c>2 × TelemetryGapLogical</c>，⛔ 不动它）。
-	/// 功耗/转速/占空比三片改成 <c>MiddleRight</c>：数字列惯用右对齐，位数变化时**右缘恒对齐**
+	/// 功耗/转速两片用 <c>MiddleRight</c>：数字列惯用右对齐，位数变化时**右缘恒对齐**
 	///（例如 <c>999rpm</c> 与 <c>1790rpm</c> 居中对齐会左右各差半个字宽）。
+	/// <para>
+	/// ⭐ 2026-10-16（方案 X · 用户原话「传感器读数间距太大了 …小一点但别贴在一起」）：**占空比片改 <c>MiddleLeft</c>**。
+	/// <b>理由</b>：它是**行内最后一列**（追加顺序见 <see cref="TelemetryPieceArray" /> /
+	/// <see cref="BuildTelemetryRow" />，占空比之后不再有任何片）⇒ 它的预留余量应当留在**行外侧**，
+	/// ⛔ 不该变成与转速列之间的空档。右对齐时余量全落在左边：占空比按 <c>"100%"</c> 预留、
+	/// 而实际显示 <c>49%</c> 这种两位数时，差出来的一个字宽就夹在 <c>2296rpm</c> 与 <c>32%</c> 之间
+	///（真机反馈点名的正是这一处；本机实测该空档 ≈18px，而其余相邻空档只有 <c>2 × GapLogical</c> = 6px）。
+	/// 左对齐后**所有相邻空档恒为 6px**，正好恢复本类注释里那条不变量；而且片宽、预留样本、
+	/// 取证口径（<see cref="TelemetryPowerSample" /> 等）一字未动 ⇒ 零抖动，也不会重演
+	///「位数变化列宽会跳」那类历史回归。代价仅是占空比两位数的行右端多出约一个字的空白（在行外侧）。
+	/// </para>
+	/// ⚠️ <b>前提是「占空比恒为行内最后一列」</b>：若将来在它右边再加一片（新字段/新列），
+	/// 这个左对齐就会把余量推进**新的空档**里 ⇒ 那时必须把它改回 <c>MiddleRight</c>（或另想余量去处）。
 	/// </summary>
 	private ContentAlignment TelemetryPieceAlign(Label piece)
 	{
-		if (piece == _telemetryCpuPower || piece == _telemetryGpuPower || piece == _telemetryCpuRpm || piece == _telemetryGpuRpm || piece == _telemetryCpuDuty || piece == _telemetryGpuDuty)
+		if (piece == _telemetryCpuDuty || piece == _telemetryGpuDuty)
+		{
+			return ContentAlignment.MiddleLeft;
+		}
+		if (piece == _telemetryCpuPower || piece == _telemetryGpuPower || piece == _telemetryCpuRpm || piece == _telemetryGpuRpm)
 		{
 			return ContentAlignment.MiddleRight;
 		}
