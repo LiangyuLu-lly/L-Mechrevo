@@ -124,6 +124,13 @@ public static class HardwareControl
 	private static int _gpuTempSmiMisses;
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（GPU 温度「完全不显示」BUGFIX · p2 实证）：⭐ 上一次**记录过**的
+	/// "本来源为什么没跑"**原因码**（⭐ 见 <see cref="SkipEarlyNvidiaSmi" /> ✅）。
+	/// <para>⭐ 作用：⭐ **原因码变化时才打日志** ⇒ ⛔ 不刷屏（⭐ 判据每 3 秒被求值一次 ⚠️）✅。</para>
+	/// </summary>
+	private static int _gpuTempSmiSkipLogged;
+
+	/// <summary>
 	/// ⭐⭐（同上）：⭐ <b>宽限期长度</b>（毫秒 ✅）。
 	/// <para>⚠️ 取值理由：⭐ 厂商（MQTT）推送通常在启动后一两秒内到 ✅ ⇒ ⭐ 5 秒足够判定
 	/// "⭐ 这台机的厂商到底给不给 GPU 温度" ⚠️；⭐ 而冷启动空窗约 31 秒 ⚠️
@@ -1006,19 +1013,39 @@ public static class HardwareControl
 	/// "⭐ 是不是我们自己写的"⚠️ —— ⭐ 第二道保护 ✅）；
 	/// ⭐ ⑤ <b>可执行文件存在</b> ⚠️ —— ⭐ 非 NVIDIA 机器静默放弃 ✅。</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（GPU 温度「完全不显示」BUGFIX · p2 实证）：
+	/// ⭐ 一次性记录"本来源**为什么没跑**"✅ —— ⭐ **原因码变化时才打** ⇒ ⛔ 不刷屏 ✅。
+	/// <para>⚠️ <b>为什么必须加</b>：p2（`…-225820`，日志级别 `All` ⇒ 能记全部级别）里
+	/// ⭐ 从启动到导出共 7 分钟、`NVML Init` 与 `GPU 温度…取到` **一行都没有** ⚠️，
+	/// 而原实现的判据 ⑤（`ResolveNvidiaSmiPath()` 找不到 exe）是**完全静默**的 ❌
+	/// ⇒ ⭐ 诊断包**无法区分**"没装 nvidia-smi"／"厂商已给值"／"已让位"⚠️
+	/// ⇒ ⭐ 下一份包据此可**一眼定位** ✅。</para>
+	/// </summary>
+	private static bool SkipEarlyNvidiaSmi(int code, string reason)
+	{
+		if (Interlocked.Exchange(ref _gpuTempSmiSkipLogged, code) != code)
+		{
+			Logger.WriteError($"GPU 温度：⭐ nvidia-smi 早期来源**本次未运行** ⇒ {reason}"
+				+ "（⭐ 本行按原因变化只记一次 ✅；⭐ 该来源只在【厂商不给 GPU 温度】的机器上才需要 ⚠️）");
+		}
+		return false;
+	}
+
 	private static bool ShouldTryEarlyNvidiaSmi()
 	{
 		// ① 让位：LHM/NVML 已就绪并给过有效值 ⇒ 本来源功成身退
 		if (Volatile.Read(ref _gpuTempRealSourceReady) == 1)
 		{
-			return false;
+			return SkipEarlyNvidiaSmi(1, "LHM/NVML 已给过有效值 ⇒ 已让位（✅ 正常，本来源不需要）");
 		}
 		int misses = Volatile.Read(ref _gpuTempSmiMisses);
 		// ①b 彻底停用：连续失败太多次 ⇒ 推断本机没有可用的 NVIDIA 工具 ⚠️ ⇒ 不再 spawn ✅
 		//   ⚠️ 这是"防无限起子进程"的兜底（⭐ 见 _gpuTempSmiMisses 的注释 ✅）
 		if (misses >= NvidiaSmiGiveUpAfterMisses)
 		{
-			return false;
+			return SkipEarlyNvidiaSmi(2, $"连续 {misses} 次取不到值 ⇒ 已彻底停用"
+				+ "（⚠️ 说明本机能找到 nvidia-smi 但**拿不到温度** ⚠️）");
 		}
 		long now = Environment.TickCount64;
 		// ② 宽限期（首次调用时记基准）
@@ -1030,14 +1057,14 @@ public static class HardwareControl
 		}
 		if (now - firstCallTick < NvidiaSmiStartupGraceMs)
 		{
-			return false;
+			return false; // ⭐ 宽限期内（正常，⛔ 不记日志免刷屏）
 		}
 		// ③ TTL（⭐ 若已连续失败到退避阈值 ⇒ 用放大的 TTL ⚠️ —— 免得一直起子进程 ❌）
 		int ttlMs = (misses >= NvidiaSmiBackoffAfterMisses) ? NvidiaSmiBackoffTtlMs : NvidiaSmiTtlMs;
 		long lastAttemptTick = Interlocked.Read(in _gpuTempSmiLastAttemptTick);
 		if (lastAttemptTick != 0L && now - lastAttemptTick < ttlMs)
 		{
-			return false;
+			return false; // ⭐ TTL 内（正常，⛔ 不记日志免刷屏）
 		}
 		// ④ 厂商已给值 ⇒ 不做
 		MechrevoHw hw;
@@ -1055,10 +1082,18 @@ public static class HardwareControl
 		}
 		if (hw.GpuTemp > 0 && !IsGpuTempFacadeWrittenByUs(hw))
 		{
-			return false; // ⭐ 厂商值有效 ⇒ ⭐ 永远不需要 nvidia-smi（⭐ GCU 机型就是这一支 ✅）
+			// ⭐ 厂商值有效 ⇒ ⭐ 永远不需要 nvidia-smi（⭐ GCU 机型就是这一支 ✅）
+			return SkipEarlyNvidiaSmi(3, $"厂商已给 GPU 温度 {hw.GpuTemp}℃ ⇒ 不需要本来源（✅ 正常）");
 		}
 		// ⑤ 可执行文件存在
-		return ResolveNvidiaSmiPath() != null;
+		if (ResolveNvidiaSmiPath() == null)
+		{
+			return SkipEarlyNvidiaSmi(4, "在本机三个候选路径里都**找不到 nvidia-smi.exe**"
+				+ "（⭐ 已查 System32 ＋ 两个 Program Files 下的 `NVIDIA Corporation\\NVSMI` ✅）"
+				+ " ⇒ ⚠️ 本来源在**本机不适用**；"
+				+ "⚠️ 若本机确有 NVIDIA 独显，**这一行就是根因** ⚠️（⭐ 即 GPU 温度只能等 NVML，而那需要更久 ⚠️）");
+		}
+		return true;
 	}
 
 	/// <summary>
@@ -1163,11 +1198,14 @@ public static class HardwareControl
 				cpuFrequency = perfFreq.Value;
 			}
 		}, "cpu-freq-sample");
-		// (c) 降级中：一次原生调用都不发；(d) 未启用/已释放：直接早退。
-		if (_localSamplingQuarantined)
-		{
-			return;
-		}
+		// (d) 未启用/已释放：直接早退。
+		//   ⭐⭐ 2026-10-16（GPU 温度「完全不显示」BUGFIX · p2 实证）：
+		//     ⚠️ 本检查**必须排在 `_localSamplingQuarantined` 之前** —— 因为下面
+		//     `RefreshEarlyGpuTempFromNvidiaSmi()` 用的是**独立子进程**
+		//     （⛔ 不碰 LHM/NVML 原生句柄 ✅）⇒ ⭐ 它**不受"本地采样链降级"影响** ✅
+		//     ⇒ ⭐ 隔离/降级期间也应该能补 GPU 温度 ✅（⭐ 与上方 `cpu-freq-sample` 同款处理 ——
+		//        那条也刻意排在隔离检查之前，注释理由一模一样 ✅）。
+		//   ⚠️ 而「LHM 被整体关掉」的配置下依然**逐位不变**（⭐ 这里就早退了 ✅）。
 		LhmMonitor? lhmMonitor = lhm;
 		if (lhmMonitor == null || lhmMonitor.IsDisposed)
 		{
@@ -1181,7 +1219,14 @@ public static class HardwareControl
 		//   ⛔ 闸门本身与它的位置**一字未动** ✅（⭐ 本步自己带 TryStep ✅）。
 		//   ⚠️ 位置理由：⭐ 排在 `lhm == null` 早退**之后** ⇒ ⭐ "⭐ LHM 被整体关掉"⭐ 的配置下
 		//      行为**逐位不变** ✅（⭐ 不因本来源而多出子进程 ⚠️）。
+		//   ⭐⭐ 2026-10-16 二次修正：⭐ 同时**排在 `_localSamplingQuarantined` 之前** ✅
+		//      （⭐ 见上方注释 —— 它不碰原生句柄，降级期间也该能取温度 ✅）。
 		RefreshEarlyGpuTempFromNvidiaSmi();
+		// (c) 降级中：一次原生调用都不发。
+		if (_localSamplingQuarantined)
+		{
+			return;
+		}
 		if (!TryStep(lhmMonitor.Update, "lhm-update"))
 		{
 			return;
