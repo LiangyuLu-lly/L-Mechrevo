@@ -3791,7 +3791,7 @@ public class MechrevoService
 		byte level = MechrevoHw.BaolongdaBrightnessFromUi(light0to4);
 		// ⭐⭐ 2026-10-16（键盘灯四项模式）：⭐ 效果 Id → 模式（功能号 16）用**同一张表** ✅
 		//   ⚠️ 来源定性：⭐ 0／2 是官方原版；⚠️ 1／3 来自基于官方修改的第三方版（⭐ `JiaoLong7.3`）
-		//     ⇒ ⭐ 社区探索所得，⭐ 待真机确认（⛔ 不得当作"官方支持四种" ⚠️）
+		//     ⇒ ⭐ 原厂**定义了但从不写入** ⚠️ ⇒ ⭐ 未验证项，待真机确认（⛔ 不得当作"官方支持四种" ⚠️）
 		byte mode;
 		if (!MechrevoHw.TryMapBaolongdaKeyboardMode(effect, out mode))
 		{

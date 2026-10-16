@@ -3073,9 +3073,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				}
 				// ⭐⭐ 2026-10-16（键盘灯四项模式 · 效果 Id → 模式）：⭐ 由**单一来源**映射 ✅
 				//   （⭐ 同表也供界面的下拉与索引映射用 ⇒ ⭐ 三处口径必然一致 ✅）
-				//   ⚠️ 来源定性：⭐ 0 ／ 2 是**官方原版**枚举（⭐ 官方蛟龙控制台只有单色 ✅）；
-				//     ⚠️ 1 ／ 3 来自**基于官方修改的第三方版本**（⭐ `JiaoLong7.3`）⇒ ⭐ 属**社区探索所得**
-				//     ⇒ ⭐ 报告称"有人实测可用" ⚠️ 但 ⭐ **机主那台仍须真机确认**（⛔ 不得当作"官方支持四种" ⚠️）
+				//   ⚠️ 来源定性（⭐ 2026-10-17 按【原厂包】调用点更正）：
+				//     ✅ 2（固定色）与 ⭐ 1（自动循环 `RGBAutoCyclic`）＝ **原厂实际使用** ✅
+				//     ⚠️ 0（`Mode_Off`）原厂**零调用点** —— ⛔ 原厂不用模式 0 关灯（关灯 ＝ 写亮度 18 ＝ 0 ✅）
+				//     ⚠️ 3（`CustomColors`）原厂**定义了但从不写入** ⚠️（⛔ 非「社区探索所得」—— ⭐ 四个值原厂枚举里本来就有 ✅）
+				//     ⇒ ⭐ **1 ／ 3 本机是否真变色仍须真机确认**（⛔ 不得当作"官方支持四种" ⚠️）
 				byte mode;
 				if (!TryMapBaolongdaKeyboardMode(effect, out mode))
 				{
@@ -3208,7 +3210,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	///
 	/// <para>⚠️ <b>模式值 1 ／ 3 的来源定性（⭐ 必须写准 ⚠️）</b>：⭐ <c>0</c>／<c>2</c> 是**官方原版**枚举
 	/// （⭐ 官方蛟龙控制台只有单色 ✅）；⚠️ <c>1</c>／<c>3</c> 来自**基于官方修改的第三方版本**
-	/// （⭐ `JiaoLong7.3`，⭐ 主程序集名即「第三方蛟龙游戏控制中心」✅）⇒ ⭐ 属**社区探索所得**
+	/// （⭐ 第三方 `JiaoLong7.3` 只是把**原厂未使用的入口**暴露到界面 ✅）⇒ ⭐ 属**未验证项**
 	/// ⇒ ⭐ **必须真机确认**（⛔ 不得当作"官方支持四种" ⚠️）。</para>
 	/// </summary>
 	/// <param name="on">⭐ <c>false</c> ⇒ ⭐ 关灯（⭐ 写亮度 0 ✅）。</param>
@@ -3328,11 +3330,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// （⭐ 下拉、⭐ 索引→Id 映射、⭐ 点进 LightForm 那扇窗、⭐ 以及下发 ⭐ **四处共用** ✅）。
 	///
 	/// <para>⚠️⚠️ <b>来源定性（⭐ 必须写准，⛔ 不得说成"官方支持四种" ⚠️）</b>：
-	/// ⭐ <c>Off=0</c> 与 <c>FixedColor=2</c> 是**官方原版**枚举（⭐ 官方蛟龙控制台**只有单色** ✅，
-	/// ⭐ 与开源 <c>JiaolongControl</c> 的 <c>RGBKeyboardMode</c> 两项一致 ✅）；
-	/// ⚠️ <c>AutoCyclic=1</c> 与 <c>CustomColors=3</c> 来自**基于官方修改的第三方版本**
-	/// （⭐ <c>JiaoLong7.3</c> · ⭐ 主程序集名即「第三方蛟龙游戏控制中心」✅）
-	/// ⇒ ⭐ 属**社区探索所得**（⚠️ 非官方文档 ✅）⇒ ⭐ 报告称"有人实测可用" ⚠️
+	/// ✅ <c>FixedColor=2</c> 与 ⭐ <c>AutoCyclic=1</c> 是**原厂实际使用** ⚠️（2026-10-17 按【原厂包】调用点更正：
+	/// ⭐ <c>Mode_RGBFixedMode</c> 与 <c>Mode_RGBAutoCyclic</c> **都有真实调用点** ✅）；
+	/// ⚠️ <c>Off=0</c> 与 <c>CustomColors=3</c> 原厂**定义了但从不写入** ⚠️（⛔ 不是「社区探索所得」—— ⭐ 四个值原厂枚举里本来就有 ✅；⭐ 关灯走写亮度 18 ＝ 0 ✅）；
+	/// （⭐ 第三方的贡献只是把**原厂未使用的入口**暴露到界面 ✅）
+	/// ⇒ ⭐ 原厂**定义了但从不写入** ⚠️ ⇒ ⭐ 属**未验证项**（⚠️ 并非「社区探索所得」✅）
 	/// 但 ⭐ **机主那台（MRID6）仍须真机确认** ✅。</para>
 	///
 	/// <para>⇒ ⭐ 结论：⭐ 四项**都要真机验** —— ⚠️ <c>1</c>／<c>3</c> 完全未验 ⚠️；
@@ -3357,12 +3359,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		if (effect.Equals("Rainbow", StringComparison.OrdinalIgnoreCase))
 		{
-			mode = 1; // ⚠️ 社区探索所得（⭐ 第三方修改版）⇒ ⭐ 待真机确认
+			mode = 1; // ✅ 原厂实际使用（⭐ 原厂包调用点已证）⇒ ⚠️ 本机是否真变色仍须真机确认
 			return true;
 		}
 		if (effect.Equals("Manual", StringComparison.OrdinalIgnoreCase))
 		{
-			mode = 3; // ⚠️ 社区探索所得（⭐ 第三方修改版）⇒ ⭐ 待真机确认
+			mode = 3; // ⚠️ 原厂定义了但从不写入 ⇒ ⭐ 未验证项，待真机确认
 			return true;
 		}
 		return false;

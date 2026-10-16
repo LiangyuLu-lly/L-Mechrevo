@@ -554,15 +554,17 @@ public class SettingsForm : RForm
 	///
 	/// <para>⭐⭐ <b>来源定性（⭐ 必须写准 —— ⛔ 不得说成"官方支持四种" ⚠️）</b>：
 	/// <list type="bullet">
-	/// <item>⭐ <c>Off</c>（模式 <c>0</c>）与 <c>Single</c>（模式 <c>2</c>）＝ <b>官方原版</b> ✅ ——
-	/// ⭐ 官方蛟龙控制台**只有单色**，⭐ 与开源 <c>JiaolongControl</c> 的 <c>RGBKeyboardMode</c>
-	/// （<c>Mode_Off=0</c> ／ <c>Mode_RGBFixedMode=2</c>）**两项一致** ✅</item>
-	/// <item>⚠️ <c>Rainbow</c>（模式 <c>1</c> ＝ <c>RGBAutoCyclic</c>）与 <c>Manual</c>
-	/// （模式 <c>3</c> ＝ <c>CustomColors</c>）＝ ⭐ 来自**基于官方修改的第三方版本**
-	/// （⭐ <c>JiaoLong7.3</c> · ⭐ 主程序集名即「第三方蛟龙游戏控制中心」✅）
-	/// ⇒ ⭐ 属**社区探索所得**（⚠️ 非官方文档 ⚠️）⇒ ⭐ 报告称"有人实测可用" ⚠️
+	/// <item>✅ <c>Single</c>（模式 <c>2</c> ＝ <c>RGBFixedMode</c>）与 ⭐ <c>Rainbow</c>（模式 <c>1</c> ＝ <c>RGBAutoCyclic</c>）＝ <b>原厂实际使用</b> ✅ ——
+	/// ⚠️ 2026-10-17 按【原厂包】<c>蛟龙游戏控制中心Setup.exe</c>（Bitland 签名 · v0.3.15）的**实际调用点**更正：
+	/// <c>Mode_RGBFixedMode</c> 与 <c>Mode_RGBAutoCyclic</c> **都有真实调用点** ✅（⭐ 与开源 <c>JiaolongControl</c> 对应项亦一致 ✅）</item>
+	/// <item>⚠️ <c>Off</c>（模式 <c>0</c> ＝ <c>Mode_Off</c>）＝ ⭐ 原厂**零调用点** ⚠️ —— ⛔ 原厂**不用模式 0 关灯**（⭐ 关灯 ＝ 写亮度 18 ＝ 0 ✅）＋ <c>Manual</c>
+	/// （模式 <c>3</c> ＝ <c>CustomColors</c>）＝ ⭐ 原厂**枚举中存在、但从不写入** ⚠️（⛔ 不是「社区探索所得」—— ⭐ 四个值原厂枚举里**本来就有** ✅）
+	/// （⭐ 第三方的贡献只是把**原厂未使用的入口**暴露到界面 ✅ ⇒ ⚠️ 此项**完全未验**）
+	/// ⭐ 原厂**定义了但从不写入** ⚠️ ⇒ ⭐ 属**未验证项**（⚠️ 并非「社区探索所得」—— ⭐ 四个值原厂枚举里本来就有 ✅）
 	/// 但 ⭐ **机主那台（MRID6）仍须真机确认** ✅</item>
 	/// </list></para>
+	///
+	/// <para>⭐ <b>原厂另两条事实</b>（供将来参考）：① 原厂**完全不碰 EC**（<c>DeviceIoControl</c>／<c>WriteIoPort</c>／<c>WinRing</c>／<c>SuperIO</c>／<c>0x2000</c>／<c>0x1060</c> 全零命中，包内 <c>.sys</c>／<c>.inf</c>／<c>.cat</c> 零）⇒ **100% 走 WMI、不装任何内核驱动** ✅；② 原厂**不做回读确认**（只判 <c>InvokeMethod</c> 成功与否）⇒ ⭐ **我们保留回读确认是对的** ✅。③ 原厂语义：**模式 1（自动循环）会禁用颜色选择器、模式 2（固定色）启用** ✅。</para>
 	///
 	/// <para>⚠️ <b>因此四项都要真机验</b>（⭐ 能力位铁律：⭐ **能点的就必须有反应** ✅）——
 	/// ⭐ 其中 <c>1</c>／<c>3</c> **完全未验证** ⚠️ ⇒ ⭐ 若机主反馈"选了没反应"，
