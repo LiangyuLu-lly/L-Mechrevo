@@ -3444,6 +3444,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					GpuFanRpm = gpu;
 					CpuFanRpm = cpu;
 					FanStatusSeen = true;
+					// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机型界面看不到风扇转速"）：
+					//   ⚠️ 根因之一：⭐ 界面上那行风扇读数由 ⭐ `MechrevoHw.IsFanInfoFresh(...)` 把关 ✅，
+					//      而它读的是 ⭐ `_fanInfoReceivedAt` ⚠️ —— ⭐ 那个时间戳**原来只有 GCU/MQTT
+					//      推送那条路会写** ❌ ⇒ ⭐ 宝龙达（⭐ 没有 GCU 推送 ⚠️）永远判"不新鲜"
+					//      ⇒ ⭐ ⭐ **整行风扇读数被界面省略** ❌ ⇒ ⭐ 就算 `CpuFanRpm` 读到了也看不到 ⚠️
+					//   ⭐ 修法：⭐ 宝龙达**读到风扇的那一刻就打这个时间戳** ✅
+					//      ⇒ ⭐ 与其他"厂商值"（⭐ 如 `CpuTemp` 那条 ⭐ 见本方法 ② 段 ✅）**同一口径** ✅
+					Interlocked.Exchange(ref _fanInfoReceivedAt, Environment.TickCount64);
 				}
 			}
 		}

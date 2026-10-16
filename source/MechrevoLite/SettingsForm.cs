@@ -11169,6 +11169,20 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			}
 			text2 = string.Concat(array);
 		}
+		// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机型界面看不到风扇转速"）：
+		//   ⚠️ 根因之二（⭐ 也是主因）：⭐ 上面那支的**门槛是"占空比%"**（`HardwareControl.cpuFan` ✅），
+		//      而 ⭐ RPM ⭐ **只是括号里的后缀**（⭐ `% (1965 rpm)` ⚠️）。
+		//      ⚠️ 而占空比只由 ⭐ **GCU/MQTT 载荷**（`CpuFanDuty` ✅）填 ⇒ ⭐ 宝龙达**没有 GCU 推送**
+		//      ⇒ ⭐ `cpuFan` 恒为 null/负 ⇒ ⭐ ⭐ **整行风扇读数被省略，RPM 也跟着看不到** ❌
+		//   ⭐ 修法：⭐ 补一支"⭐ **只有 RPM**"的显示（⭐ 直接显示 `1965 rpm`，⛔ **不编造百分比** ✅）。
+		//   ⚠️ 安全性：⭐ 这支是 `else if` ⇒ ⭐ **只有在上面那支不成立时才会走** ✅
+		//      ⇒ ⭐ GCU 机型（⭐ 一定有占空比 ✅）**永远走上面那支** ⇒ ⭐ **行为逐位不变** ✅
+		//   ⚠️ 用 `> 0` 而不是 `>= 0`：⭐ `cpuFanRPM` 是普通 static int，⭐ 默认 0 ⚠️
+		//      ⇒ ⭐ 用 `>= 0` 会把"⭐ 从没读到过"（⭐ 0 ⚠️）当成有效值 ⇒ ⭐ 显示 "0 rpm" ❌
+		else if (fanInfoFresh && HardwareControl.cpuFanRPM > 0)
+		{
+			text2 = Strings.FanSpeed + ": " + HardwareControl.cpuFanRPM + " rpm";
+		}
 		cpuFan = HardwareControl.gpuFan;
 		if (fanInfoFresh && cpuFan.HasValue && cpuFan.GetValueOrDefault() >= 0)
 		{
@@ -11195,6 +11209,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				array2[3] = "%";
 			}
 			gpuFan = string.Concat(array2);
+		}
+		// ⭐⭐ 2026-10-16（0.291.9 · 同上）：⭐ GPU 风扇同样补一支"⭐ 只有 RPM"的显示 ✅
+		//   ⚠️ 同样用 `else if` ⇒ ⭐ 只在没有占空比时才走 ⇒ ⭐ GCU 机型逐位不变 ✅
+		else if (fanInfoFresh && HardwareControl.gpuFanRPM > 0)
+		{
+			gpuFan = Strings.FanSpeed + ": " + HardwareControl.gpuFanRPM + " rpm";
 		}
 		cpuFan = HardwareControl.midFan;
 		if (cpuFan.HasValue)
