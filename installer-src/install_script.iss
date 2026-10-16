@@ -11,7 +11,11 @@ AppPublisher=L-Mechrevo contributors
 AppCopyright=Copyright (C) 2026 L-Mechrevo contributors. GPL-3.0-only.
 DefaultDirName={autopf}\L-Mechrevo
 DefaultGroupName=L-Mechrevo
+#ifdef NOGCU
+OutputBaseFilename=LM-0.291.9-beta22.9-baolongda-test-setup
+#else
 OutputBaseFilename=LM-0.291.9-beta22.9-test-setup
+#endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
 VersionInfoVersion=0.291.9
@@ -153,9 +157,11 @@ Source: "files\GCU\Uninstall-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversio
 ;      · 未证实：ACPI\INOU0000 这个设备在星耀真机上是否真的存在（需要真机只读查询）；
 ;      · 用户口径：「目前只是不确定和星耀是否通用，其他应该是通用的」。
 ; ============================================================================
+#ifndef NOGCU
 Source: "files\GCU\shared\UWACPIDriver\uwacpidriver.cat"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion; Check: ShouldInstallGcu
 Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.inf"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion; Check: ShouldInstallGcu
 Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.sys"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion; Check: ShouldInstallGcu
+#endif
 ; ============================================================================
 ; 2026-10-10（repack5）：用户把 base GCU 有意换成"老一点的 50 系 GCU"（50old 世代），
 ; 本段 [Files] 据此重排为"恰好引用磁盘上存在的文件"——删除 157 条磁盘已无的旧条目
@@ -209,12 +215,14 @@ Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.sys"; DestDir: "{app}\UWACPI
 ;      （它现在需要 -StagingRoot 指向一个含 payload\*.7z + 7za.exe 的目录，见其 .EXAMPLE）。
 ;      这是刻意的取舍：校验（Test-VendorPayloadSource）与落地都在同一个 setup 运行里完成。
 ; ============================================================================
+#ifndef NOGCU
 Source: "files\GCU\payload\1020.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 Source: "files\GCU\payload\30.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 Source: "files\GCU\payload\40.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 Source: "files\GCU\payload\50.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 Source: "files\GCU\payload\WJXY.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+#endif
 ; --- shared\ 按【目的地】铺开（⛔ 不再整目录落 {app}\GCU\shared\；铺完 shared\ 这个层级就没有了）----
 ;   shared\UWACPIDriver\ 3 件 -> {app}\UWACPIDriver\（见上面那 3 条 Source）
 ;   shared\README.txt / NOTICE.txt -> {app}\GCU\（见本段末尾 2 条 Source）
@@ -226,8 +234,10 @@ Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldIns
 ;   落点定为 {app}\GCU\logo\Language\（与 {app}\GCU\AiStoneService\ 同级）。
 ;   ⚠️ 源目录已由 owner 从 shared\logo\ 移到 files\GCU\logo\（与 AiStoneService 同级的位置），
 ;      shared\logo\ 已不存在 —— 引用新路径，⛔ 不要再写 shared\logo\。
+#ifndef NOGCU
 Source: "files\GCU\logo\Language\en-us.json"; DestDir: "{app}\GCU\logo\Language"; Flags: ignoreversion; Check: ShouldInstallGcu
 Source: "files\GCU\logo\Language\zh-cn.json"; DestDir: "{app}\GCU\logo\Language"; Flags: ignoreversion; Check: ShouldInstallGcu
+#endif
 ; ⭐ 厂商自带的两个说明文件（README.txt / NOTICE.txt）—— 落 {app}\GCU\（与 AiStoneService\ 同级）。
 ;   ⚠️ 2026-10-14（旧结构铁证，owner 已确认「按你建议来」）：旧结构 base 层 payload-old\GCU\ 的
 ;      【根下】就是这 5 个文件（install.bat / uninstall.bat / 清理官方控制台.bat / README.txt /
@@ -246,8 +256,10 @@ Source: "files\GCU\logo\Language\zh-cn.json"; DestDir: "{app}\GCU\logo\Language"
 ;                                   Remove-VendorConsole 覆盖同样名单且更全（还管 UWP/ARP/注册表）。
 ;   ⚠️ 三个 .bat 原本也从不被我们的流程调用（Install-Gcu.ps1 注释：nothing calls them automatically）。
 ;   ⚠️ 它们删的 "logo" 是官方控制台目录（C:\Program Files\OEM\*）里的，⛔ 不是 {app}\GCU\logo\，无冲突。
+#ifndef NOGCU
 Source: "files\GCU\shared\README.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu
 Source: "files\GCU\shared\NOTICE.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu
+#endif
 
 ; 2026-10-08：删除原 [Dirs] 段的三条空目录条目（{app}\ru\ / {app}\sv\ / {app}\zh-Hant\）。
 ; 原因：本包只带 zh-CN 资源，[Files] 从不向这三个目录写任何文件，而 [Dirs] 会无条件创建它们，
@@ -293,7 +305,9 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 ;     解进 {tmp}（见该函数）。Install-Gcu.ps1 从这里取载荷、解压、然后把这两样删掉，
 ;     所以 {app}\GCU 下永远不会出现 payload\ 或 7za.exe。
 ;     ⚠️ -TargetDir 仍是 "{app}\GCU"，解压产物落 {app}\GCU\AiStoneService。
+#ifndef NOGCU
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\GCU\Install-Gcu.ps1"" -StagingRoot ""{tmp}"" -TargetDir ""{app}\GCU"" -Variant {code:GetGcuVariantParam} -InstallerVersion ""18.3"" -LogDir ""{commonappdata}\L-Mechrevo\logs"" -AppExe ""{app}\L-Mechrevo.exe"" {code:GetVendorConsoleParam}"; StatusMsg: "{cm:GcuStatus}"; Check: ShouldInstallGcu
+#endif
 ; ⚠️ 2026-10-13（本轮回退 Check）：⛔ 这里【不再】用 Check: IsNet10RuntimeReady 门控。
 ;    理由：门控 = 缺运行时时连壳都不启动 = 用户装完什么都看不到（用户原话：「不静默安装用户跳过了.net
 ;    也不停止，只需要在 LM 启动的时候如果没有 .net10 再提示就行」）。
@@ -2409,6 +2423,25 @@ end;
 //   ⚠️ 刻意**不用全局变量缓存**：⭐ 一是避开"⭐ 全局 var 段该放哪"⭐ 的语法风险 ⚠️、
 //      ⭐ 二是 Inno 的 `Check:` 逐条调用，⭐ 每次两次注册表读取**可以忽略** ✅
 //   ⚠️ 只在**安装期**用它决定"装不装 GCU"；⛔ 那三个 ps1 仍**无条件安装**（⭐ 卸载要用 ✅）
+function NoGcuPackage(): Boolean;
+// ⭐ 2026-10-16（GCU 分离包）：编译期常量 —— 本包是否【不含 GCU】
+//   用 ISCC /DNOGCU 编译 => True；默认（不带宏）=> False（含 GCU 的主包）
+begin
+#ifdef NOGCU
+  Result := True;
+#else
+  Result := False;
+#endif
+end;
+
+function GetBaseBoardProduct(): String;
+// ⭐ 2026-10-16（GCU 分离包）：只读主板型号，供「同方装了会提示」用。
+//   ⚠️ 与 IsBaolongdaMold 读同一个键，⛔ 判据不受本函数影响。
+begin
+  Result := '';
+  RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardProduct', Result);
+  if Result = '' then Result := '(读不到)';
+end;
 function IsBaolongdaMold(): Boolean;
 var
   Board: String;
@@ -2466,6 +2499,8 @@ var
   GcuStagingFiles: TArrayOfString;
 begin
   Result := '';
+  // ⭐ 2026-10-16（GCU 分离包）：本包不含 GCU => 没有 dontcopy 载荷可解，直接返回空
+  if NoGcuPackage() then begin Log('LM-GCU-SKIP: 本包不含 GCU（/DNOGCU）=> 不准备也不落地 GCU'); Exit; end;
   Failed := '';
   // ⭐⭐ 2026-10-16（宝龙达适配）：⭐ **宝龙达机型必须在这里提前退出** ✅
   //   ⚠️ 理由（⭐ 这是个**真会踩到的坑** ⚠️）：⭐ 上面那 6 件载荷在 [Files] 里带了
@@ -2538,6 +2573,19 @@ var
   GcuTarget: String;
 begin
   Result := '';
+  // ⭐⭐ 2026-10-16（GCU 分离包）：本包【不含 GCU】=> 只适用于宝龙达模具（蛟龙16Pro 30/40 系）。
+  //   若非宝龙达（同方模具）=> 必须【明确告知】并给选择，⛔ 不能静默继续。
+  //   ⚠️ 注意：这里【不使用】Result（本文件既有铁律：Result 一律保持 ''），
+  //     取消走 Abort（Inno 会干净地中止，且此刻任何文件都还没落盘 => 零半装）。
+  if NoGcuPackage() and (not IsBaolongdaMold()) then
+  begin
+    if MsgBox('本安装包【未包含 GCU 组件】，仅适用于宝龙达模具机型（蛟龙16Pro 30/40 系）。' + #13#10 + #13#10 +
+        '检测到本机主板型号为：' + GetBaseBoardProduct() + #13#10 +
+        '该型号属同方模具 => 本包装不上 GCU，GCU 相关功能将不可用。' + #13#10 + #13#10 +
+        '请改用正式版安装包（含 GCU）。' + #13#10 + #13#10 +
+        '是否仍然继续安装（主程序可用，但 GCU 功能不可用）？', mbConfirmation, MB_YESNO) = IDNO then
+      Abort;
+  end;
   // ---- 2026-10-13（本轮）.NET 10 前置就落在这里 ----
   // 为什么是 PrepareToInstall（而不是 InitializeSetup / CurPageChanged）：
   //   ① InitializeSetup 在【向导出现之前】跑 —— 用户原话「这个提示不要，先打开安装程序，在安装过程中
