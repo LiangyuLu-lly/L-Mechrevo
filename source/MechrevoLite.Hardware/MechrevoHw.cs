@@ -1851,6 +1851,114 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	internal BaolongdaWmi BaolongdaWmi => _baolongda?.Wmi;
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16：**当前生效的后端路由**（⭐ <see cref="BackendRoute"/> ✅）。
+	/// <para>⭐ 设计文档：<c>docs/notes/后端路由抽象-设计-20261016.md</c> ✅。</para>
+	/// <para>⚠️ 本属性是**纯查表**、⭐ 无副作用 ✅ · ⭐ ⛔ **不改变任何既有行为** ✅ ——
+	/// 它只是把「⭐ 后端身份 ✅」这三条既有判据**汇总成一个可查询的值** ✅。</para>
+	/// <para>⭐ 顺序与后端探测顺序一致（⭐ GCU → ⭐ 宝龙达 → ⭐ 老 MIFS ✅）⇒ ⭐ 与既有判定**逐位相同** ✅。</para>
+	/// </summary>
+	internal BackendRoute ActiveRoute
+	{
+		get
+		{
+			if (IsGcuConnected)
+			{
+				return BackendRoute.Gcu;
+			}
+			if (UsesBaolongda)
+			{
+				return BackendRoute.Baolongda;
+			}
+			if (UsesLegacyMifs)
+			{
+				return BackendRoute.LegacyMifs;
+			}
+			return BackendRoute.None;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐⭐ 2026-10-16：**三态路由查询** —— ⭐「⭐ 这个动作该走谁 ✅」✅。
+	/// <para>⭐ 设计文档 §4.4 / §4.5 ✅。⭐ 目标：⭐ 让「加一条新后端」从**改一遍**变成**改一处** ✅。</para>
+	/// <para>⚠️⚠️ **语义必须严格**（⭐ 见 <see cref="FeatureSupport"/> 各成员注释 ✅）：
+	/// <list type="bullet">
+	/// <item><see cref="FeatureSupport.Supported"/> ⇒ ⭐ 当前后端**已接好**这条下发路径 ✅。</item>
+	/// <item><see cref="FeatureSupport.NotSupportedByThisBackend"/> ⇒ ⚠️ 当前后端做不到，⭐ **但别的后端可能能做** ✅
+	/// —— ⭐ 调用方**不得**假装成功 ✅，⭐ 要如实告知 ✅。</item>
+	/// <item><see cref="FeatureSupport.Unknown"/> ⇒ ⭐ **尚未判定** ✅ —— ⛔ **不代表「不支持」** ⚠️。</item>
+	/// </list></para>
+	/// <para>⚠️ 它回答的是「⭐ **谁的路径**」✅，⭐ ⛔ **不是「通不通」** ⚠️ ——
+	/// ⭐ 所以它**不是** <see cref="IsGcuConnected"/> 的替代品 ✅。</para>
+	/// <para>⚠️ **本骨架尚未逐项登记** ⇒ ⭐ 大量项返回 <see cref="FeatureSupport.Unknown"/> ✅ ——
+	/// ⭐ 那是**诚实**的（⭐ 我们还不知道 ✅），⭐ ⛔ 不是「不支持」⚠️。</para>
+	/// </summary>
+	internal FeatureSupport Query(BackendFeature feature)
+	{
+		BackendRoute route = ActiveRoute;
+		switch (route)
+		{
+			case BackendRoute.Gcu:
+				return GcuSupports(feature);
+			case BackendRoute.Baolongda:
+				return BaolongdaSupports(feature);
+			case BackendRoute.LegacyMifs:
+				return LegacyMifsSupports(feature);
+			default:
+				// ⚠️ 后端尚未就绪 ⇒ Unknown（⛔ 不是 NotSupportedByThisBackend）——
+				//    这是三态设计的关键：探测未完成 != 永远做不到。
+				return FeatureSupport.Unknown;
+		}
+	}
+
+	/// <summary>
+	/// ⭐ GCU（⭐ 历史基线后端 ✅）的支持表。
+	/// <para>⚠️ **尚未逐项登记** ⇒ ⭐ 一律 <see cref="FeatureSupport.Unknown"/> ✅ ——
+	/// ⭐ 这是**保守且诚实**的默认值 ✅（⭐ 登记工作随第 2 步迁移一起做 ✅）。</para>
+	/// <para>⚠️ ⛔ **不要**为了「让 GCU 看起来支持一切」而直接返回 <see cref="FeatureSupport.Supported"/> ⚠️ ——
+	/// 那会违反「⭐ 能力位 ＝ 已接好下发路径 ✅」这条铁律 ✅。</para>
+	/// </summary>
+	private static FeatureSupport GcuSupports(BackendFeature feature)
+	{
+		_ = feature;
+		return FeatureSupport.Unknown;
+	}
+
+	/// <summary>
+	/// ⭐ 宝龙达后端的支持表。
+	/// <para>⚠️ **强制读 <see cref="Capabilities"/>**（⭐ 即 <c>BaolongdaBackend.BuildCapabilities()</c> 的产出 ✅）
+	/// —— ⛔ **绝不允许出现第二份互相打架的后端事实** ⚠️（⭐ 设计文档 §5 ✅）。</para>
+	/// <para>⭐ 只登记**已经有明确能力位**的项 ✅；⭐ 其余返回 <see cref="FeatureSupport.Unknown"/> ✅
+	/// （⭐ 尚未逐项登记，⭐ 诚实 ✅）。</para>
+	/// </summary>
+	private FeatureSupport BaolongdaSupports(BackendFeature feature)
+	{
+		MechrevoDeviceCapabilities caps = Capabilities;
+		return feature switch
+		{
+			BackendFeature.PerfModeSwitch => caps.TurboMode ? FeatureSupport.Supported : FeatureSupport.NotSupportedByThisBackend,
+			BackendFeature.PowerLimit => caps.CpuPerformanceTuning ? FeatureSupport.Supported : FeatureSupport.NotSupportedByThisBackend,
+			BackendFeature.KeyboardLighting => caps.Keyboard ? FeatureSupport.Supported : FeatureSupport.NotSupportedByThisBackend,
+			BackendFeature.LogoLight => caps.LogoLight ? FeatureSupport.Supported : FeatureSupport.NotSupportedByThisBackend,
+			BackendFeature.Lightbar => caps.Lightbar ? FeatureSupport.Supported : FeatureSupport.NotSupportedByThisBackend,
+			BackendFeature.GpuModeSwitch => caps.DgpuDirect ? FeatureSupport.Supported : FeatureSupport.NotSupportedByThisBackend,
+			_ => FeatureSupport.Unknown,
+		};
+	}
+
+	/// <summary>
+	/// ⭐ 老机型 WMI 后端（⭐ <c>root\WMI:MICommonInterface</c> ✅）的支持表。
+	/// <para>⚠️ **尚未逐项登记** ⇒ ⭐ 一律 <see cref="FeatureSupport.Unknown"/> ✅。
+	/// ⚠️ 注意：⭐ 本骨架**刻意不推测**「⭐ 宝龙达能做的老 MIFS 也能做 ✅」⭐ 这类结论 ⚠️ ——
+	/// ⭐ 那需要逐个真机验证 ✅（⭐ 设计文档 §3.1：⭐「⭐ 两者协议同族 ✅」⭐ 是**档位映射**层面的结论 ✅，
+	/// ⛔ 不能无条件外推到所有功能 ⚠️）。</para>
+	/// </summary>
+	private static FeatureSupport LegacyMifsSupports(BackendFeature feature)
+	{
+		_ = feature;
+		return FeatureSupport.Unknown;
+	}
+
+	/// <summary>
 	/// 2026-10-09（批次3 #7）：**传输**层（TCP/MQTT 连接本身）是否活着。
 	/// ⭐ 与 <see cref="IsConnected" /> 的区别：`IsConnected` 是「**会话**是否可用」（订阅也成了），
 	/// 它把「CONNACK 成功但没拿到 SUBACK」也算成"没连上"（既有语义，180+ 调用点依赖，不动）。
