@@ -2133,6 +2133,17 @@ internal static class Program
 	private static async Task<(bool AllIssued, bool Attempted, string IssuedSummary)> SetExternalLightingPowerAsync(bool on, bool restoreEffect, bool useTemporarySnapshot, int? restoreRequestId = null)
 	{
 		MechrevoHw mechrevoHw = hw;
+		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达"全部接入"第 1 步 · ⭐ 前后端分离模板）：
+		//   ⭐ **先问门面层**："⭐ 这次 LOGO 灯开关归你管吗？" ✅
+		//   ⭐ 宝龙达在管事 ⇒ ⭐ 它写 WMI 功能号 15 并回读确认 ⇒ ⭐ **这里就结束，⛔ 一条 MQTT 都不发** ✅
+		//   ⭐ 不是宝龙达 ⇒ ⭐ 返回 false ⇒ ⭐ **下面那段 GCU 代码原封不动地照走** ✅✅
+		//   ⇒ ⭐ 这样 UI ⭐ **不需要知道后端是谁** ✅，⭐ 而 GCU/同方的行为 ⭐ **逐位不变** ✅
+		if (mechrevoHw != null && mechrevoHw.TrySetLogoLightViaBackend(on, out bool logoConfirmed))
+		{
+			string logoSummary = $"logo={(on ? "On" : "Off")}{(logoConfirmed ? "" : "(unconfirmed)")}";
+			Logger.WriteLine($"外部灯效电源（⭐ 宝龙达 WMI 路径）：⭐ on={on} · ⭐ 回读确认={logoConfirmed} · ⭐ {logoSummary}");
+			return (AllIssued: logoConfirmed, Attempted: true, IssuedSummary: logoSummary);
+		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：函数体全是 service.Issue*(MQTT) ⇒ 真正需要 GCU。
 		if (mechrevoHw == null || !mechrevoHw.IsGcuConnected || service == null)
 		{

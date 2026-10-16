@@ -2553,8 +2553,92 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		return Task.FromResult(result: false);
 	}
 
+	// ══════════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 1 步 · ⭐ 前后端分离模板）
+	//
+	//  ⭐⭐ 模板（⭐ 见 docs\notes\宝龙达-全部接入实施方案-20261016.md 第 7 节）：
+	//     ① ⭐ 在**门面层**（本类）加一个 ⭐ **意向命名**的方法 —— ⭐ 名字说"要做什么"，
+	//        ⛔ 不说"发什么话题/写哪个功能号" ✅
+	//     ② ⭐ 内部**分派**：⭐ 宝龙达 ⇒ ⭐ 写 WMI；⭐ 其他后端 ⇒ ⭐ **交回原来的 GCU 路径** ✅
+	//     ③ ⭐ UI 只调这个意向方法 ⇒ ⭐ **它不再需要知道后端是谁** ✅
+	//
+	//  ⭐⭐ **为什么用 "Try…" 三态而不是把 GCU 代码整个搬进来**（⭐ 重要的工程取舍）：
+	//     ⭐ 本方法**只处理宝龙达**，⭐ 其余情况返回 <c>false</c> ⇒ ⭐ 调用方**原路走 GCU** ✅
+	//     ⇒ ⭐ ⭐ **GCU / 老同方 的既有代码【一字不动】** ⇒ ⭐ **回归风险 = 0** ✅✅
+	//     ⭐ 这比"把 GCU 那段搬进来"更安全（⭐ 搬动大段 MQTT 代码风险高，⭐ 且收益相同 ✅）
+	//     ⚠️ 待将来所有功能都接完、⭐ 真要彻底收口时，⭐ 再把 GCU 那半搬进来也不迟 ✅
+	// ══════════════════════════════════════════════════════════════════════════
+
 	/// <summary>
-	/// ⭐⭐ 把本会话切到**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
+	/// ⭐⭐ 2026-10-16（宝龙达 · LOGO 灯）：⭐ **意向方法** —— "⭐ 把 LOGO 灯开/关" ✅
+	/// <para>⭐ 宝龙达：⭐ 走 ⭐ WMI 功能号 15（⭐ 真机已验证可读、⭐ 协议为 0/1 ✅）
+	/// ⇒ ⭐ 写后**立刻回读确认**（⭐ 真机实测的 `OutData[3]` 回显让这一步很可靠 ✅）。</para>
+	/// <para>⭐ 其他后端（⭐ GCU / ⭐ 老同方）：⭐ <b>返回 <c>false</c></b> ⇒ ⭐ 调用方**照原样走 GCU** ✅
+	/// ⛔ **本方法绝不碰 GCU 那条路** ✅。</para>
+	/// </summary>
+	/// <param name="on">⭐ 要开还是要关。</param>
+	/// <param name="confirmed">⭐ 宝龙达路径下：⭐ 回读确认后的实际状态 ✅（⭐ 非宝龙达时无意义 ✅）。</param>
+	/// <returns>⭐ <c>true</c> = 本次由宝龙达处理完了（⭐ 调用方⛔ 不要再发 GCU ✅）；⭐ <c>false</c> = 不归本方法管 ✅。</returns>
+	internal bool TrySetLogoLightViaBackend(bool on, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false; // ⭐ 不是宝龙达在管事 ⇒ 交给原来的 GCU 路径 ✅
+		}
+		try
+		{
+			if (!wmi.TrySetLogoLight(on))
+			{
+				Logger.WriteLine("宝龙达 LOGO 灯：⭐ 写入失败（详见上一行）⇒ 本次未生效");
+				return true; // ⭐ 已"处理"（只是失败）⇒ 调用方仍不该再发 GCU ✅
+			}
+			// ⭐ 回读确认（⭐ 最多 5 次、⭐ 150 ms 间隔 —— ⭐ 与档位那套同款 ✅）
+			for (int attempt = 0; attempt < 5; attempt++)
+			{
+				if (wmi.TryReadLogoLight(out bool current) && current == on)
+				{
+					confirmed = true;
+					Logger.WriteLine($"宝龙达 LOGO 灯：⭐ 已{(on ? "点亮" : "熄灭")}并回读确认 ✅（第 {attempt + 1} 次）");
+					return true;
+				}
+				Thread.Sleep(150);
+			}
+			Logger.WriteLine($"宝龙达 LOGO 灯：⚠️ 写入完成但 {(5 * 150)} ms 内**回读不一致** ⇒ 如实报告未确认 ⚠️");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 LOGO 灯：⭐ 操作异常（已吞掉，不影响别处）：" + ex.Message);
+			return true; // ⭐ 已接管 ⇒ ⛔ 不让调用方再走 GCU ✅
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 读一次宝龙达 LOGO 灯状态（⭐ 只读 ✅）。⭐ 非宝龙达时返回 <c>false</c> ✅。
+	/// </summary>
+	internal bool TryReadLogoLightViaBackend(out bool on)
+	{
+		on = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		try
+		{
+			return wmi.TryReadLogoLight(out on);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 LOGO 灯：⭐ 读取异常：" + ex.Message);
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// 把本会话切到**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
 	/// <para>⭐ 与 <see cref="ApplyLegacyBackendAsync" /> 是**同一套路**（⭐ 替换能力位 ⇒ 起 3 s 定时刷新 ⇒ 立刻读一次 ⇒ 宣布就绪 ✅），
 	/// 差别只在 ⭐ **能力位更宽**（⭐ 宝龙达有风扇/CPU温度/LOGO灯/功耗墙 ✅）与 ⭐ <c>ProjectId</c> ✅。</para>
 	/// <para>⚠️ **能力位刻意只开"已验证 + 已接线"的**（⭐ 沿用本树"⛔ 不假装可写"的约定 ✅）：

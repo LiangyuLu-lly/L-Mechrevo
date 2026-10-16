@@ -173,6 +173,12 @@ internal sealed class BaolongdaBackend : IDisposable
 			IsMechrevo = true,
 			ProfileAvailable = true,
 			TurboMode = true,
+			// ⭐⭐ 2026-10-16（"全部接入"第 1 步）：⭐ **LOGO 灯** ✅
+			//   ⭐ 依据：⭐ ① 真机已验证功能号 15 可读（⭐ 读到 `00 80 00 0F 01` = 开 ✅）
+			//          ⭐ ② **下发分派已接好** ⇒ `MechrevoHw.TrySetLogoLightViaBackend`
+			//             ＋ ⭐ `Program.SetExternalLightingPowerAsync` 开头那一段 ✅
+			//   ⚠️ 按铁律：⭐ **分派接好了才开这一位** ✅（⭐ 铁律见本方法文档注释 ✅）
+			LogoLight = true,
 			AmdPlatform = PawnIO.CpuInfo.IsAMD
 		};
 	}
