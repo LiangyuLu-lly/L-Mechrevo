@@ -11023,17 +11023,26 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			return;
 		}
-		// ⭐ MUX 切换**要重启才生效** ⚠️ ⇒ ⭐ 必须提示（⛔ 不能「点了没反应也没提示」✅）
-		if (DisplayRouteMatrix.AllowsRestart(hw.DgpuGeneration))
-		{
-			await ShowGpuRestartPromptAsync(targetMode, modeName, requestSeq);
-		}
-		else
-		{
-			MarkGpuRestartPending(targetMode);
-			Logger.WriteLine("宝龙达 显卡模式切换：⭐ 已写入功能号 9 ⇒ ⭐ 记为「待重启生效」"
-				+ "（⭐ 该代际不支持由我们主动重启 ⇒ ⭐ 请用户在方便时手动重启 ✅）");
-		}
+		// ⭐⭐ 2026-10-16（机主真机反馈 · 修「弹窗 GCU 未能发送重启切换请求」）：
+		//   ⚠️⚠️ **原先这里在 AllowsRestart 时会调 `ShowGpuRestartPromptAsync`** ❌ ——
+		//      ⭐ 而那个方法是 **GCU 专用**的 ⚠️：⭐ 它弹「重启提示」⇒ ⭐ 用户选「是/否」之后
+		//      ⭐ 会走 ⭐ `Program.service.SwitchGpuMode(...)` ⭐ / ⭐ `RequestGpuModeRestartOutcomeAsync(...)`
+		//      ⭐ ⭐ **两条都是 GCU MQTT** ❌
+		//   ⇒ ⭐ ⭐ **宝龙达没有 GCU** ⇒ ⭐ 必然失败 ⇒ ⭐ 弹「⭐ **GCU 未能发送重启切换请求，
+		//      显卡模式未被标记为已切换。**」❌ —— ⭐ ⭐ **而功能号 9 其实【已经写成功了】** ✅
+		//      ⇒ ⭐ 用户看到的弹窗与事实**相反** ⚠️（⭐ 真机日志：⭐ 写入=成功 · ⭐ 回读确认=True ✅）
+		//   ⇒ ⭐ ⭐ **所以宝龙达【一律不走那条 GCU 提示】** ✅ —— ⭐ 改为一律「记待重启 ＋ 日志」✅
+		//   ⭐ 为什么这样也**不算「点了没反应」** ✅：
+		//      ⭐ `MarkGpuRestartPending` ⇒ ⭐ ⭐ **界面以橙色高亮待切换状态** ✅
+		//      ⭐（⭐ 见 `:11104` 注释：⭐「⭐ 标记待重启，⭐ 界面以橙色高亮待切换状态」✅）
+		//      ⭐ ＋ ⭐ 上面那行日志（⭐ 默认级别可见性由级别决定，⭐ 诊断包里一定看得到 ✅）
+		//   ⚠️ 待办：⭐ 若日后想要更明显的提示 ⇒ ⭐ 可在 `Strings` 加一条文案 ＋ ⭐ 用
+		//      ⭐ `ToastForm.ShowNotice(...)`（⭐ 本次刻意不动 resx，⭐ 减少改动面 ✅）
+		//   ⭐ 语义：⭐ 宝龙达的「应用」＝ ⭐ **它自己的固件下次开机读功能号 9** ✅
+		//      ⇒ ⭐ ⛔ 不需要 GCU 的重启路由 ✅
+		MarkGpuRestartPending(targetMode);
+		Logger.WriteLine("宝龙达 显卡模式切换：⭐ 已写入功能号 9 ⇒ ⭐ 记为「待重启生效」"
+			+ "（⭐ 宝龙达不走 GCU 重启路由 ⇒ ⭐ 请用户在方便时手动重启 ✅）");
 	}
 
 	private async Task<GpuModeStatusReadback> RefreshGpuModeUiStateAsync()
