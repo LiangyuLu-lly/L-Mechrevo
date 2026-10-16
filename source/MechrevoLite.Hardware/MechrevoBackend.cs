@@ -70,10 +70,15 @@ internal static class MechrevoBackendOrder
 	/// 表现为「GCU 未连接」而不是"选错后端"）。判据 <see cref="MechrevoHw.IsGcuServiceInstalled" /> 只看
 	/// 服务注册表键 / GCU 是否留下过 ItemSupport 快照 —— 都是**只读**、不启服务、不发包。</para>
 	/// </summary>
-	internal static readonly MechrevoBackendProbe[] Candidates = new MechrevoBackendProbe[3]
+	internal static readonly MechrevoBackendProbe[] Candidates = new MechrevoBackendProbe[4]
 	{
 		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => MechrevoHw.IsGcuServiceInstalled ? MechrevoHw.GcuBackendMarker : null),
 		new MechrevoBackendProbe(MechrevoBackendKind.LegacyMifs, () => LegacyMifsWmi.TryCreate()),
+		// ⭐ 2026-10-16（0.291.9 · 宝龙达适配第 1 步）：放在 **GCU 无条件兜底之前** ——
+		//   ⚠️ 它现在**恒返回 null**（骨架阶段 + 默认不启用）⇒ 对现有全部机型都是空跑，
+		//   行为与改动前逐字一致 ✅；等将来实现真实探测后自然在这里生效。
+		//   ⭐ 位置理由：宝龙达机型**没有 GCU 服务**、也**没有同方老接口** ⇒ 天然落在这一格。
+		new MechrevoBackendProbe(MechrevoBackendKind.Baolongda, () => BaolongdaBackend.TryCreate()),
 		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => MechrevoHw.GcuBackendMarker),
 	};
 
