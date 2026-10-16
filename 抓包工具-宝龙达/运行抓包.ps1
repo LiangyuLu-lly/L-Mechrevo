@@ -18,8 +18,8 @@ $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 # ⭐⭐ 工具版本（⭐ 每次改脚本都要升，⭐ 并写进 06-采集环境.txt ⇒ ⭐ 以后一眼就能看出机主用的是哪一版）
-$script:KitVersion  = '2026-10-16.5'
-$script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,PerMode-Interactive,ReadOnly'
+$script:KitVersion  = '2026-10-16.6'
+$script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,PerMode-Interactive,Fixed-WmiArray,ReadOnly'
 #   2026-10-16.1  首版（六节 + 强/弱相关筛选）
 #   2026-10-16.2  ＋ MIFS-Probe：MICommonInterface 实例枚举与只读试调用
 #   2026-10-16.3  ＋ 修设备树过滤（漏掉 ACPI\PNP0C14\…）+ 修 06 节一处引号 bug + 版本标记
@@ -30,6 +30,66 @@ $script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,PerMode-Inter
 $stamp   = Get-Date -Format 'yyyyMMdd-HHmmss'
 $outRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) ("宝龙达抓包-" + $stamp)
 New-Item -ItemType Directory -Path $outRoot -Force | Out-Null
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ⭐⭐ 读一次 MiInterface（⭐ 只读 Get=250）—— ⭐ **带两种写法自动回退** ✅
+#
+# ⚠️ 起因（2026-10-16.6 · 真机报错）：原来只用下标写法
+#    `$ip['InData'] = $buf` ＋ `$out = $op['OutData']`
+#    ⇒ 真机上抛「无法将类型为 PSObject 的对象强制转换为类型 System.Array」❌
+#    ⇒ 6 个功能号**全部失败** ⚠️
+# ⇒ 现在 ⭐ **先试 A 写法（显式 byte[] + Properties[...].Value，⭐ 社区通用稳妥写法）**，
+#    ⭐ 失败了再试 **B 写法（下标 + SetPropertyValue）** ⇒ ⭐ 只要有一种通就能拿到值 ✅
+#    ⭐ 并把"用的哪种写法"也记进结果里，⭐ 便于我们判断到底哪种对 ✅
+# ⭐ 返回哈希表：⭐ Ok / Hex / Bytes / Raw / Error / Style
+# ═════════════════════════════════════════════════════════════════════════════
+function Invoke-MifsGet {
+	param([System.Management.ManagementObject]$Target, [int]$FunctionNo)
+	$r = @{ Ok = $false; Hex = ''; Bytes = $null; Raw = -1; Error = ''; Style = '' }
+
+	# ── 写法 A：⭐ 显式 byte[] ＋ ⭐ Properties[...].Value ──
+	try {
+		$ip = $Target.GetMethodParameters('MiInterface')
+		[byte[]]$buf = New-Object byte[] 32
+		$buf[1] = 250
+		$buf[3] = [byte]$FunctionNo
+		$ip.Properties['InData'].Value = $buf
+		$op = $Target.InvokeMethod('MiInterface', $ip, $null)
+		[byte[]]$out = $op.Properties['OutData'].Value
+		if ($out -and $out.Length -gt 0) {
+			$r.Ok = $true; $r.Bytes = $out; $r.Style = 'A'
+			$r.Hex = (($out | ForEach-Object { $_.ToString('X2') }) -join ' ')
+			if ($out.Length -gt 4) { $r.Raw = [int]$out[4] }
+			return $r
+		}
+		$r.Error = 'A 写法返回空'
+	} catch {
+		$r.Error = 'A 写法: ' + $_.Exception.Message
+	}
+
+	# ── 写法 B：⭐ 下标 ＋ ⭐ SetPropertyValue（⭐ 回退）──
+	try {
+		$ip2 = $Target.GetMethodParameters('MiInterface')
+		[byte[]]$buf2 = New-Object byte[] 32
+		$buf2[1] = 250
+		$buf2[3] = [byte]$FunctionNo
+		$ip2.SetPropertyValue('InData', $buf2)
+		$op2 = $Target.InvokeMethod('MiInterface', $ip2, $null)
+		$raw = $op2['OutData']
+		[byte[]]$out2 = $raw
+		if ($out2 -and $out2.Length -gt 0) {
+			$r.Ok = $true; $r.Bytes = $out2; $r.Style = 'B'; $r.Error = ''
+			$r.Hex = (($out2 | ForEach-Object { $_.ToString('X2') }) -join ' ')
+			if ($out2.Length -gt 4) { $r.Raw = [int]$out2[4] }
+			return $r
+		}
+		$r.Error = ($r.Error + ' ／ B 写法返回空')
+	} catch {
+		$r.Error = ($r.Error + ' ／ B 写法: ' + $_.Exception.Message)
+	}
+	return $r
+}
+
 
 function Write-Section {
 	param([string]$FileName, [string]$Title, [scriptblock]$Body)
@@ -228,17 +288,11 @@ Write-Section '02-ACPI-WMI接口.txt' 'ACPI / WMI 接口探测（本机有哪些
 			)
 			foreach ($pr in $probes) {
 				try {
-					$ip = $inst.GetMethodParameters('MiInterface')
-					$buf = New-Object byte[] 32
-					$buf[1] = 250
-					$buf[3] = [byte]$pr.No
-					$ip['InData'] = $buf
-					$op = $inst.InvokeMethod('MiInterface', $ip, $null)
-					$out = $op['OutData']
-					if ($out) {
-						$hex = ($out | ForEach-Object { $_.ToString('X2') }) -join ' '
-						Add-Line $L ("      ⭐ 功能号 " + $pr.No + " · " + $pr.Name + " 调用成功")
-						Add-Line $L ("         OutData = " + $hex)
+					# ⭐ 用共享的 Invoke-MifsGet（⭐ 内含 A/B 两种写法自动回退 ✅，⭐ 见文件开头 ✅）
+					$res = Invoke-MifsGet -Target $inst -FunctionNo $pr.No
+					if ($res.Ok) {
+						Add-Line $L ("      ⭐ 功能号 " + $pr.No + " · " + $pr.Name + " 调用成功（写法 " + $res.Style + "）")
+						Add-Line $L ("         OutData = " + $res.Hex)
 						Add-Line $L ("         " + $pr.Hint)
 					} else {
 						Add-Line $L ("      ⚠️ 功能号 " + $pr.No + " · " + $pr.Name + " 返回空")
@@ -475,21 +529,17 @@ $isAdminNow = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsI
 # ⭐ 定义一个"读某个功能号"的小工具（⭐ 只读；⭐ 第 7 节与第 2 节同源口径 ✅）
 function Read-MifsFunction {
 	param([string]$InstancePath, [int]$FunctionNo)
-	$result = @{ Ok = $false; Hex = ''; Raw = -1; Error = '' }
+	# ⭐ 委托给共享的 Invoke-MifsGet（⭐ 内含 A/B 两种写法自动回退 ✅，⭐ 见文件开头 ✅）
+	#    ⇒ ⭐ 这样两处用的是**同一套逻辑**，⛔ 不会一处修好一处还坏 ✅
+	$result = @{ Ok = $false; Hex = ''; Raw = -1; Error = ''; Style = '' }
 	try {
 		$mo = New-Object System.Management.ManagementObject('root\WMI', $InstancePath, $null)
-		$ip = $mo.GetMethodParameters('MiInterface')
-		$buf = New-Object byte[] 32
-		$buf[1] = 250          # ⭐ 只读：Get
-		$buf[3] = [byte]$FunctionNo
-		$ip['InData'] = $buf
-		$op = $mo.InvokeMethod('MiInterface', $ip, $null)
-		$out = $op['OutData']
-		if ($out) {
-			$result.Ok = $true
-			$result.Hex = (($out | ForEach-Object { $_.ToString('X2') }) -join ' ')
-			if ($out.Length -gt 4) { $result.Raw = $out[4] }
-		}
+		$res = Invoke-MifsGet -Target $mo -FunctionNo $FunctionNo
+		$result.Ok = $res.Ok
+		$result.Hex = $res.Hex
+		$result.Raw = $res.Raw
+		$result.Error = $res.Error
+		$result.Style = $res.Style
 	} catch {
 		$result.Error = $_.Exception.Message
 	}
@@ -508,7 +558,13 @@ if (-not $isAdminNow) {
 }
 
 if ($doInteractive) {
-	WriteSection '07-逐模式实测.txt' '逐模式实测（⭐ 每个档位各读一次）' {
+	# ⚠️⚠️ 2026-10-16.6 修正（⭐ 真机报错）：⭐ 原来写的是 `WriteSection`（⭐ **少了连字符**）❌
+	#    ⇒ ⭐ 真机上抛 ⭐「无法将"WriteSection"项识别为 cmdlet…」⇒ ⭐ **整节没跑** ⚠️
+	#    ⇒ ⭐ 函数名是 ⭐ `Write-Section`（⭐ 带连字符 ✅）—— 已改 ✅
+	#    ⭐ 并且**整节包进 try/catch**：⭐ 万一再出错，⛔ 不能把红字喷给机主，
+	#       ⭐ 而应写进文件 + ⭐ 继续打包 ✅
+	try {
+	Write-Section '07-逐模式实测.txt' '逐模式实测（⭐ 每个档位各读一次）' {
 		param($L)
 		Add-Line $L "⭐ 本节的读法：⭐ 只读（Get=250），⛔ 一个 Set 都不发 ✅"
 		Add-Line $L ("⭐ 使用实例：⭐ " + $script:MifsInstancePath)
@@ -560,6 +616,17 @@ if ($doInteractive) {
 		}
 		Add-Line $L "⭐ 说明：⭐ 若某个档位读到的 功能号 8 原始值与上面「参考原始值」不一致，"
 		Add-Line $L "   ⇒ ⭐ 那正是我们要的信息（⭐ 说明该机的档位编号与我们预期不同）✅ 请照实保留 ✅"
+	}
+	} catch {
+		# ⚠️ 整节失败也不能让机主看到红字、更不能中断打包 ✅
+		Write-Host (" ⚠️ 逐模式实测这一节出错了（⭐ 不影响前 6 节）: " + $_.Exception.Message) -ForegroundColor Yellow
+		try {
+			$errPath = Join-Path $outRoot '07-逐模式实测-出错.txt'
+			[System.IO.File]::WriteAllText($errPath,
+				"=== 逐模式实测出错 ===`r`n" + $_.Exception.ToString() + "`r`n`r`n（前 6 节仍然有效 ✅）",
+				(New-Object System.Text.UTF8Encoding($true)))
+			Write-Host ("    ⭐ 已把错误写进: " + $errPath) -ForegroundColor Gray
+		} catch {}
 	}
 }
 # ─────────────────────────────────────────────────────────────────────────────
