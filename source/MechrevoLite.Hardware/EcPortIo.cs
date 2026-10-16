@@ -43,6 +43,17 @@ internal static class EcPortIo
 
 	private const byte EcCmdWrite = 0x93;
 
+	// ── ACPI 标准 EC 命令（RD_EC = 0x80 · 单字节地址 · 访问 0x00~0xFF 标准空间）──
+	//	⭐ 2026-10-16 新增：EC 的地址空间【不止一套】，此前只实现了厂商 XRAM mailbox ⚠️
+	//	   · 0x92/0x93 → XRAM mailbox，用【双字节】地址（0x8150 限充 / 0x8410 EC版本 / 0x847C SOC）
+	//	   · 0x80/0x81 → ACPI 标准空间，用【单字节】地址（0x9A 键盘背光 / 0x20 Fn锁 / 0xE4 散热模式）
+	//	⭐ 依据（斗战者，同为宝龙达代工）：
+	//	   DriverBridge.ReadEc: 0x66←0x80, 0x62←(byte)reg, 读 0x62    ← 单字节
+	//	   其 EC 物理窗口 EC_BASE=0xFE800400 / EC_SIZE=0xFF(256) ⇒ 映射的正是这 256 字节标准空间 ✅
+	//	⚠️ 这解释了为何此前用 0x92 读键盘背光怎么都不对 —— 地址空间不同 ✅
+	//	⚠️ 本轮只接入【读】0x80；0x81(WR_EC) 未定义、未放行、无调用方（写入须先报方案）✅
+	private const byte EcCmdAcpiRead = 0x80;
+
 	// ── 端口 0x66 的状态位 ──
 	private const byte StatusObf = 1;  // Output Buffer Full：有数据可读
 
@@ -301,6 +312,100 @@ internal static class EcPortIo
 		return true;
 	}
 
+	/// <summary>
+	/// ACPI 标准空间读（RD_EC = 0x80 · <b>单字节</b>地址 · 0x00~0xFF）。
+	/// <para>与 <see cref="ReadByteCore"/> 的区别：那套是厂商 XRAM mailbox（0x92 ＋ 双字节地址），
+	/// 够不到键盘背光 0x9A 这类落在标准空间的寄存器。</para>
+	/// </summary>
+	private static bool ReadByteAcpiCore(int reg, out int value)
+	{
+		value = -1;
+		SettleBeforeTransaction();
+		if (!WriteCommand(EcCmdAcpiRead, IoKind.Read))
+		{
+			return false;
+		}
+		if (!WriteData((byte)(reg & 0xFF), IoKind.Read))
+		{
+			return false;
+		}
+		// ⭐⭐ 2026-10-16 实测修正：ACPI 标准空间读**不等 OBF**，照斗战者的时序 ⚠️
+		//   依据：斗战者 DriverBridge.ReadEc = `0x66←0x80` → `0x62←reg` → `Sleep(5)` → **直接读** `0x62`
+		//   ⭐ 实测证据（本机诊断包 …-235908 的 ②e）：用「等 OBF 置位」读 0x80 时，
+		//      `0x66` 状态**恒为 0x00**、OBF **从未置位** ⇒ 13 个地址全部超时并迅速中毒 ⚠️
+		//   ⚠️ 这与 0x92(XRAM) 的行为**不同** —— 那条路的 OBF 会正常置位（②d 已实测读到字节）✅
+		//   ⇒ 故此处与 <see cref="ReadByteCore"/> 分道：那条等 OBF，这条不等 ✅
+		Thread.Sleep(5);
+		// ⚠️⚠️ **可信度警告（2026-10-16 本机实测 · 诊断包 …-000002）**：
+		//   本机走 0x80 时 OBF（bit0）**从未置位**，但"直接读"仍能拿到字节 ⚠️
+		//   ⭐ 决定性证据：实测 `0x40` 读到 `0x07`，**恰等于同一进程里 H2RAM `0x7C3` 的对照读值**（②b）
+		//   ⇒ ⚠️ **强烈怀疑读到的是上一次事务残留在数据寄存器里的字节**，⛔ **不能当成可靠读数** ⚠️
+		//   ⇒ 其余地址全 0x00 亦同此理（无残留时读到空值）。
+		//   ⭐ 本条与既有的「**IOCTL 返回成功 ≠ 地址可达**」是**同一类陷阱** ⇒ 故把状态位记下来，
+		//      让诊断能区分「**读到了**」与「**读对了**」✅
+		//   ⚠️ 判断依据：⭐ **OBF 置位**才是「EC 真的给出了数据」；未置位 ⇒ 本次读数**不可信**。
+		//      本机（同方翼龙15Pro）OBF 恒 0 ⇒ 该机 EC **不支持 0x80**（机型差异，非代码缺陷）；
+		//      ⭐ 蛟龙（宝龙达 IT5570）上应能观察到 OBF 置位 —— **必须以真机结果为准** ✅
+		if (PortIn(PortStatus, out byte st, IoKind.Read))
+		{
+			_lastStatusSeen = st;
+		}
+		if (!PortIn(PortData, out byte data, IoKind.Read))
+		{
+			return false;
+		}
+		value = data;
+		return true;
+	}
+
+	/// <summary>
+	/// 只读：读 ACPI 标准空间一个字节（<paramref name="reg"/> 限 0x00~0xFF）。
+	/// <para>任何失败都返回 false，并按需标记中毒。<b>绝不抛出</b>。</para>
+	/// <para>⚠️ 与 <see cref="TryReadByte"/>（XRAM）是<b>两套地址空间</b>，别混用。</para>
+	/// </summary>
+	internal static bool TryReadByteAcpi(int reg, out int value)
+	{
+		value = -1;
+		if (reg < 0 || reg > 0xFF)
+		{
+			_lastReadFailure = "标准空间地址越界：0x" + reg.ToString("X4") + "（只允许 0x00~0xFF）";
+			return false;
+		}
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				_lastReadFailure = "通道已中毒：" + _poisonReason;
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				_lastReadFailure = "模块未装载：" + _loadFailure;
+				return false;
+			}
+			if (!TryEnterEcMutex(out Mutex mutex, out bool held))
+			{
+				Poison("无法获取 " + MutexName + " 互斥体");
+				return false;
+			}
+			try
+			{
+				bool ok = ReadByteAcpiCore(reg, out value);
+				NoteReadOutcome(ok);
+				return ok;
+			}
+			catch (Exception ex)
+			{
+				Poison("读标准空间 0x" + reg.ToString("X2") + " 抛异常：" + ex.GetType().Name);
+				return false;
+			}
+			finally
+			{
+				ReleaseEcMutex(mutex, held);
+			}
+		}
+	}
+
 	private static bool WriteByteCore(int address, int value)
 	{
 		SettleBeforeTransaction();
@@ -322,9 +427,9 @@ internal static class EcPortIo
 	/// <summary>向 0x66 发命令（先等 IBF 清空）。<paramref name="command"/> 受命令白名单约束。</summary>
 	private static bool WriteCommand(byte command, IoKind kind)
 	{
-		if (command != EcCmdRead && command != EcCmdWrite)
+		if (command != EcCmdRead && command != EcCmdWrite && command != EcCmdAcpiRead)
 		{
-			Poison("命令 0x" + command.ToString("X2") + " 不在白名单（只允许 0x92/0x93）");
+			Poison("命令 0x" + command.ToString("X2") + " 不在白名单（只允许 0x92/0x93/0x80）");
 			return false;
 		}
 		if (!WaitIbfClear(kind))

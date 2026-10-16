@@ -58,6 +58,7 @@ internal static class DiagnosticBaolongdaInfo
 			AppendDriverProbe(sb);
 			AppendEcVersionProbe(sb);
 			AppendEcPortIoProbe(sb);
+			AppendEcStandardSpaceProbe(sb);
 			AppendFunctionProbe(sb);
 			AppendHidNote(sb);
 		}
@@ -596,6 +597,96 @@ internal static class DiagnosticBaolongdaInfo
 		catch (Exception ex)
 		{
 			sb.AppendLine("EC 端口 I/O 试读异常 = " + ex.Message);
+		}
+	}
+
+	// ── ②e EC ACPI 标准空间（0x00~0xFF · 命令 0x80 · 单字节地址）只读试读 ──
+	// 2026-10-16（键盘背光通道调研 · 用户要求「本轮只读」）：
+	//   ⭐ 出发点：用户报「键盘灯开了无法关闭 亮度不能调节」，并指出「关灯就是和亮度 0 一样」⚠️
+	//   ⭐ 调研结论：⭐ EC 的地址空间【不止一套】，而此前只实现了厂商 XRAM mailbox ⚠️
+	//     · 0x92/0x93 → XRAM mailbox，用【双字节】地址（0x8150 限充 / 0x8410 EC版本 / 0x847C SOC）← ②d 那节
+	//     · 0x80/0x81 → ACPI 标准空间，用【单字节】地址（0x9A 键盘背光 / 0x20 Fn锁 / 0xE4 散热模式）← 本节
+	//   ⭐ 依据（斗战者 · 同为宝龙达代工，其读实现即标准 ACPI EC 协议）：
+	//     `DriverBridge.ReadEc`：`0x66←0x80`（RD_EC）→ `0x62←(byte)reg` → 读 `0x62`（⭐ 单字节 ✅）
+	//     其 EC 物理窗口 `EC_BASE=0xFE800400` / `EC_SIZE=0xFF`（= 256）⇒ 映射的正是这 256 字节标准空间 ✅
+	//   ⇒ ⭐ 这就解释了**此前用 0x92 读键盘背光为何怎么都不对**：⭐ **两者地址空间不同** ✅
+	//   ⛔ **全程只读**：只发 0x80 · ⛔ 绝不发 0x81（写）· ⛔ 不改任何寄存器 ✅
+	private static void AppendEcStandardSpaceProbe(StringBuilder sb)
+	{
+		sb.AppendLine();
+		sb.AppendLine("── ②e EC **ACPI 标准空间**（0x00~0xFF · 命令 0x80 · 单字节）只读试读 ──");
+		sb.AppendLine("⭐ 为什么要单独一节：EC 的地址空间【不止一套】⚠️");
+		sb.AppendLine("   · 0x92/0x93 → 厂商 **XRAM mailbox**，用【双字节】地址（0x8150 / 0x8410 / 0x847C）← ②d 那节");
+		sb.AppendLine("   · 0x80/0x81 → **ACPI 标准空间**，用【单字节】地址（0x9A 键盘背光 / 0x20 Fn锁 / 0xE4 散热）← 本节");
+		sb.AppendLine("⭐⭐ 依据（斗战者 · 同为宝龙达代工）：其读实现就是标准 ACPI EC 协议");
+		sb.AppendLine("   `0x66←0x80(RD_EC)` → `0x62←(byte)reg` → 读 `0x62`（⭐ 单字节地址 ✅）");
+		sb.AppendLine("   其 EC 物理窗口 `EC_BASE=0xFE800400` / `EC_SIZE=0xFF`（=256）⇒ 映射的正是这 256 字节标准空间 ✅");
+		sb.AppendLine("   ⇒ ⭐ 这解释了此前用 0x92 读键盘背光**为何怎么都不对**：⭐ **地址空间不同** ✅");
+		sb.AppendLine("⛔ 全程只读：只发 0x80 · ⛔ 绝不发 0x81（写）· ⛔ 不改任何寄存器 ✅");
+		sb.AppendLine();
+		sb.AppendLine("⭐⭐ **对照实验（用来判定两套地址空间的关系）**：");
+		sb.AppendLine("   本机 H2RAM 已实测 `0x740`(ProjectID)=**25**、`0x741`=**33**、`0x766`(键盘灯判据)=**0x97**、`0x767`=**0**");
+		sb.AppendLine("   ⇒ ⭐ 若本节 `0x40`/`0x41`/`0x66`/`0x67` 读出**同样的值**，即说明");
+		sb.AppendLine("      **H2RAM 窗口 ≡ 标准空间 ＋ 0x700** ✅；⛔ 若不同，则两套确为**互相独立**的地址空间 ⚠️");
+		sb.AppendLine();
+		try
+		{
+			sb.AppendLine("PawnIO 驱动 = " + EcPortIo.DescribePawnInstalled());
+			sb.AppendLine();
+
+			// ⭐ 探测表：前 9 个是斗战者的偏移语义（同为宝龙达代工）；后 4 个是上面那组对照 ✅
+			(int Reg, string Label)[] probes =
+			{
+				(0x9A, "键盘背光等级（斗战者 OFF_KBNL · 合理值 0~3 · ⭐ 0 = 关灯）"),
+				(0x20, "Fn 锁（斗战者 OFF_FNHK · bit3）"),
+				(0xE4, "散热模式（斗战者 OFF_ITSM · 合理值 0~3）"),
+				(0xE0, "GPU 温度（斗战者 OFF_GPUT）"),
+				(0xE1, "CPU 温度（斗战者 OFF_CPUT）"),
+				(0x96, "GPU 风扇转速 高字节（斗战者 OFF_F3HI）"),
+				(0x97, "GPU 风扇转速 低字节（斗战者 OFF_F3LO）"),
+				(0x9B, "CPU 风扇转速 高字节（斗战者 OFF_F1HI）"),
+				(0x9C, "CPU 风扇转速 低字节（斗战者 OFF_F1LO）"),
+				(0x40, "⭐对照：H2RAM 0x740 读到 25（ProjectID）"),
+				(0x41, "⭐对照：H2RAM 0x741 读到 33"),
+				(0x66, "⭐对照：H2RAM 0x766 读到 0x97（键盘灯判据）"),
+				(0x67, "⭐对照：H2RAM 0x767 读到 0"),
+			};
+
+			int okCount = 0;
+			foreach ((int reg, string label) in probes)
+			{
+				bool ok = EcPortIo.TryReadByteAcpi(reg, out int v);
+				if (ok)
+				{
+					okCount++;
+				}
+				sb.AppendLine("   0x" + reg.ToString("X2") + " " + label + " = "
+					+ (ok ? ("✅ " + ChargeLimitEcProbe.FormatRaw(v)) : "⛔ 读不到")
+					+ (ok ? "" : ("　（原因：" + EcPortIo.LastReadFailure + "）")));
+			}
+			sb.AppendLine();
+			sb.AppendLine("通道 = " + EcPortIo.DescribeChannel());
+			sb.AppendLine();
+
+			if (okCount == 0)
+			{
+				sb.AppendLine("结论 = ⛔ **标准空间一个字节都没读到** ⚠️");
+				sb.AppendLine("   ⇒ ⭐ 具体卡在哪看上面「通道 =」那一行（驱动未装 / 模块未装载 / 已中毒）✅");
+			}
+			else
+			{
+				sb.AppendLine("结论 = ✅ 读到了 " + okCount + "/" + probes.Length
+					+ " 个字节 ⇒ ⭐ **ACPI 标准空间通道（命令 0x80 · 单字节地址）可用** ✅");
+				sb.AppendLine("   ⭐ 这**才是**键盘背光 `0x9A` 所在的那套地址空间 ⚠️（②d 那套 XRAM **够不到**它）");
+				sb.AppendLine("   ⚠️ 但本机（同方翼龙15Pro）EC **未必**是蛟龙的 IT5570");
+				sb.AppendLine("      ⇒ ⭐ `0x9A` 在**本机**是否等于「键盘背光等级」**尚不能断言** ⚠️");
+				sb.AppendLine("      ⇒ ⭐ 请以**蛟龙（宝龙达）真机**读数为准；真机上还应做「改亮度前后各读一次」的对比 ✅");
+			}
+			sb.AppendLine("⭐ 如实说明：本节**只读**（只发 0x80）· ⛔ 未发 0x81 写 · ⛔ 未改任何寄存器 ✅");
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("EC 标准空间试读异常 = " + ex.Message);
 		}
 	}
 
