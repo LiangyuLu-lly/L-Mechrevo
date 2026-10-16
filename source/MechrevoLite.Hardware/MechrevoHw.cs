@@ -3512,12 +3512,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	internal const int BaolongdaFanTypeSmall = 1;
 
 	// ⚠️ 占空比 → `x100RPM` 需要"该通道最大转速" ⚠️
-	//    ⭐ 参考实现（`BellatorFanControl`，⭐ 联想 N176）用的是 ⭐ 大扇 4400 / ⭐ 小扇 8200 ⚠️
-	//    ⚠️ **蛟龙的这两个数没有来源** ⚠️ ⇒ ⭐ 先用参考值，⭐ 并**在日志里标明"未确认"** ✅
-	private const int BaolongdaLargeFanMaxRpm = 4400;
-
-	/// <summary>⭐ 见 <see cref="BaolongdaLargeFanMaxRpm" /> ⚠️（⭐ 未确认 ✅）。</summary>
-	private const int BaolongdaSmallFanMaxRpm = 8200;
+	// ⭐⭐ 2026-10-16（0.291.9.4 · 第 1 步）：⭐ 这里原来有两个「⭐ 参考 max RPM」⭐ 常量 ⚠️
+	//    （⭐ BaolongdaLargeFanMaxRpm = 4400 / ⭐ BaolongdaSmallFanMaxRpm = 8200 ✅）
+	//    ⚠️ 它们是**抄来的参考值**、⭐ 而且**蛟龙的这两个数没有来源** ⚠️
+	//    ⇒ ⭐ ⭐ 曲线改用 **RPM** 之后 ✅（⭐ 见 FanCurveEngine.cs ✅）⭐ **不再需要 max RPM 这个分母** ✅
+	//    ⇒ ⭐ ⭐ **已删除** ✅ —— ⭐ 少一个猜出来的数 ✅
 
 	private volatile bool _baolongdaFanCurveApplied;
 
@@ -3606,20 +3605,27 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteLineIfChanged("baolongda-fancurve-notemp", "宝龙达风扇曲线：⚠️ 两个温度都没有有效值 ⇒ 本轮跳过（⛔ 不瞎写风扇 ✅）");
 				return false;
 			}
-			int cpuDuty = InterpolateDuty(settings.CpuTemperatures, settings.CpuDuties, cpuTemp);
-			int gpuDuty = InterpolateDuty(settings.GpuTemperatures, settings.GpuDuties, gpuTemp);
-			int gpuUnits = Math.Clamp(gpuDuty * BaolongdaLargeFanMaxRpm / 100 / 100, 0, 60);
-			int cpuUnits = Math.Clamp(cpuDuty * BaolongdaSmallFanMaxRpm / 100 / 100, 0, 60);
-			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致：
-			//    ⭐ ch0 = `FanType 0` = 大扇/GPU · ⭐ ch1 = `FanType 1` = 小扇/CPU ⚠️（⭐ 未确认 ✅）
-			if (!TrySetFanManualViaBackend(enable: true, gpuUnits, cpuUnits, out bool confirmed))
+			// ⭐⭐ 2026-10-16（第 1 步）：⭐ 曲线改 **RPM** ✅ ⇒ ⭐ 不再有「⭐ 占空比 × ⭐ max RPM ÷ 100」这一步 ✅
+			//    ⚠️ 而且 ⭐ **原来那两个 max RPM（4400/8200）是抄来的参考值** ⚠️ ⇒ ⭐ 现在整个不需要它了 ✅
+			FanCurvePoint[] channel0Points = FanCurveEngine.BuildPoints(settings.Channel0Temperatures, settings.Channel0Rpms);
+			FanCurvePoint[] channel1Points = FanCurveEngine.BuildPoints(settings.Channel1Temperatures, settings.Channel1Rpms);
+			// ⚠️⚠️ 温度来源的**配对沿用改动前**的关联（gpuTemp↔ch0 · cpuTemp↔ch1）✅
+			//    ⭐ ⛔ 但**归属本身仍未真机确认** ⚠️ ⇒ ⭐ 这里刻意不写 CPU/GPU 语义 ✅
+			int channel0Rpm = FanCurveEngine.ResolveRpm(channel0Points, gpuTemp, settings.MinRpm, settings.MaxRpm);
+			int channel1Rpm = FanCurveEngine.ResolveRpm(channel1Points, cpuTemp, settings.MinRpm, settings.MaxRpm);
+			int channel0Units = FanCurveEngine.ToUnits100Rpm(channel0Rpm);
+			int channel1Units = FanCurveEngine.ToUnits100Rpm(channel1Rpm);
+			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致 ✅
+			//    ⭐ ch0 = `FanType 0` · ⭐ ch1 = `FanType 1` ⚠️（⭐ 语义归属未确认 ✅）
+			if (!TrySetFanManualViaBackend(enable: true, channel0Units, channel1Units, out bool confirmed))
 			{
 				return false;
 			}
 			_baolongdaFanCurveApplied = true;
 			Logger.WriteLineIfChanged("baolongda-fancurve-step",
-				$"宝龙达风扇曲线（⭐ 软件闭环）：⭐ CPU {cpuTemp}℃ → ⭐ {cpuDuty}%（⭐ {cpuUnits * 100} RPM）· ⭐ GPU {gpuTemp}℃ → ⭐ {gpuDuty}%（⭐ {gpuUnits * 100} RPM）"
-				+ $" · ⭐ 确认={confirmed} ⚠️（⭐ 最大转速按参考值 {BaolongdaSmallFanMaxRpm}/{BaolongdaLargeFanMaxRpm}、⭐ 通道归属待确认 ⚠️）");
+				$"宝龙达风扇曲线（⭐ 软件闭环 · ⭐ 单位 RPM ✅）：⭐ ch0 温度 {gpuTemp}℃ → ⭐ {channel0Rpm} RPM（⭐ 档位 {channel0Units}）"
+				+ $" · ⭐ ch1 温度 {cpuTemp}℃ → ⭐ {channel1Rpm} RPM（⭐ 档位 {channel1Units}）"
+				+ $" · ⭐ 确认={confirmed} ⚠️（⭐ 通道归属待真机确认 ✅）");
 			return true;
 		}
 		catch (Exception ex)
