@@ -48,7 +48,20 @@ internal sealed class BaolongdaWmi : IDisposable
 	private const string WmiClass = "MICommonInterface";
 	private const string WmiMethodName = "MiInterface";
 
-	/// <summary>⭐ 宝龙达统一使用这个实例名（⭐ `ACPI\PNP0C14` 是 ACPI 的 WMI 通用设备 ID，⭐ `MIFS_0` 才是厂商实例）。</summary>
+	/// <summary>
+	/// ⭐ 实例名候选表（⭐ 按顺序试；⭐ 都失败再枚举 ← 兜底 ✅）。
+	/// <para>⚠️ 2026-10-16 **真机实测修正**（蛟龙16Pro · MRID6-23）：⭐ 设备树里那个 WMI-ACPI 设备叫
+	/// ⭐ <c>ACPI\PNP0C14\MIFS</c>（⭐ **没有 `_0` 后缀** ⚠️），⭐ 而三份开源实现里写的是
+	/// <c>ACPI\PNP0C14\MIFS_0</c> ⇒ ⭐ **实例名确实因机型/映射而异** ⚠️
+	/// ⇒ ⭐ 所以**两种都试**，⛔ 不写死一个 ✅（⭐ 反正最后还有枚举兜底 ✅）</para>
+	/// </summary>
+	internal static readonly string[] PreferredInstanceNames = new string[2]
+	{
+		@"ACPI\PNP0C14\MIFS_0", // 三份开源实现用的（联想 N176 等）
+		@"ACPI\PNP0C14\MIFS",   // ⭐ 真机实测到的（机械革命蛟龙16Pro · MRID6-23）
+	};
+
+	/// <summary>⚠️ 仅用于兼容旧引用（⭐ 取第一个候选 ✅）。</summary>
 	internal const string PreferredInstanceName = @"ACPI\PNP0C14\MIFS_0";
 
 	/// <summary>请求/响应缓冲固定 32 字节（⭐ 三份实现一致）。</summary>
@@ -219,19 +232,31 @@ internal sealed class BaolongdaWmi : IDisposable
 			return null;
 		}
 
-		// ── ① 直指（⭐ 宝龙达三份实现的做法）──
-		try
+		// ── ① 逐个试候选实例名（⭐ 真机实测：⭐ 蛟龙是 `MIFS`，⭐ 联想是 `MIFS_0` ⇒ ⭐ 两种都得试 ✅）──
+		foreach (string candidate in PreferredInstanceNames)
 		{
-			using ManagementObject obj = new ManagementObject(WmiNamespace, WmiClass + ".InstanceName='" + PreferredInstanceName + "'", null);
-			obj.Get();
-			return obj.Path.RelativePath;
+			try
+			{
+				using ManagementObject obj = new ManagementObject(WmiNamespace, WmiClass + ".InstanceName='" + candidate + "'", null);
+				obj.Get();
+				return obj.Path.RelativePath;
+			}
+			catch (ManagementException ex) when (ex.ErrorCode == ManagementStatus.AccessDenied)
+			{
+				// ⚠️⚠️ 2026-10-16 真机实测：⭐ **非管理员身份下会 AccessDenied**（⭐ 抓包脚本那次就是 ✅）
+				// ⇒ ⭐ 这不是"接口不存在"，⭐ 而是"权限不够" ⇒ ⭐ 必须**如实记出来**，
+				//    ⛔ 不能当成"没有这个后端"（⭐ 否则会误导排查方向 ⚠️）
+				Logger.WriteLine($"宝龙达 WMI：⭐ 访问被拒（AccessDenied）—— 实例 \"{candidate}\" **存在但我们权限不够**"
+					+ " ⇒ ⚠️ 本进程可能没有以管理员运行；⭐ 这也说明这台机器**很可能就是宝龙达机型** ✅");
+				return null;
+			}
+			catch (Exception ex)
+			{
+				// 类在、但这个实例名不在 ⇒ 试下一个候选
+				Logger.WriteLine($"宝龙达 WMI：实例名候选 \"{candidate}\" 未命中（试下一个）：{ex.Message}");
+			}
 		}
-		catch (Exception ex)
-		{
-			// ⚠️ 类在、但这个实例名不在 ⇒ 常见于实例名后缀不同（MIFS_1 / 别的前缀）⇒ 落到枚举
-			Logger.WriteLine($"宝龙达 WMI：类在，但实例名直指 \"{PreferredInstanceName}\" 失败（将枚举）：{ex.Message}");
-		}
-		// ── ② 枚举（⭐ 兼容实例名不同的机型）──
+		// ── ② 枚举（⭐ 兜底：⭐ 兼容实例名完全不同的机型 ✅）──
 		try
 		{
 			using ManagementClass mc = new ManagementClass(WmiNamespace + ":" + WmiClass);

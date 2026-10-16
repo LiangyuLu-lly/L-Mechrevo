@@ -18,11 +18,12 @@ $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 # ⭐⭐ 工具版本（⭐ 每次改脚本都要升，⭐ 并写进 06-采集环境.txt ⇒ ⭐ 以后一眼就能看出机主用的是哪一版）
-$script:KitVersion  = '2026-10-16.3'
-$script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,ReadOnly'
+$script:KitVersion  = '2026-10-16.4'
+$script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,ReadOnly'
 #   2026-10-16.1  首版（六节 + 强/弱相关筛选）
 #   2026-10-16.2  ＋ MIFS-Probe：MICommonInterface 实例枚举与只读试调用
 #   2026-10-16.3  ＋ 修设备树过滤（漏掉 ACPI\PNP0C14\…）+ 修 06 节一处引号 bug + 版本标记
+#   2026-10-16.4  ＋ AccessDenied 单独识别 + 明确提示「请用管理员重跑」（真机实测：非管理员会 AccessDenied）
 
 $stamp   = Get-Date -Format 'yyyyMMdd-HHmmss'
 $outRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) ("宝龙达抓包-" + $stamp)
@@ -166,10 +167,12 @@ Write-Section '02-ACPI-WMI接口.txt' 'ACPI / WMI 接口探测（本机有哪些
 	Add-Line $L ""
 
 	Add-Line $L "── ⭐⭐ MICommonInterface 实例枚举与试调用（⭐ 本工具最关键的一节）──"
-	Add-Line $L "  ⭐ 背景：宝龙达模具那套接口（⭐ 三份开源实现一致确认）是 root\WMI 的 MICommonInterface，"
-	Add-Line $L "     实例名形如 ACPI\PNP0C14\MIFS_0，方法 MiInterface（InData[32] => OutData）。"
+	Add-Line $L "  ⭐ 背景：宝龙达模具那套接口是 root\WMI 的 MICommonInterface，方法 MiInterface（InData[32] => OutData）。"
+	Add-Line $L "  ⭐ 实例名形如 ACPI\PNP0C14\MIFS_0（⭐ 蛟龙实测是 ACPI\PNP0C14\MIFS ⇒ ⭐ 两种都试）"
 	Add-Line $L "  ⭐ 我们要确认三件事：① 你这台机的实例名 ② 类 GUID ③ 各功能号能不能调通。"
 	Add-Line $L "  ⚠️ 本节**只读**（只用 Get=250），⛔ 一个 Set 都不发、⛔ 不改任何设置。"
+	$isAdminNow = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+	Add-Line $L ("  ⭐ 当前是否管理员：⭐ " + $isAdminNow + "（⚠️ 这一项很关键，见下）")
 	Add-Line $L ""
 	try {
 		$mc = New-Object System.Management.ManagementClass('root\WMI:MICommonInterface')
@@ -180,8 +183,33 @@ Write-Section '02-ACPI-WMI接口.txt' 'ACPI / WMI 接口探测（本机有哪些
 			if ($q) { Add-Line $L ("     ⭐ 类 GUID = " + $q.Value + "   <-- ⭐ 请重点核对这个值") } else { Add-Line $L "     ⚠️ 该类没有 GUID 限定符（也请告诉我们）" }
 		} catch {}
 		Add-Line $L ""
-		$insts = $mc.GetInstances()
+		# ⭐⭐ 2026-10-16 真机实测：非管理员下 GetInstances() 会抛 AccessDenied ⚠️
+		#     ⇒ ⭐ 必须**单独捕获**并明确提示"请用管理员重跑"，
+		#        ⛔ 不能混在"类不可用"里（⭐ 那会把"权限不够"误报成"没有接口"❌）
+		$insts = $null
+		try {
+			$insts = $mc.GetInstances()
+		} catch {
+			$msg = $_.Exception.Message
+			if ($msg -match 'Access|拒绝|denied') {
+				Add-Line $L "  ⚠️⚠️ **访问被拒（Access denied）** —— ⭐ 类存在，但当前身份读不到实例 ⚠️"
+				Add-Line $L "     ⇒ ⭐ 这**不代表**「这台机没有接口」，⭐ 而是**权限不够** ✅"
+				Add-Line $L "     ⇒ ⭐⭐ **请务必用【管理员身份】重新运行本脚本**（见《怎么运行.txt》方法三）✅"
+				Add-Line $L "     ⇒ ⭐ 重跑后这一节才会出现实例名与各功能号的实测值 ✅"
+				Add-Line $L ""
+				Add-Line $L ("     原始错误：⭐ " + $msg)
+				Add-Line $L ("     当前是否管理员：⭐ " + $isAdminNow)
+				Add-Line $L ""
+				Add-Line $L "  ⭐ 补充证据（设备树里已经看到的）：⭐ 若下面是 ACPI\\PNP0C14\\MIFS，"
+				Add-Line $L "     那就**基本可以确定这台机就是宝龙达模具**（⭐ 只差管理员权限把值读出来）✅"
+				$insts = $null
+			} else {
+				Add-Line $L ("  ⚠️ 枚举实例失败：⭐ " + $msg)
+				$insts = $null
+			}
+		}
 		$n = 0
+		if ($insts) {
 		foreach ($inst in $insts) {
 			$n++
 			Add-Line $L ("  ⭐ 实例 #" + $n + " : " + $inst.Path.RelativePath)
@@ -217,8 +245,9 @@ Write-Section '02-ACPI-WMI接口.txt' 'ACPI / WMI 接口探测（本机有哪些
 			}
 			Add-Line $L ""
 		}
+		}  # ← if ($insts)
 		Add-Line $L ("  ⭐ 实例总数 = " + $n)
-		if ($n -eq 0) {
+		if ($n -eq 0 -and $insts) {
 			Add-Line $L "  ⚠️ 一个实例都没有 ==> 这台机可能没有这套接口，或厂商驱动/服务还没起来。"
 			Add-Line $L "     请确认：① 官方控制台装了吗？ ② 装了的话**先把官方控制台打开**再重跑本脚本。"
 		}
