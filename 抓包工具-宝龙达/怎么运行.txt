@@ -52,18 +52,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\运行抓包.ps1"
 
 ## ⭐ 怎么确认"读全了没有"
 
-跑完打开 `06-采集环境.txt`，看有没有这一行：
+跑完看**两个文件各一行**，各确认一件事：
+
+⭐ **① `06-采集环境.txt`** ⇒ ⭐ 确认版本对不对：
 
 ```
-⭐⭐ 版本 = 2026-10-16.4   ·   ⭐ 特征 = MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,ReadOnly
-  ⭐ 当前是否管理员：⭐ True          ← 必须是 True
+⭐⭐ 版本 = 2026-10-16.5   ·   ⭐ 特征 = MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,PerMode-Interactive,ReadOnly
 ```
 
-再看 `02-ACPI-WMI接口.txt` 里那一节（搜「实例枚举与试调用」）：
+⭐ **② `02-ACPI-WMI接口.txt`**（搜「实例枚举与试调用」）⇒ ⭐ 确认权限够不够：
+
+```
+  ⭐ 当前是否管理员：⭐ True        ← ⭐⭐ 必须是 True！（⭐ 注意：这一行在 **02** 里，⛔ 不在 06 ⚠️）
+```
 
 - ✅ **好**：出现 `⭐ 实例 #1 : MICommonInterface.InstanceName='ACPI\PNP0C14\MIFS'` 以及
-  6 个功能号（8 / 13 / 22 / 20 / 15 / 23）的 `OutData = ...` 实测值
+  6 个功能号（8 / 13 / 22 / 20 / 15 / 23）的 `OutData = ...` 实测值 ⇒ ⭐ **齐了，发回来就行** ✅
 - ⚠️ **缺**：出现 `⚠️⚠️ 访问被拒（Access denied）` ⇒ ⭐ **请用管理员重跑** ✅
+
+⭐ **③ 若你选了做「逐模式实测」** ⇒ 还会多一个 `07-逐模式实测.txt` ✅（⭐ 没有也正常 ✅）
 
 ---
 
