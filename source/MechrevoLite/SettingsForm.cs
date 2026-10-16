@@ -232,8 +232,6 @@ public class SettingsForm : RForm
 	// 2026-10-08 17:00：本窗是否走「50 系滑块行」（真＝滑块上屏、无开关无三档；假＝新布局）。
 	private bool _gen50SliderRow;
 	// 2026-10-08（充电上限开关）：开关控件 + 抑制重入标志（程序化设置 Checked 时不触发写 EC）。
-	private RCheckBox? checkChargeLimit;
-	private bool _chargeLimitUiSuppressed;
 	// 2026-10-10（用户要求 · ⭐ 原话「无极限制充电开的时候上面三档位应该置灰(包括EC现充开关)」）：
 	// checkChargeLimit（EC 限充开关）与 _batteryModeButtons（三档）的**启用态** =
 	//   本字段（EC 通道可用性基准，由 ApplyChargeLimitSliderGating 记录）
@@ -7028,7 +7026,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		if (_chargeSliderEnabled)
 		{
 			Logger.WriteLine($"限充方式互斥：无极限充（实验性）生效 ⇒ 三档点击被拒绝（档位 {limitPercent}% 不落地，滑块为唯一权威）");
-			SyncChargeLimitSwitch();
 			RefreshBatteryModeButtons();
 			await Task.CompletedTask;
 			return false;
@@ -7072,17 +7069,9 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// —— EC 传输（EC 限充 ON）：直写 EC；⛔ 绝不下发 GCU 档位报文（两个源互相覆盖的根源就在这） ——
 		// 2026-10-15（隐藏规则 B）：判据改用 IsEcDirectWriteAllowed()（含代际门控）—— 老机型在这里也**拒绝**，
 		// 与 BatteryControl 侧同一把闸（上一步已把它们路由去 GCU 分支，这里是防御性的第二道）。
-		if (!EcChargeLimit.IsEcDirectWriteAllowed())
-		{
-			ToastForm.ShowFailure(Strings.ChargeLimitUnavailable);
-			SyncChargeLimitSwitch();
-			RefreshBatteryModeButtons();
-			return false;
-		}
 		if (!BatteryControl.CaptureChargeLimitGesture() || !BatteryControl.ApplyChargeLimitFromUserGesture(limitPercent))
 		{
 			ToastForm.ShowFailure(Strings.ChargeLimitUnconfirmed);
-			SyncChargeLimitSwitch();
 			RefreshBatteryModeButtons();
 			return false;
 		}
@@ -7265,129 +7254,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		RefreshBatteryModeButtons();
 	}
 
-	/// <summary>
-	/// 2026-10-08：程序化同步开关状态（不触发写 EC）。所有 UI 刷新路径都走这里。
-	/// </summary>
-	private void SetChargeLimitSwitchQuiet(bool on)
-	{
-		if (checkChargeLimit != null)
-		{
-			_chargeLimitUiSuppressed = true;
-			try
-			{
-				checkChargeLimit.Checked = on;
-			}
-			finally
-			{
-				_chargeLimitUiSuppressed = false;
-			}
-		}
-	}
-
-	/// <summary>
-	/// 2026-10-08（充电上限 UI 返工）：开关状态 = EC 回读与记忆值合并。
-	/// 2026-10-10（传输路由 · 用户澄清「EC限制充电也是那三档按钮,…那个开关只改变传输方式」）：
-	/// 开关语义收窄为**传输方式选择器** ⇒ 以记忆位 <c>charge_limit_lock</c> 为准：
-	/// ① 记忆＝开（EC 传输）⇒ 显示开；仅当"记忆是开 + 档位非长效"而 EC 上确实没有限充时（＝写入没落地）
-	///    如实回退为关并改记忆（沿用旧口径「宁可显示没限充，也不显示一个假的已锁定」）；
-	/// ② 记忆＝关（GCU 传输）⇒ 显示关，**不再**因为 EC 寄存器上有残留值（上一条方式留下的、或 GCU 自己写的）
-	///    就把开关点亮 —— 否则 UI 显示"EC 限充开"、而档位点击其实走 GCU 官方路径，等于两套说法。
-	/// ⛔ 只读 EC/记忆 + 改控件勾选与一个记忆位，不写 EC、不发报文。
-	/// </summary>
-	private void SyncChargeLimitSwitch()
-	{
-		bool flag = BatteryControl.LockEnabled();
-		if (flag)
-		{
-			int num = BatteryControl.ResolveDisplayLimitPercent();
-			bool landed = EcChargeLimit.IsSupportedLimit(num) && num < 100;
-			if (!landed && BatteryControl.StoredModePercent() < 100)
-			{
-				flag = false;
-				BatteryControl.SetLockEnabled(on: false);
-			}
-		}
-		SetChargeLimitSwitchQuiet(flag);
-	}
-
-	/// <summary>
-	/// 2026-10-08（充电上限 UI 返工）；2026-10-10（传输路由/三方式互斥 · 用户澄清原话「EC限制充电也是那三档按钮,
-	/// 只是打开以后不走GCU发报,直接用EC走三档」）：本开关**只切传输方式**，不改变档位值 ——
-	/// <list type="bullet">
-	/// <item>打开（EC 传输）⇒ ① 请求 GCU 侧让位（BatteryProtection=0 长效/不限制，保证"GCU 限电方式不同时生效"）；
-	/// ② 按当前档位**直写 EC** 0x7B9（长效 100% ＝ 写 0 不限制／平衡 80／工作站 60）+ 写后回读确认。</item>
-	/// <item>关闭（GCU 传输）⇒ GCU 可用时把当前**记忆档位**交给官方路径（BatteryProtection/Control），
-	/// ⛔ **不再写 EC**（对称规则：GCU 方式生效时 EC 路径不得写入）；GCU 不可用时保持旧行为写 EC 100
-	/// （否则会留下"开关已关但 EC 上仍有限制"的孤儿上限）。</item>
-	/// </list>
-	/// </summary>
-	private void CheckChargeLimit_CheckedChanged(object? sender, EventArgs e)
-	{
-		if (_chargeLimitUiSuppressed || checkChargeLimit == null)
-		{
-			return;
-		}
-		// 2026-10-10（三方式互斥）：无极限充（实验性）生效 ⇒ 滑块是唯一权威；EC 现充开关此时已置灰，
-		// 这里再挡一道程序化触发：不写 EC、不改开关记忆（charge_limit_lock 保持原值），只把控件按记忆态静默还原。
-		if (_chargeSliderEnabled)
-		{
-			Logger.WriteLine("限充方式互斥：无极限充（实验性）生效 ⇒ EC 限充开关的动作被拒绝（不写 EC，滑块为唯一权威）");
-			SetChargeLimitSwitchQuiet(BatteryControl.LockEnabled());
-			return;
-		}
-		bool flag = checkChargeLimit.Checked;
-		// 先记住开关意图（＝传输方式）：写入确认（CommitChargeLimit → VisualiseBattery）或失败回退
-		// （RestoreChargeLimitDisplay）都会再走一次 SyncChargeLimitSwitch，届时按 EC 回读纠正显示。
-		BatteryControl.SetLockEnabled(flag);
-		if (flag)
-		{
-			// 进入 EC 传输：先请 GCU 侧让位（长效＝不限制）——不 await，UI 不等 MQTT 回读。
-			_ = EnsureGcuStandsDownAsync("打开 EC 限充 ⇒ 切到 EC 直写传输");
-		}
-		else if (GcuBatteryProtectionAvailable())
-		{
-			// 切回 GCU 传输：把**记忆档位**交给官方路径；⛔ 不写 EC（这正是"两个源同时写"的入口）。
-			int tierPercent = BatteryControl.StoredModePercent();
-			_ = PublishTierToGcuAsync(ModeIndexForPercent(tierPercent), tierPercent, "关闭 EC 限充 ⇒ 回到 GCU 传输（档位＝记忆档位）");
-			RefreshBatteryModeButtons();
-			return;
-		}
-		else
-		{
-			Logger.WriteLine("限充传输：EC 限充已关闭且 GCU 电池保护不可用 ⇒ 按旧行为写 EC 100%（不限制），避免留下开关已关却仍生效的上限");
-		}
-		// 2026-10-15（隐藏规则 B）：同用 IsEcDirectWriteAllowed()（老机型上本开关已被隐藏，这里是防御性判据）。
-		if (!EcChargeLimit.IsEcDirectWriteAllowed())
-		{
-			ToastForm.ShowFailure(Strings.ChargeLimitUnavailable);
-			SyncChargeLimitSwitch();
-			return;
-		}
-		// ⭐⭐ 2026-10-16（0.291.8.1 · 修「耀世16ultra 2025 表示 EC 限制充电打不开」）：
-		// **写入前的固件预检**。那台机的 EC 固件按证据不支持限充（门控 0x7C3=0x07、ROMID 0x770=0xFF、
-		// 存储区 0x87F=0xFF），但原来这条拒绝只发生在**异步写入**里 + 一条容易错过的 toast
-		// ⇒ 用户看到开关"打开了"却没效果，反复点了 60+ 次（诊断包里刷了一屏"限充写入被拒绝"）。
-		// 现在：⭐ 开关一拨上来就**同步**判定，不支持 ⇒ ⭐ 立刻给可见文案 + ⭐ 还原开关 + ⭐ 不进写入路径 ✅
-		// ⚠️ 判据与 TrySet 里那道门逐字同源（IsFirmwareLimitSupported）；ec_charge_limit=1 时它返回 true ⇒ 逃生口不变。
-		if (flag && !EcChargeLimit.IsFirmwareLimitSupported())
-		{
-			Logger.WriteLine("限充固件预检：本机 EC 固件不支持限充（证据见上一行）⇒ 开关动作被提前拒绝，界面还原（⛔ 未进写入路径、⛔ 未写任何寄存器）");
-			ToastForm.ShowFailure(Strings.ChargeLimitFirmwareUnsupported);
-			BatteryControl.SetLockEnabled(false);
-			SetChargeLimitSwitchQuiet(false);
-			SyncChargeLimitSwitch();
-			RefreshBatteryModeButtons();
-			return;
-		}
-		int setLimit = (flag ? BatteryControl.SelectedModePercent() : 100);
-		RefreshBatteryModeButtons();
-		if (!BatteryControl.ApplyChargeLimitFromUserGesture(setLimit))
-		{
-			ToastForm.ShowFailure(Strings.ChargeLimitFailedRestored);
-			SyncChargeLimitSwitch();
-			RefreshBatteryModeButtons();
-		}
-	}
 
 	/// <summary>
 	/// 2026-10-08 17:00（修正）：50 系滑块行 —— 与返工前逐项一致：单行、16%/70%/14% 三列
@@ -7474,91 +7340,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			host.RowStyles.Add(new RowStyle(SizeType.Absolute, num5));
 		}
 		host.Height = num + num2 + num3 + num4 + num6 + num5;
-		checkChargeLimit = new RCheckBox
-		{
-			Name = "checkChargeLimit",
-			Text = Strings.ChargeLimitSwitch,
-			AutoSize = true,
-			Appearance = Appearance.Normal,
-			Anchor = AnchorStyles.Left,
-			SwitchOnRight = false,
-			TabStop = false,
-			Cursor = Cursors.Hand,
-			ForeColor = UiVisualStyle.Text,
-			BackColor = panelBattery.BackColor,
-			Font = UiStyleCaptionFont(),
-			Margin = new Padding(0, 0, ResponsiveLayout.LogicalToDevice(this, 8), 0)
-		};
-		// 2026-10-15（用户要求删掉旁边那颗白色「实验」小按钮）：角标已整体移除 ⇒ 无障碍名只报开关本身，
-		// ⛔ 不再拼接 Strings.ChargeLimitBadge（该资源键保留不动，避免动到 resx 之外的任何东西）。
-		checkChargeLimit.AccessibleName = Strings.ChargeLimitSwitch;
-		// 文案只讲开关做了什么（按档位把上限直写 EC、写后回读确认），不再提"Windows 如何显示电量"
-		// —— 用户 2026-10-08 19:30 定稿：不写任何关于系统电量显示的断言。
-		toolTip.SetToolTip(checkChargeLimit, Strings.ChargeLimitSwitchTip);
 		// 2026-10-15（限充真效果判据上屏 · 用户批准的修法④；同时按用户要求删掉原来那颗白色「实验」小胶囊）：
 		// 把上游口径的 0x0742 bit2 判定（ChargeLimitEffectEvidence.Latest：生效 / 未生效 / 无法判定）从
 		// 「只进日志」搬到限充区**用户看得到**的位置 —— 复用原角标所在的那一格（第 1 行容器的第 1 列）。
 		// ⚠️ 纯只读展示：不写 EC、不改 config、不触发任何写入；由 RefreshChargeLimitEffectLabel 按 2s 快照刷新。
 		// ⚠️ 外观刻意用**普通说明文字**（Muted 小字）而不是 mini-chip 胶囊 ⇒ 不会被误认成没删掉的旧角标。
-		_chargeLimitEffectLabel = new Label
-		{
-			Name = "labelChargeLimitEffect",
-			Text = "",
-			AutoSize = true,
-			Anchor = AnchorStyles.Left,
-			Visible = false,
-			ForeColor = UiVisualStyle.Muted,
-			BackColor = panelBattery.BackColor,
-			Font = UiStyleCaptionFont(),
-			Margin = new Padding(ResponsiveLayout.LogicalToDevice(this, 8), 0, 0, 0)
-		};
-		// ⚠️ 不设 AccessibleName：Label 的 Text 本身就是「生效/未生效/无法判定」，再挂一个别的名字反而误导读屏。
-		// 第 1 行容器：开关 + 限充效果判定标签（2026-10-15 起，原「实验」角标已按用户要求移除）。两列都是 AutoSize，两个控件都只锚 Left（不在 TableLayoutPanel 里
-		// 贴 Top/Bottom＝在 26 逻辑像素的行内垂直居中），所以不需要按字体高度手算偏移。
-		TableLayoutPanel chargeLimitHead = new TableLayoutPanel
-		{
-			Name = "chargeLimitHead",
-			ColumnCount = 2,
-			RowCount = 1,
-			AutoSize = true,
-			AutoSizeMode = AutoSizeMode.GrowAndShrink,
-			Anchor = AnchorStyles.Left,
-			Margin = Padding.Empty,
-			Padding = Padding.Empty,
-			BackColor = panelBattery.BackColor
-		};
-		chargeLimitHead.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-		chargeLimitHead.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-		chargeLimitHead.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		chargeLimitHead.Controls.Add(checkChargeLimit, 0, 0);
-		chargeLimitHead.Controls.Add(_chargeLimitEffectLabel, 1, 0);
-		// 与滑块一致：先取真实用户手势凭证，再写 EC（UserGestureLease 要求 15 秒内的真实输入）。
-		checkChargeLimit.MouseDown += (object? _, MouseEventArgs _) => BatteryControl.CaptureChargeLimitGesture();
-		checkChargeLimit.CheckedChanged += CheckChargeLimit_CheckedChanged;
-		host.Controls.Add(chargeLimitHead, 0, 0);
-		host.SetColumnSpan(chargeLimitHead, 3);
-		// 2026-10-15（隐藏规则 A/B）：记下本行容器与行高，供 ApplyChargeLimitRowVisibility 收放（⛔ 不删控件）。
-		_chargeLimitHeadRow = chargeLimitHead;
-		_chargeLimitHeadRowHeight = num;
-		// 第 2 行副文案（单行，资源串里没有换行）：只说机制本身 ——「通过直写 EC 限电（不走 GCU）」，
-		// 不提任何关于系统电量显示的断言（2026-10-08 19:30 定稿）。
-		Label labelChargeLimitDesc = new Label
-		{
-			Name = "labelChargeLimitDesc",
-			Text = Strings.ChargeLimitSwitchDesc,
-			AutoSize = false,
-			Dock = DockStyle.Fill,
-			TextAlign = ContentAlignment.MiddleLeft,
-			ForeColor = UiVisualStyle.Muted,
-			BackColor = panelBattery.BackColor,
-			Font = UiStyleCaptionFont(),
-			Margin = Padding.Empty
-		};
-		host.Controls.Add(labelChargeLimitDesc, 0, 1);
-		host.SetColumnSpan(labelChargeLimitDesc, 3);
-		// 2026-10-15（隐藏规则 A/B）：副标题行同样记下行高（与开关行一起收放）。
-		_chargeLimitDescLabel = labelChargeLimitDesc;
-		_chargeLimitDescRowHeight = num2;
 		string[] modeLabels = new string[3] { Strings.ChargeModeLongevity, Strings.ChargeModeBalanced, Strings.ChargeModeWorkstation };
 		int[] modeLimits = new int[3] { 100, 80, 60 };
 		string modeTipFormat = Strings.ChargeModeTip;
@@ -7609,7 +7395,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			{
 				if (!await ApplyBatteryLimitModeAsync(mode, modeLimits[mode]))
 				{
-					SyncChargeLimitSwitch();
 					RefreshBatteryModeButtons();
 				}
 			};
@@ -7665,7 +7450,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		ApplyChargeSliderVisibility();
 		panelBattery.MinimumSize = new Size(0, host.Bottom + panelBattery.Padding.Bottom);
-		SyncChargeLimitSwitch();
 		RefreshBatteryModeButtons();
 		// 2026-10-15（限充真效果判据上屏 · 修法④）：构造时先按当前快照填一次（通常为空 ⇒ 隐藏，零回归）。
 		RefreshChargeLimitEffectLabel();
@@ -7757,10 +7541,9 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		//     （那种状态下 A 的档位记忆会在 GCU 上报后经重放覆盖 B 的滑块值）。
 		// 反向（B 生效时点 A）由 CheckChargeLimit_CheckedChanged 的写入硬门拒绝并把勾选还原 ⇒
 		// 同一时刻最多一种 EC 方式生效，双向对称、不存在来回互写。
-		if (flag && (BatteryControl.LockEnabled() || (checkChargeLimit != null && checkChargeLimit.Checked)))
+		if (flag && BatteryControl.LockEnabled())
 		{
 			BatteryControl.SetLockEnabled(false);
-			SetChargeLimitSwitchQuiet(false);
 			Logger.WriteLine("限充方式互斥：打开无极限充（实验性）⇒ EC 限充开关已自动关闭（charge_limit_lock=0；⛔ 未写 EC）");
 		}
 		if (flag)
@@ -8014,10 +7797,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		bool ecSwitchOn = BatteryControl.LockEnabled();
 		bool gcuPathAvailable = GcuBatteryProtectionAvailable();
 		bool tierEnabled = !_chargeSliderEnabled && (_chargeLimitStageBaseEnabled || ecSwitchOn || gcuPathAvailable);
-		if (checkChargeLimit != null)
-		{
-			checkChargeLimit.Enabled = ecSwitchEnabled;
-		}
 		if (_batteryModeButtons != null)
 		{
 			Logger.WriteLineIfChanged("charge-limit-tier-enable", $"[charge-limit] 三档 Enabled={tierEnabled}（EC 通道基准={_chargeLimitStageBaseEnabled}、EC 限充开关={ecSwitchOn}、GCU 电池保护可用={gcuPathAvailable}、无极限充滑块={_chargeSliderEnabled}）");
@@ -8044,13 +7823,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			ToastForm.ShowFailure(Strings.ChargeLimitIneffective);
 			// 2026-10-08：三档与开关已常驻，回退后只需按 EC 回读重新同步 UI。
-			SyncChargeLimitSwitch();
 			RefreshBatteryModeButtons();
 			return;
 		}
 		if (verdict == ChargeLimitVerdict.Verified)
 		{
-			SyncChargeLimitSwitch();
 			RefreshBatteryModeButtons();
 			Program.toast?.RunToast(Strings.ChargeLimitVerified);
 		}
@@ -8544,12 +8321,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// （代际门控**故意不进** flag）⇒ 老机型保留完整电池卡片 + 三档（GCU 路）。
 		ApplyChargeLimitRowVisibility(!flag || EcChargeLimit.IsLegacyGenerationBlocked());
 		ApplyChargeLimitStageEnablement();
-		if (checkChargeLimit != null)
-		{
-			// 悬停提示用完整说明（ChargeLimitSwitchTip）：开关打开做了什么（按档位直写 EC + 回读确认）
-			// 都不该在这里被覆盖掉（2026-10-08 19:30 定稿：只讲机制，不讲系统显示）。
-			toolTip.SetToolTip(checkChargeLimit, flag ? Strings.ChargeLimitSwitchTip : ChargeLimitDisabledReason(RuntimeModelSupport.Current()));
-		}
 	}
 
 	internal static string ChargeLimitDisabledReason(SupportDecision support)
@@ -12630,7 +12401,6 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 		// 2026-10-08（充电上限 UI 返工）：每次写入被确认/回退后都按 EC 回读重同步开关与档位高亮，
 		// 避免"开关开着但寄存器是关的"或高亮停在旧档位。滑块已不参与显示。
-		SyncChargeLimitSwitch();
 		RefreshBatteryModeButtons();
 		if (BatteryControl.chargeFull)
 		{
