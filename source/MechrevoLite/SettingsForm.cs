@@ -516,6 +516,31 @@ public class SettingsForm : RForm
 
 	private bool _syncingEffectCombos;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 灯光效果下拉 · ⭐ 机主反馈「宝龙达只有单色吧」）：
+	/// ⭐ 宝龙达固件**只支持「关 ／ RGB 固定色」** ✅ —— ⭐ 界面上就**只列这两项** ✅，
+	/// ⛔ 不再列呼吸／波浪／彩虹那些**本机做不到**的 ⚠️。
+	/// <para>⭐ 依据（⭐ 协议事实，⭐ 见 `_refs\JiaolongControl` · MIT · ⭐ 只取事实 ✅）：
+	/// ⭐ `RGBKeyboardMode` **只有** `Mode_Off = 0` 与 `Mode_RGBFixedMode = 2`（⭐ 加 `Unknow = 255`）✅；
+	/// ⭐ 功能号 <b>15</b> 的 LOGO 灯**只有 开 ／ 关**（⭐ 连颜色都没有 ✅）。</para>
+	/// <para>⭐ 这与「能力位铁律」一致：⭐ **能点的就必须有反应** ⇒ ⭐ 做不到的就不该出现在表里 ✅
+	/// （⛔ 原来是「列出来然后静默降级」⚠️ —— ⭐ 用户会以为能做 ✅）。</para>
+	/// </summary>
+	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[2]
+	{
+		("Off", Strings.Off),
+		("Single", Strings.EffectSingle)
+	};
+
+	/// <summary>
+	/// ⭐ 宝龙达时把任意「声明的效果表」收敛成**本机真能做到的那两项** ✅；
+	/// ⭐ 其他机型（⭐ GCU ／ 老同方 ／ 非宝龙达 ✅）**原样返回** ⇒ ⭐ 逐位不变 ✅。
+	/// </summary>
+	private static (string Effect, string Name)[] EffectsForCurrentBackend((string Effect, string Name)[] declared)
+	{
+		return (Program.hw?.UsesBaolongda == true) ? BaolongdaLightEffects : declared;
+	}
+
 	private RCheckBox? _lightOffOnBatteryChk;
 
 	private RComboBox? _lightSleepCombo;
@@ -15162,9 +15187,14 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				int selectedIndex = effectCombo.SelectedIndex;
 				if (selectedIndex >= 0 && Program.rgb != null)
 				{
-					if (ShouldUseGcuKeyboardFallback(Program.rgb))
+					// ⭐⭐ 2026-10-16（宝龙达 · 效果表收敛）：⭐ 宝龙达下这里与 FillKeyboardEffectCombo
+					//   **必须用同一张表** ✅ ⇒ ⭐ 否则下拉显示两项、索引却映射到呼吸/波浪
+					//   ⇒ ⭐ 选「单色」实际发的是别的效果 ❌（⭐ 非宝龙达判据不变 ⇒ 逐位不变 ✅）
+					if (ShouldUseGcuKeyboardFallback(Program.rgb) || Program.hw?.UsesBaolongda == true)
 					{
-						(string, string)[] array2 = KeyboardFirmwareEffects.Visible(CurrentKeyboardType());
+						(string, string)[] array2 = (Program.hw?.UsesBaolongda == true)
+							? BaolongdaLightEffects
+							: KeyboardFirmwareEffects.Visible(CurrentKeyboardType());
 						if (selectedIndex < array2.Length)
 						{
 							string id = array2[selectedIndex].Item1;
@@ -15616,6 +15646,11 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		body.Controls.Add(_lblKeyboardControllerStatus, 0, row + 1);
 		void BuildLightChannelRow(string rowName, string label, string topic, string title, (string Effect, string Name)[] effects, int gridRow, Action<RCheckBox, ComboBox> storeControls)
 		{
+			// ⭐⭐ 2026-10-16（宝龙达 · 效果表收敛）：⭐ 宝龙达固件只支持 关／RGB 固定色 ✅
+			//   ⇒ ⭐ 这里把"声明的效果表"收敛一次，⭐ **下面下拉、⭐ 索引→Id 映射、⭐ 以及点进
+			//      LightForm 那扇窗的列表**都用这张收敛后的表 ✅ —— ⭐ 三处口径必然一致 ✅。
+			//   ⭐ 非宝龙达 ⇒ **原样返回** ⇒ ⭐ 逐位不变 ✅。
+			effects = EffectsForCurrentBackend(effects);
 			TableLayoutPanel tableLayoutPanel3 = MakeRow(rowName);
 			FillRow(tableLayoutPanel3, label, out var sw2, out var effectCombo2, () =>
 			{
@@ -15928,6 +15963,15 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		bool flag = ShouldUseGcuKeyboardFallback(Program.rgb);
 		int keyboardType = CurrentKeyboardType();
 		(string, string)[] array = KeyboardFirmwareEffects.Visible(keyboardType);
+		// ⭐⭐ 2026-10-16（宝龙达 · 效果表收敛）：⭐ 宝龙达固件**只支持 关／RGB 固定色** ✅
+		//   ⇒ ⭐ 强制走「固件效果表」这一路（⭐ 形状是 (Id, Label) ✅），⭐ 且只留那两项 ✅。
+		//   ⚠️ 必须**同时**改下面键盘行的 SelectedIndexChanged（⭐ 它用同一张表按索引取 Id ⚠️）——
+		//      否则下拉显示两项、索引却映射到呼吸/波浪 ⇒ ⭐ 选「单色」实际发的是别的效果 ❌。
+		if (Program.hw?.UsesBaolongda == true)
+		{
+			flag = true;
+			array = BaolongdaLightEffects;
+		}
 		(int, string)[] array2 = RgbForm.VisibleHidEffects(keyboardType);
 		string[] array3 = (flag ? array.Select(((string Id, string Label) e) => e.Label).ToArray() : array2.Select(((int Mode, string Name) e) => e.Name).ToArray());
 		int num;

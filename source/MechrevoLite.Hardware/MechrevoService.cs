@@ -4517,6 +4517,39 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public async Task<bool> ConfirmLightPower(string topic, bool on)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX）：
+		//   ⚠️ 根因（⭐ 机主诊断包实证）：下面这条确认路**只认 GCU/MQTT** —— 它靠"等
+		//      `KeyboardPower`／`QuickSwitches[key]` 变成目标值"判定 ✅，等不到就发 `GETSTATUS` ❌。
+		//      宝龙达下①`KeyboardPower` **从不更新**（⭐ 只在 GCU payload 解析里赋值 ⚠️）
+		//      ②`QuickSwitches["logolight"]` 只每 3 s 刷一次（⭐ 180/500/700 ms 等不到 ✅）
+		//      ⇒ 它**恒判"未确认"** ⇒ 发 MQTT ⇒ 日志刷「ConfirmLightPower fail: …MQTT 未连接」❌
+		//      ⇒ 返回 **false** ⇒ ⭐ `SetLightPower` 返回 false
+		//      ⇒ ⭐ **界面把开关拨回去 = 用户看到的「关了又开」** ✅
+		//   ⇒ ⭐ 先问门面层「这次归你管吗」✅ ⇒ 非 GCU 后端**自己读硬件回读确认** ✅
+		//      ⇒ ⭐ 处理完**直接返回**（⭐ 一条 MQTT 不发 ✅）；⭐ 否则**下面原来那几行一行未改** ✅
+		//      （⭐ 非宝龙达恒 `false` ⇒ 逐位不变 ✅）
+		if (_hw != null)
+		{
+			bool handled;
+			bool backendConfirmed;
+			try
+			{
+				handled = _hw.TryConfirmLightPowerViaBackend(topic, on, out backendConfirmed);
+			}
+			catch (Exception ex2)
+			{
+				// ⚠️ 分派本身异常 ⇒ ⭐ 如实记录，⛔ 但**不让它影响原路**（⭐ 继续往下走 ✅）
+				Logger.WriteError("宝龙达 灯光：⚠️ 确认分派异常 ⇒ 交回原路：" + ex2.Message);
+				handled = false;
+				backendConfirmed = false;
+			}
+			if (handled)
+			{
+				Logger.WriteError($"ConfirmLightPower（⭐ 非 GCU 后端路径）：⭐ topic={topic} · ⭐ on={on}"
+					+ $" · ⭐ 硬件回读确认={backendConfirmed} ⇒ ⭐ 未发任何 MQTT ✅");
+				return backendConfirmed;
+			}
+		}
 		string lightKey;
 		try
 		{
@@ -4583,6 +4616,16 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public async Task RequestLightStatus(string topic)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX 的配套）：
+		//   ⭐ 本主题由非 GCU 后端本地接管 ⇒ ⭐ 这里**没有任何 MQTT 可问** ⚠️ ⇒ 直接返回 ✅
+		//   （⛔ 否则会刷一条注定失败的「RequestLightStatus fail: …MQTT 未连接」❌ ——
+		//    ⭐ 而真实状态本来就能由本后端用功能号本地回读 ✅）
+		if (_hw != null && _hw.HandlesLightTopicViaBackend(topic))
+		{
+			Logger.WriteError($"RequestLightStatus（⭐ 非 GCU 后端路径）：⭐ topic={topic} ⇒ ⭐ 跳过 MQTT ✅"
+				+ "（⭐ 状态由本后端用功能号回读 ✅）");
+			return;
+		}
 		try
 		{
 			await _hw.Publish(topic, new Dictionary<string, object> { ["Action"] = "GETSTATUS" }).ConfigureAwait(continueOnCapturedContext: false);

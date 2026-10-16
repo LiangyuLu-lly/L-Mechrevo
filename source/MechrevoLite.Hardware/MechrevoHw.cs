@@ -2823,7 +2823,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ── ⭐ LOGO 灯：⭐ 复用现成实现 ✅ ──
 		if (string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal))
 		{
-			return TrySetLogoLightViaBackend(on, out confirmed);
+			bool logoHandled = TrySetLogoLightViaBackend(on, out confirmed);
+			if (logoHandled && confirmed)
+			{
+				// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX · LOGO 那半边）：
+				//   ⚠️ 根因：`QuickSwitches["logolight"]` 只由 `RefreshBaolongdaSwitchStates` 每 3 s 刷一次 ⚠️
+				//      ⇒ `ConfirmLightPower` 的 180 ms／500 ms／700 ms 等待**等不到**它 ❌ ⇒ 它去发 MQTT
+				//      ⇒ 失败 ⇒ `SetLightPower` 返回 false ⇒ ⭐ **界面把开关拨回去** ❌
+				//   ⇒ ⭐ 写入并**回读确认后立刻**镜像本地状态 ✅（⭐ 口径与 3 s 周期刷新同源 ✅ ——
+				//      功能号 15 的真实回读值 ✅，⛔ 不是拿"意图"当状态 ⚠️）。
+				SyncBaolongdaQuickSwitch("logolight", on ? 1 : 0);
+			}
+			return logoHandled;
 		}
 		// ── ⭐ 键盘灯：⭐ 只处理这一个主题 ⚠️ ──
 		if (!string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
@@ -2853,23 +2864,37 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				{
 					return false; // ⭐ 理论上不会发生 ⇒ 交回原路更安全 ✅
 				}
-				if (confirmed)
-				{
-					return true;
-				}
+				// ⭐ 这里**刻意不提前 return** —— ⭐ 继续走下面的「功能号 16 真实模式回读」✅
+				//   （⭐ 只有那样才会把 `KeyboardPower` 镜像写成真值 ✅ ⇒ `ConfirmLightPower` 才不会再发 MQTT ✅）
 			}
-			// ⭐ 回读确认（⭐ 与 LOGO 灯同款：⭐ 5 次 × 150 ms ✅）
+			// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX）：
+			//   ⚠️ 根因（⭐ 机主诊断包实证）：本方法原来用【功能号 10 能不能读到】当"回读确认"⚠️
+			//      ⇒ 那只证明"接口活着"，⛔ 不证明"模式真的切过去了"❌；而且**本类从不更新
+			//      `KeyboardPower`**（⭐ 它只在 GCU payload 解析里被赋值 ✅）⇒ 宝龙达下它**恒为默认 true** ❌
+			//      ⇒ `MechrevoService.ConfirmLightPower` 的 `IsConfirmed()` 恒假 ⇒ 它去发 MQTT
+			//      ⇒ 「ConfirmLightPower fail: …MQTT 未连接」⇒ `SetLightPower` 返回 **false**
+			//      ⇒ ⭐ **界面把开关拨回去 = 用户看到的「关了又开」** ✅
+			//   ⇒ 改为【用功能号 16 的真实模式值】判开/关 ✅，⭐ 并如实回写 `KeyboardPower` 镜像 ✅：
+			//      ⭐ 口径依据（⭐ 参考 `_refs\JiaolongControl` · MIT · ⭐ 只取协议事实 ✅ ——
+			//      `SysEnums.cs` 的 `RGBKeyboardMode`）：⭐ `Mode_Off = 0` · ⭐ `Mode_RGBFixedMode = 2` ·
+			//      ⭐ `Unknow = 255` ⇒ ⭐ **「开」＝ 模式 ≠ 0** ✅ · ⭐ **「关」＝ 模式 0** ✅
+			//      （⭐ 本方法下发时正是这么写的：⭐ 关 ⇒ 模式 0 ✅ · ⭐ 开 ⇒ 模式 2 ✅）。
 			for (int attempt = 0; attempt < 5; attempt++)
 			{
-				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte _))
+				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
 				{
-					confirmed = true;
-					Logger.WriteError($"宝龙达 灯光：⭐ 键盘灯电源已{(on ? "开" : "关")}并回读确认 ✅（第 {attempt + 1} 次）");
+					bool actual = mode != 0;
+					KeyboardPower = actual; // ⭐ 如实回写本地镜像 ✅（⭐ 修「关了又开」的关键一步 ⚠️）
+					confirmed = actual == on;
+					Logger.WriteError($"宝龙达 灯光：⭐ 键盘灯电源已{(on ? "开" : "关")}并回读确认"
+						+ $"（⭐ 功能号 16 模式={mode} · ⭐ 实际={(actual ? "开" : "关")} · ⭐ 第 {attempt + 1} 次）"
+						+ (confirmed ? " ✅" : " ⚠️ 与目标不一致 ⇒ 如实报告未确认 ⚠️"));
 					return true;
 				}
 				Thread.Sleep(150);
 			}
-			Logger.WriteError($"宝龙达 灯光：⚠️ 键盘灯电源写入完成但 {5 * 150} ms 内回读不到 ⇒ 如实报告未确认 ⚠️");
+			Logger.WriteError($"宝龙达 灯光：⚠️ 键盘灯电源写入完成但 {5 * 150} ms 内读不到模式"
+				+ "（⭐ 功能号 16）⇒ 如实报告未确认 ⚠️（⭐ 本地镜像保持不变、⛔ 不编造状态 ✅）");
 			return true;
 		}
 		catch (Exception ex)
@@ -2877,6 +2902,79 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			Logger.WriteError("宝龙达 灯光：⭐ 操作异常（已吞掉，不影响别处）：" + ex.Message);
 			return true; // ⭐ 已接管 ⇒ ⛔ 不让调用方再走 GCU ✅
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX）：⭐ 把
+	/// <c>MechrevoService.ConfirmLightPower(topic, on)</c> 这一步**分派给非 GCU 后端** ✅
+	/// <para>⚠️ 根因（⭐ 机主诊断包实证）：那条确认路**只认 GCU/MQTT** —— 它靠"等
+	/// <c>KeyboardPower</c>／<c>QuickSwitches[key]</c> 变成目标值"来判定 ✅，等不到就发
+	/// <c>GETSTATUS</c> ❌。而宝龙达下 ① <c>KeyboardPower</c> **从不更新**（⭐ 它只在 GCU payload
+	/// 解析里被赋值 ⚠️）② <c>QuickSwitches["logolight"]</c> 只每 3 s 刷一次（⭐ 180/500/700 ms 等不到 ✅）
+	/// ⇒ 它**恒判"未确认"** ⇒ 发 MQTT ⇒ 失败 ⇒ 返回 <c>false</c>
+	/// ⇒ ⭐ **<c>SetLightPower</c> 返回 false ⇒ 界面把开关拨回去 = 用户看到的「关了又开」** ❌</para>
+	/// <para>⭐ 本方法**只读硬件**（⭐ 功能号 16 模式 ／ ⭐ 功能号 15 LOGO ✅）、⭐ 并把真实值回写本地镜像 ✅
+	/// ⇒ ⭐ 调用方据此确认，⛔ 一条 MQTT 都不发 ✅。</para>
+	/// <para>⭐ 主题口径与 <see cref="TrySetLightPowerViaBackend" /> **逐字一致** ✅
+	/// （⭐ 只认 <c>Keyboard/Ctrl</c> 与 <c>HidLightbar_Logo/Ctrl</c> ✅ —— ⭐ 保证"接管"与"确认"成对 ✅）。
+	/// ⭐ 返回 <c>true</c> ⇒ 已由本后端处理 ✅；⭐ <c>false</c> ⇒ 不归它管 ⇒ 调用方**原路走** ✅
+	/// （⭐ 非宝龙达恒 false ⇒ 逐位不变 ✅）。</para>
+	/// </summary>
+	internal bool TryConfirmLightPowerViaBackend(string topic, bool on, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false; // ⭐ 不是宝龙达在管事 ⇒ 交给原来的 GCU 路径 ✅
+		}
+		try
+		{
+			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+			{
+				// ⭐ 口径同 TrySetLightPowerViaBackend：⭐ Mode_Off=0 ⇒ 关 ✅ · ⭐ 非 0 ⇒ 开 ✅ · ⭐ Unknow=255 ⇒ 读不到 ✅
+				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
+				{
+					bool actual = mode != 0;
+					KeyboardPower = actual; // ⭐ 如实回写镜像 ✅
+					confirmed = actual == on;
+					return true;
+				}
+				return true; // ⭐ 已接管（⭐ 只是读不到 ⇒ 如实报未确认 ⚠️）⇒ ⛔ 不让调用方去发 MQTT ✅
+			}
+			if (string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal))
+			{
+				if (wmi.TryReadLogoLight(out bool logoOn))
+				{
+					SyncBaolongdaQuickSwitch("logolight", logoOn ? 1 : 0);
+					confirmed = logoOn == on;
+					return true;
+				}
+				return true;
+			}
+			return false; // ⭐ 其余主题（⭐ 灯带／铰链／同步 ⚠️）不归它管 ⇒ 交回原路 ✅
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("宝龙达 灯光：⭐ 确认分派异常（已吞掉，不影响别处）：" + ex.Message);
+			return true; // ⭐ 已接管 ⇒ ⛔ 不让调用方再走 GCU ✅
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX 的配套）：⭐ 这个灯光主题**是否由非 GCU 后端
+	/// 本地接管** —— ⭐ 供 <c>MechrevoService.RequestLightStatus</c> **少发一条注定失败的 MQTT** ✅。
+	/// <para>⭐ 判据与 <see cref="TrySetLightPowerViaBackend" /> 逐字一致 ✅（⭐ 只认 <c>Keyboard/Ctrl</c>
+	/// 与 <c>HidLightbar_Logo/Ctrl</c> ✅）；⭐ 非宝龙达恒 <c>false</c> ⇒ 调用方逐位不变 ✅。</para>
+	/// </summary>
+	internal bool HandlesLightTopicViaBackend(string topic)
+	{
+		if (_baolongda?.Wmi == null || _disposed || string.IsNullOrEmpty(topic))
+		{
+			return false;
+		}
+		return string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal)
+			|| string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal);
 	}
 
 	/// <summary>
