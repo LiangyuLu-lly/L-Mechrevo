@@ -321,6 +321,40 @@ public class CustomModeForm : RForm
 
 	internal static string FanTableTimeoutText => Strings.FanTableNotReady;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 诚实性 · 用户真机反馈）：⭐ <b>非 GCU 后端下"硬件状态页读不到"该怎么说</b> ✅。
+	/// <para>⚠️ <b>修的是什么</b>：⭐ <see cref="RefreshHardwareStateAsync" /> 原来在
+	/// <c>RequestCustomModePageStateAsync()</c> 失败时一律显示 <see cref="FanTableTimeoutText" />
+	/// （＝「⭐ 风扇曲线未就绪」⚠️）⭐ —— ⭐ 而<b>真实原因与风扇曲线无关</b> ❌：
+	/// ⭐ 那个方法体里是三条 <c>Publish("Fan/Control" …) / Publish("LCHWOC/Control" …)</c>
+	/// ⭐ ⭐ <b>纯 MQTT 下发</b>，⭐ 宝龙达机型<b>没有 GCU</b> ⇒ ⭐ 必然抛/为假 ✅。
+	/// ⭐ 机主真机日志原文：⭐ <c>Custom mode status refresh failed: 发布到 Fan/Control 失败：MQTT 未连接</c> ⚠️。</para>
+	/// <para>⭐ <b>为什么"硬件状态页"</b>：⭐ 该页要显示的风扇曲线 / 功耗墙 / 显卡功率，⭐ 在非 GCU 后端上
+	/// <b>没有可读来源</b> ✅ ⇒ ⭐ 如实说"读不到"比甩给风扇曲线准确 ✅。</para>
+	/// <para>⚠️ <b>为什么不进 resx</b>：⭐ <c>Strings*.resx</c> 是<b>混合行尾</b>（⭐ CRLF=14 ＋ ⭐ 裸 LF=5343 ⚠️）
+	/// ⇒ ⭐ <c>edit</c> 工具会把整个文件改写成 LF、⭐ diff 爆成全文 ❌；⭐ 且新增一条串要同时改
+	/// <c>Strings.resx</c> ＋ <c>Strings.zh-CN.resx</c> ＋ <c>Strings.cs</c> 三处 ⚠️。
+	/// ⭐ 本模块已有先例（⭐ <c>PerfModeRunner.WriteRejectedDetail</c> / <c>StepErrorDetail</c> 都是
+	/// 面向界面的中文字面量 ✅），⭐ 故沿用"⭐ 代码里给准确文案"⭐ 这条口径 ✅。</para>
+	/// <para>⚠️ <b>非宝龙达 ⇒ 恒不取用</b> ⇒ ⭐ 仍显示 <see cref="FanTableTimeoutText" />，⭐ 逐字不变 ✅。</para>
+	/// </summary>
+	internal static string HardwareStateUnavailableText => "本机无 GCU，硬件状态页不可读";
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ <b>本机写不了「固件自定义档」时的如实说明</b> ✅。
+	/// <para>⚠️ <b>背景</b>：⭐ 自定义档走 <see cref="PerfModeRoute.FirmwareSlot" /> ⇒ ⭐ 档位步
+	/// <c>SwitchFirmwareSlot</c>（⇒ <c>MechrevoService.SwitchCustomProfileWithResend</c>）与字段步
+	/// <c>WriteFirmwareField</c>（⇒ <c>SetCustomDetail</c>）⭐ <b>只走 GCU 的 MQTT</b> ❌；
+	/// ⭐ 宝龙达没有 GCU ⇒ ⭐ 恒失败 ⚠️（⭐ 真机日志：⭐ <c>SwitchCustomProfile: GCU 未连接</c> ＋
+	/// <c>SwitchFirmwareSlot:0 -> Failed</c> ✅）。</para>
+	/// <para>⭐ 现在 <c>PerfModeCapabilities.SupportsFirmwareSlot == false</c> ⇒
+	/// <see cref="PerfModeApplyPlanner" /> <b>不再生成</b>那两步 ✅ ⇒ ⭐ 不会再出现「⭐ 切换失败」/「⭐ 这次没写进去」
+	/// 这类"⭐ 像是重试一下就能好"⭐ 的误导 ❌；⭐ 但界面上也<b>不该</b>显示成"⭐ 已切换到 X" ✅
+	/// ⇒ ⭐ 用这条如实说明"⭐ 保存下来的是本机配置、⭐ 固件档位不会切" ✅。</para>
+	/// <para>⚠️ <b>非宝龙达 ⇒ 恒不取用</b> ⇒ ⭐ 原有分支逐字不变 ✅。</para>
+	/// </summary>
+	internal static string FirmwareSlotUnsupportedText => "本机无 GCU，不支持写入固件自定义档（设置仍保存在本机）";
+
 	internal string EditingModeId => _modeId;
 
 	internal static Action? RestartAsAdminOverride { get; set; }
@@ -2595,6 +2629,32 @@ public class CustomModeForm : RForm
 		});
 		PerfModeDefinition perfModeDefinition = FindMode(outcome.ModeId);
 		string arg = (((object)perfModeDefinition != null) ? PerfModeText.Name(perfModeDefinition) : "");
+		// ⭐⭐ 2026-10-16（宝龙达 · 自定义档诚实性）：⭐ 本机写不了「固件自定义档」时，⭐ 这条结果里
+		//   【不会】有档位步/固件字段步（⭐ 依据：PerfModeCapabilities.SupportsFirmwareSlot=false
+		//   ＋ PerfModeApplyPlanner 据此不生成那两步 ✅）⇒ ⭐ flag=false、⭐ ModeSwitched=false
+		//   ⇒ ⭐ 原来会掉进下面 else 分支，⭐ 而两种表现都不准确 ⚠️：
+		//     ① ⭐ 步骤为空（⭐ 用户只改了"不改变"的那些行 ✅）⇒ ⭐ 直接 return ⇒ ⭐ **界面毫无反应** ❌；
+		//     ② ⭐ 有步骤 ⇒ ⭐ 显示"已确认 N 项" ⇒ ⭐ 会被读成"档位已经切过去了" ❌。
+		//   ⭐ 所以这里如实说明：⭐ 保存下来的是【本机配置】，⭐ 固件档位**不切** ✅。
+		//   ⚠️ ⭐ 不掩盖真实失败：⭐ 有失败项 ⇒ ⭐ 仍走下面 AnyFailed 分支（⭐ 红字 ✅）。
+		//   ⚠️ 非宝龙达 ⇒ `firmwareSlotNotWritable` 恒 false ⇒ ⭐ 下面原有三分支【一字不变】✅。
+		bool firmwareSlotNotWritable = ((object)perfModeDefinition != null)
+			&& perfModeDefinition.Route == PerfModeRoute.FirmwareSlot
+			&& (Program.hw?.UsesBaolongda ?? false);
+		if (firmwareSlotNotWritable && !outcome.AnyFailed)
+		{
+			_status.Text = FirmwareSlotUnsupportedText;
+			_status.ForeColor = UiVisualStyle.Warn;
+			_tips.SetToolTip(_status, PerfModeText.Details(outcome, amd));
+			ResizeToContent();
+			// ⭐ 默认「仅错误」级别可见（⭐ WriteError ✅）；⭐ 用状态翻转去重 ⇒ ⭐ 不会随每次
+			//   懒验证/重绘刷屏（⭐ 只有"从别的情形变成这种"时才落一行 ✅）。
+			if (Logger.TryMarkChanged("perf-custom-firmware-slot-unsupported", "PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）写不了固件自定义档 ⇒ 只保存本机配置、不切固件档；已按后端如实提示"))
+			{
+				Logger.WriteError("PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）写不了固件自定义档 ⇒ 只保存本机配置、不切固件档；已按后端如实提示");
+			}
+			return;
+		}
 		if (flag && !outcome.ModeSwitched)
 		{
 			_status.Text = Strings.PerfModeSwitchFailed;
@@ -3450,7 +3510,10 @@ public class CustomModeForm : RForm
 			await Task.Run((Func<bool>)hw.EnsureDirectGpuOverclock);
 			if (!(await hw.RequestCustomModePageStateAsync()))
 			{
-				_status.Text = FanTableTimeoutText;
+				// ⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ 这条失败的真实原因是"三条 MQTT 下发发不出去"，
+				//   与风扇曲线无关 ❌ ⇒ ⭐ 非 GCU 后端改说实话（见 HardwareStateUnavailableText）。
+				//   ⚠️ 非宝龙达 ⇒ hw.UsesBaolongda 为 false ⇒ ⭐ 仍取 FanTableTimeoutText，逐字不变 ✅。
+				_status.Text = (hw.UsesBaolongda ? HardwareStateUnavailableText : FanTableTimeoutText);
 				_status.ForeColor = UiVisualStyle.Danger;
 				return false;
 			}
@@ -3459,7 +3522,8 @@ public class CustomModeForm : RForm
 		catch (Exception ex)
 		{
 			Logger.WriteLine("Custom mode status refresh failed: " + ex.Message);
-			_status.Text = FanTableTimeoutText;
+			// ⭐ 同上（宝龙达 · 诚实性）：⭐ 异常也是"MQTT 未连接"这条链 ⇒ ⭐ 按后端如实说 ✅。
+			_status.Text = (hw.UsesBaolongda ? HardwareStateUnavailableText : FanTableTimeoutText);
 			_status.ForeColor = UiVisualStyle.Danger;
 			return false;
 		}

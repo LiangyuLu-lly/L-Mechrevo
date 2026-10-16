@@ -17,13 +17,22 @@ public static class PerfModeApplyPlanner
 		List<PerfApplyStep> list = new List<PerfApplyStep>(16);
 		PerfModeSettings settings = mode.Settings;
 		PerfModeRoute perfModeRoute = routeOverride ?? mode.Route;
+		// ⭐⭐ 2026-10-16（宝龙达 · 自定义档诚实性）：⭐ 本后端【写不了固件自定义档】时，不生成那两步 ✅
+		//   ⭐ 依据见 PerfModeCapabilities.SupportsFirmwareSlot 的长注释 ——
+		//      档位步 `SwitchFirmwareSlot` 会经 `MechrevoService.SwitchCustomProfile*` 的两道 `!IsGcuConnected` 闸
+		//      而【恒失败】❌；⭐ 而 Runner 一见档位步失败就 `break` ⇒ ⭐ 把后面【所有】步骤（含本该能用的
+		//      电源计划/覆盖层/睿频/刷新率）一起废掉 ❌。
+		//   ⇒ ⭐ 所以宝龙达下退化为「只做后端无关的那些步骤」＝ 配置保存在本机（⭐ `perf_custom*_` 键本来就存得下 ✅）。
+		//   ⚠️ 非 FirmwareSlot 路由 ⇒ 恒 true ⇒ ⭐ 内置档路径【逐位不变】✅；
+		//   ⚠️ `caps.SupportsFirmwareSlot` 默认 true ⇒ ⭐ 所有既有后端（GCU/老接口）【逐位不变】✅。
+		bool canWriteFirmwareSlot = perfModeRoute != PerfModeRoute.FirmwareSlot || caps.SupportsFirmwareSlot;
 		if (perfModeRoute == PerfModeRoute.FirmwareSlot)
 		{
 			if ((object)slotPlan == null)
 			{
 				throw new ArgumentNullException("slotPlan", "走固件自定义档的模式必须先做档位决策");
 			}
-			if (includeSwitch)
+			if (canWriteFirmwareSlot && includeSwitch)
 			{
 				list.Add(new PerfApplyStep(PerfApplyStepKind.SwitchFirmwareSlot, null, null, slotPlan.SlotIndex, IsCpuCurve: false, null, PerfApplyVerify.ModeReadback));
 			}
@@ -43,7 +52,7 @@ public static class PerfModeApplyPlanner
 				list.Add(new PerfApplyStep(PerfApplyStepKind.SwitchTurboSubMode, null, null, (mode.Kind == PerfModeKind.SilentTurbo) ? 1 : 0));
 			}
 		}
-		if (perfModeRoute == PerfModeRoute.FirmwareSlot && (object)slotPlan != null && slotPlan.NeedsParameterWrite)
+		if (canWriteFirmwareSlot && perfModeRoute == PerfModeRoute.FirmwareSlot && (object)slotPlan != null && slotPlan.NeedsParameterWrite)
 		{
 			if (settings.TccOn.HasValue)
 			{

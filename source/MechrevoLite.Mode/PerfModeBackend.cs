@@ -41,7 +41,15 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			// 现在判据 = **Win32 侧到底有没有可切的档位**（内屏实测最大档 > MIN_RATE ⇒ 至少两档），
 			// 并保留"自动刷新率开着时不做固定档"这条语义 —— 但改读**我们自己的**配置键 `screen_auto`。
 			SupportsRefreshRate = (ScreenGateProbe.Win32MaxRefreshRate() > ScreenControl.MIN_RATE) && !AppConfig.Is("screen_auto"),
-			SupportsTurboSubMode = (hw.Capabilities.SilentTurboAvailability == FeatureAvailability.Supported)
+			SupportsTurboSubMode = (hw.Capabilities.SilentTurboAvailability == FeatureAvailability.Supported),
+			// ⭐⭐ 2026-10-16（宝龙达 · 自定义档诚实性）：⭐ 固件自定义档【只有 GCU 后端能写】✅。
+			//   ⭐ 依据：⭐ 档位步 `SwitchFirmwareSlot` ⇒ `MechrevoService.SwitchCustomProfileWithResend`（⭐ `:768`/`:801`
+			//     两道 `!IsGcuConnected` 闸 ❌）· ⭐ 字段步 `WriteFirmwareField` ⇒ `SetCustomDetail`（⭐ 同样是 MQTT ❌）
+			//   ⭐ 真机日志（⭐ 宝龙达 `MRID6-23` ✅）：⭐ `SwitchCustomProfile: GCU 未连接` ＋ `SwitchFirmwareSlot:0 -> Failed` ⚠️
+			//   ⇒ ⭐ 所以按后端【如实申报】：⭐ 宝龙达 ⇒ false ⇒ ⭐ 规划器不生成那两步 ✅
+			//      ⇒ ⭐ 不再出现"注定失败"的档位步（⭐ 它会让 Runner 提前 break、把后面所有步骤一起废掉 ❌）✅
+			//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda == false` ⇒ true ⇒ ⭐ 步骤列表【一个字节都不变】✅
+			SupportsFirmwareSlot = !hw.UsesBaolongda
 		};
 	}
 

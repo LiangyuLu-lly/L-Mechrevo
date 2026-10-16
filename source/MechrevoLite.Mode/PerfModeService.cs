@@ -517,9 +517,15 @@ internal sealed class PerfModeService
 		if (hw == null || !hw.IsConnected)
 		{
 			Logger.WriteLine("PerfModes: activate(" + modeId + ") refused, GCU not connected");
+			// ⭐⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ 失败原因【按后端如实写】✅ ——
+			//   ⭐ 原来恒写「GCU 未连接」⚠️，⭐ 但宝龙达机型**本来就没有 GCU**（⭐ 而 `IsConnected` 的判据是
+			//      `UsesBuiltInModes || IsGcuConnected` ⇒ ⭐ 语义是"后端在不在"、⭐ 不是"有没有跟 GCU 说过话" ✅）
+			//      ⇒ ⭐ 在宝龙达上这句是【误导】❌。
+			//   ⚠️ 非宝龙达（⭐ 含 `hw == null` 这种判不出来的情形 ✅）⇒ ⭐ 字符串逐字不变 ✅。
+			string refusalDetail = ((hw != null && hw.UsesBaolongda) ? "本机为非 GCU 后端（宝龙达），该步骤不适用" : "GCU 未连接");
 			PerfApplyOutcome perfApplyOutcome = new PerfApplyOutcome(modeId, new PerfApplyStepOutcome[1]
 			{
-				new PerfApplyStepOutcome(SwitchStepFor(mode, 0), PerfApplyResult.Failed, "GCU 未连接")
+				new PerfApplyStepOutcome(SwitchStepFor(mode, 0), PerfApplyResult.Failed, refusalDetail)
 			});
 			RaiseApplied(perfApplyOutcome);
 			return perfApplyOutcome;
