@@ -23,8 +23,11 @@ namespace MechrevoLite.Hardware;
 ///
 /// <para><b>槽位选择</b>：上游 <c>LpcIO.p</c> 注释写明
 /// <i>"Slot 0 is at 0x2e/0x2f, slot 1 at 0x4e/0x4f"</i>。
-/// 本类固定用 <b>slot 1</b>，因为 <c>JiaolongControl</c> 的 <c>ECMemoryTable</c> 用的就是
-/// <c>EC_ADDR_PORT = 0x4E</c> / <c>EC_DATA_PORT = 0x4F</c>（厂商控制台走的是 slot 0）。
+/// <b>两个槽位都支持</b>：默认（<see cref="TryReadByte"/>）走 <b>slot 1</b>，
+/// 因为 <c>JiaolongControl</c> 的 <c>ECMemoryTable</c> 用的就是
+/// <c>EC_ADDR_PORT = 0x4E</c> / <c>EC_DATA_PORT = 0x4F</c>（厂商控制台走的是 slot 0）；
+/// <see cref="TryReadByteOnSlot"/> 可显式指定槽位，供诊断做「**同地址两槽位并列对照**」——
+/// ⭐ 那是把「读回全 <c>0xFF</c> 是**槽位不对**」与「**本机读不到**」分开的唯一手段。
 /// <c>ioctl_select_slot</c> 会 reset 模块内部状态，故<b>每次事务前都重新选择一次</b>。</para>
 ///
 /// <para><b>⚠️ 诚实边界：本类的「只读」包含对 SuperIO 窗口寄存器的写。</b>
@@ -54,12 +57,36 @@ namespace MechrevoLite.Hardware;
 /// </summary>
 internal static class EcLpcIo
 {
-	// ── LPC/SuperIO 槽位 1（= 蛟龙控制台的 EC_ADDR_PORT / EC_DATA_PORT）──
-	private const ushort SlotIndexPort = 0x4E;
+	// ── LPC/SuperIO 的两个槽位（上游 LpcIO.p：slot 0 = 0x2E/0x2F、slot 1 = 0x4E/0x4F）──
+	//
+	//  ⭐ 协议事实：两个槽位是**同一套 SuperIO 协议**的两个端口基址（不是两套协议），
+	//    用 `ioctl_select_slot(0|1)` 切换；子寄存器语义（0x11 地址高 · 0x10 地址低 · 0x12 数据）**完全相同**。
+	//    · slot 0（0x2E/0x2F）—— 厂商控制台 7.3 走这条（含 `Write_EC_Init` 解锁前置）
+	//    · slot 1（0x4E/0x4F）—— 蛟龙开源控制台的 ECMemoryTable.EC_ADDR_PORT/EC_DATA_PORT 走这条
+	//  ⚠️ ⇒ 二者指向**同一片 XRAM**，只是入口不同 —— 这正是 ②f 做「同地址两槽位并列对照」的原因：
+	//     ⭐ 若 slot 0 能读到 0x55（芯片 ID）而 slot 1 全 0xFF ⇒ 说明**通道与协议都对、只是槽位因模具而异**；
+	//     ⭐ 若两个槽位都全 0xFF ⇒ 只能说**本机读不到**（⚠️ 可能是没有该 SuperIO 设备、也可能未进入配置态
+	//        或地址本就不存在 —— 三者本探针**分不开**，故不得据此下"不存在"的结论）。
+	internal const ulong SlotZero = 0;
 
-	private const ushort SlotDataPort = 0x4F;
+	internal const ulong SlotOne = 1;
 
-	private const ulong SlotNumber = 1;
+	/// <summary>默认槽位 = slot 1（蛟龙控制台口径，上游 ECMemoryTable 用的就是它）。</summary>
+	internal const ulong DefaultSlot = SlotOne;
+
+	/// <summary>槽位 → 索引端口（上游 LpcIO.p：slot 0 = 0x2E、slot 1 = 0x4E）。</summary>
+	internal static ushort IndexPortFor(ulong slot)
+	{
+		return (slot == SlotZero) ? ((ushort)0x2E) : ((ushort)0x4E);
+	}
+
+	/// <summary>槽位 → 数据端口（= 索引端口 + 1）。</summary>
+	internal static ushort DataPortFor(ulong slot)
+	{
+		return (ushort)(IndexPortFor(slot) + 1);
+	}
+
+	private static ulong _lastSlotUsed = DefaultSlot;
 
 	// ── SuperIO 子寄存器（协议事实：只取端口对/寄存器号/访问顺序，未抄任何代码）──
 	private const byte SubRegAddressHigh = 0x11;
@@ -139,8 +166,10 @@ internal static class EcLpcIo
 			{
 				return "⛔ 模块未装载（" + _loadFailure + "）";
 			}
-			string text = "✅ 模块已装载（LpcIO · slot " + SlotNumber + " = 0x"
-				+ SlotIndexPort.ToString("X2") + "/0x" + SlotDataPort.ToString("X2")
+			string text = "✅ 模块已装载（LpcIO · 支持 slot 0 = 0x2E/0x2F 与 slot 1 = 0x4E/0x4F"
+				+ " · 同一套子寄存器语义 · 最近一次事务用 slot " + _lastSlotUsed
+				+ "（0x" + IndexPortFor(_lastSlotUsed).ToString("X2")
+				+ "/0x" + DataPortFor(_lastSlotUsed).ToString("X2") + "）"
 				+ " · 子寄存器白名单仅 0x10/0x11/0x12）· 已发 Execute " + _ioCount + " 次";
 			if (_consecutiveReadFailures > 0)
 			{
@@ -173,10 +202,26 @@ internal static class EcLpcIo
 	}
 
 	/// <summary>
-	/// 只读：经 LPC/SuperIO 窗口读 EC 一个字节。
+	/// 只读：经 LPC/SuperIO 窗口读 EC 一个字节（**默认槽位 slot 1**，蛟龙控制台口径）。
 	/// <para>任何失败都返回 false，并按需标记中毒（软失败计数 / 硬失败立即）。<b>绝不抛出</b>。</para>
 	/// </summary>
 	internal static bool TryReadByte(int address, out int value)
+	{
+		return TryReadByteOnSlot(DefaultSlot, address, out value);
+	}
+
+	/// <summary>
+	/// 只读：**指定槽位**读 EC 一个字节。
+	///
+	/// <para>⭐ 为什么要能换槽位：slot 0（<c>0x2E</c>/<c>0x2F</c>）与 slot 1（<c>0x4E</c>/<c>0x4F</c>）
+	/// 是**同一套 SuperIO 协议**的两个端口基址、指向**同一片 XRAM**（上游 <c>LpcIO.p</c>：
+	/// <i>"Slot 0 is at 0x2e/0x2f, slot 1 at 0x4e/0x4f"</i>）。
+	/// 同一地址在两个槽位各读一次，即可把「**读回全 <c>0xFF</c> 是槽位不对**」与
+	/// 「**本机读不到**」分开 —— 只读一个槽位时这两种失败长得一样。</para>
+	///
+	/// <para>任何失败都返回 false，并按需标记中毒。<b>绝不抛出</b>。</para>
+	/// </summary>
+	internal static bool TryReadByteOnSlot(ulong slot, int address, out int value)
 	{
 		value = -1;
 		lock (Gate)
@@ -198,13 +243,13 @@ internal static class EcLpcIo
 			}
 			try
 			{
-				bool ok = ReadByteCore(address, out value);
+				bool ok = ReadByteCore(slot, address, out value);
 				NoteReadOutcome(ok);
 				return ok;
 			}
 			catch (Exception ex)
 			{
-				Poison("读 LPC EC 0x" + address.ToString("X4") + " 抛异常：" + ex.GetType().Name);
+				Poison("读 LPC EC slot " + slot + " 0x" + address.ToString("X4") + " 抛异常：" + ex.GetType().Name);
 				return false;
 			}
 			finally
@@ -238,23 +283,24 @@ internal static class EcLpcIo
 	//  LPC/SuperIO 时序（调用方必须已持锁 + 已确保模块 + 已取互斥体）
 	//
 	//  读一个 EC 字节：
-	//    ① 选槽位（ioctl_select_slot 1 ⇒ 内部 g_register_port = 0x4E）
+	//    ① 选槽位（ioctl_select_slot <slot> ⇒ 内部 g_register_port = 0x2E（slot 0）或 0x4E（slot 1））
 	//    ② 子寄存器 0x11 ← 地址高字节        （寻址，不是写 EC 数据）
 	//    ③ 子寄存器 0x10 ← 地址低字节        （寻址，不是写 EC 数据）
 	//    ④ 读子寄存器 0x12 ⇒ 数据字节
 	//
 	//  上游 superio_outb(reg,val) 的实现 =
 	//      io_out_byte(g_register_port, reg); io_out_byte(g_register_port + 1, val);
-	//  与 JiaolongControl 的 WritePort(0x4E, reg); WritePort(0x4F, val) 逐字对应。
+	//  与 JiaolongControl 的 WritePort(0x4E, reg); WritePort(0x4F, val) 逐字对应
+	//  （slot 0 只是把 0x4E/0x4F 换成 0x2E/0x2F，其余时序逐字相同）。
 	//  （只取协议事实；未抄任何第三方代码）
 	// ══════════════════════════════════════════════════════════════════
 
-	private static bool ReadByteCore(int address, out int value)
+	private static bool ReadByteCore(ulong slot, int address, out int value)
 	{
 		value = -1;
 		// ⭐ 每次事务前重选槽位：ioctl_select_slot 会 reset 模块内部状态，
-		//    且其他调用方可能改过它 ⇒ 重设一次最稳（代价 1 次 Execute）
-		if (!SelectSlot())
+		//    且其他调用方（含本类的另一槽位读）可能改过它 ⇒ 重设一次最稳（代价 1 次 Execute）
+		if (!SelectSlot(slot))
 		{
 			return false;
 		}
@@ -274,16 +320,21 @@ internal static class EcLpcIo
 		return true;
 	}
 
-	/// <summary>选择 LPC/SuperIO 槽位（幂等；每次事务前调用）。</summary>
-	private static bool SelectSlot()
+	/// <summary>
+	/// 选择 LPC/SuperIO 槽位（幂等；每次事务前调用）。
+	/// ⚠️ 槽位是模块内部状态（<c>g_register_port</c>）⇒ 必须与随后的子寄存器读写**同一槽位**，
+	/// 故每次事务前都重选一次，不依赖上一次的选择（本类现在会交替读两个槽位）。
+	/// </summary>
+	private static bool SelectSlot(ulong slot)
 	{
 		try
 		{
-			if (!_pawn.Execute("ioctl_select_slot", new ulong[1] { SlotNumber }, null))
+			if (!_pawn.Execute("ioctl_select_slot", new ulong[1] { slot }, null))
 			{
-				ReportSoftFailure("选择 LPC 槽位 " + SlotNumber + " 失败（ioctl_select_slot）");
+				ReportSoftFailure("选择 LPC 槽位 " + slot + " 失败（ioctl_select_slot）");
 				return false;
 			}
+			_lastSlotUsed = slot;
 			return true;
 		}
 		catch (Exception ex)

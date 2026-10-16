@@ -778,7 +778,31 @@ internal static class DiagnosticBaolongdaInfo
 			sb.AppendLine("   ⚠️ 若本节读到的是 0xFF / 0x00 这类**恒定填充值** ⇒ ⭐ 说明该地址在本机根本不存在");
 			sb.AppendLine("      ⇒ ⚠️ 那就**不能**据此否定蛟龙上的存在性（⭐ 本机 EC 型号不同）⚠️");
 			sb.AppendLine();
-			sb.AppendLine("④ **通道状态** = " + EcLpcIo.DescribeChannel());
+			sb.AppendLine("④ ⭐ **slot 0（0x2E/0x2F）vs slot 1（0x4E/0x4F）并列对照** —— ⭐ 本节的**判定核心** ⚠️");
+			sb.AppendLine("   ⭐ 为什么要对照：两个槽位是**同一套 SuperIO 协议**的两个端口基址、指向**同一片 XRAM**");
+			sb.AppendLine("      （上游 LpcIO.p：\"Slot 0 is at 0x2e/0x2f, slot 1 at 0x4e/0x4f\"）");
+			sb.AppendLine("      ⇒ ⚠️ 单读一个槽位时，「**槽位不对**」与「**本机读不到**」长得**一模一样** ⚠️");
+			sb.AppendLine("         · 若 **slot 0 能读到 0x55（芯片 ID）** ⇒ ⭐ 证明**通道与协议都对、只是槽位因模具而异** ✅");
+			sb.AppendLine("         · 若 **两个槽位都读不到 / 全 0xFF** ⇒ ⭐ 只能说**本机读不到** ⚠️");
+			sb.AppendLine("           ⛔ 不得据此说「不存在」—— 本探针**分不开**这三种可能：");
+			sb.AppendLine("              ① 本机没有该 SuperIO 设备 · ② 未进入 SuperIO 配置态 · ③ 该地址本就不存在 ⚠️");
+			sb.AppendLine("   ⚠️ 已知：厂商控制台 7.3 走 **slot 0**、蛟龙开源控制台走 **slot 1**；");
+			sb.AppendLine("      而两者都自称在读同一个 0x2000 / 0x1060 / 0xC411 ⇒ ⭐ 更说明是**同一片空间的两个入口** ✅");
+			sb.AppendLine();
+			sb.AppendLine("   地址      含义                          slot 0 (0x2E/0x2F)   slot 1 (0x4E/0x4F)");
+			sb.AppendLine("   ────────  ────────────────────────────  ───────────────────  ───────────────────");
+			AppendSlotCompareRow(sb, 8192, "芯片 ID 1（期望 0x55）");
+			AppendSlotCompareRow(sb, 8193, "芯片 ID 2");
+			AppendSlotCompareRow(sb, 4192, "解锁寄存器（bit7=已解锁）");
+			AppendSlotCompareRow(sb, 50193, "EC 版本（控制台口径）");
+			AppendSlotCompareRow(sb, 51252, "风扇 1（上游 Fan1_RPM）");
+			AppendSlotCompareRow(sb, 51253, "风扇 2（上游 Fan2_RPM）");
+			sb.AppendLine();
+			sb.AppendLine("   ⚠️ 判据提醒：**读到 ≠ 合理**（②b 的教训：IOCTL 成功也可能回填充值）");
+			sb.AppendLine("      ⇒ ⭐ 本表**只报原始字节**，不下语义结论 ⚠️");
+			sb.AppendLine("   ⚠️ 且本机 EC **不是 IT5570** ⇒ 本机读数**不能当蛟龙的真值**，只能验「通道 ＋ 时序 ＋ 槽位」✅");
+			sb.AppendLine();
+			sb.AppendLine("⑤ **通道状态** = " + EcLpcIo.DescribeChannel());
 			sb.AppendLine("⛔ 本节只读：只读子寄存器 0x12 · 只写窗口寄存器 0x11/0x10（寻址）· ⛔ 未写任何 EC 数据 ✅");
 		}
 		catch (Exception ex)
@@ -786,6 +810,60 @@ internal static class DiagnosticBaolongdaInfo
 			sb.AppendLine("⚠️ ②f 诊断异常（已吞掉，不影响本节其余部分）：" + ex.GetType().Name + " · " + ex.Message);
 		}
 	}
+
+	/// <summary>
+	/// ②f 辅助：同一地址在 slot 0 / slot 1 各读一次，输出一行对照。
+	///
+	/// <para>⚠️ <see cref="EcLpcIo.LastReadFailure"/> 是**全局**的 ⇒ 若要取原因文本必须**读完立刻取**，
+	/// 否则会被下一次读覆盖。本方法只报成功/失败与字节值，故不需要它。</para>
+	///
+	/// <para>⛔ 只读：不写任何 EC 数据（只向窗口寄存器写地址高/低字节，那是**寻址**）。</para>
+	/// </summary>
+	private static void AppendSlotCompareRow(StringBuilder sb, int address, string what)
+	{
+		string cell0 = ReadOneSlotForCompare(EcLpcIo.SlotZero, address);
+		string cell1 = ReadOneSlotForCompare(EcLpcIo.SlotOne, address);
+		sb.AppendLine("   0x" + address.ToString("X4") + "    " + PadTo(what, 28) + "  "
+			+ PadTo(cell0, 19) + "  " + cell1);
+	}
+
+	/// <summary>②f 辅助：在指定槽位读一个字节 ⇒ 可直接打印的单元格文本（⛔ 只读）。</summary>
+	private static string ReadOneSlotForCompare(ulong slot, int address)
+	{
+		try
+		{
+			if (EcLpcIo.TryReadByteOnSlot(slot, address, out int v))
+			{
+				return "✅ 0x" + v.ToString("X2");
+			}
+			return "⛔ 读不到";
+		}
+		catch (Exception ex)
+		{
+			return "⛔ 异常(" + ex.GetType().Name + ")";
+		}
+	}
+
+	/// <summary>
+	/// ②f 辅助：按**显示宽度**补齐（全角与符号占 2 列，否则对照表会歪）。
+	/// ⚠️ 只影响诊断文本的对齐，**不影响任何判据**。
+	/// </summary>
+	private static string PadTo(string text, int width)
+	{
+		string s = ((text == null) ? string.Empty : text);
+		int num = 0;
+		foreach (char c in s)
+		{
+			bool flag = (c >= '\u1100' && c <= '\u115f') || (c >= '\u2600' && c <= '\u27bf')
+				|| (c >= '\u2b00' && c <= '\u2bff') || (c >= '\u2e80' && c <= '\ua4cf')
+				|| (c >= '\uac00' && c <= '\ud7a3') || (c >= '\uf900' && c <= '\ufaff')
+				|| (c >= '\ufe30' && c <= '\ufe6f') || (c >= '\uff00' && c <= '\uff60')
+				|| (c >= '\uffe0' && c <= '\uffe6');
+			num += (flag ? 2 : 1);
+		}
+		return ((num >= width) ? s : (s + new string(' ', width - num)));
+	}
+
 	private static void AppendFunctionProbe(StringBuilder sb)
 	{
 		sb.AppendLine();
