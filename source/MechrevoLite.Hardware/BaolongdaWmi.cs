@@ -195,6 +195,20 @@ internal sealed class BaolongdaWmi : IDisposable
 			if (!created.TryReadCpuTemperature(out int celsius))
 			{
 				Logger.WriteLine("宝龙达 WMI 探测：实例打开了但读不到 CPU 温度 ⇒ 判为不可用（⛔ 不接管）");
+				// ⚠️⚠️ 2026-10-16：⭐ **第二个盲点** —— ⭐ 上面那行是 `WriteLine`，⭐ 级别由**消息内容**判定 ⚠️
+				//    ⇒ ⭐ 默认「仅错误」级别下**可能不落盘** ❌ ⇒ ⭐ 机主反馈时我们同样看不到 ⚠️
+				//    ⇒ ⭐ 板号是宝龙达候选时，⭐ **必须**补一条默认级别可见的记录 ✅
+				//    ⭐ 这一支覆盖的正是"⭐ 类在、⭐ 但 ACPI/EC 方法不响应"⭐ 的情形
+				//      （⭐ 例如厂商驱动/服务被卸载后，⭐ 固件侧接口未解锁 ⚠️）
+				if (IsBaolongdaBoardCandidate())
+				{
+					Logger.WriteError("宝龙达 WMI 探测失败：⭐ 主板型号是宝龙达候选（`MRID6-*`）且 "
+						+ "`root\\WMI:MICommonInterface` **类存在**，⭐ 但**读一次 CPU 温度（功能号 22）失败** "
+						+ "⇒ ⭐ 本机认不出宝龙达 ❌。"
+						+ "⚠️ 可选成因：⭐ **官方控制台/它的驱动被卸载后固件侧接口未解锁** ⚠️、"
+						+ "⭐ 权限不足（⭐ 未以管理员运行 ✅）、⭐ 或 BIOS 设置被改 ⚠️。"
+						+ "⭐ 请随诊断包一起反馈（⭐ 宝龙达诊断段会打印类/实例/设备存在性 ✅）");
+				}
 				created.Dispose();
 				return null;
 			}
@@ -226,7 +240,19 @@ internal sealed class BaolongdaWmi : IDisposable
 		}
 		catch (ManagementException ex) when (ex.ErrorCode == ManagementStatus.NotFound || ex.ErrorCode == ManagementStatus.InvalidClass)
 		{
-			// ⭐ 这个类根本不存在 ⇒ 静默（⭐ 现有机型每次启动都会走到这里，⛔ 一行日志都不该打 ✅）
+			// ⭐ 这个类根本不存在 ⇒ 对**非宝龙达机型**必须静默（⭐ 现有机型每次启动都会走到这里，⛔ 一行日志都不该打 ✅）
+			// ⚠️⚠️ 2026-10-16 群里反馈：⭐「⭐ 一卸载官方控制台这个软件就识别不了了」⚠️
+			//    ⇒ ⭐ 若**板号是宝龙达候选**（⭐ `MRID6-*` ✅）**却探不到这个类** ⚠️，
+			//      ⭐ ⭐ 那就【必须】留一条**默认级别可见**的记录 ✅ ——
+			//      ⭐ 否则我们连"为什么认不出"都拿不到任何证据 ❌（⭐ 这正是本次反馈卡住的原因 ✅）
+			//    ⭐ 判据用**静态板号**（⭐ 只读注册表 ✅ · ⭐ 与后端白名单**同一套** ✅）⇒ ⭐ 不误伤同方 ✅
+			if (IsBaolongdaBoardCandidate())
+			{
+				Logger.WriteError("宝龙达 WMI 探测失败：⭐ 主板型号是宝龙达候选（`MRID6-*`）但 "
+					+ "`root\\WMI:MICommonInterface` **这个类不存在** ⇒ ⭐ 本机认不出宝龙达 ❌。"
+					+ "⚠️ 已知成因：⭐ **卸载官方控制台（JiaoLong Control）后可能出现此现象** ⚠️；"
+					+ "⭐ 请随诊断包一起反馈（⭐ 宝龙达诊断段会打印该类与 `PNP0C14` 设备的存在性 ✅）");
+			}
 			return null;
 		}
 		catch (Exception ex)
@@ -281,6 +307,26 @@ internal sealed class BaolongdaWmi : IDisposable
 			Logger.WriteLine("宝龙达 WMI：枚举实例失败：" + ex2.Message);
 		}
 		return null;
+	}
+
+	/// <summary>
+	/// ⭐ 静态板号判据：⭐ 本机**是不是宝龙达候选** ✅（⭐ 只读注册表 ✅ · ⭐ 与
+	/// <see cref="BaolongdaBackend.IsBaolongdaModelWhitelisted" /> **同一套** ✅ ⇒ ⭐ 单一事实来源 ✅）。
+	/// <para>⚠️ 用途**仅限**：⭐ 决定"探不到 WMI 类"时**要不要留一条可见记录** ✅ ——
+	/// ⛔ **不参与任何能力/后端判定** ⚠️（⭐ 能力位仍由 <c>BaolongdaBackend.BuildCapabilities</c> 独占 ✅）。</para>
+	/// <para>⭐ 非宝龙达机型 ⇒ 恒 <c>false</c> ⇒ ⭐ **保持原来的静默** ✅（⛔ 不刷日志 ✅）。</para>
+	/// </summary>
+	private static bool IsBaolongdaBoardCandidate()
+	{
+		try
+		{
+			return BaolongdaBackend.IsBaolongdaModelWhitelisted(out _);
+		}
+		catch
+		{
+			// ⭐ 读注册表失败/异常 ⇒ 按"不是候选"处理 ⇒ ⭐ 安全方向（⭐ 与后端白名单一致 ✅）
+			return false;
+		}
 	}
 
 	/// <summary>读类的 GUID 限定符（⭐ 只读；⭐ 失败就留空串）。</summary>

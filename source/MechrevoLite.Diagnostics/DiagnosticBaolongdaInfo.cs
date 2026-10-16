@@ -21,6 +21,7 @@
 
 using System;
 using System.IO;
+using System.Management;
 using System.Text;
 using MechrevoLite.Hardware;
 
@@ -40,6 +41,7 @@ internal static class DiagnosticBaolongdaInfo
 		try
 		{
 			AppendWhitelist(sb);
+			AppendWmiClassProbe(sb);
 			AppendDriverProbe(sb);
 			AppendFunctionProbe(sb);
 			AppendHidNote(sb);
@@ -78,6 +80,125 @@ internal static class DiagnosticBaolongdaInfo
 		catch
 		{
 			return string.Empty;
+		}
+	}
+
+	// ── ①b `root\WMI:MICommonInterface` 类/实例存在性（⭐ 识别链的**第一步** ⚠️）──
+	//    ⚠️ 2026-10-16 群里反馈：「⭐ 一卸载官方控制台这个软件就识别不了了」⚠️
+	//    ⇒ ⭐ 这条反馈原来**无法证伪**：⭐「类不存在」那条分支是【完全静默】的 ❌ ·
+	//      ⭐ 而诊断段也**从不打印**这个类 ⇒ ⭐ 我们手上没有任何证据 ⚠️
+	//    ⇒ ⭐ 本段 ＋ ⭐ 运行时那条 `Logger.WriteError` 一起补上这个盲点 ✅
+	private static void AppendWmiClassProbe(StringBuilder sb)
+	{
+		sb.AppendLine();
+		sb.AppendLine("── ①b `root\\WMI:MICommonInterface`（⭐ 宝龙达识别链的**第一步** ⚠️）──");
+		sb.AppendLine("⭐ 用途：⭐ 这个类**在不在**，直接决定我们能否认出宝龙达 ✅");
+		sb.AppendLine("⚠️ 已知成因：⭐ 群里反馈 **卸载官方控制台（JiaoLong Control）后可能消失** ⚠️"
+			+ "（⭐ 新增本段就是为了证实/证伪它 ✅）");
+		try
+		{
+			using ManagementClass mc = new ManagementClass("root\\WMI:MICommonInterface");
+			try
+			{
+				mc.Get();
+			}
+			catch (ManagementException ex) when (ex.ErrorCode == ManagementStatus.NotFound || ex.ErrorCode == ManagementStatus.InvalidClass)
+			{
+				sb.AppendLine("类存在性 = ⛔ **不存在** ❌ ⇒ ⭐ ⭐ **这就是认不出宝龙达的原因** ✅");
+				sb.AppendLine("   ⇒ ⭐ 运行时也会有一条【默认级别可见】的日志（⭐ 仅板号为 `MRID6-*` 候选时打 ✅）");
+				// ⚠️ ⭐ **这一支最需要旁证** ⚠️ ⇒ ⭐ 打完旁证再返回 ✅（⛔ 不能直接 return ❌）
+				AppendSideEvidence(sb);
+				return;
+			}
+			sb.AppendLine("类存在性 = ✅ 存在 ⇒ ⭐ 第一步通过 ✅");
+			try
+			{
+				object guid = mc.Qualifiers["Guid"]?.Value;
+				sb.AppendLine("类 GUID = " + (guid?.ToString() ?? "（⚠️ 无 GUID 限定符）"));
+			}
+			catch
+			{
+				sb.AppendLine("类 GUID = （读取失败）");
+			}
+			try
+			{
+				int count = 0;
+				using ManagementObjectCollection instances = mc.GetInstances();
+				foreach (ManagementBaseObject inst in instances)
+				{
+					string relative = (inst as ManagementObject)?.Path?.RelativePath;
+					sb.AppendLine("  实例[" + count + "] = " + (string.IsNullOrEmpty(relative) ? "（无路径）" : relative));
+					count++;
+				}
+				sb.AppendLine("实例个数 = " + count
+					+ (count == 0 ? " ⚠️ ⇒ 类在但**没有任何实例**（⭐ 识别同样会失败 ⚠️）" : " ✅"));
+			}
+			catch (Exception ex)
+			{
+				sb.AppendLine("实例枚举失败 = " + ex.Message);
+			}
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("类探测异常 = " + ex.Message);
+		}
+		// ⭐ 旁证段（⭐ **两种情形都要打** ⚠️ —— ⭐ 尤其"类不存在"⭐ 那一支最需要它 ✅）
+		AppendSideEvidence(sb);
+	}
+
+	/// <summary>
+	/// ⭐ 旁证：⭐ 官方控制台（⭐ JiaoLong Control ✅）/ ⭐ 它的驱动 / ⭐ `PNP0C14` 设备 / ⭐ `WmiAcpi.sys`
+	/// 的存在性 ✅ —— ⭐ 全部只读 ⚠️。
+	/// <para>⚠️⚠️ **必须在"类不存在"时也打印** ✅ —— ⭐ 那正是最需要旁证的场景 ⚠️
+	/// （⭐ 群里"卸载官方控制台后识别不了"⭐ 的反馈就落在那一支 ✅）。</para>
+	/// <para>⭐ 真机实测（⭐ 同方/GCU 机型 ✅）：⭐ **有 `PNP0C14` 设备但【没有】`MICommonInterface` 类** ✅
+	/// ⇒ ⭐ 所以「设备在 ≠ 类在」⚠️ ⇒ ⭐ 两者必须**分别打印**才能分辨断在哪一步 ✅。</para>
+	/// </summary>
+	private static void AppendSideEvidence(StringBuilder sb)
+	{
+		// ⭐ 旁证：⭐ 官方控制台/它的驱动在不在（⭐ 用于和"卸载后失效"的反馈对照 ✅ · ⭐ 只查存在性 ⚠️）
+		try
+		{
+			string[] paths = new string[3]
+			{
+				"C:\\Program Files\\JiaoLongControl",
+				"C:\\Program Files\\JiaoLongControl\\JiaoLongDriver64.sys",
+				"C:\\Windows\\System32\\drivers\\WmiAcpi.sys"
+			};
+			for (int k = 0; k < paths.Length; k++)
+			{
+				string what = (k == 0)
+					? "官方控制台目录"
+					: ((k == 1) ? "官方控制台驱动" : "WmiAcpi.sys（⭐ ACPI MOF ⇒ WMI 类 的提供者 ✅）");
+				bool exists = (k == 0) ? Directory.Exists(paths[k]) : File.Exists(paths[k]);
+				sb.AppendLine("旁证·" + what + " = " + (exists ? "✅ 在" : "⛔ 不在"));
+			}
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("旁证探测异常 = " + ex.Message);
+		}
+		// ⭐ 旁证·`PNP0C14` 设备（⭐ **关键判据** ⚠️ · ⭐ 真机实测：⭐ 同方机型【有】`PNP0C14` 但【没有】该类 ✅）
+		try
+		{
+			int deviceCount = 0;
+			using ManagementObjectSearcher searcher = new ManagementObjectSearcher(
+				"root\\CIMV2", "SELECT DeviceID,Status FROM Win32_PnPEntity WHERE DeviceID LIKE 'ACPI\\\\PNP0C14%'");
+			using ManagementObjectCollection rows = searcher.Get();
+			foreach (ManagementBaseObject row in rows)
+			{
+				sb.AppendLine("旁证·PNP0C14 设备[" + deviceCount + "] = " + row["DeviceID"]
+					+ " · 状态=" + row["Status"]);
+				deviceCount++;
+			}
+			sb.AppendLine("旁证·PNP0C14 设备个数 = " + deviceCount
+				+ (deviceCount == 0
+					? " ⚠️ ⇒ 连 ACPI-WMI 映射设备都没有（⭐ 少见 ⚠️）"
+					: " ✅（⭐ 注意：⭐ 有设备**不代表**有 `MICommonInterface` 类 ⚠️ —— ⭐ 类由**该机 BIOS 的 ACPI MOF** 定义 ✅）"));
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("旁证·PNP0C14 设备查询失败 = " + ex.Message);
 		}
 	}
 
