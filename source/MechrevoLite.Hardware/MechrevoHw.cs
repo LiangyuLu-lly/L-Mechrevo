@@ -3705,6 +3705,62 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · OSD 提示）：⭐ 把「快捷开关 ⇒ OSD」这一步**分派给宝龙达本地实现** ✅。
+	/// <para>⭐ <b>机主原话</b>：「⭐ OSD显示开关不可用（⭐ <i>LM好像有自己的OSD部分</i> ✅）」——
+	/// ⭐ 后半句就是**修法**：⭐ LM 自己本来就有一套 OSD（⭐ <c>OSDNativeForm</c> ⇒ ⭐ <c>ToastForm</c> /
+	/// <c>HardwareOverlay</c> ✅）⇒ ⭐ **宝龙达下让这个开关去管【LM 自己的 OSD】** ✅。</para>
+	/// <para>⚠️ <b>为什么原来不可用</b>：⭐ 该开关原语义是「⭐ 隐藏**厂商** OSD」（⭐ 下发
+	/// <c>OSD_HIDDEN_ON</c> / ⭐ <c>OSD_HIDDEN_OFF</c> ✅）⭐ **只能走 GCU 的 MQTT** ❌ ——
+	/// ⭐ 宝龙达没有 GCU ⇒ ⭐ 恒失败 ⇒ ⭐ <b>点了没反应</b> ⚠️（⭐ 而它又被 <c>StaticQuick</c> 判为可点 ⚠️
+	/// ⇒ ⭐ 正好违反「⭐ 能点的就必须有反应」✅）。</para>
+	/// <para>⭐ <b>语义保持一致</b>（⭐ ⛔ 不翻转 ✅）：⭐ <paramref name="on" /> = <c>true</c> ⇒ ⭐ **显示 OSD**
+	/// （⭐ 对应原来的 ⭐ <c>OSD_HIDDEN_OFF</c> ✅）· ⭐ <c>false</c> ⇒ ⭐ **隐藏 OSD**
+	/// （⭐ 对应 ⭐ <c>OSD_HIDDEN_ON</c> ✅）—— ⭐ 与 <see cref="QuickSwitches" /> 里
+	/// <c>"osd"</c> 的既有口径**逐位一致** ✅。</para>
+	/// <para>⚠️ <b>门控只用板号</b>（<see cref="BaolongdaBackend.IsBaolongdaModelWhitelisted" /> ✅）：
+	/// ⭐ 因为本功能**纯本地**（⭐ 不碰 WMI / ⭐ 不碰 EC / ⭐ 不写配置以外任何状态 ✅）⇒
+	/// ⭐ 即使「⭐ 官方控制台被卸载 ⇒ ⭐ WMI 类消失」⚠️ 也照样可用 ✅ —— ⭐ 比"看 GCU 在不在"更稳 ✅。</para>
+	/// <para>⭐ 其他后端：⭐ <b>返回 <c>false</c></b> ⇒ ⭐ 调用方**照原样走 GCU** ✅（⭐ 逐位不变 ✅）。</para>
+	/// </summary>
+	/// <param name="on">⭐ <c>true</c> = 显示 LM 的 OSD；⭐ <c>false</c> = 隐藏。</param>
+	/// <param name="confirmed">⭐ 宝龙达路径下：⭐ 回读配置确认后的实际状态 ✅。</param>
+	/// <returns>⭐ <c>true</c> = 本次由宝龙达处理完了（⭐ 调用方⛔ 不要再发 GCU ✅）；⭐ <c>false</c> = 不归本方法管 ✅。</returns>
+	internal bool TrySetOsdViaBackend(bool on, out bool confirmed)
+	{
+		confirmed = false;
+		// ⭐ 只认板号（⭐ 单一事实来源 ✅）—— ⭐ 纯本地功能 ⇒ ⭐ 不要求 WMI/GCU 可用 ✅
+		if (!BaolongdaBackend.IsBaolongdaModelWhitelisted(out _))
+		{
+			return false; // ⭐ 不是宝龙达 ⇒ 交给原来的 GCU 路径 ✅
+		}
+		try
+		{
+			// ⭐ 口径：⭐ `osd_hidden=1` ⇒ ⭐ 隐藏 OSD ✅ · ⭐ `=0` ⇒ ⭐ 显示 OSD ✅
+			//   ⇒ ⭐ 开关 on=true（⭐ 显示）⇒ ⭐ 写 0 ✅
+			AppConfig.Set("osd_hidden", on ? 0 : 1);
+			// ⭐ 立刻同步进 `QuickSwitches`（⭐ 界面刷新读的就是它 ✅，见
+			//   `SettingsForm` 的 `[QS-refresh]` 段 ✅）—— ⭐ 否则要等 3 秒周期同步 ⚠️
+			//   ⇒ ⭐ 那 3 秒里界面会显示"⭐ 旧值"⚠️ ⇒ ⭐ 看起来像"⭐ 点了没反应" ❌（⭐ 正是本 bug 的观感 ✅）
+			QuickSwitches["osd"] = on;
+			// ⭐ 回读确认（⭐ 与其它分派同款纪律：⭐ 写进去 ≠ 生效 ✅）
+			if (AppConfig.Get("osd_hidden", -1) == (on ? 0 : 1))
+			{
+				confirmed = true;
+				Logger.WriteError("⭐ 宝龙达 OSD 提示：⭐ 已设为「" + (on ? "显示" : "隐藏") + "」并回读确认 ✅"
+					+ "（⭐ 本地方案：⭐ 控 LM 自己的 OSD，⛔ 未发任何 MQTT ✅）");
+				return true;
+			}
+			Logger.WriteError("⭐ 宝龙达 OSD 提示：⚠️ 已写入但**回读不一致**（⭐ 未确认 ⚠️）");
+			return true; // ⭐ 已接管（⭐ 只是没确认 ✅）⇒ ⭐ 调用方仍不该再发 GCU ✅
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("⭐ 宝龙达 OSD 提示：⚠️ 设置抛错 ⇒ ⭐ 本次未生效 ⚠️（" + ex.Message + "）");
+			return true;
+		}
+	}
+
+	/// <summary>
 	/// ⭐ 宝龙达"⭐ 单字节开关"⭐ 的**共同实现**（⭐ Fn 键锁 11 / ⭐ 触摸板锁 12 ✅）。
 	/// <para>⭐ 流程：⭐ ① 先读当前值（⭐ 读不到 ⇒ ⭐ **拒绝盲写** ✅）
 	/// ⇒ ⭐ ② 已等于目标 ⇒ ⭐ 直接算确认（⭐ ⛔ 不白写一次 ✅）
@@ -3873,6 +3929,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			SyncBaolongdaQuickSwitch("logolight", snap.LogoLight);
 			SyncBaolongdaQuickSwitch("touchpad", snap.TouchpadLock);
 			SyncBaolongdaQuickSwitch("fnkey", snap.FnLock);
+			// ⭐⭐ 2026-10-16（OSD 提示 · 本地方案）：⭐ 这个开关的状态**来自本地配置** ✅
+			//   ⛔ **刻意不走** SyncBaolongdaQuickSwitch —— ⭐ 那条日志会写「⭐ 由硬件真实状态同步而来」❌，
+			//      ⭐ 而 OSD 根本没走硬件 ⚠️ ⇒ ⭐ 用它会**谎报来源** ✅（⭐ 本会话的纪律：⭐ 日志必须如实 ✅）。
+			//   ⚠️ 为什么必须在这里主动同步：⭐ 宝龙达**没有 GCU** ⇒ ⭐ GCU payload 永远到不了 ⚠️
+			//      ⇒ ⭐ 不主动写的话 <c>QuickSwitches["osd"]</c> 会**一直是关的** ❌ ⇒ ⭐ 界面与实际相反 ✅。
+			bool osdShow = AppConfig.Get("osd_hidden", 0) == 0;
+			if (!QuickSwitches.TryGetValue("osd", out bool osdCurrent) || osdCurrent != osdShow)
+			{
+				QuickSwitches["osd"] = osdShow;
+				Logger.WriteLine($"宝龙达 OSD 提示：⭐ 开关状态 ⇒ {(osdShow ? "显示" : "隐藏")}"
+					+ "（⭐ 本地配置口径，⛔ 非硬件回读 ✅）");
+			}
 			// ⚠️ 刻意**不打**周期性日志：⭐ 快照里的温度/转速每 3 秒都变 ⚠️
 			//    ⇒ ⭐ 打日志就是刷屏 ❌（⭐ 支持清单在启动时打一次，⭐ 见 ApplyBaolongdaBackendAsync ✅）
 		}

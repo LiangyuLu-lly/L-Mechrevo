@@ -2824,6 +2824,19 @@ public class MechrevoService
 					return baolongdaOk;
 				}
 			}
+			// ⭐⭐ 2026-10-16（宝龙达 · OSD 提示）：⭐ 走**本地实现**（⭐ 它连 WMI 都不用 ✅）
+			//   ⭐ 机主原话「⭐ OSD显示开关不可用（⭐ LM好像有自己的OSD部分 ✅）」⇒ ⭐ 让这个开关管 LM 自己的 OSD ✅
+			//   ⚠️ 原来那条 `OSD_HIDDEN_ON/OFF` **只能走 GCU 的 MQTT** ❌ ⇒ ⭐ 宝龙达恒失败 ⇒ ⭐ 点了没反应 ⚠️
+			//   ⭐ 模板同上：⭐ 非宝龙达恒 false ⇒ ⭐ 下面 action 那条**原路不变** ✅（⭐ 逐位一致 ✅）
+			if (string.Equals(key, "osd", StringComparison.Ordinal))
+			{
+				bool osdOk = false;
+				if (_hw.TrySetOsdViaBackend(on, out osdOk))
+				{
+					Logger.WriteLine($"SwitchQuick(osd,{on}) ⭐ 走宝龙达**本地** OSD ⇒ 确认={osdOk}（⛔ 未发任何 MQTT ✅）");
+					return osdOk;
+				}
+			}
 			string action = key switch
 			{
 				"touchpad" => (!on) ? "TOUCHPAD_OFF" : "TOUCHPAD_ON", 
