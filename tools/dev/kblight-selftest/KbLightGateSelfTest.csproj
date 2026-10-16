@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>KbLightGateSelfTest</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace />
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\LightingState.cs" Link="LightingState.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\LightingIdleAction.cs" Link="LightingIdleAction.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\KeyboardLightingPlan.cs" Link="KeyboardLightingPlan.cs" />
+  </ItemGroup>
+</Project>

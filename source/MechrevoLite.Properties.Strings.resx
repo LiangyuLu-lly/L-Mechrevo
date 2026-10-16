@@ -1,0 +1,5374 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+<resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>1.3</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+<data name="AuraRandomColor" xml:space="preserve">
+    <value>Random</value>
+  </data>
+<data name="Brightness" xml:space="preserve">
+    <value>Brightness</value>
+  </data>
+<data name="Battery" xml:space="preserve">
+    <value>Battery</value>
+  </data>
+<data name="Export" xml:space="preserve">
+    <value>Export Profile</value>
+  </data>
+<data name="Lighting" xml:space="preserve">
+    <value>Lighting</value>
+  </data>
+<data name="Lightbar" xml:space="preserve">
+    <value>Lightbar</value>
+  </data>
+<data name="Overdrive" xml:space="preserve">
+    <value>Overdrive</value>
+  </data>
+<data name="Updates" xml:space="preserve">
+    <value>Updates</value>
+  </data>
+<data name="FnLock" xml:space="preserve">
+    <value>Process Fn+F hotkeys without Fn</value>
+  </data>
+<data name="GPUModeStandard" xml:space="preserve">
+    <value>iGPU + dGPU</value>
+  </data>
+<data name="AlertUltimateTitle" xml:space="preserve">
+    <value>Reboot now?</value>
+  </data>
+<data name="Donate" xml:space="preserve">
+    <value>Donate</value>
+  </data>
+<data name="BatteryLimitFull" xml:space="preserve">
+    <value>One time charge to 100%</value>
+  </data>
+<data name="LaptopBacklight" xml:space="preserve">
+    <value>Laptop Backlight</value>
+  </data>
+<data name="Balanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+<data name="Custom" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+<data name="AlertUltimateOn" xml:space="preserve">
+    <value>Ultimate Mode requires restart</value>
+  </data>
+<data name="BatteryChargeLimit" xml:space="preserve">
+    <value>Battery Charge Limit</value>
+  </data>
+<data name="RunOnStartup" xml:space="preserve">
+    <value>Run on Startup</value>
+  </data>
+<data name="GPUChanging" xml:space="preserve">
+    <value>Changing</value>
+  </data>
+<data name="BatteryHealth" xml:space="preserve">
+    <value>Battery Health</value>
+  </data>
+<data name="BatteryCharge" xml:space="preserve">
+    <value>Charge</value>
+  </data>
+<data name="ThankYou" xml:space="preserve">
+    <value>Thank You</value>
+  </data>
+<data name="DisableDynamicLighting" xml:space="preserve">
+    <value>Please disable Windows &gt; Dynamic Lighting</value>
+  </data>
+<data name="BrightnessUp" xml:space="preserve">
+    <value>Brightness Up</value>
+  </data>
+<data name="Silent" xml:space="preserve">
+    <value>Silent</value>
+  </data>
+<data name="GPUModeEco" xml:space="preserve">
+    <value>iGPU only</value>
+  </data>
+<data name="Profile" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+<data name="PerformanceMode" xml:space="preserve">
+    <value>Mode</value>
+  </data>
+<data name="AutoMode" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+<data name="StandardGPUTooltip" xml:space="preserve">
+    <value>Enables dGPU for standard use</value>
+  </data>
+<data name="AutoRefreshTooltip" xml:space="preserve">
+    <value>Sets 60Hz to save battery, and back when plugged</value>
+  </data>
+<data name="RestartingNVServices" xml:space="preserve">
+    <value>Restarting NV Services...</value>
+  </data>
+<data name="EcoMode" xml:space="preserve">
+    <value>Eco</value>
+  </data>
+<data name="Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+<data name="Default" xml:space="preserve">
+    <value>Default</value>
+  </data>
+<data name="StandardMode" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+<data name="Keyboard" xml:space="preserve">
+    <value>Keyboard</value>
+  </data>
+<data name="Shutdown" xml:space="preserve">
+    <value>Shutdown</value>
+  </data>
+<data name="EcoGPUTooltip" xml:space="preserve">
+    <value>Disables dGPU to save battery</value>
+  </data>
+<data name="OneZone" xml:space="preserve">
+    <value>One Zone</value>
+  </data>
+<data name="AlertUltimateOff" xml:space="preserve">
+    <value>Switching off Ultimate Mode requires restart</value>
+  </data>
+<data name="Discharging" xml:space="preserve">
+    <value>Discharging</value>
+  </data>
+<data name="On" xml:space="preserve">
+    <value>On</value>
+  </data>
+<data name="GPUModeUltimate" xml:space="preserve">
+    <value>dGPU exclusive</value>
+  </data>
+<data name="FanSpeed" xml:space="preserve">
+    <value>Fan</value>
+  </data>
+<data name="BrightnessDown" xml:space="preserve">
+    <value>Brightness Down</value>
+  </data>
+<data name="Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
+<data name="Lid" xml:space="preserve">
+    <value>Lid</value>
+  </data>
+<data name="Low" xml:space="preserve">
+    <value>Low</value>
+  </data>
+<data name="RPM" xml:space="preserve">
+    <value>RPM</value>
+  </data>
+<data name="Extra" xml:space="preserve">
+    <value>Extra</value>
+  </data>
+<data name="Apply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+<data name="Muted" xml:space="preserve">
+    <value>Muted</value>
+  </data>
+<data name="Color" xml:space="preserve">
+    <value>Color</value>
+  </data>
+<data name="Other" xml:space="preserve">
+    <value>Other</value>
+  </data>
+<data name="AmbientModeResources" xml:space="preserve">
+    <value>Ambient mode may increase resource usage</value>
+  </data>
+<data name="Turbo" xml:space="preserve">
+    <value>Turbo</value>
+  </data>
+<data name="Reset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+<data name="Start" xml:space="preserve">
+    <value>Start</value>
+  </data>
+<data name="Sleep" xml:space="preserve">
+    <value>Sleep</value>
+  </data>
+<data name="ToggleFnLock" xml:space="preserve">
+    <value>Toggle Fn-Lock</value>
+  </data>
+<data name="MaxRefreshTooltip" xml:space="preserve">
+    <value>Max refresh rate for lower latency</value>
+  </data>
+<data name="Contrast" xml:space="preserve">
+    <value>Contrast</value>
+  </data>
+<data name="LaptopScreen" xml:space="preserve">
+    <value>Laptop Screen</value>
+  </data>
+<data name="GPUMode" xml:space="preserve">
+    <value>GPU Mode</value>
+  </data>
+<data name="BacklightUp" xml:space="preserve">
+    <value>Backlight Up</value>
+  </data>
+<data name="StopGPUApps" xml:space="preserve">
+    <value>Stop GPU Applications</value>
+  </data>
+<data name="UltimateGPUTooltip" xml:space="preserve">
+    <value>Routes laptop screen to dGPU, maximizing FPS</value>
+  </data>
+<data name="LanguageRestartPrompt" xml:space="preserve">
+    <value>Restart the app to apply the language?</value>
+  </data>
+<data name="PrintScreen" xml:space="preserve">
+    <value>PrintScreen</value>
+  </data>
+<data name="Overlay" xml:space="preserve">
+    <value>Overlay</value>
+  </data>
+<data name="Minutes" xml:space="preserve">
+    <value>Minutes</value>
+  </data>
+<data name="MinRefreshTooltip" xml:space="preserve">
+    <value>60Hz refresh rate to save battery</value>
+  </data>
+<data name="LaptopKeyboard" xml:space="preserve">
+    <value>Laptop Keyboard</value>
+  </data>
+<data name="ExtraSettings" xml:space="preserve">
+    <value>Extra Settings</value>
+  </data>
+<data name="Multizone" xml:space="preserve">
+    <value>Multi Zone</value>
+  </data>
+<data name="LanguageRestartTitle" xml:space="preserve">
+    <value>Restart required</value>
+  </data>
+<data name="BacklightDown" xml:space="preserve">
+    <value>Backlight Down</value>
+  </data>
+<data name="Charging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+<data name="MultizoneStrong" xml:space="preserve">
+    <value>Multi Zone Strong</value>
+  </data>
+<data name="TurnedOff" xml:space="preserve">
+    <value>Turned off</value>
+  </data>
+<data name="UltimateMode" xml:space="preserve">
+    <value>Ultimate</value>
+  </data>
+<data name="Controller" xml:space="preserve">
+    <value>Controller</value>
+  </data>
+<data name="PowerLimits" xml:space="preserve">
+    <value>Power Limits</value>
+  </data>
+<data name="Boot" xml:space="preserve">
+    <value>Boot</value>
+  </data>
+<data name="LightChannelHinge" xml:space="preserve">
+    <value>Hinge</value>
+  </data>
+<data name="LightChannelSync" xml:space="preserve">
+    <value>Sync</value>
+  </data>
+<data name="LightHingeTitle" xml:space="preserve">
+    <value>Hinge lighting</value>
+  </data>
+<data name="LightSyncTitle" xml:space="preserve">
+    <value>Sync lighting</value>
+  </data>
+<data name="Logo" xml:space="preserve">
+    <value>Logo</value>
+  </data>
+<data name="High" xml:space="preserve">
+    <value>High</value>
+  </data>
+<data name="Quit" xml:space="preserve">
+    <value>Quit</value>
+  </data>
+<data name="Stop" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+<data name="Zoom" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+<data name="TurboMode" xml:space="preserve">
+    <value>Turbo Mode</value>
+  </data>
+<data name="TurboHighEnergy" xml:space="preserve">
+    <value>High Energy Turbo</value>
+  </data>
+<data name="SilentTurbo" xml:space="preserve">
+    <value>Silent Turbo</value>
+  </data>
+<data name="PerfSwitchFailed" xml:space="preserve">
+    <value>Failed to switch performance mode</value>
+  </data>
+<data name="PerfProfileIndexUnconfirmed" xml:space="preserve">
+    <value>Mode switched, but the profile number was not confirmed by the device</value>
+  </data>
+<data name="StartupFailed" xml:space="preserve">
+    <value>Failed to set startup setting</value>
+  </data>
+<data name="QuickSwitchFailed" xml:space="preserve">
+    <value>Failed to set quick switch</value>
+  </data>
+<data name="AuraFailed" xml:space="preserve">
+    <value>Failed to set lighting effect</value>
+  </data>
+<data name="AutoRefresh" xml:space="preserve">
+    <value>Auto Refresh</value>
+  </data>
+<data name="HzManualWhileAutoOn" xml:space="preserve">
+    <!-- 2026-10-15: picking a rate by hand no longer turns "Auto Refresh" off; when it is on, this single-line OSD
+         just warns that the setting may get overridden (deliberately kept minimal — the word "may" covers the
+         cases where nothing actually overrides it, so no conflict/panel-size/dedup logic is applied).
+         A separator is used after the picked rate, matching the style of the other notices in this project.
+         Placeholder: {0} = the rate the user just picked (Hz). ⚠️ Exactly one placeholder; the caller passes one arg. -->
+    <value>Switched to {0}Hz · with Auto Refresh on, this setting may get overridden</value>
+  </data>
+<data name="Screen" xml:space="preserve">
+    <value>Screen</value>
+  </data>
+<data name="ColorCalibration" xml:space="preserve">
+    <value>Calibration</value>
+  </data>
+<data name="ColorCalibrationFailed" xml:space="preserve">
+    <value>The color profile was not applied; the previous profile is kept.</value>
+  </data>
+<data name="NotConnected" xml:space="preserve">
+    <value>Not Connected</value>
+  </data>
+<data name="AdminRequired" xml:space="preserve">
+    
+    
+    <value>Administrator privileges required</value>
+    
+  
+  </data>
+<data name="AlreadyDonated" xml:space="preserve">
+    
+    
+    <value>Already donated ❤</value>
+    
+  
+  </data>
+<data name="Auto" xml:space="preserve">
+    
+    
+    <value>Auto</value>
+    
+  
+  </data>
+<data name="AutoModeTooltip" xml:space="preserve">
+    
+    
+    <value>Auto switch</value>
+    
+  
+  </data>
+<data name="AutoOffOnBattery" xml:space="preserve">
+    
+    
+    <value>Turn off all lighting automatically on battery</value>
+    
+  
+  </data>
+<data name="LightingAutoOffTime" xml:space="preserve">
+    
+    
+    <value>Auto-off time</value>
+    
+  
+  </data>
+<data name="BalancedMode" xml:space="preserve">
+    
+    
+    <value>Balanced</value>
+    
+  
+  </data>
+<data name="BatteryAbnormal" xml:space="preserve">
+    
+    
+    <value>Battery abnormal</value>
+    
+  
+  </data>
+<data name="BatteryCycles" xml:space="preserve">
+    
+    
+    <value>{0} cycles</value>
+    
+  
+  </data>
+<data name="BleAwaitingTakeover" xml:space="preserve">
+    
+    
+    <value>Bluetooth awaiting GCU takeover</value>
+    
+  
+  </data>
+<data name="BreathColor" xml:space="preserve">
+    
+    
+    <value>Breathing color</value>
+    
+  
+  </data>
+<data name="Cancel" xml:space="preserve">
+    
+    
+    <value>Cancel</value>
+    
+  
+  </data>
+<data name="ChargeLimitFailedRestored" xml:space="preserve">
+    
+    
+    <value>Charge limit setting failed; restored to previous value</value>
+    
+  
+  </data>
+<data name="ChargeLimitPending" xml:space="preserve">
+    <value>Charge limit set - observing whether it takes effect...</value>
+  </data>
+<data name="ChargeLimitVerified" xml:space="preserve">
+    <value>Charge limit verified</value>
+  </data>
+<data name="ChargeLimitIneffective" xml:space="preserve">
+    <value>Charge limit not effective, full charge restored</value>
+  </data>
+<data name="ChargeLimitGcuDisconnected" xml:space="preserve">
+    
+    
+    <value>GCU not connected. Charge limit mode setting failed</value>
+    
+  
+  </data>
+<data name="ChargeLimitGcuUnconfirmed" xml:space="preserve">
+    
+    
+    <value>GCU did not confirm the charge limit tier (battery protection not read back; EC untouched)</value>
+    
+  
+  </data>
+<data name="ChargeLimitOff" xml:space="preserve">
+    
+    
+    <value>Charge limit off</value>
+    
+  
+  </data>
+<data name="ChargeLimitEffectOk" xml:space="preserve">
+     <value>Effective</value>
+   </data>
+ <data name="ChargeLimitEffectBad" xml:space="preserve">
+     <value>Not effective</value>
+   </data>
+ <data name="ChargeLimitEffectUnknown" xml:space="preserve">
+     <value>Undetermined</value>
+   </data>
+ <data name="ChargeLimitFirmwareUnsupported" xml:space="preserve">
+     <value>This machine's EC firmware does not support a charge limit (write skipped; no register was written blindly)</value>
+   </data>
+<data name="ChargeLimitShort" xml:space="preserve">
+    
+    
+    <value>Charge limit</value>
+    
+  
+  </data>
+<data name="ChargeLimitSwitchTip" xml:space="preserve">
+    <value>On: writes the selected mode's limit straight into the EC (Longevity 100% = no limit / Balanced 80% / Workstation 60%), a direct EC write that does not depend on the GCU, read back to confirm. Off: writes no limit.</value>
+  </data>
+<data name="ChargeModeTip" xml:space="preserve">
+    <value>{0}: limit {1}%. When the switch is on this mode is written straight to the EC (no GCU), read back to confirm</value>
+  </data>
+<data name="ChargeLimitSwitch" xml:space="preserve">
+    <value>EC 3-tier charge limit (experimental)</value>
+  </data>
+<data name="ChargeLimitBadge" xml:space="preserve">
+    <value>Experimental</value>
+  </data>
+<data name="ChargeLimitSwitchDesc" xml:space="preserve">
+    <value>Limits charging by writing the EC directly (no GCU)</value>
+  </data>
+<data name="ChargeLimitStateLine" xml:space="preserve">
+    <value>Limit {0}% - now {1}%</value>
+  </data>
+<data name="ChargeLimitSliderSwitch" xml:space="preserve">
+    <value>Enable stepless charge limit (experimental)</value>
+  </data>
+<data name="ChargeLimitSliderSwitchTip" xml:space="preserve">
+    <value>Experimental: shows the "Charge limit" slider in the battery card, a continuous 50-100% cap; writing briefly triggers the EC store so the limit persists after reboot. Off (default) keeps the slider off screen. Warning: some devices do not properly implement the charging threshold interface - forcing it may damage the battery.</value>
+  </data>
+  <data name="ChargeLimitSliderWarning" xml:space="preserve">
+    <value>Some devices do not properly implement the charging threshold interface. Forcing it may permanently damage the battery.</value>
+  </data>
+<data name="ChargeLimitWindowsNote" xml:space="preserve">
+    <value>The limit writes the selected cap straight into the EC (no GCU) and reads it back to confirm.</value>
+  </data>
+<data name="ChargeLimitUnavailable" xml:space="preserve">
+    
+    
+    <value>Charge limit unavailable</value>
+    
+  
+  </data>
+<data name="ChargeLimitUnconfirmed" xml:space="preserve">
+    
+    
+    <value>Charge limit switch not confirmed. Please retry</value>
+    
+  
+  </data>
+<data name="ChargeLimitUnparsable" xml:space="preserve">
+    
+    
+    <value>Model could not be identified; charge limit unavailable</value>
+    
+  
+  </data>
+<data name="ChargeLimitUnsupportedModel" xml:space="preserve">
+    
+    
+    <value>Current model does not support charge limit</value>
+    
+  
+  </data>
+<data name="ChargeModeBalanced" xml:space="preserve">
+    
+    
+    <value>Balanced</value>
+    
+  
+  </data>
+<data name="ChargeModeLongevity" xml:space="preserve">
+    
+    
+    <value>Longevity</value>
+    
+  
+  </data>
+<data name="ChargeModeWorkstation" xml:space="preserve">
+    
+    
+    <value>Workstation</value>
+    
+  
+  </data>
+<data name="CheckUpdates" xml:space="preserve">
+    
+    
+    <value>Check Updates</value>
+    
+  
+  </data>
+<data name="CheckUpdatesDot" xml:space="preserve">
+    
+    
+    <value>Check Updates ●</value>
+    
+  
+  </data>
+<data name="ColorCount" xml:space="preserve">
+    
+    
+    <value>Color count</value>
+    
+  
+  </data>
+<data name="ColorInterval" xml:space="preserve">
+    
+    
+    <value>Per-color display time</value>
+    
+  
+  </data>
+<data name="Concurrent" xml:space="preserve">
+    
+    
+    <value>Concurrent</value>
+    
+  
+  </data>
+<data name="ConfirmedAt" xml:space="preserve">
+    
+    
+    <value>Confirmed {0}</value>
+    
+  
+  </data>
+<data name="Connected" xml:space="preserve">
+    
+    
+    <value>Connected</value>
+    
+  
+  </data>
+<data name="ConnectFailedColon" xml:space="preserve">
+    
+    
+    <value>Connection failed: {0}</value>
+    
+  
+  </data>
+<data name="Connecting" xml:space="preserve">
+    
+    
+    <value>Connecting…</value>
+    
+  
+  </data>
+<data name="ConnectingKeyboardRgb" xml:space="preserve">
+    
+    
+    <value>Connecting keyboard RGB…</value>
+    
+  
+  </data>
+<data name="CoreClockOffset" xml:space="preserve">
+    
+    
+    <value>Core clock offset (MHz)</value>
+    
+  
+  </data>
+<data name="CpuFppt" xml:space="preserve">
+    
+    
+    <value>CPU peak power wall fPPT (W)</value>
+    
+  
+  </data>
+<data name="CpuPl1" xml:space="preserve">
+    
+    
+    <value>CPU power wall PL1 (W)</value>
+    
+  
+  </data>
+<data name="CpuPl2" xml:space="preserve">
+    
+    
+    <value>CPU power wall PL2 (W)</value>
+    
+  
+  </data>
+<data name="CpuPl4" xml:space="preserve">
+    
+    
+    <value>CPU instantaneous power wall PL4 (W)</value>
+    
+  
+  </data>
+<data name="CpuTempWall" xml:space="preserve">
+    
+    
+    <value>CPU temperature wall</value>
+    
+  
+  </data>
+<data name="Create" xml:space="preserve">
+    
+    
+    <value>Create</value>
+    
+  
+  </data>
+<data name="CustomMode" xml:space="preserve">
+    
+    
+    <value>Custom</value>
+    
+  
+  </data>
+<data name="CustomModeCurrent" xml:space="preserve">
+    
+    
+    <value>Custom mode (current {0})</value>
+    
+  
+  </data>
+<data name="CustomModeRightClickTip" xml:space="preserve">
+    
+    
+    <value>Right-click to open the custom panel</value>
+    
+  
+  </data>
+<data name="CustomPerformanceMode" xml:space="preserve">
+    
+    
+    <value>Custom performance mode</value>
+    
+  
+  </data>
+<data name="CustomProfileActivated" xml:space="preserve">
+    
+    
+    <value>Custom {0} activated</value>
+    
+  
+  </data>
+<data name="CustomProfileActivatedPowerUnconfirmed" xml:space="preserve">
+    
+    
+    <value>Custom {0} activated; Windows power settings not confirmed</value>
+    
+  
+  </data>
+<data name="CustomProfileN" xml:space="preserve">
+    
+    
+    <value>Custom {0}</value>
+    
+  
+  </data>
+<data name="CustomProfilePowerPlanUnconfirmed" xml:space="preserve">
+    
+    
+    <value>Custom profile switched, power plan not confirmed</value>
+    
+  
+  </data>
+<data name="DarkTheme" xml:space="preserve">
+    
+    
+    <value>Dark</value>
+    
+  
+  </data>
+<data name="DeepSleepOff" xml:space="preserve">
+    
+    
+    <value>Deep sleep disabled. Takes effect after reboot!</value>
+    
+  
+  </data>
+<data name="DeepSleepOn" xml:space="preserve">
+    
+    
+    <value>Deep sleep enabled. Takes effect after reboot!</value>
+    
+  
+  </data>
+<data name="Delete" xml:space="preserve">
+    
+    
+    <value>Delete</value>
+    
+  
+  </data>
+<data name="Density" xml:space="preserve">
+    
+    
+    <value>Density</value>
+    
+  
+  </data>
+<data name="Detecting" xml:space="preserve">
+    
+    
+    <value>Detecting...</value>
+    
+  
+  </data>
+<data name="DgpuElevationPrompt" xml:space="preserve">
+    
+    
+    <value>The following programs cannot be closed with normal privileges:
+
+{0}
+
+Use administrator privileges to force-close them? (A UAC prompt will appear)
+Choose No to switch to restart-based switching.</value>
+    
+  
+  </data>
+<data name="DgpuInUsePrompt" xml:space="preserve">
+    
+    
+    <value>Detected the following programs using the discrete GPU:
+
+{0}
+
+Yes = request to close the programs then hot switch
+No = use restart-based switching
+Cancel = keep current state</value>
+    
+  
+  </data>
+<data name="DgpuRecheckFailed" xml:space="preserve">
+    
+    
+    <value>Could not re-read the discrete GPU usage state after closing programs. Hot switch cancelled.</value>
+    
+  
+  </data>
+<data name="DgpuRiskDgpuDrivesDisplay" xml:space="preserve">
+    
+    
+    <value>The desktop is currently driven by the discrete GPU and by nothing else.
+
+Switching to iGPU power saving now makes the display lose its signal (black screen), and the discrete GPU stays unavailable until the next reboot - if a program stops responding you may have to force a power-off.
+
+Continue only if you have a second display or another way to get the picture back.</value>
+    
+  
+  </data>
+<data name="DgpuSnapshotUnavailable" xml:space="preserve">
+    
+    
+    <value>Cannot read the programs currently using the discrete GPU, so a hot switch cannot be guaranteed safe.
+
+Switch to restart-based switching instead?</value>
+    
+  
+  </data>
+<data name="DgpuStillInUsePrompt" xml:space="preserve">
+    
+    
+    <value>The following programs are still using the discrete GPU:
+
+{0}
+
+Force-close these programs and continue? Unsaved work may be lost.</value>
+    
+  
+  </data>
+<data name="DgpuStuckCancelled" xml:space="preserve">
+    
+    
+    <value>Some discrete GPU programs could not be closed. Hot switch cancelled.
+
+Switch to restart-based switching instead?</value>
+    
+  
+  </data>
+<data name="Diagnostics" xml:space="preserve">
+    
+    
+    <value>Diagnostics</value>
+    
+  
+  </data>
+<data name="DirectMode" xml:space="preserve">
+    
+    
+    <value>Discrete GPU direct</value>
+    
+  
+  </data>
+<data name="DirectModeTooltip" xml:space="preserve">
+    
+    
+    <value>Discrete GPU direct connection</value>
+    
+  
+  </data>
+<data name="DirectShort" xml:space="preserve">
+    
+    
+    <value>Direct</value>
+    
+  
+  </data>
+<data name="DisconnectBleWaterCooler" xml:space="preserve">
+    
+    
+    <value>Disconnect the Bluetooth liquid cooler?</value>
+    
+  
+  </data>
+<data name="Disconnected" xml:space="preserve">
+    
+    
+    <value>Disconnected</value>
+    
+  
+  </data>
+<data name="DisplaySection" xml:space="preserve">
+    
+    
+    <value>Display</value>
+    
+  
+  </data>
+<data name="DonateQrMissing" xml:space="preserve">
+    
+    
+    <value>QR code resource missing</value>
+    
+  
+  </data>
+<data name="DonateScanHint" xml:space="preserve">
+    
+    
+    <value>Scan to donate and support ongoing development</value>
+    
+  
+  </data>
+<data name="DonateThanks" xml:space="preserve">
+    
+    
+    <value>Thank you for supporting L-Mechrevo</value>
+    
+  
+  </data>
+<data name="DonateTitle" xml:space="preserve">
+    
+    
+    <value>Donate</value>
+    
+  
+  </data>
+<data name="DonateAttribution" xml:space="preserve">
+    
+    
+    <value>The two QR codes above belong to the original L-Mechrevo project, published by LiangyuLu-lly. Source: https://github.com/LiangyuLu-lly/L-Mechrevo/tree/v0.290.6
+
+The two QR codes below belong to the maintainer of this build, xiaohan (xmsjx). This build is maintained by xiaohan (xmsjx).</value>
+    
+  
+  </data>
+<data name="DonateSource" xml:space="preserve">
+    
+    
+    <value>Original project (LiangyuLu-lly)</value>
+    
+  
+  </data>
+<data name="DonateSourceMine" xml:space="preserve">
+    
+    
+    <value>This build's maintainer — xiaohan (xmsjx)</value>
+    
+  
+  </data>
+<data name="DontRemind" xml:space="preserve">
+    
+    
+    <value>Don't remind again</value>
+    
+  
+  </data>
+<data name="DragCurveHint" xml:space="preserve">
+    
+    
+    <value>Drag curve points up/down to adjust duty</value>
+    
+  
+  </data>
+<data name="Duration" xml:space="preserve">
+    
+    
+    <value>Duration</value>
+    
+  
+  </data>
+<data name="DynamicBoostValue" xml:space="preserve">
+    
+    
+    <value>Dynamic boost value</value>
+    
+  
+  </data>
+<data name="Edit" xml:space="preserve">
+    
+    
+    <value>Edit</value>
+    
+  
+  </data>
+<data name="EffectAurora" xml:space="preserve">
+    
+    
+    <value>Aurora</value>
+    
+  
+  </data>
+<data name="EffectBlink" xml:space="preserve">
+    
+    
+    <value>Blink</value>
+    
+  
+  </data>
+<data name="EffectBreathing" xml:space="preserve">
+    
+    
+    <value>Breathing</value>
+    
+  
+  </data>
+<data name="EffectFlame" xml:space="preserve">
+    
+    
+    <value>Flame</value>
+    
+  
+  </data>
+<data name="EffectFlowRainbow" xml:space="preserve">
+    
+    
+    <value>Flow rainbow</value>
+    
+  
+  </data>
+<data name="EffectGaming" xml:space="preserve">
+    
+    
+    <value>Gaming</value>
+    
+  
+  </data>
+<data name="EffectImpact" xml:space="preserve">
+    
+    
+    <value>Impact</value>
+    
+  
+  </data>
+<data name="EffectLightning" xml:space="preserve">
+    
+    
+    <value>Lightning</value>
+    
+  
+  </data>
+<data name="EffectManual" xml:space="preserve">
+    
+    
+    <value>Rotation</value>
+    
+  
+  </data>
+<data name="EffectMarquee" xml:space="preserve">
+    
+    
+    <value>Marquee</value>
+    
+  
+  </data>
+<data name="EffectMatrix" xml:space="preserve">
+    
+    
+    <value>Matrix</value>
+    
+  
+  </data>
+<data name="EffectMeteor" xml:space="preserve">
+    
+    
+    <value>Meteor</value>
+    
+  
+  </data>
+<data name="EffectMix" xml:space="preserve">
+    
+    
+    <value>Mix</value>
+    
+  
+  </data>
+<data name="EffectRainbow" xml:space="preserve">
+    
+    
+    <value>Rainbow</value>
+    
+  
+  </data>
+<data name="EffectRainbowWheel" xml:space="preserve">
+    
+    
+    <value>Rainbow wheel</value>
+    
+  
+  </data>
+<data name="EffectRaindrop" xml:space="preserve">
+    
+    
+    <value>Raindrop</value>
+    
+  
+  </data>
+<data name="EffectReactive" xml:space="preserve">
+    
+    
+    <value>Reactive</value>
+    
+  
+  </data>
+<data name="EffectRipple" xml:space="preserve">
+    
+    
+    <value>Ripple</value>
+    
+  
+  </data>
+<data name="EffectSingle" xml:space="preserve">
+    
+    
+    <value>Steady</value>
+    
+  
+  </data>
+<data name="EffectSpark" xml:space="preserve">
+    
+    
+    <value>Spark</value>
+    
+  
+  </data>
+<data name="EffectStatic" xml:space="preserve">
+    
+    
+    <value>Static</value>
+    
+  
+  </data>
+<data name="EffectWave" xml:space="preserve">
+    
+    
+    <value>Wave</value>
+    
+  
+  </data>
+<data name="Enable" xml:space="preserve">
+    
+    
+    <value>Enable</value>
+    
+  
+  </data>
+<data name="EnablingFanIndep" xml:space="preserve">
+    
+    
+    <value>Enabling fan independent control…</value>
+    
+  
+  </data>
+<data name="ExportDiagnostics" xml:space="preserve">
+    
+    
+    <value>Export diagnostics</value>
+    
+  
+  </data>
+<data name="Extreme" xml:space="preserve">
+    
+    
+    <value>&amp;Extreme</value>
+    
+  
+  </data>
+<data name="Fan" xml:space="preserve">
+    
+    
+    <value>Fan</value>
+    
+  
+  </data>
+<data name="FanBoostStrong" xml:space="preserve">
+    
+    
+    <value>Fan boost</value>
+    
+  
+  </data>
+<data name="FanCurve" xml:space="preserve">
+    
+    
+    <value>Fan curve</value>
+    
+  
+  </data>
+<data name="FanCurveCurrentProfile" xml:space="preserve">
+    
+    
+    <value>Fan curve (current custom profile)</value>
+    
+  
+  </data>
+<data name="FanCurveTitleHint" xml:space="preserve">
+    
+    
+    <value>{0} fan curve (drag points to adjust duty)</value>
+    
+  
+  </data>
+<data name="FanIndepDefaultOn" xml:space="preserve">
+    
+    
+    <value>Fan independent control enabled by default</value>
+    
+  
+  </data>
+<data name="FanIndependentControl" xml:space="preserve">
+    
+    
+    <value>Fan independent control</value>
+    
+  
+  </data>
+<data name="FanIndepHelp" xml:space="preserve">
+    
+    
+    <value>Off = both fans follow the GPU curve (default); On = CPU/GPU independent.</value>
+    
+  
+  </data>
+<data name="FanIndepUnconfirmed" xml:space="preserve">
+    
+    
+    <value>Fan independent control not confirmed</value>
+    
+  
+  </data>
+<data name="FanSwitchSensitivity" xml:space="preserve">
+    
+    
+    <value>Fan switch sensitivity</value>
+    
+  
+  </data>
+<data name="FanTableNotReady" xml:space="preserve">
+    
+    
+    <value>Fan curve not ready</value>
+    
+  
+  </data>
+<data name="FanTablePrefix" xml:space="preserve">
+    
+    
+    <value>Table: </value>
+    
+  
+  </data>
+<data name="FirstRun" xml:space="preserve">
+    
+    
+    <value>First run</value>
+    
+  
+  </data>
+<data name="FirstRunIntro" xml:space="preserve">
+    
+    
+    <value>Complete the three steps below to keep the hardware service and avoid control conflicts.</value>
+    
+  
+  </data>
+<data name="FirstRunStep1Body" xml:space="preserve">
+    
+    
+    <value>The installer has already set up the GCU service and driver; this program includes all required components. The official console has been cleaned up and replaced by L-Mechrevo, so there is no need to download or install it.</value>
+    
+  
+  </data>
+<data name="FirstRunStep1Title" xml:space="preserve">
+    
+    
+    <value>No other console required</value>
+    
+  
+  </data>
+<data name="FirstRunStep2Body" xml:space="preserve">
+    
+    
+    <value>Open the System page in this program to configure startup, performance mode, GPU mode and lighting; the GCU service runs in the background with no extra steps needed.</value>
+    
+  
+  </data>
+<data name="FirstRunStep2Title" xml:space="preserve">
+    
+    
+    <value>Start using it directly</value>
+    
+  
+  </data>
+<data name="FirstRunStep3Body" xml:space="preserve">
+    
+    
+    <value>Do not run BetterRGB, OpenRGB or other vendor lighting programs at the same time; multiple programs grabbing HID devices can make lighting fail or cause device access conflicts.</value>
+    
+  
+  </data>
+<data name="FirstRunStep3Title" xml:space="preserve">
+    
+    
+    <value>Exit other lighting control software</value>
+    
+  
+  </data>
+<data name="FirstRunStep4Body" xml:space="preserve">
+    
+    
+    <value>Look in BIOS or the official console: is there an "iGPU only / integrated-graphics only" option? "Yes" shows the iGPU-only mode button, "No" hides it; "Not sure" keeps it visible, and you can change this any time in Settings.</value>
+    
+  
+  </data>
+<data name="FirstRunStep4BodyShort" xml:space="preserve">
+    
+    
+    <value>Look in BIOS or the official console for an "iGPU only / integrated-graphics only" option.</value>
+    
+  
+  </data>
+<data name="FirstRunStep4No" xml:space="preserve">
+    
+    
+    <value>No</value>
+    
+  
+  </data>
+<data name="FirstRunStep4Title" xml:space="preserve">
+    
+    
+    <value>Does your PC have an "iGPU-only" option?</value>
+    
+  
+  </data>
+<data name="FirstRunStep4Unknown" xml:space="preserve">
+    
+    
+    <value>Not sure</value>
+    
+  
+  </data>
+<data name="FirstRunStep4Yes" xml:space="preserve">
+    
+    
+    <value>Yes</value>
+    
+  
+  </data>
+<data name="FirstRunStep5Body" xml:space="preserve">
+    
+    
+    <value>Every 5 minutes an anonymous record is sent (version, model, BIOS, CPU/GPU and keyboard model, GCU state, Windows build, admin or not, error count); on start-up and on errors a scrubbed log from this program is attached (user name, computer name, user folder path and MAC addresses become placeholders). Turn it off any time in Settings → Privacy &amp; feedback.</value>
+    
+    
+  
+  </data>
+<data name="FirstRunStep5Title" xml:space="preserve">
+    
+    
+    <value>Anonymous usage stats and logs</value>
+    
+    
+  
+  </data>
+<data name="FirstRunWelcome" xml:space="preserve">
+    
+    
+    <value>Get started with L-Mechrevo</value>
+    
+  
+  </data>
+<data name="FlowFault" xml:space="preserve">
+    
+    
+    <value>Flow fault</value>
+    
+  
+  </data>
+<data name="FollowSystem" xml:space="preserve">
+    
+    
+    <value>Follow system</value>
+    
+  
+  </data>
+<data name="FrameRate" xml:space="preserve">
+    
+    
+    <value>Frame rate</value>
+    
+  
+  </data>
+<data name="Game" xml:space="preserve">
+    
+    
+    <value>&amp;Game</value>
+    
+  
+  </data>
+<data name="GcuConnectedText" xml:space="preserve">
+    
+    
+    <value>● GCU connected</value>
+    
+  
+  </data>
+<data name="GcuConnectedTooltip" xml:space="preserve">
+    
+    
+    <value>GCU service connected (GCUBridge, MQTT 127.0.0.1:13688)</value>
+    
+  
+  </data>
+<data name="GcuConnectingText" xml:space="preserve">
+    
+    
+    <value>● GCU connecting</value>
+    
+  
+  </data>
+<data name="GcuConnectingTooltip" xml:space="preserve">
+    
+    
+    <value>Connecting to GCU service (127.0.0.1:13688) — the service is usually ready a few seconds after login; the app retries automatically</value>
+    
+  
+  </data>
+<data name="GcuDisconnected" xml:space="preserve">
+    
+    
+    <value>GCU not connected</value>
+    
+  
+  </data>
+<data name="GcuDisconnectedText" xml:space="preserve">
+    
+    
+    <value>● GCU not connected</value>
+    
+  
+  </data>
+<data name="GcuDisconnectedTooltip" xml:space="preserve">
+    
+    
+    <value>GCU service not running or connection failed (127.0.0.1:13688); the app keeps reconnecting and this indicator turns green when recovered</value>
+    
+  
+  </data>
+<data name="GcuServiceNotReady" xml:space="preserve">
+    
+    
+    <value>The GCU hardware service is not connected yet. Please try again later.</value>
+    
+  
+  </data>
+<data name="GcuStatusUnknown" xml:space="preserve">
+    
+    
+    <value>● GCU status unknown</value>
+    
+  
+  </data>
+<data name="GcuUnknownText" xml:space="preserve">
+    
+    
+    <value>● GCU status unknown</value>
+    
+  
+  </data>
+<data name="GcuUnknownTooltip" xml:space="preserve">
+    
+    
+    <value>Hardware backend not initialized yet</value>
+    
+  
+  </data>
+<data name="GearShiftDelay" xml:space="preserve">
+    
+    
+    <value>Gear shift delay (ms)</value>
+    
+  
+  </data>
+<data name="GoToSystemPage" xml:space="preserve">
+    
+    
+    <value>Go to System page</value>
+    
+  
+  </data>
+<data name="GpuCannotResolveSid" xml:space="preserve">
+    
+    
+    <value>Could not determine the current user SID; the elevated write helper will not be started for safety.</value>
+    
+  
+  </data>
+<data name="GpuDynamicBoost" xml:space="preserve">
+    
+    
+    <value>GPU dynamic boost</value>
+    
+  
+  </data>
+<data name="GpuElevationCancelledNoWrite" xml:space="preserve">
+    
+    
+    <value>Administrator authorization cancelled; GPU frequency not written.</value>
+    
+  
+  </data>
+<data name="GpuElevationPrompt2" xml:space="preserve">
+    
+    
+    <value>The following programs cannot be closed with normal privileges (may be running as administrator):
+
+{0}
+
+Authorize administrator privileges to force-close them? (A UAC prompt will appear)</value>
+    
+  
+  </data>
+<data name="GpuInUseSwitchPrompt" xml:space="preserve">
+    
+    
+    <value>The following programs are using the discrete GPU and must be closed before switching to iGPU-only:
+
+{0}
+
+Close these programs and continue switching?</value>
+    
+  
+  </data>
+<data name="GpuModeUnreadable" xml:space="preserve">
+    
+    
+    <value>Could not read the current GPU mode. To avoid switching based on stale state, please retry later.</value>
+    
+  
+  </data>
+<data name="GpuModeUnsupported" xml:space="preserve">
+    
+    
+    <value>The current model or GCU version does not report support for this GPU mode.</value>
+    
+  
+  </data>
+<data name="GpuNvOverclockInterfaceMissing" xml:space="preserve">
+    
+    
+    <value>The NVIDIA driver does not provide a writable overclocking interface.</value>
+    
+  
+  </data>
+<data name="GpuNvRangeExceeded" xml:space="preserve">
+    
+    
+    <value>The requested value exceeds the range allowed by the NVIDIA driver.</value>
+    
+  
+  </data>
+<data name="GpuNvReadbackMismatch" xml:space="preserve">
+    
+    
+    <value>The NVIDIA driver read-back value does not match the requested value.</value>
+    
+  
+  </data>
+<data name="GpuOverclock" xml:space="preserve">
+    
+    
+    <value>GPU OC</value>
+    
+  
+  </data>
+<data name="GpuRestartManualPrompt" xml:space="preserve">
+    
+    
+    <value>GCU did not restart the system automatically. The GPU mode command has been written and will take effect after reboot.
+
+Click OK to restart Windows in 5 seconds to complete the switch.</value>
+    
+  
+  </data>
+<data name="GpuRestartPrompt" xml:space="preserve">
+    
+    
+    <value>Switching to {0} mode requires a reboot to take effect.
+
+"Yes" = send switch command and reboot now;
+"No" = send switch command now, takes effect after reboot (target highlighted in orange);
+"Cancel" = do nothing.</value>
+    
+  
+  </data>
+<data name="GpuRestartRequestFailed" xml:space="preserve">
+    
+    
+    <value>GCU could not send the restart switch request. The GPU mode was not marked as switched.</value>
+    
+  
+  </data>
+<data name="GpuRestartUnsupported" xml:space="preserve">
+    
+    
+    <value>The current model or GCU version does not support the switch to「{0}」: no switch command is available. Cancelled and not rebooted.</value>
+    
+  
+  </data>
+<data name="GpuSomeUnclosable" xml:space="preserve">
+    
+    
+    <value>Some discrete GPU programs could not be closed; the switch may fail</value>
+    
+  
+  </data>
+<data name="GpuStillOccupied" xml:space="preserve">
+    
+    
+    <value>Programs still occupy the discrete GPU; the switch may fail</value>
+    
+  
+  </data>
+<data name="GpuSwitchFailedRestored" xml:space="preserve">
+    
+    
+    <value>GPU mode switch failed; restored to previous mode</value>
+    
+  
+  </data>
+<data name="GpuTgpTarget" xml:space="preserve">
+    
+    
+    <value>GPU TGP target (W)</value>
+    
+  
+  </data>
+<data name="GpuWriteHelperCannotLaunch" xml:space="preserve">
+    
+    
+    <value>Could not start the GPU write helper; check the log.</value>
+    
+  
+  </data>
+<data name="GpuWriteHelperLaunchFailed" xml:space="preserve">
+    
+    
+    <value>The GPU write helper just failed to start or was cancelled. Please retry later. Repeated requests will not prompt for administrator again.</value>
+    
+  
+  </data>
+<data name="GpuWriteHelperTimeout" xml:space="preserve">
+    
+    
+    <value>The GPU write helper did not respond within the time limit.</value>
+    
+  
+  </data>
+<data name="GpuWriteRequestEmpty" xml:space="preserve">
+    
+    
+    <value>The GPU write request is empty.</value>
+    
+  
+  </data>
+<data name="GpuWriteRequestInvalid" xml:space="preserve">
+    
+    
+    <value>The GPU write request format is invalid.</value>
+    
+  
+  </data>
+<data name="GpuWriteRequestValidationFailed" xml:space="preserve">
+    
+    
+    <value>The GPU write request failed validation.</value>
+    
+  
+  </data>
+<data name="Hex" xml:space="preserve">
+    
+    
+    <value>Hex</value>
+    
+  
+  </data>
+<data name="HorizontalZones" xml:space="preserve">
+    
+    
+    <value>Horizontal zones</value>
+    
+  
+  </data>
+<data name="HotSwitchTimeoutPrompt" xml:space="preserve">
+    
+    
+    <value>The hot switch did not complete within two minutes and was stopped.
+
+iGPU-only mode supports restart-to-apply: keep the iGPU setting now, and the laptop will boot into iGPU-only mode after reboot.
+
+[Yes] restart now and apply
+[No] keep the setting, restart later by yourself
+[Cancel] abandon and restore the previous mode</value>
+    
+  
+  </data>
+<data name="HybridMode" xml:space="preserve">
+    
+    
+    <value>Hybrid mode</value>
+    
+  
+  </data>
+<data name="HybridModeTooltip" xml:space="preserve">
+    
+    
+    <value>Hybrid mode</value>
+    
+  
+  </data>
+<data name="HybridShort" xml:space="preserve">
+    
+    
+    <value>Hybrid</value>
+    
+  
+  </data>
+<data name="IgpuMode" xml:space="preserve">
+    
+    
+    <value>iGPU-only mode</value>
+    
+  
+  </data>
+<data name="IgpuModeTooltip" xml:space="preserve">
+    
+    
+    <value>iGPU-only mode</value>
+    
+  
+  </data>
+<data name="IgpuOnNextRestart" xml:space="preserve">
+    
+    
+    <value>iGPU-only mode will take effect on next reboot</value>
+    
+  
+  </data>
+<data name="IgpuOnlyGuideIntro" xml:space="preserve">
+    
+    
+    <value>You can change the answer any time in Settings.</value>
+    
+  
+  </data>
+<data name="IgpuOnlyGuideTitle" xml:space="preserve">
+    
+    
+    <value>iGPU-only mode display</value>
+    
+  
+  </data>
+<data name="IgpuOnlyShowToggle" xml:space="preserve">
+    
+    
+    <value>iGPU-only mode display</value>
+    
+  
+  </data>
+<data name="IgpuOnlyShowToggleTip" xml:space="preserve">
+    
+    
+    <value>Show the "iGPU-only mode" button and tray menu item. Turn it off if your PC has no "iGPU only / integrated-graphics only" option in BIOS or the official console.</value>
+    
+  
+  </data>
+<data name="IgpuOnlyUnverifiedHint" xml:space="preserve">
+    <value>May be unsupported; try once</value>
+  </data>
+<data name="IgpuOnlyForceSecondConfirm" xml:space="preserve">
+    
+    
+    <value>Second confirmation: do you still want to force the switch to iGPU power saving?
+
+Yes = you know a black screen is possible and accept the risk;
+No = give up this forced switch and change nothing.</value>
+    
+  
+  </data>
+<data name="IgpuOnlyUnverifiedTip" xml:space="preserve">
+    <value>There is no reliable way to tell whether this PC supports iGPU-only mode, so this button is shown by rule of thumb. You can try it once: after the reboot, if the switch really worked I will remember it and keep the button; if it did not, I will hide the button (you can still turn it back on in Settings).</value>
+  </data>
+<data name="IgpuOnlyModeAuto" xml:space="preserve">
+    <value>Auto (by hardware)</value>
+  </data>
+<data name="IgpuOnlyModeShow" xml:space="preserve">
+    <value>Always show</value>
+  </data>
+<data name="IgpuOnlyModeHide" xml:space="preserve">
+    <value>Always hide</value>
+  </data>
+<data name="IgpuOnlyModeForceShowHint" xml:space="preserve">
+    <value>Pick "Always show" if the judgement is wrong</value>
+  </data>
+<data name="IgpuOnlyModeTip" xml:space="preserve">
+    <value>Decide from the hardware capability bit whether to show the "iGPU-only mode" button and tray item (the default, i.e. Auto). If the judgement is wrong, pick "Always show" to bring it back; "Always hide" never shows it.</value>
+  </data>
+<data name="IgpuShort" xml:space="preserve">
+    
+    
+    <value>iGPU</value>
+    
+  
+  </data>
+<data name="IgpuSaving" xml:space="preserve">
+    
+    
+    <value>iGPU Saving</value>
+    
+  
+  </data>
+<data name="IgpuSavingOff" xml:space="preserve">
+    
+    
+    <value>Off</value>
+    
+  
+  </data>
+<data name="IgpuSavingOn" xml:space="preserve">
+    
+    
+    <value>On</value>
+    
+  
+  </data>
+<data name="IgpuSavingAuto" xml:space="preserve">
+    
+    
+    <value>Auto</value>
+    
+  
+  </data>
+<data name="IsolateOfficialConsole" xml:space="preserve">
+    
+    
+    <value>Isolate official UI &amp; tray</value>
+    
+  
+  </data>
+<data name="IsolatePrompt" xml:space="preserve">
+    
+    
+    <value>Isolate the official console UI and tray?
+
+The official console does not need to be uninstalled. GCUBridge, GCUService, UWACPI driver and model configuration are all kept.</value>
+    
+  
+  </data>
+<data name="Isolating" xml:space="preserve">
+    
+    
+    <value>Isolating...</value>
+    
+  
+  </data>
+<data name="KeyboardBrightnessRestored" xml:space="preserve">
+    <value>Keyboard backlight brightness was 0, so it was raised to {0}% (otherwise the light would be on but invisible)</value>
+  </data>
+<data name="KeyboardChannelDisabled" xml:space="preserve">
+    <value>Keyboard lighting channel is not enabled (official channel is off)</value>
+  </data>
+<data name="KeyboardChannelNotReady" xml:space="preserve">
+    <value>Keyboard lighting channel is not ready</value>
+  </data>
+<data name="KeyboardControllerUnsupported" xml:space="preserve">
+    
+    
+    <value>This controller does not support software lighting control; switched to the official channel</value>
+    
+  
+  </data>
+<data name="KeyboardDeviceNotReady" xml:space="preserve">
+    <value>Keyboard device is not ready yet; please try again shortly</value>
+  </data>
+<data name="KeyboardLighting" xml:space="preserve">
+    
+    
+    <value>Keyboard lighting</value>
+    
+  
+  </data>
+<data name="KeyboardRgbNotConnected" xml:space="preserve">
+    
+    
+    <value>Keyboard RGB device not connected</value>
+    
+  
+  </data>
+<data name="KillCannotLaunchElevated" xml:space="preserve">
+    
+    
+    <value>Could not launch the elevated process; check the log.</value>
+    
+  
+  </data>
+<data name="KillCannotLaunchElevated2" xml:space="preserve">
+    
+    
+    <value>Could not launch the elevated process.</value>
+    
+  
+  </data>
+<data name="KillCannotReadIdentity" xml:space="preserve">
+    
+    
+    <value>Could not read process identity: </value>
+    
+  
+  </data>
+<data name="KilledN" xml:space="preserve">
+    
+    
+    <value>{0} discrete GPU programs terminated.</value>
+    
+  
+  </data>
+<data name="KillElevationCancelled" xml:space="preserve">
+    
+    
+    <value>Administrator authorization cancelled; no process was terminated.</value>
+    
+  
+  </data>
+<data name="KillInvalidResult" xml:space="preserve">
+    
+    
+    <value>The elevated process returned an invalid result.</value>
+    
+  
+  </data>
+<data name="KillMissingStartTime" xml:space="preserve">
+    
+    
+    <value>Target lacks start time; identity cannot be safely verified.</value>
+    
+  
+  </data>
+<data name="KillNoResult" xml:space="preserve">
+    
+    
+    <value>The elevated process returned no result.</value>
+    
+  
+  </data>
+<data name="KillPidReusedName" xml:space="preserve">
+    
+    
+    <value>Process name mismatch (PID may have been reused)</value>
+    
+  
+  </data>
+<data name="KillPidReusedStartTime" xml:space="preserve">
+    
+    
+    <value>Start time mismatch (PID may have been reused)</value>
+    
+  
+  </data>
+<data name="KillTargetProtected" xml:space="preserve">
+    
+    
+    <value>Target is in the protection list or does not meet the safety conditions</value>
+    
+  
+  </data>
+<data name="Later" xml:space="preserve">
+    
+    
+    <value>Later</value>
+    
+  
+  </data>
+<data name="Layout" xml:space="preserve">
+    
+    
+    <value>Layout</value>
+    
+  
+  </data>
+<data name="LcAllOff" xml:space="preserve">
+    
+    
+    <value>Turn off all lighting</value>
+    
+  
+  </data>
+<data name="LcBleConnected" xml:space="preserve">
+    
+    
+    <value>Bluetooth connected</value>
+    
+  
+  </data>
+<data name="LcBleDetectedNotControllable" xml:space="preserve">
+    
+    
+    <value>Windows detected the liquid cooler Bluetooth connection, but GCU has not reported a controllable state yet. Refresh the connection status and retry later.</value>
+    
+  
+  </data>
+<data name="LcBleWaitingGcu" xml:space="preserve">
+    
+    
+    <value>Bluetooth connected, waiting for GCU to take over</value>
+    
+  
+  </data>
+<data name="LcColorful" xml:space="preserve">
+    
+    
+    <value>Colorful</value>
+    
+  
+  </data>
+<data name="LcColorfulBreath" xml:space="preserve">
+    
+    
+    <value>Colorful breathing</value>
+    
+  
+  </data>
+<data name="LcConfirmingFlow" xml:space="preserve">
+    
+    
+    <value>Confirming water flow</value>
+    
+  
+  </data>
+<data name="LcConnectFailedBusy" xml:space="preserve">
+    
+    
+    <value>Liquid cooler connection failed (Bluetooth busy or GATT failure, click to retry)</value>
+    
+  
+  </data>
+<data name="LcConnectFailedRetry" xml:space="preserve">
+    
+    
+    <value>Connection failed (click to retry)</value>
+    
+  
+  </data>
+<data name="LcConnecting" xml:space="preserve">
+    
+    
+    <value>Connecting</value>
+    
+  
+  </data>
+<data name="LcConnectingBox" xml:space="preserve">
+    
+    
+    <value>Connecting liquid cooler…</value>
+    
+  
+  </data>
+<data name="LcCustomBreath" xml:space="preserve">
+    
+    
+    <value>Custom color breathing…</value>
+    
+  
+  </data>
+<data name="LcCustomColorHeader" xml:space="preserve">
+    
+    
+    <value>Custom color</value>
+    
+  
+  </data>
+<data name="LcCustomStatic" xml:space="preserve">
+    
+    
+    <value>Custom color steady…</value>
+    
+  
+  </data>
+<data name="LcCyanBreath" xml:space="preserve">
+    
+    
+    <value>Cyan breathing</value>
+    
+  
+  </data>
+<data name="LcCyanStatic" xml:space="preserve">
+    
+    
+    <value>Cyan steady</value>
+    
+  
+  </data>
+<data name="LcDeviceIsReady" xml:space="preserve">
+    
+    
+    <value>Device ready</value>
+    
+  
+  </data>
+<data name="LcDeviceNotReady" xml:space="preserve">
+    
+    
+    <value>Device not ready</value>
+    
+  
+  </data>
+<data name="LcDirectConnected" xml:space="preserve">
+    
+    
+    <value>Directly connected</value>
+    
+  
+  </data>
+<data name="LcEffectApplied" xml:space="preserve">
+    
+    
+    <value>Effect applied: </value>
+    
+  
+  </data>
+<data name="LcEffectConfirmed" xml:space="preserve">
+    
+    
+    <value>Effect confirmed: </value>
+    
+  
+  </data>
+<data name="LcEffectNeedsFanLed" xml:space="preserve">
+    
+    
+    <value>This effect requires the fan LEDs of an LCT22002 (Mk2). Your liquid cooler only supports head effects.</value>
+    
+  
+  </data>
+<data name="LcEffectSent" xml:space="preserve">
+    
+    
+    <value>Effect command sent: </value>
+    
+  
+  </data>
+<data name="LcEffectWriteFailed" xml:space="preserve">
+    
+    
+    <value>Lighting write failed</value>
+    
+  
+  </data>
+<data name="LcFanConfirmed" xml:space="preserve">
+    
+    
+    <value>Fan gear confirmed: </value>
+    
+  
+  </data>
+<data name="LcFanFallback" xml:space="preserve">
+    
+    
+    <value>GCU did not provide this fan gear; restored to previous gear</value>
+    
+  
+  </data>
+<data name="LcFanLedHeader" xml:space="preserve">
+    
+    
+    <value>Fan effects (Mk2 only)</value>
+    
+  
+  </data>
+<data name="LcFanRainbow" xml:space="preserve">
+    
+    
+    <value>Fan rainbow (Mk2)</value>
+    
+  
+  </data>
+<data name="LcFanRotate" xml:space="preserve">
+    
+    
+    <value>Fan rotating colors (Mk2)</value>
+    
+  
+  </data>
+<data name="LcFanSent" xml:space="preserve">
+    
+    
+    <value>Fan command sent: </value>
+    
+  
+  </data>
+<data name="LcFanWriteFailed" xml:space="preserve">
+    
+    
+    <value>Fan write failed; restored to previous gear</value>
+    
+  
+  </data>
+<data name="LcFlowFault" xml:space="preserve">
+    
+    
+    <value>Flow fault</value>
+    
+  
+  </data>
+<data name="LcGcuConnected" xml:space="preserve">
+    
+    
+    <value>GCU connected to liquid cooler</value>
+    
+  
+  </data>
+<data name="LcGcuConnecting" xml:space="preserve">
+    
+    
+    <value>GCU is connecting to the liquid cooler, please wait (click to refresh)</value>
+    
+  
+  </data>
+<data name="LcGcuReportsFault" xml:space="preserve">
+    
+    
+    <value>GCU reports flow fault</value>
+    
+  
+  </data>
+<data name="LcGcuWaterCoolingPrefix" xml:space="preserve">
+    
+    
+    <value>GCU liquid cooling · </value>
+    
+  
+  </data>
+<data name="LcHeadEffectHeader" xml:space="preserve">
+    
+    
+    <value>Head effects</value>
+    
+  
+  </data>
+<data name="LcMeterFault" xml:space="preserve">
+    
+    
+    <value>GCU flow fault</value>
+    
+  
+  </data>
+<data name="LcNotConnectedClick" xml:space="preserve">
+    
+    
+    <value>Not connected (click to connect)</value>
+    
+  
+  </data>
+<data name="LcNotControllableYet" xml:space="preserve">
+    
+    
+    <value>{0}, not controllable yet. Wait for GCU to finish connecting and retry.</value>
+    
+  
+  </data>
+<data name="LcNotFoundRetry" xml:space="preserve">
+    
+    
+    <value>Liquid cooler not found (click to retry)</value>
+    
+  
+  </data>
+<data name="LcPumpConfirmed" xml:space="preserve">
+    
+    
+    <value>Pump speed confirmed: </value>
+    
+  
+  </data>
+<data name="LcPumpFallback" xml:space="preserve">
+    
+    
+    <value>GCU did not provide this pump speed gear; restored to previous gear</value>
+    
+  
+  </data>
+<data name="LcPumpSent" xml:space="preserve">
+    
+    
+    <value>Pump speed command sent: </value>
+    
+  
+  </data>
+<data name="LcPumpWriteFailed" xml:space="preserve">
+    
+    
+    <value>Pump speed write failed; restored to previous gear</value>
+    
+  
+  </data>
+<data name="LcRefreshing" xml:space="preserve">
+    
+    
+    <value>Refreshing GCU liquid cooling status…</value>
+    
+  
+  </data>
+<data name="LcScanning" xml:space="preserve">
+    
+    
+    <value>Scanning</value>
+    
+  
+  </data>
+<data name="LcSetLightFirstConnect" xml:space="preserve">
+    
+    
+    <value>Click the connection status above first, connect the liquid cooler, then set lighting.</value>
+    
+  
+  </data>
+<data name="LcSetLightWaitDone" xml:space="preserve">
+    
+    
+    <value>{0}; please wait for the connection to complete before setting lighting.</value>
+    
+  
+  </data>
+<data name="LcSetLightWaitGcu" xml:space="preserve">
+    
+    
+    <value>Windows detected the liquid cooler Bluetooth connection. Please wait for GCU to finish connecting before setting lighting.</value>
+    
+  
+  </data>
+<data name="LcSystemNotConnected" xml:space="preserve">
+    
+    
+    <value>Liquid cooling system not connected.</value>
+    
+  
+  </data>
+<data name="LcWaitConnectable" xml:space="preserve">
+    
+    
+    <value>Waiting to connect</value>
+    
+  
+  </data>
+<data name="LcWaitingStatus" xml:space="preserve">
+    
+    
+    <value>Waiting for status</value>
+    
+  
+  </data>
+<data name="LightEffectDawn" xml:space="preserve">
+    
+    
+    <value>Dawn</value>
+    
+  
+  </data>
+<data name="LightEffectFlash" xml:space="preserve">
+    
+    
+    <value>Flash</value>
+    
+  
+  </data>
+<data name="LightbarEffect" xml:space="preserve">
+    
+    
+    <value>Lightbar effect</value>
+    
+  
+  </data>
+<data name="LightChannelsOn" xml:space="preserve">
+    
+    
+    <value>{0} channels · {1} on</value>
+    
+  
+  </data>
+<data name="LightingOff" xml:space="preserve">
+    
+    
+    <value>Lighting off</value>
+    
+  
+  </data>
+<data name="LightLogoUiHint" xml:space="preserve">
+    
+    
+    <value>Pick "Force show" if this row is missing by mistake; pick "Force hide" to drop it even when the Logo light exists</value>
+    
+  
+  </data>
+<data name="LightLogoUiTip" xml:space="preserve">
+    
+    
+    <value>Whether the "Logo light" row is shown. Automatic = the hardware verdict for this row (the row is kept unless there is no Logo-light evidence at all; when in doubt it stays, so nothing changes by default). Show / Hide override that verdict by hand. Only this row's visibility and the channel count are affected, nothing is sent to the hardware.</value>
+    
+  
+  </data>
+<data name="LightLogoUiTitle" xml:space="preserve">
+    
+    
+    <value>Logo light row</value>
+    
+  
+  </data>
+<data name="LightSettingFailed" xml:space="preserve">
+    
+    
+    <value>Lighting setting failed</value>
+    
+  
+  </data>
+<data name="LightStripUiHint" xml:space="preserve">
+    
+    
+    <value>Pick "Force show" if this row is missing by mistake; pick "Force hide" to drop it even when the lightbar exists</value>
+    
+  
+  </data>
+<data name="LightStripUiTip" xml:space="preserve">
+    
+    
+    <value>Whether the "lightbar" row is shown. Automatic = the hardware verdict for this row (the row is dropped only when GCU explicitly reports no base lightbar, does report a Logo variant and reports no MBLogo support; when in doubt it stays, so nothing changes by default). Show / Hide override that verdict by hand. Only this row's visibility and the channel count are affected, nothing is sent to the hardware.</value>
+    
+  
+  </data>
+<data name="LightStripUiTitle" xml:space="preserve">
+    
+    
+    <value>Lightbar row</value>
+    
+  
+  </data>
+<data name="LightTheme" xml:space="preserve">
+    
+    
+    <value>Light</value>
+    
+  
+  </data>
+<data name="LiquidCoolingShort" xml:space="preserve">
+    
+    
+    <value>Liquid cooling</value>
+    
+  
+  </data>
+<data name="LiquidCoolingSystem" xml:space="preserve">
+    
+    
+    <value>Liquid cooling system</value>
+    
+  
+  </data>
+<data name="LogoEffect" xml:space="preserve">
+    
+    
+    <value>Logo effect</value>
+    
+  
+  </data>
+<data name="ManualModel" xml:space="preserve">
+    
+    
+    <value>Manual model</value>
+    
+  
+  </data>
+<data name="MatrixFlow" xml:space="preserve">
+    
+    
+    <value>Flow</value>
+    
+  
+  </data>
+<data name="MatrixLaser" xml:space="preserve">
+    
+    
+    <value>Laser</value>
+    
+  
+  </data>
+<data name="MatrixRain" xml:space="preserve">
+    
+    
+    <value>Rain</value>
+    
+  
+  </data>
+<data name="MatrixRipple" xml:space="preserve">
+    
+    
+    <value>Ripple</value>
+    
+  
+  </data>
+<data name="MaxGear" xml:space="preserve">
+    
+    
+    <value>Max</value>
+    
+  
+  </data>
+<data name="MemClockOffset" xml:space="preserve">
+    
+    
+    <value>Memory clock offset (MHz)</value>
+    
+  
+  </data>
+<data name="ModelOverrideAuto" xml:space="preserve">
+    
+    
+    <value>Restored to auto</value>
+    
+  
+  </data>
+<data name="ModelOverrideInvalid" xml:space="preserve">
+    
+    
+    <value>Invalid ({0})</value>
+    
+  
+  </data>
+<data name="ModelOverridePinned" xml:space="preserve">
+    
+    
+    <value>Manually pinned</value>
+    
+  
+  </data>
+<data name="ModelUnparsable" xml:space="preserve">
+    
+    
+    <value>Model could not be identified; read-only mode enabled.</value>
+    
+  
+  </data>
+<data name="ModelUnsupported" xml:space="preserve">
+    
+    
+    <value>Current model is not in the support list (identified as {0}); read-only mode enabled.</value>
+    
+  
+  </data>
+<data name="MoreApplications" xml:space="preserve">
+    
+    
+    <value>and {0} more programs</value>
+    
+  
+  </data>
+<data name="MoreSwitches" xml:space="preserve">
+    
+    
+    <value>More switches</value>
+    
+  
+  </data>
+<data name="NoElevatedKillTargets" xml:space="preserve">
+    
+    
+    <value>No targets require elevated termination.</value>
+    
+  
+  </data>
+<data name="NotConnectedNotSaved" xml:space="preserve">
+    
+    
+    <value>Not connected; not saved</value>
+    
+  
+  </data>
+<data name="OffConsoleAlreadyIsolated" xml:space="preserve">
+    
+    
+    <value>The official console is already isolated.</value>
+    
+  
+  </data>
+<data name="OffConsoleCannotLaunchElevated" xml:space="preserve">
+    
+    
+    <value>Could not launch the administrator operation.</value>
+    
+  
+  </data>
+<data name="OffConsoleElevationCancelled" xml:space="preserve">
+    
+    
+    <value>Administrator authorization cancelled.</value>
+    
+  
+  </data>
+<data name="OffConsoleElevationFailed" xml:space="preserve">
+    
+    
+    <value>Administrator operation failed: </value>
+    
+  
+  </data>
+<data name="OffConsoleElevationIncomplete" xml:space="preserve">
+    
+    
+    <value>Administrator operation not completed; check the log.</value>
+    
+  
+  </data>
+<data name="OffConsoleIsolatedGcuOnly" xml:space="preserve">
+    
+    
+    <value>Isolated · GCU background only</value>
+    
+  
+  </data>
+<data name="OffConsoleIsolatedWaiting" xml:space="preserve">
+    
+    
+    <value>Isolated · GCU background waiting to connect</value>
+    
+  
+  </data>
+<data name="OffConsoleIsolationError" xml:space="preserve">
+    
+    
+    <value>Isolation error · official UI still running</value>
+    
+  
+  </data>
+<data name="OffConsoleIsolationFailedRestored" xml:space="preserve">
+    
+    
+    <value>Isolation failed; original state restored: </value>
+    
+  
+  </data>
+<data name="OffConsoleIsolationFailedRollback" xml:space="preserve">
+    
+    
+    <value>Isolation failed and rollback incomplete. Click Restore Official Console to retry: </value>
+    
+  
+  </data>
+<data name="OffConsoleNotDetected" xml:space="preserve">
+    
+    
+    <value>Not detected</value>
+    
+  
+  </data>
+<data name="OffConsoleNothingRestored" xml:space="preserve">
+    
+    
+    <value>Nothing was restored ({0} expected, {1} skipped, {2} failed). Isolation state kept unchanged.</value>
+    
+  
+  </data>
+<data name="OffConsoleNothingToRestore" xml:space="preserve">
+    
+    
+    <value>Nothing to restore.</value>
+    
+  
+  </data>
+<data name="OffConsoleNoUninstall" xml:space="preserve">
+    
+    
+    <value>No uninstall needed · click the button on the right to isolate</value>
+    
+  
+  </data>
+<data name="OffConsolePartialRestoreFailed" xml:space="preserve">
+    
+    
+    <value>Some items failed to restore ({0} restored, {1} failed); isolation state kept unchanged, click restore again.</value>
+    
+  
+  </data>
+<data name="OffConsoleRestoreComplete" xml:space="preserve">
+    
+    
+    <value>Official console startup state restored.</value>
+    
+  
+  </data>
+<data name="OffConsoleRestoreFailed" xml:space="preserve">
+    
+    
+    <value>Restore failed: </value>
+    
+  
+  </data>
+<data name="OffConsoleRestoreUnreadable" xml:space="preserve">
+    
+    
+    <value>Isolation state file unreadable; cannot restore automatically. Check manually: {0}</value>
+    
+  
+  </data>
+<data name="OffConsoleSnapshotUnreadable" xml:space="preserve">
+    
+    
+    <value>Isolation state file unreadable; aborted to avoid overwriting the original record. Check or delete: {0}</value>
+    
+  
+  </data>
+<data name="Office" xml:space="preserve">
+    
+    
+    <value>&amp;Office</value>
+    
+  
+  </data>
+<data name="OfficialConsole" xml:space="preserve">
+    
+    
+    <value>Official console</value>
+    
+  
+  </data>
+<data name="Ok" xml:space="preserve">
+    
+    
+    <value>OK</value>
+    
+  
+  </data>
+<data name="OpenMainUi" xml:space="preserve">
+    
+    
+    <value>Open main UI</value>
+    
+  
+  </data>
+<data name="OverclockNeedsAdmin" xml:space="preserve">
+    
+    
+    <value>Overclocking requires administrator privileges</value>
+    
+  
+  </data>
+<data name="OverlayMonitor" xml:space="preserve">
+    
+    
+    <value>Overlay monitor</value>
+    
+  
+  </data>
+<data name="ParamsConfirmed" xml:space="preserve">
+    
+    
+    <value>Parameters confirmed</value>
+    
+  
+  </data>
+<data name="ParamsReverted" xml:space="preserve">
+    
+    
+    <value>Parameters not applied; restored to read-back values</value>
+    
+  
+  </data>
+<data name="ParamsSavedToProfile" xml:space="preserve">
+    
+    
+    <value>Parameters are saved to the currently selected custom profile.</value>
+    
+  
+  </data>
+<data name="ParamsSaveFailed" xml:space="preserve">
+    
+    
+    <value>Failed to save parameters</value>
+    
+  
+  </data>
+<data name="PowerPlan" xml:space="preserve">
+    
+    
+    <value>Power plan</value>
+    
+  
+  </data>
+<data name="PowerPlanBalanced" xml:space="preserve">
+    
+    
+    <value>Balanced</value>
+    
+  
+  </data>
+<data name="PowerPlanConfirmedTurboUnconfirmed" xml:space="preserve">
+    
+    
+    <value>Power plan confirmed; turbo mode not confirmed</value>
+    
+  
+  </data>
+<data name="PowerPlanEnergySave" xml:space="preserve">
+    
+    
+    <value>Power saver</value>
+    
+  
+  </data>
+<data name="PowerPlanHighPerf" xml:space="preserve">
+    
+    
+    <value>High performance</value>
+    
+  
+  </data>
+<data name="PowerPlanN" xml:space="preserve">
+    
+    
+    <value>Power plan {0}</value>
+    
+  
+  </data>
+<data name="PowerPlanTurboConfirmed" xml:space="preserve">
+    
+    
+    <value>Power plan and turbo mode confirmed</value>
+    
+  
+  </data>
+<data name="PowerPlanUltimate" xml:space="preserve">
+    
+    
+    <value>Ultimate performance</value>
+    
+  
+  </data>
+<data name="PowerPlanUnavailable" xml:space="preserve">
+    
+    
+    <value>Saved plan unavailable</value>
+    
+  
+  </data>
+<data name="PowerPlanUnconfirmedNotSaved" xml:space="preserve">
+    
+    
+    <value>Power plan not confirmed; not saved</value>
+    
+  
+  </data>
+<data name="ProcessExited" xml:space="preserve">
+    
+    
+    <value>Exited</value>
+    
+  
+  </data>
+<data name="Pump" xml:space="preserve">
+    
+    
+    <value>Pump</value>
+    
+  
+  </data>
+<data name="PumpSpeed" xml:space="preserve">
+    
+    
+    <value>Pump speed</value>
+    
+  
+  </data>
+<data name="QuickSwitchesOn" xml:space="preserve">
+    
+    
+    <value>{0}/{1} on</value>
+    
+  
+  </data>
+<data name="RandomColor" xml:space="preserve">
+    
+    
+    <value>Random color</value>
+    
+  
+  </data>
+<data name="ReadOnlySuffix" xml:space="preserve">
+    
+    
+    <value> (read-only)</value>
+    
+  
+  </data>
+<data name="RestartAsAdmin" xml:space="preserve">
+    
+    
+    <value>Restart as administrator</value>
+    
+  
+  </data>
+<data name="RestartIn5sForIgpu" xml:space="preserve">
+    
+    
+    <value>Restarting in 5 seconds to apply iGPU-only mode</value>
+    
+  
+  </data>
+<data name="RestartToApply" xml:space="preserve">
+    
+    
+    <value>Restart to apply</value>
+    
+  
+  </data>
+<data name="RestoreCurrentDefaults" xml:space="preserve">
+    
+    
+    <value>Restore current profile defaults</value>
+    
+  
+  </data>
+<data name="RestoreDefaultsPrompt" xml:space="preserve">
+    
+    
+    <value>Restore the current custom profile to default parameters?</value>
+    
+  
+  </data>
+<data name="RestoredPreviousMode" xml:space="preserve">
+    
+    
+    <value>Restored to previous mode</value>
+    
+  
+  </data>
+<data name="RestoreOfficialConsole" xml:space="preserve">
+    
+    
+    <value>Restore official console</value>
+    
+  
+  </data>
+<data name="RestorePrompt" xml:space="preserve">
+    
+    
+    <value>Restore the official console to its original startup state?</value>
+    
+  
+  </data>
+<data name="RestoreSent" xml:space="preserve">
+    
+    
+    <value>Restore command sent</value>
+    
+  
+  </data>
+<data name="Restoring" xml:space="preserve">
+    
+    
+    <value>Restoring…</value>
+    
+  
+  </data>
+<data name="ReverseRotation" xml:space="preserve">
+    
+    
+    <value>Reverse rotation</value>
+    
+  
+  </data>
+<data name="Save" xml:space="preserve">
+    
+    
+    <value>Save</value>
+    
+  
+  </data>
+<data name="SaveFailed" xml:space="preserve">
+    
+    
+    <value>Save failed</value>
+    
+  
+  </data>
+<data name="SaveUnconfirmedRetry" xml:space="preserve">
+    
+    
+    <value>Save not confirmed; please retry</value>
+    
+  
+  </data>
+<data name="ScreenBlankFailed" xml:space="preserve">
+    
+    
+    <value>Monitor could not be turned off (the system did not accept the power-off request).
+</value>
+    
+  
+  </data>
+  <data name="ScreenBlankDriverMissing" xml:space="preserve">
+    <value>Screen blank needs the virtual-display driver component (usbmmidd_v2), but the component is missing: </value>
+  </data>
+<data name="SelectColor" xml:space="preserve">
+    
+    
+    <value>Select color</value>
+    
+  
+  </data>
+<data name="SelectCustomProfile" xml:space="preserve">
+    
+    
+    <value>Select a custom profile</value>
+    
+  
+  </data>
+<data name="ServiceNotConnected" xml:space="preserve">
+    
+    
+    <value>Service not connected</value>
+    
+  
+  </data>
+<data name="Settings" xml:space="preserve">
+    
+    
+    <value>Settings</value>
+    
+  
+  </data>
+<data name="SilentMode" xml:space="preserve">
+    
+    
+    <value>Silent</value>
+    
+  
+  </data>
+<data name="SingleColor" xml:space="preserve">
+    
+    
+    <value>Custom color</value>
+    
+  
+  </data>
+<data name="SleepSavedRetryOnReconnect" xml:space="preserve">
+    
+    
+    <value>Sleep time saved; will retry after device reconnects</value>
+    
+  
+  </data>
+<data name="Smooth" xml:space="preserve">
+    
+    
+    <value>Smooth</value>
+    
+  
+  </data>
+<data name="SomeKillFailed" xml:space="preserve">
+    
+    
+    <value>Some targets failed to terminate: </value>
+    
+  
+  </data>
+<data name="Speed" xml:space="preserve">
+    
+    
+    <value>Speed</value>
+    
+  
+  </data>
+<data name="SpeedFast" xml:space="preserve">
+    
+    
+    <value>Fast</value>
+    
+  
+  </data>
+<data name="SpeedMedium" xml:space="preserve">
+    
+    
+    <value>Medium</value>
+    
+  
+  </data>
+<data name="SpeedSlow" xml:space="preserve">
+    
+    
+    <value>Slow</value>
+    
+  
+  </data>
+<data name="StartupTaskFailed" xml:space="preserve">
+    
+    
+    <value>Could not {0} the startup task. Please reopen the console and try again.</value>
+    
+  
+  </data>
+<data name="Style" xml:space="preserve">
+    
+    
+    <value>Style</value>
+    
+  
+  </data>
+<data name="SwitchColor" xml:space="preserve">
+    
+    
+    <value>Switch color</value>
+    
+  
+  </data>
+<data name="SwitchPending" xml:space="preserve">
+    
+    
+    <value>Switching…</value>
+    
+  
+  </data>
+<data name="SwitchToIgpuMode" xml:space="preserve">
+    
+    
+    <value>Switch to iGPU-only mode</value>
+    
+  
+  </data>
+<data name="SwitchUnconfirmed" xml:space="preserve">
+    
+    
+    <value>Switch not confirmed</value>
+    
+  
+  </data>
+<data name="SystemSection" xml:space="preserve">
+    
+    
+    <value>System</value>
+    
+  
+  </data>
+<data name="TempWallValue" xml:space="preserve">
+    
+    
+    <value>Temperature wall value (°C)</value>
+    
+  
+  </data>
+<data name="TestFeedback" xml:space="preserve">
+    
+    
+    <value>L-Mechrevo is currently in a small-scale testing phase.
+
+If you have suggestions or feedback, welcome to contact QQ: 2871715852.</value>
+    
+  
+  </data>
+<data name="TrayActionFailed" xml:space="preserve">
+    
+    
+    <value>Tray action failed</value>
+    
+  
+  </data>
+<data name="TurboBoostConfirmed" xml:space="preserve">
+    
+    
+    <value>Turbo mode confirmed</value>
+    
+  
+  </data>
+<data name="TurboBoostMode" xml:space="preserve">
+    
+    
+    <value>Turbo mode</value>
+    
+  
+  </data>
+<data name="TurboBoostUnconfirmedNotSaved" xml:space="preserve">
+    
+    
+    <value>Turbo mode not confirmed; not saved</value>
+    
+  
+  </data>
+<data name="TurboMode0" xml:space="preserve">
+    
+    
+    <value>Turbo disabled (CPU stays at base frequency)</value>
+    
+  
+  </data>
+<data name="TurboMode1" xml:space="preserve">
+    
+    
+    <value>Turbo enabled (default, system automatic)</value>
+    
+  
+  </data>
+<data name="TurboMode2" xml:space="preserve">
+    
+    
+    <value>Aggressive turbo (best performance, hottest)</value>
+    
+  
+  </data>
+<data name="TurboMode3" xml:space="preserve">
+    
+    
+    <value>Efficient turbo (power saving first, cooler)</value>
+    
+  
+  </data>
+<data name="TurboMode4" xml:space="preserve">
+    
+    
+    <value>Efficient aggressive (balanced perf &amp; power)</value>
+    
+  
+  </data>
+<data name="TurboMode5" xml:space="preserve">
+    
+    
+    <value>Aggressive with floor (base frequency first, then boost)</value>
+    
+  
+  </data>
+<data name="TurboMode6" xml:space="preserve">
+    
+    
+    <value>Efficient with floor (floor + power saving)</value>
+    
+  
+  </data>
+<data name="UiAppearance" xml:space="preserve">
+    
+    
+    <value>UI appearance</value>
+    
+  
+  </data>
+<data name="UiSection" xml:space="preserve">
+    
+    
+    <value>UI</value>
+    
+  
+  </data>
+<data name="Unknown" xml:space="preserve">
+    
+    
+    <value>Unknown</value>
+    
+  
+  </data>
+<data name="UnknownReason" xml:space="preserve">
+    
+    
+    <value>Unknown reason</value>
+    
+  
+  </data>
+<data name="UnnamedDevice" xml:space="preserve">
+    
+    
+    <value>(unnamed device)</value>
+    
+  
+  </data>
+<data name="Unreadable" xml:space="preserve">
+    
+    
+    <value>Unreadable</value>
+    
+  
+  </data>
+<data name="Update" xml:space="preserve">
+    
+    
+    <value>Update</value>
+    
+  
+  </data>
+<data name="UpdateAvailableTooltip" xml:space="preserve">
+    
+    
+    <value>New version {0} available (click to view)</value>
+    
+  
+  </data>
+<data name="VerticalZones" xml:space="preserve">
+    
+    
+    <value>Vertical zones</value>
+    
+  
+  </data>
+<data name="WaterCoolerBox" xml:space="preserve">
+    
+    
+    <value>Liquid cooler</value>
+    
+  
+  </data>
+<data name="WaterCoolingLighting" xml:space="preserve">
+    
+    
+    <value>Liquid cooling lighting</value>
+    
+  
+  </data>
+<data name="WaveAngle" xml:space="preserve">
+    
+    
+    <value>Angle</value>
+    
+  
+  </data>
+<data name="Width" xml:space="preserve">
+    
+    
+    <value>Width</value>
+    
+  
+  </data>
+<data name="ZoneColors" xml:space="preserve">
+    
+    
+    <value>Zone colors</value>
+    
+  
+  </data>
+<data name="ZoneCount" xml:space="preserve">
+    
+    
+    <value>Zone count</value>
+    
+  
+  </data>
+<data name="AccessibleColorCalibration" xml:space="preserve">
+    
+    
+    <value>Screen Color Calibration</value>
+    
+  
+  </data>
+<data name="IdleOff10Min" xml:space="preserve">
+    
+    
+    <value>10 minutes</value>
+    
+  
+  </data>
+<data name="IdleOff10Sec" xml:space="preserve">
+    
+    
+    <value>10 sec (software)</value>
+    
+  
+  </data>
+<data name="IdleOff15Min" xml:space="preserve">
+    
+    
+    <value>15 minutes</value>
+    
+  
+  </data>
+<data name="IdleOff1Hour" xml:space="preserve">
+    
+    
+    <value>1 hour</value>
+    
+  
+  </data>
+<data name="IdleOff20Min" xml:space="preserve">
+    
+    
+    <value>20 minutes</value>
+    
+  
+  </data>
+<data name="IdleOff2Hour" xml:space="preserve">
+    
+    
+    <value>2 hours</value>
+    
+  
+  </data>
+<data name="IdleOff30Min" xml:space="preserve">
+    
+    
+    <value>30 minutes</value>
+    
+  
+  </data>
+<data name="IdleOff45Min" xml:space="preserve">
+    
+    
+    <value>45 minutes</value>
+    
+  
+  </data>
+<data name="QuickAcRecovery" xml:space="preserve">
+    
+    
+    <value>AC recovery</value>
+    
+  
+  </data>
+<data name="QuickBluetooth" xml:space="preserve">
+    
+    
+    <value>Bluetooth</value>
+    
+  
+  </data>
+<data name="QuickCamera" xml:space="preserve">
+    
+    
+    <value>Camera</value>
+    
+  
+  </data>
+<data name="QuickCopilot" xml:space="preserve">
+    
+    
+    <value>Copilot key lock</value>
+    
+  
+  </data>
+<data name="QuickCpuAdvPerf" xml:space="preserve">
+    
+    
+    <value>Unlock BIOS advanced menu</value>
+    
+  
+  </data>
+<data name="QuickCpuAdvPerfTip" xml:space="preserve">
+    <value>Unlocks the BIOS overclocking advanced menu on supported models</value>
+  </data>
+<data name="QuickDarkTheme" xml:space="preserve">
+    
+    
+    <value>System dark theme</value>
+    
+  
+  </data>
+<data name="QuickDeepSleep" xml:space="preserve">
+    
+    
+    <value>Deep sleep</value>
+    
+  
+  </data>
+<data name="QuickFnkey" xml:space="preserve">
+    
+    
+    <value>Fn key lock</value>
+    
+  
+  </data>
+<data name="QuickGameWhitelist" xml:space="preserve">
+    
+    
+    <value>Game whitelist</value>
+    
+  
+  </data>
+<data name="QuickGroupInput" xml:space="preserve">
+    
+    
+    <value>Input devices</value>
+    
+  
+  </data>
+<data name="QuickGroupKeyboard" xml:space="preserve">
+    
+    
+    <value>Keyboard &amp; hotkeys</value>
+    
+  
+  </data>
+<data name="QuickGroupPower" xml:space="preserve">
+    
+    
+    <value>Power &amp; system</value>
+    
+  
+  </data>
+<data name="QuickGroupSleep" xml:space="preserve">
+    
+    
+    <value>Sleep saver</value>
+    
+  
+  </data>
+<data name="QuickHighPerf" xml:space="preserve">
+    
+    
+    <value>High performance power</value>
+    
+  
+  </data>
+<data name="QuickMonitorOff" xml:space="preserve">
+    
+    
+    <value>Screen off (no sleep)</value>
+    
+  
+  </data>
+<data name="QuickWindowsUpdate" xml:space="preserve">
+    <value>Disable Windows Update</value>
+  </data>
+<data name="QuickNumpad" xml:space="preserve">
+    
+    
+    <value>Numpad lock</value>
+    
+  
+  </data>
+<data name="QuickOsd" xml:space="preserve">
+    
+    
+    <value>OSD hint</value>
+    
+  
+  </data>
+<data name="QuickStartup" xml:space="preserve">
+    
+    
+    <value>Startup</value>
+    
+  
+  </data>
+<data name="QuickSleepAway" xml:space="preserve">
+    
+    
+    <value>Block away mode</value>
+    
+  
+  </data>
+<data name="QuickSleepDeep" xml:space="preserve">
+    
+    
+    <value>Enable ACPI deep sleep</value>
+    
+  
+  </data>
+<data name="QuickSleepHibernate" xml:space="preserve">
+    
+    
+    <value>Hibernate after 30 min</value>
+    
+  
+  </data>
+<data name="QuickSleepNetOff" xml:space="preserve">
+    
+    
+    <value>Disconnect network on standby</value>
+    
+  
+  </data>
+<data name="QuickSleepRtcWake" xml:space="preserve">
+    
+    
+    <value>Disable RTC wake timers</value>
+    
+  
+  </data>
+<data name="QuickSleepSysReq" xml:space="preserve">
+    
+    
+    <value>Ignore system required policy</value>
+    
+  
+  </data>
+<data name="QuickTaskbarAutohide" xml:space="preserve">
+    
+    
+    <value>Auto-hide taskbar</value>
+    
+  
+  </data>
+<data name="QuickTouchpad" xml:space="preserve">
+    
+    
+    <value>Touchpad</value>
+    
+  
+  </data>
+<data name="QuickTouchpadToggle" xml:space="preserve">
+    
+    
+    <value>Touchpad toggle key</value>
+    
+  
+  </data>
+<data name="QuickTransparency" xml:space="preserve">
+    
+    
+    <value>System transparency</value>
+    
+  
+  </data>
+<data name="QuickUsb" xml:space="preserve">
+    
+    
+    <value>USB charging</value>
+    
+  
+  </data>
+<data name="QuickWinkey" xml:space="preserve">
+    
+    
+    <value>Win key lock</value>
+    
+  
+  </data>
+<data name="UpdateAlreadyLatest" xml:space="preserve">
+    
+    
+    <value>You are up to date</value>
+    
+  
+  </data>
+<data name="UpdateCannotAutoInstall" xml:space="preserve">
+    
+    
+    <value>Cannot auto install</value>
+    
+  
+  </data>
+<data name="UpdateCannotLaunchInstaller" xml:space="preserve">
+    
+    
+    <value>Cannot launch the installer. Use Open Download Page to update manually.</value>
+    
+  
+  </data>
+<data name="UpdateCannotLaunchUpdater" xml:space="preserve">
+    
+    
+    <value>Cannot launch the updater (directory may not be writable). Use Open Download Page to update manually.</value>
+    
+  
+  </data>
+<data name="UpdateChecking" xml:space="preserve">
+    
+    
+    <value>Checking for updates…</value>
+    
+  
+  </data>
+<data name="UpdateConfirmInstaller" xml:space="preserve">
+    
+    
+    <value>Will download the installer package and launch setup. This program will exit during installation.
+
+Continue?</value>
+    
+  
+  </data>
+<data name="UpdateConfirmSelf" xml:space="preserve">
+    
+    
+    <value>Installation will close this program, replace the current exe and restart automatically.
+
+Continue?</value>
+    
+  
+  </data>
+<data name="UpdateDownloadFailedManual" xml:space="preserve">
+    
+    
+    <value>Download failed. Click Open Download Page to download manually.</value>
+    
+  
+  </data>
+<data name="UpdateDownloadInstall" xml:space="preserve">
+    
+    
+    <value>Download &amp; Install</value>
+    
+  
+  </data>
+<data name="UpdateExtractFailed" xml:space="preserve">
+    
+    
+    <value>Package extraction failed (no executable found).</value>
+    
+  
+  </data>
+<data name="UpdateFailed" xml:space="preserve">
+    
+    
+    <value>Check failed</value>
+    
+  
+  </data>
+<data name="UpdateFeedback" xml:space="preserve">
+    
+    
+    <value>Feedback</value>
+    
+  
+  </data>
+<data name="UpdateFoundNew" xml:space="preserve">
+    
+    
+    <value>New version {0} available</value>
+    
+  
+  </data>
+<data name="UpdateInstallerLaunched" xml:space="preserve">
+    
+    
+    <value>Installer launched; this program is about to exit…</value>
+    
+  
+  </data>
+<data name="UpdateInstallFailed" xml:space="preserve">
+    
+    
+    <value>Install failed: {0}</value>
+    
+  
+  </data>
+<data name="UpdateInstallTitle" xml:space="preserve">
+    
+    
+    <value>Install Update</value>
+    
+  
+  </data>
+<data name="UpdateLatestSuffix" xml:space="preserve">
+    
+    
+    <value>, server latest {0}</value>
+    
+  
+  </data>
+<data name="UpdateNetdiskManual" xml:space="preserve">
+    
+    
+    <value>This version is published on the cloud drive. Click Open Download Page to download manually.</value>
+    
+  
+  </data>
+<data name="UpdateNetworkError" xml:space="preserve">
+    
+    
+    <value>Cannot reach the update server (network unavailable or server error).</value>
+    
+  
+  </data>
+<data name="UpdateNoNotes" xml:space="preserve">
+    
+    
+    <value>No update notes</value>
+    
+  
+  </data>
+<data name="UpdateOpenDownloadPage" xml:space="preserve">
+    
+    
+    <value>Open Download Page</value>
+    
+  
+  </data>
+<data name="UpdateReleaseSuffix" xml:space="preserve">
+    
+    
+    <value> · released {0}</value>
+    
+  
+  </data>
+<data name="UpdateSha256Auto" xml:space="preserve">
+    
+    
+    <value>The server provided SHA-256; it will be verified automatically after download.</value>
+    
+  
+  </data>
+<data name="UpdateSha256Verify" xml:space="preserve">
+    
+    
+    <value>Downloads and verifies SHA-256, then launches the installer.</value>
+    
+  
+  </data>
+<data name="UpdateUpdaterLaunched" xml:space="preserve">
+    
+    
+    <value>Updater launched; this program is about to exit…</value>
+    
+  
+  </data>
+<data name="UpdateVerifyFailed" xml:space="preserve">
+    
+    
+    <value>Package failed verification: {0}</value>
+    
+  
+  </data>
+<data name="UpdateVersionInfo" xml:space="preserve">
+    
+    
+    <value>Current version {0}{1}</value>
+    
+  
+  </data>
+<data name="UpdateWillOpenDownloadPage" xml:space="preserve">
+    
+    
+    <value>Will open the download page for you.</value>
+    
+  
+  </data>
+<data name="DisplayEffect" xml:space="preserve">
+    
+    
+    <value>Vibrancy</value>
+    
+  
+  </data>
+<data name="CalibApplyOnStartup" xml:space="preserve">
+    
+    
+    <value>Apply calibration on startup</value>
+    
+  
+  </data>
+<data name="CalibApplyOnStartupHint" xml:space="preserve">
+    
+    
+    <value>When enabled, the calibration is applied once at startup.
+Leave it off unless calibration is lost after a reboot.</value>
+    
+  
+  </data>
+<data name="CustomCalibration" xml:space="preserve">
+    
+    
+    <value>Custom calibration</value>
+    
+  
+  </data>
+<data name="CustomCalibrationHint" xml:space="preserve">
+    
+    
+    <value>When enabled, a "Custom" option appears in the calibration list.
+It applies the selected ICC via Windows color management (not via GCU); turning it off removes all applied ICC profiles.</value>
+    
+  
+  </data>
+<data name="Import" xml:space="preserve">
+    
+    
+    <value>Import</value>
+    
+  
+  </data>
+<data name="DisplayEffectCinemaMode" xml:space="preserve">
+    
+    
+    <value>Cinema</value>
+    
+  
+  </data>
+<data name="DisplayEffectInternetMode" xml:space="preserve">
+    
+    
+    <value>Internet</value>
+    
+  
+  </data>
+<data name="DisplayEffectLowBlueMode" xml:space="preserve">
+    
+    
+    <value>Low Blue</value>
+    
+  
+  </data>
+<data name="DisplayEffectPhotoMode" xml:space="preserve">
+    
+    
+    <value>Photo</value>
+    
+  
+  </data>
+<data name="DisplayEffectVideoMode" xml:space="preserve">
+    
+    
+    <value>Video</value>
+    
+  
+  </data>
+<data name="DisplayEffectVibrantMode" xml:space="preserve">
+    
+    
+    <value>Vivid</value>
+    
+  
+  </data>
+<data name="SettingsZonePrivacy" xml:space="preserve">
+    
+    
+    <value>Privacy and feedback</value>
+    
+  
+  </data>
+<data name="UsageTelemetryToggle" xml:space="preserve">
+    
+    
+    <value>Send anonymous usage stats and anonymised logs</value>
+    
+  
+  </data>
+<data name="UsageTelemetryTip" xml:space="preserve">
+    
+    
+    <value>Every 5 minutes: a random install ID, app version, model, BIOS, CPU/GPU model, GCU state, whether it runs as administrator, Windows version and the number of failures. After start-up and when failures happen, an anonymised log is added. No files, user name, computer name or MAC addresses.</value>
+    
+  
+  </data>
+<data name="FeedbackOpen" xml:space="preserve">
+    
+    
+    <value>Report a problem…</value>
+    
+  
+  </data>
+<data name="FeedbackTitle" xml:space="preserve">
+    
+    
+    <value>Report a problem</value>
+    
+  
+  </data>
+<data name="FeedbackLead" xml:space="preserve">
+    
+    
+    <value>Tell us what went wrong. You get a ticket number after sending, so the report can be matched later.</value>
+    
+  
+  </data>
+<data name="FeedbackMessageLabel" xml:space="preserve">
+    
+    
+    <value>What happened</value>
+    
+  
+  </data>
+<data name="FeedbackMessagePlaceholder" xml:space="preserve">
+    
+    
+    <value>What you did, what you expected, what happened</value>
+    
+  
+  </data>
+<data name="FeedbackContactLabel" xml:space="preserve">
+    
+    
+    <value>Contact (optional)</value>
+    
+  
+  </data>
+<data name="FeedbackContactPlaceholder" xml:space="preserve">
+    
+    
+    <value>QQ or e-mail, in case we need to ask</value>
+    
+  
+  </data>
+<data name="FeedbackAttach" xml:space="preserve">
+    
+    
+    <value>Attach system info and the recent log (anonymised)</value>
+    
+  
+  </data>
+<data name="FeedbackAttachTip" xml:space="preserve">
+    
+    
+    <value>Includes model, BIOS, CPU/GPU and drivers, GCU state and the recent log. Your user folder, user name, computer name and device MAC addresses are replaced.</value>
+    
+  
+  </data>
+<data name="FeedbackSend" xml:space="preserve">
+    
+    
+    <value>Send</value>
+    
+  
+  </data>
+<data name="FeedbackCancel" xml:space="preserve">
+    
+    
+    <value>Cancel</value>
+    
+  
+  </data>
+<data name="FeedbackClose" xml:space="preserve">
+    
+    
+    <value>Close</value>
+    
+  
+  </data>
+<data name="FeedbackSending" xml:space="preserve">
+    
+    
+    <value>Sending…</value>
+    
+  
+  </data>
+<data name="FeedbackSent" xml:space="preserve">
+    
+    
+    <value>Sent, ticket {0}. Thank you.</value>
+    
+  
+  </data>
+<data name="FeedbackFailed" xml:space="preserve">
+    
+    
+    <value>Not sent: {0}. Try again later, or export a diagnostic pack with Diagnostics and send it to the developer.</value>
+    
+  
+  </data>
+<data name="FeedbackTooShort" xml:space="preserve">
+    
+    
+    <value>Please describe the problem first.</value>
+    
+  
+  </data>
+<data name="FeedbackRateLimited" xml:space="preserve">
+    
+    
+    <value>too many reports from this network, try again in an hour</value>
+    
+  
+  </data>
+<data name="FeedbackTooLarge" xml:space="preserve">
+    
+    
+    <value>too large, untick the attachment and send again</value>
+    
+  
+  </data>
+<data name="FeedbackTimedOut" xml:space="preserve">
+    
+    
+    <value>timed out</value>
+    
+  
+  </data>
+<data name="PowerSourceBattery" xml:space="preserve">
+    
+    
+    <value>On battery</value>
+    
+  
+  </data>
+<data name="PowerSourceBarrel" xml:space="preserve">
+    
+    
+    <value>DC adapter</value>
+    
+  
+  </data>
+<data name="PowerSourceBarrelWatts" xml:space="preserve">
+    
+    
+    <value>{0} W adapter</value>
+    
+  
+  </data>
+<data name="PowerSourceTypeC" xml:space="preserve">
+    
+    
+    <value>USB-C power</value>
+    
+  
+  </data>
+<data name="PowerSourceBarrelAndTypeC" xml:space="preserve">
+    
+    
+    <value>DC + USB-C</value>
+    
+  
+  </data>
+<data name="PowerSourceExternal" xml:space="preserve">
+    
+    
+    <value>AC power</value>
+    
+  
+  </data>
+<data name="BatteryStateCharging" xml:space="preserve">
+    
+    
+    <value>Charging {0} W</value>
+    
+  
+  </data>
+<data name="BatteryStateChargingNoRate" xml:space="preserve">
+    
+    
+    <value>Charging</value>
+    
+  
+  </data>
+<data name="BatteryStateDischarging" xml:space="preserve">
+    
+    
+    <value>Discharging {0} W</value>
+    
+  
+  </data>
+<data name="BatteryStateDischargingNoRate" xml:space="preserve">
+    
+    
+    <value>Discharging</value>
+    
+  
+  </data>
+<data name="BatteryStateFull" xml:space="preserve">
+    
+    
+    <value>Full</value>
+    
+  
+  </data>
+<data name="BatteryStateHeldAtLimit" xml:space="preserve">
+    
+    
+    <value>Held at limit</value>
+    
+  
+  </data>
+<data name="BatteryStateIdle" xml:space="preserve">
+    
+    
+    <value>Not charging</value>
+    
+  
+  </data>
+<data name="BatteryAbnormalTag" xml:space="preserve">
+    
+    
+    <value>Battery fault</value>
+    
+  
+  </data>
+<data name="BatteryCycleCountLine" xml:space="preserve">
+    
+    
+    <value>Cycle count: {0}</value>
+    
+  
+  </data>
+<data name="BatteryCapacityLine" xml:space="preserve">
+    
+    
+    <value>Design capacity: {0}</value>
+    
+  
+  </data>
+<data name="BatteryLevelLine" xml:space="preserve">
+    
+    
+    <value>Charge: {0}%</value>
+    
+  
+  </data>
+<data name="BatteryVoltageLine" xml:space="preserve">
+    
+    
+    <value>Voltage: {0} V</value>
+    
+  
+  </data>
+<data name="PowerTipSource" xml:space="preserve">
+    
+    
+    <value>Power: {0} (EC 0x7CC=0x{1:X2})</value>
+    
+  
+  </data>
+<data name="PowerTipSourcePlain" xml:space="preserve">
+    
+    
+    <value>Power: {0}</value>
+    
+  
+  </data>
+<data name="PowerTipSourceUnknown" xml:space="preserve">
+    
+    
+    <value>Power source type unknown (EC read failed)</value>
+    
+  
+  </data>
+<data name="PowerTipDualUnverified" xml:space="preserve">
+    
+    
+    <value>DC and USB-C both connected (not verified on this model; shown as DC)</value>
+    
+  
+  </data>
+<data name="PowerTipAdapter" xml:space="preserve">
+    
+    
+    <value>Adapter rating: {0} W (vendor table)</value>
+    
+  
+  </data>
+<data name="PowerTipAdapterUnknown" xml:space="preserve">
+    
+    
+    <value>Adapter rating: unknown (code 0x{0:X2} not in the vendor table)</value>
+    
+  
+  </data>
+<data name="BoostMode" xml:space="preserve">
+    
+    
+    <value>Boost mode</value>
+    
+  
+  </data>
+<data name="CoreOffset" xml:space="preserve">
+    
+    
+    <value>Core clock offset (MHz)</value>
+    
+  
+  </data>
+<data name="FanSwitchDelay" xml:space="preserve">
+    
+    
+    <value>Step delay (ms)</value>
+    
+  
+  </data>
+<data name="GpuTgp" xml:space="preserve">
+    
+    
+    <value>GPU TGP target (W)</value>
+    
+  
+  </data>
+<data name="MemoryOffset" xml:space="preserve">
+    
+    
+    <value>Memory clock offset (MHz)</value>
+    
+  
+  </data>
+<data name="ModeTuneFanBoost" xml:space="preserve">
+    
+    
+    <value>Fan boost</value>
+    
+  
+  </data>
+<data name="ModeTunePowerMode" xml:space="preserve">
+    
+    
+    <value>Windows power mode</value>
+    
+  
+  </data>
+<data name="ModeTuneRefresh" xml:space="preserve">
+    
+    
+    <value>Refresh rate</value>
+    
+  
+  </data>
+<data name="PerfModeCustomized" xml:space="preserve">
+    
+    
+    <value>{0} · customized</value>
+    
+  
+  </data>
+<data name="PerfModeOutcome" xml:space="preserve">
+    
+    
+    <value>{0} in effect · {1} awaiting confirmation · {2} didn't succeed</value>
+    
+  
+  </data>
+<data name="PerfModeOutcomeStale" xml:space="preserve">
+    
+    
+    <value>· {0} may not have taken effect (click Apply again)</value>
+    
+  
+  </data>
+<data name="PerfModeStaleDetail" xml:space="preserve">
+    
+    
+    <value>Sent, but the readback never matched - it may not have taken effect (click Apply again)</value>
+    
+  
+  </data>
+<data name="PerfModeUnappliedChanges" xml:space="preserve">
+    
+    
+    <value>You have unapplied changes — click Apply to save and send them</value>
+    
+  
+  </data>
+<data name="SpinStepHint" xml:space="preserve">
+    
+    
+    <value>Step: click to change by 1</value>
+    
+  
+  </data>
+<data name="PerfStepSwitch" xml:space="preserve">
+    
+    
+    <value>Mode switch</value>
+    
+  
+  </data>
+<data name="EnabledLabel" xml:space="preserve">
+    
+    
+    <value>Enable</value>
+    
+  
+  </data>
+<data name="GcuDisconnectedShort" xml:space="preserve">
+    
+    
+    <value>GCU is not connected</value>
+    
+  
+  </data>
+<data name="ModeTuneApplying" xml:space="preserve">
+    
+    
+    <value>Applying…</value>
+    
+  
+  </data>
+<data name="ModeTuneOff" xml:space="preserve">
+    
+    
+    <value>Off</value>
+    
+  
+  </data>
+<data name="ModeTuneOn" xml:space="preserve">
+    
+    
+    <value>On</value>
+    
+  
+  </data>
+<data name="ModeTunePowerBalanced" xml:space="preserve">
+    
+    
+    <value>Balanced</value>
+    
+  
+  </data>
+<data name="ModeTunePowerEfficiency" xml:space="preserve">
+    
+    
+    <value>Best efficiency</value>
+    
+  
+  </data>
+<data name="ModeTunePowerPerformance" xml:space="preserve">
+    
+    
+    <value>Best performance</value>
+    
+  
+  </data>
+<data name="ModeTuneUnchanged" xml:space="preserve">
+    
+    
+    <value>Unchanged</value>
+    
+  
+  </data>
+<data name="OcNeedsAdmin" xml:space="preserve">
+    
+    
+    <value>Overclocking requires administrator rights</value>
+    
+  
+  </data>
+<data name="PerfEditorTitle" xml:space="preserve">
+    
+    
+    <value>Performance modes</value>
+    
+  
+  </data>
+<data name="PerfModeCreated" xml:space="preserve">
+    
+    
+    <value>Created "{0}" from "{1}".</value>
+    
+  
+  </data>
+<data name="PerfModeDelete" xml:space="preserve">
+    
+    
+    <value>Delete</value>
+    
+  
+  </data>
+<data name="PerfModeDeletePrompt" xml:space="preserve">
+    
+    
+    <value>Delete "{0}"? All of its settings will be removed.</value>
+    
+  
+  </data>
+<data name="PerfModeDeleted" xml:space="preserve">
+    
+    
+    <value>Deleted "{0}".</value>
+    
+  
+  </data>
+<data name="PerfModeFanCurveNeedsSlot" xml:space="preserve">
+    
+    
+    <value>Fan curves only take effect on a firmware custom slot; moving "{0}" there…</value>
+    
+  
+  </data>
+<data name="PerfModeHintCustom" xml:space="preserve">
+    
+    
+    <value>Runs on firmware custom slot {0}.</value>
+    
+  
+  </data>
+<data name="PerfModeHintCustomUnassigned" xml:space="preserve">
+    
+    
+    <value>A firmware custom slot is assigned when this mode is activated.</value>
+    
+  
+  </data>
+<data name="PerfModeHintEmulated" xml:space="preserve">
+    
+    
+    <value>Customized: runs on firmware custom slot {0}, which the vendor OSD shows as custom. Restore defaults to return to the vendor mode.</value>
+    
+  
+  </data>
+<data name="PerfModeHintVendor" xml:space="preserve">
+    
+    
+    <value>Vendor defaults. Changing power limits, GPU power or the fan curve moves this mode onto a firmware custom slot (the vendor OSD then shows it as custom).</value>
+    
+  
+  </data>
+<data name="PerfModeKeepOneCustom" xml:space="preserve">
+    
+    
+    <value>At least one custom mode must remain.</value>
+    
+  
+  </data>
+<data name="PerfModeLabel" xml:space="preserve">
+    
+    
+    <value>Mode</value>
+    
+  
+  </data>
+<data name="PerfModeLimitReached" xml:space="preserve">
+    
+    
+    <value>The custom mode limit ({0}) has been reached.</value>
+    
+  
+  </data>
+<data name="PerfModeNameCancel" xml:space="preserve">
+    
+    
+    <value>Cancel</value>
+    
+  
+  </data>
+<data name="PerfModeNameSave" xml:space="preserve">
+    
+    
+    <value>Save</value>
+    
+  
+  </data>
+<data name="PerfModeNameTooLong" xml:space="preserve">
+    
+    
+    <value>Names can be at most {0} characters.</value>
+    
+  
+  </data>
+<data name="PerfModeNew" xml:space="preserve">
+    
+    
+    <value>New</value>
+    
+  
+  </data>
+<data name="PerfModeNoSlotSeed" xml:space="preserve">
+    
+    
+    <value>Could not read this mode's vendor defaults, so it cannot be moved onto a custom slot.</value>
+    
+  
+  </data>
+<data name="PerfModeOcArmed" xml:space="preserve">
+    
+    
+    <value>Enabled; takes effect once a clock offset is set.</value>
+    
+  
+  </data>
+<data name="PerfModeOutcomeFailedItems" xml:space="preserve">
+    
+    
+    <value>Didn't take effect: {0}</value>
+    
+  
+  </data>
+<data name="PerfModeRename" xml:space="preserve">
+    
+    
+    <value>Rename</value>
+    
+  
+  </data>
+<data name="PerfModeRestore" xml:space="preserve">
+    
+    
+    <value>Restore defaults</value>
+    
+  
+  </data>
+<data name="PerfModeRestoreDone" xml:space="preserve">
+    
+    
+    <value>"{0}" is back to its factory settings.</value>
+    
+  
+  </data>
+<data name="PerfModeRestoreFailed" xml:space="preserve">
+    
+    
+    <value>Restoring "{0}" was not confirmed.</value>
+    
+  
+  </data>
+<data name="PerfModeRestorePrompt" xml:space="preserve">
+    
+    
+    <value>Restore "{0}" to its factory settings?</value>
+    
+  
+  </data>
+<data name="PerfModeSavedInactive" xml:space="preserve">
+    
+    
+    <value>Saved; applies when this mode is activated.</value>
+    
+  
+  </data>
+<data name="PerfModeSwitchFailed" xml:space="preserve">
+    
+    
+    <value>The mode didn't switch — try again</value>
+    
+  
+  </data>
+<data name="PerfModeSwitched" xml:space="preserve">
+    
+    
+    <value>Switched to "{0}"</value>
+    
+  
+  </data>
+<data name="ProfileNameLabel" xml:space="preserve">
+    
+    
+    <value>Profile name</value>
+    
+  
+  </data>
+<data name="ProfileNameNotConfirmed" xml:space="preserve">
+    
+    
+    <value>The GCU service did not confirm the new name.</value>
+    
+  
+  </data>
+<data name="ProfileNameSaved" xml:space="preserve">
+    
+    
+    <value>Profile name saved and read back.</value>
+    
+  
+  </data>
+<data name="SleepAc" xml:space="preserve">
+    
+    
+    <value>AC</value>
+    
+  
+  </data>
+<data name="SleepDc" xml:space="preserve">
+    
+    
+    <value>DC</value>
+    
+  
+  </data>
+<data name="QuickSleepNetOffTip" xml:space="preserve">
+    
+    
+    <value>Disconnect from the network during standby to reduce power draw.</value>
+    
+  
+  </data>
+<data name="QuickSleepAwayTip" xml:space="preserve">
+    
+    
+    <value>Prevent apps from using away mode to keep the system awake.</value>
+    
+  
+  </data>
+<data name="QuickSleepSysReqTip" xml:space="preserve">
+    
+    
+    <value>Allow the system to sleep even when apps request the "system required" policy.</value>
+    
+  
+  </data>
+<data name="QuickSleepRtcWakeTip" xml:space="preserve">
+    
+    
+    <value>Disable scheduled tasks from waking the computer at set times.</value>
+    
+  
+  </data>
+<data name="QuickSleepDeepTip" xml:space="preserve">
+    
+    
+    <value>Use ACPI deep sleep in standby for lower power draw; wake-up will be slower.</value>
+    
+  
+  </data>
+<data name="QuickSleepHibernateTip" xml:space="preserve">
+    
+    
+    <value>Automatically hibernate after 30 minutes of standby.</value>
+    
+  
+  </data>
+<data name="GpuRouteIgpu" xml:space="preserve">
+    <value>iGPU Mode</value>
+  </data>
+<data name="GpuRouteDirect" xml:space="preserve">
+    <value>dGPU Mode</value>
+  </data>
+<data name="GpuRouteStandard" xml:space="preserve">
+    <value>Hybrid Mode</value>
+  </data>
+<data name="GpuRouteUnknownTag" xml:space="preserve">
+    <value>GPU status unknown</value>
+  </data>
+<data name="GpuRouteUnknown" xml:space="preserve">
+    <value>GPU output route unknown; switch modes or restart to recover</value>
+  </data>
+<data name="GpuRestartPendingTag" xml:space="preserve">
+    <value>Restart to apply</value>
+  </data>
+<data name="GpuIgpuNeedsStandard" xml:space="preserve">
+    <value>Unavailable in dGPU mode; switch to Hybrid first</value>
+  </data>
+<data name="GpuRouteIgpuTip" xml:space="preserve">
+    <value>Switch to iGPU mode</value>
+  </data>
+<data name="GpuRouteStandardTip" xml:space="preserve">
+    <value>Switch to Hybrid mode</value>
+  </data>
+<data name="GpuRouteDirectTip" xml:space="preserve">
+    <value>Switch to dGPU mode</value>
+  </data>
+<data name="GpuPrefHighPerf" xml:space="preserve">
+    <value>High performance GPU</value>
+  </data>
+<data name="GpuPrefAuto" xml:space="preserve">
+    <value>Auto select</value>
+  </data>
+<data name="GpuPrefUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+<data name="GpuPrefTip" xml:space="preserve">
+    <value>Manage GPU preference in NVIDIA driver settings</value>
+  </data>
+<data name="GpuRouteApplied" xml:space="preserve">
+    <value>Applied: {0}</value>
+  </data>
+<data name="GpuRouteNotApplied" xml:space="preserve">
+    <value>Not applied; current: {0}</value>
+  </data>
+<data name="ForceWaterCoolingMenu" xml:space="preserve">
+    <value>Force water cooling menu</value>
+  </data>
+<data name="ForceWaterCoolingMenuTip" xml:space="preserve">
+    <value>Always show the water cooling menu, even when no liquid cooler is detected</value>
+  </data>
+<data name="PresetColor" xml:space="preserve">
+    <value>Preset color</value>
+  </data>
+<data name="ChargeTaskLocationTitle" xml:space="preserve">
+    <value>Charge limit · install location</value>
+  </data>
+<data name="ChargeTaskLocationBody" xml:space="preserve">
+    <value>L-Mechrevo is installed in a directory that ordinary users can write to:
+{0}
+
+Installing into a directory that ordinary (non-administrator) accounts can write to is a security risk: the program files there can be replaced by such an account, so L-Mechrevo refuses to register the charge-limit boot task as SYSTEM (otherwise the swapped-in file would run automatically as SYSTEM at boot - privilege escalation).
+
+Note: the default location C:\Program Files\L-Mechrevo is protected and never shows this prompt. Seeing this prompt means the directory really does allow ordinary-user writes (checked against the access rules of both the directory and the exe).
+
+Consequence: after a full power loss the charge limit will not be restored automatically and may silently revert to 100%. Normal restarts hide the problem.
+
+Tighten this directory's permissions now? (only administrators will be able to write; normal users can still read and run L-Mechrevo)</value>
+  </data>
+<data name="ChargeTaskElevationNotice" xml:space="preserve">
+    <value>Charge-limit restore at boot is not enabled: registering the SYSTEM scheduled task requires administrator rights. Right-click L-Mechrevo and choose "Run as administrator".</value>
+  </data>
+<data name="ChargeTaskLocationFixed" xml:space="preserve">
+    <value>Directory permissions tightened; the charge-limit boot task is now registered</value>
+  </data>
+<data name="ChargeTaskLocationFailed" xml:space="preserve">
+    <value>Could not tighten directory permissions. Please install L-Mechrevo into C:\Program Files</value>
+  </data>
+<data name="ModeConfigShort" xml:space="preserve">
+    <value>Config</value>
+  </data>
+<data name="ModeConfigTiny" xml:space="preserve">
+    <value>Cfg</value>
+  </data>
+<data name="CpuTuneAccepted" xml:space="preserve">
+    <value>SMU accepted the command. Effective setting and stability are not independently verified.</value>
+  </data>
+<data name="CpuTuneAdminRequired" xml:space="preserve">
+    <value>Driver access denied. Restart the app as administrator, then detect again.</value>
+  </data>
+<data name="CpuTuneApply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+<data name="CpuTuneCache" xml:space="preserve">
+    <value>Cache voltage offset</value>
+  </data>
+<data name="CpuTuneClock" xml:space="preserve">
+    <value>Fixed all-core clock (experimental)</value>
+  </data>
+<data name="CpuTuneClockNoReadback" xml:space="preserve">
+    <value>Unavailable (fixed clock has no independent readback)</value>
+  </data>
+<data name="CpuTuneCore" xml:space="preserve">
+    <value>Core voltage offset</value>
+  </data>
+<data name="CpuTuneCurrent" xml:space="preserve">
+    <value>Readback</value>
+  </data>
+<data name="CpuTuneCurve" xml:space="preserve">
+    <value>All-core Curve Optimizer (experimental)</value>
+  </data>
+    <data name="CpuTuneClockLabel" xml:space="preserve">
+    <value>Fixed all-core clock (MHz)</value>
+  </data>
+    <data name="CpuTuneValueCo" xml:space="preserve">
+    <value>All-core CO offset (legacy; this input box has been removed)</value>
+  </data>
+    <data name="CpuTuneFMaxLabel" xml:space="preserve">
+    <value>FMax (PBO max frequency)</value>
+  </data>
+    <data name="CpuTuneFreqNote" xml:space="preserve">
+    <value>These two are not the same thing: FMax is the PBO boost ceiling (MHz), while the fixed all-core clock pins every core at that frequency (a separate SMU command). They can be set independently; the fixed clock takes effect after a reboot and has no read-back.</value>
+  </data>
+    <data name="CpuTuneFMaxUnsupported" xml:space="preserve">
+    <value>This machine does not support FMax (no PBO mailbox command for this CPU).</value>
+  </data>
+    <data name="CpuTuneFMaxReadOnly" xml:space="preserve">
+    <value>This machine supports reading FMax only; writing is disabled.</value>
+  </data>
+    <data name="CpuTuneFMaxNoReadback" xml:space="preserve">
+    <value>This machine can write FMax, but read-back verification is unavailable (this CPU has no FMax read command).</value>
+  </data>
+    <data name="CpuTuneFMaxWriteNote" xml:space="preserve">
+    <value>Writing then reading back. The exact meaning of this parameter (absolute MHz vs offset) is unconfirmed.</value>
+  </data>
+    <data name="CpuTuneFMaxReadback" xml:space="preserve">
+    <value>FMax readback: {0} MHz (raw response[0] = {1})</value>
+  </data>
+    <data name="CpuTuneFMaxReadFailed" xml:space="preserve">
+    <value>FMax readback failed (this platform did not return a value).</value>
+  </data>
+    <data name="CpuTuneFMaxUnverified" xml:space="preserve">
+    <value>FMax write was accepted, but the read-back did not confirm it (see the detail below).</value>
+  </data>
+    <data name="CpuTuneSnapshotSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+    <data name="CpuTuneSnapshotLoad" xml:space="preserve">
+    <value>Load</value>
+  </data>
+    <data name="CpuTuneSnapshotSaveTip" xml:space="preserve">
+    <value>Save writes the current CO values and FMax into the config file only - not a single SMU command is sent, so the CPU does not change right now. Load is the button that reads them back and applies them.</value>
+  </data>
+    <data name="CpuTuneSnapshotLoadTip" xml:space="preserve">
+    <value>Load really writes: CO goes through the existing Curve Optimizer path and FMax through the existing PBO path (write followed by read-back verification and the raw firmware status code). On a machine that cannot write FMax this refuses before any command is sent and says why.</value>
+  </data>
+    <data name="CpuTuneSnapshotSaved" xml:space="preserve">
+    <value>Saved: {0}</value>
+  </data>
+    <data name="CpuTuneSnapshotLoaded" xml:space="preserve">
+    <value>Loaded and applied: {0}</value>
+  </data>
+    <data name="CpuTuneSnapshotNothing" xml:space="preserve">
+    <value>Nothing to save (neither CO nor FMax is writable on this machine).</value>
+  </data>
+    <data name="CpuTuneSnapshotEmptyConfig" xml:space="preserve">
+    <value>Nothing has been saved yet (no CO / FMax entries in the config).</value>
+  </data>
+    <data name="CpuTuneSnapshotNothingApplied" xml:space="preserve">
+    <value>Nothing could be applied: {0}</value>
+  </data>
+    <data name="CpuTuneSnapshotSkipped" xml:space="preserve">
+    <value>Skipped: {0}</value>
+  </data>
+    <data name="CpuTuneSnapshotNotApplied" xml:space="preserve">
+    <value>Not applied: {0}</value>
+  </data>
+    <data name="CpuTuneSnapshotFailed" xml:space="preserve">
+    <value>NOT applied (the write did not succeed): {0}</value>
+  </data>
+    <data name="CpuTuneSnapshotCoNotSaved" xml:space="preserve">
+    <value>CO not saved ({0})</value>
+  </data>
+    <data name="CpuTuneSnapshotFMaxNotSaved" xml:space="preserve">
+    <value>FMax not saved ({0})</value>
+  </data>
+    <data name="CpuTuneSnapshotCoPerCore" xml:space="preserve">
+    <value>per-core CO [{0}]</value>
+  </data>
+    <data name="CpuTuneSnapshotCoAll" xml:space="preserve">
+    <value>all-core CO {0}</value>
+  </data>
+    <data name="CpuTuneSnapshotFMax" xml:space="preserve">
+    <value>FMax {0} MHz</value>
+  </data>
+    <data name="CpuTuneSnapshotCoSkipped" xml:space="preserve">
+    <value>CO not applied ({0})</value>
+  </data>
+    <data name="CpuTuneSnapshotFMaxSkipped" xml:space="preserve">
+    <value>FMax not applied ({0})</value>
+  </data>
+    <data name="CpuTuneSnapshotCoNotWritable" xml:space="preserve">
+    <value>CO is not writable on this machine</value>
+  </data>
+    <data name="CpuTuneFMaxBaseline" xml:space="preserve">
+    <value>FMax baseline (the value read last time): {0} MHz</value>
+  </data>
+    <data name="CpuTuneFMaxBaselineUnknown" xml:space="preserve">
+    <value>FMax baseline: unknown (it has never been read successfully, so Reset will not guess a value)</value>
+  </data>
+    <data name="CpuTuneFMaxBaselineUnknownShort" xml:space="preserve">
+    <value>FMax baseline unknown (nothing is written)</value>
+  </data>
+    <data name="CpuTuneFMaxResetRestored" xml:space="preserve">
+    <value>FMax restored to the baseline read last time: {0} MHz</value>
+  </data>
+    <data name="CpuTuneFMaxResetNoBaseline" xml:space="preserve">
+    <value>FMax left unchanged: no baseline was recorded, so no value is guessed and none is written</value>
+  </data>
+    <data name="CpuTuneFMaxResetAlready" xml:space="preserve">
+    <value>FMax already equals the baseline {0} MHz; nothing was written</value>
+  </data>
+    <data name="CpuTuneFMaxResetFailed" xml:space="preserve">
+    <value>FMax was NOT restored to the baseline {0} MHz (see the detail line above)</value>
+  </data>
+    <data name="CpuTuneDetailsTitle" xml:space="preserve">
+    <value>Technical details</value>
+  </data>
+    <data name="CpuTuneSummaryReady" xml:space="preserve">
+    <value>all options writable</value>
+  </data>
+    <data name="CpuTuneSummaryPartial" xml:space="preserve">
+    <value>some options locked for this SKU</value>
+  </data>
+    <data name="CpuTuneSummaryLocked" xml:space="preserve">
+    <value>no writable option</value>
+  </data>
+    <data name="CpuTuneSummaryPerCoreOff" xml:space="preserve">
+    <value>per-core CO write unavailable (no per-core write command for this codename)</value>
+  </data>
+<data name="CpuTuneDriverLink" xml:space="preserve">
+    <value>PawnIO driver download</value>
+  </data>
+<data name="CpuTuneDriverMissing" xml:space="preserve">
+    <value>PawnIO driver is not installed. Install the driver manually, then detect again.</value>
+  </data>
+<data name="CpuTuneDriverRestart" xml:space="preserve">
+    <value>Driver installed. Restart Windows, then detect CPU capabilities again.</value>
+  </data>
+<data name="CpuTuneFailed" xml:space="preserve">
+    <value>Change failed; inspect the details. Restore if a partial change remains.</value>
+  </data>
+<data name="CpuTuneInstallDriver" xml:space="preserve">
+    <value>Install missing driver</value>
+  </data>
+<data name="CpuTuneIntelReady" xml:space="preserve">
+    <value>Intel capability detected. Writes still require matching CPU readback; firmware may reject undervolting.</value>
+  </data>
+<data name="CpuTuneNoReadback" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+<data name="CpuTuneNoReadCmd" xml:space="preserve">
+    <value>Unavailable (this platform has no readback command)</value>
+  </data>
+<data name="CpuTuneProbe" xml:space="preserve">
+    <value>Detect capability</value>
+  </data>
+<data name="CpuTuneProbeFailed" xml:space="preserve">
+    <value>Driver or firmware detection failed. Changes are disabled.</value>
+  </data>
+<data name="CpuTuneProbePrompt" xml:space="preserve">
+    <value>Detect capability before applying any changes.</value>
+  </data>
+<data name="CpuTuneRatio" xml:space="preserve">
+    <value>Core maximum OC ratio</value>
+  </data>
+<data name="CpuTuneReadbackMixed" xml:space="preserve">
+    <value>Cores differ ({0} ~ {1} CO over {2} cores; per-core list in the notes below)</value>
+  </data>
+<data name="CpuTuneReadbackValue" xml:space="preserve">
+    <value>{0} CO (SMU current value, cleared on reboot)</value>
+  </data>
+<data name="CpuTuneReadbackZero" xml:space="preserve">
+    <value>0 CO (no offset detected; may also be this boot's default)</value>
+  </data>
+<data name="CpuTuneReadFailed" xml:space="preserve">
+    <value>Unavailable (read failed)</value>
+  </data>
+<data name="CpuTuneRisk" xml:space="preserve">
+    <value>Start with small steps. Excessive undervolting or overclocking can freeze or restart the PC. Command acceptance does not prove stability; restore defaults if errors occur.</value>
+  </data>
+<data name="CpuTuneScope" xml:space="preserve">
+    <value>Applies for this boot and is kept when the performance mode changes. Apply writes and saves the value; Save only writes the config (CO and FMax, no SMU command); Load reads the saved CO and FMax back and applies them; Reset zeroes the CO of every core, exits fixed-clock mode and puts FMax back to the baseline read last time (when no baseline was recorded, no FMax value is guessed).</value>
+  </data>
+<data name="CpuTuneScopeNonAmd" xml:space="preserve">
+    <value>This machine exposes no writable CPU tuning interface: FMax (PBO maximum frequency), Curve Optimizer and fixed all-core clock are AMD platform features and are not shown here. Detect only performs a read-only probe and writes no setting.</value>
+  </data>
+<data name="CpuTuneSmuReady" xml:space="preserve">
+    <value>AMD command route detected. Firmware may reject changes. Fixed clock has no independent readback; CO can be read back (it reflects the SMU's current state, not the last value written). Success still only means the SMU accepted the command.</value>
+  </data>
+<data name="CpuTuneSmuPartial" xml:space="preserve">
+    <value>AMD command route detected, but part of it is blocked for this SKU (see the notes below): the locked options stay visible as unavailable, while the remaining writable options are still offered. Fixed clock has no independent readback; CO can be read back (it reflects the SMU's current state, not the last value written). Success still only means the SMU accepted the command.</value>
+  </data>
+<data name="CpuTuneOptionUnavailable" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+<data name="CpuTuneTitle" xml:space="preserve">
+    <value>CPU tuning</value>
+  </data>
+<data name="CpuTuneUnsupported" xml:space="preserve">
+    <value>No supported writable interface detected. Hybrid Intel CPU ratio control requires further validation.</value>
+  </data>
+<data name="CpuTuneVerified" xml:space="preserve">
+    <value>Applied; CPU setting readback matches. Stability still requires testing.</value>
+  </data>
+<data name="CpuTuneForcedMark" xml:space="preserve">
+    <value> (forced display)</value>
+  </data>
+<data name="CpuTuneForcedNotice" xml:space="preserve">
+    <value>Debug switch LMECHREVO_FORCE_CPU_TUNING is on: this window is shown by force, not by capability detection. Apply / Restore still follow the detected capability and stay disabled when no writable interface is found.</value>
+  </data>
+    <data name="CpuTunePerCoreTitle" xml:space="preserve">
+      <value>Per-core Curve Optimizer</value>
+    </data>
+    <data name="CpuTuneCoreLabel" xml:space="preserve">
+      <value>Core {0}</value>
+    </data>
+    <data name="CpuTuneResetAllCores" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+    <data name="CpuTuneAutoApply" xml:space="preserve">
+      <value>Apply the saved CO values and FMax at startup</value>
+    </data>
+    <data name="CpuTuneAutoApplyWarning" xml:space="preserve">
+    <value>With this on, every startup really writes these settings (not a read-only check; FMax is only written where this machine can write it); it lasts for this boot only and the firmware starts over after a reboot. Leave it off unless you are sure.</value>
+  </data>
+    <data name="CpuTuneAutoApplyConfirm" xml:space="preserve">
+    <value>Turn startup auto-apply on?
+
+Every L-Mechrevo start would really write the values listed under "Will write" below into the SMU (not a read-only check; where this machine cannot write FMax, FMax is neither listed nor written). A bad value can freeze or restart the PC.
+
+Will write: {0}
+Current baseline (read when the window opened): {1}
+
+It lasts for this boot only, the firmware starts over after a reboot. Continue?</value>
+  </data>
+    <data name="CpuTuneAutoApplyOn" xml:space="preserve">
+      <value>on</value>
+    </data>
+    <data name="CpuTuneAutoApplyOff" xml:space="preserve">
+      <value>off</value>
+    </data>
+    <data name="CpuTuneSaved" xml:space="preserve">
+      <value>Settings saved. Startup auto-apply: {0}.</value>
+    </data>
+    <data name="CpuTuneResetConfirm" xml:space="preserve">
+    <value>Reset writes 0 to every core and then sends one all-core CO 0 fallback, and it exits fixed-clock mode.
+
+It clears every core, including offsets that already existed before you opened this window, plus the saved per-core values (so startup auto-apply cannot replay what you just cleared).
+
+Where the machine supports writing FMax, Reset also puts FMax back to the baseline that was read last time; if no baseline was recorded, no FMax value is guessed and none is written.
+
+Will write: {0}
+Current baseline (read when the window opened): {1}
+
+Continue?</value>
+  </data>
+    <data name="CpuTuneResetConfirmTitle" xml:space="preserve">
+    <value>Reset every core to CO 0?</value>
+  </data>
+    <data name="CpuTuneResetDone" xml:space="preserve">
+    <value>Reset finished: every core was written to CO 0 and fixed-clock mode was exited.</value>
+  </data>
+    <data name="CpuTunePerCoreBlocked" xml:space="preserve">
+      <value>Per-core CO is unavailable (not writable)</value>
+    </data>
+    <data name="CpuTunePerCoreCodenameOnly" xml:space="preserve">
+      <value>This codename has no per-core CO write command in the SMU reference, so only the all-core CO write is available (Vermeer is the one codename measured on real hardware).</value>
+    </data>
+    <data name="CpuTunePerCoreNotCurve" xml:space="preserve">
+      <value>Per-core CO applies to the all-core Curve Optimizer entry only.</value>
+    </data>
+    <data name="CpuTunePerCoreBaseline" xml:space="preserve">
+      <value>Read at entry (this boot): {0}</value>
+    </data>
+    <data name="CpuTunePerCoreBaselineUnknown" xml:space="preserve">
+      <value>unavailable (no per-core readback on this platform)</value>
+    </data>
+    <data name="CpuTuneAutoApplyWarningTip" xml:space="preserve">
+    <value>Details: the write is a real SMU command and the SMU state can be read back afterwards; a bad offset can freeze or restart the PC. The switch only does something on desktop Vermeer (the per-core write path measured on a Ryzen 7 5700X); elsewhere the switch and the buttons stay disabled. Turning it on saves the values currently in the boxes, and those saved values are what a startup replays. The same switch also replays the saved FMax (cpu_fmax_saved) through the existing PBO write path, on machines whose codename has an FMax write command.</value>
+  </data>
+    <data name="CpuTuneGuardSkipped" xml:space="preserve">
+    <value>The last shutdown was not clean, so startup auto-apply was skipped this boot (no CO and no FMax value was written). Switch: Custom mode -> CPU tuning.</value>
+  </data>
+    <data name="CpuTuneGuardSkippedTip" xml:space="preserve">
+    <value>Windows saw no clean exit last time (crash, power loss or a forced kill), so this start did not write the saved per-core CO values or the saved FMax into the SMU - a possibly unstable setting is not re-applied. To turn the feature off: Custom mode -> CPU tuning -> clear "Apply the saved CO values and FMax at startup". The line disappears after one clean shutdown.</value>
+  </data>
+    <data name="CpuTuneGuardSkipToast" xml:space="preserve">
+    <value>Unclean shutdown: saved CO / FMax not auto-applied</value>
+  </data>
+    <data name="GpuOcGuardOffToast" xml:space="preserve">
+      <value>Unclean shutdown: GPU overclock was turned off automatically (and will not be re-applied on this boot)</value>
+    </data>
+    <data name="LogLevel" xml:space="preserve">
+    <value>Log level</value>
+  </data>
+    <data name="LogLevelOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+    <data name="LogLevelErrorOnly" xml:space="preserve">
+    <value>Errors only</value>
+  </data>
+    <data name="LogLevelAll" xml:space="preserve">
+    <value>All</value>
+  </data>
+    <data name="LogLevelTip" xml:space="preserve">
+    <value>How much detail gets written to the log file (%APPDATA%\MechrevoLite\log.txt). Takes effect immediately, no restart needed. Pick "All" while troubleshooting (it writes a lot of diagnostic detail), then switch back to "Off".</value>
+  </data>
+    <data name="LogLevelEnvOverride" xml:space="preserve">
+    <value>Log level is currently decided by the LMECHREVO_LOG_LEVEL environment variable, so this setting has no effect.</value>
+  </data>
+    <data name="LogLevelClearOverrideButton" xml:space="preserve">
+    <value>Clear environment override</value>
+  </data>
+    <data name="LogLevelClearOverrideConfirm" xml:space="preserve">
+    <value>This deletes the LMECHREVO_LOG_LEVEL *user* environment variable (the per-user variable only - the system-wide variable is never touched), then writes the level currently selected above into the config, so that setting takes effect. Continue?</value>
+  </data>
+    <data name="LogLevelClearOverrideDone" xml:space="preserve">
+    <value>Cleared. Log level is now decided by the setting above.</value>
+  </data>
+    <data name="LogLevelClearOverrideMachineOnly" xml:space="preserve">
+    <value>LMECHREVO_LOG_LEVEL is set as a *system* environment variable, which cannot be changed from here - please handle it manually (System Properties -&gt; Environment Variables).</value>
+  </data>
+    <data name="IgpuOnlyShowToggleUnavailableTip" xml:space="preserve">
+    <value>On this model the iGPU-only mode entry is decided by the hardware (30-series is always hidden, 50-series follows the capability bit), so this switch cannot change the result.</value>
+  </data>
+    <data name="GpuCoreOffsetRisk" xml:space="preserve">
+    <value>Core offset too high - risk of hardware damage</value>
+  </data>
+    <data name="VramOffsetRisk" xml:space="preserve">
+    <value>Memory offset too high - risk of hardware damage</value>
+  </data>
+    <data name="SettingsZoneBackup" xml:space="preserve">
+    <value>Settings backup</value>
+  </data>
+    <data name="SettingsBackupExportButton" xml:space="preserve">
+    <value>Export settings...</value>
+  </data>
+    <data name="SettingsBackupImportButton" xml:space="preserve">
+    <value>Import settings...</value>
+  </data>
+    <data name="SettingsBackupExportTip" xml:space="preserve">
+    <value>Pack the user settings (custom profiles, fan curves, lighting, ...) into one zip with a restore readme. Saved to the Desktop by default.</value>
+  </data>
+    <data name="SettingsBackupImportTip" xml:space="preserve">
+    <value>Restore from a settings-backup zip. The current settings are backed up to %APPDATA%\MechrevoLite\userdata-backup-&lt;timestamp&gt;\ first, and L-Mechrevo must be restarted afterwards.</value>
+  </data>
+    <data name="SettingsBackupHint" xml:space="preserve">
+    <value>User settings only (no logs); the current settings are backed up before importing, restart L-Mechrevo afterwards.</value>
+  </data>
+    <data name="SettingsBackupExportDone" xml:space="preserve">
+    <value>Settings backup exported:
+{0}
+
+{1} files, {2}.
+
+Open the containing folder?</value>
+  </data>
+    <data name="SettingsBackupExportSkipped" xml:space="preserve">
+    <value>These files did not exist and were not packed (the rest is unaffected):</value>
+  </data>
+    <data name="SettingsBackupExportFailed" xml:space="preserve">
+    <value>Exporting the settings backup failed:
+{0}</value>
+  </data>
+    <data name="SettingsBackupImportConfirm" xml:space="preserve">
+    <value>This backup will overwrite the current settings (whole-file overwrite, no key-by-key merge).
+
+The current settings are backed up first to:
+%APPDATA%\MechrevoLite\userdata-backup-&lt;timestamp&gt;\
+
+Continue?</value>
+  </data>
+    <data name="SettingsBackupImportDone" xml:space="preserve">
+    <value>Settings imported: {0} files restored.
+
+The previous settings were backed up to:
+{1}
+
+Restart L-Mechrevo now to apply them (until then the running instance may overwrite what was imported).</value>
+  </data>
+    <data name="SettingsBackupImportPartialFailed" xml:space="preserve">
+    <value>These files could not be written (the rest was restored):</value>
+  </data>
+    <data name="SettingsBackupImportInvalid" xml:space="preserve">
+    <value>This is not a valid L-Mechrevo settings backup:
+{0}</value>
+  </data>
+    <data name="SettingsBackupImportFailed" xml:space="preserve">
+    <value>Importing the settings backup failed:
+{0}</value>
+  </data>
+    <data name="QuickSleepProtected" xml:space="preserve">
+    <value>This power plan is protected by the system or you lack permission to modify it: {0} ({1})</value>
+  </data>
+    <data name="QuickSleepVerifyFailed" xml:space="preserve">
+    <value>The power setting did not take effect (read-back mismatch): {0} ({1})</value>
+  </data>
+    <data name="GcuWarmupRestartHint" xml:space="preserve">
+    <value>Some features may only appear after L-Mechrevo is restarted. Restart L-Mechrevo now?</value>
+  </data>
+    <data name="GcuWarmupRestartHintTitle" xml:space="preserve">
+    <value>Restart L-Mechrevo</value>
+  </data>
+    <data name="DuplicateInstanceTitle" xml:space="preserve">
+    <value>L-Mechrevo is already running</value>
+  </data>
+    <data name="DuplicateInstanceNotice" xml:space="preserve">
+    <value>L-Mechrevo is already running - its window has been brought up for you.</value>
+  </data>
+    <data name="NetDesktopRuntimeNoticeTitle" xml:space="preserve">
+    <value>.NET 10 desktop runtime not found in the standard location</value>
+  </data>
+    <data name="NetDesktopRuntimeNotice" xml:space="preserve">
+    <value>Microsoft.WindowsDesktop.App (the .NET 10 desktop runtime) was not found in the standard locations (the sharedfx registry key or %ProgramFiles%\dotnet\shared). L-Mechrevo is running right now, so this copy must have been started with a runtime from a non-standard location - nothing to do if everything works. If double-clicking L-Mechrevo ever does nothing at all, please install "windowsdesktop-runtime-10 x64" from https://dotnet.microsoft.com/download/dotnet/10.0 (the installer does this automatically). This notice is shown only once.</value>
+  </data>
+    <data name="AboutLicensesTitle" xml:space="preserve">
+      <value>About L-Mechrevo — open-source licences and credits</value>
+    </data>
+    <data name="AboutLicensesIntro" xml:space="preserve">
+      <value>L-Mechrevo is free software, distributed under the GNU General Public License version 3 only. It contains code derived from the projects below, and it ships one third-party binary module. The full licence texts are in the LICENSES folder next to the program (LICENSE / THIRD_PARTY_NOTICES.txt are in there too).</value>
+    </data>
+    <data name="AboutLicensesOrigin" xml:space="preserve">
+      <value>The original L-Mechrevo project this program is based on was published by LiangyuLu-lly: https://github.com/LiangyuLu-lly/L-Mechrevo/tree/v0.290.6 . This build is maintained by xiaohan (xmsjx) on top of it. Listed below are the third-party components and licences; the original project is likewise GPL-3.0-only.</value>
+    </data>
+    <data name="AboutLicensesCopyright" xml:space="preserve">
+      <value>Copyright (C) 2026 L-Mechrevo contributors</value>
+    </data>
+    <data name="AboutLicensesNoWarranty" xml:space="preserve">
+      <value>This program comes with ABSOLUTELY NO WARRANTY. It is free software, and you are welcome to redistribute it under the terms of the GNU General Public License version 3 only. See LICENSES\LICENSE for the full terms.</value>
+    </data>
+    <data name="AboutLicensesDerivedHeading" xml:space="preserve">
+      <value>Code we derived from</value>
+    </data>
+    <data name="AboutLicensesReferenceHeading" xml:space="preserve">
+      <value>Protocol references (no code copied)</value>
+    </data>
+    <data name="AboutLicensesShippedHeading" xml:space="preserve">
+      <value>Shipped as a binary in this program</value>
+    </data>
+    <data name="AboutLicensesUseGHelper" xml:space="preserve">
+      <value>The application as a whole is derived from G-Helper. That is why L-Mechrevo is licensed under the GNU General Public License version 3 only.</value>
+    </data>
+    <data name="AboutLicensesUseZenStatesCore" xml:space="preserve">
+      <value>AMD SMU command IDs and mailbox address groups, the FMax (PBO boost limit) tables, the per-core Curve Optimizer write and read-back command tables, the OC-mode and power/thermal limit tables, and the 6-argument mailbox transaction sequence.</value>
+    </data>
+    <data name="AboutLicensesUseSmudbg" xml:space="preserve">
+      <value>Protocol / behaviour reference for the FMax commands, researched alongside ZenStates-Core. No SMUDebugTool code was copied.</value>
+    </data>
+    <data name="AboutLicensesUseMechrevoChargeLimit" xml:space="preserve">
+      <value>Reference and adapted implementation for the charge-limit gate persistence (0x07C3 gate open + storage-area write), MIT. Code adapted from this repository.</value>
+    </data>
+  <data name="AboutLicensesUseNullSignal" xml:space="preserve">
+    <value>Reference implementation for the screen-blank feature (virtual-display switch for true blank without sleep), MIT.</value>
+  </data>
+  <data name="AboutLicensesUseUsbmmidd" xml:space="preserve">
+    <value>Virtual display driver (usbmmidd_v2) bundled for the screen-blank feature: mounts a virtual display and force-switches the video signal so the physical panel goes dark while the system keeps running. Copyright (c) 2014-2021 Amyuni Technologies Inc., distributed under the Amyuni licence in usbmmidd_v2\License.txt.</value>
+  </data>
+    <data name="AboutLicensesUsePawnIOModules" xml:space="preserve">
+      <value>The RyzenSMU module (RyzenSMU.bin) is embedded unmodified in L-Mechrevo.dll and provides the kernel-mediated SMU mailbox access used for CPU tuning.</value>
+    </data>
+    <data name="AboutLicensesUsePawnIOIntelMsr" xml:space="preserve">
+      <value>The IntelMSR module (LMechrevo.IntelMSR.bin) is embedded unmodified in L-Mechrevo.dll and provides the kernel-mediated MSR 0x150 OC-mailbox access used for Intel CPU tuning.</value>
+    </data>
+    <data name="AboutLicensesUseRyzenSmu" xml:space="preserve">
+      <value>Community RSMU command tables, used as a documented protocol reference.</value>
+    </data>
+    <data name="AboutLicensesUseRyzenAdj" xml:space="preserve">
+      <value>AMD SMU reference: the Curve Optimizer / iGPU-curve / overclock / power / thermal command values and their MP1-to-PSMU fallback order were cross-checked against this project.</value>
+    </data>
+    <data name="AboutLicensesUseUxtu" xml:space="preserve">
+      <value>Additional SMU route reference.</value>
+    </data>
+    <data name="AboutLicensesUseIntelUndervolt" xml:space="preserve">
+      <value>Intel OC Mailbox (MSR 0x150) protocol reference for the Intel tuning path; no code copied.</value>
+    </data>
+    <data name="AboutLicensesUseWatercooler" xml:space="preserve">
+      <value>Bluetooth LE liquid-cooler GATT service and command layout, used as a protocol reference for an independent implementation.</value>
+    </data>
+    <data name="AboutLicensesOpenFolder" xml:space="preserve">
+      <value>Open the LICENSES folder</value>
+    </data>
+    <data name="AboutLicensesFolderMissing" xml:space="preserve">
+      <value>The LICENSES folder was not found next to the program. Licence texts: {0}</value>
+    </data>
+    <data name="AboutLicensesClose" xml:space="preserve">
+      <value>Close</value>
+    </data>
+    <data name="AboutLicensesUseGHelperSmu" xml:space="preserve">
+      <value>The AMD SMU command layer used by CPU undervolting (Curve Optimizer), the iGPU curve, the fixed-frequency overclock mode, the power limits and the thermal limit. Our table uses the same command IDs, the same channels and the same call order as G-Helper's RyzenSmu.cs.</value>
+    </data>
+    <data name="QuickMicMute" xml:space="preserve">
+      <value>Microphone mute</value>
+    </data>
+    <data name="QuickMicMuteTip" xml:space="preserve">
+      <value>Mutes / unmutes the default recording device (same as the Mute button in Windows sound settings). This only changes the system volume state and writes nothing to the registry.</value>
+    </data>
+    <data name="QuickMicMuteUnavailable" xml:space="preserve">
+      <value>No usable default recording device was found, so the microphone mute switch is unavailable.</value>
+    </data>
+    <data name="QuickTileAdd" xml:space="preserve">
+      <!-- 2026-10-12（用户原话「自定义快捷按钮改成自定义吧 这看着太宽了」）：磁贴上的**可见文字标签**，
+           越短越好（中文 3 字）；tooltip 另用 QuickTilePickerTitle。 -->
+      <value>Customize</value>
+    </data>
+    <data name="QuickTileRowTitle" xml:space="preserve">
+      <!-- 2026-10-12（用户原话「给按钮加个标题 叫快捷开关 类似性能模式之类的」）：磁贴行上方的标题行文案。 -->
+      <value>Quick switches</value>
+    </data>
+    <data name="QuickTileScreenOff" xml:space="preserve">
+      <value>Screen off</value>
+    </data>
+    <data name="QuickTileMicrophone" xml:space="preserve">
+      <value>Microphone</value>
+    </data>
+    <data name="QuickTilePickerTitle" xml:space="preserve">
+      <value>Customize quick tiles</value>
+    </data>
+    <data name="QuickTilePickerHint" xml:space="preserve">
+      <!-- 2026-10-12: zero picks are legal (only "Customize" stays) and the tile order is the row order (▲▼);
+           2026-10-12: picked rows always stay in one block on top - ▲▼ only move inside their own group. -->
+      <value>Pick at most {0} switches; with none picked only "Customize" remains. Use ▲ ▼ in each row to reorder the tiles (picked switches stay on top).</value>
+    </data>
+    <data name="QuickTilePickerMoveDown" xml:space="preserve">
+      <!-- 2026-10-12: accessible name/tooltip of the in-row ▼ button. -->
+      <value>Move down (tile order)</value>
+    </data>
+    <data name="QuickTilePickerMoveUp" xml:space="preserve">
+      <!-- 2026-10-12: accessible name/tooltip of the in-row ▲ button. -->
+      <value>Move up (tile order)</value>
+    </data>
+    <data name="QuickTilePickerFull" xml:space="preserve">
+      <value>At most {0} tiles.</value>
+    </data>
+    <data name="QuickTilePickerEmpty" xml:space="preserve">
+      <!-- 2026-10-12: no longer an error - the neutral note shown when nothing is picked. -->
+      <value>Nothing picked: the tile row keeps only "Customize".</value>
+    </data>
+    <data name="QuickTileSwitchMissing" xml:space="preserve">
+      <value>This switch is not available on this machine</value>
+    </data>
+    <data name="LegacyMifsConnected" xml:space="preserve">
+      <!-- 2026-10-15 (C-1 step 2): TOP-RIGHT CONNECTION STATUS shown when the legacy MICommonInterface backend is in use. -->
+      <!-- The legacy path never goes through GCU/MQTT, so "GCU not connected" would be misleading; it is simply "ready". -->
+      <value>● Ready</value>
+    </data>
+    <data name="LegacyMifsNotReady" xml:space="preserve">
+      <!-- 2026-10-15 (non-GCU backends): shown instead of "Ready" when a non-GCU backend (legacy MICommonInterface,
+           or the future Baolongda ACPI backend) is up but this model is NOT supported (read-only degraded).
+           GCU machines never reach this string; they keep their own "GCU not connected". -->
+      <value>● Not ready</value>
+    </data>
+    <data name="LegacyMifsDisconnected" xml:space="preserve">
+      <value>Legacy MIFS interface not detected</value>
+    </data>
+    <data name="LegacyMifsTip" xml:space="preserve">
+      <value>This machine uses the legacy MICommonInterface; only the three built-in performance modes are available.</value>
+    </data>
+  </root>

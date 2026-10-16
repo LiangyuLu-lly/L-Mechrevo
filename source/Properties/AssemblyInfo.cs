@@ -1,0 +1,19 @@
+﻿using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using System.Security;
+using System.Security.Permissions;
+
+[assembly: InternalsVisibleTo("MechrevoLite.Tests")]
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+[assembly: AssemblyCompany("L-Mechrevo")]
+[assembly: AssemblyConfiguration("Release")]
+[assembly: AssemblyFileVersion("0.291.8.1")]
+[assembly: AssemblyInformationalVersion("0.291.8.1-beta22.8.1")]
+[assembly: AssemblyProduct("L-Mechrevo")]
+[assembly: AssemblyTitle("L-Mechrevo")]
+[assembly: TargetPlatform("Windows10.0.19041.0")]
+[assembly: SupportedOSPlatform("Windows10.0.19041.0")]
+[assembly: AssemblyVersion("0.291.8.1")]

@@ -1,0 +1,168 @@
+# 主界面布局重排（2026-10-11 21:2x，0.291.6.1）——新布局的控件几何核对数据
+# 来源：把**刚构建出来的** source\bin\Release\...\L-Mechrevo.dll 用合成夹具实例化 SettingsForm
+#       （Program.UiAuditMode=true、96 DPI、1280x720 工作区），导出各容器的绝对像素矩形。
+# ⚠️ 不是截图（本会话无法截取运行中的 LM 窗口：该进程提权，PrintWindow 返回 false、
+#    置前被系统拒绝），仅作几何自证；肉眼核对请看报告里的三步。
+# 关键结论（逻辑像素，卡片宽 376 / 行宽 348）：
+#   性能模式标题行   y=82..108  : [图标 26][性能模式 322]
+#   性能模式按钮行   y=48..82   : [五颗模式按钮 212][风扇强冷/显卡OC/配置编辑 102][CPU 读数 → 行最右 358..386]
+#   显卡模式标题行   y=112..146 : [图标 26][显卡模式 116][状态文字 200]
+#   显卡模式按钮行   y=146..172 : [三颗按钮 320][GPU 读数 → 行最右]
+#   性能卡片高 62（原 66 里只有 26+34=60 可用）· 显卡卡片高 96（原 66）
+FORM client={Width=420, Height=529} bounds={X=1015,Y=286,Width=436,Height=568}
+=== panelPerformance BufferedPanel bounds={X=16,Y=40,Width=376,Height=62} client={Width=376, Height=62} vis=True dock=Top
+  panelCPUTitle [BufferedPanel] bounds={X=16,Y=36,Width=348,Height=60} vis=True dock=Top text=''
+    perfHeaderRow [BufferedPanel] bounds={X=0,Y=0,Width=348,Height=26} vis=True dock=Top text=''
+       [BufferedTableLayoutPanel] bounds={X=0,Y=0,Width=348,Height=26} vis=True dock=Fill text=''
+   [TableLayoutPanel] bounds={X=16,Y=62,Width=362,Height=26} vis=False dock=Top text=''
+     [FlowLayoutPanel] bounds={X=0,Y=0,Width=120,Height=26} vis=False dock=Fill text=''
+       [Label] bounds={X=2,Y=4,Width=29,Height=16} vis=False dock=None text='静音'
+       [RComboBox] bounds={X=32,Y=0,Width=76,Height=24} vis=False dock=None text='配置 1'
+     [FlowLayoutPanel] bounds={X=120,Y=0,Width=120,Height=26} vis=False dock=Fill text=''
+       [Label] bounds={X=2,Y=4,Width=29,Height=16} vis=False dock=None text='平衡'
+       [RComboBox] bounds={X=32,Y=0,Width=76,Height=24} vis=False dock=None text='配置 1'
+     [FlowLayoutPanel] bounds={X=240,Y=0,Width=122,Height=26} vis=False dock=Fill text=''
+       [Label] bounds={X=2,Y=4,Width=29,Height=16} vis=False dock=None text='狂暴'
+       [RComboBox] bounds={X=32,Y=0,Width=76,Height=24} vis=False dock=None text='配置 1'
+  perfModeRow [BufferedTableLayoutPanel] bounds={X=16,Y=2,Width=348,Height=34} vis=True dock=Top text=''
+    tablePerf [BufferedTableLayoutPanel] bounds={X=0,Y=0,Width=212,Height=34} vis=True dock=Fill text=''
+      buttonSilent [RButton] bounds={X=0,Y=0,Width=39,Height=34} vis=True dock=Fill text='静音'
+      buttonBalanced [RButton] bounds={X=45,Y=0,Width=36,Height=34} vis=True dock=Fill text='平衡'
+       [RButton] bounds={X=87,Y=0,Width=36,Height=34} vis=True dock=Fill text='静音狂暴'
+      buttonTurbo [RButton] bounds={X=129,Y=0,Width=36,Height=34} vis=True dock=Fill text='狂暴'
+       [RButton] bounds={X=171,Y=0,Width=41,Height=34} vis=True dock=Fill text='自定义'
+    perfShortcuts [FlowLayoutPanel] bounds={X=216,Y=4,Width=102,Height=25} vis=True dock=None text=''
+      quick_fanboost [RCheckBox] bounds={X=0,Y=4,Width=94,Height=17} vis=True dock=None text='风扇强冷'
+      gpu_oc [RCheckBox] bounds={X=0,Y=0,Width=104,Height=24} vis=False dock=None text='GPU 超频'
+       [RButton] bounds={X=0,Y=0,Width=72,Height=24} vis=False dock=None text='配置编辑'
+     [Label] bounds={X=320,Y=10,Width=28,Height=14} vis=True dock=None text='CPU'
+     [Label] bounds={X=99,Y=38,Width=14,Height=14} vis=True dock=None text='—'
+     [Label] bounds={X=212,Y=34,Width=28,Height=23} vis=True dock=Fill text=''
+=== panelCPUTitle BufferedPanel bounds={X=16,Y=36,Width=348,Height=60} client={Width=348, Height=60} vis=True dock=Top
+  perfHeaderRow [BufferedPanel] bounds={X=0,Y=0,Width=348,Height=26} vis=True dock=Top text=''
+     [BufferedTableLayoutPanel] bounds={X=0,Y=0,Width=348,Height=26} vis=True dock=Fill text=''
+      picturePerf [PictureBox] bounds={X=0,Y=0,Width=26,Height=26} vis=True dock=Fill text=''
+      labelPerf [Label] bounds={X=26,Y=0,Width=322,Height=26} vis=True dock=Fill text='性能模式'
+=== tablePerf BufferedTableLayoutPanel bounds={X=0,Y=0,Width=212,Height=34} client={Width=212, Height=34} vis=True dock=Fill
+  buttonSilent [RButton] bounds={X=0,Y=0,Width=39,Height=34} vis=True dock=Fill text='静音'
+  buttonBalanced [RButton] bounds={X=45,Y=0,Width=36,Height=34} vis=True dock=Fill text='平衡'
+   [RButton] bounds={X=87,Y=0,Width=36,Height=34} vis=True dock=Fill text='静音狂暴'
+  buttonTurbo [RButton] bounds={X=129,Y=0,Width=36,Height=34} vis=True dock=Fill text='狂暴'
+   [RButton] bounds={X=171,Y=0,Width=41,Height=34} vis=True dock=Fill text='自定义'
+=== perfShortcuts FlowLayoutPanel bounds={X=216,Y=4,Width=102,Height=25} client={Width=102, Height=25} vis=True dock=None
+  quick_fanboost [RCheckBox] bounds={X=0,Y=4,Width=94,Height=17} vis=True dock=None text='风扇强冷'
+  gpu_oc [RCheckBox] bounds={X=0,Y=0,Width=104,Height=24} vis=False dock=None text='GPU 超频'
+   [RButton] bounds={X=0,Y=0,Width=72,Height=24} vis=False dock=None text='配置编辑'
+=== panelGPU BufferedPanel bounds={X=16,Y=104,Width=376,Height=96} client={Width=376, Height=96} vis=True dock=Top
+  labelTipGPU [Label] bounds={X=10,Y=70,Width=370,Height=18} vis=False dock=Top text=''
+  tableAMD [TableLayoutPanel] bounds={X=10,Y=158,Width=394,Height=40} vis=False dock=Top text=''
+  panelGPUTitle [Panel] bounds={X=16,Y=2,Width=348,Height=60} vis=True dock=Top text=''
+     [BufferedTableLayoutPanel] bounds={X=0,Y=34,Width=348,Height=26} vis=True dock=Fill text=''
+      pictureGPU [PictureBox] bounds={X=0,Y=0,Width=26,Height=26} vis=True dock=Fill text=''
+      labelGPU [Label] bounds={X=26,Y=0,Width=116,Height=26} vis=True dock=Fill text='显卡模式'
+      labelGPUFan [Label] bounds={X=148,Y=0,Width=200,Height=26} vis=True dock=Fill text='         '
+    gpuModeRow [BufferedTableLayoutPanel] bounds={X=0,Y=0,Width=348,Height=34} vis=True dock=Top text=''
+      tableGPU [BufferedTableLayoutPanel] bounds={X=0,Y=0,Width=320,Height=34} vis=True dock=Fill text=''
+       [Label] bounds={X=320,Y=10,Width=28,Height=14} vis=True dock=None text='GPU'
+       [Label] bounds={X=153,Y=38,Width=14,Height=14} vis=True dock=None text='—'
+       [Label] bounds={X=320,Y=34,Width=28,Height=23} vis=True dock=Fill text=''
+   [BufferedTableLayoutPanel] bounds={X=10,Y=82,Width=370,Height=30} vis=False dock=Bottom text=''
+     [Label] bounds={X=0,Y=0,Width=92,Height=30} vis=False dock=Fill text='核显省电'
+     [RButton] bounds={X=92,Y=0,Width=92,Height=30} vis=False dock=Fill text='关闭'
+     [RButton] bounds={X=184,Y=0,Width=92,Height=30} vis=False dock=Fill text='开启'
+     [RButton] bounds={X=276,Y=0,Width=94,Height=30} vis=False dock=Fill text='自动'
+=== panelGPUTitle Panel bounds={X=16,Y=2,Width=348,Height=60} client={Width=348, Height=60} vis=True dock=Top
+   [BufferedTableLayoutPanel] bounds={X=0,Y=34,Width=348,Height=26} vis=True dock=Fill text=''
+    pictureGPU [PictureBox] bounds={X=0,Y=0,Width=26,Height=26} vis=True dock=Fill text=''
+    labelGPU [Label] bounds={X=26,Y=0,Width=116,Height=26} vis=True dock=Fill text='显卡模式'
+    labelGPUFan [Label] bounds={X=148,Y=0,Width=200,Height=26} vis=True dock=Fill text='         '
+  gpuModeRow [BufferedTableLayoutPanel] bounds={X=0,Y=0,Width=348,Height=34} vis=True dock=Top text=''
+    tableGPU [BufferedTableLayoutPanel] bounds={X=0,Y=0,Width=320,Height=34} vis=True dock=Fill text=''
+      buttonEco [RButton] bounds={X=0,Y=0,Width=103,Height=34} vis=True dock=Top text='核显模式'
+      buttonStandard [RButton] bounds={X=109,Y=0,Width=100,Height=34} vis=True dock=Top text='混合'
+      buttonUltimate [RButton] bounds={X=215,Y=0,Width=105,Height=34} vis=True dock=Top text='直连'
+     [Label] bounds={X=320,Y=10,Width=28,Height=14} vis=True dock=None text='GPU'
+     [Label] bounds={X=153,Y=38,Width=14,Height=14} vis=True dock=None text='—'
+     [Label] bounds={X=320,Y=34,Width=28,Height=23} vis=True dock=Fill text=''
+=== tableGPU BufferedTableLayoutPanel bounds={X=0,Y=0,Width=320,Height=34} client={Width=320, Height=34} vis=True dock=Fill
+  buttonEco [RButton] bounds={X=0,Y=0,Width=103,Height=34} vis=True dock=Top text='核显模式'
+  buttonStandard [RButton] bounds={X=109,Y=0,Width=100,Height=34} vis=True dock=Top text='混合'
+  buttonUltimate [RButton] bounds={X=215,Y=0,Width=105,Height=34} vis=True dock=Top text='直连'
+--- panelPerformance direct layout ---
+  panelCPUTitle BufferedPanel bounds={X=16,Y=36,Width=348,Height=60} vis=True dock=Top
+   TableLayoutPanel bounds={X=16,Y=62,Width=362,Height=26} vis=False dock=Top
+  perfModeRow BufferedTableLayoutPanel bounds={X=16,Y=2,Width=348,Height=34} vis=True dock=Top
+--- perfModeRow cells ---
+  tablePerf BufferedTableLayoutPanel bounds={X=0,Y=0,Width=212,Height=34} vis=True kids=[buttonSilent:静音:{X=0,Y=0,Width=39,Height=34}:vis=True][buttonBalanced:平衡:{X=45,Y=0,Width=36,Height=34}:vis=True][:静音狂暴:{X=87,Y=0,Width=36,Height=34}:vis=True][buttonTurbo:狂暴:{X=129,Y=0,Width=36,Height=34}:vis=True][:自定义:{X=171,Y=0,Width=41,Height=34}:vis=True]
+  perfShortcuts FlowLayoutPanel bounds={X=216,Y=4,Width=102,Height=25} vis=True kids=[quick_fanboost:风扇强冷:{X=0,Y=4,Width=94,Height=17}:vis=True][gpu_oc:GPU 超频:{X=0,Y=0,Width=104,Height=24}:vis=False][:配置编辑:{X=0,Y=0,Width=72,Height=24}:vis=False]
+   Label bounds={X=320,Y=10,Width=28,Height=14} vis=True kids=
+   Label bounds={X=99,Y=38,Width=14,Height=14} vis=True kids=
+   Label bounds={X=212,Y=34,Width=28,Height=23} vis=True kids=
+--- gpuModeRow cells ---
+  tableGPU BufferedTableLayoutPanel bounds={X=0,Y=0,Width=320,Height=34} vis=True kids=[buttonEco:核显模式:{X=0,Y=0,Width=103,Height=34}:vis=True][buttonStandard:混合:{X=109,Y=0,Width=100,Height=34}:vis=True][buttonUltimate:直连:{X=215,Y=0,Width=105,Height=34}:vis=True]
+   Label bounds={X=320,Y=10,Width=28,Height=14} vis=True kids=
+   Label bounds={X=153,Y=38,Width=14,Height=14} vis=True kids=
+   Label bounds={X=320,Y=34,Width=28,Height=23} vis=True kids=
+--- ABSOLUTE positions (relative to form client, visible controls with text or known names) ---
+dashboardLayout [BufferedTableLayoutPanel] abs=(6,6)-(414,523) size=408x517 vis=True text=''
+  dashboardPageHost [BufferedPanel] abs=(6,6)-(414,472) size=408x466 vis=True text=''
+    dashboardStack [BufferedTableLayoutPanel] abs=(6,6)-(414,1402) size=408x1396 vis=True text=''
+      panelGcuStatus [BufferedPanel] abs=(22,16)-(398,40) size=376x24 vis=True text=''
+        labelGcuStatus [Label] abs=(22,16)-(120,33) size=98x17 vis=True text='● GCU 状态未知'
+      panelPerformance [BufferedPanel] abs=(22,46)-(398,108) size=376x62 vis=True text=''
+        panelCPUTitle [BufferedPanel] abs=(38,82)-(386,142) size=348x60 vis=True text=''
+          perfHeaderRow [BufferedPanel] abs=(38,82)-(386,108) size=348x26 vis=True text=''
+        perfModeRow [BufferedTableLayoutPanel] abs=(38,48)-(386,82) size=348x34 vis=True text=''
+          tablePerf [BufferedTableLayoutPanel] abs=(38,48)-(250,82) size=212x34 vis=True text=''
+          perfShortcuts [FlowLayoutPanel] abs=(254,52)-(356,77) size=102x25 vis=True text=''
+           [Label] abs=(358,58)-(386,72) size=28x14 vis=True text='CPU'
+           [Label] abs=(137,86)-(151,100) size=14x14 vis=True text='—'
+      panelGPU [BufferedPanel] abs=(22,110)-(398,206) size=376x96 vis=True text=''
+        panelGPUTitle [Panel] abs=(38,112)-(386,172) size=348x60 vis=True text=''
+           [BufferedTableLayoutPanel] abs=(38,146)-(386,172) size=348x26 vis=True text=''
+          gpuModeRow [BufferedTableLayoutPanel] abs=(38,112)-(386,146) size=348x34 vis=True text=''
+      panelBrightness [BufferedPanel] abs=(22,212)-(398,336) size=376x124 vis=True text=''
+         [BufferedTableLayoutPanel] abs=(38,214)-(386,336) size=348x122 vis=True text=''
+           [BufferedTableLayoutPanel] abs=(38,214)-(386,240) size=348x26 vis=True text=''
+          labelScreenBrightness [Label] abs=(38,240)-(128,268) size=90x28 vis=True text='亮度'
+          labelScreenBrightnessValue [Label] abs=(336,240)-(386,268) size=50x28 vis=True text='100%'
+          rowColorCalibration [TableLayoutPanel] abs=(38,272)-(386,302) size=348x30 vis=True text=''
+          rowDisplayEffect [TableLayoutPanel] abs=(38,306)-(386,336) size=348x30 vis=True text=''
+      panelBattery [BufferedPanel] abs=(22,342)-(398,487) size=376x145 vis=True text=''
+        panelBatteryTitle [Panel] abs=(38,344)-(386,370) size=348x26 vis=True text=''
+           [BufferedTableLayoutPanel] abs=(38,344)-(386,368) size=348x24 vis=True text=''
+        tableBatteryLimit [TableLayoutPanel] abs=(38,368)-(386,482) size=348x114 vis=True text=''
+          chargeLimitHead [TableLayoutPanel] abs=(38,368)-(182,394) size=144x26 vis=True text=''
+          labelChargeLimitDesc [Label] abs=(38,394)-(386,420) size=348x26 vis=True text='通过直写 EC 限电（不走 GCU）'
+           [TableLayoutPanel] abs=(38,422)-(384,454) size=346x32 vis=True text=''
+          checkChargeSlider [RCheckBox] abs=(38,460)-(224,477) size=186x17 vis=True text='启用无极限充功能(实验性)'
+          tableChargeSliderRow [TableLayoutPanel] abs=(38,482)-(386,483) size=348x1 vis=True text=''
+      collapseGroup_group_lc_open [RCollapseGroup] abs=(22,497)-(398,640) size=376x143 vis=True text=''
+        collapseGroup_group_lc_open_content [Panel] abs=(22,528)-(398,640) size=376x112 vis=True text=''
+          panelLc [BufferedPanel] abs=(22,528)-(398,640) size=376x112 vis=True text=''
+        collapseGroup_group_lc_open_header [BufferedTableLayoutPanel] abs=(22,498)-(398,528) size=376x30 vis=True text=''
+          collapseGroup_group_lc_open_arrow [Label] abs=(24,499)-(42,527) size=18x28 vis=True text='▾'
+          collapseGroup_group_lc_open_title [Label] abs=(66,499)-(98,527) size=32x28 vis=True text='液冷'
+      collapseGroup_group_light_open [RCollapseGroup] abs=(22,646)-(398,892) size=376x246 vis=True text=''
+        collapseGroup_group_light_open_content [Panel] abs=(22,676)-(398,892) size=376x216 vis=True text=''
+          lightRows [BufferedTableLayoutPanel] abs=(22,676)-(398,892) size=376x216 vis=True text=''
+        collapseGroup_group_light_open_header [BufferedTableLayoutPanel] abs=(22,646)-(398,676) size=376x30 vis=True text=''
+          collapseGroup_group_light_open_arrow [Label] abs=(24,647)-(42,675) size=18x28 vis=True text='▾'
+          collapseGroup_group_light_open_title [Label] abs=(66,647)-(98,675) size=32x28 vis=True text='灯光'
+          collapseGroup_group_light_open_summary [Label] abs=(98,647)-(396,675) size=298x28 vis=True text='5 通道 · 1 开启'
+      collapseGroup_group_quick_open [RCollapseGroup] abs=(22,898)-(398,1384) size=376x486 vis=True text=''
+        collapseGroup_group_quick_open_content [Panel] abs=(22,928)-(398,1384) size=376x456 vis=True text=''
+          panelQuickSwitch [BufferedPanel] abs=(22,928)-(398,1384) size=376x456 vis=True text=''
+        collapseGroup_group_quick_open_header [BufferedTableLayoutPanel] abs=(22,898)-(398,928) size=376x30 vis=True text=''
+          collapseGroup_group_quick_open_arrow [Label] abs=(24,899)-(42,927) size=18x28 vis=True text='▾'
+          collapseGroup_group_quick_open_title [Label] abs=(66,899)-(122,927) size=56x28 vis=True text='更多开关'
+          collapseGroup_group_quick_open_summary [Label] abs=(122,899)-(396,927) size=274x28 vis=True text='0/27 开启'
+  panelFooter [Panel] abs=(6,472)-(414,523) size=408x51 vis=True text=''
+     [BufferedTableLayoutPanel] abs=(18,479)-(404,519) size=386x40 vis=True text=''
+      labelVersion [Label] abs=(22,481)-(106,518) size=84x37 vis=True text='0.291.6.1 beta22.6'
+      buttonOverlay [RButton] abs=(107,481)-(153,517) size=46x36 vis=True text='悬浮窗'
+       [RButton] abs=(155,481)-(204,517) size=49x36 vis=True text='设置'
+      buttonUpdates [RButton] abs=(205,481)-(251,517) size=46x36 vis=True text='更新'
+      buttonDonate [RBadgeButton] abs=(254,481)-(300,517) size=46x36 vis=True text='赞助'
+       [RButton] abs=(302,481)-(351,517) size=49x36 vis=True text='诊断'
+      buttonQuit [RButton] abs=(354,481)-(400,517) size=46x36 vis=True text='退出'

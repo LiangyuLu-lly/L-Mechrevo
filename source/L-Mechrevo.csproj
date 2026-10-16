@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>L-Mechrevo</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>True</UseWindowsForms>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+    <NoWarn>$(NoWarn);WFO1000;CA1416</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="LMechrevo.RyzenSMU.bin" />
+    <None Remove="LMechrevo.model-registry.json" />
+    <None Remove="MechrevoLite.Diagnostics\LMechrevo.gcu-payload-baseline.txt" />
+    <EmbeddedResource Include="LMechrevo.RyzenSMU.bin" LogicalName="LMechrevo.RyzenSMU.bin" />
+    <!-- 2026-10-10 合规：LMechrevo.RyzenSMU.bin 是 namazso/PawnIO.Modules 的 RyzenSMU 模块
+         （LGPL-2.1-or-later，Copyright (C) 2025 namazso），**原样未修改**地内嵌分发。
+         许可文本：LICENSES\LGPL-2.1.txt（= 上游 COPYING）。
+         第三方清单：THIRD-PARTY-NOTICES.md · 补丁计划：ATTRIBUTION-PATCH-PLAN.md
+         L-Mechrevo 自身版权行：Copyright (C) 2026 L-Mechrevo contributors（与根 LICENSE、两份 resx、install_script.iss 的 AppCopyright 一致）。
+         ⚠️ 发布前必须确认本文件对应的上游 tag/版本（见 THIRD-PARTY-NOTICES.md §6.1）。 -->
+    <None Remove="LMechrevo.IntelMSR.bin" />
+    <!-- 2026-10-10 intel（⑦B）：上游（作者 0.290.6）Intel 运行时调校通路用的 PawnIO 模块
+         LMechrevo.IntelMSR.bin（5324 B，SHA-256 D6ED85D65AB17A22F813EF98207D6D537155EE2DED5976A21CB48413C9B92E5F），
+         **原样未修改**地从上游 0.290.6 取回并内嵌分发（与 LMechrevo.RyzenSMU.bin 同一处理方式）。
+         用途：PawnIOWrapper.LoadModule() 载入后由 PawnIO\IntelOcMailbox.cs 读写 MSR 0x150 的 OC 邮箱。
+         许可/署名：namazso/PawnIO.Modules（LGPL-2.1-or-later，与 RyzenSMU.bin 同一个上游、同一份 LICENSES\LGPL-2.1.txt）；
+         协议来源 kitsunyan/intel-undervolt（GPL-3.0）见 THIRD-PARTY-NOTICES.md §1.2 B4 与 §1.3。 -->
+    <EmbeddedResource Include="LMechrevo.IntelMSR.bin" LogicalName="LMechrevo.IntelMSR.bin" />
+    <EmbeddedResource Include="LMechrevo.model-registry.json" LogicalName="LMechrevo.model-registry.json" />
+    <!-- 2026-10-09（75:00）：按变体选择的 GCU 载荷落地基线（由 tmp_gcu_baseline.ps1 从 installer-src\files\GCU\payload 生成）。
+         内容 = 每个变体逐文件 相对路径+字节数；[载荷落地] 一节按注册表 GcuVariant 选表，不再拿 40A 硬编码套所有机型。
+         ⚠️ 内嵌资源随程序集走；万一漏了只会在该节写「内嵌资源缺失」，不崩、不误报。 -->
+    <EmbeddedResource Include="MechrevoLite.Diagnostics\LMechrevo.gcu-payload-baseline.txt" LogicalName="LMechrevo.gcu-payload-baseline.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.Win32.TaskScheduler">
+      <HintPath>..\lm_pkg_files\{app}\Microsoft.Win32.TaskScheduler.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Management">
+      <HintPath>..\lm_pkg_files\{app}\System.Management.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\lm_pkg_files\{app}\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Probe">
+      <HintPath>..\lm_pkg_files\{app}\Probe.dll</HintPath>
+    </Reference>
+    <Reference Include="LibreHardwareMonitorLib">
+      <HintPath>..\lm_pkg_files\{app}\LibreHardwareMonitorLib.dll</HintPath>
+    </Reference>
+    <Reference Include="MQTTnet">
+      <HintPath>..\lm_pkg_files\{app}\MQTTnet.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Windows.SDK.NET">
+      <HintPath>..\lm_pkg_files\{app}\Microsoft.Windows.SDK.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="NvAPIWrapper">
+      <HintPath>..\lm_pkg_files\{app}\NvAPIWrapper.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

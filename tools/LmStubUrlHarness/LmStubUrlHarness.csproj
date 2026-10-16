@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ================================================================================================
+       LmStubUrlHarness —— 启动壳「打开下载」代码路径的无窗 harness（2026-10-13 新增）
+       ================================================================================================
+       目的：不显示任何窗口、不真的开浏览器，把 tools\LmLauncherStub 里【真正会打进安装包】的
+             UrlOpener.TryOpen() 走一遍，并用 TestHooks.TryRun 替身断言（⚠️ 2026-10-13 r24 修断言）：
+               · ★ 档位顺序 = ① shell 关联 -> ② 显式默认浏览器 -> ③ explorer.exe（能用的档必须在最前）；
+               · ★ 每一档拿到的 exe 必须【在磁盘上真实存在】（r23 把 ...\System32\explorer.exe 写进了断言，
+                 而那个文件根本不存在 => 等于把 bug 写进了测试；这条断言就是为挡住这类回归加的）；
+               · 参数形态 = 带引号的直链；某档失败就退到下一档；全失败 -> 返回 false（界面给可见提示）；
+               · 每一步都写进了 %TEMP%\L-Mechrevo-Launcher.log。
+       用法： dotnet build tools\LmStubUrlHarness\LmStubUrlHarness.csproj -c Release -o <临时目录>
+              <临时目录>\LmStubUrlHarness.exe <L-Mechrevo-Launcher.exe 的路径>
+       ⛔ 它不是产品的一部分、⛔ 不参与安装包构建；产物只落临时目录，用完即删。
+       ================================================================================================ -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net481</TargetFramework>
+    <AssemblyName>LmStubUrlHarness</AssemblyName>
+    <RootNamespace>LmStubUrlHarness</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
+    <GenerateBindingRedirects>false</GenerateBindingRedirects>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <DebugType>none</DebugType>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <FrameworkPathOverride Condition="Exists('C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1')">C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1</FrameworkPathOverride>
+    <FrameworkPathOverride Condition="'$(FrameworkPathOverride)' == '' and Exists('C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8')">C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8</FrameworkPathOverride>
+    <TargetFrameworkVersion Condition="'$(TargetFrameworkVersion)' == ''">v4.8.1</TargetFrameworkVersion>
+    <!-- 壳工程目录（默认 = 本工程同级目录里的 LmLauncherStub，可用 -p:StubDir=… 覆盖）。 -->
+    <StubDir Condition="'$(StubDir)' == ''">$(MSBuildThisFileDirectory)..\LmLauncherStub</StubDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 引用【已构建好的壳】（只读引用，⛔ 不触发壳的构建、⛔ 不碰 installer-src\files）。 -->
+    <Reference Include="L-Mechrevo-Launcher">
+      <HintPath>$(StubDir)\bin\Release\L-Mechrevo-Launcher.exe</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,449 @@
+using System;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+/// <summary>
+/// 2026-10-09（本地功耗采样 NVML 原生崩溃修复）：加固后的 NVML 封装。
+///
+/// 事故依据（用户提供的 .NET Runtime 1026 / Application Error 1000，异常代码 0xc0000005，出错模块 coreclr.dll）：
+///   LibreHardwareMonitor.Interop.NvidiaML.NvmlDeviceGetPowerUsage / Gpu.NvidiaGpu.Update()
+///   ← LhmMonitor.Update() ← HardwareControl.RefreshLocalMonitoring() ← SampleLocalPower()
+///   ← CustomModeForm.UpdatePowerWallVerdict() ← 构造函数里挂的 2s Timer。
+///
+/// 本类提供四层防护（缺一不可）：
+///   (a) 异常防护：SEHException / AccessViolationException / Exception 全部就地吃掉，只记日志并返回 null；
+///   (b) 句柄自愈：**从不缓存 device handle**（每次现取现用、并对 0 句柄做校验），
+///       连续失败到阈值后 nvmlShutdown + nvmlInit_v2 重建，失败再升级；
+///   (c) 降级而非致命：重建无效则进入隔离期，期间一次原生调用都不发（<see cref="Unavailable"/> = true），
+///       到期做一次探测性重试（退避 60s → 10 分钟封顶），成功后自动恢复；
+///   (d)(e) 生命周期与降频：结果按 <see cref="SnapshotTtlMs"/> 缓存，1 秒级调用方（悬浮窗）不会把原生调用频率放大。
+/// 另外每次原生调用前都用 <see cref="NativeDriverGuard"/> 确认 nvml.dll 仍映射在初始化时的同一基址。
+/// </summary>
+public static class NvmlHelper
+{
+	private struct nvmlMemory_t
+	{
+		public ulong total;
+
+		public ulong free;
+
+		public ulong used;
+	}
+
+	internal const string NvmlModuleName = "nvml.dll";
+
+	private const string NvmlDll = "nvml.dll";
+
+	private const int NVML_SUCCESS = 0;
+
+	/// <summary>(e) 降频：同一份快照在 TTL 内复用，避免 1s 级调用方把原生调用频率放大。</summary>
+	internal const int SnapshotTtlMs = 1500;
+
+	/// <summary>(b) 连续失败到该阈值就重建 NVML（句柄/上下文）。</summary>
+	internal const int FailureThreshold = 4;
+
+	/// <summary>(b) 重建这么多次仍失败就降级（隔离）。</summary>
+	private const int MaxReinitBeforeQuarantine = 2;
+
+	private const long InitRetryIntervalMs = 5000L;
+
+	/// <summary>(c) 隔离起步 60s，每次重试仍失败翻倍，上限 10 分钟。</summary>
+	private const long QuarantineBaseMs = 60000L;
+
+	private const long QuarantineMaxMs = 600000L;
+
+	private static readonly object _lock = new object();
+
+	private static bool _init;
+
+	private static long _lastInitAttempt;
+
+	/// <summary>本进程内彻底停用 NVML（模块失效或已确认原生异常）——之后一次原生调用都不发。</summary>
+	private static bool _disabled;
+
+	private static string _disabledReason = "";
+
+	private static bool _moduleGuardArmed;
+
+	private static int _consecutiveFailures;
+
+	private static int _lastError;
+
+	private static int _reinitCount;
+
+	private static long _quarantineUntilTicks;
+
+	private static long _quarantineMs = 60000L;
+
+	private static long _snapshotTicks = -1L;
+
+	private static uint _snapshotIndex;
+
+	private static float? _snapshotPower;
+
+	private static long? _snapshotUsedMb;
+
+	private static long? _snapshotTotalMb;
+
+	[DllImport("nvml.dll")]
+	private static extern int nvmlInit_v2();
+
+	[DllImport("nvml.dll")]
+	private static extern int nvmlShutdown();
+
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetHandleByIndex_v2(uint index, out nint device);
+
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetPowerUsage(nint device, out uint powerMilliWatts);
+
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetMemoryInfo(nint device, out nvmlMemory_t memory);
+
+	/// <summary>(c) 已降级：隔离期内或模块已失效，调用方应完全跳过本类（一次原生调用都不要发）。</summary>
+	internal static bool Unavailable
+	{
+		get
+		{
+			if (_disabled)
+			{
+				return true;
+			}
+			long until = Interlocked.Read(in _quarantineUntilTicks);
+			return until != 0L && Environment.TickCount64 < until;
+		}
+	}
+
+	internal static bool ModuleGone => _disabled;
+
+	internal static int ConsecutiveFailures => Volatile.Read(in _consecutiveFailures);
+
+	internal static int LastError => Volatile.Read(in _lastError);
+
+	public static void Init()
+	{
+		lock (_lock)
+		{
+			InitLocked();
+		}
+	}
+
+	public static float? GetGpuPower(uint gpuIndex = 0u)
+	{
+		lock (_lock)
+		{
+			RefreshLocked(gpuIndex);
+			return _snapshotPower;
+		}
+	}
+
+	public static (long usedMb, long totalMb)? GetMemoryInfo(uint gpuIndex = 0u)
+	{
+		lock (_lock)
+		{
+			RefreshLocked(gpuIndex);
+			if (!_snapshotUsedMb.HasValue || !_snapshotTotalMb.HasValue)
+			{
+				return null;
+			}
+			return (_snapshotUsedMb.Value, _snapshotTotalMb.Value);
+		}
+	}
+
+	/// <summary>(b)(c) 重建入口：清掉失败计数与隔离期，下次采样重新 nvmlInit_v2 并重取句柄。模块已失效时内部直接跳过。</summary>
+	internal static void Reset()
+	{
+		lock (_lock)
+		{
+			_consecutiveFailures = 0;
+			_reinitCount = 0;
+			_lastError = 0;
+			_quarantineUntilTicks = 0L;
+			_quarantineMs = QuarantineBaseMs;
+			_init = false;
+			_lastInitAttempt = 0L;
+			InvalidateSnapshotLocked();
+			if (!_disabled)
+			{
+				Logger.WriteLine("NVML 已请求重建（失败计数清零，下次采样重新初始化并重取设备句柄）");
+			}
+		}
+	}
+
+	public static void Shutdown()
+	{
+		lock (_lock)
+		{
+			if (!_init)
+			{
+				return;
+			}
+			if (ModuleTrustedLocked("Shutdown 前"))
+			{
+				try
+				{
+					int value = nvmlShutdown();
+					Logger.WriteLine($"NVML Shutdown: {value}");
+				}
+				catch (SEHException ex)
+				{
+					DisableLocked("nvmlShutdown 原生异常", ex);
+				}
+				catch (AccessViolationException ex)
+				{
+					DisableLocked("nvmlShutdown 原生异常", ex);
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLineThrottled("nvml-shutdown", "NVML shutdown failed: " + ex.GetType().Name + " " + ex.Message, 60000);
+				}
+			}
+			_init = false;
+			_lastInitAttempt = 0L;
+			InvalidateSnapshotLocked();
+		}
+	}
+
+	private static void InitLocked()
+	{
+		if (_init || _disabled)
+		{
+			return;
+		}
+		long tickCount = Environment.TickCount64;
+		if (tickCount - _lastInitAttempt < InitRetryIntervalMs)
+		{
+			return;
+		}
+		_lastInitAttempt = tickCount;
+		if (!ModuleTrustedLocked("初始化前"))
+		{
+			return;
+		}
+		try
+		{
+			int num = nvmlInit_v2();
+			_init = num == NVML_SUCCESS;
+			if (!_init)
+			{
+				Logger.WriteLineThrottled("nvml-init", $"NVML Init: {num}", 60000);
+				return;
+			}
+			// (b) 记住初始化成功时 nvml.dll 的基址：之后每次调用前比对，模块被卸载/换址就再也不碰它。
+			nint num2 = NativeDriverGuard.Query(NvmlModuleName);
+			_moduleGuardArmed = num2 != 0;
+			if (_moduleGuardArmed)
+			{
+				NativeDriverGuard.Remember(NvmlModuleName, num2);
+			}
+			else
+			{
+				Logger.WriteLine("NVML 初始化成功但拿不到 nvml.dll 模块句柄，模块存活守卫未启用（其余防护仍在）");
+			}
+			Logger.WriteLine($"NVML Init: {num}（设备句柄每次现取，不缓存）");
+		}
+		catch (SEHException ex)
+		{
+			DisableLocked("nvmlInit_v2 原生异常", ex);
+		}
+		catch (AccessViolationException ex)
+		{
+			DisableLocked("nvmlInit_v2 原生异常", ex);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineThrottled("nvml-init", "NVML Init exception: " + ex.GetType().Name + " " + ex.Message, 60000);
+		}
+	}
+
+	/// <summary>
+	/// (b) 重建一次：先 nvmlShutdown（带模块守卫），再允许立即 nvmlInit_v2；失败的 device handle 绝不带过来。
+	/// </summary>
+	private static void ReinitLocked(string reason)
+	{
+		if (ModuleTrustedLocked("重建前"))
+		{
+			try
+			{
+				if (_init)
+				{
+					int num = nvmlShutdown();
+					Logger.WriteLine($"NVML 重建前 Shutdown: {num}（原因：{reason}）");
+				}
+			}
+			catch (SEHException ex)
+			{
+				DisableLocked("nvmlShutdown 原生异常", ex);
+				return;
+			}
+			catch (AccessViolationException ex)
+			{
+				DisableLocked("nvmlShutdown 原生异常", ex);
+				return;
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLineThrottled("nvml-shutdown", "NVML 重建前 shutdown 失败: " + ex.GetType().Name + " " + ex.Message, 60000);
+			}
+		}
+		_init = false;
+		_lastInitAttempt = 0L;
+		InvalidateSnapshotLocked();
+	}
+
+	/// <summary>模块存活判定：基址变了就**永久**停用（CoreCLR 桩里缓存的导出地址无法在本进程内安全重解析）。</summary>
+	private static bool ModuleTrustedLocked(string phase)
+	{
+		if (!_moduleGuardArmed)
+		{
+			return true;
+		}
+		if (!NativeDriverGuard.IsStale(NvmlModuleName, out nint _))
+		{
+			return true;
+		}
+		DisableLocked($"nvml.dll 已不在初始化时的基址（{phase}）：模块被卸载/重载，缓存导出地址失效");
+		return false;
+	}
+
+	private static void DisableLocked(string reason, Exception ex = null)
+	{
+		if (_disabled)
+		{
+			return;
+		}
+		_disabled = true;
+		_disabledReason = reason;
+		_init = false;
+		_quarantineUntilTicks = long.MaxValue;
+		InvalidateSnapshotLocked();
+		string text = ((ex == null) ? "" : $" {ex.GetType().Name}: {ex.Message}");
+		Logger.WriteLine($"NVML 已在本进程停用（GPU 功耗/显存采样降级）：{reason}{text}");
+	}
+
+	private static void RefreshLocked(uint gpuIndex)
+	{
+		long tickCount = Environment.TickCount64;
+		if (_snapshotIndex == gpuIndex && _snapshotTicks >= 0L && tickCount - _snapshotTicks < SnapshotTtlMs)
+		{
+			return;
+		}
+		if (_disabled)
+		{
+			InvalidateSnapshotLocked();
+			return;
+		}
+		if (Unavailable)
+		{
+			// (c) 隔离期内一次原生调用都不发。
+			InvalidateSnapshotLocked();
+			return;
+		}
+		InitLocked();
+		_snapshotIndex = gpuIndex;
+		_snapshotTicks = tickCount;
+		_snapshotPower = null;
+		_snapshotUsedMb = null;
+		_snapshotTotalMb = null;
+		if (!_init)
+		{
+			return;
+		}
+		if (!ModuleTrustedLocked("采样前"))
+		{
+			return;
+		}
+		try
+		{
+			nint device = 0;
+			int num = nvmlDeviceGetHandleByIndex_v2(gpuIndex, out device);
+			if (num != NVML_SUCCESS)
+			{
+				NoteFailureLocked("nvmlDeviceGetHandleByIndex_v2", num);
+				return;
+			}
+			if (device == 0)
+			{
+				// 句柄校验：拿不到有效句柄时绝不往下传，避免把 0/垃圾指针交给驱动。
+				NoteFailureLocked("nvmlDeviceGetHandleByIndex_v2 返回 0 句柄", -1);
+				return;
+			}
+			int num2 = nvmlDeviceGetPowerUsage(device, out uint powerMilliWatts);
+			if (num2 == NVML_SUCCESS && powerMilliWatts > 0 && (float)powerMilliWatts <= 200000f)
+			{
+				_snapshotPower = (float)powerMilliWatts / 1000f;
+			}
+			int num3 = nvmlDeviceGetMemoryInfo(device, out nvmlMemory_t memory);
+			if (num3 == NVML_SUCCESS && memory.total > 0L)
+			{
+				_snapshotUsedMb = (long)(memory.used / 1048576);
+				_snapshotTotalMb = (long)(memory.total / 1048576);
+			}
+			// 只要有一个查询成功就说明句柄/上下文是活的（功耗返回 0 是低功耗态，不是失败）。
+			if (num2 == NVML_SUCCESS || num3 == NVML_SUCCESS)
+			{
+				NoteSuccessLocked();
+				return;
+			}
+			NoteFailureLocked("nvmlDeviceGetPowerUsage/nvmlDeviceGetMemoryInfo", num2);
+		}
+		catch (SEHException ex)
+		{
+			DisableLocked("NVML 采样原生异常", ex);
+		}
+		catch (AccessViolationException ex)
+		{
+			DisableLocked("NVML 采样原生异常", ex);
+		}
+		catch (Exception ex)
+		{
+			NoteFailureLocked("NVML 采样异常 " + ex.GetType().Name + ": " + ex.Message, -1);
+		}
+	}
+
+	private static void NoteSuccessLocked()
+	{
+		if (Interlocked.Exchange(ref _consecutiveFailures, 0) != 0)
+		{
+			Logger.WriteLine("NVML 采样已恢复（连续失败计数清零）");
+		}
+		_reinitCount = 0;
+	}
+
+	/// <summary>(b)(c) 失败计数 → 重建 → 仍失败则隔离降级（退避翻倍，到期才重试）。</summary>
+	private static void NoteFailureLocked(string what, int code)
+	{
+		_lastError = code;
+		int num = Interlocked.Increment(ref _consecutiveFailures);
+		if (num < FailureThreshold)
+		{
+			Logger.WriteLineThrottled("nvml-fail", $"NVML 采样失败({num}/{FailureThreshold})：{what} code={code}", 30000);
+			return;
+		}
+		Interlocked.Exchange(ref _consecutiveFailures, 0);
+		if (_reinitCount < MaxReinitBeforeQuarantine)
+		{
+			int num2 = ++_reinitCount;
+			Logger.WriteLine($"NVML 连续 {FailureThreshold} 次采样失败（{what} code={code}）：重建 NVML 句柄/上下文（第 {num2}/{MaxReinitBeforeQuarantine} 次）");
+			ReinitLocked($"{what} code={code}");
+			return;
+		}
+		_reinitCount = 0;
+		_init = false;
+		_lastInitAttempt = 0L;
+		InvalidateSnapshotLocked();
+		_quarantineUntilTicks = Environment.TickCount64 + _quarantineMs;
+		Logger.WriteLine($"NVML 重建无效（{what} code={code}）：GPU 功耗/显存采样降级停用 {_quarantineMs / 1000}s，到期自动重试一次");
+		_quarantineMs = Math.Min(_quarantineMs * 2, QuarantineMaxMs);
+	}
+
+	private static void InvalidateSnapshotLocked()
+	{
+		_snapshotTicks = -1L;
+		_snapshotPower = null;
+		_snapshotUsedMb = null;
+		_snapshotTotalMb = null;
+	}
+
+	internal static string DisabledReason => _disabledReason;
+}

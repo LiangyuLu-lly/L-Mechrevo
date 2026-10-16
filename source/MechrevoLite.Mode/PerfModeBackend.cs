@@ -1,0 +1,237 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using MechrevoLite.Display;
+using MechrevoLite.Hardware;
+
+namespace MechrevoLite.Mode;
+
+internal sealed class PerfModeBackend : IPerfModeBackend
+{
+	private readonly MechrevoService _service;
+
+	private readonly MechrevoHw _hw;
+
+	public PerfModeBackend(MechrevoService service, MechrevoHw hw)
+	{
+		_service = service ?? throw new ArgumentNullException("service");
+		_hw = hw ?? throw new ArgumentNullException("hw");
+	}
+
+	public static PerfModeCapabilities CapabilitiesFrom(MechrevoHw hw)
+	{
+		ArgumentNullException.ThrowIfNull(hw, "hw");
+		return new PerfModeCapabilities
+		{
+			UsesAmdPowerFields = hw.UsesAmdPowerFields,
+			SupportsPl1 = hw.Pl1Adjustable,
+			SupportsPl2 = hw.Pl2Adjustable,
+			SupportsPl4 = hw.Pl4Adjustable,
+			SupportsTcc = hw.TccAdjustable,
+			SupportsTgp = hw.GpuTgpAdjustable,
+			SupportsDynamicBoost = hw.GpuDynamicBoostAdjustable,
+			SupportsGpuOverclock = hw.SupportsGpuOverclock,
+			SupportsFanCurve = hw.FanCurveSeen,
+			SupportsFanBoost = hw.SupportsFanBoost,
+			SupportsFanSwitchSpeed = hw.SupportsFanSwitchSpeed,
+			// 2026-10-15（用户拍板：刷新率这条**整个改走 Windows API**，不再依赖 GCU）：
+			// 原来判的是 GCU 能力位 + 固件的「自动刷新率」字段（`hw.SupportsDisplayRefresh && !hw.DcHz`）
+			// ⇒ 非 GCU 机型（老接口 / 将来宝龙达）永远拿不到这一步。
+			// 现在判据 = **Win32 侧到底有没有可切的档位**（内屏实测最大档 > MIN_RATE ⇒ 至少两档），
+			// 并保留"自动刷新率开着时不做固定档"这条语义 —— 但改读**我们自己的**配置键 `screen_auto`。
+			SupportsRefreshRate = (ScreenGateProbe.Win32MaxRefreshRate() > ScreenControl.MIN_RATE) && !AppConfig.Is("screen_auto"),
+			SupportsTurboSubMode = (hw.Capabilities.SilentTurboAvailability == FeatureAvailability.Supported)
+		};
+	}
+
+	public async Task<bool> SwitchBuiltInAsync(PerfModeKind kind, CancellationToken ct)
+	{
+		return await _service.SwitchMode(PerfModeMapping.ToServiceMode(kind)) == MechrevoService.ModeSwitchResult.Ok;
+	}
+
+	public Task<bool> SwitchTurboSubModeAsync(bool silent, CancellationToken ct)
+	{
+		return _service.SwitchTurboSubMode(silent, ct);
+	}
+
+	public Task<bool> SwitchFirmwareSlotAsync(int slotIndex, CancellationToken ct)
+	{
+		return _service.SwitchCustomProfileWithResend(slotIndex, ct);
+	}
+
+	public Task<bool> WriteDetailFieldAsync(string wireKey, string value, CancellationToken ct)
+	{
+		return _service.SetCustomDetail(new Dictionary<string, string> { [wireKey] = value });
+	}
+
+	public async Task<bool> WriteFanCurveAsync(bool cpu, int[] duty, CancellationToken ct)
+	{
+		try
+		{
+			await _hw.SetFanCurve((!cpu) ? 1 : 0, duty).ConfigureAwait(continueOnCapturedContext: false);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("PerfModeBackend.WriteFanCurve(" + (cpu ? "CPU" : "GPU") + ") failed: " + ex.Message);
+			return false;
+		}
+	}
+
+	public Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct)
+	{
+		return _service.ApplyGcuGpuOverclock(on, core, memory);
+	}
+
+	public Task<bool> SetSlotNameAsync(string name, CancellationToken ct)
+	{
+		return _service.SetCustomProfileName(name);
+	}
+
+	public Task<bool> SetFanBoostAsync(bool on, CancellationToken ct)
+	{
+		if (_hw.FanBoost != on)
+		{
+			return _service.SwitchFanBoost(on);
+		}
+		return Task.FromResult(result: true);
+	}
+
+	public Task<bool> SetRefreshRateAsync(int hz, CancellationToken ct)
+	{
+		// 2026-10-15（用户拍板：刷新率这条整个改走 Windows API）：不再下发 GCU 的 GPU_HZSETTING。
+		// 唯一动作 = ScreenControl.SetScreen(hz) ⇒ ScreenNative.SetRefreshRate ⇒ ChangeDisplaySettingsEx；
+		// 回读也用 Win32（EnumDisplaySettingsEx），±2Hz 视为同一档（规避 59.94 取整）。
+		try
+		{
+			string screen = ScreenNative.FindLaptopScreen(log: false);
+			int current = ScreenNative.GetRefreshRate(screen);
+			if (current > 0 && Math.Abs(current - hz) <= 2)
+			{
+				return Task.FromResult(result: true);
+			}
+			ScreenControl.SetScreen(hz);
+			int readback = ScreenNative.GetRefreshRate(screen);
+			return Task.FromResult(readback > 0 && Math.Abs(readback - hz) <= 2);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("PerfModeBackend.SetRefreshRate(" + hz + ") failed: " + ex.Message);
+			return Task.FromResult(result: false);
+		}
+	}
+
+	public bool SetPowerPlan(string guid)
+	{
+		return WinPowerPlan.SetActivePlan(guid);
+	}
+
+	public bool SetCpuBoost(int index)
+	{
+		return WinPowerPlan.SetBoost(index);
+	}
+
+	public bool SetPowerOverlay(int mode)
+	{
+		PowerOverlayResult powerOverlayResult = PowerNative.SetOverlayConfirmed(mode);
+		if (powerOverlayResult == PowerOverlayResult.Confirmed || (uint)(powerOverlayResult - 2) <= 1u)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	public Task DelayAsync(int milliseconds, CancellationToken ct)
+	{
+		return Task.Delay(milliseconds, ct);
+	}
+
+	public async Task<bool?> VerifyAsync(PerfApplyStep step, CancellationToken ct)
+	{
+		switch (step.Verify)
+		{
+		case PerfApplyVerify.ModeReadback:
+			return await VerifyModeAsync(step, ct).ConfigureAwait(continueOnCapturedContext: false);
+		case PerfApplyVerify.PowerOverlay:
+			return PowerNative.IsOverlayActive(step.Number);
+		case PerfApplyVerify.PowerPlan:
+		{
+			string activePlan = WinPowerPlan.GetActivePlan();
+			return (activePlan.Length == 0) ? ((bool?)null) : new bool?(string.Equals(activePlan, step.Value, StringComparison.OrdinalIgnoreCase));
+		}
+		case PerfApplyVerify.CpuBoost:
+		{
+			int ac;
+			int dc;
+			return WinPowerPlan.TryGetBoost(out ac, out dc) ? new bool?(ac == step.Number && dc == step.Number) : ((bool?)null);
+		}
+		case PerfApplyVerify.RefreshRate:
+		{
+			// 2026-10-15（刷新率整条改走 Windows API）：回读也走 Win32 —— 原来读 GCU 的 `_hw.CurrentHz`，
+			// 非 GCU 机型上恒为 0/-1 ⇒ 这一步会被判成"假失败"。
+			int hzNow = ScreenNative.GetRefreshRate(ScreenNative.FindLaptopScreen(log: false));
+			return (hzNow > 0) ? new bool?(Math.Abs(hzNow - step.Number) <= 2) : ((bool?)null);
+		}
+		// (a)(b)（2026-10-09，用户原话「OK 按你说的」）：驱动/NVAPI 回读滞后可达 2~4 秒 ——
+		// 此刻"对不上"**不再判「设下去了，但读回来对不上」（那是 GPU 假失败）**，改回 null（= 已下发·待确认 Sent）；
+		// 多拍重读（300ms/2s/4s + 每次 GCU 状态刷新）由 PerfLazyVerifier 在后台跑，读到一致自动升级为已确认。
+		case PerfApplyVerify.GpuClockOffset:
+			if (!_hw.DirectGpuOverclockBackendPresent)
+			{
+				return null;
+			}
+			if (step.Kind == PerfApplyStepKind.ApplyGpuOverclock)
+			{
+				bool matchOffsets = _hw.DriverGpuOverclockFieldMatches("GpuCoreClockOffsetOC", step.GpuOffsets?.Core ?? 0) && _hw.DriverGpuOverclockFieldMatches("GpuMemoryClockOffsetOC", step.GpuOffsets?.Memory ?? 0);
+				return matchOffsets ? new bool?(true) : ((bool?)null);
+			}
+			bool matchField = _hw.DriverGpuOverclockFieldMatches(step.WireKey, step.Number);
+			return matchField ? new bool?(true) : ((bool?)null);
+		case PerfApplyVerify.CpuPackagePower:
+			return VerifyCpuPowerLimit(step.Number);
+		case PerfApplyVerify.GpuPowerLimit:
+		case PerfApplyVerify.FanDuty:
+			return null;
+		default:
+			return null;
+		}
+	}
+
+	private async Task<bool?> VerifyModeAsync(PerfApplyStep step, CancellationToken ct)
+	{
+		if (step.Kind == PerfApplyStepKind.SwitchFirmwareSlot)
+		{
+			return await _hw.WaitForStateAsync(() => _hw.OperatingMode == 3 && _hw.CustomProfileIndex == step.Number, TimeSpan.FromMilliseconds(1200L), ct).ConfigureAwait(continueOnCapturedContext: false) || (_hw.OperatingMode == 3 && _hw.CustomProfileIndex == step.Number);
+		}
+		int expected = PerfModeMapping.ToFirmwareOperatingMode((PerfModeKind)step.Number);
+		return await _hw.WaitForStateAsync(() => _hw.OperatingMode == expected, TimeSpan.FromMilliseconds(1200L), ct).ConfigureAwait(continueOnCapturedContext: false) || _hw.OperatingMode == expected;
+	}
+
+	internal static bool? VerifyCpuPowerLimit(int watts)
+	{
+		return EvaluateCpuPowerLimit(watts, HardwareControl.cpuPower);
+	}
+
+	internal static bool? EvaluateCpuPowerLimit(int watts, float? measured)
+	{
+		if (watts > 0 && measured.HasValue)
+		{
+			float valueOrDefault = measured.GetValueOrDefault();
+			if (!(valueOrDefault <= 0f))
+			{
+				double num = (double)watts * 1.15 + 5.0;
+				if ((double)valueOrDefault > num)
+				{
+					return false;
+				}
+				if ((double)valueOrDefault >= (double)watts * 0.85)
+				{
+					return true;
+				}
+				return null;
+			}
+		}
+		return null;
+	}
+}
