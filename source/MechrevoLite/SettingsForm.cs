@@ -389,9 +389,15 @@ public class SettingsForm : RForm
 
 	private TableLayoutPanel? _screenRowsLayout;
 
-	private static readonly int[] ScreenRowHeights = new int[3] { 26, 34, 28 };
+	// 2026-10-16：由 3 行扩到 5 行 —— 屏幕区布局（bufferedTableLayoutPanel，见 :2262~2266 的 RowStyles）
+	// 实际有 5 行：0=占位 26、1=刷新率 34、2=亮度 28、3=**校色行 calibPanel 34**、4=**色彩增强行 displayEffectRow 34**。
+	// 而本数组原先只有 3 个元素 ⇒ SetScreenRowControls 对 row 3/4 因 `row >= Length` 直接 return
+	// ⇒ 那两行**从来没有被任何判据管过**：校色行留下"有标题没按钮"的空壳（三个控件跟 flag11 隐藏、
+	// 而标题 calibCaption 恒可见），色彩增强行整行恒显示（displayEffectRow.Visible 全仓从未被赋值）。
+	// ⚠️ 只**追加**后两项，前三项的索引与数值一字未动 ⇒ row 0/1/2 的既有行为逐位不变。
+	private static readonly int[] ScreenRowHeights = new int[5] { 26, 34, 28, 34, 34 };
 
-	private readonly int[] _screenRowVisibleHeights = new int[3];
+	private readonly int[] _screenRowVisibleHeights = new int[5];
 
 	private readonly List<RButton> _hzButtons = new List<RButton>();
 
@@ -2372,6 +2378,15 @@ public class SettingsForm : RForm
 			MechrevoService? svc = Program.service;
 			MechrevoHw hw = Program.hw;
 			// 2026-10-15（C-1 第 2 步分类 ①）：本段是 GCU 校色 ICC 绕行（下发全是 MQTT）⇒ 真正需要 GCU。
+			// 2026-10-16【更正】上面这句原来紧贴在 `if (hw.IsGcuConnected)` 之前、读起来像在说
+			// "整个屏幕校色都需要 GCU"，容易把整段判死 —— 实际它只覆盖**这一颗开关**（以及下面
+			// 走 SetColorCalibration 的档位切换）。校色分两半：
+			//   * 「自定义 ICC」档（下拉选 999）—— 纯本地：IccHelper.ApplyIcc →
+			//     WcsAssociateColorProfileWithDevice（Windows 标准 API / mscms.dll），**不需要 GCU**；
+			//   * 预设档位（默认/sRGB/P3/AdobeRGB）与这颗开关 —— 走 GCU 的 SetColorCalibration / MQTT。
+			// 所以宝龙达（非 GCU）下的处理是：这颗开关隐藏（本段走不到 ⇒ 点了不会有反应，
+			// 留着就违反"能点的就必须有反应"），而「设置」按钮与下拉的「自定义」档**保留**
+			// （判据见 flag11 / flag11GcuOnly / CustomIccTierAvailable）。
 			if (svc != null && hw != null && hw.IsGcuConnected)
 			{
 				bool requested = calibSwitch.Checked;
@@ -8130,7 +8145,20 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		bool flag8 = flag4 | flag5 | flag6 | flag6b | flag6c;
 		bool flag9 = audit | flag8;
 		bool flag10 = Show((hw?.ScreenBrightnessSeen ?? false) || ScreenGateProbe.WmiBrightnessReadable());
-		bool flag11 = Show(caps.ColorCalibration || (hw?.SupportsColorCalibration ?? false));
+		// 2026-10-16：校色行原先只有下面这一条判据（只认 GCU 上报的能力位）⇒ 宝龙达（非 GCU）下
+		// 恒为假 ⇒ 整行三个控件（开关/下拉/设置）一起隐藏，只留下恒可见的标题 calibCaption = 空壳。
+		// 但这一行里**只有开关**真正需要 GCU：它的 Click 整段包在 `if (hw.IsGcuConnected)` 里
+		// （见 :2375），点开关本质是 SetColorCalibration ⇒ 纯 MQTT。另外两项都有**非 GCU 的可用路径**：
+		//   * 下拉的「自定义」档 —— :2516 的自定义 ICC 分支直接走 IccHelper.ApplyIcc
+		//     → WcsAssociateColorProfileWithDevice（Windows 标准 API / mscms.dll），与 GCU 无关；
+		//   * 「设置」按钮 —— 打开 CalibrationStartupForm，里面全是本地配置（ICC 导入、开机自动应用）。
+		// 于是照 flag7/flag10 的既有模式（OR 补一条"实测可用"的判据，**只放宽不收紧**）拆成两条：
+		//   flag11GcuOnly —— 严格版，仍只认 GCU 上报；**只给开关用**（开关没有非 GCU 路径，
+		//                    放宽它就会做出"能点但没反应"的控件，违反能力位铁律）。
+		//   flag11        —— 放宽版，额外认"宝龙达上本地 ICC 路径可用"；给下拉、设置按钮、行可见性用。
+		// ⚠️ 非宝龙达机型上 `UsesBaolongda` 恒为假 ⇒ 两条取值与改动前的 flag11 逐位相同。
+		bool flag11GcuOnly = Show(caps.ColorCalibration || (hw?.SupportsColorCalibration ?? false));
+		bool flag11 = Show(caps.ColorCalibration || (hw?.SupportsColorCalibration ?? false) || (hw?.UsesBaolongda ?? false));
 		bool flag12 = Show(caps.LcdOverdrive || (hw?.SupportsLcdOverdrive ?? false));
 		bool flag13 = flag10 | flag11 | flag12;
 		bool flag14 = Show(AppConfig.Is("force_liquid_cooling_menu") || caps.LiquidCooling || (hw?.SupportsLiquidCooling ?? false));
@@ -8264,11 +8292,33 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		if (_calibSwitch != null)
 		{
-			_calibSwitch.Visible = audit | flag11;
+			// 2026-10-16：开关用**严格版** flag11GcuOnly —— 它的 Click 整段包在
+			// `if (svc != null && hw != null && hw.IsGcuConnected)` 里（见 :2375），
+			// 宝龙达下点了不会有任何下发（开关会拨动但状态与硬件不一致）⇒ 必须隐藏。
+			// 能力位铁律：能点的就必须有反应。
+			_calibSwitch.Visible = audit | flag11GcuOnly;
 		}
 		if (_calibSettingsBtn != null)
 		{
 			_calibSettingsBtn.Visible = audit | flag11;
+		}
+		// 2026-10-16：校色行（row 3）与色彩增强行（row 4）改由**行级可见性**统一管理 ——
+		// 整行含标题同进同退，且 SetScreenRowControls 会把行高一起清零并扣减父容器高度 ⇒ 不留空档。
+		// 此前这两行没有任何判据管过（原因见 ScreenRowHeights 的注释：数组只有 3 个元素 ⇒ row 3/4 越界 return）。
+		// ⚠️ 只在宝龙达下启用：非宝龙达保持改动前的原样（那两行恒显示），逐位不变。
+		if (hw?.UsesBaolongda ?? false)
+		{
+			// 校色行：整行跟放宽版 flag11。宝龙达下它恒为真 ⇒ 整行显示、空壳（标题在而按钮不在）随之消失；
+			// 将来若判据变假，则整行连标题一起消失，不会再出现"有标题没按钮"。
+			SetScreenRowVisible(3, flag11, new string[1] { "rowColorCalibration" });
+			// 色彩增强行：整行隐藏（含标题 effectCaption）。
+			// 判据 DisplayEffectOn.HasValue 等价于"GCU 上报过 Display/Status" —— 它全仓只有一个赋值点，
+			// 在 MechrevoHw.OnDisplayStatus（MechrevoHw.cs:5590，MQTT payload 处理）⇒ 宝龙达下恒为 null。
+			// 为什么整行隐藏而不是保留：ApplyDisplayEffectProfile / SetDisplayEffectSwitch 全是往
+			// `Display/Control` 发 MQTT、profile 数据也来自 GCU 上报，**没有任何本地路径** ⇒ 宝龙达上确实
+			// 做不了；而它此前"整行显示、开关点下去会回弹"（:2720 判 IsGcuConnected 后走 else 把开关拨回去）
+			// 恰好违反"能点的就必须有反应"。
+			SetScreenRowVisible(4, hw?.DisplayEffectOn.HasValue ?? false, new string[1] { "rowDisplayEffect" });
 		}
 		SetScreenRowVisible(2, flag10, new string[3] { "labelScreenBrightness", "sliderScreenBrightness", "labelScreenBrightnessValue" });
 		if (_hzSegTable != null)
@@ -16490,6 +16540,40 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	}
 
 	/// <summary>
+	/// 「自定义 ICC」这一档是否可用（**唯一来源**：下拉的填充与可选性共用这一个判据）。
+	/// <para>该档走的是**纯本地路径**：SettingsForm 的自定义 ICC 分支（:2516）→
+	/// <c>IccHelper.ApplyIcc</c> → <c>WcsAssociateColorProfileWithDevice</c>
+	/// （Windows 标准 API / mscms.dll），与 GCU 无关 ⇒ 宝龙达（非 GCU）后端上它同样可用，
+	/// 不该因为"GCU 没上报档位数"就被藏掉。</para>
+	/// <para>⚠️ "必须有本地 ICC 文件"是硬要求、不是保守：选这一档时若文件缺失，
+	/// :2533 会回退成 <c>value = 1</c> 并调 <c>SetColorCalibration(1)</c>（那是 GCU 路径）
+	/// ⇒ 宝龙达上必然失败。只有文件真的在，这一档才是纯本地、才该出现且可选。</para>
+	/// <para>⚠️ 第一个分支（<c>calib_custom_on</c>）保持既有语义不变；后两个分支只会在
+	/// "本地已有自定义 ICC 文件"时成立，而那正是改动前用户打开同一开关后能走到的同一档
+	/// ⇒ 非宝龙达机型不受影响。</para>
+	/// </summary>
+	internal static bool CustomIccTierAvailable()
+	{
+		if (AppConfig.Is("calib_custom_on"))
+		{
+			return true;
+		}
+		string name = AppConfig.GetString("calib_custom_icc");
+		if (string.IsNullOrWhiteSpace(name))
+		{
+			return false;
+		}
+		try
+		{
+			return File.Exists(Path.Combine(IccHelper.CustomIccDir, name));
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>
 	/// 档位回读同步能力（用户口径：40 系 GCU 不支持回读、50 系支持回读开关）：
 	/// 只有 50 系且 GCU 真的上报过档位字段才允许回读覆盖 UI；40 系一律不回读。
 	/// </summary>
@@ -16567,9 +16651,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			{
 				calibCombo.Items.Add(new KeyValuePair<string, int>("AdobeRGB", 4));
 			}
-			if (AppConfig.Is("calib_custom_on"))
+			if (CustomIccTierAvailable())
 			{
-				// 自定义校色开关开启时追加“自定义”项（经 Windows ICC，不走 GCU）
+				// 「自定义」项（经 Windows ICC，不走 GCU）。
+				// 2026-10-16：判据由 `calib_custom_on` 改为 CustomIccTierAvailable()，多认一条
+				// "本地已有自定义 ICC 文件" —— 宝龙达（非 GCU）下 GCU 不上报档位数（CalibrationLevel() <= 1），
+				// 若不认文件，用户即使在「设置」里导入了 ICC，下拉也永远只有「默认」一项。
 				calibCombo.Items.Add(new KeyValuePair<string, int>(Strings.CustomCalibration, 999));
 			}
 			calibCombo.SelectedIndex = CalibComboIndexFor(currentMode, calibCombo);
@@ -16578,7 +16665,13 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			// 避免做出一个“看着能选其实无效”的控件；开着时（多出 ICC 档）照常可选。
 			// 注意：40 系二分语义不变——校准/不校准仍由开关表达、仍不做回读。
 			calibCombo.Visible = true;
-			calibCombo.Enabled = CalibrationComboInteractive(_calibSwitch?.Checked ?? true);
+			// 2026-10-16：宝龙达下「屏幕校色」开关已被隐藏（它没有非 GCU 路径，见 flag11GcuOnly 处）
+			// ⇒ 不能拿它的 Checked 当门，否则下拉会因为"那颗隐藏的开关没勾"而永久灰掉、
+			// 用户根本选不了「自定义」。开关**可见**时与改动前逐位相同（仍取 Checked）；
+			// 开关不可见时视为不设门。构建期 _calibSwitch 尚为 null ⇒ 也走"不设门"，与改动前的
+			// `?? true` 结果一致。
+			bool enabledBySwitch = (_calibSwitch?.Visible ?? false) ? (_calibSwitch?.Checked ?? true) : true;
+			calibCombo.Enabled = CalibrationComboInteractive(enabledBySwitch);
 		}
 		finally
 		{
@@ -16600,7 +16693,9 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	/// </summary>
 	private static bool CalibrationComboInteractive(bool enabledBySwitch = true)
 	{
-		return (!CalibrationBinaryOnly() || AppConfig.Is("calib_custom_on")) && enabledBySwitch;
+		// 2026-10-16：第二项由 `calib_custom_on` 改为 CustomIccTierAvailable() —— 与
+		// RebuildCalibrationItems 的**填充判据同源**，避免出现"项加进来了却说不可选"（或反过来）的口径打架。
+		return (!CalibrationBinaryOnly() || CustomIccTierAvailable()) && enabledBySwitch;
 	}
 	
 	/// <summary>校色配置下拉的当前索引（关闭由开关独立控制，下拉不再含“关闭”项）。</summary>
