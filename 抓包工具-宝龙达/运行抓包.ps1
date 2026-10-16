@@ -18,12 +18,14 @@ $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 # ⭐⭐ 工具版本（⭐ 每次改脚本都要升，⭐ 并写进 06-采集环境.txt ⇒ ⭐ 以后一眼就能看出机主用的是哪一版）
-$script:KitVersion  = '2026-10-16.4'
-$script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,ReadOnly'
+$script:KitVersion  = '2026-10-16.5'
+$script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,AccessDenied-Hint,PerMode-Interactive,ReadOnly'
 #   2026-10-16.1  首版（六节 + 强/弱相关筛选）
 #   2026-10-16.2  ＋ MIFS-Probe：MICommonInterface 实例枚举与只读试调用
 #   2026-10-16.3  ＋ 修设备树过滤（漏掉 ACPI\PNP0C14\…）+ 修 06 节一处引号 bug + 版本标记
 #   2026-10-16.4  ＋ AccessDenied 单独识别 + 明确提示「请用管理员重跑」（真机实测：非管理员会 AccessDenied）
+#   2026-10-16.5  ＋ ⭐ **可选的「逐模式实测」**（第 7 节：你切档位、脚本在每档读一次）+
+#                    收尾说明改写（⭐ 起因：机主反馈「脚本一下就跑完了，我还没调完」⇒ 说明写得不清楚 ✅）
 
 $stamp   = Get-Date -Format 'yyyyMMdd-HHmmss'
 $outRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) ("宝龙达抓包-" + $stamp)
@@ -213,6 +215,8 @@ Write-Section '02-ACPI-WMI接口.txt' 'ACPI / WMI 接口探测（本机有哪些
 		foreach ($inst in $insts) {
 			$n++
 			Add-Line $L ("  ⭐ 实例 #" + $n + " : " + $inst.Path.RelativePath)
+			# ⭐ 记下实例路径 ⇒ 后面的「逐模式实测」（第 7 节）直接复用，⛔ 不重复发现
+			if (-not $script:MifsInstancePath) { $script:MifsInstancePath = $inst.Path.RelativePath }
 			try { foreach ($p in $inst.Properties) { if ($p.Name -notmatch '^__') { Add-Line $L ("      属性 " + $p.Name + " = " + ($p.Value)) } } } catch {}
 			$probes = @(
 				@{ No = 8;  Name = 'SystemPerMode（性能模式）';     Hint = '参考口径：OutData[4] = 0平衡 / 1增强 / 2静音' },
@@ -446,6 +450,118 @@ Write-Host ""
 Write-Host "采集完成 ✅" -ForegroundColor Green
 Write-Host ""
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. ⭐ 逐模式实测（**可选 · 交互式 · 需要管理员**）
+# ⭐ 2026-10-16.5 新增 —— 起因：机主反馈「脚本一下就跑完了，我还没调完」
+#    ⇒ ⭐ 说明我们的**说明写得不清楚**（脚本是全自动的、一分钟就完 ✅），
+#       而且**缺少一个"让你慢慢切档位、脚本在每档读一次"的环节** ✅
+#    ⇒ 本节补上：⭐ 你在每个档位上停一下，脚本读一次「模式原始值 / 风扇转速 / CPU温度 / 风扇开关 / LOGO灯」
+#       ⭐ 这样我们就能知道「静音 / 平衡 / 狂暴 各对应什么风扇与温度」✅
+#    ⚠️ 需要管理员权限（否则读不到实例 ⇒ 本节会明确告诉你）✅
+# ─────────────────────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "──────────────────────────────────────────────" -ForegroundColor Cyan
+Write-Host " ⭐ 可选的「逐模式实测」（⭐ 建议做，但不是必须）" -ForegroundColor Cyan
+Write-Host "──────────────────────────────────────────────" -ForegroundColor Cyan
+Write-Host " 这一节会让你**亲自切档位**，脚本在每个档位读一次硬件值。" -ForegroundColor Gray
+Write-Host " 这样我们能看出「静音 / 平衡 / 狂暴 各对应什么风扇与温度」。" -ForegroundColor Gray
+Write-Host " ⚠️ 需要**管理员权限**；⛔ 不做也完全没关系（上面 6 节已是主要材料）" -ForegroundColor Gray
+Write-Host " ⭐ 不做的话：直接按回车跳过 ✅" -ForegroundColor Gray
+Write-Host ""
+
+$isAdminNow = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+# ⭐ 定义一个"读某个功能号"的小工具（⭐ 只读；⭐ 第 7 节与第 2 节同源口径 ✅）
+function Read-MifsFunction {
+	param([string]$InstancePath, [int]$FunctionNo)
+	$result = @{ Ok = $false; Hex = ''; Raw = -1; Error = '' }
+	try {
+		$mo = New-Object System.Management.ManagementObject('root\WMI', $InstancePath, $null)
+		$ip = $mo.GetMethodParameters('MiInterface')
+		$buf = New-Object byte[] 32
+		$buf[1] = 250          # ⭐ 只读：Get
+		$buf[3] = [byte]$FunctionNo
+		$ip['InData'] = $buf
+		$op = $mo.InvokeMethod('MiInterface', $ip, $null)
+		$out = $op['OutData']
+		if ($out) {
+			$result.Ok = $true
+			$result.Hex = (($out | ForEach-Object { $_.ToString('X2') }) -join ' ')
+			if ($out.Length -gt 4) { $result.Raw = $out[4] }
+		}
+	} catch {
+		$result.Error = $_.Exception.Message
+	}
+	return $result
+}
+
+$doInteractive = $false
+if (-not $isAdminNow) {
+	Write-Host " ⚠️ 当前**不是管理员** ⇒ 逐模式实测**读不到硬件值**（会报 Access denied）⚠️" -ForegroundColor Yellow
+	Write-Host "    ⇒ ⭐ 想要这一节，请**关掉本窗口**、用【管理员身份】重新运行本脚本 ✅" -ForegroundColor Yellow
+} else {
+	try {
+		$ans = Read-Host " 要做逐模式实测吗？(输入 y 做 / 直接回车跳过)"
+		if ($ans -and $ans.Trim().ToLower().StartsWith('y')) { $doInteractive = $true }
+	} catch {}
+}
+
+if ($doInteractive) {
+	WriteSection '07-逐模式实测.txt' '逐模式实测（⭐ 每个档位各读一次）' {
+		param($L)
+		Add-Line $L "⭐ 本节的读法：⭐ 只读（Get=250），⛔ 一个 Set 都不发 ✅"
+		Add-Line $L ("⭐ 使用实例：⭐ " + $script:MifsInstancePath)
+		Add-Line $L ""
+
+		# ⭐ 档位定义（⭐ 参考口径：⭐ MIFS 原始值 0=平衡 · 1=增强 · 2=静音 · 3=疯狂/游戏）
+		$modes = @(
+			@{ Key = 'bal'; Label = '平衡 / 均衡（Balance）'; RawExpect = '0' },
+			@{ Key = 'perf'; Label = '增强 / 性能（Performance）'; RawExpect = '1' },
+			@{ Key = 'quiet'; Label = '静音 / 办公（Quiet）'; RawExpect = '2' },
+			@{ Key = 'game'; Label = '疯狂 / 游戏（Fullspeed，若你的机器有第 4 档）'; RawExpect = '3' }
+		)
+		foreach ($m in $modes) {
+			Add-Line $L ("── ⭐ 请切到【" + $m.Label + "】（参考原始值 " + $m.RawExpect + "）──")
+			Write-Host ""
+			Write-Host (" ⭐ 请把机器切到【" + $m.Label + "】" ) -ForegroundColor Yellow
+			Write-Host "    ⭐ 怎么切：⭐ 官方控制台里选它；" -ForegroundColor Gray
+			Write-Host "       或 ⭐ 用键盘热键切换（机械革命常见是 ⭐ Fn + Q，按几次循环换档）" -ForegroundColor Gray
+			Write-Host "    ⭐ 切好之后**等 3 秒**（让风扇稳定），再回来按回车 ✅" -ForegroundColor Gray
+			if ($m.Key -eq 'game') {
+				Read-Host "    若没有第 4 档，直接按回车跳过这一档"
+			} else {
+				Read-Host "    切好并等 3 秒后，按回车继续"
+			}
+
+			$r8 = Read-MifsFunction $script:MifsInstancePath 8
+			$r13 = Read-MifsFunction $script:MifsInstancePath 13
+			$r22 = Read-MifsFunction $script:MifsInstancePath 22
+			$r20 = Read-MifsFunction $script:MifsInstancePath 20
+			$r15 = Read-MifsFunction $script:MifsInstancePath 15
+
+			Add-Line $L ("    ⭐ 功能号 8  性能模式   : Raw=" + $r8.Raw + "   OutData = " + $r8.Hex)
+			Add-Line $L ("    ⭐ 功能号 13 风扇转速   : OutData = " + $r13.Hex)
+			if ($r13.Hex.Length -ge 17) {
+				$parts = $r13.Hex -split ' '
+				$f1 = [Convert]::ToInt32($parts[5] + $parts[4], 16)
+				$f2 = [Convert]::ToInt32($parts[7] + $parts[6], 16)
+				Add-Line $L ("       ⇒ ⭐ 第1个风扇 ≈ " + $f1 + " RPM · ⭐ 第2个风扇 ≈ " + $f2 + " RPM")
+				if ($parts.Length -ge 12) {
+					$f3 = [Convert]::ToInt32($parts[11] + $parts[10], 16)
+					Add-Line $L ("       ⇒ ⭐ 第3个风扇（若有）≈ " + $f3 + " RPM")
+				}
+			}
+			Add-Line $L ("    ⭐ 功能号 22 CPU温度   : Raw=" + $r22.Raw + "  （⭐ 0/255 视为无效）   OutData = " + $r22.Hex)
+			Add-Line $L ("    ⭐ 功能号 20 风扇手动开关: Raw=" + $r20.Raw + "   OutData = " + $r20.Hex)
+			Add-Line $L ("    ⭐ 功能号 15 LOGO灯    : Raw=" + $r15.Raw + "   OutData = " + $r15.Hex)
+			if ($r8.Error) { Add-Line $L ("    ⚠️ 读取时有错误：⭐ " + $r8.Error) }
+			Add-Line $L ""
+		}
+		Add-Line $L "⭐ 说明：⭐ 若某个档位读到的 功能号 8 原始值与上面「参考原始值」不一致，"
+		Add-Line $L "   ⇒ ⭐ 那正是我们要的信息（⭐ 说明该机的档位编号与我们预期不同）✅ 请照实保留 ✅"
+	}
+}
 # ─────────────────────────────────────────────────────────────────────────────
 # 打包成 zip（⭐ 方便直接发回）
 # ─────────────────────────────────────────────────────────────────────────────
@@ -463,8 +579,13 @@ try {
 }
 
 Write-Host ""
-Write-Host "⭐ 另外还有两件事请照《要抓什么.txt》做（脚本抓不到）：" -ForegroundColor Yellow
-Write-Host "   1) 用厂商控制台**依次切换性能档位/风扇/灯效**，各停 3 秒（我们要看它发了什么）" -ForegroundColor Yellow
-Write-Host "   2) 若是灯效问题，请录一段短视频" -ForegroundColor Yellow
+Write-Host "⭐⭐ 说明（⭐ 请读一下，⭐ 免得误会）：" -ForegroundColor Cyan
+Write-Host "   ① ⭐ 上面 6 节 + 可选的逐模式实测，⭐ 就是我们要的**主要材料** ✅" -ForegroundColor Gray
+Write-Host "   ② ⭐ 脚本本身**一分钟就跑完**，⭐ 这是**正常的** —— 它不需要你慢慢操作 ✅" -ForegroundColor Gray
+Write-Host "   ③ ⚠️ 「切档位 / 切灯光」那类操作**不是必须的**；" -ForegroundColor Gray
+Write-Host "      真正需要你操作的只有 ⭐ **那个可选的「逐模式实测」**（⭐ 你切、它读）✅" -ForegroundColor Gray
+Write-Host "   ④ ⭐ 若你愿意多做一点（可选）：⭐ 用**官方控制台**切一遍档位与灯光，" -ForegroundColor Gray
+Write-Host "      再把 `05-日志位置清单.txt` 里列出的**厂商日志文件夹**复制进来 ✅" -ForegroundColor Gray
+Write-Host "      （⚠️ 没装官方控制台就跳过这一步 ✅ 不影响主线 ✅）" -ForegroundColor Gray
 Write-Host ""
 Read-Host "按回车关闭"
