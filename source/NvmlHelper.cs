@@ -85,6 +85,14 @@ public static class NvmlHelper
 
 	private static long? _snapshotTotalMb;
 
+	// ⭐⭐ 2026-10-16（0.291.9 · "接传感器" · ⭐ 通用缺口）：GPU 温度快照。
+	//    ⭐ 起因：⭐ 用户确认「⭐ 对于所有机型都是这样子」—— ⭐ 即
+	//      ⭐ ① LM 自带的 LHM 一旦检测到 NVIDIA 就**关掉 GPU 那支**（⭐ NVML 崩溃修复 ⚠️）
+	//      ⭐ ② 宝龙达协议里**没有 GPU 温度功能号** ⚠️
+	//    ⇒ ⭐ ⭐ **GPU 温度对所有机型都是缺口** ⇒ ⭐ 补在这里（⭐ 通用、⭐ 与后端无关 ✅）
+	//    ⚠️ 沿用本类既有加固：⭐ 句柄每次现取 · ⭐ 模块存活守卫 · ⭐ 失败隔离 · ⭐ 快照 TTL ✅
+	private static uint? _snapshotTempCelsius;
+
 	[DllImport("nvml.dll")]
 	private static extern int nvmlInit_v2();
 
@@ -99,6 +107,19 @@ public static class NvmlHelper
 
 	[DllImport("nvml.dll")]
 	private static extern int nvmlDeviceGetMemoryInfo(nint device, out nvmlMemory_t memory);
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16：⭐ <c>nvmlDeviceGetTemperature</c>（⭐ NVML 官方导出 ✅）。
+	/// <para>⭐ <paramref name="sensorType" /> 传 ⭐ <see cref="NvmlTemperatureGpu" />=<c>0</c>
+	/// （⭐ `NVML_TEMPERATURE_GPU` ✅）。</para>
+	/// <para>⚠️ 只取 GPU **核心**温度 —— ⭐ 热点/显存那类要么是别的导出、⭐ 要么需要更高权限，
+	/// ⭐ 这里只补"界面最需要的那个数" ✅。</para>
+	/// </summary>
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetTemperature(nint device, int sensorType, out uint tempCelsius);
+
+	/// <summary>⭐ `NVML_TEMPERATURE_GPU`（⭐ NVML 头文件里的枚举值 = 0 ✅）。</summary>
+	private const int NvmlTemperatureGpu = 0;
 
 	/// <summary>(c) 已降级：隔离期内或模块已失效，调用方应完全跳过本类（一次原生调用都不要发）。</summary>
 	internal static bool Unavailable
@@ -125,6 +146,26 @@ public static class NvmlHelper
 		lock (_lock)
 		{
 			InitLocked();
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16：⭐ **GPU 核心温度（摄氏度）** —— ⭐ 补"所有机型都缺的那一项" ✅
+	/// <para>⭐ 用途：⭐ 宝龙达机型没有 GCU 推送、⭐ 而 LHM 的 GPU 那支在检测到 NVIDIA 时被关
+	/// ⇒ ⭐ GPU 温度只能从这里来 ✅；⭐ 老同方/GCU 机型若 GCU 报了温度则以 GCU 为准（⭐ 调用方可自行取舍 ✅）。</para>
+	/// <para>⭐ 沿用本类加固：⭐ 快照 TTL 复用 · ⭐ 失败计数与隔离 · ⭐ 拿不到句柄就绝不往下传 ✅
+	/// ⇒ ⭐ 取不到时返回 <c>null</c>（⭐ 调用方跳过即可，⛔ 不会抛 ✅）。</para>
+	/// </summary>
+	public static float? GetGpuTemperature(uint gpuIndex = 0u)
+	{
+		lock (_lock)
+		{
+			RefreshLocked(gpuIndex);
+			if (!_snapshotTempCelsius.HasValue)
+			{
+				return null;
+			}
+			return _snapshotTempCelsius.Value;
 		}
 	}
 
@@ -379,13 +420,20 @@ public static class NvmlHelper
 				_snapshotUsedMb = (long)(memory.used / 1048576);
 				_snapshotTotalMb = (long)(memory.total / 1048576);
 			}
+			// ⭐⭐ 2026-10-16：⭐ GPU 核心温度（⭐ 与功耗/显存同一把句柄、同一次快照 ✅）
+			//    ⭐ 合理性校验：⭐ (0, 150] 摄氏度 —— ⭐ NVML 取不到时常返回 0 ⚠️，⭐ 那不算有效温度 ✅
+			int num4 = nvmlDeviceGetTemperature(device, NvmlTemperatureGpu, out uint tempCelsius);
+			if (num4 == NVML_SUCCESS && tempCelsius > 0 && tempCelsius <= 150)
+			{
+				_snapshotTempCelsius = tempCelsius;
+			}
 			// 只要有一个查询成功就说明句柄/上下文是活的（功耗返回 0 是低功耗态，不是失败）。
-			if (num2 == NVML_SUCCESS || num3 == NVML_SUCCESS)
+			if (num2 == NVML_SUCCESS || num3 == NVML_SUCCESS || num4 == NVML_SUCCESS)
 			{
 				NoteSuccessLocked();
 				return;
 			}
-			NoteFailureLocked("nvmlDeviceGetPowerUsage/nvmlDeviceGetMemoryInfo", num2);
+			NoteFailureLocked("nvmlDeviceGetPowerUsage/nvmlDeviceGetMemoryInfo/nvmlDeviceGetTemperature", num2);
 		}
 		catch (SEHException ex)
 		{
@@ -443,6 +491,8 @@ public static class NvmlHelper
 		_snapshotPower = null;
 		_snapshotUsedMb = null;
 		_snapshotTotalMb = null;
+		// ⭐ 2026-10-16：⭐ 温度同样要作废（⭐ 否则会拿旧温度冒充新读数 ⚠️）
+		_snapshotTempCelsius = null;
 	}
 
 	internal static string DisabledReason => _disabledReason;

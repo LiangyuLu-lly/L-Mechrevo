@@ -310,6 +310,27 @@ public static class HardwareControl
 		catch
 		{
 		}
+		// ── ③ GPU 温度：⭐ 从加固过的 NVML 取 ✅ ──
+		//   ⭐⭐ 依据用户 2026-10-16 的确认：⭐ 「⭐ 对于所有机型都是这样子」——
+		//      ⭐ 即"⭐ LHM 检测到 NVIDIA 就关掉 GPU 那支 ⚠️ ＋ ⭐ 宝龙达协议没有 GPU 温度功能号 ⚠️"
+		//      ⭐ **是所有机型共同的缺口** ⇒ ⭐ 所以补在**通用**位置（⭐ 与后端无关 ✅）：
+		//      ⭐ 只要装了 NVIDIA 驱动、⭐ NVML 可用，⭐ 任何后端下都能拿到 GPU 核心温度 ✅
+		//   ⚠️ 仅当当前没有别的来源（⭐ 即 `gpuTemp <= 0`）时才填 —— ⭐ GCU 机型若 GCU 报了温度，
+		//      ⭐ 那个更"官方"、⭐ 优先保留 ✅
+		try
+		{
+			if (gpuTemp <= 0 && !NvmlHelper.Unavailable)
+			{
+				float? fromNvml = NvmlHelper.GetGpuTemperature();
+				if (fromNvml.HasValue && fromNvml.Value > 0f)
+				{
+					gpuTemp = (int)Math.Round(fromNvml.Value);
+				}
+			}
+		}
+		catch
+		{
+		}
 	}
 
 	public static void AttachMechrevoHw(MechrevoHw hw)
