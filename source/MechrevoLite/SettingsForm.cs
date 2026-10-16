@@ -2273,7 +2273,7 @@ public class SettingsForm : RForm
 			AutoSize = false,
 			Dock = DockStyle.Fill,
 			TextAlign = ContentAlignment.MiddleRight,
-			Font = new Font("Consolas", UiStyleCaption(), FontStyle.Regular, GraphicsUnit.Point),
+			Font = UiStyleCaptionFont(),
 			MinimumSize = new Size(44, 0),
 			Margin = Padding.Empty,
 			BackColor = bufferedPanel.BackColor
