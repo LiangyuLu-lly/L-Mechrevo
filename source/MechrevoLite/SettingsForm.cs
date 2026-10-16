@@ -8301,7 +8301,26 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		ApplyPerfConfigRowVisibility();
 		_gpuRowLayout = (hw?.GpuRowLayout ?? GpuRowLayout.Hidden);
 		panelGPU.Visible = flag21;
-		VisualiseGPUButtons(flag18, flag19);
+		// ⭐⭐ 2026-10-16（宝龙达适配 · 用户原话「⭐ GPUmode接入 宝龙达机器就显示两个按钮就行」）：
+		//   ⭐ 宝龙达协议 ⭐ **只有两个**显卡模式（⭐ 功能号 9 ✅）：
+		//      ⭐ 0 = 混合模式（⭐ 对应按钮「⭐ 标准」✅）· ⭐ 1 = 独显直连（⭐ 对应按钮「⭐ 独显直连」✅）
+		//   ⇒ ⭐ 所以 ⭐ **隐藏「核显/Eco」那一颗** ⭐ ⇒ ⭐ 正好剩两个 ✅
+		//   ⭐ 实现依据：⭐ `VisualiseGPUButtons(eco, ultimate)` 的三行是
+		//      ⭐ `buttonEco.Visible = eco` · ⭐ `buttonStandard.Visible = eco | ultimate` ·
+		//      ⭐ `buttonUltimate.Visible = ultimate` ✅
+		//      ⇒ ⭐ 传 ⭐ (eco: false, ultimate: true) ⭐ **刚好就是"⭐ 混合 ＋ ⭐ 独显直连"⭐ 两颗** ✅
+		//   ⚠️ 分支**以 `UsesBaolongda` 开头** ⇒ ⭐ 同方 / GCU 机型走 else ⭐ **逐字原样**（⭐ 零影响 ✅）
+		if (hw != null && hw.UsesBaolongda)
+		{
+			VisualiseGPUButtons(eco: false, ultimate: true);
+			Logger.WriteLineIfChanged("baolongda-gpu-buttons",
+				"宝龙达显卡模式：⭐ 只显示两个按钮（⭐ 混合 ＋ ⭐ 独显直连 ✅）⇒ ⭐ 已隐藏「核显/Eco」那一颗"
+				+ "（⭐ 因为宝龙达协议只有功能号 9 的 0/1 两个取值 ✅）");
+		}
+		else
+		{
+			VisualiseGPUButtons(flag18, flag19);
+		}
 		MiniledOffered = flag22;
 		buttonMiniled.Visible = flag22;
 		// 2026-10-13（miniledgcu）：MiniLED 取证行 —— 改前这一整条判据零日志，诊断包里无从自证

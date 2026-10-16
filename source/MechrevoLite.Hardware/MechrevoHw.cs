@@ -3018,7 +3018,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		bool ok = BaolongdaFanCurveStore.Save(settings);
 		if (!settings.Enabled)
 		{
-			RestoreBaolongdaFanFirmwareControl();
+					// ⭐⭐ 2026-10-16（"回读"需求）：⭐ 启动时把"⭐ 本机哪些功能号是通的"⭐ 打**一次** ✅
+		//   ⭐ 为什么不周期打：⭐ 快照里的温度/转速每 3 秒都变 ⚠️ ⇒ ⭐ 周期打就是刷屏 ❌
+		//   ⭐ 这一份清单 ⭐ **正好也是诊断包要的内容**（⭐ 让机主一眼看出本机支持情况 ✅）
+		try
+		{
+			BaolongdaStateSnapshot supportSnap = BaolongdaStateSnapshot.Capture(_baolongda?.Wmi);
+			foreach (string supportLine in supportSnap.DescribeSupportList())
+			{
+				Logger.WriteLine("宝龙达状态支持清单：" + supportLine);
+			}
+			Logger.WriteLine("宝龙达状态支持清单（⭐ 说明）：⭐ 上面的 ✅ 表示**本机该功能号可读** ✅；"
+				+ "⚠️ 表示读不到 ⇒ ⭐ 相关的界面开关**应当隐藏**（⛔ 免得点了没反应 ✅）");
+		}
+		catch (Exception exSnap)
+		{
+			Logger.WriteLine("宝龙达状态支持清单：⭐ 采集失败（已吞掉）：" + exSnap.Message);
+		}RestoreBaolongdaFanFirmwareControl();
 		}
 		else
 		{
@@ -3293,7 +3309,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//   ⚠️ 为什么在**启动**就要做：⭐ 上次若是**被强杀**（⭐ 任务管理器 / ⭐ 崩溃 ✅）
 		//      ⇒ ⭐ 风扇会**停在我们上次写的转速上** ⚠️（⭐ 因为"手动开关"是写在 EC 里的、⭐ 会留着 ✅）
 		//   ⭐ 本方法**先读再决定**：⭐ 手动开关本来就关着 ⇒ ⛔ **一个字节都不写** ✅
-		RestoreBaolongdaFanFirmwareControl();
+				// ⭐⭐ 2026-10-16（"回读"需求）：⭐ 启动时把"⭐ 本机哪些功能号是通的"⭐ 打**一次** ✅
+		//   ⭐ 为什么不周期打：⭐ 快照里的温度/转速每 3 秒都变 ⚠️ ⇒ ⭐ 周期打就是刷屏 ❌
+		//   ⭐ 这一份清单 ⭐ **正好也是诊断包要的内容**（⭐ 让机主一眼看出本机支持情况 ✅）
+		try
+		{
+			BaolongdaStateSnapshot supportSnap = BaolongdaStateSnapshot.Capture(_baolongda?.Wmi);
+			foreach (string supportLine in supportSnap.DescribeSupportList())
+			{
+				Logger.WriteLine("宝龙达状态支持清单：" + supportLine);
+			}
+			Logger.WriteLine("宝龙达状态支持清单（⭐ 说明）：⭐ 上面的 ✅ 表示**本机该功能号可读** ✅；"
+				+ "⚠️ 表示读不到 ⇒ ⭐ 相关的界面开关**应当隐藏**（⛔ 免得点了没反应 ✅）");
+		}
+		catch (Exception exSnap)
+		{
+			Logger.WriteLine("宝龙达状态支持清单：⭐ 采集失败（已吞掉）：" + exSnap.Message);
+		}RestoreBaolongdaFanFirmwareControl();
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath});"
 			+ $" 功耗墙范围 PL1/PL2=[{Pl1Minimum},{Pl1Maximum}]W · 温度墙=[{TccMinimum},{TccMaximum}]℃（⭐ 本地记忆 PL1={Pl1} PL2={Pl2} 温度墙={TccTarget} ⚠️ 非从机器读回）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
@@ -3305,11 +3337,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_legacyTimer = new Timer(delegate
 		{
 			_ = RefreshLegacyModeAsync();
-			RefreshBaolongdaSensors();
+			RefreshBaolongdaSensors(); RefreshBaolongdaSwitchStates();
 		}, null, LegacyRefreshIntervalMs, LegacyRefreshIntervalMs);
 		await RefreshLegacyModeAsync().ConfigureAwait(continueOnCapturedContext: false);
 		// ⭐ 立刻先读一次传感器（⭐ 免得界面上风扇/温度空着等 3 秒 ✅）
-		RefreshBaolongdaSensors();
+		RefreshBaolongdaSensors(); RefreshBaolongdaSwitchStates();
 		RaiseIsolated(CapabilitiesChanged, "CapabilitiesChanged");
 		NotifyConnectionReady();
 	}
@@ -3333,6 +3365,65 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// —— ⭐ 这一条**只来自参考实现、⛔ 还没真机交叉验证** ⚠️（⭐ 真机两组读数太接近，⭐ 分不出来 ✅）
 	/// ⇒ ⭐ 记在这里，⭐ 等以后加负载对比就能确认 ✅。</para>
 	/// </summary>
+	/// <summary>⭐ 最近一次回读的状态快照（⭐ `null` = 还没读过 ✅）。</summary>
+	internal BaolongdaStateSnapshot BaolongdaState { get; private set; }
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（⭐ 用户「⭐ 回读功能没有我们需要做的」）：⭐ **周期性状态回读** ✅
+	/// <para>⭐⭐ 解决的缺口：⭐ 宝龙达的开关（⭐ Fn 锁 · ⭐ 触摸板锁 · ⭐ LOGO 灯 · ⭐ 键盘灯 · ⭐ 风扇手动 ⚠️）
+	/// ⭐ **只有主动读才知道** ⚠️ ⇒ ⭐ 用户自己按键盘改了状态，⭐ 我们**不会知道** ❌
+	/// ⇒ ⭐ 界面显示会**过时** ❌。⭐ 本方法挂在**已有的 3 秒定时器**上，⭐ 把真实状态同步回来 ✅。</para>
+	/// <para>⭐ <b>三条原则</b>：⭐ ① ⭐ **只发 Get(=250)** ✅（⛔ 一个 Set 都不发 ✅）·
+	/// ⭐ ② ⭐ 走 ⭐ `TryReadByteChecked`（⭐ 带 `OutData[3]` 回显校验 ✅）·
+	/// ⭐ ③ ⭐ **只在读成功时才覆盖**（⭐ 读失败 ⛔ **不把已有值刷成 false** ⚠️ —— ⭐ 那会把真状态抹掉 ✅）。</para>
+	/// <para>⭐ 非宝龙达 ⇒ ⭐ 直接返回（⭐ `_baolongda` 为 `null` ✅）⇒ ⭐ GCU/同方**一行不改** ✅。</para>
+	/// </summary>
+	private void RefreshBaolongdaSwitchStates()
+	{
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return;
+		}
+		try
+		{
+			BaolongdaStateSnapshot snap = BaolongdaStateSnapshot.Capture(wmi);
+			BaolongdaState = snap;
+			// ⭐⭐ 同步进 `QuickSwitches`（⭐ 界面读的就是它 ✅）
+			//   ⚠️ 映射只挑**语义确定**的三个 ✅ —— ⭐ 其余留在快照里（⭐ 诊断包会用 ✅），
+			//      ⛔ 不乱映射（⭐ 例如功能号 10 是"键盘灯状态"，
+			//         ⚠️ **不等于**实体灯带 `lightbar` ⚠️ ⇒ ⭐ 映射过去就是错的 ❌）
+			SyncBaolongdaQuickSwitch("logolight", snap.LogoLight);
+			SyncBaolongdaQuickSwitch("touchpad", snap.TouchpadLock);
+			SyncBaolongdaQuickSwitch("fnkey", snap.FnLock);
+			// ⚠️ 刻意**不打**周期性日志：⭐ 快照里的温度/转速每 3 秒都变 ⚠️
+			//    ⇒ ⭐ 打日志就是刷屏 ❌（⭐ 支持清单在启动时打一次，⭐ 见 ApplyBaolongdaBackendAsync ✅）
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineIfChanged("baolongda-state-fail", "宝龙达状态回读失败（已吞掉）：" + ex.Message);
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 把一个回读值同步进 <see cref="QuickSwitches" />（⭐ 约定：⭐ 非 0 即 true ✅）。
+	/// <para>⚠️ <paramref name="value" /> 为 <c>null</c>（⭐ 读不到 ✅）⇒ ⭐ **什么都不做** ✅
+	/// —— ⭐ 这是本机制的**关键纪律**：⭐ ⛔ 读失败不能把有效值刷成 false ⚠️。</para>
+	/// </summary>
+	private void SyncBaolongdaQuickSwitch(string key, int? value)
+	{
+		if (!value.HasValue || string.IsNullOrEmpty(key))
+		{
+			return;
+		}
+		// ⭐ 只在**值真的变了**时才写＋记日志 ⇒ ⭐ 既省事又便于回查"⭐ 谁改的" ✅
+		bool next = value.Value != 0;
+		if (!QuickSwitches.TryGetValue(key, out bool current) || current != next)
+		{
+			QuickSwitches[key] = next;
+			Logger.WriteLine($"宝龙达状态回读：⭐ {key} ⇒ {(next ? "开" : "关")}（⭐ 由硬件真实状态同步而来 ✅）");
+		}
+	}
 	private void RefreshBaolongdaSensors()
 	{
 		BaolongdaWmi wmi = _baolongda?.Wmi;
@@ -7092,7 +7183,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⭐ 2026-10-16：⭐ 宝龙达后端同样要放（⭐ 它持有 WMI 实例 ✅）
 		//   ⭐⭐ 而且在放之前 ⭐ **必须先把风扇交回固件** ⚠️
 		//      （⭐ 否则风扇会**停在我们上次写的转速上** ⚠️ —— ⭐ 那是用户在关机前会明显感到的问题 ✅）
-		RestoreBaolongdaFanFirmwareControl();
+				// ⭐⭐ 2026-10-16（"回读"需求）：⭐ 启动时把"⭐ 本机哪些功能号是通的"⭐ 打**一次** ✅
+		//   ⭐ 为什么不周期打：⭐ 快照里的温度/转速每 3 秒都变 ⚠️ ⇒ ⭐ 周期打就是刷屏 ❌
+		//   ⭐ 这一份清单 ⭐ **正好也是诊断包要的内容**（⭐ 让机主一眼看出本机支持情况 ✅）
+		try
+		{
+			BaolongdaStateSnapshot supportSnap = BaolongdaStateSnapshot.Capture(_baolongda?.Wmi);
+			foreach (string supportLine in supportSnap.DescribeSupportList())
+			{
+				Logger.WriteLine("宝龙达状态支持清单：" + supportLine);
+			}
+			Logger.WriteLine("宝龙达状态支持清单（⭐ 说明）：⭐ 上面的 ✅ 表示**本机该功能号可读** ✅；"
+				+ "⚠️ 表示读不到 ⇒ ⭐ 相关的界面开关**应当隐藏**（⛔ 免得点了没反应 ✅）");
+		}
+		catch (Exception exSnap)
+		{
+			Logger.WriteLine("宝龙达状态支持清单：⭐ 采集失败（已吞掉）：" + exSnap.Message);
+		}RestoreBaolongdaFanFirmwareControl();
 		_baolongda?.Dispose();
 		_baolongda = null;
 		DataChanged = null;

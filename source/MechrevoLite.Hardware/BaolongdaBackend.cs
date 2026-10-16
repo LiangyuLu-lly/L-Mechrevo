@@ -97,7 +97,37 @@ internal sealed class BaolongdaBackend : IDisposable
 			//   ⭐⭐ 现在协议**已经真机验证**（⭐ 2026-10-16 · 机器 C：⭐ 6 个功能号全部可读、
 			//      ⭐ 档位语义与我们完全一致 ✅）⇒ ⭐ **探到就接管** ✅
 			//   ⚠️ 但保留一个**反向开关**（⭐ 排障用 ✅）：⭐ 显式设成 ⭐ `0` ⇒ ⭐ 跳过本后端 ✅
-			if (IsDisabledByEnvVar())
+			// ⭐⭐ 2026-10-16（⭐ 用户澄清，⭐ 原文：「⭐ 注意不要改蛟龙其他机型已经50系的蛟龙
+			//    ⭐ 其他都是同方模具的 只有30 40系的蛟龙16pro不是」）：
+			//    ⭐ 即 ⭐ **只有蛟龙16Pro 的 30/40 系是【宝龙达】模具** ✅
+			//    ⚠️ ⭐ **其他蛟龙（⭐ 含 50 系）⭐ 全是【同方】模具** ⚠️ ⇒ ⭐ 它们该走 GCU ✅
+			//
+			//    ⚠️⚠️ **为什么必须加这道门槛**（⭐ 真实风险 ⚠️）：
+			//       ⭐ 宝龙达与老同方**用同一个类 GUID** ✅ ⇒ ⭐ 我们把宝龙达候选**提到了老接口之前** ✅
+			//       ⭐ 而活体判据只是"⭐ 能读一次 CPU 温度（功能号 22）"⚠️
+			//       ⇒ ⚠️ 若某台**同方**机型恰好也能读 ⇒ ⭐ **会被误判成宝龙达** ❌
+			//          ⇒ ⭐ 后果一：⭐ 走我们宝龙达的能力集（⭐ 只开了性能档/LOGO/键盘灯/功耗墙/显卡模式 ⚠️）
+			//             ⭐ 而这些在同方机型上**未必能用** ⇒ ⚠️ **违反"⛔ 点了不能没反应"** ❌
+			//          ⇒ ⭐ 后果二：⭐ 同方机型**本来有 GCU** ⚠️ ⇒ ⭐ 被误判后就**绕开了 GCU**
+			//             ⇒ ⭐ **功能静默大缩水** ❌（⭐ 比"漏认宝龙达"难查得多 ⚠️）
+			//    ⇒ ⭐ ⭐ **原则（⭐ 用户与我们都认同 ✅）**：
+			//       ⭐ **"⭐ 宁可不认宝龙达，⭐ 也绝不误伤同方"** ✅
+			//       （⭐ 宝龙达漏认可以用 `--fan-watch` 等工具**人工确认** ✅；
+			//         ⭐ 而同方被误判是**静默缩水**，⭐ 极难查 ⚠️）
+			if (!IsBaolongdaModelWhitelisted(out string whitelistNote))
+			{
+				Logger.WriteLine("宝龙达后端：⚠️ 探到 MICommonInterface，⭐ 但**机型不在白名单** ⇒ "
+					+ "⭐ **不认作宝龙达** ✅（⭐ 宁可漏认、⭐ 也绝不误伤同方 ✅）—— " + whitelistNote);
+				try
+				{
+					wmi.Dispose();
+				}
+				catch
+				{
+				}
+				return null;
+			}
+			Logger.WriteLine("宝龙达后端：⭐ 机型白名单**通过** ✅ —— " + whitelistNote);			if (IsDisabledByEnvVar())
 			{
 				Logger.WriteLine($"宝龙达后端：⭐ 已被环境变量 {EnableEnvVar}=0 显式禁用 ⇒ 跳过（⭐ 排障用）");
 				wmi.Dispose();
@@ -120,6 +150,65 @@ internal sealed class BaolongdaBackend : IDisposable
 	/// 现在是 ⭐ **"探到就启用、设 <c>0</c> 才禁用"**（⭐ 协议已真机验证 ✅）—— ⭐ 保留它是为了**排障** ✅
 	/// （⭐ 万一某台机上接管后不对劲，⭐ 用户/我们能让它退回老接口或 GCU 路径 ✅）。</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（⭐ 用户澄清「⭐ 只有 30/40 系的蛟龙16Pro 不是同方模具」）：
+	/// ⭐ **宝龙达机型白名单** ✅ —— ⭐ 一道**防误伤同方**的门槛 ⚠️
+	///
+	/// <para>⭐⭐ <b>为什么要有它</b>：⭐ 宝龙达与老同方**共用同一个 WMI 类 GUID** ✅
+	/// ⇒ ⭐ 我们把宝龙达候选提到了老接口**之前** ✅
+	/// ⭐ 而活体判据只是"⭐ 能读一次 CPU 温度"⚠️ ⇒ ⭐ **同方机型有被误判的可能** ❌
+	/// ⇒ ⭐ 误判后果：⭐ ① ⭐ 走宝龙达能力集而**同方未必支持** ⇒ ⚠️ 违反"⛔ 点了不能没反应" ❌ ·
+	/// ⭐ ② ⭐ 同方**本来有 GCU** 却被绕开 ⇒ ⭐ **功能静默大缩水** ❌</para>
+	///
+	/// <para>⭐⭐ <b>原则</b>：⭐ **"⭐ 宁可不认宝龙达，⭐ 也绝不误伤同方"** ✅
+	/// （⭐ 宝龙达漏认可人工确认 ✅；⭐ 同方被误判是静默缩水，⭐ 极难查 ⚠️）。</para>
+	///
+	/// <para>⭐ <b>判据</b>：⭐ 读 ⭐ <c>HKLM\HARDWARE\DESCRIPTION\System\BIOS</c> 的
+	/// ⭐ <c>BaseBoardProduct</c>（⭐ **只读** ✅ · ⭐ 与 <see cref="CpuVendor" /> 同一个键 ✅）。
+	/// ⭐ 白名单：⭐ ① ⭐ <c>MRID6-23</c> ⭐ **精确命中**（⭐ 三台真机证据 ✅）·
+	/// ⭐ ② ⭐ <c>MRID6-</c> ⭐ **前缀**（⚠️ **30 系板号未知 ⇒ 标为待验证** ⚠️）。</para>
+	///
+	/// <para>⚠️ <b>失败一律按"不是宝龙达"处理</b> ✅（⭐ 读不到/抛异常 ⇒ <c>false</c> ✅）
+	/// —— ⭐ 这是**安全方向**：⭐ 落回老接口/GCU ⭐ 总比误伤好 ✅。</para>
+	/// </summary>
+	private static bool IsBaolongdaModelWhitelisted(out string note)
+	{
+		note = string.Empty;
+		string board = string.Empty;
+		try
+		{
+			using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine
+				.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
+			board = (key?.GetValue("BaseBoardProduct") as string ?? string.Empty).Trim();
+		}
+		catch (Exception ex)
+		{
+			note = "⚠️ 读主板型号失败 ⇒ ⭐ **按「不是宝龙达」处理** ✅（⭐ 出错时走安全方向 ✅）：" + ex.Message;
+			return false;
+		}
+		if (board.Length == 0)
+		{
+			note = "⚠️ 主板型号读不到（⭐ 空值 ✅）⇒ ⭐ **按「不是宝龙达」处理** ✅（⭐ 安全方向 ✅）";
+			return false;
+		}
+		// ⭐ ① 精确命中：⭐ 三台真机证据（⭐ 机器 A/B/C ✅）
+		if (string.Equals(board, "MRID6-23", StringComparison.OrdinalIgnoreCase))
+		{
+			note = $"主板型号「{board}」⭐ 精确命中白名单 ✅（⭐ 真机验证过 ✅）";
+			return true;
+		}
+		// ⭐ ② 前缀命中：⚠️ 30 系板号未知 ⇒ ⭐ **待验证** ⚠️（⭐ 先放行，⭐ 但要看得见 ✅）
+		if (board.StartsWith("MRID6-", StringComparison.OrdinalIgnoreCase))
+		{
+			note = $"主板型号「{board}」⭐ 命中 `MRID6-` 前缀（⚠️ **30/40 系板号尚未全部确认 ⇒ 标为待验证** ⚠️）"
+				+ " ⇒ ⭐ 先按宝龙达放行 ✅（⭐ 若日后发现是误判，⭐ 请把该板号加进**排除表** ✅）";
+			return true;
+		}
+		// ⭐ ③ 其余一律**不认**（⭐ 含所有同方机型 ✅）
+		note = $"主板型号「{board}」⛔ **不在宝龙达白名单**（⭐ 已知宝龙达为 `MRID6-23` / `MRID6-` 前缀 ✅）"
+			+ " ⇒ ⭐ 按用户澄清「⭐ 其他蛟龙都是同方模具 ✅」⭐ 判定为**同方** ⇒ ⭐ 让它走老接口/GCU ✅";
+		return false;
+	}
 	private static bool IsDisabledByEnvVar()
 	{
 		try
@@ -267,7 +356,26 @@ internal sealed class BaolongdaBackend : IDisposable
 			//         （⭐ 必须以 `Program.hw.UsesBaolongda` 开头 ⇒ ⭐ 同方/GCU 走 else 原路 ✅）
 			//      ⭐ ② ⭐ 把那两个按钮的点击分派到 `TrySetGpuModeViaBackend` ✅
 			//      ⭐ ③ ⭐ **然后**才把下面这行改成 ⭐ `DgpuDirect = gpuModeAvailable,` ✅
-			DgpuDirect = false,
+			// ⭐⭐ 2026-10-16 晚：⭐ **现在开** ✅ —— ⭐ 因为两件前提都已就位 ✅：
+			//   ⭐ ① ⭐ 分派已接：⭐ `GPUModeControl.SetGPUMode` 里 `UsesBaolongda` 分支
+			//      ⇒ ⭐ 界面 1（标准）⇒ ⭐ 后端 0（混合）· ⭐ 界面 2（独显直连）⇒ ⭐ 后端 1 ✅
+			//      ⭐ 且 ⭐ 界面 0（核显）⭐ **明确拒绝**（⭐ 宝龙达不支持 ✅）
+			//   ⭐ ② ⭐ 按钮已只显示两个：⭐ `SettingsForm` 里 `UsesBaolongda` 分支调
+			//      ⭐ `VisualiseGPUButtons(eco: false, ultimate: true)` ⇒ ⭐ **混合 ＋ ⭐ 独显直连** ✅
+			//   ⭐ 为什么 `CanOfferGpuModeSwitch` 会成立（⭐ 已推演 ✅）：
+			//      ⭐ `CanOfferGpuModeSwitchCore(null, true, false, 代际, 三档)` ✅
+			//      ⇒ ⭐ `gcuDgpuDirectSupport` 为 null（⭐ 宝龙达没 GCU ✅）⇒ ⭐ 不否决 ✅
+			//      ⇒ ⭐ `supportsDgpuDirect=true` ⇒ ⭐ 过"两者皆无"那一关 ✅
+			//      ⇒ ⭐ 代际 ⭐ **不是 Gen30** ⇒ ⭐ 过代际否决 ✅
+			//      ⇒ ⭐ `DisplayRoutePolicy.AllowsAction`：⭐ 代际 ≤ 1（⭐ `None` ✅）时
+			//         ⭐ 走 ⭐ `DisplayRouteMatrix.IsKnownAction(action)` ⇒ ⭐ 直连动作是**已知动作** ✅
+			//         ⇒ ⭐ 返回 true ⇒ ⭐ 于是整体 **true** ✅
+			//   ⭐ 且 ⭐ `GpuRowLayout` 会解析成 ⭐ **`Mux2` = 「混合模式 / 独显直连」两档** ✅
+			//      （⭐ `GpuRowLayouts.Resolve(false, modeSwitch=true, igpuMuxTarget=false)` ✅）
+			//      ⇒ ⭐ ⭐ **这正是用户要的"⭐ 就显示两个按钮"** ✅
+			//   ⚠️ 真机需确认：⭐ ① 功能号 9 真能读（⭐ 自检日志会写 ✅）·
+			//      ⭐ ② 切了之后**回读值真的是目标值** ✅ · ⭐ ③ 界面确实只出现两颗按钮 ✅
+			DgpuDirect = gpuModeAvailable,
 			AmdPlatform = PawnIO.CpuInfo.IsAMD
 		};
 	}

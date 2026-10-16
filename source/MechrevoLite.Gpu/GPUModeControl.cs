@@ -126,6 +126,68 @@ public class GPUModeControl
 			return;
 		}
 		MechrevoHw hw = Program.hw;
+		// ⭐⭐ 2026-10-16（宝龙达适配 · 用户「⭐ GPUmode接入 宝龙达机器就显示两个按钮就行」）：
+		//   ⭐ **非 GCU 后端的显卡模式分派** ✅ —— ⭐ 宝龙达走 WMI 功能号 9 ✅
+		//   ⭐ 模板与前面几步一致：⭐ `Try…ViaBackend` ⭐ **非宝龙达时返回 false**
+		//      ⇒ ⭐ 调用方**照原路走 GCU**（⭐ 那条路一个字不改 ✅）
+		//   ⚠️ 模式值映射（⭐ 界面 0/1/2 ⇒ ⭐ 宝龙达 0/1 ✅）：
+		//      ⭐ 界面 ⭐ `0 = 核显(Eco)` · ⭐ `1 = 混合(标准)` · ⭐ `2 = 独显直连(极致)` ⚠️
+		//      ⭐ 宝龙达 ⭐ `0 = 混合` · ⭐ `1 = 独显直连` ✅
+		//      ⇒ ⭐ 所以：⭐ 界面 1 ⇒ ⭐ 宝龙达 0 ✅ · ⭐ 界面 2 ⇒ ⭐ 宝龙达 1 ✅
+		//      ⚠️ 而 ⭐ 界面 0（核显）⭐ 宝龙达**不支持** ⇒ ⭐ 明确拒绝 ＋ ⭐ 记日志（⛔ 不静默乱发 ✅）
+		//        （⭐ 且 UI 侧已隐藏那颗按钮 ⇒ ⭐ 正常路径上根本点不到 ✅）
+		if (hw != null && hw.UsesBaolongda)
+		{
+			int backendMode;
+			if (GPUMode == 1)
+			{
+				backendMode = BaolongdaWmi.GpuModeHybrid;
+			}
+			else if (GPUMode == 2)
+			{
+				backendMode = BaolongdaWmi.GpuModeDiscrete;
+			}
+			else
+			{
+				Logger.WriteLine($"宝龙达显卡模式：⚠️ 拒绝界面模式 {GPUMode}（⭐ 核显模式 ⛔ 宝龙达不支持 ✅ —— "
+					+ "⭐ 本机只有 混合(1) / 独显直连(2) 两个 ✅）");
+				settings.VisualiseGPUMode();
+				return;
+			}
+			try
+			{
+				Interlocked.Exchange(ref _manualGpuSwitchInFlight, 1);
+				bool confirmed = false;
+				bool handled = hw.TrySetGpuModeViaBackend(backendMode, out confirmed);
+				if (!handled)
+				{
+					// ⭐ 理论上到不了（⭐ 上面已判 `UsesBaolongda` ✅）⇒ ⭐ 但**如实报告**，⛔ 不假装成功 ✅
+					Logger.WriteLine("宝龙达显卡模式：⚠️ 后端未接管（⭐ 异常情况 ⚠️）⇒ ⭐ 交由原路处理 ✅");
+				}
+				else if (confirmed)
+				{
+					AppConfig.Set("gpu_mode", GPUMode);
+					Logger.WriteLine($"宝龙达显卡模式：⭐ 已切到界面模式 {GPUMode}（⭐ 后端值 {backendMode}）并回读确认 ✅");
+				}
+				else
+				{
+					// ⚠️ 写入完成但回读不一致/读不到 ⇒ ⭐ **不写本地记忆**（⭐ 免得记错 ⚠️），⭐ 如实报告 ✅
+					Logger.WriteLine($"宝龙达显卡模式：⚠️ 已下发界面模式 {GPUMode}（⭐ 后端值 {backendMode}）"
+						+ "，但**回读未确认** ⇒ ⭐ 如实报告、⛔ 不写入本地记忆 ⚠️");
+				}
+			}
+			catch (Exception exBl)
+			{
+				Logger.WriteLine("宝龙达显卡模式：⭐ 切换异常（已吞掉）：" + exBl.Message);
+			}
+			finally
+			{
+				Interlocked.Exchange(ref _manualGpuSwitchInFlight, 0);
+			}
+			// ⭐ 让界面按**真实回读值**重画（⭐ 读不到就按现有值 ✅）
+			settings.VisualiseGPUMode();
+			return;
+		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：显卡模式切换走 GCU（GPUDevice/Control）⇒ 真正需要 GCU。
 		if (hw != null && hw.IsGcuConnected)
 		{
