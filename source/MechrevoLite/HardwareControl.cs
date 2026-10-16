@@ -599,9 +599,26 @@ public static class HardwareControl
 				//   ⭐ 用"⭐ 状态翻转"⭐ 只记一次 ⇒ ⚠️ **不会每 3 秒刷屏** ✅
 				if (Interlocked.Exchange(ref _gpuTempNoneLogged, 1) == 0)
 				{
+					// ⭐⭐ 2026-10-16（修「待机时 GPU 温度只显示 —」）：⭐ 这里的关键是**把两种完全不同的
+					//   状态分开** ✅ —— ⭐ 用户已经指出原因：「⭐ 显卡没读数是因为占用低待机了」✅，
+					//   但"⭐ 待机"与"⭐ 真故障"在界面上**长得一模一样**（⭐ 都是「—」⚠️）⇒ ⭐ 观感像故障 ❌。
+					//   ⭐ 判据见 `NvmlHelper.TempUnavailableWhileDeviceAlive`：
+					//     ① ⭐ 句柄拿得到（⭐ 卡还在 ✅）＋ ⭐ 温度查询没给有效值 ⇒ ⭐ 低功耗/待机态 ✅
+					//     ② ⭐ 连句柄都拿不到、⭐ 或 NVML 已隔离 ⚠️ ⇒ ⭐ 真故障 ⇒ ⭐ 维持「—」✅
+					//   ⭐ 同时把**温度专属返回码**打出来 —— 这是"待机时 NVML 到底返回什么"的**唯一证据** ⚠️
+					//     （⭐ 既有 `_lastError` 只在四个查询全失败时更新 ⇒ ⭐ 这个组合它记不到 ❌）
+					bool nvmlAliveNoTemp = NvmlHelper.TempUnavailableWhileDeviceAlive;
+					string verdict = nvmlAliveNoTemp
+						? "⇒ ⭐ 判定为**待机/低功耗态** ✅（⭐ 设备句柄有效、⭐ 只是温度这个查询没给值 ✅）"
+						: "⇒ ⭐ 未能判定为待机 ⚠️（⭐ 句柄也拿不到、⭐ 或 NVML 已隔离）⇒ ⭐ 维持「—」✅";
 					Logger.WriteError($"GPU 温度：⚠️ 厂商/LHM/NVML **三个来源都没给值** ⇒ 界面会显示「—」"
 						+ $"（⭐ 厂商值={hw.GpuTemp} · ⭐ LHM={(lhmMonitor.GpuTemperature.HasValue ? lhmMonitor.GpuTemperature.Value.ToString("F0") : "无")}"
-						+ $" · ⭐ NVML已隔离={NvmlHelper.Unavailable}）；⭐ 本条只在开始取不到的那一刻记一次 ✅");
+						+ $" · ⭐ NVML已隔离={NvmlHelper.Unavailable}"
+						+ $" · ⭐ 句柄有效={nvmlAliveNoTemp}"
+						+ $" · ⭐ 温度专属返回码={NvmlHelper.LastTempError}"
+						+ $"（⭐ -1=没查过 · ⭐ -2=返回成功但值无效/常见于低功耗 · ⭐ 0=成功 · ⭐ 其他=NVML 原始码））"
+						+ verdict
+						+ "；⭐ 本条只在开始取不到的那一刻记一次 ✅");
 				}
 			}
 		}
@@ -884,6 +901,15 @@ public static class HardwareControl
 	/// <para>⚠️ 判据：⭐ 我们记过 <see cref="_gpuTempFacadeWritten"/>、⭐ 而且它**现在还是这个数** ✅
 	/// ⇒ ⭐ 说明中间**没有别人**（⭐ 厂商 ✅）写过 ⇒ ⭐ 不能当厂商值 ⚠️。</para>
 	/// </summary>
+	/// <summary>⭐⭐ 2026-10-16（修「待机时 GPU 温度只显示 —」）：⭐ GPU 温度**"在、但没值"**
+	/// = 待机/低功耗态 ✅ —— 供界面把「—」显示成「待机」，⭐ 免得看着像故障 ⚠️。
+	/// <para>⚠️ 判据来自 <see cref="NvmlHelper.TempUnavailableWhileDeviceAlive" />：
+	/// ⭐ 句柄拿得到（⭐ 卡还在 ✅）＋ ⭐ 温度查询没给出有效值 ⇒ ⭐ 低功耗/待机 ✅；
+	/// ⭐ 连句柄都拿不到 ⇒ ⭐ 真故障 ⇒ ⭐ 本属性为假 ✅（⭐ 那种情况界面该继续显示「—」✅）。</para>
+	/// <para>⛔ <b>它只回答"为什么没有数字"，绝不提供数字</b> —— 界面必须显示"无读数"语义，
+	/// ⛔ 不得据此编造温度 ✅（铁律：读不到就显示未知）。</para></summary>
+	internal static bool GpuTempIdle => NvmlHelper.TempUnavailableWhileDeviceAlive;
+
 	private static bool IsGpuTempFacadeWrittenByUs(MechrevoHw hw)
 	{
 		if (hw == null)

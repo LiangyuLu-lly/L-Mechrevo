@@ -93,6 +93,22 @@ public static class NvmlHelper
 	//    ⚠️ 沿用本类既有加固：⭐ 句柄每次现取 · ⭐ 模块存活守卫 · ⭐ 失败隔离 · ⭐ 快照 TTL ✅
 	private static uint? _snapshotTempCelsius;
 
+	// ⭐⭐ 2026-10-16（修「待机时 GPU 温度只显示 —」，用户反馈「显卡没读数是因为占用低待机了」但要求改善观感）：
+	//    ⚠️ 为什么需要这两个字段：⭐ 既有的 `_lastError`（⭐ :70 ✅）**只在四个查询全失败时才更新**（⭐ 见
+	//      `NoteFailureLocked` 的那次调用 ⚠️）⇒ ⭐ 待机时那种「⭐ 功耗查得到、⭐ 温度查不到」的组合
+	//      ⭐ ⭐ **根本记不下来** ❌ ⇒ ⭐ 于是分不清下面这两种**语义完全不同**的状态 ⚠️：
+	//        ① ⭐ 设备**在**、⭐ 只是温度这个查询没给值 ⇒ ⭐ 低功耗/待机态 ✅（⭐ 正常，⭐ 该显示"待机" ✅）
+	//        ② ⭐ 设备**整个不可达**（⭐ 驱动异常/⭐ 卡掉了 ⚠️）⇒ ⭐ 真故障 ⇒ ⭐ 该显示"—" ✅
+	//    ⭐ 判据：⭐ `_deviceHandleAlive`（⭐ 句柄拿到了 ⇒ 卡在 ✅）＋ `_lastTempError`（⭐ 温度查询专属返回码 ✅）
+	private static int _lastTempError = -1;
+
+	private static bool _deviceHandleAlive;
+
+	/// <summary>⭐ <c>_lastTempError</c> 的专用码：⭐ 查询**返回成功、但值无效**（⭐ 0 或超范围 ⚠️）。
+	/// <para>⚠️ 为什么单列一码：⭐ 低功耗/待机态下 <c>nvmlDeviceGetTemperature</c> 常**返回成功却给 0** ⚠️，
+	/// 那与"⭐ 查询直接报错"是两种不同的失败路径 ✅ ⇒ ⭐ 判"待机"时必须一并认 ✅。</para></summary>
+	private const int TempValueInvalid = -2;
+
 	[DllImport("nvml.dll")]
 	private static extern int nvmlInit_v2();
 
@@ -157,6 +173,37 @@ public static class NvmlHelper
 	internal static int ConsecutiveFailures => Volatile.Read(in _consecutiveFailures);
 
 	internal static int LastError => Volatile.Read(in _lastError);
+
+	/// <summary>⭐ 温度查询（<c>nvmlDeviceGetTemperature</c>）的**专属**最后返回码。
+	/// <para>⚠️ 与 <see cref="LastError" /> 不同：那个只在四个查询**全失败**时才更新
+	/// ⇒ ⭐ 待机时那种「⭐ 功耗查得到、⭐ 温度查不到」的组合，⭐ 它**记不到** ❌。
+	/// <c>-1</c> = 本进程内还没查过温度 ✅。</para></summary>
+	internal static int LastTempError => Volatile.Read(in _lastTempError);
+
+	/// <summary>⭐⭐ 判据：⭐ <b>设备在、⭐ 但温度取不到</b> ⇒ ⭐ 低功耗/待机态 ✅（⛔ 不是故障 ⚠️）。
+	/// <para>三条同时成立才算：⭐ ① 拿到过有效设备句柄（⭐ 说明卡在 ✅）·
+	/// ② 温度查询的返回码不是 <c>NVML_SUCCESS</c>（⭐ 说明确实没给出值 ⚠️）·
+	/// ③ 快照里**从来没有**过有效温度（⭐ 有旧值就轮不到这里 ✅）。</para>
+	/// <para>⚠️ 用途：⭐ 让界面把这种状态显示成「待机」，⭐ 而不是甩一个看着像故障的「—」✅。</para>
+	/// <para>⛔ <b>绝不用它编造温度数字</b> —— 它只回答"⭐ 为什么没有数字"✅，⭐ 不提供数字 ✅。</para></summary>
+	internal static bool TempUnavailableWhileDeviceAlive
+	{
+		get
+		{
+			if (!Volatile.Read(in _deviceHandleAlive))
+			{
+				return false;
+			}
+			if (Volatile.Read(in _lastTempError) == NVML_SUCCESS)
+			{
+				return false;
+			}
+			lock (_lock)
+			{
+				return !_snapshotTempCelsius.HasValue;
+			}
+		}
+	}
 
 	public static void Init()
 	{
@@ -236,6 +283,10 @@ public static class NvmlHelper
 			_consecutiveFailures = 0;
 			_reinitCount = 0;
 			_lastError = 0;
+			// ⭐⭐ 2026-10-16：⭐ 温度专属状态一并复位 ⇒ ⭐ 重建后重新判定"⭐ 是待机还是故障" ✅
+			//   （⭐ 不复位的话，重建前那次「卡不在」的结论会残留 ⇒ ⭐ 界面可能一直当故障 ⚠️）
+			Volatile.Write(ref _lastTempError, -1);
+			Volatile.Write(ref _deviceHandleAlive, false);
 			_quarantineUntilTicks = 0L;
 			_quarantineMs = QuarantineBaseMs;
 			_init = false;
@@ -437,15 +488,22 @@ public static class NvmlHelper
 			int num = nvmlDeviceGetHandleByIndex_v2(gpuIndex, out device);
 			if (num != NVML_SUCCESS)
 			{
+				// ⭐ 拿不到句柄 ⇒ ⭐ 卡不在了（⭐ 或驱动异常 ⚠️）⇒ ⭐ 这与"待机"是两回事 ✅
+				Volatile.Write(ref _deviceHandleAlive, false);
 				NoteFailureLocked("nvmlDeviceGetHandleByIndex_v2", num);
 				return;
 			}
 			if (device == 0)
 			{
 				// 句柄校验：拿不到有效句柄时绝不往下传，避免把 0/垃圾指针交给驱动。
+				Volatile.Write(ref _deviceHandleAlive, false);
 				NoteFailureLocked("nvmlDeviceGetHandleByIndex_v2 返回 0 句柄", -1);
 				return;
 			}
+			// ⭐⭐ 2026-10-16：⭐ 句柄有效 ⇒ ⭐ **卡在** ✅ —— 这是"待机"判定的必要条件之一 ⚠️
+			//   ⭐ 待机时句柄照样拿得到（⭐ 卡没被移走 ✅），⭐ 只是温度那个查询不给值 ⚠️；
+			//   ⭐ 而真故障（⭐ 驱动异常/⭐ 卡掉了 ❌）连句柄都拿不到 ⇒ ⭐ 两者由此分开 ✅
+			Volatile.Write(ref _deviceHandleAlive, true);
 			int num2 = nvmlDeviceGetPowerUsage(device, out uint powerMilliWatts);
 			if (num2 == NVML_SUCCESS && powerMilliWatts > 0 && (float)powerMilliWatts <= 200000f)
 			{
@@ -460,7 +518,15 @@ public static class NvmlHelper
 			// ⭐⭐ 2026-10-16：⭐ GPU 核心温度（⭐ 与功耗/显存同一把句柄、同一次快照 ✅）
 			//    ⭐ 合理性校验：⭐ (0, 150] 摄氏度 —— ⭐ NVML 取不到时常返回 0 ⚠️，⭐ 那不算有效温度 ✅
 			int num4 = nvmlDeviceGetTemperature(device, NvmlTemperatureGpu, out uint tempCelsius);
-			if (num4 == NVML_SUCCESS && tempCelsius > 0 && tempCelsius <= 150)
+			bool tempValid = num4 == NVML_SUCCESS && tempCelsius > 0 && tempCelsius <= 150;
+			// ⭐⭐ 2026-10-16：⭐ 温度查询的**专属**结果码 —— ⭐ 与 `_lastError` 分开记 ⚠️
+			//   （⭐ 那个只在四个查询**全失败**时才更新 ⇒ ⭐ 待机这种「⭐ 功耗成功、⭐ 温度失败」
+			//    的组合它**记不到** ❌）
+			//   ⭐ 编码：⭐ `NVML_SUCCESS`(0) = 拿到有效温度 ✅ · ⭐ 其他 ≥0 = NVML 原始返回码 ·
+			//     ⭐ `TempValueInvalid`(-2) = 返回成功但值无效（⭐ 0 或超范围 ⚠️）——
+			//     ⭐ 后者恰是"低功耗态下 NVML 返回 0"的签名 ✅ ⇒ ⭐ 必须与"查询报错"分开 ✅
+			Volatile.Write(ref _lastTempError, tempValid ? NVML_SUCCESS : ((num4 == NVML_SUCCESS) ? TempValueInvalid : num4));
+			if (tempValid)
 			{
 				_snapshotTempCelsius = tempCelsius;
 			}
@@ -538,6 +604,11 @@ public static class NvmlHelper
 		// ⭐ 2026-10-16：⭐ 温度与频率同样要作废（⭐ 否则会拿旧值冒充新读数 ⚠️）
 		_snapshotTempCelsius = null;
 		_snapshotClockMhz = null;
+		// ⭐⭐ 2026-10-16（修"待机显示 —"）：⭐ 快照作废 ⇒ ⭐ "⭐ 设备还在不在"与"⭐ 温度为什么没有"
+		//   这两个结论**同时失效** ⚠️ ⇒ ⭐ 一并复位，⭐ 免得拿陈旧结论去判"待机" ✅
+		//   （⭐ 下一次成功采样会重新把 `_deviceHandleAlive` 置真 ✅）
+		Volatile.Write(ref _deviceHandleAlive, false);
+		Volatile.Write(ref _lastTempError, -1);
 	}
 
 	internal static string DisabledReason => _disabledReason;
