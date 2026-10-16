@@ -3436,6 +3436,89 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// 本轮**只接了性能档** ⇒ ⭐ 只开 <c>ProfileAvailable</c> / <c>TurboMode</c> ✅；
 	/// ⭐ 风扇 / ⭐ 灯效 / ⭐ 功耗墙等**等各自的下发路径接完再逐个打开** ⚠️（⛔ 现在打开只会让 UI 走到没接的代码上 ✅）。</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-16：⭐ **宝龙达的「Fn 键锁」写入**（⭐ 功能号 11 ✅）。
+	/// <para>⭐ 依据：⭐ 真机诊断包已**回读成功**（⭐ 状态行 ⭐ `Fn锁=0` ✅）
+	/// ⇒ ⭐ ⭐ **硬件确定支持** ⇒ ⭐ 接写入**不违反铁律** ✅。</para>
+	/// <para>⚠️ 语义如实说明：⭐ 功能号 11/12 的 **0/1 方向我们没有真机定论** ⚠️
+	/// ⇒ ⭐ 所以做法是 ⭐ **"⭐ 写进去、⭐ 再读出来、⭐ 两边一致才算确认"** ✅
+	/// —— ⭐ 若方向恰好相反，⭐ 也只会表现为"⭐ 开关状态反了"⚠️，⛔ **不会写到别的寄存器上** ✅。
+	/// 📌 待真机确认方向后，⭐ 只需在此处翻转一次 ✅。</para>
+	/// <para>⭐ 返回 <c>false</c> ⇒ ⭐ 不归它管（⭐ 非宝龙达 ⭐ **恒 false**）⇒ ⭐ 调用方走原路 ✅。</para>
+	/// </summary>
+	internal bool TrySetFnLockViaBackend(bool on, out bool confirmed)
+	{
+		return TrySetBaolongdaToggleViaBackend(BaolongdaWmi.Function.FnLock, "Fn键锁", on, out confirmed);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16：⭐ **宝龙达的「触摸板」写入**（⭐ 功能号 12 ✅）。
+	/// <para>⭐ 依据：⭐ 真机诊断包已**回读成功**（⭐ 状态行 ⭐ `触摸板=1` ✅）⇒ ⭐ **硬件确定支持** ✅。</para>
+	/// <para>⚠️ 语义与「Fn 键锁」同：⭐ 0/1 方向未定论 ⇒ ⭐ 用"⭐ 写入后回读一致"⭐ 判确认 ✅。</para>
+	/// </summary>
+	internal bool TrySetTouchpadViaBackend(bool on, out bool confirmed)
+	{
+		return TrySetBaolongdaToggleViaBackend(BaolongdaWmi.Function.TPLock, "触摸板", on, out confirmed);
+	}
+
+	/// <summary>
+	/// ⭐ 宝龙达"⭐ 单字节开关"⭐ 的**共同实现**（⭐ Fn 键锁 11 / ⭐ 触摸板锁 12 ✅）。
+	/// <para>⭐ 流程：⭐ ① 先读当前值（⭐ 读不到 ⇒ ⭐ **拒绝盲写** ✅）
+	/// ⇒ ⭐ ② 已等于目标 ⇒ ⭐ 直接算确认（⭐ ⛔ 不白写一次 ✅）
+	/// ⇒ ⭐ ③ 写 1/0 ⇒ ⭐ ④ 最多 5 次回读确认（⭐ 与档位/显卡模式同一套节奏 ✅）。</para>
+	/// <para>⚠️ 日志**如实区分**三类：⭐ 已确认 ✅ / ⭐ 写入完成但回读不一致 ⚠️ / ⭐ 回读不到 ⚠️ ✅。</para>
+	/// </summary>
+	private bool TrySetBaolongdaToggleViaBackend(BaolongdaWmi.Function function, string label, bool on, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false; // ⭐ 非宝龙达 ⇒ ⭐ 交回原路 ✅
+		}
+		try
+		{
+			byte target = (byte)(on ? 1 : 0);
+			// ⭐ ① 写前先读（⭐ 也是"⭐ 这个功能号真的存在吗"⭐ 的证据 ✅）
+			if (!wmi.TryReadByteChecked(function, out byte before))
+			{
+				Logger.WriteError($"宝龙达 {label}：⚠️ 写前**读不到**当前值 ⇒ ⭐ **拒绝盲写**（⭐ 未下发任何命令 ✅）");
+				return true; // ⭐ 已接管：⭐ 不让调用方再去发 GCU ✅
+			}
+			if (before == target)
+			{
+				confirmed = true;
+				Logger.WriteLine($"宝龙达 {label}：⭐ 当前值已是 {target} ⇒ ⛔ 不必写（⭐ 直接算确认 ✅）");
+				return true;
+			}
+			// ⭐ ③ 写
+			if (!wmi.TryWriteByte(function, target))
+			{
+				Logger.WriteError($"宝龙达 {label}：⚠️ **写入未执行**（⭐ 详见协议层日志 ✅）");
+				return true;
+			}
+			// ⭐ ④ 回读确认（⭐ 5 × 150 ms，⭐ 与显卡模式同节奏 ✅）
+			for (int attempt = 0; attempt < 5; attempt++)
+			{
+				if (wmi.TryReadByteChecked(function, out byte now) && now == target)
+				{
+					confirmed = true;
+					Logger.WriteLine($"宝龙达 {label}：⭐ 已设为 {target}（⭐ {on}）并回读确认 ✅（⭐ 第 {attempt + 1} 次）");
+					return true;
+				}
+				Thread.Sleep(150);
+			}
+			Logger.WriteError($"宝龙达 {label}：⚠️ **写入完成但 750 ms 内回读不一致或读不到** ⇒ ⭐ 如实报告未确认 ⚠️"
+				+ $"（⭐ 目标={target} · ⭐ 写前={before} ✅）");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError($"宝龙达 {label}：⭐ 操作异常（已吞掉，⛔ 不影响别处）：" + ex.Message);
+			return true;
+		}
+	}
+
 	private async Task ApplyBaolongdaBackendAsync(BaolongdaBackend backend)
 	{
 		_activeBackend = MechrevoBackendKind.Baolongda;

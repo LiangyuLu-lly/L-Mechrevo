@@ -2808,6 +2808,22 @@ public class MechrevoService
 			{
 				return false;
 			}
+			// ⭐⭐ 2026-10-16（宝龙达 · 窄范围）：⭐ **Fn 键锁 / 触摸板 走 WMI**（⭐ 它没有 GCU ✅）
+			//   ⭐ 依据：⭐ 真机诊断包已回读到 ⭐ `Fn锁=0` ✅ / ⭐ `触摸板=1` ✅ ⇒ ⭐ **硬件支持** ✅
+			//   ⭐ 模板：⭐ 与档位/LOGO/键盘灯/功耗墙/显卡模式**同一套**（⭐ 非宝龙达恒 false ⇒ 下面原路 ✅）
+			if (string.Equals(key, "fnkey", StringComparison.Ordinal)
+				|| string.Equals(key, "touchpad", StringComparison.Ordinal))
+			{
+				bool baolongdaOk = false;
+				bool handled = string.Equals(key, "fnkey", StringComparison.Ordinal)
+					? _hw.TrySetFnLockViaBackend(on, out baolongdaOk)
+					: _hw.TrySetTouchpadViaBackend(on, out baolongdaOk);
+				if (handled)
+				{
+					Logger.WriteLine($"SwitchQuick({key},{on}) ⭐ 走宝龙达 WMI ⇒ 确认={baolongdaOk}（⛔ 未发任何 MQTT ✅）");
+					return baolongdaOk;
+				}
+			}
 			string action = key switch
 			{
 				"touchpad" => (!on) ? "TOUCHPAD_OFF" : "TOUCHPAD_ON", 
