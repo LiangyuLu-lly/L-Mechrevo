@@ -3903,7 +3903,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>
 	/// ⭐⭐ 2026-10-16：⭐ **宝龙达的「触摸板」写入**（⭐ 功能号 12 ✅）。
 	/// <para>⭐ 依据：⭐ 真机诊断包已**回读成功**（⭐ 状态行 ⭐ `触摸板=1` ✅）⇒ ⭐ **硬件确定支持** ✅。</para>
-	/// <para>⚠️ 语义与「Fn 键锁」同：⭐ 0/1 方向未定论 ⇒ ⭐ 用"⭐ 写入后回读一致"⭐ 判确认 ✅。</para>
+	/// <para>⭐⭐ 2026-10-16（⭐ 机主反馈「⭐ <b>触摸板的开关反了在宝龙达机型上</b>」✅）：⭐ <b>极性已定论 ⇒ 取反</b> ✅。
+	/// 见 <see cref="BaolongdaToggleInverted" /> 的推导 —— ⭐ 功能号 12 的名字是 <c>TPLock</c>（⭐ 一个<b>锁</b> ⚠️），
+	/// ⭐ 而界面 <c>touchpad</c> 的 checked 语义是「⭐ <b>触摸板启用</b>」（⭐ 与 GCU 侧读的 <c>TochpadEnable</c> 一致 ✅）
+	/// ⇒ ⭐ <b>两者相反</b> ✅。</para>
+	/// <para>⚠️ 本方法与读侧 <see cref="RefreshBaolongdaSwitchStates" /> <b>共用同一个极性来源</b>
+	/// （<see cref="BaolongdaToggleInverted" /> ✅）⇒ ⛔ <b>不会出现"⭐ 显示说开、⭐ 实际是关"⭐ 那种两侧口径打架的状态</b> ✅。</para>
 	/// </summary>
 	internal bool TrySetTouchpadViaBackend(bool on, out bool confirmed)
 	{
@@ -3967,6 +3972,31 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16：⭐ 宝龙达「单字节开关」的**极性**（⭐ <b>读侧写侧共用的唯一来源</b> ✅）。
+	/// <para>⭐ 返回 <c>true</c> ⇒ ⭐ <b>寄存器语义与界面语义相反</b> ⇒ ⭐ 需要取反 ✅。</para>
+	/// <para>⭐⭐ <b>功能号 12（TPLock · 触摸板）＝ 取反</b> ✅ —— 依据：
+	/// ⭐ 该功能号的名字就是 <c>TPLock</c>（⭐ 锁 ⚠️）；⭐ 参考实现（⭐ 斗战者 <c>DOUZHANZHE-Control</c> ✅）
+	/// 把它叫 <c>TouchpadLock</c>，⭐ 且 ⭐ <c>SetTouchpadLock(bool locked)</c> 写
+	/// <c>locked ? 1 : 0</c> ✅ · ⭐ <c>GetTouchpadLock() == 1</c> ⇒ ⭐ <c>TouchpadLocked</c> ✅
+	/// ⇒ ⭐ ⭐ <b>写 1 = 锁定 = 触摸板【禁用】</b> ⚠️。</para>
+	/// <para>⚠️ 而界面 <c>QuickSwitches["touchpad"]</c> 的 <c>true</c> 表示
+	/// 「⭐ <b>触摸板可用</b>」✅ —— ⭐ 依据：⭐ GCU 侧读的是 <c>TochpadEnable</c>
+	/// （⭐ 见 <c>OnSettingsDeviceSwitchItemStatus</c> ✅），⭐ 写的是 ⭐ <c>TOUCHPAD_ON</c> / ⭐ <c>TOUCHPAD_OFF</c>
+	/// （⭐ 见 <c>SwitchQuick</c> 的映射 ✅）⇒ ⭐ <b>语义 = 启用</b> ✅。</para>
+	/// <para>⇒ ⭐ ⭐ <b>两者相反 ⇒ ⭐ 必须取反</b> ✅ —— ⚠️ 而改动前读侧
+	/// （⭐ <c>SyncBaolongdaQuickSwitch</c> 的 <c>!= 0</c> ✅）与写侧（⭐ <c>on ? 1 : 0</c> ✅）
+	/// <b>都按「1 = 开」处理</b> ⚠️ ⇒ ⭐ 两者【一致地反了】❌ ⇒ ⭐ 表现为"⭐ 开关能拨、⭐ 但做的是反事"✅
+	/// —— ⭐ 正是机主报的现象 ✅。</para>
+	/// <para>⚠️ <b>Fn 锁（功能号 11）真机【未定论】</b> ⚠️ ⇒ ⭐ 保持直通、⛔ <b>不取反</b> ✅
+	/// （⭐ 机主只反馈了触摸板 ✅ · ⭐ 两者共用本方法 ⇒ ⭐ 所以极性必须按功能号区分、⭐ 不能写在共用段里 ✅）。</para>
+	/// </summary>
+	private static bool BaolongdaToggleInverted(BaolongdaWmi.Function function)
+	{
+		// ⭐ 只认触摸板（TPLock）—— ⭐ 新增功能号时在这里逐项登记，⛔ 别改成"默认取反" ✅
+		return function == BaolongdaWmi.Function.TPLock;
+	}
+
+	/// <summary>
 	/// ⭐ 宝龙达"⭐ 单字节开关"⭐ 的**共同实现**（⭐ Fn 键锁 11 / ⭐ 触摸板锁 12 ✅）。
 	/// <para>⭐ 流程：⭐ ① 先读当前值（⭐ 读不到 ⇒ ⭐ **拒绝盲写** ✅）
 	/// ⇒ ⭐ ② 已等于目标 ⇒ ⭐ 直接算确认（⭐ ⛔ 不白写一次 ✅）
@@ -3983,7 +4013,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			byte target = (byte)(on ? 1 : 0);
+			// ⭐⭐ 极性（⭐ 唯一来源：BaolongdaToggleInverted ✅）—— ⭐ <paramref name="on" /> 是**界面语义**
+			//   （⭐ checked = 开 ✅）⇒ ⭐ 需要取反的功能号在这里翻成**寄存器语义**再写 ✅
+			//   ⚠️ 读侧走的是**同一个方法** ⇒ ⭐ 两边口径必然一致 ✅
+			//      （⛔ 不会出现"⭐ 显示说开、⭐ 实际是关"⭐ 那种更糟的状态 ✅）
+			bool inverted = BaolongdaToggleInverted(function);
+			byte target = (byte)((inverted ? !on : on) ? 1 : 0);
 			// ⭐ ① 写前先读（⭐ 也是"⭐ 这个功能号真的存在吗"⭐ 的证据 ✅）
 			if (!wmi.TryReadByteChecked(function, out byte before))
 			{
@@ -3993,7 +4028,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			if (before == target)
 			{
 				confirmed = true;
-				Logger.WriteLine($"宝龙达 {label}：⭐ 当前值已是 {target} ⇒ ⛔ 不必写（⭐ 直接算确认 ✅）");
+				Logger.WriteLine($"宝龙达 {label}：⭐ 当前寄存器值已是 {target}（⭐ 界面={on}"
+					+ $" · ⭐ 极性{(inverted ? "相反(已取反)" : "相同")} ✅）⇒ ⛔ 不必写（⭐ 直接算确认 ✅）");
 				return true;
 			}
 			// ⭐ ③ 写
@@ -4008,13 +4044,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				if (wmi.TryReadByteChecked(function, out byte now) && now == target)
 				{
 					confirmed = true;
-					Logger.WriteLine($"宝龙达 {label}：⭐ 已设为 {target}（⭐ {on}）并回读确认 ✅（⭐ 第 {attempt + 1} 次）");
+					Logger.WriteLine($"宝龙达 {label}：⭐ 已写寄存器值 {target}（⭐ 界面={on}"
+						+ $" · ⭐ 极性{(inverted ? "相反(已取反)" : "相同")} ✅）并回读确认 ✅（⭐ 第 {attempt + 1} 次）");
 					return true;
 				}
 				Thread.Sleep(150);
 			}
 			Logger.WriteError($"宝龙达 {label}：⚠️ **写入完成但 750 ms 内回读不一致或读不到** ⇒ ⭐ 如实报告未确认 ⚠️"
-				+ $"（⭐ 目标={target} · ⭐ 写前={before} ✅）");
+				+ $"（⭐ 目标寄存器={target} · ⭐ 界面={on} · ⭐ 极性{(inverted ? "相反(已取反)" : "相同")} · ⭐ 写前={before} ✅）");
 			return true;
 		}
 		catch (Exception ex)
@@ -4133,7 +4170,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//      ⛔ 不乱映射（⭐ 例如功能号 10 是"键盘灯状态"，
 			//         ⚠️ **不等于**实体灯带 `lightbar` ⚠️ ⇒ ⭐ 映射过去就是错的 ❌）
 			SyncBaolongdaQuickSwitch("logolight", snap.LogoLight);
-			SyncBaolongdaQuickSwitch("touchpad", snap.TouchpadLock);
+			// ⭐⭐ 2026-10-16（⭐ 机主反馈「⭐ 触摸板的开关反了」✅）：⭐ 功能号 12 是「⭐ 锁」语义 ⚠️
+			//   （⭐ TPLock ⇒ 1 = 锁定 = 禁用 ✅），⭐ 而界面 <c>touchpad</c> 的 true 表示「⭐ 可用」✅
+			//   ⇒ ⭐ **取反** ✅ —— ⚠️ 极性来自 <see cref="BaolongdaToggleInverted" />（⭐ 与写入侧**共用** ✅
+			//   ⇒ ⛔ 不会出现两侧口径打架 ✅）。
+			SyncBaolongdaQuickSwitch("touchpad", snap.TouchpadLock, BaolongdaToggleInverted(BaolongdaWmi.Function.TPLock));
+			// ⚠️ Fn 锁（功能号 11）真机**未定论** ⚠️ ⇒ ⭐ 保持直通、⛔ 不取反 ✅（⭐ 机主只反馈了触摸板 ✅）
 			SyncBaolongdaQuickSwitch("fnkey", snap.FnLock);
 			// ⭐⭐ 2026-10-16（OSD 提示 · 本地方案）：⭐ 这个开关的状态**来自本地配置** ✅
 			//   ⛔ **刻意不走** SyncBaolongdaQuickSwitch —— ⭐ 那条日志会写「⭐ 由硬件真实状态同步而来」❌，
@@ -4160,8 +4202,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⭐ 把一个回读值同步进 <see cref="QuickSwitches" />（⭐ 约定：⭐ 非 0 即 true ✅）。
 	/// <para>⚠️ <paramref name="value" /> 为 <c>null</c>（⭐ 读不到 ✅）⇒ ⭐ **什么都不做** ✅
 	/// —— ⭐ 这是本机制的**关键纪律**：⭐ ⛔ 读失败不能把有效值刷成 false ⚠️。</para>
+	/// <para>⭐⭐ 2026-10-16：⭐ <paramref name="invert" /> ＝ <b>寄存器语义与界面语义相反</b> ✅
+	/// （⭐ 唯一来源：<see cref="BaolongdaToggleInverted" /> ✅）—— ⚠️ 必须与写入侧
+	/// <see cref="TrySetBaolongdaToggleViaBackend" /> <b>同口径</b>，
+	/// ⛔ 否则会出现"⭐ 显示说开、⭐ 实际是关"⭐ 那种更糟的状态 ✅。</para>
+	/// <para>⚠️ <b>只在读到规范值（0/1）时才取反</b> —— ⭐ 其余值我们**不知道**语义 ⚠️
+	/// ⇒ ⭐ 原样透传（⛔ 不猜），⭐ 保持与改动前逐位一致 ✅（⭐ 原值仍在快照/诊断包里可查 ✅）。</para>
 	/// </summary>
-	private void SyncBaolongdaQuickSwitch(string key, int? value)
+	private void SyncBaolongdaQuickSwitch(string key, int? value, bool invert = false)
 	{
 		if (!value.HasValue || string.IsNullOrEmpty(key))
 		{
@@ -4169,10 +4217,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// ⭐ 只在**值真的变了**时才写＋记日志 ⇒ ⭐ 既省事又便于回查"⭐ 谁改的" ✅
 		bool next = value.Value != 0;
+		bool inverted = false;
+		if (invert && (value.Value == 0 || value.Value == 1))
+		{
+			next = !next;
+			inverted = true;
+		}
 		if (!QuickSwitches.TryGetValue(key, out bool current) || current != next)
 		{
 			QuickSwitches[key] = next;
-			Logger.WriteLine($"宝龙达状态回读：⭐ {key} ⇒ {(next ? "开" : "关")}（⭐ 由硬件真实状态同步而来 ✅）");
+			Logger.WriteLine($"宝龙达状态回读：⭐ {key} ⇒ {(next ? "开" : "关")}（⭐ 由硬件真实状态同步而来 ✅"
+				+ (inverted ? $" · ⭐ 寄存器原值={value.Value}（⭐ 本功能号是「锁」语义 ⇒ ⭐ 已取反 ✅）" : string.Empty)
+				+ "）");
 		}
 	}
 	private void RefreshBaolongdaSensors()
