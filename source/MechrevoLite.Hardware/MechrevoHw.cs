@@ -3271,7 +3271,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				wmi.TrySetCpuCustomEnabled(false);
 				confirmed = wmi.TryReadCpuCustomEnabled(out bool offNow) && !offNow;
-				Logger.WriteLine($"宝龙达 功耗墙：⭐ 已关闭自定义 ⇒ 回读确认={confirmed}");
+				Logger.WriteError($"宝龙达 功耗墙：⭐ 已关闭自定义 ⇒ 回读确认={confirmed}");
 				return true;
 			}
 			// ⭐ 顺序：⭐ 先设三个值 ⇒ ⭐ 最后才"开启" ✅（⭐ 免得中途以默认值生效一瞬间 ⚠️）
@@ -3283,7 +3283,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			bool ok3 = wmi.TrySetCpuTempWall((byte)wall);
 			if (!(ok1 && ok2 && ok3))
 			{
-				Logger.WriteLine($"宝龙达 功耗墙：⚠️ 有子命令写入失败（⭐ PL1={ok1} · ⭐ PL2={ok2} · ⭐ 温度墙={ok3}）⇒ 如实报告");
+				Logger.WriteError($"宝龙达 功耗墙：⚠️ 有子命令写入失败（⭐ PL1={ok1} · ⭐ PL2={ok2} · ⭐ 温度墙={ok3}）⇒ 如实报告");
 			}
 			bool okOn = wmi.TrySetCpuCustomEnabled(true);
 			// ⭐ 回读确认（⭐ 只能确认"已开启"，⛔ 确认不了数值 ⚠️）
@@ -3304,13 +3304,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Pl1 = pl1;
 					Pl2 = pl2;
 					TccTarget = wall;
-					Logger.WriteLine($"宝龙达 功耗墙：⭐ 已应用并确认开启 ✅（⭐ PL1={pl1}W · ⭐ PL2={pl2}W · ⭐ 温度墙={wall}℃"
+					// ⭐⭐ 2026-10-16：⭐ 真机验证功耗墙的**成功证据** ⚠️ ⇒ ⭐ 必须 WriteError（⭐ 默认级别可见 ✅）
+					Logger.WriteError($"宝龙达 功耗墙：⭐ 已应用并确认开启 ✅（⭐ PL1={pl1}W · ⭐ PL2={pl2}W · ⭐ 温度墙={wall}℃"
 						+ " —— ⚠️ 数值是**我们下发的**，⭐ 协议读不回来 ⚠️；⭐ 已写入本地记忆供校验使用 ✅）");
 					return true;
 				}
 				Thread.Sleep(150);
 			}
-			Logger.WriteLine($"宝龙达 功耗墙：⚠️ 写入完成但回读未确认（⭐ 开启写成功={okOn}）⇒ 如实报告 ⚠️");
+			// ⭐⭐ 2026-10-16：⭐ 真机验证功耗墙的**未确认证据** ⚠️ ⇒ ⭐ 必须 WriteError（⭐ 默认级别可见 ✅）
+			Logger.WriteError($"宝龙达 功耗墙：⚠️ 写入完成但回读未确认（⭐ 开启写成功={okOn}）⇒ 如实报告 ⚠️");
 			return true;
 		}
 		catch (Exception ex)

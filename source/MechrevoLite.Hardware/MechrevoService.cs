@@ -3768,7 +3768,10 @@ public class MechrevoService
 			tempWallC = 95;
 		}
 		_ = hw.TryApplyCpuPowerLimitViaBackend(enable: true, pl1, pl2, tempWallC, out bool confirmed);
-		Logger.WriteLine($"宝龙达 功耗墙（⭐ 非 GCU 后端路径）：⭐ key={key} · ⭐ 下发 PL1={pl1}W PL2={pl2}W 温度墙={tempWallC}℃"
+		// ⭐⭐ 2026-10-16：⭐ 这条是**真机验证功耗墙下发**的主要证据 ⚠️ ⇒ ⭐ 必须用 `WriteError` ✅
+		//   （⭐ `Logger.WriteLine` 的级别由**消息内容**判定 ⇒ ⭐ 默认「仅错误」级别下**可能不落盘** ❌）
+		//   ⭐ 每次"应用"最多 3 行（⭐ PL1 / PL2 / 温度墙各一次 ✅）⇒ ⭐ 不需要额外去重 ✅
+		Logger.WriteError($"宝龙达 功耗墙（⭐ 非 GCU 后端路径）：⭐ key={key} · ⭐ 下发 PL1={pl1}W PL2={pl2}W 温度墙={tempWallC}℃"
 			+ $" · ⭐ 确认={confirmed} ⇒ ⭐ 该项未发 MQTT ✅");
 		return true;
 	}
