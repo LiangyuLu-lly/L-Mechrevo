@@ -967,7 +967,21 @@ public class MechrevoService
 					gcuFields.Clear();
 				}
 			}
-			KeyValuePair<string, string>[] gcuEntries = source.Where((KeyValuePair<string, string> field) => gcuFields.ContainsKey(field.Key)).ToArray();
+			// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 3 步 · 功耗墙 · ⭐ 前后端分离模板）：
+			//   ⭐ 功耗墙那几项（⭐ PL1 / PL2 / 温度墙）⭐ **在非 GCU 后端下走 WMI**（⭐ 它没有 GCU ✅）
+			//   ⇒ ⭐ 所以**先在这里把它们摘出去并就地应用** ✅ ⇒ ⭐ 剩下的才进 GCU 的待发列表 ✅
+			//   ⚠️ 作用范围：⭐ `TryApplyPowerLimitViaBackend` ⭐ **非宝龙达时恒返回 false** ✅
+			//      ⇒ ⭐ GCU / 老同方 机型 ⭐ **列表与原来逐项相同** ⇒ ⭐ **行为逐位不变** ✅
+			List<KeyValuePair<string, string>> sourceForGcu = new List<KeyValuePair<string, string>>(source.Length);
+			foreach (KeyValuePair<string, string> field2 in source)
+			{
+				if (TryApplyPowerLimitViaBackend(field2.Key, field2.Value))
+				{
+					continue; // ⭐ 已由非 GCU 后端处理 ⇒ ⛔ 这一条不发 MQTT ✅
+				}
+				sourceForGcu.Add(field2);
+			}
+			KeyValuePair<string, string>[] gcuEntries = sourceForGcu.Where((KeyValuePair<string, string> field) => gcuFields.ContainsKey(field.Key)).ToArray();
 			KeyValuePair<string, string>[] gcuConfirmationEntries = gcuEntries.Where((KeyValuePair<string, string> field) => !IsGpuOverclockField(field.Key)).ToArray();
 			// 2026-10-09（批量下发超时口径 + 重发前收敛）：
 			// 下发拆成两件事：① CancelBatch（保证首批不再继续发出新字段、供重发前收敛用）；
@@ -3631,6 +3645,75 @@ public class MechrevoService
 	/// <c>Keyboard</c>、⛔ 没开 `Lightbar`/`RgbLightbar` ⇒ ⭐ UI 上不会出现那些效果 ✅
 	/// （⚠️ 真机未验证项：⭐ 功能号 16/17/18 —— ⭐ 门面层内部会先读功能号 10，⭐ 读不到就拒绝写 ✅）</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 3 步 · 功耗墙）：⭐ **把功耗墙那几项分派给门面层** ✅
+	/// <para>⭐ 处理哪些键：⭐ `PL1`（⭐ PL1 瓦数 ✅）· ⭐ `PL2` ✅ · ⭐ `CpuTccOffset`（⭐ 温度墙 ✅）</para>
+	/// <para>⭐ 返回 <c>true</c> ⇒ ⭐ 已由非 GCU 后端处理完（⭐ 调用方 ⛔ 不要再发 MQTT ✅）；
+	/// ⭐ 返回 <c>false</c> ⇒ ⭐ 不归它管（⭐ GCU / 老同方 ⭐ **恒返回 false** ⇒ ⭐ 行为逐位不变 ✅）。</para>
+	/// <para>⚠️ 数值语义：⭐ 界面的 PL1/PL2 是**瓦**、⭐ 温度墙走的是 ⭐ `TccOffset`（⭐ 与 GCU 同口径 ✅）
+	/// —— ⭐ 宝龙达协议里那个是**绝对温度 ℃** ⚠️ ⇒ ⭐ 这里做一次换算：
+	/// ⭐ **温度墙 ℃ = `TccMaximum` − `TccOffset`** ✅（⭐ `TccMaximum` 我们填的是 105 ✅）</para>
+	/// <para>⚠️ 实现取舍（⭐ 如实说明）：⭐ 这几个键是**分别**到达的 ⇒ ⭐ 每个都会**各触发一次写入** ⚠️
+	/// ⇒ ⭐ 结果是"⭐ 最后一个生效 ✅、⭐ 总开销多几次只读回读 ✅" —— ⭐ 功能正确、⛔ 不是最优 ✅
+	/// ⭐ （⭐ 更优做法是把它们**攒成一次**应用 ⚠️ ⇒ ⭐ 留待审查阶段优化 ✅）</para>
+	/// </summary>
+	private bool TryApplyPowerLimitViaBackend(string key, string rawValue)
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return false; // ⭐ 不是宝龙达在管事 ⇒ ⭐ 原样交给 GCU ✅
+		}
+		bool isPl1 = string.Equals(key, "PL1", StringComparison.Ordinal);
+		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
+		bool isTempWall = string.Equals(key, "CpuTccOffset", StringComparison.Ordinal);
+		if (!isPl1 && !isPl2 && !isTempWall)
+		{
+			return false; // ⭐ 别的键不归本方法管 ✅
+		}
+		if (!int.TryParse(rawValue, out int result))
+		{
+			Logger.WriteLine($"宝龙达 功耗墙：⭐ 键 {key} 的值 \"{rawValue}\" 不是整数 ⇒ 跳过 ⚠️");
+			return true; // ⭐ 已接管 ⇒ ⛔ 不让它走 GCU ✅
+		}
+		// ⭐ 三个值取"现值（⭐ 本地记忆 ✅）"，⭐ 只覆盖这次要改的那一个 ✅
+		int pl1 = hw.Pl1;
+		int pl2 = hw.Pl2;
+		int tempWallC = (hw.TccMaximum > 0) ? (hw.TccMaximum - hw.TccTarget) : 0;
+		if (isPl1)
+		{
+			pl1 = result;
+		}
+		else if (isPl2)
+		{
+			pl2 = result;
+		}
+		else if (isTempWall)
+		{
+			// ⭐ 界面给的是 TccOffset（⭐ 0 = 不限制 ⇒ 越大约束越强 ⚠️）⇒ ⭐ 换算成绝对温度 ✅
+			//   ⭐ 0 ⇒ ⭐ 不设温度墙（⭐ 用上限 105 ✅）；⭐ N ⇒ ⭐ 105 − N ✅
+			int max = (hw.TccMaximum > 0) ? hw.TccMaximum : 105;
+			tempWallC = (result <= 0) ? max : Math.Max(60, max - result);
+		}
+		// ⭐ 写之前：⭐ 若还没设过（⭐ 本地记忆为 0 ✅）⭐ 用一个保守默认值，⛔ 免得上电就写 0 ✅
+		if (pl1 <= 0)
+		{
+			pl1 = 45;
+		}
+		if (pl2 <= 0)
+		{
+			pl2 = 65;
+		}
+		if (tempWallC <= 0)
+		{
+			tempWallC = 95;
+		}
+		_ = hw.TryApplyCpuPowerLimitViaBackend(enable: true, pl1, pl2, tempWallC, out bool confirmed);
+		Logger.WriteLine($"宝龙达 功耗墙（⭐ 非 GCU 后端路径）：⭐ key={key} · ⭐ 下发 PL1={pl1}W PL2={pl2}W 温度墙={tempWallC}℃"
+			+ $" · ⭐ 确认={confirmed} ⇒ ⭐ 该项未发 MQTT ✅");
+		return true;
+	}
+
 	private bool TryApplyKeyboardViaBackend(string effect, int light0to4, Color? singleColor)
 	{
 		MechrevoHw hw = _hw;

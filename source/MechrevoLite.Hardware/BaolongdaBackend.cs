@@ -233,7 +233,7 @@ internal sealed class BaolongdaBackend : IDisposable
 			//      ⇒ ⭐ 接上之后 ⭐ 把下面这行改成 ⭐ `CpuPerformanceTuning = powerWallAvailable,` ⭐ 即可 ✅
 			//   ⚠️ 且 ⛔ **不开** `OverclockSettings`（⭐ 那是 GPU 超频那一组，
 			//      ⭐ 宝龙达协议里**没有**对应功能号 ⚠️ ⇒ ⭐ 开了就是点了没反应 ❌）
-			CpuPerformanceTuning = false,
+			CpuPerformanceTuning = powerWallAvailable,
 			AmdPlatform = PawnIO.CpuInfo.IsAMD
 		};
 	}
