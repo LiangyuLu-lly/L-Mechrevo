@@ -2637,6 +2637,242 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 	}
 
+	// ══════════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2~4 步）：⭐ 键盘灯 / ⭐ 功耗墙 / ⭐ 风扇手动
+	//     ⭐ 全部沿用第 1 步（LOGO 灯）那个 ⭐ **`Try…` 三态模板** ✅：
+	//        ⭐ 宝龙达 ⇒ ⭐ 写 WMI ＋ ⭐ 回读/校验；⭐ 其余后端 ⇒ ⭐ 返回 false ⇒ ⭐ **交回原路** ✅
+	//     ⇒ ⭐ ⭐ **GCU / 老同方 的既有代码，本轮同样【一行未改】** ✅
+	// ══════════════════════════════════════════════════════════════════════════
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯）：⭐ **意向方法** —— "⭐ 把键盘灯设成：开/关 ＋ 颜色 ＋ 亮度" ✅
+	/// <para>⭐ 宝龙达协议（⭐ 参考实现 + ⭐ 我们的功能号表 ✅）：
+	/// ⭐ ① ⭐ 功能号 16 = 模式（⭐ 0 = 关 · ⭐ 2 = RGB 固定色 ✅）
+	/// ⭐ ② ⭐ 功能号 17 = 颜色（⭐ 写 3 字节 ⭐ R,G,B ✅）
+	/// ⭐ ③ ⭐ 功能号 18 = 亮度（⭐ 0~3 级 ✅）</para>
+	/// <para>⚠️⚠️ <b>真机尚未验证</b>：⭐ 16/17/18 这三个功能号**没在真机上试过** ⚠️
+	/// （⭐ 已真机验证过的是 8 / 13 / 22 / 20 / 23 / 15 ✅）⇒ ⭐ 所以 ⭐ **调用方必须先确认能力位**，
+	/// ⚠️ 且 ⭐ 本方法在**写入前先试读一次**（⭐ `RgbKeyboardStatus` 功能号 10 ✅）：
+	/// ⭐ 读得到才认为"这套键盘灯接口确实在"⇒ ⛔ 否则直接拒绝，⭐ **不盲写** ✅。</para>
+	/// <para>⭐ 顺序严格按参考实现：⭐ **先发颜色（17）⇒ ⭐ 再发模式（16）⇒ ⭐ 最后亮度（18）** ✅
+	/// —— ⚠️ 因为颜色必须在"进入固定色模式"**之前**就位，⭐ 否则会闪一下别的颜色 ✅。</para>
+	/// </summary>
+	internal bool TrySetKeyboardLightingViaBackend(bool on, int colorArgb, int brightness0to3, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		try
+		{
+			// ⭐ ① 先试读一次"键盘灯状态"（⭐ 功能号 10）—— ⭐ 读得到才敢写 ⚠️
+			if (!wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte status))
+			{
+				Logger.WriteLine("宝龙达 键盘灯：⚠️ 读不到键盘灯状态（⭐ 功能号 10）⇒ ⭐ 拒绝盲写，本轮不动 ✅"
+					+ "（⚠️ 说明 16/17/18 这条链在本机可能不成立 ⇒ ⭐ 需真机进一步确认）");
+				return true; // ⭐ 已接管：⭐ 不让调用方再去发 GCU ✅
+			}
+			if (!on)
+			{
+				// ⭐ 关灯：⭐ 只写模式 0 ✅
+				wmi.TrySetKeyboardMode(0);
+				confirmed = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte off2) && off2 == 0;
+				Logger.WriteLine($"宝龙达 键盘灯：⭐ 关灯 ⇒ 回读={confirmed}（⭐ 原始状态字节 {off2}）");
+				return true;
+			}
+			// ⭐ ② 先颜色（⭐ 功能号 17，⭐ 三字节 ⭐ R,G,B ✅）
+			int r = (colorArgb >> 16) & 0xFF;
+			int g = (colorArgb >> 8) & 0xFF;
+			int b = colorArgb & 0xFF;
+			if (!wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b))
+			{
+				Logger.WriteLine("宝龙达 键盘灯：⭐ 写颜色失败 ⇒ 本次未生效");
+				return true;
+			}
+			// ⭐ ③ 再模式（⭐ 功能号 16：⭐ 2 = RGB 固定色 ✅）
+			if (!wmi.TrySetKeyboardMode(2))
+			{
+				Logger.WriteLine("宝龙达 键盘灯：⭐ 写模式失败 ⇒ 本次未生效");
+				return true;
+			}
+			// ⭐ ④ 最后亮度（⭐ 功能号 18：⭐ 0~3 ✅）
+			wmi.TrySetKeyboardBrightness((byte)Math.Max(0, Math.Min(3, brightness0to3)));
+			// ⭐ 回读确认（⭐ 功能号 10 的状态字节：⭐ 0 = 灭 · ⭐ 非 0 = 亮 ✅）
+			for (int attempt = 0; attempt < 5; attempt++)
+			{
+				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte now) && now != 0)
+				{
+					confirmed = true;
+					Logger.WriteLine($"宝龙达 键盘灯：⭐ 已点亮（⭐ rgb=#{r:X2}{g:X2}{b:X2} · ⭐ 亮度={brightness0to3}）"
+						+ $"并回读确认 ✅（状态字节 {now}，⭐ 第 {attempt + 1} 次；⚠️ 功能号 16/17/18 仍属真机未验证项）");
+					return true;
+				}
+				Thread.Sleep(150);
+			}
+			Logger.WriteLine("宝龙达 键盘灯：⚠️ 写入完成但**回读未确认**（⚠️ 16/17/18 未真机验证，⭐ 如实报告 ⚠️）");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 键盘灯：⭐ 操作异常（已吞掉）：" + ex.Message);
+			return true;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **意向方法** —— "⭐ 应用一组 CPU 功耗/温度墙" ✅
+	/// <para>⭐ 宝龙达协议（⭐ 功能号 23 `CpuPower` ✅）：
+	/// ⭐ 写**单字节** ⭐ <c>1</c> = 开启自定义 / ⭐ <c>0</c> = 关闭 ✅；
+	/// ⭐ 写**两字节** `[子命令, 值]`：⭐ `2` = PL1(瓦) · ⭐ `3` = PL2(瓦) · ⭐ `4` = 温度墙(℃) ✅</para>
+	/// <para>⚠️⚠️ <b>重要的协议限制</b>：⭐ 功能号 23 ⭐ **只能写、读不回 PL1/PL2/温度墙的当前值** ⚠️
+	/// ⇒ ⭐ 所以本方法 ⭐ **只能"写后回读是否已开启"来确认**（⭐ 不能确认具体数值 ✅）
+	/// ⇒ ⭐ 调用方若要在界面上显示数值，⭐ **必须自己记住**（⭐ 本地记忆、⭐ 并明确标注 ⛔ 非从机器读回 ⚠️）。</para>
+	/// <para>⚠️ 合理性上限（⭐ 防手滑）：⭐ PL1/PL2 夹在 ⭐ `[5, 200]` 瓦 · ⭐ 温度墙夹在 ⭐ `[60, 105]` ℃ ✅。</para>
+	/// </summary>
+	internal bool TryApplyCpuPowerLimitViaBackend(bool enable, int pl1Watts, int pl2Watts, int tempWallC, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		try
+		{
+			if (!enable)
+			{
+				wmi.TrySetCpuCustomEnabled(false);
+				confirmed = wmi.TryReadCpuCustomEnabled(out bool offNow) && !offNow;
+				Logger.WriteLine($"宝龙达 功耗墙：⭐ 已关闭自定义 ⇒ 回读确认={confirmed}");
+				return true;
+			}
+			// ⭐ 顺序：⭐ 先设三个值 ⇒ ⭐ 最后才"开启" ✅（⭐ 免得中途以默认值生效一瞬间 ⚠️）
+			int pl1 = Math.Max(5, Math.Min(200, pl1Watts));
+			int pl2 = Math.Max(5, Math.Min(200, pl2Watts));
+			int wall = Math.Max(60, Math.Min(105, tempWallC));
+			bool ok1 = wmi.TrySetCpuLongPower((byte)pl1);
+			bool ok2 = wmi.TrySetCpuShortPower((byte)pl2);
+			bool ok3 = wmi.TrySetCpuTempWall((byte)wall);
+			if (!(ok1 && ok2 && ok3))
+			{
+				Logger.WriteLine($"宝龙达 功耗墙：⚠️ 有子命令写入失败（⭐ PL1={ok1} · ⭐ PL2={ok2} · ⭐ 温度墙={ok3}）⇒ 如实报告");
+			}
+			bool okOn = wmi.TrySetCpuCustomEnabled(true);
+			// ⭐ 回读确认（⭐ 只能确认"已开启"，⛔ 确认不了数值 ⚠️）
+			for (int attempt = 0; attempt < 5; attempt++)
+			{
+				if (wmi.TryReadCpuCustomEnabled(out bool now) && now)
+				{
+					confirmed = true;
+					Logger.WriteLine($"宝龙达 功耗墙：⭐ 已应用并确认开启 ✅（⭐ PL1={pl1}W · ⭐ PL2={pl2}W · ⭐ 温度墙={wall}℃"
+						+ " —— ⚠️ 数值是**我们下发的**，⭐ 协议读不回来 ⚠️）");
+					return true;
+				}
+				Thread.Sleep(150);
+			}
+			Logger.WriteLine($"宝龙达 功耗墙：⚠️ 写入完成但回读未确认（⭐ 开启写成功={okOn}）⇒ 如实报告 ⚠️");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 功耗墙：⭐ 操作异常（已吞掉）：" + ex.Message);
+			return true;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 风扇手动）：⭐ **意向方法** —— "⭐ 接管风扇并设两个通道的转速" ✅
+	/// <para>⭐ 宝龙达协议：⭐ 功能号 20 = 手动开关（⭐ 写 `[FanType, 0/1]` ✅）·
+	/// ⭐ 功能号 21 = 转速（⭐ 写 `[FanType, x100RPM]` ✅）。</para>
+	/// <para>⚠️⚠️ <b>本方法是全部功能里【风险最高】的一个</b>：⭐ 它会**真正改动机器的散热行为** ⚠️
+	/// ⇒ ⭐ 因此额外加了三道保险：
+	/// ⭐ ① ⭐ 先调 ⭐ <see cref="BaolongdaWmi.PrepareFanManualControl" />（⭐ 参考实现明确要求：
+	/// ⭐ 写风扇前先把官方控制台的手动开关**关掉**，⭐ "为避免与官方控制台冲突" ✅）；
+	/// ⭐ ② ⭐ 转数夹在 ⭐ `[0, 60]`（⭐ 即 **0~6000 RPM** ✅）—— ⭐ 保守上限，⛔ 不让人手滑写爆 ✅；
+	/// ⭐ ③ ⭐ `enable=false` 时 ⭐ **两个通道都写 0**（⭐ 交回固件自动控制 ✅）。</para>
+	/// <para>⚠️ <b>通道归属尚未确认</b>：⭐ 按参考实现（蛟龙16Pro）⭐ `FanType=0` = ⭐ **大扇/GPU** ·
+	/// ⭐ `FanType=1` = ⭐ **小扇/CPU** ⚠️ —— ⭐ 真机两组读数太接近，⭐ **还没交叉验证** ⚠️
+	/// ⇒ ⭐ 所以本方法**要求调用方显式传两个通道**（⭐ 而不是替它猜 ✅），⭐ 且日志把两个通道都记全 ✅。</para>
+	/// </summary>
+	internal bool TrySetFanManualViaBackend(bool enable, int firstChannelUnits100Rpm, int secondChannelUnits100Rpm, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		try
+		{
+			if (!enable)
+			{
+				// ⭐ 交回固件：⭐ 两个通道都写 0 ⇒ ⭐ 再关手动开关 ✅（⭐ 顺序与参考实现的"恢复"一致 ✅）
+				wmi.TrySetMaxFanSpeed(0, 0);
+				wmi.TrySetMaxFanSpeed(1, 0);
+				wmi.TrySetMaxFanSpeedSwitch(false);
+				confirmed = true;
+				Logger.WriteLine("宝龙达 风扇：⭐ 已交回固件自动控制（⭐ 两通道归零 ＋ ⭐ 手动开关关闭 ✅）");
+				return true;
+			}
+			// ⭐ 保险 ①：⭐ 先关官方控制台的手动开关（⭐ 参考实现的要求 ✅）
+			wmi.PrepareFanManualControl();
+			int a = Math.Max(0, Math.Min(60, firstChannelUnits100Rpm));
+			int b = Math.Max(0, Math.Min(60, secondChannelUnits100Rpm));
+			// ⚠️ 通道归属未确认 ⇒ 日志把"我们按什么理解"写全，⭐ 便于真机对照 ✅
+			bool okA = wmi.TrySetMaxFanSpeed(0, (byte)a);
+			bool okB = wmi.TrySetMaxFanSpeed(1, (byte)b);
+			bool okSw = wmi.TrySetMaxFanSpeedSwitch(true);
+			if (okA && okB && okSw)
+			{
+				confirmed = true;
+				Logger.WriteLine($"宝龙达 风扇：⭐ 已接管（⭐ 通道0={a * 100} RPM · ⭐ 通道1={b * 100} RPM ✅"
+					+ " · ⚠️ 通道归属按参考实现理解：0=大扇/GPU · 1=小扇/CPU ⚠️ 尚未真机交叉验证 ⚠️）");
+			}
+			else
+			{
+				Logger.WriteLine($"宝龙达 风扇：⚠️ 写入不完整（⭐ 通道0={okA} · ⭐ 通道1={okB} · ⭐ 开关={okSw}）⇒ 如实报告 ⚠️");
+			}
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 风扇：⭐ 操作异常（已吞掉）：" + ex.Message);
+			return true;
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 读一次宝龙达风扇转速（⭐ 只读 ✅）。⭐ 非宝龙达时返回 <c>false</c> ✅。
+	/// <para>⭐ 两个通道按参考实现理解为：⭐ `First` = 大扇/GPU · ⭐ `Second` = 小扇/CPU ⚠️（⭐ 待验证 ✅）。</para>
+	/// </summary>
+	internal bool TryReadFanSpeedsViaBackend(out int firstChannelRpm, out int secondChannelRpm)
+	{
+		firstChannelRpm = 0;
+		secondChannelRpm = 0;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		try
+		{
+			if (!wmi.TryReadFanSpeeds(out BaolongdaWmi.FanSpeeds speeds))
+			{
+				return false;
+			}
+			firstChannelRpm = (speeds.First > 0) ? speeds.First : 0;
+			secondChannelRpm = (speeds.Second > 0) ? speeds.Second : 0;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 风扇：⭐ 读取异常：" + ex.Message);
+			return false;
+		}
+	}
+
 	/// <summary>
 	/// 把本会话切到**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
 	/// <para>⭐ 与 <see cref="ApplyLegacyBackendAsync" /> 是**同一套路**（⭐ 替换能力位 ⇒ 起 3 s 定时刷新 ⇒ 立刻读一次 ⇒ 宣布就绪 ✅），
