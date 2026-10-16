@@ -158,6 +158,69 @@ Write-Section '02-ACPI-WMI接口.txt' 'ACPI / WMI 接口探测（本机有哪些
 	}
 	Add-Line $L ""
 
+	Add-Line $L "── ⭐⭐ MICommonInterface 实例枚举与试调用（⭐ 本工具最关键的一节）──"
+	Add-Line $L "  ⭐ 背景：宝龙达模具那套接口（⭐ 三份开源实现一致确认）是 root\WMI 的 MICommonInterface，"
+	Add-Line $L "     实例名形如 ACPI\PNP0C14\MIFS_0，方法 MiInterface（InData[32] => OutData）。"
+	Add-Line $L "  ⭐ 我们要确认三件事：① 你这台机的实例名 ② 类 GUID ③ 各功能号能不能调通。"
+	Add-Line $L "  ⚠️ 本节**只读**（只用 Get=250），⛔ 一个 Set 都不发、⛔ 不改任何设置。"
+	Add-Line $L ""
+	try {
+		$mc = New-Object System.Management.ManagementClass('root\WMI:MICommonInterface')
+		$mc.Get() | Out-Null
+		Add-Line $L "  ✅ 类 root\WMI:MICommonInterface 存在"
+		try {
+			$q = $mc.Qualifiers['Guid']
+			if ($q) { Add-Line $L ("     ⭐ 类 GUID = " + $q.Value + "   <-- ⭐ 请重点核对这个值") } else { Add-Line $L "     ⚠️ 该类没有 GUID 限定符（也请告诉我们）" }
+		} catch {}
+		Add-Line $L ""
+		$insts = $mc.GetInstances()
+		$n = 0
+		foreach ($inst in $insts) {
+			$n++
+			Add-Line $L ("  ⭐ 实例 #" + $n + " : " + $inst.Path.RelativePath)
+			try { foreach ($p in $inst.Properties) { if ($p.Name -notmatch '^__') { Add-Line $L ("      属性 " + $p.Name + " = " + ($p.Value)) } } } catch {}
+			$probes = @(
+				@{ No = 8;  Name = 'SystemPerMode（性能模式）';     Hint = '参考口径：OutData[4] = 0平衡 / 1增强 / 2静音' },
+				@{ No = 13; Name = 'CPUGPUFanSpeed（风扇转速）';    Hint = '参考口径：16 位小端；大扇1=[4..5] 大扇2=[6..7] 小扇=[10..11]' },
+				@{ No = 22; Name = 'CPUThermometer（CPU温度）';     Hint = '参考口径：OutData[4] = 摄氏度数' },
+				@{ No = 20; Name = 'MaxFanSpeedSwitch（风扇手动开关）'; Hint = '参考口径：OutData[4] = 0 关 / 1 开' },
+				@{ No = 15; Name = 'Ambientlight（LOGO灯）';        Hint = '参考口径：OutData[4] = 0 关 / 1 开' },
+				@{ No = 23; Name = 'CPUPower（功耗墙/温度墙）';      Hint = '参考口径：OutData[4] = 1 表示自定义已开启' }
+			)
+			foreach ($pr in $probes) {
+				try {
+					$ip = $inst.GetMethodParameters('MiInterface')
+					$buf = New-Object byte[] 32
+					$buf[1] = 250
+					$buf[3] = [byte]$pr.No
+					$ip['InData'] = $buf
+					$op = $inst.InvokeMethod('MiInterface', $ip, $null)
+					$out = $op['OutData']
+					if ($out) {
+						$hex = ($out | ForEach-Object { $_.ToString('X2') }) -join ' '
+						Add-Line $L ("      ⭐ 功能号 " + $pr.No + " · " + $pr.Name + " 调用成功")
+						Add-Line $L ("         OutData = " + $hex)
+						Add-Line $L ("         " + $pr.Hint)
+					} else {
+						Add-Line $L ("      ⚠️ 功能号 " + $pr.No + " · " + $pr.Name + " 返回空")
+					}
+				} catch {
+					Add-Line $L ("      ⚠️ 功能号 " + $pr.No + " · " + $pr.Name + " 调用失败: " + $_.Exception.Message)
+				}
+			}
+			Add-Line $L ""
+		}
+		Add-Line $L ("  ⭐ 实例总数 = " + $n)
+		if ($n -eq 0) {
+			Add-Line $L "  ⚠️ 一个实例都没有 ==> 这台机可能没有这套接口，或厂商驱动/服务还没起来。"
+			Add-Line $L "     请确认：① 官方控制台装了吗？ ② 装了的话**先把官方控制台打开**再重跑本脚本。"
+		}
+	} catch {
+		Add-Line $L ("  ⚠️ 类 root\WMI:MICommonInterface 不可用: " + $_.Exception.Message)
+		Add-Line $L "     ==> 这台机可能不是宝龙达模具，或厂商接口没装/没起来。"
+		Add-Line $L "     ==> 无论如何请把本文件整份发回（我们要看它到底有哪些类）。"
+	}
+	Add-Line $L ""
 	Add-Line $L "── 设备树里的 ACPI 设备（⭐ 宝龙达那套驱动的落点）──"
 	try {
 		Get-PnpDevice -ErrorAction Stop | Where-Object { $_.InstanceId -match 'ACPI' } | Sort-Object InstanceId | ForEach-Object {
