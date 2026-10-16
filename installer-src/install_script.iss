@@ -153,9 +153,9 @@ Source: "files\GCU\Uninstall-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversio
 ;      · 未证实：ACPI\INOU0000 这个设备在星耀真机上是否真的存在（需要真机只读查询）；
 ;      · 用户口径：「目前只是不确定和星耀是否通用，其他应该是通用的」。
 ; ============================================================================
-Source: "files\GCU\shared\UWACPIDriver\uwacpidriver.cat"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion
-Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.inf"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion
-Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.sys"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion
+Source: "files\GCU\shared\UWACPIDriver\uwacpidriver.cat"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion; Check: ShouldInstallGcu
+Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.inf"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion; Check: ShouldInstallGcu
+Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.sys"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion; Check: ShouldInstallGcu
 ; ============================================================================
 ; 2026-10-10（repack5）：用户把 base GCU 有意换成"老一点的 50 系 GCU"（50old 世代），
 ; 本段 [Files] 据此重排为"恰好引用磁盘上存在的文件"——删除 157 条磁盘已无的旧条目
@@ -209,12 +209,12 @@ Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.sys"; DestDir: "{app}\UWACPI
 ;      （它现在需要 -StagingRoot 指向一个含 payload\*.7z + 7za.exe 的目录，见其 .EXAMPLE）。
 ;      这是刻意的取舍：校验（Test-VendorPayloadSource）与落地都在同一个 setup 运行里完成。
 ; ============================================================================
-Source: "files\GCU\payload\1020.7z"; DestDir: "{tmp}"; Flags: dontcopy
-Source: "files\GCU\payload\30.7z"; DestDir: "{tmp}"; Flags: dontcopy
-Source: "files\GCU\payload\40.7z"; DestDir: "{tmp}"; Flags: dontcopy
-Source: "files\GCU\payload\50.7z"; DestDir: "{tmp}"; Flags: dontcopy
-Source: "files\GCU\payload\WJXY.7z"; DestDir: "{tmp}"; Flags: dontcopy
-Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy
+Source: "files\GCU\payload\1020.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+Source: "files\GCU\payload\30.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+Source: "files\GCU\payload\40.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+Source: "files\GCU\payload\50.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+Source: "files\GCU\payload\WJXY.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 ; --- shared\ 按【目的地】铺开（⛔ 不再整目录落 {app}\GCU\shared\；铺完 shared\ 这个层级就没有了）----
 ;   shared\UWACPIDriver\ 3 件 -> {app}\UWACPIDriver\（见上面那 3 条 Source）
 ;   shared\README.txt / NOTICE.txt -> {app}\GCU\（见本段末尾 2 条 Source）
@@ -226,8 +226,8 @@ Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy
 ;   落点定为 {app}\GCU\logo\Language\（与 {app}\GCU\AiStoneService\ 同级）。
 ;   ⚠️ 源目录已由 owner 从 shared\logo\ 移到 files\GCU\logo\（与 AiStoneService 同级的位置），
 ;      shared\logo\ 已不存在 —— 引用新路径，⛔ 不要再写 shared\logo\。
-Source: "files\GCU\logo\Language\en-us.json"; DestDir: "{app}\GCU\logo\Language"; Flags: ignoreversion
-Source: "files\GCU\logo\Language\zh-cn.json"; DestDir: "{app}\GCU\logo\Language"; Flags: ignoreversion
+Source: "files\GCU\logo\Language\en-us.json"; DestDir: "{app}\GCU\logo\Language"; Flags: ignoreversion; Check: ShouldInstallGcu
+Source: "files\GCU\logo\Language\zh-cn.json"; DestDir: "{app}\GCU\logo\Language"; Flags: ignoreversion; Check: ShouldInstallGcu
 ; ⭐ 厂商自带的两个说明文件（README.txt / NOTICE.txt）—— 落 {app}\GCU\（与 AiStoneService\ 同级）。
 ;   ⚠️ 2026-10-14（旧结构铁证，owner 已确认「按你建议来」）：旧结构 base 层 payload-old\GCU\ 的
 ;      【根下】就是这 5 个文件（install.bat / uninstall.bat / 清理官方控制台.bat / README.txt /
@@ -246,8 +246,8 @@ Source: "files\GCU\logo\Language\zh-cn.json"; DestDir: "{app}\GCU\logo\Language"
 ;                                   Remove-VendorConsole 覆盖同样名单且更全（还管 UWP/ARP/注册表）。
 ;   ⚠️ 三个 .bat 原本也从不被我们的流程调用（Install-Gcu.ps1 注释：nothing calls them automatically）。
 ;   ⚠️ 它们删的 "logo" 是官方控制台目录（C:\Program Files\OEM\*）里的，⛔ 不是 {app}\GCU\logo\，无冲突。
-Source: "files\GCU\shared\README.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion
-Source: "files\GCU\shared\NOTICE.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion
+Source: "files\GCU\shared\README.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu
+Source: "files\GCU\shared\NOTICE.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu
 
 ; 2026-10-08：删除原 [Dirs] 段的三条空目录条目（{app}\ru\ / {app}\sv\ / {app}\zh-Hant\）。
 ; 原因：本包只带 zh-CN 资源，[Files] 从不向这三个目录写任何文件，而 [Dirs] 会无条件创建它们，
@@ -293,7 +293,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 ;     解进 {tmp}（见该函数）。Install-Gcu.ps1 从这里取载荷、解压、然后把这两样删掉，
 ;     所以 {app}\GCU 下永远不会出现 payload\ 或 7za.exe。
 ;     ⚠️ -TargetDir 仍是 "{app}\GCU"，解压产物落 {app}\GCU\AiStoneService。
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\GCU\Install-Gcu.ps1"" -StagingRoot ""{tmp}"" -TargetDir ""{app}\GCU"" -Variant {code:GetGcuVariantParam} -InstallerVersion ""18.3"" -LogDir ""{commonappdata}\L-Mechrevo\logs"" -AppExe ""{app}\L-Mechrevo.exe"" {code:GetVendorConsoleParam}"; StatusMsg: "{cm:GcuStatus}"; 
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\GCU\Install-Gcu.ps1"" -StagingRoot ""{tmp}"" -TargetDir ""{app}\GCU"" -Variant {code:GetGcuVariantParam} -InstallerVersion ""18.3"" -LogDir ""{commonappdata}\L-Mechrevo\logs"" -AppExe ""{app}\L-Mechrevo.exe"" {code:GetVendorConsoleParam}"; StatusMsg: "{cm:GcuStatus}"; Check: ShouldInstallGcu
 ; ⚠️ 2026-10-13（本轮回退 Check）：⛔ 这里【不再】用 Check: IsNet10RuntimeReady 门控。
 ;    理由：门控 = 缺运行时时连壳都不启动 = 用户装完什么都看不到（用户原话：「不静默安装用户跳过了.net
 ;    也不停止，只需要在 LM 启动的时候如果没有 .net10 再提示就行」）。
@@ -2381,6 +2381,84 @@ end;
 //   ⚠️ 解不出任何一件 = 载荷不可能装上 ⇒ 返回非空字符串让 Inno 中止安装。这是刻意的：
 //      宁可不装，也不要装出一个没有 GCU 本体的半成品（那正是上一版留下的坏状态）。
 // ============================================================================
+// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达模具适配）：⭐ 宝龙达机型【不安装 GCU】的判据
+//   ⭐ 用户原话：「对于蛟龙16Pro 30系 40系 不安装GCU 走宝龙达路」
+//   ⚠️⚠️ 用户补充澄清（⭐ 关键，⭐ 它决定了判据形态）：
+//      「注意不要改蛟龙其他机型已经50系的蛟龙 其他都是同方模具的 只有30 40系的蛟龙16pro不是」
+//      ⇒ ⭐ **只有 蛟龙16Pro 的 30系 / 40系 是宝龙达模具** ✅
+//      ⚠️ 其余蛟龙（⭐ **含 50 系蛟龙**）**都是同方模具** ⇒ ⭐ **照旧装 GCU** ✅
+//   ⛔ 因此【绝不能】用「型号串含 Jiaolong」当判据 —— ⚠️ 50 系蛟龙也含它 ⇒ **会误伤** ❌
+//   ⛔ 也【不能】用「有 MICommonInterface」当主判据 —— ⚠️ 同方机型**也有**这个 WMI 类 ❌
+//   ⭐ 判据 = 【白名单式】（⭐ 原则：⭐ 宁可不跳过，⭐ 也绝不误伤同方 ✅）：
+//      ⭐ ① 板号**精确命中** `MRID6-23` ⇒ 跳过 GCU
+//         （⭐ 依据：⭐ 三台真机抓包一致 ✅，⭐ 配置 RTX 4060 / 4070 ⇒ 即"40 系" ✅）
+//      ⭐ ② 扩展：板号以 `MRID6-` 开头 ⇒ 跳过
+//         ⭐ **与后端 `BaolongdaBackend` 的判据【逐条一致】**（⭐ 父 agent 2026-10-16 明确要求对齐 ⚠️）：
+//            ⭐ 后端也是「`MRID6-23` 精确 ＋ `MRID6-` 前缀放行 ＋ 其余不认 ＋ 读不到按不是宝龙达」✅
+//            ⭐ ⇒ ⭐ 两路结论**永远一致**（⭐ 要么都走宝龙达、⭐ 要么都装 GCU ✅）
+//         ⚠️⚠️ **未验证风险（⭐ 必须记档 ⚠️）**：⭐ 若**某个 `MRID6-*` 其实是同方模具** ⚠️
+//            ⇒ ⭐ 会被误判 ⇒ ⭐ **不装 GCU ⇒ 功能缩水**（⭐ 静默、⭐ 难查 ⚠️）
+//            ⭐ 依据：⭐ 用户判断 30/40 系都是 `MRID6-*`（⭐ 40 系已知 `MRID6-23` ✅；⭐ 30 系**未证实** ⚠️）
+//            ⭐ ⇒ ⭐ 按用户判断走 ✅，⭐ 但**列为待真机确认项** ⚠️
+//         ⭐ 要**收紧**成"只认精确命中"⇒ ⭐ 把下面那个 `if` 的条件最前面加上 `False and ` 即可（⭐ 一处 ✅）
+//      ⭐ ③ **其余一切情况**（⭐ 含读取失败 / ⭐ 值缺失 / ⭐ 任何不确定）⇒ ⭐ **照旧装 GCU** ✅
+//   ⭐ 注册表来源（⭐ 真机抓包实证 ✅）：`HKLM\HARDWARE\DESCRIPTION\System\BIOS`
+//      ⭐ `BaseBoardProduct`（⭐ = `MRID6-23` ✅）· ⭐ `SystemProductName`（⭐ = `Jiaolong Series MRID6` ✅）
+//      ⭐ 用注册表而**不用 WMI**：⭐ ① Inno Pascal 读注册表是一行、⭐ 无需 COM/WMI ✅
+//         ⭐ ② 这两项与 WMI 的 `Win32_BaseBoard.Product` / `Win32_ComputerSystemProduct.Name` 同源 ✅
+//   ⚠️ 刻意**不用全局变量缓存**：⭐ 一是避开"⭐ 全局 var 段该放哪"⭐ 的语法风险 ⚠️、
+//      ⭐ 二是 Inno 的 `Check:` 逐条调用，⭐ 每次两次注册表读取**可以忽略** ✅
+//   ⚠️ 只在**安装期**用它决定"装不装 GCU"；⛔ 那三个 ps1 仍**无条件安装**（⭐ 卸载要用 ✅）
+function IsBaolongdaMold(): Boolean;
+var
+  Board: String;
+  Model: String;
+  BoardU: String;
+  ModelU: String;
+begin
+  Result := False;
+  Board := '';
+  Model := '';
+  try
+    RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardProduct', Board);
+    RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'SystemProductName', Model);
+    BoardU := Uppercase(Board);
+    ModelU := Uppercase(Model);
+    // ⭐ ① 白名单：精确命中（真机证据 ✅）
+    if BoardU = 'MRID6-23' then
+    begin
+      Log('LM-GCU-SKIP: 板号 = MRID6-23（宝龙达模具 · 蛟龙16Pro 40系）=> 本机【不安装 GCU】');
+      Result := True;
+      Exit;
+    end;
+    // ⭐ ② 扩展：板号前缀 MRID6-（⭐ 与后端判据逐条一致 ✅）
+    //    ⚠️ 待真机确认（30 系板号未证实）；⭐ 要收紧成"只认精确命中"就把这行条件加上 False and
+    if Copy(BoardU, 1, 6) = 'MRID6-' then
+    begin
+      Log('LM-GCU-SKIP: 板号 = ' + Board + '（MRID6- 前缀 · 宝龙达模具 · 待真机确认）=> 本机【不安装 GCU】');
+      Result := True;
+      Exit;
+    end;
+    Log('LM-GCU-SKIP: 判据未命中 => 照旧安装 GCU；板号=' + Board + ' · 型号=' + Model);
+  except
+    // ⚠️ 任何异常 ⇒ ⭐ 不跳过（照旧装 GCU）—— ⭐ 保守优先，⛔ 绝不因判据异常而改变现有行为 ✅
+    Log('LM-GCU-SKIP: 判据读取异常 => 按【非宝龙达】处理，照旧安装 GCU');
+    Result := False;
+  end;
+end;
+
+// ⭐ [Files] / [Run] 的 `Check:` 参数用这个（⭐ 名字直说"该不该装 GCU" ✅）。
+//   ⭐ 返回 False ⇒ ⭐ Inno 跳过该条目 ✅；⭐ 返回 True ⇒ ⭐ 照旧安装 ✅。
+//   ⚠️ Inno 的 `Check:` 语义 = "返回 True 才处理这一条" ✅ ⇒ 所以这里取反 ✅。
+//   ⚠️⚠️ **原型必须是【无参】的** `function Name: Boolean` —— ⚠️ 实测写成
+//      `function Name(Param: String): Boolean` 会被 ISCC 拒绝：
+//      「Invalid prototype for 'ShouldInstallGcu'」⇒ ⭐ 编译中止 ❌
+//      （⭐ 带 `Param: String` 的那种只适用于 `{code:Name}` 常量展开，⛔ 不适用于 Check ✅）
+function ShouldInstallGcu(): Boolean;
+begin
+  Result := not IsBaolongdaMold();
+end;
+
 function ExtractGcuStagingTemporaries(): String;
 var
   I: Integer;
@@ -2389,6 +2467,18 @@ var
 begin
   Result := '';
   Failed := '';
+  // ⭐⭐ 2026-10-16（宝龙达适配）：⭐ **宝龙达机型必须在这里提前退出** ✅
+  //   ⚠️ 理由（⭐ 这是个**真会踩到的坑** ⚠️）：⭐ 上面那 6 件载荷在 [Files] 里带了
+  //      `Check: ShouldInstallGcu` ⇒ ⭐ 宝龙达机型上它们**不随安装包准备** ✅
+  //      ⇒ ⭐ 若还去 `ExtractTemporaryFile` ⇒ ⭐ **每一件都失败** ⇒ ⭐ `Failed` 非空
+  //      ⇒ ⭐ 返回非空 ⇒ ⭐ `PrepareToInstall` 会 `Exit` ⇒ ⭐ ⭐ **安装被中止** ❌❌
+  //   ⇒ ⭐ 所以这里必须**先判、先退出** ✅（⭐ 宝龙达本来就不装 GCU，⭐ 无需载荷 ✅）
+  if IsBaolongdaMold() then
+  begin
+    Log('LM-GCU-SKIP: 宝龙达机型 => 跳过 GCU 载荷解压（本机不安装 GCU，无载荷需求）');
+    Result := '';
+    Exit;
+  end;
   // ⚠️ 用 TArrayOfString + SetArrayLength（本文件 [Code] 里既有的写法），⛔ 不用
   //    「const <name>: array[0..5] of String = (...)」——Inno 的 Pascal Script 不接受
   //    函数内 const 段里的定长数组字面量，会直接报 "'BEGIN' expected" 编译中止。
