@@ -131,7 +131,7 @@ public class LightForm : RForm
 		};
 		sliderLight.ValueChanged += (object? _, EventArgs _) =>
 		{
-			_light = Math.Clamp(sliderLight.Value * 4 / 100, 0, 4);
+			_light = Math.Clamp(sliderLight.Value * 4 / 100, 0, Program.hw?.UsesBaolongda == true ? 3 : 4);
 			ScheduleEffectUpdate();
 		};
 		AddRow(Strings.Brightness, sliderLight);
