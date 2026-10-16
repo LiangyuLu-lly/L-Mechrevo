@@ -400,11 +400,16 @@ public class MechrevoService
 			// ⭐⭐ 2026-10-15（C-1 第 2 步，对照 A-22）：老机型后端**不走 GCU** —— 这里单独一支：
 			// 视觉档 0/1/2 映射到老接口的内部档，档 3（自定义）老接口根本没有 ⇒ 直接判失败（⛔ 不假装可写）。
 			// ⚠️ GCU 分支（下面那一整段）**一字未动**，本机走的就是它。
-			if (hw != null && hw.UsesLegacyMifs)
+			// ⭐⭐ 2026-10-16（宝龙达适配）：⭐ 判据由 `UsesLegacyMifs` 放宽为 **`UsesBuiltInModes`**
+			//   ⇒ ⭐ 宝龙达（蛟龙16Pro 等）**也走这一支** ✅ —— ⭐ 因为两者**协议同族、档位映射逐字相同**
+			//     （⭐ 真机已验证：⭐ 静音→MIFS 2 · ⭐ 平衡→MIFS 0 · ⭐ 狂暴→MIFS 1 ✅）
+			//   ⇒ ⭐ 且 `SwitchLegacyModeAsync` 内部已经是"谁在管事就调谁"（⭐ 见 `SwitchBuiltInModeAsync` ✅）
+			//   ⚠️ 老同方机型上 `UsesBaolongda` 恒为 false ⇒ ⭐ 行为与改动前逐位一致 ✅。
+			if (hw != null && hw.UsesBuiltInModes)
 			{
 				if (mode == 3)
 				{
-					Logger.WriteLine($"MechrevoService.SwitchMode({mode}) 老接口后端不支持自定义档");
+					Logger.WriteLine($"MechrevoService.SwitchMode({mode}) 内置档位后端（老接口/宝龙达）不支持自定义档");
 					return ModeSwitchResult.Failed;
 				}
 				bool legacyOk = await hw.SwitchLegacyModeAsync((int)PowerModeMapping.FromVisualMode(mode), requestCts.Token).ConfigureAwait(continueOnCapturedContext: false);

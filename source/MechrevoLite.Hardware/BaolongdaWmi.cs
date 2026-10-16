@@ -32,7 +32,10 @@
 // 见 THIRD-PARTY-NOTICES.md 与 LICENSES\。
 
 using System;
+using System.IO;
 using System.Management;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MechrevoLite.Hardware;
 
@@ -432,8 +435,72 @@ internal sealed class BaolongdaWmi : IDisposable
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
-	//  ① 性能模式（⭐ 与 LegacyMifsWmi 同一套映射，⭐ 已核对正确 —— 见笔记 4.1）
+	//  ① 性能模式（⭐ 与 LegacyMifsWmi 同一套映射 —— 见笔记 4.1）
+	//     ⭐⭐ 2026-10-16 真机【实测证实】：⭐ 平衡→raw 0 · ⭐ 增强→raw 1 · ⭐ 静音→raw 2 ✅
+	//        且静音档风扇明显更低（2743 RPM vs 3054）⇒ ⭐ 语义没搞反，⭐ 物理上也自洽 ✅
 	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>最近一次读/写是否成功（⭐ 与 <c>LegacyMifsWmi.Available</c> 同款语义 ✅）。</summary>
+	internal bool Available { get; private set; }
+
+	private long _version;
+
+	/// <summary>
+	/// 读一次档位并打包成 <see cref="LegacyMifsSnapshot" />。
+	/// <para>⭐ 刻意**复用老接口的快照类型**（⭐ 协议同族 ✅）⇒ ⭐ <c>MechrevoHw</c> 的刷新/切档逻辑
+	/// 可以**一套代码管两种后端**，⛔ 不必复制一份 ✅</para>
+	/// <para>⚠️ 失败时置 <see cref="Available" />=<c>false</c> 并**原样抛出**（⭐ 与 <c>LegacyMifsWmi.ReadMode</c> 同款约定 ✅）。</para>
+	/// </summary>
+	internal LegacyMifsSnapshot ReadMode()
+	{
+		lock (_gate)
+		{
+			ObjectDisposedException.ThrowIf(_disposed, this);
+			try
+			{
+				// ⚠️ 这里**不能**调 TryReadOperatingMode（⭐ 它内部也要 lock _gate ⇒ ⭐ C# 的 lock 可重入，
+				//    所以其实**可以**调；⭐ 但为清晰起见仍走它 ✅ —— lock 可重入这点已确认 ✅）
+				if (!TryReadOperatingMode(out int operatingMode))
+				{
+					throw new IOException("宝龙达 MIFS 读档位失败（详见上一行日志）。");
+				}
+				Available = true;
+				return new LegacyMifsSnapshot(operatingMode, ++_version);
+			}
+			catch
+			{
+				Available = false;
+				throw;
+			}
+		}
+	}
+
+	/// <summary>
+	/// 写档位 ＋ 内部最多 5 次回读确认（⭐ 150 ms 间隔）—— ⭐ 与 <c>LegacyMifsWmi.SwitchModeAsync</c> 同款 ✅
+	/// <para>⭐ <paramref name="operatingMode" /> 取内部口径 <c>0..2</c>。</para>
+	/// <para>⚠️ 真机实测：⭐ 该机型只有 3 档 ⇒ ⭐ 写 3 会被 <see cref="TrySetOperatingMode" /> 拒绝 ✅。</para>
+	/// </summary>
+	internal async Task<bool> SwitchModeAsync(int operatingMode, CancellationToken ct)
+	{
+		await Task.Run(delegate
+		{
+			ct.ThrowIfCancellationRequested();
+			if (!TrySetOperatingMode(operatingMode))
+			{
+				throw new IOException("宝龙达 MIFS 写档位失败（详见上一行日志）。");
+			}
+		}, ct).ConfigureAwait(continueOnCapturedContext: false);
+		for (int attempt = 0; attempt < 5; attempt++)
+		{
+			ct.ThrowIfCancellationRequested();
+			if ((await Task.Run((Func<LegacyMifsSnapshot>)ReadMode, ct).ConfigureAwait(continueOnCapturedContext: false)).OperatingMode == operatingMode)
+			{
+				return true;
+			}
+			await Task.Delay(150, ct).ConfigureAwait(continueOnCapturedContext: false);
+		}
+		return false;
+	}
 
 	/// <summary>
 	/// 读性能模式，⭐ 返回值与 <see cref="MechrevoHw.OperatingMode" /> 同一口径（⭐ `ConsoleOperatingMode`）：

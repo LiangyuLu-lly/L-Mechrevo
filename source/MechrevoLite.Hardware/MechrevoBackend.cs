@@ -1,4 +1,4 @@
-﻿// 2026-10-15（C-1 第 2 步「后端化」）：把「本机走哪个后端」从写死的「有 GCU / 没 GCU」抽成**有序候选表**。
+// 2026-10-15（C-1 第 2 步「后端化」）：把「本机走哪个后端」从写死的「有 GCU / 没 GCU」抽成**有序候选表**。
 // 用途：MechrevoHw 启动时按 MechrevoBackendOrder.Candidates 顺序**逐个探测**，第一个可用的即为 ActiveBackend。
 // ⭐ 以后新增后端（例如宝龙达模具那套另行准备的 ACPI 驱动）**只需加一项**：
 //     ① MechrevoBackendKind 加枚举值；② 写一个「返回非 null 即成功」的探测委托；③ 加进 Candidates 数组。
@@ -73,12 +73,15 @@ internal static class MechrevoBackendOrder
 	internal static readonly MechrevoBackendProbe[] Candidates = new MechrevoBackendProbe[4]
 	{
 		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => MechrevoHw.IsGcuServiceInstalled ? MechrevoHw.GcuBackendMarker : null),
-		new MechrevoBackendProbe(MechrevoBackendKind.LegacyMifs, () => LegacyMifsWmi.TryCreate()),
-		// ⭐ 2026-10-16（0.291.9 · 宝龙达适配第 1 步）：放在 **GCU 无条件兜底之前** ——
-		//   ⚠️ 它现在**恒返回 null**（骨架阶段 + 默认不启用）⇒ 对现有全部机型都是空跑，
-		//   行为与改动前逐字一致 ✅；等将来实现真实探测后自然在这里生效。
-		//   ⭐ 位置理由：宝龙达机型**没有 GCU 服务**、也**没有同方老接口** ⇒ 天然落在这一格。
+		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配第 3 步）：⭐ **提到老接口【之前】** ✅
+		//   ⭐ 理由（⭐ 真机实测得出 ⚠️）：⭐ 宝龙达机型的 `MICommonInterface` **类 GUID 与老同方那份完全一致**
+		//     （⭐ `b60bfb48-3e5b-49e4-a0e9-8cffe1b3434b` ✅）⇒ ⭐ 老接口的 GUID 校验**也会通过** ⚠️
+		//     ⇒ ⭐ 若把宝龙达放在后面，⭐ 它**永远轮不到**，⭐ 新接的风扇/温度/灯效就都用不上 ✅
+		//   ⚠️ 不会误伤老机型：⭐ `BaolongdaWmi.TryCreate` 要求 **真读一次 CPU 温度（功能号 22）** 才算活体 ✅；
+		//      ⭐ 老机型读不到就是 null ⇒ ⭐ 自动落到下一格 `LegacyMifs` ⇒ ⭐ 行为与改动前一致 ✅。
+		//   ⚠️ 也不能放在 GCU **之前**：⭐ `IsGcuServiceInstalled` 为真说明这台机该走 GCU（⭐ 见上面那段注释 ⚠️）。
 		new MechrevoBackendProbe(MechrevoBackendKind.Baolongda, () => BaolongdaBackend.TryCreate()),
+		new MechrevoBackendProbe(MechrevoBackendKind.LegacyMifs, () => LegacyMifsWmi.TryCreate()),
 		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => MechrevoHw.GcuBackendMarker),
 	};
 

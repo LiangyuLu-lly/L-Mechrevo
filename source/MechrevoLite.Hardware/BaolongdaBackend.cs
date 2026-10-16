@@ -92,16 +92,18 @@ internal sealed class BaolongdaBackend : IDisposable
 			Logger.WriteLine($"宝龙达后端：⭐ 探测到接口 —— 实例=\"{wmi.InstancePath}\" · 类GUID={(wmi.ClassGuid.Length == 0 ? "(无)" : wmi.ClassGuid)} "
 				+ $"· 风扇={wmi.FanCount} 个 · 模式={wmi.ModeCount} 档 ⇒ {guidNote}");
 
-			// ── ⭐ 接管仍需显式开关（⭐ 真机验证前保持保守）──
-			if (!IsTakeoverEnabled())
+			// ── ⭐⭐ 2026-10-16（第 3 步 · 接入 UI）：⭐ **不再默认挡住** ✅ ──
+			//   ⭐ 之前必须设 `LMECHREVO_BAOLONGDA_BACKEND=1` 才接管（⭐ 那时协议还没真机验证 ⚠️）。
+			//   ⭐⭐ 现在协议**已经真机验证**（⭐ 2026-10-16 · 机器 C：⭐ 6 个功能号全部可读、
+			//      ⭐ 档位语义与我们完全一致 ✅）⇒ ⭐ **探到就接管** ✅
+			//   ⚠️ 但保留一个**反向开关**（⭐ 排障用 ✅）：⭐ 显式设成 ⭐ `0` ⇒ ⭐ 跳过本后端 ✅
+			if (IsDisabledByEnvVar())
 			{
-				Logger.WriteLine($"宝龙达后端：⭐ 本版**默认不接管**（尚未真机验证）⇒ 继续按原候选表探测；"
-					+ $"⭐ 要在本机试用请设环境变量 {EnableEnvVar}=1 后重启（⭐ 设了就会由我们接管性能档/风扇等）");
+				Logger.WriteLine($"宝龙达后端：⭐ 已被环境变量 {EnableEnvVar}=0 显式禁用 ⇒ 跳过（⭐ 排障用）");
 				wmi.Dispose();
 				return null;
 			}
-
-			Logger.WriteLine($"宝龙达后端：⭐ 已由环境变量 {EnableEnvVar}=1 启用接管（⭐ 真机调试模式）");
+			Logger.WriteLine("宝龙达后端：⭐ 协议已真机验证（2026-10-16）⇒ ⭐ 接管本会话（性能档；其余功能等接线）");
 			return new BaolongdaBackend(wmi);
 		}
 		catch (Exception ex)
@@ -112,12 +114,17 @@ internal sealed class BaolongdaBackend : IDisposable
 		}
 	}
 
-	/// <summary>是否允许接管（⭐ 只在环境变量显式为 <c>1</c> 时 ✅；⭐ 只读环境变量，⛔ 不写配置/注册表）。</summary>
-	private static bool IsTakeoverEnabled()
+	/// <summary>
+	/// ⭐ 是否被**显式禁用**（⭐ 只在环境变量恰为 <c>0</c> 时 ✅）。
+	/// <para>⚠️ 语义在 2026-10-16 第 3 步**反转**了：⭐ 以前是"设 <c>1</c> 才启用"（⭐ 协议未验证时保守 ⚠️），
+	/// 现在是 ⭐ **"探到就启用、设 <c>0</c> 才禁用"**（⭐ 协议已真机验证 ✅）—— ⭐ 保留它是为了**排障** ✅
+	/// （⭐ 万一某台机上接管后不对劲，⭐ 用户/我们能让它退回老接口或 GCU 路径 ✅）。</para>
+	/// </summary>
+	private static bool IsDisabledByEnvVar()
 	{
 		try
 		{
-			return string.Equals(Environment.GetEnvironmentVariable(EnableEnvVar)?.Trim(), "1", StringComparison.Ordinal);
+			return string.Equals(Environment.GetEnvironmentVariable(EnableEnvVar)?.Trim(), "0", StringComparison.Ordinal);
 		}
 		catch
 		{

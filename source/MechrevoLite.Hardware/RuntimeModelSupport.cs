@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Probe;
 
 namespace MechrevoLite.Hardware;
@@ -26,10 +26,17 @@ public static class RuntimeModelSupport
 			// 老接口（root\WMI:MICommonInterface，以及将来给宝龙达准备的那套）**不经过 GCU、也不依赖
 			// ACPI 机型码** ⇒ 只要探到它就一律判支持，与 ACPIDriver 能不能打开无关。
 			// 本机（GCU 机型）`UsesLegacyMifs` 恒 false ⇒ 这一支进不来，行为与改动前逐位一致。
+			// ⭐⭐ 2026-10-16（宝龙达适配）：⭐ 判据放宽为 `UsesBuiltInModes` ⇒ ⭐ 宝龙达机型**也判支持** ✅
+			//   （⭐ 两者都"不经过 GCU、也不依赖 ACPI 机型码" ✅ —— ⭐ 真机实测宝龙达机型拿不到 GCU 那套 ✅）
 			MechrevoHw legacyHw = Program.hw;
 			if (legacyHw != null && legacyHw.UsesLegacyMifs)
 			{
 				return SupportDecision.Supported("MICommonInterface");
+			}
+			if (legacyHw != null && legacyHw.UsesBaolongda)
+			{
+				// ⭐ 宝龙达走这里 —— ⭐ 与老接口**同样的判据**（⭐ 探到就判支持，⭐ 不看 ACPIDriver 能不能开 ✅）
+				return SupportDecision.Supported("Baolongda");
 			}
 			if (!AcpiDriverReadTransport.TryOpen(out AcpiDriverReadTransport transport, out string error) || transport == null)
 			{
@@ -88,6 +95,13 @@ public static class RuntimeModelSupport
 			// ⇒ 必须看 GCU 连接而不是 IsConnected，否则老接口机型会被误判成 "GCU 已服务"。
 			// ⚠️ 老接口机型另有单独一支（按 UsesLegacyMifs 返回 MICommonInterface），见下方分支。
 			if (hw != null && hw.IsGcuConnected)
+			{
+				return true;
+			}
+			// ⭐⭐ 2026-10-16（宝龙达适配）：⭐ 「有厂商后端在服务这台机器」也算 ——
+			//   ⭐ 老同方（老接口）与 ⭐ 宝龙达都是**不经 GCU** 的后端 ⇒ ⭐ 它们活着就说明这台机被服务着 ✅
+			//   ⚠️ 老同方机型上 `UsesBaolongda` 恒 false ⇒ ⭐ 与改动前一致 ✅。
+			if (hw != null && hw.UsesBuiltInModes)
 			{
 				return true;
 			}

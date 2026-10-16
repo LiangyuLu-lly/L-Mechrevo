@@ -166,6 +166,13 @@ public class MechrevoHw : IDisposable
 	//    每个都会多出一条 CS8632 警告（本文件已有 170+ 条同类）。运行时语义完全相同。
 	private LegacyMifsWmi _legacyMifs;
 
+	// ⭐⭐ 2026-10-16（0.291.9 beta22.9 · 宝龙达适配）：宝龙达模具后端（⭐ 蛟龙16Pro 等）。
+	//     ⭐ 它**协议上与 LegacyMifsWmi 同族**（⭐ 同一个 root\WMI:MICommonInterface / 250-251 / 功能号 8 ✅），
+	//     但**能力更全**（⭐ 风扇 · ⭐ CPU温度 · ⭐ LOGO灯 · ⭐ 功耗墙 ✅）。
+	//     ⭐⭐ 真机已验证（⭐ 2026-10-16 · 机器 C）：⭐ 6 个功能号全部可读，⭐ 档位语义与我们完全一致 ✅
+	//     ⇒ ⭐ 因此**复用老接口那一整套刷新/切档管线**（⭐ 见 ReadBuiltInMode / SwitchBuiltInModeAsync ✅）。
+	private BaolongdaBackend _baolongda;
+
 	private Timer _legacyTimer;
 
 	private long _legacySnapshotVersion;
@@ -1787,7 +1794,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⚠️ 判据是**后端在不在**，不是"有没有跟 GCU 说过话"：老接口在而 GCU 从未连上时本属性为 true
 	/// ⇒ 依赖 GCU 上报的功能仍必须各自用 <see cref="IsGcuConnected" /> / 能力位把关（已逐点分类，见本轮报告 ②）。
 	/// </summary>
-	public bool IsConnected => UsesLegacyMifs || IsGcuConnected;
+	public bool IsConnected => UsesBuiltInModes || IsGcuConnected;
 
 	/// <summary>
 	/// 2026-10-15（C-1 第 2 步）：本会话是否在用**老机型 WMI 后端**（<c>root\WMI:MICommonInterface</c>）。
@@ -1796,6 +1803,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// 退回 GCU 语义 —— 3 s 定时器会自己把它刷回来。
 	/// </summary>
 	internal bool UsesLegacyMifs => _legacyMifs != null;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达适配）：本会话是否在用**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
+	/// 判据是「探测到过该对象」（<c>_baolongda != null</c>）—— ⚠️ 与 <see cref="UsesLegacyMifs" /> 同款约定
+	/// （⛔ 不看瞬时可用性 ✅）。
+	/// </summary>
+	internal bool UsesBaolongda => _baolongda != null;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16：本会话是否在用**任一种"内置档位"后端**（⭐ 老同方 或 ⭐ 宝龙达 ✅）。
+	/// <para>⭐ 存在的理由：⭐ 两者**协议同族、档位映射逐字相同**（⭐ 真机已验证 ✅）⇒
+	/// 凡"老接口走这条路"的判断，⭐ 宝龙达**也应该走同一条** ✅。</para>
+	/// <para>⚠️ <see cref="UsesLegacyMifs" /> 的**语义保持原样**（⛔ 不扩宽）⇒ 已有引用点行为逐位不变 ✅；
+	/// 需要"两者都算"的地方**显式改读本属性**（⭐ 当前只有 <c>MechrevoService.SwitchMode</c> 一处 ✅）。</para>
+	/// </summary>
+	internal bool UsesBuiltInModes => _legacyMifs != null || _baolongda != null;
+
+	/// <summary>⭐ 宝龙达后端的原始协议对象（⭐ 供温度/风扇/灯效等**后续功能**接入；⭐ 现在只为档位服务 ✅）。</summary>
+	internal BaolongdaWmi BaolongdaWmi => _baolongda?.Wmi;
 
 	/// <summary>
 	/// 2026-10-09（批次3 #7）：**传输**层（TCP/MQTT 连接本身）是否活着。
@@ -2420,15 +2446,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// </summary>
 	internal async Task<bool> RefreshLegacyModeAsync(CancellationToken ct = default(CancellationToken))
 	{
-		LegacyMifsWmi legacy = _legacyMifs;
-		if (legacy == null || _disposed)
+		// ⭐⭐ 2026-10-16（宝龙达适配）：⭐ 这里从"只认老接口"改成**认两种后端** ——
+		//     ⭐ 两者协议同族（⭐ 同一个 MICommonInterface / 250-251 / 功能号 8 ✅）⇒
+		//     ⭐ 读档位这一件事**一套代码就够**（⭐ 见 ReadBuiltInMode ✅）。
+		//     ⚠️ 老同方机型上 `_baolongda` 恒为 null ⇒ ⭐ 行为与改动前**逐位一致** ✅。
+		if (!UsesBuiltInModes || _disposed)
 		{
 			return false;
 		}
 		await _legacyRefreshGate.WaitAsync(ct).ConfigureAwait(continueOnCapturedContext: false);
 		try
 		{
-			LegacyMifsSnapshot snapshot = await Task.Run((Func<LegacyMifsSnapshot>)legacy.ReadMode, ct).ConfigureAwait(continueOnCapturedContext: false);
+			LegacyMifsSnapshot snapshot = await Task.Run((Func<LegacyMifsSnapshot>)ReadBuiltInMode, ct).ConfigureAwait(continueOnCapturedContext: false);
 			bool changed;
 			lock (_legacyStateGate)
 			{
@@ -2471,14 +2500,87 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// </summary>
 	internal async Task<bool> SwitchLegacyModeAsync(int operatingMode, CancellationToken ct)
 	{
-		LegacyMifsWmi legacy = _legacyMifs;
-		if (legacy == null || operatingMode < 0 || operatingMode > 2)
+		if (!UsesBuiltInModes || operatingMode < 0 || operatingMode > 2)
 		{
 			return false;
 		}
-		bool confirmed = await legacy.SwitchModeAsync(operatingMode, ct).ConfigureAwait(continueOnCapturedContext: false);
+		bool confirmed = await SwitchBuiltInModeAsync(operatingMode, ct).ConfigureAwait(continueOnCapturedContext: false);
 		await RefreshLegacyModeAsync(ct).ConfigureAwait(continueOnCapturedContext: false);
 		return confirmed && OperatingMode == operatingMode;
+	}
+
+	// ══════════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-16（宝龙达适配）：「内置档位」的两个**共用入口**
+	//
+	//  ⭐ 为什么共用：⭐ 老同方（`LegacyMifsWmi`）与宝龙达（`BaolongdaWmi`）**协议同族**：
+	//     · 同一个 `root\WMI:MICommonInterface`、同一个实例
+	//     · 同样 `InData[1]` = 250/251、`InData[3]` = 功能号 8
+	//     · ⭐ **档位映射逐字相同**（⭐ 真机已验证：⭐ 平衡→0 · ⭐ 增强→1 · ⭐ 静音→2 ✅）
+	//  ⇒ ⭐ 所以「读一次档位 / 写一次档位」只需要**一套代码**，⭐ 换的只是**调用哪个对象** ✅
+	//  ⇒ ⛔ 不复制两份（⭐ 复制两份以后必然只改一处 ✅）
+	// ⚠️ 优先级：⭐ 同一会话里**只会有一个**（⭐ 候选表探到谁就是谁 ✅）。
+	// ══════════════════════════════════════════════════════════════════════════
+
+	/// <summary>读一次档位（⭐ 老同方 或 ⭐ 宝龙达，⭐ 谁在管事读谁 ✅）。⭐ 两者都没有时抛异常（⭐ 调用方已先判 <see cref="UsesBuiltInModes" /> ✅）。</summary>
+	private LegacyMifsSnapshot ReadBuiltInMode()
+	{
+		BaolongdaWmi baolongda = _baolongda?.Wmi;
+		if (baolongda != null)
+		{
+			return baolongda.ReadMode();
+		}
+		LegacyMifsWmi legacy = _legacyMifs;
+		if (legacy != null)
+		{
+			return legacy.ReadMode();
+		}
+		throw new InvalidOperationException("没有任何「内置档位」后端在管事。");
+	}
+
+	/// <summary>写一次档位（⭐ 老同方 或 ⭐ 宝龙达 ✅；⭐ 都包含"写后最多 5 次回读确认" ✅）。</summary>
+	private Task<bool> SwitchBuiltInModeAsync(int operatingMode, CancellationToken ct)
+	{
+		BaolongdaWmi baolongda = _baolongda?.Wmi;
+		if (baolongda != null)
+		{
+			return baolongda.SwitchModeAsync(operatingMode, ct);
+		}
+		LegacyMifsWmi legacy = _legacyMifs;
+		if (legacy != null)
+		{
+			return legacy.SwitchModeAsync(operatingMode, ct);
+		}
+		return Task.FromResult(result: false);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 把本会话切到**宝龙达模具后端**（⭐ 蛟龙16Pro 等）。
+	/// <para>⭐ 与 <see cref="ApplyLegacyBackendAsync" /> 是**同一套路**（⭐ 替换能力位 ⇒ 起 3 s 定时刷新 ⇒ 立刻读一次 ⇒ 宣布就绪 ✅），
+	/// 差别只在 ⭐ **能力位更宽**（⭐ 宝龙达有风扇/CPU温度/LOGO灯/功耗墙 ✅）与 ⭐ <c>ProjectId</c> ✅。</para>
+	/// <para>⚠️ **能力位刻意只开"已验证 + 已接线"的**（⭐ 沿用本树"⛔ 不假装可写"的约定 ✅）：
+	/// 本轮**只接了性能档** ⇒ ⭐ 只开 <c>ProfileAvailable</c> / <c>TurboMode</c> ✅；
+	/// ⭐ 风扇 / ⭐ 灯效 / ⭐ 功耗墙等**等各自的下发路径接完再逐个打开** ⚠️（⛔ 现在打开只会让 UI 走到没接的代码上 ✅）。</para>
+	/// </summary>
+	private async Task ApplyBaolongdaBackendAsync(BaolongdaBackend backend)
+	{
+		_activeBackend = MechrevoBackendKind.Baolongda;
+		Capabilities = new MechrevoDeviceCapabilities
+		{
+			ProjectId = "Baolongda",
+			IsMechrevo = true,
+			ProfileAvailable = true,
+			TurboMode = true,
+			AmdPlatform = PawnIO.CpuInfo.IsAMD
+		};
+		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
+			+ $" fans={backend.Wmi.FanCount} modes={backend.Wmi.ModeCount}");
+		_legacyTimer = new Timer(delegate
+		{
+			_ = RefreshLegacyModeAsync();
+		}, null, LegacyRefreshIntervalMs, LegacyRefreshIntervalMs);
+		await RefreshLegacyModeAsync().ConfigureAwait(continueOnCapturedContext: false);
+		RaiseIsolated(CapabilitiesChanged, "CapabilitiesChanged");
+		NotifyConnectionReady();
 	}
 
 	public async Task<bool> ConnectAsync()
@@ -2504,6 +2606,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				_legacyProbed = true;
 				(MechrevoBackendKind kind, object created) = await Task.Run((Func<(MechrevoBackendKind, object)>)MechrevoBackendOrder.Probe).ConfigureAwait(continueOnCapturedContext: false);
+				// ⭐⭐ 2026-10-16（宝龙达适配）：宝龙达模具（⭐ 蛟龙16Pro 等）—— ⭐ 必须**排在老接口之前**判，
+				// 因为两者协议同族、老接口的 GUID 校验在宝龙达机上**也会通过**（⭐ 真机实测 GUID 完全一致 ⚠️）
+				// ⇒ ⭐ 若先判老接口，宝龙达后端**永远轮不到**，我们新接的风扇/温度/灯效就都用不上 ✅
+				// ⚠️ 不会误伤老机型：\`BaolongdaWmi.TryCreate\` 要求**真读一次 CPU 温度**才算活体 ✅，
+				//    老机型读不到就回落 `<see cref="MechrevoBackendKind.LegacyMifs" />` ⇒ ⭐ 行为不变 ✅。
+				if (kind == MechrevoBackendKind.Baolongda && created is BaolongdaBackend baolongdaBackend)
+				{
+					_baolongda = baolongdaBackend;
+					await ApplyBaolongdaBackendAsync(baolongdaBackend).ConfigureAwait(continueOnCapturedContext: false);
+					return true;
+				}
 				if (kind == MechrevoBackendKind.LegacyMifs && created is LegacyMifsWmi legacyBackend)
 				{
 					_legacyMifs = legacyBackend;
@@ -2518,8 +2631,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// 注：级别过滤下（默认 error）本行不进日志，用户可见的信号是顶部状态：非 GCU 后端显示「● 已就绪」。
 				Logger.WriteLine($"Hardware backend: GCU (MQTT). IsGcuServiceInstalled={IsGcuServiceInstalled}, legacyProbe={kind}");
 			}
-			if (_legacyMifs != null)
+			if (UsesBuiltInModes)
 			{
+				// ⭐ 2026-10-16：⭐ 老同方 与 ⭐ 宝龙达 ⭐ 共用这一支（⭐ 两者都靠 ReadBuiltInMode 读档位 ✅）
 				return await RefreshLegacyModeAsync().ConfigureAwait(continueOnCapturedContext: false);
 			}
 			if (_subscriptionsReady && (_client?.IsConnected ?? false))
@@ -2805,7 +2919,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	{
 		// 2026-10-15（C-1 第 2 步，对照 A-22）：老接口后端**没有 MQTT**，一条 GETSTATUS 都不发 ——
 		// 只读一次老接口档位。⛔ GCU 分支一字未动。
-		if (_legacyMifs != null)
+		// ⭐ 2026-10-16：⭐ 宝龙达同样没有 MQTT ⇒ ⭐ 也走这一支 ✅
+		if (UsesBuiltInModes)
 		{
 			await RefreshLegacyModeAsync().ConfigureAwait(continueOnCapturedContext: false);
 			return;
@@ -6175,6 +6290,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_legacyTimer = null;
 		_legacyMifs?.Dispose();
 		_legacyMifs = null;
+		// ⭐ 2026-10-16：⭐ 宝龙达后端同样要放（⭐ 它持有 WMI 实例 ✅）
+		_baolongda?.Dispose();
+		_baolongda = null;
 		DataChanged = null;
 		ConnectionReady = null;
 		StateChanged = null;

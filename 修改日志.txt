@@ -1,3 +1,69 @@
+r69（2026-10-16 · **baolongda 分支**）★★★★★ **把蛟龙（宝龙达）后端接到 UI 上** —— 性能档已可用
+用户原话：「⭐ 开始吧 把蛟龙的后端接到我们UI上」。
+① ⭐ **设计决定（⭐ 关键）**：⭐ 宝龙达（`BaolongdaWmi`）与老同方（`LegacyMifsWmi`）**协议同族**：
+   ⭐ 同一个 `root\WMI:MICommonInterface` · ⭐ 同样 250/251 · ⭐ 同样功能号 8 · ⭐ **档位映射逐字相同** ✅
+   （⭐ 真机已验证：⭐ 静音→2 · ⭐ 平衡→0 · ⭐ 狂暴→1 ✅）
+   ⇒ ⭐⭐ **"读档位/写档位"只写【一套代码】**（⭐ 换的只是**调哪个对象** ✅）⇒ ⛔ 不复制两份
+      （⭐ 复制两份以后必然只改一处 ⚠️）
+   ⇒ ⭐ 新增两个共用入口：⭐ `ReadBuiltInMode()` / ⭐ `SwitchBuiltInModeAsync()` ✅
+② ⭐ **改动清单（⭐ 6 个文件）**：
+   ⭐ ① ⭐ `BaolongdaWmi.cs`：⭐ 新增 ⭐ `ReadMode()` / ⭐ `SwitchModeAsync()` / ⭐ `Available` / ⭐ `_version`
+        —— ⭐ **刻意复用 `LegacyMifsSnapshot` 快照类型**（⭐ 协议同族 ✅）⇒ ⭐ 上层管线一套就够 ✅
+        ⭐ 且 ⭐ 与 `LegacyMifsWmi` **同款约定**：⭐ 失败置 `Available=false` 并**原样抛出** ✅
+        ⭐ 加 3 个 using（⭐ `System.IO` / ⭐ `System.Threading` / ⭐ `System.Threading.Tasks` ✅）
+        ⚠️ 注意点：⭐ `ReadMode()` 持 `_gate` 又调 `TryReadOperatingMode`（⭐ 内部再 lock）⇒
+           ⭐ C# `lock` **可重入** ⇒ ⭐ **不会死锁** ✅（⭐ 已在注释里写明 ✅）
+   ⭐ ② ⭐ `MechrevoHw.cs`：⭐ 新增字段 ⭐ `_baolongda` ✅ · ⭐ 新增属性 ⭐ `UsesBaolongda` /
+        ⭐ **`UsesBuiltInModes`**（⭐ = 老同方 **或** 宝龙达 ✅）· ⭐ `BaolongdaWmi`（⭐ 外露协议对象 ✅）
+        ⭐ `IsConnected` ⇒ ⭐ 改读 `UsesBuiltInModes` ✅
+        ⭐ `RefreshLegacyModeAsync` / ⭐ `SwitchLegacyModeAsync` ⇒ ⭐ 改成"认两种后端" ✅
+        ⭐ 新增 ⭐ **`ApplyBaolongdaBackendAsync`**（⭐ 与 `ApplyLegacyBackendAsync` 同套路：
+           ⭐ 换能力位 ⇒ ⭐ 起 3 s 定时刷新 ⇒ ⭐ 立刻读一次 ⇒ ⭐ `NotifyConnectionReady` ✅）
+        ⭐ `ConnectAsync` ⇒ ⭐ 新增宝龙达分支 ✅ · ⭐ `RequestInitialStateAsync` ⇒ ⭐ 走内置档位支 ✅
+        ⭐ `Dispose` ⇒ ⭐ 释放 `_baolongda` ✅
+   ⭐ ③ ⭐ `MechrevoBackend.cs`（⭐ **候选表**）：⭐ ⭐ **把宝龙达提到老接口【之前】** ✅
+        ⭐ 理由（⭐ 真机实测得出 ⚠️）：⭐ 宝龙达机型的类 GUID 与老同方**完全一致**
+           ⇒ ⭐ 老接口的 GUID 校验**也会通过** ⇒ ⭐ 若排在后面，⭐ 宝龙达**永远轮不到** ❌
+        ⚠️ 不误伤老机型：⭐ `BaolongdaWmi.TryCreate` 要求 ⭐ **真读一次 CPU 温度（功能号 22）**⭐ 才算活体 ✅
+           ⇒ ⭐ 老机型读不到 ⇒ ⭐ 自动落到下一格 `LegacyMifs` ⇒ ⭐ 行为不变 ✅
+        ⚠️ 也不能放在 GCU 之前（⭐ `IsGcuServiceInstalled` 为真说明该走 GCU ✅）
+        ⭐ 顺序最终：⭐ **GCU(装了才优先) → ⭐ 宝龙达 → ⭐ 老接口 → ⭐ GCU 无条件兜底** ✅
+   ⭐ ④ ⭐ `BaolongdaBackend.cs`：⭐ **去掉"默认不接管"的门** ✅
+        ⭐ 语义**反转**：⭐ 以前"设 `=1` 才启用"（⭐ 协议未验证时保守 ⚠️）
+        ⇒ ⭐ 现在 ⭐ **"探到就接管、设 `=0` 才禁用"**（⭐ 协议已真机验证 ✅）
+        ⭐ 保留反向开关是为了 ⭐ **排障**（⭐ 万一某台机接管后不对劲，⭐ 能让它退回原路径 ✅）
+        ⭐ 文件头注释同步更新（⭐ 状态从"骨架/不接管"改成"已接线" ✅）
+   ⭐ ⑤ ⭐ `MechrevoService.cs`：⭐ `SwitchMode` 的判据 ⭐ `UsesLegacyMifs` ⇒ ⭐ **`UsesBuiltInModes`** ✅
+        ⇒ ⭐ 宝龙达也走"内置档位"那一支（⭐ 档 3 自定义照旧判失败 ⛔ 不假装可写 ✅）
+        ⭐ 且它调的 `SwitchLegacyModeAsync` 内部已是"谁管事调谁" ✅
+   ⭐ ⑥ ⭐ `RuntimeModelSupport.cs`：⭐ 两处 ✅
+        ⭐ 「机型支持判定」⇒ ⭐ 新增宝龙达支（⭐ `Supported("Baolongda")` ✅，⭐ 与老接口同判据 ✅）
+        ⭐ `IsServiceServed()` ⇒ ⭐ 新增 `UsesBuiltInModes` 也算"有后端在服务" ✅
+③ ⭐ **能力位只开"已验证 ＋ 已接线"的**（⭐ 沿用本树"⛔ 不假装可写"的约定 ✅）：
+   ⭐ 本轮**只接了性能档** ⇒ ⭐ 只开 ⭐ `ProfileAvailable` / ⭐ `TurboMode` / ⭐ `AmdPlatform` ✅
+   ⭐ 风扇 / ⭐ 灯效 / ⭐ 功耗墙 ⭐ **等各自的下发路径接完再逐个打开** ⚠️
+      （⭐ 现在就打开只会让 UI 走到**没接的代码**上 ❌）
+④ ⭐ **UI 侧不用改**（⭐ 代码早就为这一天留好了 ✅）：
+   ⭐ `SettingsForm` 的状态文案判据是 ⭐ `ActiveBackend != None && != Gcu`
+      ⇒ ⭐ **宝龙达自动显示「已就绪」** ✅（⭐ 源码注释就写着"以后加宝龙达后端时这里一行都不用改" ✅）
+⑤ ⭐ **验证**：
+   ⭐ 编译 ⭐ **0 错误 / 0 警告** ✅
+   ⭐ `ilspycmd` 确认 `BaolongdaBackend` / `BaolongdaWmi` 已进程序集 ✅
+   ⭐ 部署到本机（⭐ GCU 机型）⇒ ⭐ ⭐ **日志里"宝龙达/Baolongda"条数 = 0** ✅
+      ⇒ ⭐ **本机零影响、探测完全静默** ✅（⭐ 这是我最担心的回归点 ✅）
+   ⭐ 进程响应正常 ✅
+   ⭐ 跑了 UI 审计（⭐ 90 s 内产出 **137 个页面截图**、⭐ 无崩溃 ✅）
+      ⚠️ 但 ⭐ 审计用的是**假硬件**且**跳过探测** ⇒ ⭐ 它对本次改动的覆盖**为零** ⚠️
+      （⭐ 不是有效回归测试 ⇒ ⭐ 已如实记录，⛔ 不当成"验证过了" ✅）
+⑥ ⚠️ **尚未真机验证的部分（⭐ 如实列出 ⚠️）**：
+   ⭐ ① ⭐ 蛟龙机上**接管后**的实际表现（⭐ 切档是否真生效、⭐ 状态栏是否显示「已就绪」✅）
+   ⭐ ② ⭐ `ArrayFix` 那个**已验证写法**与我 `BaolongdaWmi` 里 C# 写法的等价性
+      ⭐（⭐ C# 侧**不存在** PSObject 那个问题 ⇒ ⭐ 理论上更稳 ✅，⭐ 但仍需真机确认 ✅）
+   ⭐ ③ ⭐ 老同方机型上 `BaolongdaWmi.TryCreate` 是否会**意外命中**（⭐ 若命中：⭐ 档位行为相同 ✅、
+      ⭐ 但能力位仍只开性能档 ⇒ ⭐ 无害 ✅）
+⑦ ⏭ **下一步**：⭐ ① ⭐ 让机器 C 用**正式安装包**试一次（⭐ 看状态栏「已就绪」＋ ⭐ 切档是否生效 ✅）；
+   ⭐ ② ⭐ 然后按顺序接更多功能：⭐ 风扇读(13) → ⭐ CPU温度(22) → ⭐ LOGO灯(15) → ⭐ 风扇手动(20/21) →
+      ⭐ 功耗墙(23) → ⭐ 键盘灯(16/17/18) ✅（⭐ 每接一个就打开对应能力位 ✅）
 r68（2026-10-16 · **baolongda 分支**）★★★★★ **决定性胜利**：6 个功能号全部成功 ＋ 逐模式实测 ⇒ **协议层真机验证通过** 🎉
 用户原话：「⭐ @D:\Downloads\宝龙达抓包-20261016-144732.zip ⭐ 看看行不行」。
 ① ⭐⭐⭐⭐ **6 个功能号全部"调用成功"并返回合理值**（⭐ 机器 C · ⭐ 管理员 ✅ · ⭐ `MIFS_0` ✅）：
