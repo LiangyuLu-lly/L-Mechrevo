@@ -620,6 +620,14 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配）：⭐ 传感器能力转储（⭐ 落实"LHM 能读温度就优先用它"✅）
+		//    ⭐ 用法：⭐ `L-Mechrevo.exe --sensor-dump [输出目录]` ✅
+		if (text == "--sensor-dump")
+		{
+			Environment.ExitCode = MechrevoLite.Hardware.SensorDumpRunner.Run((args.Length > 1) ? Path.GetFullPath(args[1]) : null);
+			Logger.Close();
+			return;
+		}
 		switch (text)
 		{
 		case "--lctest":

@@ -53,6 +53,46 @@ public class LhmMonitor : IDisposable
 
 	public float? GpuPower { get; private set; }
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达适配 · "接传感器"）：⭐ **CPU 温度（摄氏度）** —— 取自 LM 自带的
+	/// LibreHardwareMonitor ✅。
+	/// <para>⭐ 这是"LM 自带传感器"这一侧的**温度来源**，⭐ 按用户 2026-10-16 的要求
+	/// **优先于宝龙达 WMI 的功能号 22** 使用 ✅。</para>
+	/// <para>⚠️ 取不到时为 <c>null</c>（⭐ 例如 LHM 驱动没起来 / ⭐ 非管理员 / ⭐ 传感器名不匹配 ✅）
+	/// ⇒ ⭐ 调用方据此**回退到宝龙达 WMI** ✅。</para>
+	/// </summary>
+	public float? CpuTemperature { get; private set; }
+
+	/// <summary>⭐ 实际选中的 CPU 温度传感器名（⭐ 诊断用：⭐ 让我们知道到底读到的是哪一个 ✅）。</summary>
+	public string CpuTemperatureSensorName { get; private set; }
+
+	/// <summary>
+	/// ⭐ 判断某个 CPU 温度传感器名是不是我们要的。
+	/// <para>⭐ 依据实测（⭐ `--sensor-dump`）：⭐ AMD 上是 ⭐ <c>Core (Tctl/Tdie)</c> ✅；
+	/// ⭐ Intel 上通常是 ⭐ <c>CPU Package</c> / ⭐ <c>Core Average</c> / ⭐ <c>Core Max</c> ✅。</para>
+	/// <para>⚠️ 刻意**不取** <c>Distance to TjMax</c>（⭐ 那是"距离上限还有多少度"，⭐ 语义相反 ❌）；
+	/// ⭐ 也**不取**各种 <c>Core #N</c> 单核值（⭐ 想优先要"封装/最高"那种整体值 ✅）。</para>
+	/// </summary>
+	internal static bool IsCpuTemperatureSensorName(string? name)
+	{
+		if (string.IsNullOrEmpty(name))
+		{
+			return false;
+		}
+		// ⚠️ 先排除语义相反的
+		if (name.IndexOf("Distance", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("TjMax", StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			return false;
+		}
+		return name.IndexOf("Tctl", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Tdie", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("CPU Package", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Core Average", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Core Max", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("CPU", StringComparison.OrdinalIgnoreCase) >= 0;
+	}
+
 	public int GpuMemoryTotalMb { get; private set; }
 
 	public int GpuMemoryUsedMb { get; private set; }
@@ -226,6 +266,22 @@ public class LhmMonitor : IDisposable
 						{
 							float num5 = sensor.Value.Value;
 							CpuClockMhz = num5 * ((num5 < 1000f) ? 1000f : 1f);
+						}
+						// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配 · "接传感器"）：⭐ **新增温度采集** ✅
+						//   ⭐ 起因（⭐ 用户原话）：「⭐ 接 传感器如果 LM 自带的那个 dll 能读温度
+						//      **优先用 LM 的传感器**，⭐ 不能的再接」✅
+						//   ⭐ 实测（⭐ `--sensor-dump` · ⭐ 本机 翼龙15Pro）：⭐ LHM 能读 **5 个温度** ✅
+						//      （⭐ GPU Core 78 / ⭐ Hot Spot 91 / ⭐ 显存 80 / ⭐ iGPU 72 / ⭐ CPU Tctl/Tdie ✅）
+						//   ⚠️ 但生产里 `_nvidiaGpuSkipped` 会**关掉 GPU 那支**（⭐ 见构造函数注释：
+						//      ⭐ NVML 原生崩溃修复 ⚠️）⇒ ⭐ 生产上 **GPU 温度不来自 LHM** ⚠️，
+						//      ⭐ 能稳定拿到的是 ⭐ **CPU 温度** ✅
+						//   ⇒ ⭐ 所以这里**只补 CPU 温度**（⭐ 优先取到一个就固定用那个传感器的名字 ✅）；
+						//      ⭐ GPU 温度另有来源（⭐ NVML / ⭐ 宝龙达侧后续 ✅）
+						else if (sensor.SensorType == SensorType.Temperature && item.HardwareType == HardwareType.Cpu
+							&& !CpuTemperature.HasValue && IsCpuTemperatureSensorName(sensor.Name))
+						{
+							CpuTemperature = sensor.Value;
+							CpuTemperatureSensorName = sensor.Name;
 						}
 						else if (sensor.SensorType == SensorType.SmallData && IsGpuMemoryTotalSensorName(sensor.Name))
 						{

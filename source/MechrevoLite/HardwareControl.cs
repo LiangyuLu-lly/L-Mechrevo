@@ -245,9 +245,75 @@ public static class HardwareControl
 		}
 	}
 
-	public static void AttachMechrevoHw(MechrevoHw hw)
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配 · "接传感器"）：⭐ 给"**非 GCU 后端**"补上传感器值。
+	///
+	/// <para>⭐ 为什么需要：⭐ GCU 机型上 <c>cpuTemp</c> / <c>gpuTemp</c> / 风扇是 MQTT 推送
+	/// （<see cref="AttachMechrevoHw" /> 里的 <c>DataChanged</c>）填的；⭐ 宝龙达**没有 GCU**
+	/// ⇒ ⭐ 那条路永远不触发 ⇒ ⭐ 界面上的温度/风扇会一直是 0 ❌。</para>
+	///
+	/// <para>⭐⭐ <b>取数优先级</b>（⭐ 严格照用户 2026-10-16 的要求）：
+	/// <list type="number">
+	/// <item>⭐ <b>温度</b> ⇒ ⭐ **先用 LM 自带的 LibreHardwareMonitor**（<see cref="LhmMonitor.CpuTemperature" />）✅</item>
+	/// <item>⭐ LHM 读不到（⭐ null / ⭐ ≤0，⭐ 例如驱动未起 / ⭐ 非管理员 ✅）
+	/// ⇒ ⭐ 才回退**宝龙达功能号 22**（<c>MechrevoHw.BaolongdaCpuTemp</c>）✅</item>
+	/// <item>⭐ <b>风扇</b> ⇒ ⭐ **只能用宝龙达**（⭐ 实测：⭐ LHM 在本机风扇传感器 = 0 个 ❌；
+	/// ⭐ 真机已验证宝龙达功能号 13 能读 ✅）⇒ ⭐ 没有竞争，⭐ 直接用 ✅</item>
+	/// </list></para>
+	///
+	/// <para>⚠️ <b>未解决的一项</b>（⭐ 如实记下）：⭐ <b>GPU 温度</b>在宝龙达机型上**暂时拿不到** ⚠️
+	/// —— ⭐ 因为生产里 <see cref="LhmMonitor" /> 一旦检测到 NVIDIA 就**关掉 GPU 那支**
+	/// （⭐ 历史上的 NVML 原生崩溃修复 ⚠️），⭐ 而宝龙达协议里**没有 GPU 温度功能号** ⚠️。
+	/// ⭐ 将来的路子：⭐ 用已被加固的 <c>NvmlHelper</c> 取（⭐ 它已有句柄自愈与隔离 ✅）。</para>
+	///
+	/// <para>⚠️ 只在 <c>UsesBaolongda</c> 时为真时动作 ⇒ ⭐ **GCU 机型 / ⭐ 老同方机型行为逐位不变** ✅。</para>
+	/// </summary>
+	private static void ApplyBuiltInBackendSensors(LhmMonitor lhmMonitor)
 	{
-		hw.DataChanged += () =>
+		MechrevoHw hw;
+		try
+		{
+			hw = Program.hw;
+		}
+		catch
+		{
+			return;
+		}
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return;
+		}
+		// ── ① 风扇：⭐ 宝龙达（⭐ LHM 读不到 ⇒ ⭐ 没有优先级问题 ✅）──
+		try
+		{
+			cpuFanRPM = hw.CpuFanRpm;
+			gpuFanRPM = hw.GpuFanRpm;
+		}
+		catch
+		{
+		}
+		// ── ② CPU 温度：⭐ 先 LHM，⭐ 不行再宝龙达 ✅ ──
+		try
+		{
+			float? fromLhm = lhmMonitor.CpuTemperature;
+			if (fromLhm.HasValue && fromLhm.Value > 0f)
+			{
+				// ⭐ 用 LM 自带的传感器（⭐ 用户要求的优先项 ✅）
+				cpuTemp = (int)Math.Round(fromLhm.Value);
+			}
+			else if (hw.BaolongdaCpuTemp > 0)
+			{
+				// ⭐ 回退：宝龙达功能号 22 ✅
+				cpuTemp = hw.BaolongdaCpuTemp;
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	public static void AttachMechrevoHw(MechrevoHw hw)
+	{		hw.DataChanged += () =>
 		{
 			cpuTemp = hw.CpuTemp;
 			cpuUsage = hw.CpuUsage;
@@ -397,6 +463,13 @@ public static class HardwareControl
 		{
 			return;
 		}
+		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配 · "接传感器"）：⭐ 非 GCU 后端的传感器补值 ✅
+		//   ⚠️ GCU 机型的 cpuTemp/gpuTemp/风扇是 `DataChanged`（MQTT 推送）填的；
+		//      ⭐ 宝龙达**没有 GCU 推送** ⇒ ⭐ 必须由这条"3 秒本地采样"路径补上 ✅
+		//   ⭐⭐ 温度优先级（⭐ 用户 2026-10-16 原话）：
+		//      「⭐ 接 传感器如果 LM 自带的那个 dll 能读温度**优先用 LM 的传感器**，⭐ 不能的再接」
+		//      ⇒ ⭐ **先试 LHM**（⭐ 我们自带的 LibreHardwareMonitor ✅）⇒ ⭐ 读不到才用宝龙达功能号 22 ✅
+		ApplyBuiltInBackendSensors(lhmMonitor);
 		if (num5.HasValue && num5.Value > 0f)
 		{
 			cpuFrequency = (int)num5.Value;

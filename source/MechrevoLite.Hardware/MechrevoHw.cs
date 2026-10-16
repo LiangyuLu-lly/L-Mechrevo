@@ -2574,13 +2574,88 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		};
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
 			+ $" fans={backend.Wmi.FanCount} modes={backend.Wmi.ModeCount}");
+		// ⭐⭐ 2026-10-16（"接传感器"）：⭐ 同一个 3 s 定时器里**顺便刷一遍传感器** ✅
+		//    ⭐ 读的是 ⭐ 风扇转速（功能号 13）＋ ⭐ CPU 温度（功能号 22，⭐ 仅作**兜底** ✅）
+		//    ⚠️ 温度**优先用 LM 自带的 LHM**（⭐ 用户要求 ✅）⇒ ⭐ 本方法只把宝龙达的值放进
+		//       `BaolongdaCpuTemp`，⭐ 由展示层决定用哪个 ✅
 		_legacyTimer = new Timer(delegate
 		{
 			_ = RefreshLegacyModeAsync();
+			RefreshBaolongdaSensors();
 		}, null, LegacyRefreshIntervalMs, LegacyRefreshIntervalMs);
 		await RefreshLegacyModeAsync().ConfigureAwait(continueOnCapturedContext: false);
+		// ⭐ 立刻先读一次传感器（⭐ 免得界面上风扇/温度空着等 3 秒 ✅）
+		RefreshBaolongdaSensors();
 		RaiseIsolated(CapabilitiesChanged, "CapabilitiesChanged");
 		NotifyConnectionReady();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达适配 · "接传感器"）：⭐ 宝龙达侧的**传感器兜底值**。
+	/// <para>⭐ <b>CPU 温度</b>（⭐ 功能号 22）：⭐ ⚠️ **只在 LM 自带的 LibreHardwareMonitor 读不到时才用** ✅
+	/// —— ⭐ 依据用户 2026-10-16 原话「⭐ 接 传感器如果 LM 自带的那个 dll 能读温度**优先用 LM 的传感器**，
+	/// ⭐ 不能的再接」✅。⭐ 0 = 本次没读到（⭐ 调用方据此回退 ✅）。</para>
+	/// <para>⭐ <b>风扇转速</b>不在这里暴露 —— ⭐ 它直接写进 <see cref="CpuFanRpm" /> /
+	/// <see cref="GpuFanRpm" />（⭐ 那两个属性本来就是界面风扇显示的来源 ✅），
+	/// ⭐ 因为 ⭐ **LHM 读不到风扇**（⭐ 实测：⭐ `--sensor-dump` 风扇数 = 0 ✅）⇒ ⭐ 没有竞争关系 ✅。</para>
+	/// </summary>
+	internal int BaolongdaCpuTemp { get; private set; }
+
+	/// <summary>
+	/// ⭐ 刷一次宝龙达传感器（⭐ 风扇转速 ＋ ⭐ CPU 温度兜底 ✅）。
+	/// <para>⭐ 全程**只读**（⭐ 只用 Get=250 ✅）；⭐ 失败只记一行日志（⭐ 3 s 定时器上不许外抛 ✅）。</para>
+	/// <para>⚠️ <b>通道归属</b>按参考实现（⭐ 蛟龙16Pro `JiaolongControl`）：
+	/// ⭐ 功能号 13 的 <c>OutData[4..5]</c> = ⭐ **GPU 扇** · ⭐ <c>[6..7]</c> = ⭐ **CPU 扇** ⚠️
+	/// —— ⭐ 这一条**只来自参考实现、⛔ 还没真机交叉验证** ⚠️（⭐ 真机两组读数太接近，⭐ 分不出来 ✅）
+	/// ⇒ ⭐ 记在这里，⭐ 等以后加负载对比就能确认 ✅。</para>
+	/// </summary>
+	private void RefreshBaolongdaSensors()
+	{
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return;
+		}
+		// ── ① 风扇转速（⭐ 功能号 13）—— ⭐ 这是 LHM 做不到、⭐ 必须靠宝龙达的一项 ✅ ──
+		try
+		{
+			if (wmi.TryReadFanSpeeds(out BaolongdaWmi.FanSpeeds speeds))
+			{
+				// ⚠️ 通道归属见方法注释（⭐ 待真机确认 ⚠️）
+				int gpu = (speeds.First > 0) ? speeds.First : 0;
+				int cpu = (speeds.Second > 0) ? speeds.Second : 0;
+				lock (_legacyStateGate)
+				{
+					GpuFanRpm = gpu;
+					CpuFanRpm = cpu;
+					FanStatusSeen = true;
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineIfChanged("baolongda-fan", "宝龙达读风扇转速失败: " + ex.Message);
+		}
+		// ── ② CPU 温度兜底（⭐ 功能号 22）—— ⚠️ 只放进 BaolongdaCpuTemp，⛔ 不覆盖 CpuTemp ✅ ──
+		try
+		{
+			if (wmi.TryReadCpuTemperature(out int celsius))
+			{
+				BaolongdaCpuTemp = celsius;
+				// ⭐ 同时给 `CpuTemp` 一个**兜底值** ⇒ ⭐ 所有读 `hw.CpuTemp` 的地方都不至于看到 0 ✅
+				// ⚠️ 但展示层若能从 LM 自带的 LHM 读到温度，⭐ 会**覆盖**这个值 ✅
+				//    —— ⭐ 这正是用户要的优先级（⭐ "LM 能读就优先用 LM" ✅）
+				lock (_legacyStateGate)
+				{
+					CpuTemp = celsius;
+					Interlocked.Exchange(ref _cpuInfoReceivedAt, Environment.TickCount64);
+				}
+			}
+		}
+		catch (Exception ex2)
+		{
+			Logger.WriteLineIfChanged("baolongda-temp", "宝龙达读 CPU 温度失败: " + ex2.Message);
+		}
 	}
 
 	public async Task<bool> ConnectAsync()
