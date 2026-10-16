@@ -2845,12 +2845,19 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			if (!on)
 			{
-				// ⭐ 关灯：⭐ 只写「模式 0」（关）✅ —— ⭐ 不需要颜色/亮度 ✅
-				if (!wmi.TrySetKeyboardMode(0))
+				// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉」BUGFIX）：⭐ 关灯改为**与另一条路共用的统一实现** ✅
+				//   ⚠️ 真机依据（p2 = `L-Mechrevo-诊断包-0.291.9.4-20261016-225820` · 宝龙达 MRID6）：
+				//      ⭐ 写【功能号 16 = 0】后回读**仍为 2** ⇒ ⭐ **模式写不生效** ❌
+				//      ⇒ ⭐ 光写一次模式不够 ⇒ 改为多路尝试
+				//        （见 <see cref="TrySetKeyboardLightingViaBackend" /> 的路线 A / 路线 B ✅）
+				//   ⇒ ⭐ 两条路（`PublishLightPower` 分派 ／ `SetKeyboardEffect`）**共用同一实现与同一判据** ✅
+				//      ⛔ 不再一处判功能号 16、另一处判功能号 10
+				//      （⚠️ 那正是上一轮「关了又开」修完后**仍然不一致**的地方 —— 功能号 10 恒为 0 ⇒ 假阳性 ⚠️）
+				if (!TrySetKeyboardLightingViaBackend(false, 0, 0, out confirmed))
 				{
-					Logger.WriteError("宝龙达 灯光：⚠️ 关键盘灯写入失败（详见上一行）⇒ 本次未生效");
-					return true; // ⭐ 已接管（只是失败）⇒ ⛔ 别让调用方再发 GCU ✅
+					return false; // ⭐ 理论上不会发生（宝龙达在管事）⇒ 交回原路更安全 ✅
 				}
+				return true; // ⭐ 已接管 → 判据由统一实现给出（功能号 16 模式值 ✅）⇒ ⛔ 不再走下面的重复回读 ✅
 			}
 			else
 			{
@@ -3202,10 +3209,46 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			if (!on)
 			{
-				// ⭐ 关灯：⭐ 只写模式 0 ✅
+				// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉」BUGFIX）：
+				//   ⚠️ 真机依据（p2 = `L-Mechrevo-诊断包-0.291.9.4-20261016-225820` · 宝龙达 MRID6）：
+				//      ① ⭐ 写【功能号 16 = 0】后回读**仍为 2** ⇒ ⭐ **模式写不生效** ❌
+				//      ② ⭐ 功能号 10 **恒为 0**（启动 / 关灯后 / 开灯后都是 0）
+				//         ⇒ ⭐ 它**不随键盘灯状态变化** ⇒ ⛔ 旧代码 `off2 == 0` 是**假阳性** ❌
+				//         （⚠️ 那正是本包「关灯 ⇒ 回读=True」却**实际关不掉**的根因 ✅）
+				//   ⇒ ⭐ 判据统一到【功能号 16 的模式值】✅ ＋ ⭐ 关灯做**多路尝试** ✅：
+				//      路线 A：只写模式 0 ✅（现状）
+				//      路线 B：模式 0 **再**写颜色黑 (0,0,0) ✅
+				//      （⭐ 官方 `Models.Keyboard.SetRGBKeyboardColor` 的顺序是【先模式 ⇒ 再颜色】✅
+				//       ⇒ ⭐ 路线 B 沿用该顺序 —— ⚠️ 而本方法"开灯"那半边是【先颜色 ⇒ 再模式】，
+				//         两者不一致**本身就是一个待真机确认项** ⚠️）
+				LogKeyboardLightingState(wmi, "关灯前");
 				wmi.TrySetKeyboardMode(0);
-				confirmed = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte off2) && off2 == 0;
-				Logger.WriteLine($"宝龙达 键盘灯：⭐ 关灯 ⇒ 回读={confirmed}（⭐ 原始状态字节 {off2}）");
+				if (TryConfirmKeyboardMode(wmi, expectedOn: false))
+				{
+					confirmed = true;
+					Logger.WriteError("宝龙达 键盘灯：⭐ 关灯成功（路线 A：只写模式 0）"
+						+ "⇒ 回读功能号 16 模式已为 0 ✅ 确认=True");
+					LogKeyboardLightingState(wmi, "关灯后(A)");
+					return true;
+				}
+				Logger.WriteError("宝龙达 键盘灯：⚠️ 路线 A（只写模式 0）未生效 ⇒ 尝试路线 B"
+					+ "（模式 0 ＋ 颜色黑 0,0,0 · ⭐ 按官方【先模式 ⇒ 再颜色】的顺序 ✅）⚠️");
+				wmi.TrySetKeyboardMode(0);
+				wmi.TrySetKeyboardColor(0, 0, 0);
+				if (TryConfirmKeyboardMode(wmi, expectedOn: false))
+				{
+					confirmed = true;
+					Logger.WriteError("宝龙达 键盘灯：⭐ 关灯成功（路线 B：模式 0 ＋ 颜色黑）"
+						+ "⇒ 回读功能号 16 模式已为 0 ✅ 确认=True");
+					LogKeyboardLightingState(wmi, "关灯后(B)");
+					return true;
+				}
+				confirmed = false;
+				Logger.WriteError("宝龙达 键盘灯：⚠️⚠️ 两条关灯路线都**未生效** ⇒ 如实报告未确认 ⚠️"
+					+ "（⭐ 真机依据：0.291.9.4 诊断包里写模式 0 后回读恒为 2"
+					+ " ⇒ 本机固件可能【不接受模式 0 写入】⚠️"
+					+ " ⇒ ⭐ 界面会据实回弹开关，⛔ 绝不假装成功 ✅）");
+				LogKeyboardLightingState(wmi, "关灯失败后");
 				return true;
 			}
 			// ⭐ ② 先颜色（⭐ 功能号 17，⭐ 三字节 ⭐ R,G,B ✅）
@@ -3225,27 +3268,162 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			// ⭐ ④ 最后亮度（⭐ 功能号 18：⭐ 0~3 ✅）
 			wmi.TrySetKeyboardBrightness((byte)Math.Max(0, Math.Min(3, brightness0to3)));
-			// ⭐ 回读确认（⭐ 功能号 10 的状态字节：⭐ 0 = 灭 · ⭐ 非 0 = 亮 ✅）
-			for (int attempt = 0; attempt < 5; attempt++)
+			// ⭐⭐ 2026-10-16（键盘灯「关不掉」BUGFIX）：⭐ 判据由【功能号 10 的状态字节】
+			//   改为【功能号 16 的模式值】✅ —— ⚠️ 因为真机实测功能号 10 **恒为 0**
+			//   （启动 / 关灯后 / 开灯后都是 0，⭐ 它不随灯的状态变化 ⚠️），
+			//   而功能号 16 才是两种官方枚举都定义的"模式"✅
+			//   （⭐ `Mode_Off = 0` ⇒ 关 · ⭐ `Mode_RGBFixedMode = 2` ⇒ 开 ✅）。
+			if (TryConfirmKeyboardMode(wmi, expectedOn: true))
 			{
-				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte now) && now != 0)
-				{
-					confirmed = true;
-					Logger.WriteLine($"宝龙达 键盘灯：⭐ 已点亮（⭐ rgb=#{r:X2}{g:X2}{b:X2} · ⭐ 亮度={brightness0to3}）"
-						+ $"并回读确认 ✅（状态字节 {now}，⭐ 第 {attempt + 1} 次；⚠️ 功能号 16/17/18 仍属真机未验证项）");
-					return true;
-				}
-				Thread.Sleep(150);
+				confirmed = true;
+				Logger.WriteError($"宝龙达 键盘灯：⭐ 已点亮（rgb=#{r:X2}{g:X2}{b:X2} · 亮度={brightness0to3}）"
+					+ "⇒ 回读功能号 16 模式非 0 ✅ 确认=True");
+				LogKeyboardLightingState(wmi, "开灯后");
+				return true;
 			}
-			Logger.WriteLine("宝龙达 键盘灯：⚠️ 写入完成但**回读未确认**（⚠️ 16/17/18 未真机验证，⭐ 如实报告 ⚠️）");
+			Logger.WriteError("宝龙达 键盘灯：⚠️ 写入完成但**回读未确认**"
+				+ "（⭐ 功能号 16 模式仍为 0 或读不到）⇒ 如实报告 ⚠️"
+				+ "（⚠️ 真机依据：功能号 18 亮度写**生效**、功能号 16 模式写**疑似不生效** ⚠️）");
+			LogKeyboardLightingState(wmi, "开灯失败后");
 			return true;
 		}
 		catch (Exception ex)
 		{
-			Logger.WriteLine("宝龙达 键盘灯：⭐ 操作异常（已吞掉）：" + ex.Message);
+			Logger.WriteError("宝龙达 键盘灯：⭐ 操作异常（已吞掉）：" + ex.Message);
 			return true;
 		}
 	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉」BUGFIX）：⭐ 键盘灯开/关的【判据单一来源】✅。
+	/// <para>⭐ 口径（⭐ 两个官方来源**双向一致** ✅）：⭐ 官方控制台 `WMIRGBKeyboardMode` ＋ ⭐ 蛟龙
+	/// `SysEnums.RGBKeyboardMode` ⇒ ⭐ <c>Mode_Off = 0</c>（关）· ⭐ <c>Mode_RGBFixedMode = 2</c>（开）·
+	/// ⭐ <c>Unknow = 255</c>（读不到）✅</para>
+	/// <para>⛔ <b>为什么不用功能号 10</b>：真机实测它 ⭐ **恒为 0**（启动 / 关灯后 / 开灯后都是 0 ✅）
+	/// ⇒ ⭐ 它**不随键盘灯状态变化** ⇒ ⛔ 旧代码 `off2 == 0` 判"关灯成功"是**假阳性** ❌
+	/// —— ⭐ 那正是 0.291.9.4 里"关灯 ⇒ 回读=True"却**实际关不掉**的根因 ✅。</para>
+	/// </summary>
+	private static bool TryConfirmKeyboardMode(BaolongdaWmi wmi, bool expectedOn)
+	{
+		for (int attempt = 0; attempt < 4; attempt++)
+		{
+			if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
+			{
+				if ((mode != 0) == expectedOn)
+				{
+					return true;
+				}
+			}
+			Thread.Sleep(100);
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯）：⭐ 键盘灯的**默认「仅错误」级别可见**诊断 ——
+	/// 把功能号 ⭐ 10 ／ 16 ／ 17(3 字节) ／ 18 的真实值**全打出来** ✅。
+	/// <para>⚠️ <b>为什么必须打</b>（真机实测对照 · p1 vs p2）：
+	/// ⭐ 功能号 10 **恒为 0**（不随状态变化）· ⭐ 功能号 18（亮度）**会变**（p2 期间 0 ⇒ 3 ✅）·
+	/// ⭐ 功能号 16（模式）写 0 后**回读仍为 2** ❌
+	/// ⇒ ⭐ 下一份诊断包据此可定位「⭐ 模式写为何不生效」⚠️（⭐ 这是当前唯一没查清的一环 ✅）。</para>
+	/// </summary>
+	private static void LogKeyboardLightingState(BaolongdaWmi wmi, string phase)
+	{
+		bool ok10 = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte v10);
+		bool ok16 = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte v16);
+		bool ok18 = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte v18);
+		bool ok17 = wmi.TryReadBytesChecked(BaolongdaWmi.Function.RgbKeyboardColor, 3, out byte[] c17);
+		string rgb = (ok17 && c17 != null && c17.Length >= 3)
+			? $"{c17[0]},{c17[1]},{c17[2]}"
+			: "读不到";
+		Logger.WriteError($"宝龙达 键盘灯[{phase}]：功能号 10 状态={(ok10 ? v10.ToString() : "读不到")}"
+			+ $" · 16 模式={(ok16 ? v16.ToString() : "读不到")} · 17 颜色={rgb}"
+			+ $" · 18 亮度={(ok18 ? v18.ToString() : "读不到")}"
+			+ "（⭐ 判据用 16：0=关 · 非0=开；⚠️ 10 恒 0 故不作判据 ⚠️）");
+	}
+
+	private int _baolongdaFanRpmMaxCache;
+
+	private bool _baolongdaFanRpmMaxIsReference;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 转速百分比）：⭐ 风扇百分比的**分母**（RPM ✅）——
+	/// ⭐ <b>单一事实来源</b>：⭐ 主界面遥测、⭐ 托盘提示、⭐ 风扇曲线**三处共用它** ✅。
+	///
+	/// <para>⚠️⚠️ <b>为什么必须有它（用户 2026-10-16 追问点出的内部矛盾）</b>：
+	/// ⭐ 此前 <c>BaolongdaFanCurveSettings.DefaultMaxRpm = 4200</c> 已经**在曲线那边当分母用了** ✅，
+	/// ⭐ 而主界面/托盘却因为"宝龙达没有 max RPM"**不显示百分比** ❌
+	/// ⇒ ⭐ <b>一处有一处没有 ⇒ 自相矛盾</b> ⚠️。⭐ 本属性把它收敛成**一个来源** ✅。</para>
+	///
+	/// <para>⭐ <b>取值顺序</b>：⭐ ① 试读**功能号 21**（<c>MaxFanSpeed</c>）——
+	/// ⭐ 只接受落在【合理风扇区间 <c>1000~12000 RPM</c>】内的解释（⭐ 原样 ／ ⭐ ×100 两种候选，
+	/// ⚠️ 因为它的**读语义尚未真机验证** ⚠️）⇒ ⭐ 命中即<b>实测值</b> ✅；
+	/// ⭐ ② 读不到 ⇒ ⭐ 退化为 <see cref="BaolongdaFanCurveSettings.DefaultMaxRpm" />（4200）
+	/// 并置 <see cref="FanRpmMaxIsReference" />=<c>true</c> ⚠️。</para>
+	///
+	/// <para>⚠️ <b>4200 的来源（已查实，⭐ 不是实测）</b>：⭐ 注释自述是**占位值** ——
+	/// 「⭐ 刻意保守（⭐ 远低于协议上限 6000 ✅）· ⭐ 宁可低：⭐ 上限猜大了会让风扇狂转 ⚠️」
+	/// ⇒ ⭐ 它**不是**从斗战者 <c>FanLargeMax = 4400</c> 改来的，⭐ 也**不是**任何真机读数 ✅
+	/// ⇒ ⭐ 所以用它算出的百分比只能当**粗略参考** ⚠️（⭐ 因此本类如实暴露"是不是参考值" ✅）。</para>
+	/// </summary>
+	public int FanRpmMaxForPercent
+	{
+		get
+		{
+			if (!UsesBaolongda)
+			{
+				return 0; // ⭐ 非宝龙达：分母由各机型自己的 duty 口径负责 ⇒ ⭐ 本属性不参与 ✅
+			}
+			int cached = _baolongdaFanRpmMaxCache;
+			if (cached > 0)
+			{
+				return cached;
+			}
+			int resolved = 0;
+			try
+			{
+				BaolongdaWmi wmi = _baolongda?.Wmi;
+				if (wmi != null && wmi.TryReadByte(BaolongdaWmi.Function.MaxFanSpeed, out byte raw))
+				{
+					// ⚠️ 功能号 21 的**读语义未验证** ⇒ ⭐ 只接受落在合理风扇区间的解释 ✅
+					//   ⭐ 候选 ①：原样（RPM）· ⭐ 候选 ②：×100（⭐ 若它沿用"写"的 RPM÷100 口径 ✅）
+					foreach (int cand in new int[2] { raw, raw * 100 })
+					{
+						if (cand >= 1000 && cand <= 12000)
+						{
+							resolved = cand;
+							break;
+						}
+					}
+				}
+			}
+			catch
+			{
+				resolved = 0;
+			}
+			if (resolved > 0)
+			{
+				_baolongdaFanRpmMaxCache = resolved;
+				_baolongdaFanRpmMaxIsReference = false;
+				Logger.WriteError($"宝龙达 风扇百分比：⭐ 分母取自【功能号 21 实测】= {resolved} RPM ✅"
+					+ "（⭐ 主界面 ／ ⭐ 托盘 ／ ⭐ 风扇曲线三处共用它 ✅）");
+				return resolved;
+			}
+			_baolongdaFanRpmMaxCache = BaolongdaFanCurveSettings.DefaultMaxRpm;
+			_baolongdaFanRpmMaxIsReference = true;
+			Logger.WriteError($"宝龙达 风扇百分比：⚠️ 功能号 21 读不到**本机实测 max**"
+				+ $" ⇒ ⭐ 退化为**参考分母** {BaolongdaFanCurveSettings.DefaultMaxRpm} RPM ⚠️"
+				+ "（⭐ 该值是占位值、⛔ **不是**本机实测 ⚠️ ⇒ ⭐ 百分比只能当**粗略参考** ✅；"
+				+ "⭐ 与风扇曲线的 <c>MaxRpm</c> 是**同一个数** ✅）");
+			return _baolongdaFanRpmMaxCache;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ 当前 <see cref="FanRpmMaxForPercent" /> 是不是**参考值**（⭐ 而非本机实测 ⚠️）
+	/// —— ⭐ 供 UI ／ 日志**如实标注** ✅（⭐ 铁律：读不到就显示未知，⛔ 绝不编数字 ✅）。
+	/// </summary>
+	public bool FanRpmMaxIsReference => _baolongdaFanRpmMaxIsReference;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **意向方法** —— "⭐ 应用一组 CPU 功耗/温度墙" ✅

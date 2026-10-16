@@ -15064,7 +15064,30 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//      ⇒ ⭐ <b>宁可不显示，⭐ 也不显示错的</b> ✅（⭐ 与"⭐ 不许谎报"⭐ 同一原则 ✅）
 		//   ⚠️ 对 GCU 机型：⭐ <c>UsesBaolongda</c> 为假 ⇒ ⭐ 照旧传真实 duty ✅ ⇒
 		//      ⭐ 下面的判据一字未改 ⇒ ⭐ <b>行为逐位不变</b> ✅（⭐ 含"⭐ duty=0 时照旧显示 <c>0%</c>"⚠️）
-		int? duty = hw.UsesBaolongda ? (int?)null : (isCpu ? hw.CpuFanDuty : hw.GpuFanDuty);
+		// ⭐⭐ 2026-10-16（宝龙达 · 转速百分比）：⭐ 判据由「宝龙达 ⇒ 一律不显示」改为
+		//   「**有没有可靠分母**」✅ —— ⚠️ 原判据的前提是"宝龙达协议里没有风扇最大转速"⚠️，
+		//   但那个前提**从未被真正验证过**（⭐ 诊断段此前**根本没试读过功能号 21** ⚠️）。
+		//   ⭐ 现在：⭐ ① 先试读**功能号 21**（⭐ 见 `MechrevoHw.FanRpmMaxForPercent` ✅）——
+		//             ⭐ 读到**本机实测 max** ⇒ ⭐ 用 `RPM ÷ max` 算**准确百分比** ✅
+		//             （⭐ 与风扇曲线**共用同一个分母** ✅ ⇒ ⭐ 修掉"一处有一处没有"的自相矛盾 ✅）；
+		//           ⭐ ② 读不到 ⇒ ⭐ 退化为**参考分母** ⇒ ⭐ **仍然不显示** ⚠️
+		//             （⚠️ 参考值 4200 会让 4856rpm 算出 115% ⇒ ⭐ 那是**错的数字** ❌
+		//              ⇒ ⭐ 遵守本段既有立场「⭐ 宁可不显示，⭐ 也不显示错的」✅）。
+		//   ⚠️ 对 GCU 机型：⭐ `UsesBaolongda` 为假 ⇒ ⭐ 走 else ⇒ **判据一字未改** ✅
+		//      ⇒ ⭐ **行为逐位不变** ✅（⭐ 含"⭐ duty=0 时照旧显示 <c>0%</c>" ⚠️）
+		int? duty;
+		if (hw.UsesBaolongda)
+		{
+			int rpmMaxForPercent = hw.FanRpmMaxForPercent;
+			int rpmNow = isCpu ? hw.CpuFanRpm : hw.GpuFanRpm;
+			duty = (!hw.FanRpmMaxIsReference && rpmMaxForPercent > 0 && rpmNow > 0)
+				? (int?)Math.Min(100, (int)Math.Round(rpmNow * 100.0 / rpmMaxForPercent))
+				: (int?)null;
+		}
+		else
+		{
+			duty = isCpu ? hw.CpuFanDuty : hw.GpuFanDuty;
+		}
 		float? power = (isCpu ? HardwareControl.cpuPower : HardwareControl.gpuPower);
 		// 2026-10-16（方案 A）：三个字段**分开**返回（各占一片）；⛔ 不再在 TelemetryRest 里拼接。
 		bool fanFresh = hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L);
