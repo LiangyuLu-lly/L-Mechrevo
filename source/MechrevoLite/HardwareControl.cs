@@ -294,65 +294,67 @@ public static class HardwareControl
 		{
 			return;
 		}
-		bool isBaolongda = hw.UsesBaolongda;
-		// ── ① CPU 温度：⭐ LHM 优先（⭐ 所有机型 ✅）⇒ ⭐ 读不到才用厂商的 ✅ ──
+		
+		// ── ① CPU 温度：⭐⭐ 2026-10-16 **回退修正** —— ⭐ **厂商优先、⭐ LHM 兜底** ✅ ──
+		//   ⚠️⚠️ 事故：⭐ 我先前写成"⭐ LHM 优先"⇒ ⭐ **用户实测 GCU 机型上 CPU/GPU 温度变成「—」** ❌
+		//      ⭐ 根因：⭐ LHM 那条路**没能给出有效值**（⭐ 或给得比 GCU 晚 ⚠️）⇒
+		//      ⭐ 而我把"⭐ 厂商值"放在了 **else** 分支里 ⇒ ⭐ 一旦 LHM 分支被进入但值无效，
+		//      ⭐ **厂商的实时值就被挡住了** ⚠️
+		//   ⇒ ⭐ ⭐ 现在改为 ⭐ **厂商值优先**（⭐ 只要它有效就照原样用 ✅），
+		//      ⭐ **只有厂商没给值时**才用 LHM ✅
+		//   ⭐ 这样 ⭐ **GCU 机型的显示与改动前【逐位一致】** ✅（⭐ 先把回归修掉 ✅），
+		//      ⭐ 而非 GCU 后端（⭐ 本来就没有厂商值 ✅）依旧能拿到 LHM 的温度 ✅
+		//   📌 待办：⭐ "⭐ 所有机型优先用 LHM"⭐ 这条 ⭐ **等 LHM 那条路被证明稳定后再恢复** ⚠️
+		//      （⭐ 要恢复时 ⭐ 把下面 if/else 顺序对调即可 ✅）
 		try
 		{
-			float? fromLhm = lhmMonitor.CpuTemperature;
-			if (fromLhm.HasValue && fromLhm.Value > 0f)
+			int cpuFromVendor = (hw.BaolongdaCpuTemp > 0) ? hw.BaolongdaCpuTemp : hw.CpuTemp;
+			if (cpuFromVendor > 0)
 			{
-				int celsius = (int)Math.Round(fromLhm.Value);
-				if (cpuTemp != celsius)
-				{
-					cpuTemp = celsius;
-				}
-				// ⭐ 首次（或来源变化后首次）记一行，⭐ 便于回查"温度来源变成了 LHM" ✅
-				if (Interlocked.Exchange(ref _lhmCpuTempLogged, 1) == 0)
-				{
-					Logger.WriteLine($"传感器优先级：⭐ CPU 温度改用 **LM 自带的 LHM**（传感器={lhmMonitor.CpuTemperatureSensorName}，"
-						+ $"值={celsius}℃）⇒ ⭐ 按用户要求「所有机型优先用 LHM」✅（后端={(isBaolongda ? "宝龙达" : (hw.UsesBuiltInModes ? "老同方" : "GCU"))}）");
-				}
+				// ⭐ 厂商（⭐ GCU 推送 / ⭐ 宝龙达功能号 22 ✅）给了有效值 ⇒ ⭐ 照原样用 ✅
+				cpuTemp = cpuFromVendor;
 			}
 			else
 			{
-				// ⭐ LHM 读不到 ⇒ ⭐ 回退厂商接口 ✅
-				//   ⭐ 宝龙达：`RefreshBaolongdaSensors` 已把值放进 `CpuTemp`/`BaolongdaCpuTemp` ✅
-				//   ⭐ GCU / ⭐ 老同方：`CpuTemp` 由推送或老接口填 ✅
-				int fromVendor = (hw.BaolongdaCpuTemp > 0) ? hw.BaolongdaCpuTemp : hw.CpuTemp;
-				if (fromVendor > 0)
+				// ⭐ 厂商没给 ⇒ ⭐ 才用 LM 自带的 LHM 兜底 ✅（⭐ 非 GCU 后端主要靠这一支 ✅）
+				float? fromLhm = lhmMonitor.CpuTemperature;
+				if (fromLhm.HasValue && fromLhm.Value > 0f)
 				{
-					cpuTemp = fromVendor;
-					// ⭐ 备注：⭐ 宝龙达机型上 `RefreshBaolongdaSensors` 也会写 `CpuTemp`，
-					//    所以这里两条路都通；⭐ 不重复记账 ✅
+					cpuTemp = (int)Math.Round(fromLhm.Value);
+					if (Interlocked.Exchange(ref _lhmCpuTempLogged, 1) == 0)
+					{
+						Logger.WriteLine($"传感器兜底：⭐ 厂商未提供 CPU 温度 ⇒ 改用 **LM 自带的 LHM**"
+							+ $"（传感器={lhmMonitor.CpuTemperatureSensorName}，值={cpuTemp}℃）✅");
+					}
 				}
 			}
 		}
 		catch
 		{
 		}
-		// ── ② GPU 温度：⭐ LHM 优先 ⇒ ⭐ 厂商（GCU）⇒ ⭐ 再不行 NVML ✅ ──
+		// ── ② GPU 温度：⭐⭐ 同样 **厂商优先、⭐ LHM ⇒ ⭐ NVML 兜底** ✅ ──
 		try
 		{
-			bool filled = false;
-			float? lhmGpu = lhmMonitor.GpuTemperature;
-			if (lhmGpu.HasValue && lhmGpu.Value > 0f)
+			if (hw.GpuTemp > 0)
 			{
-				gpuTemp = (int)Math.Round(lhmGpu.Value);
-				filled = true;
+				gpuTemp = hw.GpuTemp; // ⭐ 厂商（⭐ GCU ✅）优先 ⇒ ⭐ 与改动前一致 ✅
 			}
-			if (!filled && hw.GpuTemp > 0)
+			else
 			{
-				// ⭐ 厂商接口（⭐ GCU 推送 ✅）
-				gpuTemp = hw.GpuTemp;
-				filled = true;
-			}
-			if (!filled && !NvmlHelper.Unavailable)
-			{
-				// ⭐ 通用缺口兜底：⭐ 加固过的 NVML（⭐ NVIDIA 机型 ✅）
-				float? fromNvml = NvmlHelper.GetGpuTemperature();
-				if (fromNvml.HasValue && fromNvml.Value > 0f)
+				bool filled = false;
+				float? lhmGpu = lhmMonitor.GpuTemperature;
+				if (lhmGpu.HasValue && lhmGpu.Value > 0f)
 				{
-					gpuTemp = (int)Math.Round(fromNvml.Value);
+					gpuTemp = (int)Math.Round(lhmGpu.Value);
+					filled = true;
+				}
+				if (!filled && !NvmlHelper.Unavailable)
+				{
+					float? fromNvml = NvmlHelper.GetGpuTemperature();
+					if (fromNvml.HasValue && fromNvml.Value > 0f)
+					{
+						gpuTemp = (int)Math.Round(fromNvml.Value);
+					}
 				}
 			}
 		}
