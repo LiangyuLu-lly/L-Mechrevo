@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -54,6 +56,110 @@ public static class HardwareControl
 	/// ⭐ 而"⭐ 续命"⭐ 与"⭐ 续命到期"⭐ 这两件事**各自只该记一次** ✅ ⇒ ⭐ 按状态翻转记 ✅。</para>
 	/// </summary>
 	private static int _gpuTempKeepAliveState;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（冷启动 GPU 温度空窗 · <c>nvidia-smi</c> 早期来源）：
+	/// <b>本会话是否已经由"真正的本地来源"（LHM / NVML）给出过有效 GPU 温度</b> ✅（⭐ 0=没有 · ⭐ 1=有 ✅）。
+	/// <para>⚠️ <b>它就是 <c>nvidia-smi</c> 的【让位开关】</b>：⭐ 一旦 LHM/NVML 就绪并给出有效值，
+	/// 就不再 spawn <c>nvidia-smi</c> ✅ ⇒ ⭐ 避免长期起子进程 ⚠️
+	/// （⭐ 一次 spawn 约 150~300 ms ✅ —— ⭐ 本机实测 145 ms ✅）。</para>
+	/// </summary>
+	private static int _gpuTempRealSourceReady;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <b>我们（<c>HardwareControl</c>）上一次写进 <c>hw.GpuTemp</c> 的值</b> ✅
+	/// （⭐ 0 = 本会话还没写过 ✅）。
+	/// <para>⚠️⚠️ <b>为什么必须记它</b>：⭐ <see cref="ApplySensorPriority"/> 的判据原来是
+	/// <c>if (hw.GpuTemp &gt; 0)</c> 就当成"⭐ 厂商值"⚠️ —— 而
+	/// <see cref="MechrevoHw.MarkExternalGpuTemp"/> 写的是**同一个属性** ❌
+	/// ⇒ ⭐ ⭐ <b>我们自己写的值在下一轮会被误判成厂商值</b>：
+	/// ⭐ ① ⭐ LHM/NVML <b>永远不会再被读取</b>（⭐ 温度冻结在第一个外部值上 ⚠️）；
+	/// ⭐ ② ⭐ 本轮的"让位"逻辑永远不触发 ❌。</para>
+	/// <para>⭐ 判据：⭐ <c>hw.GpuTemp == _gpuTempFacadeWritten</c> ⇒ ⭐ 这个值是**我们**写的 ✅；
+	/// ⭐ 厂商真的写了自己的值 ⇒ ⭐ 两个数不相等 ⇒ ⭐ 自动走回厂商分支 ✅，
+	/// 并**在那里清成 0**（⭐ 之后每轮都正确 ✅）。</para>
+	/// </summary>
+	private static int _gpuTempFacadeWritten;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <c>nvidia-smi</c> <b>最近一次尝试</b>的时刻（⭐ TTL 用 ✅）。
+	/// <para>⚠️ 为什么需要 TTL：⭐ 采样本每 3 秒跑一次 ⚠️ ⇒ ⭐ 不能每次都 spawn 子进程 ❌
+	/// ⇒ ⭐ 学斗战者（<c>_lastGpuTemp</c> ＋ ⭐ 短 TTL ✅）✅。</para>
+	/// </summary>
+	private static long _gpuTempSmiLastAttemptTick;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <b>首次采样</b>的时刻（⭐ 宽限期基准 ✅）。
+	/// <para>⚠️ 为什么要宽限期：⭐ 本机（⭐ GCU ✅）的厂商值由 MQTT 推送填 ⚠️ ⇒
+	/// ⭐ 启动最初一两秒里 <c>hw.GpuTemp</c> 可能**还是 0** ❌ ⇒ ⭐ 若立刻尝试 <c>nvidia-smi</c>，
+	/// 就会在"⭐ 厂商本来会给值"⭐ 的机器上也 spawn 一次 ⚠️ ⇒ ⭐ 违反"⭐ 逐位不变"❌。
+	/// ⭐ 先等一段时间 ⇒ ⭐ 厂商值到了就 <c>hw.GpuTemp &gt; 0</c> ⇒ ⭐ 本来源**永不触发** ✅。</para>
+	/// </summary>
+	private static long _gpuTempSmiFirstCallTick;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <b><c>nvidia-smi</c> 可执行文件路径缓存</b> ✅
+	/// （⭐ <c>null</c> = 还没找过 · ⭐ <c>""</c> = 找过、**没有** ⇒ ⭐ 静默放弃、⛔ 不再重找 ⚠️）。
+	/// <para>⚠️ 非 NVIDIA 机器上这个文件不存在 ⚠️ ⇒ ⭐ <b>必须优雅退化</b>：
+	/// ⭐ 静默 <c>return</c>、⛔ 不打错误日志、⛔ 不报错 ✅（⭐ 并缓存负结果 ⇒ ⭐ 不每 3 秒重找一遍 ❌）。</para>
+	/// </summary>
+	private static string _gpuTempSmiExePath;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <c>nvidia-smi</c> 早期来源的**日志状态翻转位** ✅
+	/// （⭐ 0=未用过 · ⭐ 1=成功过 ✅ · ⭐ 2=已让位 ✅ · ⭐ 3=已停用 ⚠️）。
+	/// <para>⚠️ 本状态机每 3 秒跑一次 ⚠️ ⇒ ⭐ 直接写日志就是刷屏 ❌ ⇒ ⭐ 按状态翻转只记一次 ✅。</para>
+	/// </summary>
+	private static int _gpuTempSmiState;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <c>nvidia-smi</c> **连续取不到值**的次数（⭐ 成功即清零 ✅）。
+	/// <para>⚠️⚠️ <b>为什么必须有它 —— 防"⭐ 无限 spawn"</b>：⭐ 有 <c>nvidia-smi.exe</c>
+	/// **不代表有可用的 NVIDIA 显卡** ⚠️（⭐ 例如换过显卡、⭐ 驱动残留 ✅）⇒ ⭐ 那种机器上
+	/// LHM/NVML 永远不会就绪 ⇒ ⭐ "让位"永远不触发 ⇒ ⭐ 本来源就会**每 3 秒起一个子进程、
+	/// 永不停止** ❌。⭐ 所以：⭐ 连续失败到 <see cref="NvidiaSmiBackoffAfterMisses"/> ⇒ ⭐ **退避**
+	/// （⭐ TTL 放大到 <see cref="NvidiaSmiBackoffTtlMs"/> ✅）；⭐ 到
+	/// <see cref="NvidiaSmiGiveUpAfterMisses"/> ⇒ ⭐ **彻底停用本来源** ✅。</para>
+	/// </summary>
+	private static int _gpuTempSmiMisses;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <b>宽限期长度</b>（毫秒 ✅）。
+	/// <para>⚠️ 取值理由：⭐ 厂商（MQTT）推送通常在启动后一两秒内到 ✅ ⇒ ⭐ 5 秒足够判定
+	/// "⭐ 这台机的厂商到底给不给 GPU 温度" ⚠️；⭐ 而冷启动空窗约 31 秒 ⚠️
+	/// ⇒ ⭐ 仍能覆盖大部分空窗 ✅。</para>
+	/// </summary>
+	private const int NvidiaSmiStartupGraceMs = 5000;
+
+	/// <summary>⭐⭐（同上）：⭐ <c>nvidia-smi</c> 取值 **TTL**（毫秒 ✅）。</summary>
+	private const int NvidiaSmiTtlMs = 2000;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ 连续失败到这么多次 ⇒ ⭐ **退避**（⭐ TTL 放大 ✅）。
+	/// <para>⚠️ 取值理由：⭐ 3 次 ≈ 启动后 5~11 秒 ✅ ⇒ ⭐ 若那时还取不到，
+	/// 说明"⭐ 这台机的 <c>nvidia-smi</c> 不太可能好用"⭐ 的概率已经很高 ⚠️
+	/// ⇒ ⭐ 降频而不是立刻放弃（⭐ 免得把"⭐ 开机瞬时抖动"⭐ 误判成"⭐ 永远不行"❌）。</para>
+	/// </summary>
+	private const int NvidiaSmiBackoffAfterMisses = 3;
+
+	/// <summary>⭐⭐（同上）：⭐ 退避后的 TTL（毫秒 ✅）。</summary>
+	private const int NvidiaSmiBackoffTtlMs = 20000;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ 连续失败到这么多次 ⇒ ⭐ **彻底停用本来源** ✅
+	/// （⭐ 防"⭐ 永不休止地起子进程"❌ ✅）。
+	/// <para>⚠️ 取值理由：⭐ 配合退避 ⇒ ⭐ 大约跑满 2~3 分钟才放弃 ✅ ⇒
+	/// ⭐ 足够覆盖冷启动空窗（⭐ 约 31 秒 ✅）＋ ⭐ 启动初期抖动 ⚠️，
+	/// ⭐ 又不会无限期地空转 ❌。</para>
+	/// </summary>
+	private const int NvidiaSmiGiveUpAfterMisses = 10;
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <c>nvidia-smi</c> 子进程**超时**（毫秒 ✅）。
+	/// <para>⚠️ 为什么必须有：⭐ 采样本是在 <c>lhmLock</c> 里跑的 ⚠️ ⇒ ⭐ 子进程若挂住会**
+	/// 一直占着锁** ❌ ⇒ ⭐ 必须封顶 ✅（⭐ 正常 150~300 ms ✅ · ⭐ 极少数最坏情况才会走满 ✅）。</para>
+	/// </summary>
+	private const int NvidiaSmiTimeoutMs = 3000;
 
 	public static int cpuTemp;
 
@@ -381,7 +487,14 @@ public static class HardwareControl
 			//   ⭐ 只有**不是**厂商给的（⭐ = LHM/NVML 补的 ✅）才需要写回门面层 ✅
 			//   ⇒ ⭐ GCU 机型（⭐ 厂商值恒有效 ✅）走老分支 ⇒ ⭐ 行为逐位不变 ✅
 			bool gpuTempFromVendor = false;
-			if (hw.GpuTemp > 0)
+			// ⭐⭐ 2026-10-16（nvidia-smi 早期来源）：⭐ 门面层这个值**是不是我们自己写的** ⚠️ ——
+			//   ⚠️ 必须分清，否则 `MarkExternalGpuTemp`（⭐ 外部来源 ✅）写的值在下一轮会被
+			//      误判成"⭐ 厂商值"❌ ⇒ ⭐ LHM/NVML 永远不会再被读取（⭐ 温度冻结在第一个外部值上 ⚠️）
+			//      ＋ ⭐ nvidia-smi 的"让位"永远不触发 ❌。
+			//   ⭐ 判据：⭐ "⭐ 我们记过、⭐ 且现在还是那个数"⭐ ⇒ ⭐ 是我们写的 ✅；
+			//      ⭐ 厂商写了自己的值 ⇒ ⭐ 两个数不等 ⇒ ⭐ 自动走回厂商分支 ✅。
+			bool facadeIsOurs = IsGpuTempFacadeWrittenByUs(hw);
+			if (hw.GpuTemp > 0 && !facadeIsOurs)
 			{
 				gpuTemp = hw.GpuTemp; // ⭐ 厂商（⭐ GCU ✅）优先 ⇒ ⭐ 与改动前一致 ✅
 				gpuTempFilled = true;
@@ -389,11 +502,16 @@ public static class HardwareControl
 			}
 			else
 			{
+				// ⭐⭐ 2026-10-16（nvidia-smi 早期来源）：⭐ 本支 = "⭐ 门面层里没有【厂商】值" ✅ ——
+				//   ① ⭐ 先问**真正的本地来源**（⭐ LHM ⇒ ⭐ NVML ✅）⇒ ⭐ 它们一旦给值就让 nvidia-smi 让位 ✅
+				//   ② ⭐ 都没给、⭐ 而门面层里还有**我们自己写的**早期值 ⇒ ⭐ 沿用它 ✅
 				float? lhmGpu = lhmMonitor.GpuTemperature;
 				if (lhmGpu.HasValue && lhmGpu.Value > 0f)
 				{
 					gpuTemp = (int)Math.Round(lhmGpu.Value);
 					gpuTempFilled = true;
+					// ⭐ LHM 就绪 ⇒ ⭐ nvidia-smi 让位（⭐ 不再 spawn 子进程 ✅）
+					MarkGpuTempRealSourceReady();
 				}
 				if (!gpuTempFilled && !NvmlHelper.Unavailable)
 				{
@@ -402,7 +520,16 @@ public static class HardwareControl
 					{
 						gpuTemp = (int)Math.Round(fromNvml.Value);
 						gpuTempFilled = true;
+						// ⭐ NVML 就绪 ⇒ ⭐ nvidia-smi 让位（⭐ 不再 spawn 子进程 ✅）
+						MarkGpuTempRealSourceReady();
 					}
+				}
+				if (!gpuTempFilled && facadeIsOurs && hw.GpuTemp > 0)
+				{
+					// ⭐ LHM/NVML 都还没就绪 ⚠️ ⇒ ⭐ 沿用 nvidia-smi 早期来源写的那个值 ✅
+					//   ⇒ ⭐ 冷启动那 31 秒不再显示「—」✅（⭐ 值是真的、⭐ 来源已在日志里记明 ✅）
+					gpuTemp = hw.GpuTemp;
+					gpuTempFilled = true;
 				}
 			}
 			// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机型 GPU 温度显示为「—」"）：
@@ -419,6 +546,9 @@ public static class HardwareControl
 				{
 					// ⭐ 老路：⭐ 厂商值已经在 `hw` 里 ✅ ⇒ ⭐ 只需要时间戳（⭐ 与改动前逐字一致 ✅）
 					hw.MarkGpuInfoReceived();
+					// ⭐⭐ 2026-10-16（nvidia-smi 早期来源）：⭐ 厂商接管了门面层 ⇒ ⭐ 把"⭐ 我们上次写的值"⭐ 清掉 ✅
+					//   ⇒ ⭐ 之后每一轮都会**正确地**走厂商分支 ✅（⭐ 也让 nvidia-smi 那边彻底让位 ✅）
+					Interlocked.Exchange(ref _gpuTempFacadeWritten, 0);
 				}
 				else
 				{
@@ -431,6 +561,11 @@ public static class HardwareControl
 					//      `hw.CpuFanRpm`（⭐ 门面层属性 ✅），⭐ 两条路**根本不是同一处** ✅
 					//   ⇒ ⭐ 修法：⭐ **把外部来源的值写回门面层** ✅（⭐ 连值带时间戳 ✅）
 					hw.MarkExternalGpuTemp(gpuTemp);
+					// ⭐⭐ 2026-10-16（nvidia-smi 早期来源）：⭐ 记下"⭐ 门面层这个值是【我们】写的" ✅
+					//   ⚠️ 必须记 —— 否则下一轮 `hw.GpuTemp > 0` 会把它**误判成厂商值** ❌
+					//      ⇒ ⭐ LHM/NVML 永远不再被读取（⭐ 温度冻结在第一个外部值上 ⚠️）
+					//      ⇒ ⭐ 且 nvidia-smi 的"让位"永远不触发 ❌。
+					Interlocked.Exchange(ref _gpuTempFacadeWritten, gpuTemp);
 					// ⭐⭐ 2026-10-16（方案 A）：⭐ 记下"⭐ 外部来源最后一次给出有效值的时刻" ✅
 					//   ⇒ ⭐ 闸门失败时可以在此基础上**在上限之内**续命（⛔ 不闪「—」）✅
 					//   ⭐ 同时把续命状态复位 ⇒ ⭐ "⭐ 恢复过、⭐ 之后又失败"⭐ 会重新记一次
@@ -720,6 +855,298 @@ public static class HardwareControl
 	}
 
 	/// <summary>
+	/// ⭐⭐（同上）：⭐ 标记"⭐ **真正的本地来源**（LHM / NVML）已经就绪" ✅ ⇒ ⭐ <c>nvidia-smi</c>
+	/// 从此**让位**（⭐ <see cref="ShouldTryEarlyNvidiaSmi"/> 第 ① 条 ✅）。
+	/// <para>⚠️ 让位日志只在"⭐ 确实用过 <c>nvidia-smi</c>"⭐（⭐ <see cref="_gpuTempSmiState"/> 为 1 ✅）
+	/// 时记一次 ⚠️ ⇒ ⭐ GCU 机型（⭐ 从没用过、⭐ 状态恒为 0 ✅）<b>零日志影响</b> ✅
+	/// ⇒ ⭐ 不影响"⭐ 逐位不变"⭐ 的结论 ✅。</para>
+	/// </summary>
+	private static void MarkGpuTempRealSourceReady()
+	{
+		Interlocked.Exchange(ref _gpuTempRealSourceReady, 1);
+		if (Interlocked.CompareExchange(ref _gpuTempSmiState, 2, 1) == 1)
+		{
+			Logger.WriteError("GPU 温度：⭐ nvidia-smi 早期来源**已让位** ✅（⭐ LHM/NVML 已就绪并给出有效值 ✅）"
+				+ " ⇒ ⭐ 之后不再 spawn 子进程 ✅；⭐ 本条只记一次 ✅");
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（冷启动 GPU 温度空窗 · <c>nvidia-smi</c> 早期来源）：
+	/// ⭐ <b>门面层现在的 <c>hw.GpuTemp</c> 是不是【我们自己】写进去的</b> ✅。
+	/// <para>⚠️ 判据：⭐ 我们记过 <see cref="_gpuTempFacadeWritten"/>、⭐ 而且它**现在还是这个数** ✅
+	/// ⇒ ⭐ 说明中间**没有别人**（⭐ 厂商 ✅）写过 ⇒ ⭐ 不能当厂商值 ⚠️。</para>
+	/// </summary>
+	private static bool IsGpuTempFacadeWrittenByUs(MechrevoHw hw)
+	{
+		if (hw == null)
+		{
+			return false;
+		}
+		int written = Volatile.Read(ref _gpuTempFacadeWritten);
+		return written > 0 && hw.GpuTemp == written;
+	}
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ 找 <c>nvidia-smi.exe</c> ✅（⭐ 结果**缓存**，⭐ 含负结果 ✅）。
+	/// <para>⚠️ 为什么<b>不靠 PATH</b>：⭐ 斗战者参考实现（<c>BellatorFanControl.CandidatePaths()</c> ✅）
+	/// 就是**显式枚举安装目录**的 ✅；⭐ 只靠 PATH 很脆 ⚠️（⭐ 我们的进程环境未必带它 ✅）。</para>
+	/// <para>⭐ 候选顺序：⭐ ① <c>%SystemRoot%\System32</c>（⭐ 现代驱动放这里 ✅ ——
+	/// ⭐ ⚠️ 本机实测**只有这一处存在**：两个 <c>NVIDIA Corporation\NVSMI</c> 都没有 ✅）
+	/// ⇒ ⭐ ② <c>%ProgramFiles%\NVIDIA Corporation\NVSMI</c>（⭐ 老驱动 ✅）
+	/// ⇒ ⭐ ③ <c>%ProgramFiles(x86)%\…</c> ✅。</para>
+	/// <para>⛔ 找不到 ⇒ ⭐ 返回 <c>null</c> 并**缓存空串** ⇒ ⭐ 后续调用**一次都不再枚举** ✅、
+	/// ⛔ 不打日志、⛔ 不报错 ✅（⭐ 非 NVIDIA 机器就是这样优雅退化 ✅）。</para>
+	/// </summary>
+	private static string ResolveNvidiaSmiPath()
+	{
+		string cached = _gpuTempSmiExePath;
+		if (cached != null)
+		{
+			return (cached.Length == 0) ? null : cached; // ⭐ "" = 已确认没有 ⇒ 静默放弃 ✅
+		}
+		string found = null;
+		try
+		{
+			string[] candidates =
+			{
+				Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"),
+				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe"),
+				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe")
+			};
+			foreach (string candidate in candidates)
+			{
+				if (!string.IsNullOrEmpty(candidate) && File.Exists(candidate))
+				{
+					found = candidate;
+					break;
+				}
+			}
+		}
+		catch
+		{
+			found = null;
+		}
+		_gpuTempSmiExePath = found ?? "";
+		return found;
+	}
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ 向 <c>nvidia-smi</c> 要一次 GPU 温度 ✅。
+	/// <para>⭐⭐ <b>为什么它能治那 31 秒</b>：⭐ 我们进程内的 NVML 要等启动后约 31 秒才第一次
+	/// 初始化成功 ⚠️（⭐ 真机日志：<c>21:42:31</c> 启动 ⇒ ⭐ <c>21:43:03.959</c> 才 <c>NVML Init: 0</c> ✅）；
+	/// 而 <c>nvidia-smi</c> 是 <b>另一个进程</b> ✅ ⇒ ⭐ 不受我们进程内的初始化时序影响 ✅。</para>
+	/// <para>⭐ 命令：⭐ <c>--query-gpu=temperature.gpu --format=csv,noheader,nounits</c> ⇒
+	/// ⭐ 一行纯数字（⭐ ⚠️ 本机实测 145 ms、⭐ 输出 <c>80</c> ✅）⇒
+	/// ⭐ 解析失败一律当"⭐ 取不到"⭐ 处理，⛔ <b>不猜值</b> ✅。</para>
+	/// <para>⚠️ 读取顺序刻意是"⭐ <b>先等退出、⭐ 再读输出</b>"⭐ —— ⭐ <c>nvidia-smi</c> 的输出只有几十字节 ✅
+	/// ⇒ ⭐ 不可能写满管道 ⇒ ⭐ 不会有经典的"⭐ 先读后等"⭐ 死锁 ✅。</para>
+	/// </summary>
+	private static int? QueryNvidiaSmiTemperature(string exePath)
+	{
+		try
+		{
+			using Process process = new Process();
+			process.StartInfo.FileName = exePath;
+			process.StartInfo.Arguments = "--query-gpu=temperature.gpu --format=csv,noheader,nounits";
+			process.StartInfo.UseShellExecute = false;
+			process.StartInfo.CreateNoWindow = true;
+			process.StartInfo.RedirectStandardOutput = true;
+			process.StartInfo.RedirectStandardError = true;
+			process.Start();
+			// ⚠️ 超时 ⇒ ⭐ 杀子进程 ＋ ⭐ 当"取不到" ✅（⛔ 绝不无限期占着 lhmLock ⚠️）
+			if (!process.WaitForExit(NvidiaSmiTimeoutMs))
+			{
+				try
+				{
+					process.Kill(entireProcessTree: true);
+				}
+				catch
+				{
+				}
+				return null;
+			}
+			if (process.ExitCode != 0)
+			{
+				return null;
+			}
+			string stdout = process.StandardOutput.ReadToEnd();
+			string firstLine = null;
+			foreach (string line in stdout.Split('\n'))
+			{
+				string trimmed = line.Trim();
+				if (trimmed.Length > 0)
+				{
+					firstLine = trimmed;
+					break;
+				}
+			}
+			// ⭐ 理据：⭐ 0℃ 以下 / ⭐ 150℃ 以上都不是"⭐ 真实 GPU 温度"⭐ ⇒ ⭐ 当取不到 ✅（⛔ 不猜 ⚠️）
+			if (firstLine != null && int.TryParse(firstLine, out int celsius) && celsius > 0 && celsius < 150)
+			{
+				return celsius;
+			}
+			return null;
+		}
+		catch
+		{
+			// ⭐ 文件不在 / ⭐ 权限不足 / ⭐ 非 NVIDIA ⇒ ⭐ 一律静默"取不到" ✅（⛔ 不打错误日志 ⚠️）
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐（同上）：⭐ <b>该不该试一次 <c>nvidia-smi</c></b> ✅。
+	/// <para>⚠️ 五道判据，⭐ 任何一条不满足就**一次都不 spawn** ✅：
+	/// ⭐ ① <b>让位</b> —— LHM/NVML 已给过有效值 ⇒ ⭐ 不再调用 ✅；
+	/// ⭐ ② <b>宽限期</b> —— ⭐ 启动后前 <see cref="NvidiaSmiStartupGraceMs"/> ms 不试 ⚠️
+	/// （⭐ 先让厂商（MQTT）有机会填值 ⇒ ⭐ 这是"⭐ 非宝龙达 / ⭐ GCU 逐位不变"⭐ 的第一道保护 ✅）；
+	/// ⭐ ③ <b>TTL</b> —— ⭐ 距上次尝试不足 <see cref="NvidiaSmiTtlMs"/> ms ⇒ ⭐ 不重复 spawn ✅；
+	/// ⭐ ④ <b>厂商已给值</b> —— ⭐ 不做 ✅（⭐ 用 <see cref="IsGpuTempFacadeWrittenByUs"/> 区分
+	/// "⭐ 是不是我们自己写的"⚠️ —— ⭐ 第二道保护 ✅）；
+	/// ⭐ ⑤ <b>可执行文件存在</b> ⚠️ —— ⭐ 非 NVIDIA 机器静默放弃 ✅。</para>
+	/// </summary>
+	private static bool ShouldTryEarlyNvidiaSmi()
+	{
+		// ① 让位：LHM/NVML 已就绪并给过有效值 ⇒ 本来源功成身退
+		if (Volatile.Read(ref _gpuTempRealSourceReady) == 1)
+		{
+			return false;
+		}
+		int misses = Volatile.Read(ref _gpuTempSmiMisses);
+		// ①b 彻底停用：连续失败太多次 ⇒ 推断本机没有可用的 NVIDIA 工具 ⚠️ ⇒ 不再 spawn ✅
+		//   ⚠️ 这是"防无限起子进程"的兜底（⭐ 见 _gpuTempSmiMisses 的注释 ✅）
+		if (misses >= NvidiaSmiGiveUpAfterMisses)
+		{
+			return false;
+		}
+		long now = Environment.TickCount64;
+		// ② 宽限期（首次调用时记基准）
+		long firstCallTick = Interlocked.Read(in _gpuTempSmiFirstCallTick);
+		if (firstCallTick == 0L)
+		{
+			Interlocked.CompareExchange(ref _gpuTempSmiFirstCallTick, now, 0L);
+			firstCallTick = Interlocked.Read(in _gpuTempSmiFirstCallTick);
+		}
+		if (now - firstCallTick < NvidiaSmiStartupGraceMs)
+		{
+			return false;
+		}
+		// ③ TTL（⭐ 若已连续失败到退避阈值 ⇒ 用放大的 TTL ⚠️ —— 免得一直起子进程 ❌）
+		int ttlMs = (misses >= NvidiaSmiBackoffAfterMisses) ? NvidiaSmiBackoffTtlMs : NvidiaSmiTtlMs;
+		long lastAttemptTick = Interlocked.Read(in _gpuTempSmiLastAttemptTick);
+		if (lastAttemptTick != 0L && now - lastAttemptTick < ttlMs)
+		{
+			return false;
+		}
+		// ④ 厂商已给值 ⇒ 不做
+		MechrevoHw hw;
+		try
+		{
+			hw = Program.hw;
+		}
+		catch
+		{
+			return false;
+		}
+		if (hw == null)
+		{
+			return false;
+		}
+		if (hw.GpuTemp > 0 && !IsGpuTempFacadeWrittenByUs(hw))
+		{
+			return false; // ⭐ 厂商值有效 ⇒ ⭐ 永远不需要 nvidia-smi（⭐ GCU 机型就是这一支 ✅）
+		}
+		// ⑤ 可执行文件存在
+		return ResolveNvidiaSmiPath() != null;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（冷启动 GPU 温度空窗）：⭐ <b><c>nvidia-smi</c> 早期来源</b> ✅ ——
+	/// 排在两道闸门（⭐ <c>lhm-update</c> / ⭐ <c>lhm-read</c> ✅）**之外**的第一步 ✅。
+	///
+	/// <para>⚠️⚠️ <b>为什么必须排在外面</b>：⭐ 那两道闸门**失败就 <c>return</c>** ⚠️ ⇒
+	/// ⭐ <see cref="ApplySensorPriority"/> 根本不跑 ❌ ⇒ ⭐ 冷启动那 31 秒里
+	/// <b>没有任何代码有机会取 GPU 温度</b> ❌ ⇒ ⭐ 界面恒显示「—」⚠️。
+	/// ⭐ 所以本来源**绝不能塞进 <c>lhm-read</c> 的失败分支**（⭐ 那正是"⭐ 跳过"⭐ 的地方 ❌），
+	/// 而要**独立成一步、⭐ 排在闸门之前** ✅。</para>
+	///
+	/// <para>⚠️ 但**闸门本身与它的位置一字未动** ✅ —— ⛔ 没有把 <see cref="ApplySensorPriority"/>
+	/// 提到闸门之前（⭐ 那会削弱原生层 AV 防护 ❌）；⭐ 本方法**自己**被 <c>TryStep</c> 包着 ✅。</para>
+	///
+	/// <para>⭐ <b>记账与既有"⭐ 外部来源"⭐ 完全同款</b>：⭐ 写回门面层（<c>MarkExternalGpuTemp</c> ✅）＋
+	/// ⭐ 打 <see cref="_gpuTempExternalGoodTick"/> ⇒ ⭐ 方案 A 的"续命"也能覆盖它 ✅。</para>
+	/// </summary>
+	private static void RefreshEarlyGpuTempFromNvidiaSmi()
+	{
+		// ⭐ 用 TryStep 包裹（⭐ 它起外部进程 ⇒ ⭐ 必须与原生层采样同等待遇 ✅）；
+		//   ⚠️ 但 countsAsHealthFailure: false —— ⭐ nvidia-smi 取不到跟 LHM/NVML 那条链**无关** ⚠️
+		//      ⇒ ⭐ 绝不能因为它失败就触发"⭐ 采样链坏了 ⇒ ⭐ 重建 / ⭐ 降级"❌。
+		TryStep(delegate
+		{
+			if (!ShouldTryEarlyNvidiaSmi())
+			{
+				return;
+			}
+			Interlocked.Exchange(ref _gpuTempSmiLastAttemptTick, Environment.TickCount64);
+			string exePath = ResolveNvidiaSmiPath();
+			if (exePath == null)
+			{
+				return;
+			}
+			int? celsius = QueryNvidiaSmiTemperature(exePath);
+			if (!celsius.HasValue)
+			{
+				// ⭐ 取不到 ⇒ ⭐ 什么都不做 ⇒ ⭐ 界面照旧（⭐ 该「—」就「—」⇒ ⛔ 不谎报 ✅）
+				//   ⚠️ 但要**计数** ⇒ ⭐ 到阈值就退避 / ⭐ 最终停用 ✅（⭐ 防"⭐ 无限起子进程"❌）
+				int misses = Interlocked.Increment(ref _gpuTempSmiMisses);
+				if (misses == NvidiaSmiGiveUpAfterMisses && Interlocked.CompareExchange(ref _gpuTempSmiState, 3, 0) == 0)
+				{
+					Logger.WriteError($"GPU 温度：⚠️ **nvidia-smi 早期来源已停用**（⭐ 连续 {misses} 次取不到值 ⇒ "
+						+ "推断本机没有可用的 NVIDIA 工具 ⚠️）⇒ ⭐ 之后**不再 spawn 子进程** ✅；"
+						+ "⭐ 在 LHM/NVML 就绪之前界面仍会显示「—」✅（⛔ 不谎报 ⚠️）；⭐ 本条只记一次 ✅");
+				}
+				return;
+			}
+			// ⭐ 成功 ⇒ ⭐ 失败计数清零（⭐ 退避 / 停用判定跟着复位 ✅）
+			Interlocked.Exchange(ref _gpuTempSmiMisses, 0);
+			MechrevoHw hw;
+			try
+			{
+				hw = Program.hw;
+			}
+			catch
+			{
+				return;
+			}
+			if (hw == null)
+			{
+				return;
+			}
+			// ⭐ 复核：⭐ 厂商可能就在这几百毫秒里刚给了值 ⇒ ⭐ 立刻让位、⛔ 不覆盖它 ✅
+			if (hw.GpuTemp > 0 && !IsGpuTempFacadeWrittenByUs(hw))
+			{
+				return;
+			}
+			hw.MarkExternalGpuTemp(celsius.Value);
+			Interlocked.Exchange(ref _gpuTempFacadeWritten, celsius.Value);
+			Interlocked.Exchange(ref _gpuTempExternalGoodTick, Environment.TickCount64);
+			Interlocked.Exchange(ref _gpuTempKeepAliveState, 0);
+			// ⭐ 状态翻转：⭐ 之前"⭐ 三个来源都没给"⭐ ⇒ ⭐ 现在有了 ⇒ ⭐ 复位并记一行 ✅
+			if (Interlocked.Exchange(ref _gpuTempNoneLogged, 0) == 1)
+			{
+				Logger.WriteError($"GPU 温度：⭐ 已恢复 ✅ —— 现在能取到 {celsius.Value}℃（⭐ 由 nvidia-smi 早期来源提供 ✅）");
+			}
+			if (Interlocked.CompareExchange(ref _gpuTempSmiState, 1, 0) == 0)
+			{
+				Logger.WriteError($"GPU 温度：⭐ 冷启动空窗已由 **nvidia-smi 早期来源**补上 ✅ —— 取到 {celsius.Value}℃"
+					+ "（⭐ 本进程自己的 NVML 要等启动后约 31 秒才首次就绪 ⚠️ ⇒ ⭐ 这段时间原来显示「—」❌）；"
+					+ "⭐ 一旦 LHM/NVML 就绪本来源就自动让位 ✅；⭐ 本条只记一次 ✅");
+			}
+		}, "nvidia-smi-early", countsAsHealthFailure: false);
+	}
+
+	/// <summary>
 	/// 采样主干（由 <see cref="RefreshLocalMonitoring"/> 在同一次持锁内调用）：
 	/// 每一步各自兜底（LHM 更新 / LHM 读值 / NVML 采样 / 性能计数器回退），任何一步失败只跳过本次采样。
 	/// </summary>
@@ -746,6 +1173,15 @@ public static class HardwareControl
 		{
 			return;
 		}
+		// ⭐⭐ 2026-10-16（冷启动 GPU 温度空窗）：⭐ `nvidia-smi` 早期来源 ✅ ——
+		//   ⚠️ 刻意排在**两道闸门【之外】**：⭐ 下面 `lhm-update`、⭐ 再下面 `lhm-read` ⚠️ ——
+		//      任何一道失败都会 `return` ⇒ ⭐ `ApplySensorPriority` 不跑 ⇒ ⭐ 那 31 秒里
+		//      **没有任何代码有机会取 GPU 温度** ❌ ⇒ ⭐ 界面恒「—」⚠️。
+		//   ⭐ 放在这里 ⇒ ⭐ 即使两道闸门都失败、⭐ 也能把早期值补进门面层 ✅。
+		//   ⛔ 闸门本身与它的位置**一字未动** ✅（⭐ 本步自己带 TryStep ✅）。
+		//   ⚠️ 位置理由：⭐ 排在 `lhm == null` 早退**之后** ⇒ ⭐ "⭐ LHM 被整体关掉"⭐ 的配置下
+		//      行为**逐位不变** ✅（⭐ 不因本来源而多出子进程 ⚠️）。
+		RefreshEarlyGpuTempFromNvidiaSmi();
 		if (!TryStep(lhmMonitor.Update, "lhm-update"))
 		{
 			return;
