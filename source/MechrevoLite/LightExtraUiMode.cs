@@ -321,8 +321,31 @@ internal static class LightExtraRows
 			// ⚠️ 仅影响该行的 Visible 与灯光区通道数（见 SettingsForm.RefreshDeviceCapabilities 的 flag5/flag6），
 			// 不碰任何下发：点击灯带行里的开关仍要过 MechrevoService.SupportsLightTopic / hw.SupportsLightbar 那道门，
 			// 本机没有灯带的机型上开关会被硬件侧拒绝并回弹，绝不会凭空向不存在的通道发帧。
-			lightbarOut = true;
-			stripReason = "force-show";
+			// ⚠️ 2026-10-16（baolongda 死控件闸）：宝龙达后端上 **HidLightbar/Ctrl 这条主题没有任何下发通路** ——
+			//   * MechrevoHw.TrySetLightPowerViaBackend 对「非 Keyboard、非 Logo」的主题一律 return false
+			//     ⇒ 交回原路 ⇒ 原路是 MechrevoService.PublishLightPower（MQTT）⇒ 宝龙达没有 GCU ⇒ 必然失败；
+			//   * 且宝龙达的 Caps.Lightbar / Caps.RgbLightbar 恒为 false（见 BaolongdaBackend.BuildCapabilities 的
+			//     「只开 Keyboard，不开 Lightbar / RgbLightbar」），LightbarStatusSeen 只由 GCU Status 赋真
+			//     （MechrevoHw.OnLightbarOrLogoLightStatus）⇒ auto 判据本就把它收起。
+			//   ⇒ 此时「强制显示」只可能产出一个点了没反应的死控件：SupportsLightTopic("HidLightbar/Ctrl")
+			//     走 "lightbar" => _hw.SupportsLightbar = false ⇒ 开关被拒并回弹 ⇒ 违反「能点的就必须有反应」。
+			//   ⇒ 因此宝龙达上**忽略 force-show**，退回 auto 判据（lightbarRow && !phantom）。
+			//   ⚠️ 语义范围：只动「宝龙达 + 灯带行 + 用户显式 show」这一个组合；非宝龙达（GCU / 老同方）的
+			//      「判据判错时的后路」语义逐位不变。Logo 行的 force-show 不受影响 —— 宝龙达确实支持 Logo 灯
+			//      （功能号 15，TrySetLogoLightViaBackend 已接），那一行的 show 是真的能用的。
+			//   ⚠️ 撤除条件：**将来若给宝龙达接了灯带后端**（TrySetLightPowerViaBackend 认了 HidLightbar/Ctrl，
+			//      且 BuildCapabilities 开了 Lightbar / RgbLightbar），这个前提必须一并撤掉，否则它会变成新的
+			//      死约束（把已支持的行也压住）。注意这里退化成 auto 而非写死 false，就是为了那种情况下能自动放行。
+			if (hw != null && hw.UsesBaolongda)
+			{
+				lightbarOut = lightbarRow && !phantom;
+				stripReason = "force-show-ignored-baolongda(" + baseEvidence + ")->" + (lightbarOut ? "keep" : "hide");
+			}
+			else
+			{
+				lightbarOut = true;
+				stripReason = "force-show";
+			}
 		}
 		else if (LightRowUiValue.IsHide(stripMode))
 		{
