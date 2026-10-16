@@ -167,6 +167,25 @@ internal sealed class BaolongdaBackend : IDisposable
 	/// </summary>
 	internal MechrevoDeviceCapabilities BuildCapabilities()
 	{
+		// ⭐⭐ 2026-10-16（"全部接入"第 2 步 · 键盘灯）：⭐ **运行时自检**代替"等真机探测" ✅
+		//   ⚠️ 背景：⭐ 功能号 16/17/18（⭐ 模式/颜色/亮度）⭐ **真机从未验证过** ⚠️
+		//   ⭐ 而铁律要求"⭐ 点了不能没反应" ⇒ ⭐ 所以这里 ⭐ **先真读一次功能号 10**
+		//      （⭐ `RgbKeyboardStatus`，⭐ 它是这套键盘灯接口的"存在证明" ✅）
+		//   ⇒ ⭐ 读得到 ⇒ ⭐ 才开 `Keyboard` ✅；⭐ 读不到 ⇒ ⭐ 保持 false ⇒ ⭐ **UI 不会出现键盘灯控件** ✅
+		//   ⭐ 这样 ⭐ **不需要等机主探测就能安全上线** ✅（⭐ 而且门面层写入前也会再查一次 ✅）
+		bool keyboardAvailable = false;
+		if (_wmi != null)
+		{
+			try
+			{
+				keyboardAvailable = _wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte _);
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("宝龙达：键盘灯自检异常（按不支持处理）：" + ex.Message);
+			}
+		}
+		Logger.WriteLine($"宝龙达：键盘灯运行时自检 ⇒ {(keyboardAvailable ? "✅ 功能号 10 可读 ⇒ 开放 Keyboard 能力位" : "⚠️ 功能号 10 读不到 ⇒ Keyboard 能力位保持 false（UI 不显示，避免点了没反应）")}");
 		return new MechrevoDeviceCapabilities
 		{
 			ProjectId = "Baolongda",
@@ -179,6 +198,11 @@ internal sealed class BaolongdaBackend : IDisposable
 			//             ＋ ⭐ `Program.SetExternalLightingPowerAsync` 开头那一段 ✅
 			//   ⚠️ 按铁律：⭐ **分派接好了才开这一位** ✅（⭐ 铁律见本方法文档注释 ✅）
 			LogoLight = true,
+			// ⭐⭐ 2026-10-16（第 2 步 · 键盘灯）：⭐ 由上面的**运行时自检**决定 ✅
+			//   ⚠️ 只开 `Keyboard`（⭐ 开关 + ⭐ 颜色 + ⭐ 亮度），⛔ **不开** `Lightbar` / ⛔ `RgbLightbar`
+			//   —— ⭐ 宝龙达只有"模式 16 / 颜色 17 / 亮度 18"三件套 ✅，
+			//   ⭐ 那些复杂效果（⭐ 波浪/涟漪/跑马灯…）它**不支持** ⇒ ⭐ 开了只会出现点了没反应的选项 ❌
+			Keyboard = keyboardAvailable,
 			AmdPlatform = PawnIO.CpuInfo.IsAMD
 		};
 	}

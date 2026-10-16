@@ -3622,8 +3622,44 @@ public class MechrevoService
 			}
 		}
 	}
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2 步 · 键盘灯）：⭐ **把"键盘灯"这一步分派给门面层** ✅
+	/// <para>⭐ 返回 <c>true</c> ⇒ ⭐ 已由**非 GCU 后端**处理完（⭐ 调用方 ⛔ 不要再走 MQTT ✅）；
+	/// ⭐ 返回 <c>false</c> ⇒ ⭐ 不归它管 ⇒ ⭐ 调用方**照原路走** ✅。</para>
+	/// <para>⚠️ 效果映射：⭐ 宝龙达只有 ⭐ "关 / ⭐ RGB 固定色" ⚠️（⭐ 功能号 16 的 0 / 2 ✅）
+	/// ⇒ ⭐ 我们那些复杂效果（⭐ 呼吸/波浪…）**统一降级成固定色** ✅ —— ⭐ 因为能力位只开了
+	/// <c>Keyboard</c>、⛔ 没开 `Lightbar`/`RgbLightbar` ⇒ ⭐ UI 上不会出现那些效果 ✅
+	/// （⚠️ 真机未验证项：⭐ 功能号 16/17/18 —— ⭐ 门面层内部会先读功能号 10，⭐ 读不到就拒绝写 ✅）</para>
+	/// </summary>
+	private bool TryApplyKeyboardViaBackend(string effect, int light0to4, Color? singleColor)
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null)
+		{
+			return false;
+		}
+		// ⭐ 亮度：⭐ 我们这边是 0..4（⭐ 0 = 灭 ✅）⇒ ⭐ 宝龙达是 0..3 级 ✅
+		int level = Math.Max(0, Math.Min(3, light0to4 - 1));
+		bool on = (light0to4 > 0) && !string.Equals(effect, "Off", StringComparison.OrdinalIgnoreCase);
+		int argb = singleColor.HasValue ? singleColor.Value.ToArgb() : unchecked((int)0xFFFFFFFF);
+		if (!hw.TrySetKeyboardLightingViaBackend(on, argb, level, out bool confirmed))
+		{
+			return false; // ⭐ 不是非 GCU 后端在管事 ⇒ 交回原路 ✅
+		}
+		Logger.WriteLine($"SetKeyboardEffect（⭐ 非 GCU 后端路径）：⭐ on={on} · ⭐ effect={effect} · ⭐ light={light0to4}"
+			+ $" · ⭐ 确认={confirmed} ⇒ ⭐ 未发任何 MQTT ✅");
+		return true;
+	}
+
 public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1, string direction = "None", Color? singleColor = null, bool save = false)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2 步 · 键盘灯 · ⭐ 前后端分离模板）：
+		//   ⭐ 先问门面层"这次归你管吗" ✅ ⇒ ⭐ 非 GCU 后端在管事就**处理完直接返回**（⭐ 一条 MQTT 不发 ✅）
+		//   ⭐ 否则 ⭐ **下面原来那两行一行未改** ✅（⭐ 回归风险 = 0 ✅）
+		if (TryApplyKeyboardViaBackend(effect, light, singleColor))
+		{
+			return Task.FromResult(result: true);
+		}
 		// 2026-10-09（kbdctrl，用户原话「只搁置用户模式」⇒「给 LM 接通键盘灯」这一条开工）：开关打开时
 		// 改走新的 Keyboard/Ctrl 直发链路（PublishKeyboardCtrlEffectAsync，跳过 Keyboard/Status 判定）；
 		// 开关关闭（默认）时**逐字**执行下面原来那一行 ⇒ 行为与改前完全一致。
@@ -3636,6 +3672,30 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardBrightnessPreservingEffect(int level0to4)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2 步）：⭐ 亮度调整同样先问门面层 ✅
+		//   ⭐ 非 GCU 后端 ⇒ ⭐ 读出当前效果/颜色（⭐ 沿用下面的读取逻辑）后走 WMI ✅；
+		//   ⭐ 否则 ⭐ 原样往下走 ✅
+		if (_hw != null)
+		{
+			int speed0 = 1;
+			Color? singleColor0 = null;
+			string effect0;
+			if (LightingSettingsStore.TryLoad("Keyboard/Ctrl", out var settings0) && KeyboardFirmwareEffects.Contains(settings0.Effect))
+			{
+				effect0 = settings0.Effect;
+				speed0 = settings0.Speed;
+				singleColor0 = ((effect0 == "Single") ? new Color?(Color.FromArgb(settings0.ColorArgb)) : ((Color?)null));
+			}
+			else
+			{
+				effect0 = (string.IsNullOrWhiteSpace(_hw.KeyboardEffect) ? "Single" : _hw.KeyboardEffect);
+			}
+			if (TryApplyKeyboardViaBackend(effect0, level0to4, singleColor0))
+			{
+				return Task.FromResult(result: true);
+			}
+			_ = speed0;
+		}
 		// 2026-10-09（kbdctrl）：开关打开时亮度也走新的 Keyboard/Ctrl 链路；关闭时逐字走原路径。
 		if (KeyboardCtrlPublishSwitch.Enabled)
 		{
