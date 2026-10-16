@@ -14144,6 +14144,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			num = Math.Max(num, TelemetryPieceWidth(text, piece.Font, piece.TextAlign));
 		}
+		// ⭐ 2026-10-16（用户原话「传感器读数间距太大了 …小一点但别贴在一起」）：**空片且无预留 ⇒ 宽度归零**。
+		// 上面那条算式对空文本仍给出 <c>TelemetryTextWidth("") + 2 × GapLogical</c>（实测 = 2 + 2 × GapLogical），
+		// 那是一段"什么都不显示、却照样占位"的死宽度：宝龙达下没有功耗读数（`_telemetryPowerSeen` 为假）时，
+		// 它正好夹在「温度」与「转速」两片之间 ⇒ 白白多出一个空档。真机日志 `[70°C|w=44][|w=12][2705rpm|w=76]`
+		// 就是这个形状（那 12px 里有 10px 是死宽度）。归零后该列宽 = 0，两片直接按 <c>2 × GapLogical</c> 相邻。
+		// ⚠️ 只在「文本为空 **且** 没有预留样本」时归零 —— 只要 `seen` 为真（任一行真的要显示该字段），
+		// 仍按预留样本给宽；那是"两行逐列对齐 + 防跳动"的既有语义，⛔ 不碰。
+		// ⚠️ 不破坏 `w == want` 那条回归断言：<see cref="TelemetryReserveSampleFor" /> 对同一字段的 CPU/GPU
+		// 两片返回同一个值（`seen` 是全局的），所以"文本为空"必定两行同时成立 ⇒ 列宽与控件宽同时为 0。
+		if (string.IsNullOrEmpty(piece.Text) && text == null)
+		{
+			return 0;
+		}
 		return num;
 	}
 
@@ -14151,10 +14164,15 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	/// 2026-10-11（用户原话「CPU GPU读数的间隔不统一 优化一下」＋「主要是温度那个」）：**读数片的统一间距**。
 	/// 每一片在文本左右各留一份本值（逻辑像素）⇒ 相邻两片文本之间的空档恒为 <c>2 × 本值</c>；
 	/// 行最右那片文本离卡片右沿也是 <c>本值 + TextSafetyRightLogical</c>（见 <see cref="TelemetryPieceWidth" />）。
-	/// 取 5：比原先名字片右边那 1~2 设备像素明显，又不至于把标题行左组（风扇强冷/显卡超频/配置编辑）
-	/// 挤到没余量（所需宽的变化见 <see cref="TelemetryPieceWidth" /> 与真机取值）。
+	/// 取 3（2026-10-16 用户原话「传感器读数间距太大了 修一下吧 小一点但别贴在一起」⇒ 由 5 收窄）：
+	/// <b>下限约束</b>：相邻两片读数文本之间**恒为 <c>2 × 本值</c> = 6 逻辑像素**（8.5pt 下约合两个空格，
+	/// 肉眼可辨"没贴在一起"）⇒ ⛔ 不许再调小到 2 及以下；也⛔ 不许把某一侧留白改成比本值更小 ——
+	/// 那会破坏"相邻空档与文本内容无关"这条不变量（见 <see cref="TelemetryPieceWidth" /> 与
+	/// <see cref="AppendTelemetryPieces" /> 的两条口径说明）。
+	/// ⚠️ 收窄**只动间距**，⛔ 不动任何预留样本 —— 缩小预留会重新引入"读数一变宽就把左组挤到裁字"
+	/// （历史记录见 <see cref="TelemetryReserveSampleFor" /> 与 :14012-14031）。
 	/// </summary>
-	private const int TelemetryGapLogical = 5;
+	private const int TelemetryGapLogical = 3;
 
 	/// <summary>
 	/// 2026-10-11（用户原话「CPU GPU读数的间隔不统一 优化一下」）：**读数片宽度**的唯一算式。
@@ -14738,14 +14756,21 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//（复用 TelemetryParts 那一套同一个格式化入口 ⇒ ⛔ 不会出现「预留了但永远不显示」的空列）。
 		if (hw != null)
 		{
-			bool fanFresh = hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L);
-			bool zeroIsMeaningful = hw.FanZeroIsMeaningful;
-			if (!_telemetryPowerSeen && (TelemetryPower(HardwareControl.cpuPower).Length > 0 || TelemetryPower(HardwareControl.gpuPower).Length > 0))
+			// ⭐ 2026-10-16（用户原话「传感器读数间距太大了 …小一点但别贴在一起」＋守住上面那句自述语义）：
+			// 判据改用 **TelemetryParts 的返回值** —— 也就是**展示层同一个函数**的输出，⛔ 不再另取原始字段。
+			// ⚠️ 改前为什么是错的：duty 那两个判据读的是 `hw.CpuFanDuty` / `hw.GpuFanDuty`（**只有 GCU 载荷会填**），
+			// 而展示层在宝龙达下把 duty 判成"未知"（没有可靠分母 ⇒ 不打百分比，见 TelemetryParts 内那段注释）
+			// ⇒ 两边**取值不同源** ⇒ 宝龙达上 `_telemetryDutySeen` 被那个恒为 0 的原始字段置真，
+			// 于是"预留了但永远不显示"：真机日志 `[2678rpm|w=76][|w=51]` 的行尾白白空出 51px。
+			// 这正是本段原来以为不可能发生的那种情况；改用 TelemetryParts 后由构造保证同源。
+			(string name, string temp, string power, string rpm, string duty) cpuParts = TelemetryParts(hw, isCpu: true);
+			(string name, string temp, string power, string rpm, string duty) gpuParts = TelemetryParts(hw, isCpu: false);
+			if (!_telemetryPowerSeen && (cpuParts.power.Length > 0 || gpuParts.power.Length > 0))
 			{
 				_telemetryPowerSeen = true;
 				flag |= SyncTelemetryReserveWidth();
 			}
-			if (!_telemetryDutySeen && (TelemetryDuty(hw.CpuFanDuty, fanFresh, zeroIsMeaningful).Length > 0 || TelemetryDuty(hw.GpuFanDuty, fanFresh, zeroIsMeaningful).Length > 0))
+			if (!_telemetryDutySeen && (cpuParts.duty.Length > 0 || gpuParts.duty.Length > 0))
 			{
 				_telemetryDutySeen = true;
 				flag |= SyncTelemetryReserveWidth();
