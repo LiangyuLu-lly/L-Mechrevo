@@ -17,6 +17,13 @@
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
+# ⭐⭐ 工具版本（⭐ 每次改脚本都要升，⭐ 并写进 06-采集环境.txt ⇒ ⭐ 以后一眼就能看出机主用的是哪一版）
+$script:KitVersion  = '2026-10-16.3'
+$script:KitFeatures = 'MIFS-Probe,PNP0C14-Filter,ReadOnly'
+#   2026-10-16.1  首版（六节 + 强/弱相关筛选）
+#   2026-10-16.2  ＋ MIFS-Probe：MICommonInterface 实例枚举与只读试调用
+#   2026-10-16.3  ＋ 修设备树过滤（漏掉 ACPI\PNP0C14\…）+ 修 06 节一处引号 bug + 版本标记
+
 $stamp   = Get-Date -Format 'yyyyMMdd-HHmmss'
 $outRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) ("宝龙达抓包-" + $stamp)
 New-Item -ItemType Directory -Path $outRoot -Force | Out-Null
@@ -397,7 +404,11 @@ Write-Section '06-采集环境.txt' '本次采集的环境（便于我们复现�
 	Add-Line $L ("时区            : " + (Get-TimeZone).Id)
 	Add-Line $L ("日期            : " + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
 	Add-Line $L ""
-	Add-Line $L "── 本机是"什么模具"的判据汇总 ──"
+	Add-Line $L "── ⭐ 抓包工具版本（⭐ 请连同这一行一起发回）──"
+	Add-Line $L ("  ⭐⭐ 版本 = " + $script:KitVersion + "   ·   ⭐ 特征 = " + $script:KitFeatures)
+	Add-Line $L ("  ⭐ 若「特征」里【没有】MIFS-Probe ⇒ 说明用的是**旧版**工具，请换新版重跑（我们需要 MICommonInterface 的实例名与功能号实测那一节）")
+	Add-Line $L ""
+	Add-Line $L "── ⭐ 本机模具判据汇总（⭐ 请连同下面这行一起抄给作者）──"
 	Add-Line $L "  ⭐ 请把「01-机器信息.txt」里的 Manufacturer / Model / SystemFamily / BaseBoard 抄给作者"
 	Add-Line $L "  ⭐ 并说明：这台机器**能不能装官方控制台**、装了哪个版本"
 }
