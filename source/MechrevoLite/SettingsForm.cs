@@ -548,19 +548,34 @@ public class SettingsForm : RForm
 	private bool _syncingEffectCombos;
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 灯光效果下拉 · ⭐ 机主反馈「宝龙达只有单色吧」）：
-	/// ⭐ 宝龙达固件**只支持「关 ／ RGB 固定色」** ✅ —— ⭐ 界面上就**只列这两项** ✅，
-	/// ⛔ 不再列呼吸／波浪／彩虹那些**本机做不到**的 ⚠️。
-	/// <para>⭐ 依据（⭐ 协议事实，⭐ 见 `_refs\JiaolongControl` · MIT · ⭐ 只取事实 ✅）：
-	/// ⭐ `RGBKeyboardMode` **只有** `Mode_Off = 0` 与 `Mode_RGBFixedMode = 2`（⭐ 加 `Unknow = 255`）✅；
-	/// ⭐ 功能号 <b>15</b> 的 LOGO 灯**只有 开 ／ 关**（⭐ 连颜色都没有 ✅）。</para>
-	/// <para>⭐ 这与「能力位铁律」一致：⭐ **能点的就必须有反应** ⇒ ⭐ 做不到的就不该出现在表里 ✅
-	/// （⛔ 原来是「列出来然后静默降级」⚠️ —— ⭐ 用户会以为能做 ✅）。</para>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯效表 · ⭐ 用户要求「蛟龙控制台有四个灯效 那就做进去」）：
+	/// ⭐ 宝龙达键盘灯的**模式表 ＝ 四项** ✅（⭐ 这是**全表**：⭐ 下拉、⭐ 索引→Id 映射、
+	/// ⭐ 点进 LightForm 那扇窗、⭐ 以及下发时的 Id→模式映射 ⭐ **四处共用** ✅）。
+	///
+	/// <para>⭐⭐ <b>来源定性（⭐ 必须写准 —— ⛔ 不得说成"官方支持四种" ⚠️）</b>：
+	/// <list type="bullet">
+	/// <item>⭐ <c>Off</c>（模式 <c>0</c>）与 <c>Single</c>（模式 <c>2</c>）＝ <b>官方原版</b> ✅ ——
+	/// ⭐ 官方蛟龙控制台**只有单色**，⭐ 与开源 <c>JiaolongControl</c> 的 <c>RGBKeyboardMode</c>
+	/// （<c>Mode_Off=0</c> ／ <c>Mode_RGBFixedMode=2</c>）**两项一致** ✅</item>
+	/// <item>⚠️ <c>Rainbow</c>（模式 <c>1</c> ＝ <c>RGBAutoCyclic</c>）与 <c>Manual</c>
+	/// （模式 <c>3</c> ＝ <c>CustomColors</c>）＝ ⭐ 来自**基于官方修改的第三方版本**
+	/// （⭐ <c>JiaoLong7.3</c> · ⭐ 主程序集名即「第三方蛟龙游戏控制中心」✅）
+	/// ⇒ ⭐ 属**社区探索所得**（⚠️ 非官方文档 ⚠️）⇒ ⭐ 报告称"有人实测可用" ⚠️
+	/// 但 ⭐ **机主那台（MRID6）仍须真机确认** ✅</item>
+	/// </list></para>
+	///
+	/// <para>⚠️ <b>因此四项都要真机验</b>（⭐ 能力位铁律：⭐ **能点的就必须有反应** ✅）——
+	/// ⭐ 其中 <c>1</c>／<c>3</c> **完全未验证** ⚠️ ⇒ ⭐ 若机主反馈"选了没反应"，
+	/// ⭐ 就按能力位把该项**撤掉**（⛔ 不许留着"能点没反应" ✅）。
+	/// ⭐ 关灯**不走本表**：⭐ 关灯 ＝ ⭐ **写亮度（功能号 18）＝ 0** ✅
+	/// （⭐ 见 <c>MechrevoHw.TrySetKeyboardLightingViaBackend</c> ✅）。</para>
 	/// </summary>
-	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[2]
+	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[4]
 	{
 		("Off", Strings.Off),
-		("Single", Strings.EffectSingle)
+		("Single", Strings.EffectSingle),
+		("Rainbow", Strings.EffectRainbow),
+		("Manual", Strings.EffectManual)
 	};
 
 	/// <summary>

@@ -3043,12 +3043,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			if (off)
 			{
-				// ⭐ 关灯：⭐ 只写「模式 0」（关）✅ —— ⭐ 不需要颜色/亮度 ✅
-				if (!wmi.TrySetKeyboardMode(0))
-				{
-					Logger.WriteError("宝龙达 键盘灯效：⚠️ 关灯写入失败（详见上一行）⇒ 本次未生效");
-					return true; // ⭐ 已接管（只是失败）⇒ ⛔ 别让调用方再发 GCU ✅
-				}
+				// ⭐⭐ 2026-10-16（键盘灯「关不掉」第二轮修正）：⭐ 关灯**不再写模式 0** ❌
+				//   ⇒ ⭐ 改为**写亮度（功能号 18）= 0** ✅ —— ⭐ 参考实现（`JiaolongControl` · MIT · ⭐ 只取事实 ✅）
+				//     界面原文：「背光亮度设置为 0 时将关闭键盘灯光」✅；
+				//     ⭐ 斗战者亦**全仓没有独立关灯操作**、其背光值域就是 0~3（⭐ 0 ＝ 灭 ✅）。
+				//   ⚠️ 真机依据（⭐ 0.291.9.4 诊断包 · 宝龙达 MRID6）：⭐ 写模式 0 后**回读恒为 2**
+				//     ⇒ ⭐ 固件**不接受模式 0** ❌ ⇒ ⭐ 旧的两条路线（A：只写模式 0 · B：模式 0 ＋ 颜色黑）已废弃 ✅
+				return TrySetKeyboardLightingViaBackend(false, 0, 0, 0, out confirmed);
 			}
 			else
 			{
@@ -3070,43 +3071,38 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Logger.WriteError("宝龙达 键盘灯效：⚠️ 界面没给颜色、⭐ **回读也读不到当前值** ⇒"
 						+ " 用保守默认**白色** 0xFFFFFF ✅（⭐ 如实记录 ⚠️）");
 				}
-				// ⚠️ 动态效果 ⇒ ⭐ 降级为固定色（⭐ 写明 ✅；⛔ 不假装支持 ⚠️）
-				if (!IsFixedColorEffect(effect))
+				// ⭐⭐ 2026-10-16（键盘灯四项模式 · 效果 Id → 模式）：⭐ 由**单一来源**映射 ✅
+				//   （⭐ 同表也供界面的下拉与索引映射用 ⇒ ⭐ 三处口径必然一致 ✅）
+				//   ⚠️ 来源定性：⭐ 0 ／ 2 是**官方原版**枚举（⭐ 官方蛟龙控制台只有单色 ✅）；
+				//     ⚠️ 1 ／ 3 来自**基于官方修改的第三方版本**（⭐ `JiaoLong7.3`）⇒ ⭐ 属**社区探索所得**
+				//     ⇒ ⭐ 报告称"有人实测可用" ⚠️ 但 ⭐ **机主那台仍须真机确认**（⛔ 不得当作"官方支持四种" ⚠️）
+				byte mode;
+				if (!TryMapBaolongdaKeyboardMode(effect, out mode))
 				{
-					Logger.WriteError("宝龙达 键盘灯效：⭐ 效果「" + effect + "」在本机 **降级为固定色** ✅"
-						+ "（⚠️ 宝龙达固件只支持 关 ／ RGB 固定色 ⇒ 呼吸·波浪·彩虹·涟漪 等**动态效果无法下发** ⚠️；"
+					mode = 2;
+					Logger.WriteError("宝龙达 键盘灯效：⚠️ 效果「" + effect + "」**没有对应的固件模式** ⇒ ⭐ 降级为固定色（模式 2）✅"
+						+ "（⭐ 本机固件的模式只有 关／自动循环／固定色／自定义颜色 四种 ⚠️；"
 						+ "⭐ speed/direction 在宝龙达协议里没有对应字段 ⇒ ⭐ 已忽略 ✅）");
 				}
-				int brightness = Math.Max(0, Math.Min(3, light));
-				if (light > 3)
+				// ⭐⭐ 2026-10-16（键盘灯「亮度不对」修正）：⭐ 亮度换算收归**唯一来源** ✅
+				//   ⚠️ 旧调用方用 `light0to4 - 1` ⇒ ⭐ 界面第 1 档（⭐ 用户想要"最暗"）会算出硬件 0
+				//     ⇒ ⭐ 而硬件 0 **就是灭**（⭐ 见关灯那段）⇒ ⭐ 用户看到的是**灯灭**而不是变暗 ❌
+				int brightness = BaolongdaBrightnessFromUi(light);
+				if (light < 0 || light > 4)
 				{
-					Logger.WriteError("宝龙达 键盘灯效：⭐ 亮度 " + light + " 超出本机范围 ⇒ ⭐ **夹紧到 "
-						+ brightness + "**（⭐ 宝龙达只有 0~3 共 4 级 ✅）");
+					Logger.WriteError("宝龙达 键盘灯效：⭐ 亮度 " + light + " 超出界面范围（0~4）⇒ ⭐ **夹紧到 "
+						+ brightness + "**（⭐ 宝龙达硬件只有 0~3 共 4 级、且 0 ＝ 灭 ✅）");
 				}
-				if (!TrySetKeyboardLightingViaBackend(true, argb, brightness, out confirmed))
+				if (!TrySetKeyboardLightingViaBackend(true, argb, brightness, mode, out confirmed))
 				{
 					return false; // ⭐ 理论上不会发生 ⇒ 交回原路更安全 ✅
 				}
-				if (confirmed)
-				{
-					return true; // ⭐ 里面已经记好日志了 ✅
-				}
+				return true; // ⭐ 里面已经记好日志了（⭐ 含三层诚实边界 ✅）
 			}
-			// ⭐ 回读确认（⭐ 与 LOGO 灯 ／ 灯光电源同款：⭐ 5 次 × 150 ms ✅）
-			for (int attempt = 0; attempt < 5; attempt++)
-			{
-				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte _))
-				{
-					confirmed = true;
-					Logger.WriteError("宝龙达 键盘灯效：⭐ 已" + (off ? "关" : "应用")
-						+ "并回读确认 ✅（第 " + (attempt + 1) + " 次）");
-					return true;
-				}
-				Thread.Sleep(150);
-			}
-			Logger.WriteError("宝龙达 键盘灯效：⚠️ 写入完成但 " + (5 * 150)
-				+ " ms 内**回读不一致** ⇒ 如实报告未确认 ⚠️");
-			return true;
+			// ⭐⭐ 2026-10-16（键盘灯 · 假阳性修正）：⛔ 删掉原来那段「读一次功能号 10 就 confirmed=true」✅
+			//   ⚠️ 真机实测：⭐ 功能号 10 **恒为 0**、且**总是可读**（启动／关灯后／开灯后都是 0 ✅）
+			//   ⇒ ⭐ 那段循环**必然**把 confirmed 置真 ⇒ ⭐ 那正是本包「关灯 ⇒ 回读=True」却关不掉的**假阳性**来源 ❌
+			//   ⇒ ⭐ 现在 confirmed 由 `TrySetKeyboardLightingViaBackend` **按功能号 16／18 逐值回读**给出 ✅
 		}
 		catch (Exception ex)
 		{
@@ -3116,21 +3112,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>⭐ 判「关灯」—— ⭐ 界面口径：⭐ 效果是 Off ／ None ／ 空 ✅。</summary>
-	private static bool IsLightEffectOff(string? effect)
+	internal static bool IsLightEffectOff(string? effect)
 	{
 		return string.IsNullOrWhiteSpace(effect)
 			|| effect.Equals("Off", StringComparison.OrdinalIgnoreCase)
 			|| effect.Equals("None", StringComparison.OrdinalIgnoreCase);
 	}
 
-	/// <summary>⭐ 判「固定色」效果 —— ⭐ 宝龙达固件**只支持这一种** ✅（⭐ 其余一律降级 ✅）。</summary>
-	private static bool IsFixedColorEffect(string? effect)
-	{
-		return !string.IsNullOrWhiteSpace(effect)
-			&& (effect.Equals("Single", StringComparison.OrdinalIgnoreCase)
-				|| effect.Equals("Static", StringComparison.OrdinalIgnoreCase)
-				|| effect.Equals("Fixed", StringComparison.OrdinalIgnoreCase));
-	}
 
 	/// <summary>
 	/// ⭐ 回读键盘灯颜色（⭐ 功能号 17 ⇒ ⭐ <c>OutData[4],[5],[6]</c> ＝ R,G,B ✅）。
@@ -3190,7 +3178,46 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <para>⭐ 顺序严格按参考实现：⭐ **先发颜色（17）⇒ ⭐ 再发模式（16）⇒ ⭐ 最后亮度（18）** ✅
 	/// —— ⚠️ 因为颜色必须在"进入固定色模式"**之前**就位，⭐ 否则会闪一下别的颜色 ✅。</para>
 	/// </summary>
+	/// <summary>⭐ 兼容旧调用（⭐ 不带模式）⇒ ⭐ 沿用「固定色」（模式 2）✅ —— ⭐ 唯一实现见下面五参版 ✅。</summary>
 	internal bool TrySetKeyboardLightingViaBackend(bool on, int colorArgb, int brightness0to3, out bool confirmed)
+	{
+		return TrySetKeyboardLightingViaBackend(on, colorArgb, brightness0to3, 2, out confirmed);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉 / 亮度不对」第二轮修正）：
+	/// ⭐ 键盘灯下发的**唯一实现** ✅（⭐ 顺序：颜色 17 ⇒ 模式 16 ⇒ 亮度 18 ✅）。
+	///
+	/// <para>⭐ <b>本轮两处关键修正</b>：
+	/// <list type="number">
+	/// <item>⭐ <b>关灯不再写「模式 0」</b> —— ⭐ 改为 <b>写亮度（功能号 18）= 0</b> ✅。
+	/// 依据：⭐ 参考实现（⭐ `JiaolongControl` 的 `KeyBoard.vue` · MIT · ⭐ 只取事实 ✅）界面原文
+	/// 「<c>背光亮度设置为 0 时将关闭键盘灯光</c>」✅；⭐ 且斗战者**全仓没有独立的关灯操作**、
+	/// 其背光值域就是 <c>0~3</c>（⭐ 0 ＝ 灭 ✅）。
+	/// ⚠️ 而旧的两条路线（⭐ A：只写模式 0 · ⭐ B：模式 0 ＋ 颜色黑）**已被真机否定** ——
+	/// 0.291.9.4 诊断包实测：⭐ 写模式 0 后**回读恒为 2** ⇒ ⭐ 固件不接受模式 0 ❌。</item>
+	/// <item>⭐ <b>亮度值不再把「想要最暗」映射成「关灯」</b> ✅ —— ⭐ 统一由
+	/// <see cref="BaolongdaBrightnessFromUi" /> 换算（⭐ 0 ⇒ 0 ＝ 灭；⭐ 正数 ⇒ 夹到 1~3 ✅）。</item>
+	/// </list></para>
+	///
+	/// <para>⭐⭐ <b>三层诚实边界（⭐ 日志逐层分开写 ✅）</b>：
+	/// ① ⭐ <b>写成功</b> ＝ WMI 调用没抛异常；
+	/// ② ⭐ <b>回读一致</b> ＝ 寄存器读回来的值**精确等于**我们写的值（⭐ 模式逐值比、亮度逐值比 ✅）；
+	/// ③ ⭐ <b>灯效/亮度是否真的变了</b> ＝ ⚠️ <b>我们测不到</b> ⇒ ⭐ 只能由机主目视确认 ✅。
+	/// ⇒ ⛔ 本方法**绝不**把 ② 说成 ③（⭐ 历史教训：⭐ "回读变了 ≠ 灯真的变了" ⚠️）。</para>
+	///
+	/// <para>⚠️ <b>模式值 1 ／ 3 的来源定性（⭐ 必须写准 ⚠️）</b>：⭐ <c>0</c>／<c>2</c> 是**官方原版**枚举
+	/// （⭐ 官方蛟龙控制台只有单色 ✅）；⚠️ <c>1</c>／<c>3</c> 来自**基于官方修改的第三方版本**
+	/// （⭐ `JiaoLong7.3`，⭐ 主程序集名即「第三方蛟龙游戏控制中心」✅）⇒ ⭐ 属**社区探索所得**
+	/// ⇒ ⭐ **必须真机确认**（⛔ 不得当作"官方支持四种" ⚠️）。</para>
+	/// </summary>
+	/// <param name="on">⭐ <c>false</c> ⇒ ⭐ 关灯（⭐ 写亮度 0 ✅）。</param>
+	/// <param name="colorArgb">⭐ 单色 ARGB（⭐ 只在 <paramref name="on" /> 为真时用 ✅）。</param>
+	/// <param name="brightness0to3">⭐ 硬件亮度级 <c>0~3</c>（⭐ 0 ＝ 灭 ✅）—— ⚠️ 请用
+	/// <see cref="BaolongdaBrightnessFromUi" /> 从界面口径换算，⛔ 不要自己减 1 ✅。</param>
+	/// <param name="mode">⭐ 功能号 16 的模式值（⭐ 来自 <see cref="TryMapBaolongdaKeyboardMode" /> ✅）。</param>
+	/// <param name="confirmed">⭐ <b>回读一致</b>（⭐ ② 层 ✅）—— ⛔ 不代表灯真的变了（⭐ ③ 层测不到 ⚠️）。</param>
+	internal bool TrySetKeyboardLightingViaBackend(bool on, int colorArgb, int brightness0to3, byte mode, out bool confirmed)
 	{
 		confirmed = false;
 		BaolongdaWmi wmi = _baolongda?.Wmi;
@@ -3200,91 +3227,60 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			// ⭐ ① 先试读一次"键盘灯状态"（⭐ 功能号 10）—— ⭐ 读得到才敢写 ⚠️
+			// ⭐ ① 先试读一次「键盘灯状态」（⭐ 功能号 10）—— ⭐ 读得到才敢写 ⚠️
 			if (!wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte status))
 			{
-				Logger.WriteLine("宝龙达 键盘灯：⚠️ 读不到键盘灯状态（⭐ 功能号 10）⇒ ⭐ 拒绝盲写，本轮不动 ✅"
+				Logger.WriteError("宝龙达 键盘灯：⚠️ 读不到键盘灯状态（⭐ 功能号 10）⇒ ⭐ 拒绝盲写，本轮不动 ✅"
 					+ "（⚠️ 说明 16/17/18 这条链在本机可能不成立 ⇒ ⭐ 需真机进一步确认）");
 				return true; // ⭐ 已接管：⭐ 不让调用方再去发 GCU ✅
 			}
+			_ = status;
 			if (!on)
 			{
-				// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉」BUGFIX）：
-				//   ⚠️ 真机依据（p2 = `L-Mechrevo-诊断包-0.291.9.4-20261016-225820` · 宝龙达 MRID6）：
-				//      ① ⭐ 写【功能号 16 = 0】后回读**仍为 2** ⇒ ⭐ **模式写不生效** ❌
-				//      ② ⭐ 功能号 10 **恒为 0**（启动 / 关灯后 / 开灯后都是 0）
-				//         ⇒ ⭐ 它**不随键盘灯状态变化** ⇒ ⛔ 旧代码 `off2 == 0` 是**假阳性** ❌
-				//         （⚠️ 那正是本包「关灯 ⇒ 回读=True」却**实际关不掉**的根因 ✅）
-				//   ⇒ ⭐ 判据统一到【功能号 16 的模式值】✅ ＋ ⭐ 关灯做**多路尝试** ✅：
-				//      路线 A：只写模式 0 ✅（现状）
-				//      路线 B：模式 0 **再**写颜色黑 (0,0,0) ✅
-				//      （⭐ 官方 `Models.Keyboard.SetRGBKeyboardColor` 的顺序是【先模式 ⇒ 再颜色】✅
-				//       ⇒ ⭐ 路线 B 沿用该顺序 —— ⚠️ 而本方法"开灯"那半边是【先颜色 ⇒ 再模式】，
-				//         两者不一致**本身就是一个待真机确认项** ⚠️）
+				// ── ⭐ 关灯：⭐ 写亮度 0（⭐ 功能号 18）✅ —— ⚠️ 不再尝试模式 0（⭐ 已被真机否定 ❌）──
 				LogKeyboardLightingState(wmi, "关灯前");
-				wmi.TrySetKeyboardMode(0);
-				if (TryConfirmKeyboardMode(wmi, expectedOn: false))
+				if (!wmi.TrySetKeyboardBrightness(0))
 				{
-					confirmed = true;
-					Logger.WriteError("宝龙达 键盘灯：⭐ 关灯成功（路线 A：只写模式 0）"
-						+ "⇒ 回读功能号 16 模式已为 0 ✅ 确认=True");
-					LogKeyboardLightingState(wmi, "关灯后(A)");
+					Logger.WriteError("宝龙达 键盘灯：⚠️ 关灯失败 —— 写「亮度 0」（功能号 18）未被接受"
+						+ " ⇒ ⭐ 如实报告未确认 ⚠️");
+					LogKeyboardLightingState(wmi, "关灯失败后");
 					return true;
 				}
-				Logger.WriteError("宝龙达 键盘灯：⚠️ 路线 A（只写模式 0）未生效 ⇒ 尝试路线 B"
-					+ "（模式 0 ＋ 颜色黑 0,0,0 · ⭐ 按官方【先模式 ⇒ 再颜色】的顺序 ✅）⚠️");
-				wmi.TrySetKeyboardMode(0);
-				wmi.TrySetKeyboardColor(0, 0, 0);
-				if (TryConfirmKeyboardMode(wmi, expectedOn: false))
+				confirmed = TryConfirmKeyboardBrightness(wmi, 0);
+				if (confirmed)
 				{
-					confirmed = true;
-					Logger.WriteError("宝龙达 键盘灯：⭐ 关灯成功（路线 B：模式 0 ＋ 颜色黑）"
-						+ "⇒ 回读功能号 16 模式已为 0 ✅ 确认=True");
-					LogKeyboardLightingState(wmi, "关灯后(B)");
-					return true;
+					Logger.WriteError("宝龙达 键盘灯：⭐ 关灯已写「亮度 0」（功能号 18）"
+						+ " ⇒ ⭐ ① 写成功=是 · ② 回读一致=是（=0）✅"
+						+ " · ③ ⚠️ 灯是否真的灭了 —— **我们测不到，需目视确认** ⚠️");
 				}
-				confirmed = false;
-				Logger.WriteError("宝龙达 键盘灯：⚠️⚠️ 两条关灯路线都**未生效** ⇒ 如实报告未确认 ⚠️"
-					+ "（⭐ 真机依据：0.291.9.4 诊断包里写模式 0 后回读恒为 2"
-					+ " ⇒ 本机固件可能【不接受模式 0 写入】⚠️"
-					+ " ⇒ ⭐ 界面会据实回弹开关，⛔ 绝不假装成功 ✅）");
-				LogKeyboardLightingState(wmi, "关灯失败后");
+				else
+				{
+					Logger.WriteError("宝龙达 键盘灯：⚠️ 已写「亮度 0」（功能号 18）但**回读不一致**"
+						+ " ⇒ ⭐ 如实报告未确认 ⚠️（⭐ 若回读也不是 0 ⇒ 本机固件不接受亮度 0"
+						+ " ⇒ ⭐ 那本机可能**没有关灯手段** ⚠️ —— ⭐ 届时应按能力位处理，⛔ 留着「能点没反应」更糟 ✅）");
+				}
+				LogKeyboardLightingState(wmi, "关灯后");
 				return true;
 			}
-			// ⭐ ② 先颜色（⭐ 功能号 17，⭐ 三字节 ⭐ R,G,B ✅）
+			// ⭐ ② 先颜色（⭐ 功能号 17，⭐ 三字节 R,G,B ✅）
 			int r = (colorArgb >> 16) & 0xFF;
 			int g = (colorArgb >> 8) & 0xFF;
 			int b = colorArgb & 0xFF;
-			if (!wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b))
-			{
-				Logger.WriteLine("宝龙达 键盘灯：⭐ 写颜色失败 ⇒ 本次未生效");
-				return true;
-			}
-			// ⭐ ③ 再模式（⭐ 功能号 16：⭐ 2 = RGB 固定色 ✅）
-			if (!wmi.TrySetKeyboardMode(2))
-			{
-				Logger.WriteLine("宝龙达 键盘灯：⭐ 写模式失败 ⇒ 本次未生效");
-				return true;
-			}
-			// ⭐ ④ 最后亮度（⭐ 功能号 18：⭐ 0~3 ✅）
-			wmi.TrySetKeyboardBrightness((byte)Math.Max(0, Math.Min(3, brightness0to3)));
-			// ⭐⭐ 2026-10-16（键盘灯「关不掉」BUGFIX）：⭐ 判据由【功能号 10 的状态字节】
-			//   改为【功能号 16 的模式值】✅ —— ⚠️ 因为真机实测功能号 10 **恒为 0**
-			//   （启动 / 关灯后 / 开灯后都是 0，⭐ 它不随灯的状态变化 ⚠️），
-			//   而功能号 16 才是两种官方枚举都定义的"模式"✅
-			//   （⭐ `Mode_Off = 0` ⇒ 关 · ⭐ `Mode_RGBFixedMode = 2` ⇒ 开 ✅）。
-			if (TryConfirmKeyboardMode(wmi, expectedOn: true))
-			{
-				confirmed = true;
-				Logger.WriteError($"宝龙达 键盘灯：⭐ 已点亮（rgb=#{r:X2}{g:X2}{b:X2} · 亮度={brightness0to3}）"
-					+ "⇒ 回读功能号 16 模式非 0 ✅ 确认=True");
-				LogKeyboardLightingState(wmi, "开灯后");
-				return true;
-			}
-			Logger.WriteError("宝龙达 键盘灯：⚠️ 写入完成但**回读未确认**"
-				+ "（⭐ 功能号 16 模式仍为 0 或读不到）⇒ 如实报告 ⚠️"
-				+ "（⚠️ 真机依据：功能号 18 亮度写**生效**、功能号 16 模式写**疑似不生效** ⚠️）");
-			LogKeyboardLightingState(wmi, "开灯失败后");
+			bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
+			// ⭐ ③ 再模式（⭐ 功能号 16）—— ⭐ 由调用方按效果 Id 映射（⭐ 单一来源 ✅）
+			bool modeOk = wmi.TrySetKeyboardMode(mode);
+			// ⭐ ④ 最后亮度（⭐ 功能号 18，⭐ 0~3 ✅）
+			byte level = (byte)Math.Clamp(brightness0to3, 0, 3);
+			bool brightOk = wmi.TrySetKeyboardBrightness(level);
+			// ⭐⭐ 回读：⭐ 逐值比对（⭐ 旧代码只判"非 0 ＝ 开" ⇒ ⭐ 选自动循环/自定义时会误判成功 ❌）
+			bool modeMatch = TryConfirmModeExact(wmi, mode);
+			bool brightMatch = TryConfirmKeyboardBrightness(wmi, level);
+			confirmed = modeMatch && brightMatch;
+			Logger.WriteError($"宝龙达 键盘灯：⭐ 下发 rgb=#{r:X2}{g:X2}{b:X2} · 模式={mode} · 亮度={level}"
+				+ $" ⇒ ⭐ ① 写成功={colorOk && modeOk && brightOk}（色={colorOk} 模式={modeOk} 亮度={brightOk}）"
+				+ $" · ⭐ ② 回读一致={confirmed}（模式={modeMatch} 亮度={brightMatch}）"
+				+ " · ⭐ ③ ⚠️ 灯效/亮度是否**真的**变了 —— **我们测不到，需目视确认** ⚠️");
+			LogKeyboardLightingState(wmi, "下发后");
 			return true;
 		}
 		catch (Exception ex)
@@ -3295,28 +3291,99 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉」BUGFIX）：⭐ 键盘灯开/关的【判据单一来源】✅。
-	/// <para>⭐ 口径（⭐ 两个官方来源**双向一致** ✅）：⭐ 官方控制台 `WMIRGBKeyboardMode` ＋ ⭐ 蛟龙
-	/// `SysEnums.RGBKeyboardMode` ⇒ ⭐ <c>Mode_Off = 0</c>（关）· ⭐ <c>Mode_RGBFixedMode = 2</c>（开）·
-	/// ⭐ <c>Unknow = 255</c>（读不到）✅</para>
-	/// <para>⛔ <b>为什么不用功能号 10</b>：真机实测它 ⭐ **恒为 0**（启动 / 关灯后 / 开灯后都是 0 ✅）
-	/// ⇒ ⭐ 它**不随键盘灯状态变化** ⇒ ⛔ 旧代码 `off2 == 0` 判"关灯成功"是**假阳性** ❌
-	/// —— ⭐ 那正是 0.291.9.4 里"关灯 ⇒ 回读=True"却**实际关不掉**的根因 ✅。</para>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯模式判据）：⭐ 回读**精确等于**目标模式才算一致 ✅。
+	/// <para>⚠️ 与旧 <c>TryConfirmKeyboardMode(expectedOn)</c> 的区别：⭐ 旧的只判「非 0 ＝ 开」
+	/// ⇒ ⭐ 用户选「自动循环」/「自定义颜色」时它会**误判成功** ⚠️（⭐ 只要模式非 0 就算通过 ❌）。
+	/// ⭐ 现在四项模式各有确定值 ⇒ ⭐ 必须**逐值比对** ✅。</para>
 	/// </summary>
-	private static bool TryConfirmKeyboardMode(BaolongdaWmi wmi, bool expectedOn)
+	private static bool TryConfirmModeExact(BaolongdaWmi wmi, byte expected)
 	{
 		for (int attempt = 0; attempt < 4; attempt++)
 		{
-			if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
+			if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255 && mode == expected)
 			{
-				if ((mode != 0) == expectedOn)
-				{
-					return true;
-				}
+				return true;
 			}
 			Thread.Sleep(100);
 		}
 		return false;
+	}
+
+	/// <summary>⭐ 回读键盘灯亮度（⭐ 功能号 18）是否**精确等于**目标值 ✅（⭐ 逐值比，⛔ 不判"非 0" ⚠️）。</summary>
+	private static bool TryConfirmKeyboardBrightness(BaolongdaWmi wmi, byte expected)
+	{
+		for (int attempt = 0; attempt < 4; attempt++)
+		{
+			if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte level) && level == expected)
+			{
+				return true;
+			}
+			Thread.Sleep(100);
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16：⭐ 宝龙达键盘灯「效果 Id → 模式（功能号 16）」的**单一事实来源** ✅
+	/// （⭐ 下拉、⭐ 索引→Id 映射、⭐ 点进 LightForm 那扇窗、⭐ 以及下发 ⭐ **四处共用** ✅）。
+	///
+	/// <para>⚠️⚠️ <b>来源定性（⭐ 必须写准，⛔ 不得说成"官方支持四种" ⚠️）</b>：
+	/// ⭐ <c>Off=0</c> 与 <c>FixedColor=2</c> 是**官方原版**枚举（⭐ 官方蛟龙控制台**只有单色** ✅，
+	/// ⭐ 与开源 <c>JiaolongControl</c> 的 <c>RGBKeyboardMode</c> 两项一致 ✅）；
+	/// ⚠️ <c>AutoCyclic=1</c> 与 <c>CustomColors=3</c> 来自**基于官方修改的第三方版本**
+	/// （⭐ <c>JiaoLong7.3</c> · ⭐ 主程序集名即「第三方蛟龙游戏控制中心」✅）
+	/// ⇒ ⭐ 属**社区探索所得**（⚠️ 非官方文档 ✅）⇒ ⭐ 报告称"有人实测可用" ⚠️
+	/// 但 ⭐ **机主那台（MRID6）仍须真机确认** ✅。</para>
+	///
+	/// <para>⇒ ⭐ 结论：⭐ 四项**都要真机验** —— ⚠️ <c>1</c>／<c>3</c> 完全未验 ⚠️；
+	/// ⛔ 不得因为"表里有"就当作可用（⭐ 能力位铁律：⭐ 能点的就必须有反应 ✅）。</para>
+	/// </summary>
+	internal static bool TryMapBaolongdaKeyboardMode(string? effect, out byte mode)
+	{
+		mode = 2;
+		if (string.IsNullOrWhiteSpace(effect))
+		{
+			return false;
+		}
+		if (effect.Equals("Off", StringComparison.OrdinalIgnoreCase) || effect.Equals("None", StringComparison.OrdinalIgnoreCase))
+		{
+			mode = 0;
+			return true;
+		}
+		if (effect.Equals("Single", StringComparison.OrdinalIgnoreCase) || effect.Equals("Static", StringComparison.OrdinalIgnoreCase) || effect.Equals("Fixed", StringComparison.OrdinalIgnoreCase))
+		{
+			mode = 2;
+			return true;
+		}
+		if (effect.Equals("Rainbow", StringComparison.OrdinalIgnoreCase))
+		{
+			mode = 1; // ⚠️ 社区探索所得（⭐ 第三方修改版）⇒ ⭐ 待真机确认
+			return true;
+		}
+		if (effect.Equals("Manual", StringComparison.OrdinalIgnoreCase))
+		{
+			mode = 3; // ⚠️ 社区探索所得（⭐ 第三方修改版）⇒ ⭐ 待真机确认
+			return true;
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（键盘灯「亮度不对」修正）：⭐ 界面亮度（⭐ <c>0~4</c>，⭐ <b>0 ＝ 关</b>）
+	/// → ⭐ 宝龙达硬件级（⭐ <c>0~3</c>，⭐ <b>0 ＝ 灭</b>）✅ 的**唯一换算入口** ✅。
+	/// <para>⚠️ <b>为什么必须由它统一换算</b>：⭐ 硬件 0 **就是灭灯**（⭐ 参考实现界面原文
+	/// 「背光亮度设置为 0 时将关闭键盘灯光」✅）⇒ ⚠️ 若沿用旧调用方的 <c>light0to4 - 1</c>，
+	/// ⭐ 界面第 1 档（⭐ 用户想要"最暗"）会算出硬件 <c>0</c> ⇒ ⭐ **变成关灯** ❌
+	/// （⭐ 那正是"亮度不能调节"的一个真实成因 ⚠️）。
+	/// ⇒ ⭐ 本换算保证：⭐ <b>0 ⇒ 0（灭）· ⭐ 正数 ⇒ 夹到 1~3，⛔ 绝不映射成 0</b> ✅。</para>
+	/// </summary>
+	internal static byte BaolongdaBrightnessFromUi(int ui0to4)
+	{
+		if (ui0to4 <= 0)
+		{
+			return 0;
+		}
+		return (byte)Math.Clamp(ui0to4, 1, 3);
 	}
 
 	/// <summary>

@@ -134,7 +134,7 @@ public class LightForm : RForm
 			_light = Math.Clamp(sliderLight.Value * 4 / 100, 0, Program.hw?.UsesBaolongda == true ? 3 : 4);
 			ScheduleEffectUpdate();
 		};
-		AddRow(Strings.Brightness, sliderLight);
+		AddRow(Strings.Brightness + (Program.hw?.UsesBaolongda == true ? "（设为 0 即关闭键盘灯）" : ""), sliderLight);
 		RComboBox comboSpeed = new RComboBox
 		{
 			DropDownStyle = ComboBoxStyle.DropDownList

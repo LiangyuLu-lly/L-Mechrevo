@@ -3783,16 +3783,28 @@ public class MechrevoService
 		{
 			return false;
 		}
-		// ⭐ 亮度：⭐ 我们这边是 0..4（⭐ 0 = 灭 ✅）⇒ ⭐ 宝龙达是 0..3 级 ✅
-		int level = Math.Max(0, Math.Min(3, light0to4 - 1));
-		bool on = (light0to4 > 0) && !string.Equals(effect, "Off", StringComparison.OrdinalIgnoreCase);
+		// ⭐⭐ 2026-10-16（键盘灯「亮度不对」修正）：⭐ 亮度换算收归**唯一来源** ✅
+		//   ⚠️ 旧代码 `light0to4 - 1` 会把界面第 1 档（⭐ 用户想要"最暗"）算成硬件 0
+		//   ⇒ ⭐ 而硬件 0 **就是灭灯**（⭐ 参考实现界面原文「背光亮度设置为 0 时将关闭键盘灯光」✅）
+		//   ⇒ ⭐ 用户在第一档区间看到的是"灯灭"而不是"变暗" ❌（⭐ "亮度不能调节"的一个真实成因 ⚠️）
+		//   ⇒ ⭐ 现在统一走 <see cref="MechrevoHw.BaolongdaBrightnessFromUi" />（⭐ 0 ⇒ 0；正数 ⇒ 1~3 ✅）
+		byte level = MechrevoHw.BaolongdaBrightnessFromUi(light0to4);
+		// ⭐⭐ 2026-10-16（键盘灯四项模式）：⭐ 效果 Id → 模式（功能号 16）用**同一张表** ✅
+		//   ⚠️ 来源定性：⭐ 0／2 是官方原版；⚠️ 1／3 来自基于官方修改的第三方版（⭐ `JiaoLong7.3`）
+		//     ⇒ ⭐ 社区探索所得，⭐ 待真机确认（⛔ 不得当作"官方支持四种" ⚠️）
+		byte mode;
+		if (!MechrevoHw.TryMapBaolongdaKeyboardMode(effect, out mode))
+		{
+			mode = 2;
+		}
+		bool on = (level > 0) && !MechrevoHw.IsLightEffectOff(effect);
 		int argb = singleColor.HasValue ? singleColor.Value.ToArgb() : unchecked((int)0xFFFFFFFF);
-		if (!hw.TrySetKeyboardLightingViaBackend(on, argb, level, out bool confirmed))
+		if (!hw.TrySetKeyboardLightingViaBackend(on, argb, level, mode, out bool confirmed))
 		{
 			return false; // ⭐ 不是非 GCU 后端在管事 ⇒ 交回原路 ✅
 		}
 		Logger.WriteLine($"SetKeyboardEffect（⭐ 非 GCU 后端路径）：⭐ on={on} · ⭐ effect={effect} · ⭐ light={light0to4}"
-			+ $" · ⭐ 确认={confirmed} ⇒ ⭐ 未发任何 MQTT ✅");
+			+ $" · ⭐ mode={mode} · ⭐ level={level} · ⭐ 回读一致={confirmed} ⇒ ⭐ 未发任何 MQTT ✅");
 		return true;
 	}
 
