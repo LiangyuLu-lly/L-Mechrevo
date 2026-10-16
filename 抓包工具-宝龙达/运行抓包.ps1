@@ -44,7 +44,10 @@ New-Item -ItemType Directory -Path $outRoot -Force | Out-Null
 # ⭐ 返回哈希表：⭐ Ok / Hex / Bytes / Raw / Error / Style
 # ═════════════════════════════════════════════════════════════════════════════
 function Invoke-MifsGet {
-	param([System.Management.ManagementObject]$Target, [int]$FunctionNo)
+	# ⚠️ 参数**故意不加类型约束**（⭐ 原来写 `[System.Management.ManagementObject]$Target`）：
+	#    ⭐ 枚举出来的实例静态类型是 `ManagementBaseObject`（⭐ 运行时才是 `ManagementObject`）
+	#    ⇒ ⭐ 加了约束就有**类型转换失败**的风险 ⚠️ ⇒ ⭐ 去掉约束最稳 ✅
+	param($Target, [int]$FunctionNo)
 	$r = @{ Ok = $false; Hex = ''; Bytes = $null; Raw = -1; Error = ''; Style = '' }
 
 	# ── 写法 A：⭐ 显式 byte[] ＋ ⭐ Properties[...].Value ──
@@ -86,6 +89,30 @@ function Invoke-MifsGet {
 		$r.Error = ($r.Error + ' ／ B 写法返回空')
 	} catch {
 		$r.Error = ($r.Error + ' ／ B 写法: ' + $_.Exception.Message)
+	}
+
+	# ── 写法 C：⭐ 教科书式的「类元数据」写法（⭐ 第三种可能，⭐ 也试一下 ✅）──
+	#    ⭐ 依据：⭐ WMI 方法调用的**官方文档范例**就是
+	#       `$mc = [wmiclass]"ns:Class"` ⇒ `$mc.Methods['M'].InParameters` ⇒ `…Invoke($in)`
+	#    ⇒ ⭐ 它与 A/B 都不同（⭐ 走 class 元数据、⛔ 不经过实例对象）⇒ ⭐ 值得一试 ✅
+	try {
+		$mc = [wmiclass]('root\WMI:MICommonInterface')
+		$inParams = $mc.Methods['MiInterface'].InParameters
+		[byte[]]$buf3 = New-Object byte[] 32
+		$buf3[1] = 250
+		$buf3[3] = [byte]$FunctionNo
+		$inParams.Properties['InData'].Value = $buf3
+		$op3 = $mc.Methods['MiInterface'].Invoke($inParams)
+		[byte[]]$out3 = $op3.Properties['OutData'].Value
+		if ($out3 -and $out3.Length -gt 0) {
+			$r.Ok = $true; $r.Bytes = $out3; $r.Style = 'C'; $r.Error = ''
+			$r.Hex = (($out3 | ForEach-Object { $_.ToString('X2') }) -join ' ')
+			if ($out3.Length -gt 4) { $r.Raw = [int]$out3[4] }
+			return $r
+		}
+		$r.Error = ($r.Error + ' ／ C 写法返回空')
+	} catch {
+		$r.Error = ($r.Error + ' ／ C 写法: ' + $_.Exception.Message)
 	}
 	return $r
 }
