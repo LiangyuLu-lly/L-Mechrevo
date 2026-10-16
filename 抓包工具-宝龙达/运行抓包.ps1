@@ -222,12 +222,35 @@ Write-Section '02-ACPI-WMI接口.txt' 'ACPI / WMI 接口探测（本机有哪些
 	}
 	Add-Line $L ""
 	Add-Line $L "── 设备树里的 ACPI 设备（⭐ 宝龙达那套驱动的落点）──"
+	Add-Line $L "  ⭐ 重点看：⭐ 有没有 `ACPI\PNP0C14\...`（⭐ 这是 WMI 映射的 ACPI 设备，"
+	Add-Line $L "     厂商实例名形如 MIFS_0 / MIFS_1）。⭐ 请把这几行发回。"
+	Add-Line $L "  ⭐ 另外列出所有 `ACPI\xxxx....` 形态的设备（⭐ 厂商设备常是 4 位字母 + 数字）。"
 	try {
-		Get-PnpDevice -ErrorAction Stop | Where-Object { $_.InstanceId -match 'ACPI' } | Sort-Object InstanceId | ForEach-Object {
+		Get-PnpDevice -ErrorAction Stop | Where-Object { $_.InstanceId -match '^ACPI\\' } | Sort-Object InstanceId | ForEach-Object {
 			$friendly = $_.FriendlyName
-			if ($friendly -match 'Mechrevo|AiStone|Uniwill|Gaming|Control|Fan|Battery|EC|OEM|机械革命' -or $_.InstanceId -match 'ACPI\\[A-Z]{4}') {
+			$devId = ($_.InstanceId -split '\\')[1]
+			# ⚠️ 2026-10-16 修正：原条件 `ACPI\\[A-Z]{4}` 要求"4 个大写字母"，
+			#    而 MIFS 设备是 `ACPI\PNP0C14\…`（PNP 后面有数字）⇒ ⭐ 正好被漏掉 ❌
+			#    ⇒ 改为：⭐ ① 厂商关键词命中  或  ⭐ ② PNP 开头（ACPI 硬件 ID 惯例）或
+			#              ⭐ ③ 4 位字母数字的短 ID（厂商自定义设备）✅
+			$isInteresting = ($friendly -match 'Mechrevo|AiStone|Uniwill|Gaming|Control|Fan|Battery|EC|OEM|机械革命') -or
+				($devId -match '^PNP[0-9A-F]{4}$') -or
+				($devId -match '^[A-Z]{4}[0-9A-F]*$')
+			if ($isInteresting) {
 				Add-Line $L ("  " + $_.InstanceId + "  |  " + $friendly + "  |  " + $_.Status + "  |  class=" + $_.Class)
 			}
+		}
+	} catch { Add-Line $L ("  读取失败: " + $_.Exception.Message) }
+	Add-Line $L ""
+	Add-Line $L "── ⭐ 专门找 MIFS / WMI-ACPI 相关设备（⭐ 直接给实例名）──"
+	try {
+		$found = $false
+		Get-PnpDevice -ErrorAction Stop | Where-Object { $_.InstanceId -match 'PNP0C14|MIFS|WMI' } | Sort-Object InstanceId | ForEach-Object {
+			$found = $true
+			Add-Line $L ("  ⭐ " + $_.InstanceId + "  |  " + $_.FriendlyName + "  |  " + $_.Status + "  |  class=" + $_.Class)
+		}
+		if (-not $found) {
+			Add-Line $L "  （没找到 PNP0C14 / MIFS / WMI 相关设备 —— ⭐ 但 WMI 类可能仍然存在，见上一节）"
 		}
 	} catch { Add-Line $L ("  读取失败: " + $_.Exception.Message) }
 	Add-Line $L ""
