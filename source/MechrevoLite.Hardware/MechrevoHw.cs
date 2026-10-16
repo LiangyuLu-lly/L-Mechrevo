@@ -2693,6 +2693,85 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 灯光电源开关 · ⭐ 机主反馈「键盘灯 logo灯不可用」）：
+	/// ⭐ 把 <c>MechrevoService.PublishLightPower(topic, on)</c> 这一步**分派给非 GCU 后端** ✅
+	/// <para>⚠️ 根因（⭐ 真机诊断包实证）：那条路**直发 MQTT** ⇒ 宝龙达没有 GCU ⇒
+	/// 日志刷「<c>PublishLightPower fail: 发布到 Keyboard/Ctrl 失败：MQTT 未连接</c>」❌
+	/// ⇒ **完全没经过本类** ⇒ 键盘灯/LOGO 灯都点不动 ⚠️</para>
+	/// <para>⭐ 返回 <c>true</c> ⇒ 已由本后端处理（⭐ 调用方 ⛔ 不要再发 MQTT ✅）；
+	/// ⭐ <c>false</c> ⇒ 不归它管 ⇒ 调用方**原路走** ✅（⭐ 非宝龙达恒 false ⇒ 逐位不变 ✅）。</para>
+	/// <para>⚠️ 诚实边界：本入口**只带 <paramref name="on" />**（⭐ 没有颜色/亮度 ⚠️）
+	/// ⇒ ⭐ 点亮时用 ⭐ **白色 + 3 级亮度** ⭐ 作保守默认，⭐ **并在日志里写明用了默认值** ✅
+	/// （⛔ 不假装是从界面取到的 ⚠️）；⭐ 关灯时只写「模式 0」（关），不需要颜色 ✅。</para>
+	/// </summary>
+	internal bool TrySetLightPowerViaBackend(string topic, bool on, out bool confirmed)
+	{
+		confirmed = false;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false; // ⭐ 不是宝龙达在管事 ⇒ 交给原来的 GCU 路径 ✅
+		}
+		// ── ⭐ LOGO 灯：⭐ 复用现成实现 ✅ ──
+		if (string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal))
+		{
+			return TrySetLogoLightViaBackend(on, out confirmed);
+		}
+		// ── ⭐ 键盘灯：⭐ 只处理这一个主题 ⚠️ ──
+		if (!string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+		{
+			return false; // ⭐ 其余主题不归它管 ⇒ 交回原路 ✅
+		}
+		try
+		{
+			if (!on)
+			{
+				// ⭐ 关灯：⭐ 只写「模式 0」（关）✅ —— ⭐ 不需要颜色/亮度 ✅
+				if (!wmi.TrySetKeyboardMode(0))
+				{
+					Logger.WriteError("宝龙达 灯光：⚠️ 关键盘灯写入失败（详见上一行）⇒ 本次未生效");
+					return true; // ⭐ 已接管（只是失败）⇒ ⛔ 别让调用方再发 GCU ✅
+				}
+			}
+			else
+			{
+				// ⚠️ 本入口没带颜色/亮度 ⇒ ⭐ 用保守默认（白色 + 3 级）并如实记日志 ✅
+				const int defaultArgb = unchecked((int)0xFFFFFFFF);
+				const int defaultBrightness = 3;
+				Logger.WriteError($"宝龙达 灯光：⭐ 本入口只带开关（topic={topic}）⇒ 点亮用保守默认"
+					+ $"（白色 0x{defaultArgb:X8} · 亮度 {defaultBrightness}/3）⚠️"
+					+ " —— ⭐ 界面若另有配色/亮度入口，那条会各自下发 ✅");
+				if (!TrySetKeyboardLightingViaBackend(true, defaultArgb, defaultBrightness, out confirmed))
+				{
+					return false; // ⭐ 理论上不会发生 ⇒ 交回原路更安全 ✅
+				}
+				if (confirmed)
+				{
+					return true;
+				}
+			}
+			// ⭐ 回读确认（⭐ 与 LOGO 灯同款：⭐ 5 次 × 150 ms ✅）
+			for (int attempt = 0; attempt < 5; attempt++)
+			{
+				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte _))
+				{
+					confirmed = true;
+					Logger.WriteError($"宝龙达 灯光：⭐ 键盘灯电源已{(on ? "开" : "关")}并回读确认 ✅（第 {attempt + 1} 次）");
+					return true;
+				}
+				Thread.Sleep(150);
+			}
+			Logger.WriteError($"宝龙达 灯光：⚠️ 键盘灯电源写入完成但 {5 * 150} ms 内回读不到 ⇒ 如实报告未确认 ⚠️");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("宝龙达 灯光：⭐ 操作异常（已吞掉，不影响别处）：" + ex.Message);
+			return true; // ⭐ 已接管 ⇒ ⛔ 不让调用方再走 GCU ✅
+		}
+	}
+
+	/// <summary>
 	/// ⭐ 读一次宝龙达 LOGO 灯状态（⭐ 只读 ✅）。⭐ 非宝龙达时返回 <c>false</c> ✅。
 	/// </summary>
 	internal bool TryReadLogoLightViaBackend(out bool on)

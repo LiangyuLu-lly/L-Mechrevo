@@ -4432,6 +4432,38 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public async Task<bool> PublishLightPower(string topic, bool on)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达 · 灯光电源开关 · ⭐ 机主反馈「键盘灯 logo灯不可用」）：
+		//   ⚠️ 根因（⭐ 真机诊断包实证）：本方法**直发 MQTT** ⇒ 宝龙达**没有 GCU** ⇒
+		//      日志刷「PublishLightPower fail: 发布到 Keyboard/Ctrl 失败：MQTT 未连接」❌
+		//      ⇒ **完全没经过门面层** ⇒ 键盘灯/LOGO 灯都点不动 ⚠️
+		//   ⇒ ⭐ 先问门面层「这次归你管吗」✅ ⇒ 非 GCU 后端处理完就**直接返回**（⭐ 一条 MQTT 不发 ✅）
+		//   ⭐ 否则 ⭐ **下面原来那几行一行未改** ✅（⭐ 回归风险 = 0 ✅）
+		if (_hw != null)
+		{
+			bool handled;
+			bool confirmed;
+			try
+			{
+				handled = _hw.TrySetLightPowerViaBackend(topic, on, out confirmed);
+			}
+			catch (Exception ex2)
+			{
+				// ⚠️ 分派本身异常 ⇒ ⭐ 如实记录，⛔ 但**不让它影响原路**（⭐ 继续往下走 ✅）
+				Logger.WriteError("宝龙达 灯光：⚠️ 分派异常 ⇒ 交回原路：" + ex2.Message);
+				handled = false;
+				confirmed = false;
+			}
+			if (handled)
+			{
+				if (confirmed)
+				{
+					ObserveLightPower(topic, on);
+				}
+				Logger.WriteError($"PublishLightPower（⭐ 非 GCU 后端路径）：⭐ topic={topic} · ⭐ on={on}"
+					+ $" · ⭐ 确认={confirmed} ⇒ ⭐ 未发任何 MQTT ✅");
+				return confirmed;
+			}
+		}
 		try
 		{
 			if (!SupportsLightTopic(topic))
