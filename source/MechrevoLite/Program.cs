@@ -312,6 +312,26 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-19（30 系 · SMU 只读探针）：先确认 PawnIO/SMU 能否读，再决定 PL/温度墙是否改走 SMU。
+		//   用法：L-Mechrevo.exe --smu-probe
+		//   ⛔ 只读：不发任何 SMU 写命令；结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-smu-probe-*.txt。
+		//   ⚠️ 主程序清单是 requireAdministrator ⇒ 非管理员运行时 PawnIO 会回 AccessDenied（预期，报告会如实写）。
+		case "--smu-probe":
+		{
+			string probeLog = SmuProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[smu-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-19（30 系 · SMU **保守写 + 回读** 实测，供开发机 HawkPoint 近似验证）：
+		//   用法：L-Mechrevo.exe --smu-write-test          只读（打印当前快照，不写）
+		//         L-Mechrevo.exe --smu-write-test --yes    保守写 + 每次回读 + finally 恢复快照并确认
+		//   ⚠️ 边界写死在 SmuWriteTest 里：温度墙只往 ≥85℃ 方向、PL 只往下 5W 内、stapm_time 只写回当前值。
+		case "--smu-write-test":
+			Environment.ExitCode = SmuWriteTest.Run(args.Skip(1).ToArray());
+			Logger.Close();
+			return;
 		// 2026-10-05 step7A (upstream 0.290.6 A-41): capability probe CLI.
 		// L-Mechrevo.exe --cpu-tuning-probe [output.json]
 		case "--cpu-tuning-probe":

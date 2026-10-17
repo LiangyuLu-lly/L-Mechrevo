@@ -426,7 +426,22 @@ internal class Strings
 
 	internal static string CpuPl1 => ResourceManager.GetString("CpuPl1", resourceCulture);
 
+	/// <summary>2026-10-19（30 系 · SMU 功耗墙）：PL1 行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuPl1Hint => ResourceManager.GetString("CpuPl1Hint", resourceCulture);
+
 	internal static string CpuPl2 => ResourceManager.GetString("CpuPl2", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 功耗墙）：PL2 行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuPl2Hint => ResourceManager.GetString("CpuPl2Hint", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 功耗时间窗）：行标题「功耗时间窗（STAPM，秒）」。</summary>
+	internal static string CpuStapmTimeWindow => ResourceManager.GetString("CpuStapmTimeWindow", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 功耗时间窗）：该行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuStapmTimeWindowHint => ResourceManager.GetString("CpuStapmTimeWindowHint", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 温度墙）：温度墙行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuTempWallHint => ResourceManager.GetString("CpuTempWallHint", resourceCulture);
 
 	internal static string CpuPl4 => ResourceManager.GetString("CpuPl4", resourceCulture);
 

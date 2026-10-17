@@ -727,6 +727,21 @@
     
   
   </data>
+<data name="CpuPl1Hint" xml:space="preserve">
+    <value>长时功耗上限（瓦）。负载持续时处理器维持的平均功耗。</value>
+  </data>
+<data name="CpuPl2Hint" xml:space="preserve">
+    <value>短时/峰值功耗上限（瓦）。突发负载时可以短时间冲到更高功耗。</value>
+  </data>
+<data name="CpuStapmTimeWindow" xml:space="preserve">
+    <value>功耗时间窗（STAPM，秒）</value>
+  </data>
+<data name="CpuStapmTimeWindowHint" xml:space="preserve">
+    <value>按机身表面温度约束持续功耗的时间窗，单位秒。数值越大，功耗调整越平缓。</value>
+  </data>
+<data name="CpuTempWallHint" xml:space="preserve">
+    <value>处理器温度上限（℃）。达到该温度会主动降频。</value>
+  </data>
 <data name="CpuPl4" xml:space="preserve">
     
     

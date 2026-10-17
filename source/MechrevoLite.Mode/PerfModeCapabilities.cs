@@ -58,5 +58,15 @@ public sealed record PerfModeCapabilities
 	/// </summary>
 	public bool SupportsWmiPowerFields { get; init; }
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：⭐ <b>本后端能不能把「功耗时间窗（STAPM，秒）」下发到 SMU</b> ✅。
+	/// <para>⭐ 为什么单独一个能力位：30 系（宝龙达 <c>MRID6</c> / 6800H）没有 WMI 功能号 23，
+	/// PL1/PL2/温度墙走 SMU（<see cref="MechrevoService.SetCustomDetail" /> 开头的
+	/// <c>TryApplyPowerLimitViaBackend</c>）；而"时间窗"是**第 4 个键**（<c>SmuStapmTimeSeconds</c>），
+	/// 只有 30 系 UI 会建那一行 ⇒ 只有该后端才生成这一步。</para>
+	/// <para>⚠️ 默认 <c>false</c> ⇒ ⭐ <see cref="All" /> 与所有既有后端（GCU / 老接口 / 40 系）<b>逐位不变</b> ✅。</para>
+	/// </summary>
+	public bool SupportsSmuPowerTimeWindow { get; init; }
+
 	public static readonly PerfModeCapabilities All = new PerfModeCapabilities();
 }

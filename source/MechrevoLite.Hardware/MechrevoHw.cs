@@ -3895,6 +3895,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private int _baolongdaMemPl2;
 	private int _baolongdaMemTempWall;
 
+	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：30 系的 SMU **能读**当前 limits/tctl/时间窗 ⇒
+	// 不再全靠"本地记忆"猜；下面三项只在本机是「宝龙达 30 系」时由 `RefreshBaolongda30SeriesSmuPower` 填。
+	//   * `_baolongdaSmuSnapshot`  = 最近一次**只读** PM 表采样（null = 还没读/读不到）；
+	//   * `BaolongdaStapmTimeSeconds` = 当前 STAPM 时间窗（秒；0 = 读不到 ⇒ UI **不建**「功耗时间窗」那一行）；
+	//   * 板号/代际缓存 = 静态判据只读一次注册表。
+	private PawnIO.SmuPowerSnapshot _baolongdaSmuSnapshot;
+	private DateTime _baolongdaSmuSnapshotAt = DateTime.MinValue;
+	private int _baolongda30SeriesCache = -1;
+
 	/// <summary>
 	/// ⭐ 把**我们自己的**功耗墙范围与本地记忆值填进那些"原本等 GCU 上报"的属性里 ✅
 	/// <para>⭐ 依据：⭐ 见方案文档第 17 节 —— ⭐ 填属性即可，⛔ 不用动 UI ✅</para>
@@ -3933,6 +3942,211 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>⭐ 同 <see cref="BaolongdaPl1Unset" />：⭐ 温度墙是否**未设置** ✅。</summary>
 	public bool BaolongdaTempWallUnset => UsesBaolongda && _baolongdaMemTempWall <= BaolongdaUnset;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：本机是不是「**宝龙达 30 系**」—— 蛟龙16 / 裸板号 <c>MRID6</c> /
+	/// 6800H（Rembrandt）。
+	/// <para>⭐ <b>判据（两条并集，任一为真即算）</b>：
+	/// ① 显卡代际 <see cref="DgpuGenerationKind.Gen30" />（3070Ti 等 30 系独显；宝龙达 30 系真机就是这一形态）；
+	/// ② 主板型号 <c>BaseBoardProduct</c> **精确等于** <c>MRID6</c>（⚠️ <c>MRID6-23</c> = 40 系，**不算**；
+	///    <c>MRID6-*</c> 变体也**不算** 30 系 ⇒ 交给 ① 的独显代际判据）。</para>
+	/// <para>⚠️ 为什么必须先要求 <see cref="UsesBaolongda" />：同方 30 系（<c>GM5*</c> 等）**有 GCU**、
+	/// 功耗墙走固件槽，⛔ 不走 SMU —— 它们一个字节都不该受影响。</para>
+	/// <para>⚠️ 为什么 30 系要单独判：30 系原厂 WMI 方法表**只到 18**、没有功能号 23
+	/// ⇒ PL1/PL2/温度墙**只能走 SMU**；40 系（<c>MRID6-23</c>）有功能号 23 ⇒ 保持原 WMI 路径不变。</para>
+	/// </summary>
+	internal bool IsBaolongda30Series
+	{
+		get
+		{
+			if (!UsesBaolongda)
+			{
+				return false;
+			}
+			if (DgpuGeneration == DgpuGenerationKind.Gen30)
+			{
+				return true;
+			}
+			int cached = Volatile.Read(ref _baolongda30SeriesCache);
+			if (cached >= 0)
+			{
+				return cached == 1;
+			}
+			bool match = false;
+			try
+			{
+				using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine
+					.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
+				string board = ((key?.GetValue("BaseBoardProduct") as string) ?? string.Empty).Trim();
+				// 裸 `MRID6` = 30 系（2026-10-17 真机：蛟龙16 · 6800H＋3070Ti）；
+				// `MRID6-23` = 40 系 ⇒ 下面这条**故意**用精确比较，不匹配 `MRID6-` 前缀。
+				match = string.Equals(board, "MRID6", StringComparison.OrdinalIgnoreCase);
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("IsBaolongda30Series: 读主板型号失败（按非 30 系处理，安全方向）：" + ex.Message);
+			}
+			Volatile.Write(ref _baolongda30SeriesCache, match ? 1 : 0);
+			return match;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：当前 **STAPM 时间窗（秒）**；<c>0</c> = 读不到
+	/// （⇒ UI **不建**「功耗时间窗（STAPM，秒）」那一行 —— 铁律：读不到就不显示，⛔ 不编默认值）。
+	/// <para>⚠️ 只在 <see cref="IsBaolongda30Series" /> 且 <see cref="RefreshBaolongda30SeriesSmuPower" />
+	/// 成功过之后才有值。</para>
+	/// </summary>
+	internal int BaolongdaStapmTimeSeconds { get; private set; }
+
+	/// <summary>最近一次 30 系 SMU **只读**采样（null = 还没读/读不到；仅供日志与 UI 判断，不参与下发）。</summary>
+	internal PawnIO.SmuPowerSnapshot BaolongdaSmuSnapshot => _baolongdaSmuSnapshot;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**只读**刷新「当前功耗墙 / 温度墙 / STAPM 时间窗」，
+	/// 并把读得到的值填进本地记忆（<c>_baolongdaMem*</c> / <c>Pl1</c> / <c>Pl2</c> / <c>TccTarget</c>）。
+	/// <para>⭐ 为什么要填：30 系**能读** ⇒ 界面显示机器上的真实值（不再是「（未设置）」），
+	/// 而且"只改一项"时下发基线是真实当前值（⛔ 不再拿 0/编造值去凑）。</para>
+	/// <para>⚠️ 39 系/40 系/非宝龙达：本方法**直接返回 false**，一个寄存器不读、一个属性不动。</para>
+	/// <para>⚠️ 只读：只走 PM 表 resolve/transfer/read，⛔ 不发任何 SMU 写命令。</para>
+	/// <para>⚠️ 失败方向：PawnIO 不可用 / 非 AMD / 读表失败 ⇒ 返回 false + 日志；调用方必须如实处理
+	/// （UI = 不建时间窗行；下发 = 如实报失败，⛔ 不假装成功）。</para>
+	/// </summary>
+	internal bool RefreshBaolongda30SeriesSmuPower(bool force = false, bool requireStableStapmTime = false)
+	{
+		if (!IsBaolongda30Series)
+		{
+			return false;
+		}
+		if (!force && _baolongdaSmuSnapshot != null && (DateTime.UtcNow - _baolongdaSmuSnapshotAt).TotalSeconds < 30.0)
+		{
+			return true;
+		}
+		try
+		{
+			PawnIO.RyzenSmuService smu = MechrevoLite.Mode.ModeControl.SharedSmu;
+			if (smu == null)
+			{
+				Logger.WriteError("[smu-30] 读取当前功耗墙失败：PawnIO/SMU 不可用（30 系的 PL/温度墙只能走 SMU；需要管理员权限）");
+				return false;
+			}
+			PawnIO.SmuPowerSnapshot snapshot = smu.GetPowerSnapshot();
+			if (snapshot == null)
+			{
+				Logger.WriteError("[smu-30] 读取当前功耗墙失败：PM 表读不到（SMU 初始化过了但表没有数据）");
+				return false;
+			}
+			_baolongdaSmuSnapshot = snapshot;
+			_baolongdaSmuSnapshotAt = DateTime.UtcNow;
+			// ⭐⭐ STAPM 时间窗：**只有读数稳定才认**（真机教训：本机 Phoenix / PM 表 0x4C0009 的
+			//   0x918 字段连续两次读数会在 25~67 之间跳 ⇒ 不是"用户可设置的当前值"）。
+			//   * UI 打开时传 `requireStableStapmTime: true` ⇒ 再读一次，两次差 >1 就按"读不到"处理
+			//     ⇒ ⛔ 不建「功耗时间窗（STAPM，秒）」那一行（不显示不可信的值）；
+			//   * 下发基线/回读确认不需要它时传 false（省一次 ~0.4 s 的 PM 表读）。
+			int stapmTimeSeconds = snapshot.StapmTimeSeconds ?? 0;
+			if (requireStableStapmTime && stapmTimeSeconds > 0)
+			{
+				PawnIO.SmuPowerSnapshot second = smu.GetPowerSnapshot();
+				int secondTime = (second != null) ? (second.StapmTimeSeconds ?? 0) : 0;
+				if (secondTime <= 0 || Math.Abs(secondTime - stapmTimeSeconds) > 1)
+				{
+					Logger.WriteError($"[smu-30] STAPM 时间窗读数不稳定（{stapmTimeSeconds}s → {secondTime}s）"
+						+ " ⇒ 视为**读不到**：UI 不建该行、也不拿它做写入回读确认（⛔ 不显示不可信的值）");
+					stapmTimeSeconds = 0;
+				}
+			}
+			BaolongdaStapmTimeSeconds = stapmTimeSeconds;
+			// ⭐ limits → 本地记忆（只在"值合理"时填；越界/N/A 一律保持原样，⛔ 不硬塞）
+			int pl1 = RoundPositive(snapshot.Slow);
+			if (pl1 >= BaolongdaPlMinWatts && pl1 <= BaolongdaPl1MaxWatts)
+			{
+				_baolongdaMemPl1 = pl1;
+				Pl1 = pl1;
+			}
+			int pl2 = RoundPositive(snapshot.Fast);
+			if (pl2 >= BaolongdaPlMinWatts && pl2 <= BaolongdaPl2MaxWatts)
+			{
+				_baolongdaMemPl2 = pl2;
+				Pl2 = pl2;
+			}
+			int wall = RoundPositive(snapshot.TctlTemp);
+			if (wall >= BaolongdaTccMinCelsius && wall <= BaolongdaTccMaxCelsius)
+			{
+				_baolongdaMemTempWall = wall;
+				TccTarget = wall;
+			}
+			Logger.WriteError($"[smu-30] 当前功耗墙（只读 PM 表）：PL1(slow)={ShowUnset(_baolongdaMemPl1, "W")} "
+				+ $"PL2(fast)={ShowUnset(_baolongdaMemPl2, "W")} 温度墙(tctl)={ShowUnset(_baolongdaMemTempWall, "℃")} "
+				+ $"STAPM 时间窗={(BaolongdaStapmTimeSeconds > 0 ? BaolongdaStapmTimeSeconds + "s" : "读不到")} "
+				+ $"(PM 表 0x{snapshot.TableVersion:X6})");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[smu-30] 读取当前功耗墙异常（已吞掉、按读不到处理）：" + ex.GetType().Name + " " + ex.Message);
+			return false;
+		}
+		static int RoundPositive(float value)
+		{
+			if (float.IsNaN(value) || float.IsInfinity(value) || value <= 0f)
+			{
+				return 0;
+			}
+			return (int)Math.Round(value, MidpointRounding.AwayFromZero);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：某几项 **SMU 写成功**后更新"本地记忆"与只读快照
+	/// （传 0 的项 = 本次没写，保持原样）。⛔ 只在 SMU 返回 <c>OK</c> 之后由调用方调用。
+	/// </summary>
+	internal void NoteBaolongdaSmuLimitsApplied(int pl1Watts, int pl2Watts, int tempWallC)
+	{
+		if (pl1Watts > 0)
+		{
+			_baolongdaMemPl1 = pl1Watts;
+			Pl1 = pl1Watts;
+		}
+		if (pl2Watts > 0)
+		{
+			_baolongdaMemPl2 = pl2Watts;
+			Pl2 = pl2Watts;
+		}
+		if (tempWallC > 0)
+		{
+			_baolongdaMemTempWall = tempWallC;
+			TccTarget = tempWallC;
+		}
+		if (_baolongdaSmuSnapshot != null)
+		{
+			PawnIO.SmuPowerSnapshot snapshot = _baolongdaSmuSnapshot;
+			_baolongdaSmuSnapshot = snapshot with
+			{
+				Stapm = (pl1Watts > 0) ? pl1Watts : snapshot.Stapm,
+				Slow = (pl1Watts > 0) ? pl1Watts : snapshot.Slow,
+				Fast = (pl2Watts > 0) ? pl2Watts : snapshot.Fast,
+				TctlTemp = (tempWallC > 0) ? tempWallC : snapshot.TctlTemp
+			};
+			_baolongdaSmuSnapshotAt = DateTime.UtcNow;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：STAPM 时间窗 **SMU 写成功**后更新本地记忆/快照（单位：秒）。
+	/// </summary>
+	internal void NoteBaolongdaSmuStapmTimeApplied(int seconds)
+	{
+		if (seconds <= 0)
+		{
+			return;
+		}
+		BaolongdaStapmTimeSeconds = seconds;
+		if (_baolongdaSmuSnapshot != null)
+		{
+			_baolongdaSmuSnapshot = _baolongdaSmuSnapshot with { StapmTimeSeconds = seconds };
+			_baolongdaSmuSnapshotAt = DateTime.UtcNow;
+		}
+	}
 
 	// ══════════════════════════════════════════════════════════════════════════
 	// ⭐⭐ 2026-10-16（"全部接入"第 4 步 · 风扇**软件闭环曲线** · ⭐ 骨架）

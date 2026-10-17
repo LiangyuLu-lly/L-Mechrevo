@@ -183,6 +183,12 @@ public class CustomModeForm : RForm
 
 	private RSlider _tcc;
 
+	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：只有「宝龙达 30 系 + 当前值读得到」才创建；
+	//   条件不满足 ⇒ 字段保持 null（= 本机/本档**没有**这一行；铁律：读不到就不显示）。
+	private RSlider _stapmTime;
+
+	private RNumericUpDown _stapmTimeVal;
+
 	private RSlider _tgp;
 
 	/// <summary>⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：只有能读到有效约束时才创建 ✅</summary>
@@ -727,6 +733,19 @@ public class CustomModeForm : RForm
 			}
 		};
 		AddComboRow(Strings.BoostMode, _boostCombo);
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：⭐ 本机是不是「宝龙达 30 系」（蛟龙16 / 裸板号 MRID6 / 6800H）？
+		//   ⭐ 是 ⇒ PL1/PL2/温度墙走 **SMU**（30 系原厂 WMI 方法表只到 18、没有功能号 23），
+		//      且**只有**这种情况下才允许出现「功耗时间窗（STAPM，秒）」这一行 ✅
+		//   ⚠️ 40 系 / GCU / 老同方 ⇒ 判据为假 ⇒ 下面一行都不建、tooltip 也不挂 ⇒ 行为逐位不变 ✅
+		bool baolongda30Series = hw != null && hw.IsBaolongda30Series;
+		if (baolongda30Series)
+		{
+			// ⭐ 只读：先从 SMU PM 表读一次当前 PL1/PL2/温度墙/时间窗（顺便把本地记忆填成**真实当前值**，
+			//   这样标题不再显示「（未设置）」、下发基线也是真值）。读失败也继续：下面按"未设置"如实显示。
+			//   ⚠️ `requireStableStapmTime: true` ⇒ STAPM 时间窗必须**连续两次读数一致**才算"读得到"
+			//      （真机教训：部分 PM 表版本上这个字段是动态量、会跳）⇒ 不稳定就不建那一行。
+			hw.RefreshBaolongda30SeriesSmuPower(force: true, requireStableStapmTime: true);
+		}
 		(int, int, int, bool) tuple2 = DeviceRange(hw?.Pl1Minimum ?? (-1), hw?.Pl1Maximum ?? (-1), hw?.Pl1 ?? 0);
 		(int, int, int, bool) tuple3 = DeviceRange(hw?.Pl2Minimum ?? (-1), hw?.Pl2Maximum ?? (-1), hw?.Pl2 ?? 0);
 		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl1, hw?.BaolongdaPl1Unset ?? false), tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
@@ -745,6 +764,28 @@ public class CustomModeForm : RForm
 		_pl2Val = tuple4.Item2;
 		_pl2Label = RowLabelOf(_pl2);
 		AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：**读得到当前值才建这一行**。
+		//   ⚠️ SMU 的两个时间窗里，只有 STAPM 时间窗对用户可解释（fast/PL2 是瞬时限值、没有时间参数；
+		//      slow 时间常数这次不暴露）。单位 = **秒**（不是毫秒）。
+		//   ⛔ 读不到当前值 ⇒ 不建行、不显示任何默认值（铁律）。
+		if (baolongda30Series)
+		{
+			int currentStapmTime = hw.BaolongdaStapmTimeSeconds;
+			if (currentStapmTime >= BaolongdaProfile.StapmTimeMinSeconds && currentStapmTime <= BaolongdaProfile.StapmTimeMaxSeconds)
+			{
+				tuple4 = AddSliderRow(Strings.CpuStapmTimeWindow, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, currentStapmTime, (int v) =>
+				{
+					Queue("SmuStapmTimeSeconds", v.ToString());
+				});
+				_stapmTime = tuple4.Item1;
+				_stapmTimeVal = tuple4.Item2;
+				AttachPowerWallHint(_stapmTime, _stapmTimeVal, RowLabelOf(_stapmTime), Strings.CpuStapmTimeWindowHint);
+			}
+			else
+			{
+				Logger.WriteLine("[smu-30] UI 不建「功耗时间窗（STAPM，秒）」行：当前值读不到（PM 表无该字段/读表失败）");
+			}
+		}
 		(int, int, int, bool) tuple5 = DeviceRange(hw?.Pl4Minimum ?? (-1), hw?.Pl4Maximum ?? (-1), hw?.Pl4 ?? 0);
 		tuple4 = AddSliderRow((hw != null && hw.UsesAmdPowerFields) ? Strings.CpuFppt : Strings.CpuPl4, tuple5.Item1, tuple5.Item2, tuple5.Item3, (int v) =>
 		{
@@ -765,6 +806,25 @@ public class CustomModeForm : RForm
 		_tccLabel = RowLabelOf(_tcc);
 		AttachPowerWallUnsetHint(_tcc, _tccVal, _tccLabel);
 		_tccChk.Enabled = tuple6.Item4;
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：⭐ 30 系这三行改走 SMU，鼠标悬停显示"这一项在 SMU 里是什么"
+		//   （PL1 = slow limit / PL2 = fast limit / 温度墙 = Tctl 上限）。⚠️ 只在**读到了当前值**时替换掉
+		//   「未设置」提示；读不到时保留原来的只读/未设置说明（更贴近用户看到的现象）。
+		//   ⚠️ 非 30 系 / 40 系 / GCU ⇒ 一行都不挂 ⇒ 行为逐位不变 ✅
+		if (baolongda30Series)
+		{
+			if (!(hw?.BaolongdaPl1Unset ?? true))
+			{
+				AttachPowerWallHint(_pl1, _pl1Val, _pl1Label, Strings.CpuPl1Hint);
+			}
+			if (!(hw?.BaolongdaPl2Unset ?? true))
+			{
+				AttachPowerWallHint(_pl2, _pl2Val, _pl2Label, Strings.CpuPl2Hint);
+			}
+			if (!(hw?.BaolongdaTempWallUnset ?? true))
+			{
+				AttachPowerWallHint(_tcc, _tccVal, _tccLabel, Strings.CpuTempWallHint);
+			}
+		}
 		(int, int, int, bool) tuple8 = DeviceRange(hw?.GpuTgpMinimum ?? (-1), hw?.GpuTgpMaximum ?? (-1), hw?.GpuTgp ?? 0);
 		tuple4 = AddSliderRow(Strings.GpuTgp, tuple8.Item1, tuple8.Item2, tuple8.Item3, (int v) =>
 		{
@@ -1241,6 +1301,24 @@ public class CustomModeForm : RForm
 			if (label != null)
 			{
 				_tips.SetToolTip(label, PowerWallUnsetHint);
+			}
+		}
+
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：把"这一项在 SMU 里是什么"挂成悬浮提示（⭐ 与上面同一个 `_tips`）。
+		//   ⚠️ 只在 30 系 SMU 路径、且**该行真的建出来 / 读到了值**时调用（⛔ 不给不存在的行挂提示）。
+		void AttachPowerWallHint(Control bar, Control val, Control label, string hint)
+		{
+			if (bar != null)
+			{
+				_tips.SetToolTip(bar, hint);
+			}
+			if (val != null)
+			{
+				_tips.SetToolTip(val, hint);
+			}
+			if (label != null)
+			{
+				_tips.SetToolTip(label, hint);
 			}
 		}
 
@@ -1862,7 +1940,10 @@ public class CustomModeForm : RForm
 		return new Control[]
 		{
 			_pl1, _pl2, _pl4, _tcc, _tgp, _db, _coreOc, _memOc, _fanSwitchSpeed,
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：本机没有该行时为 null（下面的循环会跳过 null）
+			_stapmTime,
 			_pl1Val, _pl2Val, _pl4Val, _tccVal, _tgpVal, _dbVal, _coreOcVal, _memOcVal, _fanSwitchSpeedVal,
+			_stapmTimeVal,
 			_dbChk, _tccChk, _ocChk, _fanSwitchSpeedChk,
 			_fanCurveButton, _gpuOcAdminRow,
 			_applyButton
@@ -3424,6 +3505,13 @@ public class CustomModeForm : RForm
 			case "PL2":
 				RestoreSliderValue(_pl2, _pl2Val, value);
 				break;
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：行不存在（_stapmTime == null）时跳过（⛔ 不凭空补控件）。
+			case "SmuStapmTimeSeconds":
+				if (_stapmTime != null)
+				{
+					RestoreSliderValue(_stapmTime, _stapmTimeVal, value);
+				}
+				break;
 			case "PL4":
 				RestoreSliderValue(_pl4, _pl4Val, value);
 				break;
@@ -3504,6 +3592,12 @@ public class CustomModeForm : RForm
 					"PL2" => perfModeSettings with
 					{
 						Pl2 = result
+					}, 
+					// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：键 = `SmuStapmTimeSeconds`，单位秒；
+					//   只有 30 系那一行会 Queue 它（其它机型不会出现该键）。
+					"SmuStapmTimeSeconds" => perfModeSettings with
+					{
+						StapmTimeSeconds = result
 					}, 
 					"PL4" => perfModeSettings with
 					{
@@ -3902,6 +3996,18 @@ public class CustomModeForm : RForm
 			{
 				ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1);
 				ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2);
+				// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：行存在时按"当前值"刷新
+				//   （写成功后 `NoteBaolongdaSmuStapmTimeApplied` 会把它更新成刚下发的值；
+				//     否则是最近一次 PM 表只读采样的值）。⚠️ 行不存在 ⇒ 一个控件都不碰（不存在的东西不刷新）。
+				if (_stapmTime != null)
+				{
+					int stapmTimeNow = hw.BaolongdaStapmTimeSeconds;
+					if (stapmTimeNow > 0)
+					{
+						ApplyRange(_stapmTime, _stapmTimeVal, BaolongdaProfile.StapmTimeMinSeconds,
+							BaolongdaProfile.StapmTimeMaxSeconds, stapmTimeNow);
+					}
+				}
 				// ⭐⭐ 2026-10-16（"未设置"）：⭐ 值一旦下发过 ⇒ ⭐ 把标题里的「（未设置）」**去掉** ✅
 				//   ⚠️ **只减不增** —— ⭐ 标题列宽是**建窗体时**按最长标题算好的（⭐ 见 `_pl1Label` 的注释 ⚠️）
 				//      ⇒ ⭐ 变短安全、⛔ 变长会裁字 ⇒ ⭐ 本方法只允许移除标记、⛔ 绝不添加 ✅

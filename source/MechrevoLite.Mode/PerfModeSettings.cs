@@ -33,6 +33,15 @@ public sealed record PerfModeSettings
 
 	public int? TccTarget { get; init; }
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：STAPM（按机壳温度的持续功耗）的**平均时间窗**，单位**秒**。
+	/// <para>⚠️ 只在「宝龙达 30 系」上由 UI 写入（30 系没有 WMI 功能号 23 ⇒ 自定义模式的 PL/温度墙走 SMU；
+	/// 40 系不建这一行、本字段保持 null）。</para>
+	/// <para>⚠️ 它不是 "PL2 生效时间"：PL2（fast limit）是瞬时限值、没有时间参数；
+	/// SMU 侧只有 <c>stapm_time</c>（本字段）与 <c>slow_time</c>（平均功耗时间常数）两个时间窗。</para>
+	/// </summary>
+	public int? StapmTimeSeconds { get; init; }
+
 	public bool? GpuOverclockOn { get; set; }
 
 	public int? GpuCoreOffset { get; set; }

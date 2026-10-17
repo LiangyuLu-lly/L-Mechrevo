@@ -1276,6 +1276,11 @@ public class MechrevoService
 			return _hw.SupportsFanSwitchSpeed && InRange(result, _hw.FanSwitchSpeedMinimum, _hw.FanSwitchSpeedMaximum);
 		case "CpuTccOffset":
 			return _hw.TccAdjustable && InRange(result, _hw.TccMinimum, _hw.TccMaximum);
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：范围与 UI 同源（BaolongdaProfile 常量），
+		//   ⚠️ 只对「宝龙达 30 系」有效（40 系没有这一行、也不该被这个键写）。
+		case "SmuStapmTimeSeconds":
+			return _hw.IsBaolongda30Series
+				&& InRange(result, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds);
 		case "GpuConfigurableTGPTarget":
 			return _hw.GpuTgpAdjustable && InRange(result, _hw.GpuTgpMinimum, _hw.GpuTgpMaximum);
 		case "GpuDynamicBoost":
@@ -1365,6 +1370,8 @@ public class MechrevoService
 			"FanSwitchSpeedEnabled" => _hw.FanSwitchSpeedEnabled == (result == 1), 
 			"FanSwitchSpeed" => _hw.FanSwitchSpeed == _hw.QuantiseFanSwitchSpeed(result), 
 			"CpuTccOffset" => _hw.TccTarget == result, 
+			// ⭐⭐ 2026-10-19（30 系 · SMU 时间窗）：本地记忆（写成功后更新）与下发值一致
+			"SmuStapmTimeSeconds" => _hw.BaolongdaStapmTimeSeconds == result, 
 			"GpuConfigurableTGPTarget" => _hw.GpuTgp == result, 
 			"GpuDynamicBoost" => _hw.GpuDb == result, 
 			"GpuCoreClockOffsetOC" => _hw.EffectiveGpuCoreClockOffset == result, 
@@ -3875,7 +3882,10 @@ public class MechrevoService
 		bool isPl1 = string.Equals(key, "PL1", StringComparison.Ordinal);
 		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
 		bool isTempWall = string.Equals(key, "CpuTccOffset", StringComparison.Ordinal);
-		if (!isPl1 && !isPl2 && !isTempWall)
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：新增键 `SmuStapmTimeSeconds`（单位**秒**）。
+		//   ⚠️ 只有 30 系 UI 会发出它（40 系不建那一行）; ⛔ 名字里带 Seconds 是为了在调用点一眼看清单位。
+		bool isStapmTime = string.Equals(key, "SmuStapmTimeSeconds", StringComparison.Ordinal);
+		if (!isPl1 && !isPl2 && !isTempWall && !isStapmTime)
 		{
 			return false; // ⭐ 别的键不归本方法管 ✅
 		}
@@ -3883,6 +3893,13 @@ public class MechrevoService
 		{
 			Logger.WriteLine($"宝龙达 功耗墙：⭐ 键 {key} 的值 \"{rawValue}\" 不是整数 ⇒ 跳过 ⚠️");
 			return true; // ⭐ 已接管 ⇒ ⛔ 不让它走 GCU ✅
+		}
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：30 系**没有** WMI 功能号 23（原厂方法表只到 18）
+		//   ⇒ ⭐ PL1 / PL2 / 温度墙 / 时间窗**只能走 SMU** ✅
+		//   ⚠️ 40 系（宝龙达 `MRID6-23`）有功能号 23 ⇒ ⭐ 继续走下面的原 WMI 路径，**行为不变** ✅
+		if (hw.IsBaolongda30Series)
+		{
+			return ApplyPowerLimitViaSmu(hw, isPl1, isPl2, isTempWall, isStapmTime, result);
 		}
 		// ⭐ 三个值取"现值（⭐ 本地记忆 ✅）"，⭐ 只覆盖这次要改的那一个 ✅
 		int pl1 = hw.Pl1;
@@ -3929,6 +3946,226 @@ public class MechrevoService
 			+ $" · ⭐ 下发 PL1={ShowPowerValue(pl1)} PL2={ShowPowerValue(pl2)} 温度墙={ShowTempValue(tempWallC)}"
 			+ $" · ⭐ 写成功={confirmed}（⚠️ ⛔ 非「数值已生效」）⇒ ⭐ 该项未发 MQTT ✅");
 		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：把 PL1 / PL2 / 温度墙 / STAPM 时间窗下发到 **SMU**。
+	/// <para>⭐ 为什么 30 系必须走这里：30 系原厂 WMI 方法表**只到 18** ⇒ **没有**功能号 23
+	/// （`CPUPower`）⇒ 40 系那条 `TryApplyCpuPowerLimitViaBackend`（WMI）在 30 系上**根本不存在**。</para>
+	/// <para>⭐ 映射（与任务书一致）：<c>PL1 → slow limit + stapm limit（同值）</c> ·
+	/// <c>PL2 → fast limit</c> · <c>CpuTccOffset（温度墙）→ tctl_temp</c> ·
+	/// <c>SmuStapmTimeSeconds → stapm_time（秒）</c>。</para>
+	/// <para>⚠️ <b>先读再写</b>：30 系 SMU **能读**当前值（PM 表）⇒ 下发前先 <see cref="MechrevoHw.RefreshBaolongda30SeriesSmuPower" />
+	/// 把"没被这次改动的另外两项"填成真实当前值，⛔ 不拿 0/编造值去凑（也就避免把另一项意外写坏）。</para>
+	/// <para>⚠️ <b>失败方向（如实）</b>：PawnIO/SMU 不可用、读不到基线、任何一条命令非 <c>OK</c> ⇒
+	/// 写日志 + 返回 <c>false</c>（调用方会显示「未生效」，⛔ 不假装成功）。</para>
+	/// <para>⚠️ 只读/只写本机 SMU；⛔ 不发 MQTT、⛔ 不碰 EC。</para>
+	/// </summary>
+	private bool ApplyPowerLimitViaSmu(MechrevoHw hw, bool isPl1, bool isPl2, bool isTempWall, bool isStapmTime, int result)
+	{
+		PawnIO.RyzenSmuService smu = MechrevoLite.Mode.ModeControl.SharedSmu;
+		if (smu == null)
+		{
+			Logger.WriteError("[smu-30] 30 系功耗墙**未下发**：PawnIO/SMU 不可用（需要管理员权限、AMD 平台）⇒ 如实失败");
+			return false;
+		}
+		// ① 先只读刷新当前值（30 s 内复用 UI 打开时读到的快照；读不到就现场读一次）。
+		//    目的：⭐ 只改一项时，另外两项用**真实当前值**做基线，⛔ 不拿 0/编造值去覆盖。
+		bool refreshed = hw.RefreshBaolongda30SeriesSmuPower();
+		int pl1 = isPl1 ? result : hw.Pl1;
+		int pl2 = isPl2 ? result : hw.Pl2;
+		int tempWallC = isTempWall ? ((result <= 0) ? 0 : result) : ((hw.TccTarget > 0) ? hw.TccTarget : 0);
+		int stapmTime = isStapmTime ? result : 0;
+		// ② 取值夹取（与 WMI 路径同一组范围；⛔ 不写 0 = "未设置"）
+		if (pl1 > 0)
+		{
+			pl1 = Math.Clamp(pl1, BaolongdaProfile.PlMinWatts, BaolongdaProfile.Pl1MaxWatts);
+		}
+		if (pl2 > 0)
+		{
+			pl2 = Math.Clamp(pl2, BaolongdaProfile.PlMinWatts, BaolongdaProfile.Pl2MaxWatts);
+		}
+		if (tempWallC > 0)
+		{
+			tempWallC = Math.Clamp(tempWallC, BaolongdaProfile.TccMinCelsius, BaolongdaProfile.TccMaxCelsius);
+		}
+		if (isStapmTime)
+		{
+			if (stapmTime < BaolongdaProfile.StapmTimeMinSeconds || stapmTime > BaolongdaProfile.StapmTimeMaxSeconds)
+			{
+				Logger.WriteError($"[smu-30] 功耗时间窗拒绝下发：{stapmTime}s 不在 UI/校验区间 "
+					+ $"[{BaolongdaProfile.StapmTimeMinSeconds},{BaolongdaProfile.StapmTimeMaxSeconds}]s（⛔ 不猜语义）⇒ 如实失败");
+				return false;
+			}
+		}
+		// ③ 一条都不发（三项都未设置、也没改时间窗）⇒ 与 WMI 路径同口径：已接管、不假装写了
+		if (pl1 <= 0 && pl2 <= 0 && tempWallC <= 0 && !isStapmTime)
+		{
+			Logger.WriteError("[smu-30] 30 系功耗墙：⚠️ PL1／PL2／温度墙都未设置 ⇒ 本次**不下发任何 SMU 命令**"
+				+ "（⛔ 不编造默认值）—— 这是如实行为、⛔ 不是失败");
+			return true;
+		}
+		// ④ 逐项下发；每一条都必须回 OK
+		bool ok = true;
+		bool wrotePl1 = false;
+		bool wrotePl2 = false;
+		bool wroteWall = false;
+		bool wroteTime = false;
+		string pl1Status;
+		string pl2Status;
+		if (pl1 > 0 && pl2 > 0)
+		{
+			// ⭐ 正常路径（两项都已知）：按任务书口径一次下发三项 —— PL1 同时写 slow 与 stapm
+			smu.SetAllLimits(pl1, pl2, pl1, out PawnIO.SmuStatus stapmStatus, out PawnIO.SmuStatus fastStatus, out PawnIO.SmuStatus slowStatus);
+			pl1Status = $"stapm={stapmStatus}/slow={slowStatus}";
+			pl2Status = fastStatus.ToString();
+			ok = stapmStatus == PawnIO.SmuStatus.OK && fastStatus == PawnIO.SmuStatus.OK && slowStatus == PawnIO.SmuStatus.OK;
+			wrotePl1 = stapmStatus == PawnIO.SmuStatus.OK && slowStatus == PawnIO.SmuStatus.OK;
+			wrotePl2 = fastStatus == PawnIO.SmuStatus.OK;
+			if (!ok)
+			{
+				Logger.WriteError($"[smu-30] PL 下发未全部成功：stapm={stapmStatus}(0x{(uint)stapmStatus:X2}) "
+					+ $"fast={fastStatus}(0x{(uint)fastStatus:X2}) slow={slowStatus}(0x{(uint)slowStatus:X2})");
+			}
+			if (wrotePl1 || wrotePl2)
+			{
+				hw.NoteBaolongdaSmuLimitsApplied(wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0, 0);
+			}
+		}
+		else
+		{
+			// ⭐ 只知一项（读基线失败 / 另一项确实未设置）：只写这一项，⛔ 不拿 0 去覆盖另一项
+			pl1Status = "未写";
+			pl2Status = "未写";
+			if (pl1 > 0)
+			{
+				PawnIO.SmuStatus st = smu.SetStapmLimit(pl1);
+				PawnIO.SmuStatus sl = smu.SetSlowLimit(pl1);
+				pl1Status = $"stapm={st} slow={sl}";
+				wrotePl1 = st == PawnIO.SmuStatus.OK && sl == PawnIO.SmuStatus.OK;
+				ok &= wrotePl1;
+				if (wrotePl1)
+				{
+					hw.NoteBaolongdaSmuLimitsApplied(pl1, 0, 0);
+				}
+			}
+			if (pl2 > 0)
+			{
+				PawnIO.SmuStatus sf = smu.SetFastLimit(pl2);
+				pl2Status = sf.ToString();
+				wrotePl2 = sf == PawnIO.SmuStatus.OK;
+				ok &= wrotePl2;
+				if (wrotePl2)
+				{
+					hw.NoteBaolongdaSmuLimitsApplied(0, pl2, 0);
+				}
+			}
+		}
+		// 温度墙（Tctl 上限，SMU 0x19）
+		string wallStatus = "未写";
+		if (tempWallC > 0)
+		{
+			PawnIO.SmuStatus wallResult = smu.SetTctlTemp(tempWallC);
+			wallStatus = wallResult.ToString();
+			wroteWall = wallResult == PawnIO.SmuStatus.OK;
+			ok &= wroteWall;
+			if (wroteWall)
+			{
+				hw.NoteBaolongdaSmuLimitsApplied(0, 0, tempWallC);
+			}
+			else
+			{
+				Logger.WriteError($"[smu-30] 温度墙下发失败：tctl={tempWallC}℃ ⇒ SMU {wallResult}(0x{(uint)wallResult:X2})");
+			}
+		}
+		// STAPM 时间窗（秒）—— 只有本次明确改了它才写（⛔ 不把"没改"当成"要重写"）
+		string timeStatus = "未写";
+		if (isStapmTime)
+		{
+			PawnIO.SmuStatus timeResult = smu.SetStapmTimeSeconds(stapmTime);
+			timeStatus = timeResult.ToString();
+			wroteTime = timeResult == PawnIO.SmuStatus.OK;
+			ok &= wroteTime;
+			if (wroteTime)
+			{
+				hw.NoteBaolongdaSmuStapmTimeApplied(stapmTime);
+			}
+			else
+			{
+				Logger.WriteError($"[smu-30] 功耗时间窗下发失败：stapm_time={stapmTime}s ⇒ SMU {timeResult}(0x{(uint)timeResult:X2})");
+			}
+		}
+		// ⑤ **写入后回读确认**（任务硬性约束：任何写入后必须回读确认）——
+		//   ⭐ 用 PM 表再读一次（强制刷新），逐项比对刚下发的值。
+		//   ⚠️ 回读失败 / 对不上 ⇒ 如实返回 false（⛔ 不把"命令回 OK"当成"值已生效"）。
+		bool verified = false;
+		string verifyDetail;
+		if (!ok)
+		{
+			verifyDetail = "未回读（有下发失败项）";
+		}
+		else if (!wrotePl1 && !wrotePl2 && !wroteWall && !wroteTime)
+		{
+			verified = true;
+			verifyDetail = "无写入（无需回读）";
+		}
+		else
+		{
+			verified = VerifyBaolongdaSmuPower(hw, wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0,
+				wroteWall ? tempWallC : 0, wroteTime ? stapmTime : 0, out verifyDetail);
+		}
+		Logger.WriteError($"[smu-30] 30 系功耗墙（SMU 路径 · 无 WMI 23）：基线刷新={refreshed} "
+			+ $"⇒ PL1(slow+stapm)={ShowPowerValue(pl1)} [{pl1Status}] · PL2(fast)={ShowPowerValue(pl2)} [{pl2Status}] "
+			+ $"· 温度墙(tctl)={ShowTempValue(tempWallC)} [{wallStatus}] "
+			+ $"· STAPM 时间窗={(isStapmTime ? stapmTime + "s" : "未改")} [{timeStatus}] "
+			+ $"⇒ 下发全部 OK={ok} · 回读确认={verified}（{verifyDetail}）"
+			+ (ok && verified ? "" : " ⇒ ⚠️ 如实返回 false"));
+		return ok && verified;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**写入后回读确认** —— 重新读 PM 表，逐项比对刚下发的值
+	/// （容差 ±1；PL1↔slow、PL2↔fast、温度墙↔tctl、时间窗↔stapm_time）。
+	/// <para>⚠️ 只读：一次 PM 表刷新；⛔ 不再写任何东西。</para>
+	/// <para>⚠️ 回读失败（PawnIO/PM 表读不到）或对不上 ⇒ 返回 false（调用方如实报"未生效"）。</para>
+	/// </summary>
+	private bool VerifyBaolongdaSmuPower(MechrevoHw hw, int pl1, int pl2, int tempWallC, int stapmTimeSeconds, out string detail)
+	{
+		detail = string.Empty;
+		// 先给 SMU 一点时间把新值刷进 PM 表；再最多读 3 次（对不上就再等一等）。
+		for (int attempt = 0; attempt < 3; attempt++)
+		{
+			if (attempt > 0)
+			{
+				Thread.Sleep(200);
+			}
+			if (!hw.RefreshBaolongda30SeriesSmuPower(force: true))
+			{
+				detail = $"第 {attempt + 1} 次回读失败（PM 表读不到）";
+				continue;
+			}
+			PawnIO.SmuPowerSnapshot snapshot = hw.BaolongdaSmuSnapshot;
+			if (snapshot == null)
+			{
+				detail = $"第 {attempt + 1} 次回读失败（没有快照）";
+				continue;
+			}
+			int readPl1 = (int)Math.Round(snapshot.Slow, MidpointRounding.AwayFromZero);
+			int readPl2 = (int)Math.Round(snapshot.Fast, MidpointRounding.AwayFromZero);
+			int readWall = (int)Math.Round(snapshot.TctlTemp, MidpointRounding.AwayFromZero);
+			int? readTime = snapshot.StapmTimeSeconds;
+			bool matchPl1 = (pl1 <= 0) || Math.Abs(readPl1 - pl1) <= 1;
+			bool matchPl2 = (pl2 <= 0) || Math.Abs(readPl2 - pl2) <= 1;
+			bool matchWall = (tempWallC <= 0) || Math.Abs(readWall - tempWallC) <= 1;
+			bool matchTime = (stapmTimeSeconds <= 0) || (readTime.HasValue && Math.Abs(readTime.Value - stapmTimeSeconds) <= 1);
+			detail = $"读回 PL1(slow)={readPl1}W PL2(fast)={readPl2}W tctl={readWall}℃ stapm_time={(readTime.HasValue ? readTime.Value + "s" : "?")} "
+				+ $"⇒ 一致 PL1={matchPl1} PL2={matchPl2} 温度墙={matchWall} 时间窗={matchTime}（第 {attempt + 1} 次）";
+			if (matchPl1 && matchPl2 && matchWall && matchTime)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/// <summary>⭐ 把"未设置"（⭐ ≤0）如实打成「未设置」、⛔ 不打成 0 ✅。</summary>

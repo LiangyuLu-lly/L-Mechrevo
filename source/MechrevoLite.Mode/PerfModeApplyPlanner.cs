@@ -170,6 +170,13 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：⭐ 第 4 个键，只有「宝龙达 30 系」生成
+			//   （`SupportsSmuPowerTimeWindow` 默认 false ⇒ GCU/老接口/40 系步骤列表逐位不变 ✅）。
+			//   ⚠️ 单位 = **秒**；它是 STAPM 的平均时间窗，不是"PL2 生效时间"（见 PerfModeSettings 注释）。
+			if (caps.SupportsSmuPowerTimeWindow && settings.StapmTimeSeconds.HasValue)
+			{
+				list.Add(Field("SmuStapmTimeSeconds", settings.StapmTimeSeconds.Value));
+			}
 		}
 		// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线本地化）：⭐ 无固件槽的后端**不产生** GCU 的
 		//   `WriteFanCurve`（上面那个大块整块跳过），但风扇曲线**能**走本机软件闭环（功能号 20/21）✅

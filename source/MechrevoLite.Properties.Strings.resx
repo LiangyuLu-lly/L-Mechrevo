@@ -677,6 +677,21 @@
     
   
   </data>
+<data name="CpuPl1Hint" xml:space="preserve">
+    <value>Sustained power limit in watts. The average power the processor holds during sustained load.</value>
+  </data>
+<data name="CpuPl2Hint" xml:space="preserve">
+    <value>Short-term/peak power limit in watts. Burst loads can briefly boost to a higher power.</value>
+  </data>
+<data name="CpuStapmTimeWindow" xml:space="preserve">
+    <value>Power time window (STAPM, s)</value>
+  </data>
+<data name="CpuStapmTimeWindowHint" xml:space="preserve">
+    <value>Averaging window for skin-temperature-aware sustained power, in seconds. Larger values smooth power changes out.</value>
+  </data>
+<data name="CpuTempWallHint" xml:space="preserve">
+    <value>Processor temperature limit in °C. The CPU throttles when it reaches this temperature.</value>
+  </data>
 <data name="CpuPl4" xml:space="preserve">
     
     

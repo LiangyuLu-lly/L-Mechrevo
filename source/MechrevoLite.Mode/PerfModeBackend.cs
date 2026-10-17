@@ -57,7 +57,11 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//        ⇒ 它开头那个 `TryApplyPowerLimitViaBackend` ⇒ `TryApplyCpuPowerLimitViaBackend` ✅）
 			//   ⇒ ⭐ 所以单独申报：⭐ 宝龙达 ⇒ true ⇒ ⭐ 规划器额外生成那三步 ✅
 			//   ⚠️ 非宝龙达 ⇒ false ⇒ ⭐ 那三步仍留在原固件字段块里 ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsWmiPowerFields = hw.UsesBaolongda
+			SupportsWmiPowerFields = hw.UsesBaolongda,
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：⭐ 只有「宝龙达 30 系」才生成
+			//   `SmuStapmTimeSeconds` 这一步（30 系没有 WMI 23、PL/温度墙/时间窗走 SMU ✅）
+			//   ⚠️ 40 系 / GCU / 老接口 ⇒ false ⇒ ⭐ 步骤列表【一个字节都不变】✅
+			SupportsSmuPowerTimeWindow = hw.IsBaolongda30Series
 		};
 	}
 
