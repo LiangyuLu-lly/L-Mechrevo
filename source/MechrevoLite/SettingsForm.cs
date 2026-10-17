@@ -16138,17 +16138,39 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			//   ⚠️ 而 EffectsForCurrentBackend 对**所有**灯光行都返回同一张 4 项表
 			//      ⇒ ⭐ LOGO 行会露出这 4 项 ⇒ ⭐ 点了不会有效果（违反能力位铁律）❌
 			//   ⇒ ⭐ 宝龙达下 **LOGO 行不显示效果下拉**（只保留开/关开关）✅；非宝龙达 ⭐ 逐位不变 ✅。
-			bool logoRowNoEffect = rowName == "rowLogo" && (Program.hw?.UsesBaolongda ?? false);
+			// ⭐⭐ 2026-10-17（真机反馈「氛围灯/灯带有点但无效」）：⭐ 宝龙达下**非键盘灯**的行都没有效果通路 ⚠️
+			//   ① TrySetLightEffectViaBackend 只认 Keyboard/ 前缀，其余交回 GCU —— 而宝龙达**没有 GCU**
+			//   ② EffectsForCurrentBackend **不区分 topic** ⇒ 灯带/铰链/同步三行也被替换成键盘灯那 4 项（语义完全不对）
+			//   ③ LOGO 灯协议里只有一个字节功能号 15（AmbientLight 0/1），没有颜色/效果/亮度/速度/帧率/角度
+			//   ⇒ ⭐ 宝龙达下**非键盘灯**的行：隐藏效果下拉 + 隐藏「编辑」按钮 + 收掉那两列宽度
+			//      ⭐ 行本身**保留**（LightExtraRowAvailable() 恒 true 是刻意的"判据判错时的后路"，
+			//         用户还能改 light_strip_ui / light_logo_ui —— 这条设计不动 ✅）
+			//   ⚠️ 非宝龙达 / 键盘灯 ⇒ 恒 false ⇒ **逐位不变** ✅
+			bool baolongdaNonKeyboard = (Program.hw?.UsesBaolongda ?? false)
+				&& !topic.StartsWith("Keyboard/", StringComparison.OrdinalIgnoreCase);
 			TableLayoutPanel tableLayoutPanel3 = MakeRow(rowName);
 			FillRow(tableLayoutPanel3, label, out var sw2, out var effectCombo2, () =>
 			{
 				OpenLightForm(topic, title, effects);
 			});
 			storeControls(sw2, effectCombo2);
-			if (logoRowNoEffect)
+			if (baolongdaNonKeyboard)
 			{
-				// ⚠️ 只隐藏下拉，⛔ 不删控件、⛔ 不改开关逻辑、⛔ 不动任何下发
+				// ⚠️ 只改 Visible 与列宽，⛔ 不删控件、⛔ 不改开关逻辑、⛔ 不动任何下发
 				effectCombo2.Visible = false;
+				foreach (Control child in tableLayoutPanel3.Controls)
+				{
+					// 第 3 列（0 基）＝「编辑」按钮 —— 隐藏它，否则点进去还是满屏无效项
+					if (tableLayoutPanel3.GetColumn(child) == 3)
+					{
+						child.Visible = false;
+					}
+				}
+				// 列宽：原 22/10/56/12 ⇒ 收掉 56% 与 12% 两列，标签/开关重分 80%/20%（否则留一大块空白）
+				tableLayoutPanel3.ColumnStyles[0] = new ColumnStyle(SizeType.Percent, 80f);
+				tableLayoutPanel3.ColumnStyles[1] = new ColumnStyle(SizeType.Percent, 20f);
+				tableLayoutPanel3.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, 0f);
+				tableLayoutPanel3.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
 			}
 			(string, string)[] array2 = effects;
 			for (int num3 = 0; num3 < array2.Length; num3++)
