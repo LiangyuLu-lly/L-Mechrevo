@@ -2386,8 +2386,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		return key switch
 		{
 			"touchpad" => true, 
-			"wifi" => WifiSeen, 
-			"bt" => BluetoothSeen, 
+			"wifi" => WifiSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Wifi)), 
+			"bt" => BluetoothSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Bluetooth)), 
 			"webcam" => WebcamSeen, 
 			"winkey" => WinKeySeen, 
 			"fnkey" => FnKeySeen || UsesBaolongda, 
@@ -4441,6 +4441,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//    ⇒ ⭐ 现在统一走 `BuildCapabilities()` ✅（⭐ 与 GCU 那条支的风格一致：⭐
 		//      ⭐ `RefreshDeviceCapabilities` 也是从 `MechrevoDeviceCapabilities` 一处产出 ✅）
 		Capabilities = backend.BuildCapabilities();
+		// ⭐⭐ 2026-10-17（WiFi / 蓝牙 · 本地开关）：⭐ 启动 Windows Radio 的后台轮询（3 s 一次）
+		//   ⚠️ 只在宝龙达后端启动 ⇒ GCU 机型**不会**跑这个轮询（行为逐位不变 ✅）
+		RadioSwitch.Start();
+		// ⭐ 可用性变化（例如首次探测到 Radio / 被组策略禁用）⇒ 让界面重新评估这两个开关是否显示
+		RadioSwitch.AvailabilityChanged = delegate
+		{
+			RaiseIsolated(DataChanged, "DataChanged");
+		};
 		// ⭐⭐ 2026-10-16（"全部接入"第 3 步 · 功耗墙 · ⭐ 方案文档第 17 节）：
 		//   ⭐ **关键洞察**：⭐ 界面上的滑块读的是**已有属性**
 		//      （⭐ `Pl1Minimum`/`Pl1Maximum`/`Pl1` ＋ ⭐ PL2 / Tcc 那一组 ✅）
@@ -4542,6 +4550,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			SyncBaolongdaQuickSwitch("touchpad", snap.TouchpadLock, BaolongdaToggleInverted(BaolongdaWmi.Function.TPLock));
 			// ⚠️ Fn 锁（功能号 11）真机**未定论** ⚠️ ⇒ ⭐ 保持直通、⛔ 不取反 ✅（⭐ 机主只反馈了触摸板 ✅）
 			SyncBaolongdaQuickSwitch("fnkey", snap.FnLock);
+			// ⭐⭐ 2026-10-17（WiFi / 蓝牙 · 本地 Radio）：⭐ 宝龙达没有 GCU ⇒ 这两个状态由
+			//   Windows 的 Radio 提供（⭐ 依据：40 系 GCU 反编译里也是 `Windows.Devices.Radios` ✅）。
+			//   ⚠️ 只同步**读到**的；读不到就不动界面（⭐ 保持"未知"比谎报好 ✅）
+			if (RadioSwitch.Available(RadioSwitchKind.Wifi) && RadioSwitch.TryGet(RadioSwitchKind.Wifi, out bool wifiOn, out string wifiNote))
+			{
+				if (!QuickSwitches.TryGetValue("wifi", out bool wifiCur) || wifiCur != wifiOn)
+				{
+					QuickSwitches["wifi"] = wifiOn;
+					Logger.WriteLine($"宝龙达状态回读：⭐ wifi ⇒ {(wifiOn ? "开" : "关")}（⭐ 来源：Windows Radio · {wifiNote} ✅）");
+				}
+			}
+			if (RadioSwitch.Available(RadioSwitchKind.Bluetooth) && RadioSwitch.TryGet(RadioSwitchKind.Bluetooth, out bool btOn, out string btNote))
+			{
+				if (!QuickSwitches.TryGetValue("bt", out bool btCur) || btCur != btOn)
+				{
+					QuickSwitches["bt"] = btOn;
+					Logger.WriteLine($"宝龙达状态回读：⭐ bt ⇒ {(btOn ? "开" : "关")}（⭐ 来源：Windows Radio · {btNote} ✅）");
+				}
+			}
 			// ⭐⭐ 2026-10-16（OSD 提示 · 本地方案）：⭐ 这个开关的状态**来自本地配置** ✅
 			//   ⛔ **刻意不走** SyncBaolongdaQuickSwitch —— ⭐ 那条日志会写「⭐ 由硬件真实状态同步而来」❌，
 			//      ⭐ 而 OSD 根本没走硬件 ⚠️ ⇒ ⭐ 用它会**谎报来源** ✅（⭐ 本会话的纪律：⭐ 日志必须如实 ✅）。

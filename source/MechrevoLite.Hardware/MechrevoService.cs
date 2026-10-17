@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MechrevoLite.Display;
 using MechrevoLite.Gpu;
+using MechrevoLite.Helpers;
 using MechrevoLite.Mode;
 using Microsoft.Win32;
 using Probe;
@@ -2823,6 +2824,24 @@ public class MechrevoService
 					Logger.WriteLine($"SwitchQuick({key},{on}) ⭐ 走宝龙达 WMI ⇒ 确认={baolongdaOk}（⛔ 未发任何 MQTT ✅）");
 					return baolongdaOk;
 				}
+			}
+			// ⭐⭐ 2026-10-17（WiFi / 蓝牙 · 本地开关）：⭐ 宝龙达没有 GCU ⇒ 走 Windows Radio ✅
+			//   ⭐ 依据（40 系 GCU 反编译，只取做法）：`DeviceSwitchItem.cs` 用 `Windows.Devices.Radios` 切这两个 ✅
+			//   ⚠️ 仅 `UsesBaolongda` 分派 ⇒ GCU 机型的 `WIFI_ON/OFF`、`BT_ON/OFF` 那条 MQTT 路径**逐位不变** ✅
+			if (_hw.UsesBaolongda
+				&& (string.Equals(key, "wifi", StringComparison.Ordinal) || string.Equals(key, "bt", StringComparison.Ordinal)))
+			{
+				RadioSwitchKind radioKind = string.Equals(key, "wifi", StringComparison.Ordinal)
+					? RadioSwitchKind.Wifi
+					: RadioSwitchKind.Bluetooth;
+				if (RadioSwitch.Available(radioKind))
+				{
+					(bool radioOk, string radioNote) = await RadioSwitch.SetAsync(radioKind, on).ConfigureAwait(continueOnCapturedContext: false);
+					Logger.WriteLine($"SwitchQuick({key},{on}) ⭐ 走本地 Radio（Windows.Devices.Radios）⇒ 确认={radioOk}（{radioNote}）");
+					return radioOk;
+				}
+				Logger.WriteLine($"SwitchQuick({key},{on})：⚠️ 本地 Radio 不可用（未探测到或无访问权限）⇒ 不下发");
+				return false;
 			}
 			// ⭐⭐ 2026-10-16（宝龙达 · OSD 提示）：⭐ 走**本地实现**（⭐ 它连 WMI 都不用 ✅）
 			//   ⭐ 机主原话「⭐ OSD显示开关不可用（⭐ LM好像有自己的OSD部分 ✅）」⇒ ⭐ 让这个开关管 LM 自己的 OSD ✅
