@@ -4572,6 +4572,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Logger.WriteLine($"宝龙达状态回读：⭐ bt ⇒ {(btOn ? "开" : "关")}（⭐ 来源：Windows Radio · {btNote} ✅）");
 				}
 			}
+			// ⭐⭐ 2026-10-17（「高性能电源」开关 · 无 GCU）：⭐ 状态来自 LM 自己的开关
+			//   （AppConfig bd_power_overlay）——原来只有 GCU 那条 `HighPerformancePowerModeSwitch` 回包会写它
+			//   ⇒ 宝龙达上永远读不到 ⇒ 开关看起来"点不动" ✅
+			{
+				bool hiOn = MechrevoLite.Mode.PerfModeService.Instance?.WindowsPowerOverlayEnabled ?? true;
+				if (!QuickSwitches.TryGetValue("highperf", out bool hiCur) || hiCur != hiOn)
+				{
+					QuickSwitches["highperf"] = hiOn;
+					Logger.WriteLine($"宝龙达状态回读：⭐ highperf ⇒ {(hiOn ? "开" : "关")}（⭐ 来源：LM 配置 bd_power_overlay）");
+				}
+			}
 			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 状态来自注册表 ConsentStore（桌面应用那一项优先）
 			if (CameraPrivacy.TryGetDenied(out bool camDenied, out string camNote))
 			{
