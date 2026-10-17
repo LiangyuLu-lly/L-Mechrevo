@@ -347,25 +347,39 @@ public class RgbForm : RForm
 
 	private LightChannelSettings GcuSettings()
 	{
-		return LightingSettingsStore.Load("Keyboard/Ctrl", KeyboardFirmwareEffects.All[0].Id);
+		LightChannelSettings settings = LightingSettingsStore.Load("Keyboard/Ctrl", KeyboardFirmwareEffects.All[0].Id);
+		// ⭐ 2026-10-17（宝龙达 · 模式 3 写不进）：⭐ 旧配置里可能还存着 Manual
+		//   ⇒ ⭐ 读出来一律收敛到本机真能写的那三项（Manual → Single 固定色），
+		//      ⛔ 不再把不存在的模式 3 当选项显示/下发 ✅；⚠️ 非宝龙达原样返回 ⇒ 逐位不变 ✅
+		if (Program.hw?.UsesBaolongda == true)
+		{
+			settings = settings with { Effect = BaolongdaProfile.NormalizeKeyboardEffect(settings.Effect) };
+		}
+		return settings;
 	}
 
 	private string ResolveGcuEffect(LightChannelSettings stored)
 	{
+		string effect;
 		if (LightingSettingsStore.TryLoad("Keyboard/Ctrl", out var settings) && KeyboardFirmwareEffects.Contains(settings.Effect))
 		{
-			return settings.Effect;
+			effect = settings.Effect;
 		}
-		string text = Program.hw?.KeyboardEffect ?? "";
-		if (KeyboardFirmwareEffects.Contains(text))
+		else
 		{
-			return text;
+			string text = Program.hw?.KeyboardEffect ?? "";
+			if (KeyboardFirmwareEffects.Contains(text))
+			{
+				effect = text;
+			}
+			else
+			{
+				effect = (KeyboardFirmwareEffects.Contains(stored.Effect) ? stored.Effect : KeyboardFirmwareEffects.All[0].Id);
+			}
 		}
-		if (!KeyboardFirmwareEffects.Contains(stored.Effect))
-		{
-			return KeyboardFirmwareEffects.All[0].Id;
-		}
-		return stored.Effect;
+		// ⭐ 2026-10-17（宝龙达 · Manual 已撤掉）：⭐ 亮度/颜色操作会把这个效果 Id 写回配置，
+		//   ⛔ 不要因为它来自 stats/GCU 就绕过收敛 ⇒ ⭐ 宝龙达下一律回到可写三项 ✅
+		return (Program.hw?.UsesBaolongda == true) ? BaolongdaProfile.NormalizeKeyboardEffect(effect) : effect;
 	}
 
 	private void PersistGcuLightAndPublishBrightness(int light0to4)
@@ -452,7 +466,14 @@ public class RgbForm : RForm
 			MechrevoHw hw = Program.hw;
 			if (hw != null && hw.IsConnected)
 			{
-				Color? singleColor = ((settings.Effect == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null));
+				// ⭐ 2026-10-17（真机「颜色改不了 / 每次下发 rgb=#FFFFFF」）：
+				//   ① 宝龙达 WMI 只有功能号 17 的 3 字节 RGB ⇒ **预设色板必须换算成真实 ARGB**
+				//      （原来预设只写 MonochromeIndex，ColorArgb 仍是默认白 ⇒ 下发恒白 ❌）；
+				//   ② 宝龙达下不再按 effect=="Single" 决定是否带色 —— 模式 2（固定色）＋ 功能号 17
+				//      就是这条通道的全部颜色语义 ✅；⚠️ 非宝龙达仍走原判据 ⇒ 逐位不变 ✅
+				Color? singleColor = (baolongdaSkipGate
+					? new Color?(Color.FromArgb(settings.EffectiveColorArgb()))
+					: ((settings.Effect == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null)));
 				Program.service.SetKeyboardEffect(settings.Effect, settings.Light, settings.Speed, "None", singleColor, save: true);
 			}
 		}
@@ -945,7 +966,10 @@ public class RgbForm : RForm
 		if (IsGcuKeyboardFallback())
 		{
 			BuildGcuFirmwareParams();
-			SetStatus(Strings.KeyboardControllerUnsupported);
+			// ⭐ 2026-10-17（宝龙达 MRID6）：本机没有 GCU，但键盘灯走厂商 WMI（功能号 16/17/18），
+			//   ⭐ 是一条**真实可用的软件通道** ⇒ ⛔ 不再显示「控制器不支持软件灯效控制」❌
+			//   ⚠️ 其它机型保持原样（同一句提示照旧）✅
+			SetStatus((Program.hw?.UsesBaolongda == true) ? string.Empty : Strings.KeyboardControllerUnsupported);
 			if (Program.service != null)
 			{
 				MechrevoHw hw = Program.hw;

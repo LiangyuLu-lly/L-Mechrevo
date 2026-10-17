@@ -565,40 +565,29 @@ public class SettingsForm : RForm
 	private bool _syncingEffectCombos;
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯效表 · ⭐ 用户要求「蛟龙控制台有四个灯效 那就做进去」）：
-	/// ⭐ 宝龙达键盘灯的**模式表 ＝ 四项** ✅（⭐ 这是**全表**：⭐ 下拉、⭐ 索引→Id 映射、
+	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯效表）：
+	/// ⭐ 宝龙达键盘灯的**可写模式表 ＝ 三项** ✅（⭐ 下拉、⭐ 索引→Id 映射、
 	/// ⭐ 点进 LightForm 那扇窗、⭐ 以及下发时的 Id→模式映射 ⭐ **四处共用** ✅）。
 	///
-	/// <para>⭐⭐ <b>来源定性（⭐ 必须写准 —— ⛔ 不得说成"官方支持四种" ⚠️）</b>：
-	/// <list type="bullet">
-	/// <item>✅ <c>Single</c>（模式 <c>2</c> ＝ <c>RGBFixedMode</c>）与 ⭐ <c>Rainbow</c>（模式 <c>1</c> ＝ <c>RGBAutoCyclic</c>）＝ <b>原厂实际使用</b> ✅ ——
-	/// ⚠️ 2026-10-17 按【原厂包】<c>蛟龙游戏控制中心Setup.exe</c>（Bitland 签名 · v0.3.15）的**实际调用点**更正：
-	/// <c>Mode_RGBFixedMode</c> 与 <c>Mode_RGBAutoCyclic</c> **都有真实调用点** ✅（⭐ 与开源 <c>JiaolongControl</c> 对应项亦一致 ✅）</item>
-	/// <item>⚠️ <c>Off</c>（模式 <c>0</c> ＝ <c>Mode_Off</c>）＝ ⭐ 原厂**零调用点** ⚠️ —— ⛔ 原厂**不用模式 0 关灯**（⭐ 关灯 ＝ 写亮度 18 ＝ 0 ✅）＋ <c>Manual</c>
-	/// （模式 <c>3</c> ＝ <c>CustomColors</c>）＝ ⭐ 原厂**枚举中存在、但从不写入** ⚠️（⛔ 不是「社区探索所得」—— ⭐ 四个值原厂枚举里**本来就有** ✅）
-	/// （⭐ 第三方的贡献只是把**原厂未使用的入口**暴露到界面 ✅ ⇒ ⚠️ 此项**完全未验**）
-	/// ⭐ 原厂**定义了但从不写入** ⚠️ ⇒ ⭐ 属**未验证项**（⚠️ 并非「社区探索所得」—— ⭐ 四个值原厂枚举里本来就有 ✅）
-	/// 但 ⭐ **机主那台（MRID6）仍须真机确认** ✅</item>
-	/// </list></para>
+	/// <para>⭐⭐ <b>为什么没有「自定义颜色（Manual）」</b>：
+	/// ⭐ 原厂枚举里模式 <c>3</c> 只定义、从不写入 ⚠️；⭐ 40 系真机（MRID6-23）实测
+	/// **写 3 后回读仍为 2** ⇒ ⭐ 本平台固件**不接受模式 3** ❌
+	/// ⇒ ⭐ 按能力位铁律**不放进界面**（⛔ 不假装支持 ✅）。
+	/// ⭐ 单色统一走 <c>Single</c>（模式 <c>2</c>）＋ 功能号 <c>17</c> 的真实 RGB ✅。</para>
 	///
-	/// <para>⭐ <b>原厂另两条事实</b>（供将来参考）：① 原厂**完全不碰 EC**（<c>DeviceIoControl</c>／<c>WriteIoPort</c>／<c>WinRing</c>／<c>SuperIO</c>／<c>0x2000</c>／<c>0x1060</c> 全零命中，包内 <c>.sys</c>／<c>.inf</c>／<c>.cat</c> 零）⇒ **100% 走 WMI、不装任何内核驱动** ✅；② 原厂**不做回读确认**（只判 <c>InvokeMethod</c> 成功与否）⇒ ⭐ **我们保留回读确认是对的** ✅。③ 原厂语义：**模式 1（自动循环）会禁用颜色选择器、模式 2（固定色）启用** ✅。</para>
-	///
-	/// <para>⚠️ <b>因此四项都要真机验</b>（⭐ 能力位铁律：⭐ **能点的就必须有反应** ✅）——
-	/// ⭐ 其中 <c>1</c>／<c>3</c> **完全未验证** ⚠️ ⇒ ⭐ 若机主反馈"选了没反应"，
-	/// ⭐ 就按能力位把该项**撤掉**（⛔ 不许留着"能点没反应" ✅）。
-	/// ⭐ 关灯**不走本表**：⭐ 关灯 ＝ ⭐ **写亮度（功能号 18）＝ 0** ✅
+	/// <para>⭐ 三项对应 <c>MechrevoHw.TryMapBaolongdaKeyboardMode</c> 的 0／2／1 ✅；
+	/// ⭐ 关灯**不走本表**：⭐ 关灯 ＝ ⭐ <b>写亮度（功能号 18）＝ 0</b> ✅
 	/// （⭐ 见 <c>MechrevoHw.TrySetKeyboardLightingViaBackend</c> ✅）。</para>
 	/// </summary>
-	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[4]
+	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[3]
 	{
 		("Off", Strings.Off),
 		("Single", Strings.EffectSingle),
-		("Rainbow", Strings.EffectRainbow),
-		("Manual", Strings.EffectManual)
+		("Rainbow", Strings.EffectRainbow)
 	};
 
 	/// <summary>
-	/// ⭐ 宝龙达时把任意「声明的效果表」收敛成**本机真能做到的那两项** ✅；
+	/// ⭐ 宝龙达时把任意「声明的效果表」收敛成**本机真能做到的三项** ✅；
 	/// ⭐ 其他机型（⭐ GCU ／ 老同方 ／ 非宝龙达 ✅）**原样返回** ⇒ ⭐ 逐位不变 ✅。
 	/// </summary>
 	private static (string Effect, string Name)[] EffectsForCurrentBackend((string Effect, string Name)[] declared)
@@ -8468,7 +8457,10 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		if (_lblKeyboardControllerStatus != null)
 		{
-			_lblKeyboardControllerStatus.Visible = flag4 && (audit | flag24);
+			// ⭐ 2026-10-17（宝龙达 MRID6）：键盘灯走厂商 WMI（功能号 16/17/18）⇒ 有真实可用的软件通道，
+			//   ⛔ 不再显示「控制器不支持软件灯效控制」❌；⭐ 其它机型保持原样（判据逐位不变）✅
+			_lblKeyboardControllerStatus.Visible = flag4 && (audit | flag24)
+				&& !(Program.hw?.UsesBaolongda ?? false);
 		}
 		_overdriveAvailable = audit | flag12;
 		if (_overdriveChk != null)
@@ -15393,6 +15385,20 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			duty = isCpu ? hw.CpuFanDuty : hw.GpuFanDuty;
 		}
 		float? power = (isCpu ? HardwareControl.cpuPower : HardwareControl.gpuPower);
+		// ⭐⭐ 2026-10-17（真机诊断包 0.291.9.9 定因 · 修「CPU/GPU 功率显示值与实际不符」）：
+		//   ⚠️⚠️ 根因：⭐ `cpuPower`/`gpuPower` 是静态字段、**这里原来没有任何新鲜度判据** ❌
+		//      ⇒ ⭐ 本地采样链一停（⭐ 以前只有自定义模式页/悬浮窗在采样 ⚠️），它们就**冻结在最后一次的值上**、
+		//      ⭐ **一直当实时值显示** ❌ —— 真机日志证据：20:36:29 起 CPU 恒 29 W、GPU 恒 10 W，连续 4 分钟
+		//      **一位都没动**，而同一行的 CPU 温度（60→62℃）与风扇（2241→2757 rpm）一直在变 ⚠️。
+		//   ⭐ 修法：⭐ 只有「⭐ 刚刚真的被刷新过」⭐ 的功耗才显示 ⇒ 超时就不显示（⛔ 不拿冻结值冒充实时值 ✅）。
+		//   ⭐ 现在 `HardwareControl` 有**与界面无关**的常驻采样泵（2.5 s）⇒ 正常情况永远新鲜 ✅；
+		//      ⭐ 只有采样链真的停摆（降级/退出/系统挂起）时才回落到"不显示" ✅。
+		//   ⚠️ 判据只碰"新鲜度"，⛔ **不改任何 W 的换算**（LHM 已是 W；NVML 的 mW 在 `NvmlHelper` 里已 /1000 ✅）；
+		//      ⭐ GCU 机型的温度/风扇仍走厂商值，⛔ 与本判据无关 ✅。
+		if (power.HasValue && !HardwareControl.LocalPowerIsFresh(HardwareControl.LocalPowerFreshAge))
+		{
+			power = null;
+		}
 		// 2026-10-16（方案 A）：三个字段**分开**返回（各占一片）；⛔ 不再在 TelemetryRest 里拼接。
 		bool fanFresh = hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L);
 		bool zeroIsMeaningful = hw.FanZeroIsMeaningful;
@@ -15721,7 +15727,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 								MechrevoHw hw = Program.hw;
 								if (hw != null && hw.IsConnected)
 								{
-									Color? singleColor = ((id == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null));
+									// ⭐ 2026-10-17（真机「颜色改不了 / 下发恒白」）：
+									//   宝龙达 WMI 只有功能号 17 的 3 字节 RGB ⇒ 预设色板也必须换算成真实 ARGB
+									//   （原来只传 ColorArgb ⇒ 选了预设色仍是默认白 ❌）；非宝龙达逐位不变 ✅
+									Color? singleColor = ((Program.hw?.UsesBaolongda == true)
+										? new Color?(Color.FromArgb(settings.EffectiveColorArgb()))
+										: ((id == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null)));
 									sw.Enabled = false;
 									bool flag = await Program.service.SetKeyboardEffect(id, settings.Light, settings.Speed, "None", singleColor, save: true);
 									sw.Enabled = true;
@@ -16164,8 +16175,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			// ⭐⭐ 2026-10-17（真机反馈「氛围灯有颜色设置但无效」）：⭐ 宝龙达的 LOGO 灯**只有【开／关】** ⚠️
 			//   ⭐ 依据：协议里它只有一个字节功能号 15（AmbientLight，0/1）—— ⛔ 没有颜色、⛔ 没有效果、
 			//      ⛔ 没有亮度/帧率/角度/速度（BaolongdaWmi.TrySetLogoLight(on) / TryReadLogoLight(out on) 可证 ✅）。
-			//   ⚠️ 而 EffectsForCurrentBackend 对**所有**灯光行都返回同一张 4 项表
-			//      ⇒ ⭐ LOGO 行会露出这 4 项 ⇒ ⭐ 点了不会有效果（违反能力位铁律）❌
+			//   ⚠️ 而 EffectsForCurrentBackend 对**所有**灯光行都返回同一张 3 项表
+			//      ⇒ ⭐ LOGO 行会露出这 3 项 ⇒ ⭐ 点了不会有效果（违反能力位铁律）❌
 			//   ⇒ ⭐ 宝龙达下 **LOGO 行不显示效果下拉**（只保留开/关开关）✅；非宝龙达 ⭐ 逐位不变 ✅。
 			// ⭐⭐ 2026-10-17（真机反馈「氛围灯/灯带有点但无效」）：⭐ 宝龙达下**非键盘灯**的行都没有效果通路 ⚠️
 			//   ① TrySetLightEffectViaBackend 只认 Keyboard/ 前缀，其余交回 GCU —— 而宝龙达**没有 GCU**
@@ -16507,10 +16518,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		bool flag = ShouldUseGcuKeyboardFallback(Program.rgb);
 		int keyboardType = CurrentKeyboardType();
 		(string, string)[] array = KeyboardFirmwareEffects.Visible(keyboardType);
-		// ⭐⭐ 2026-10-16（宝龙达 · 效果表收敛）：⭐ 宝龙达固件**只支持 关／RGB 固定色** ✅
-		//   ⇒ ⭐ 强制走「固件效果表」这一路（⭐ 形状是 (Id, Label) ✅），⭐ 且只留那两项 ✅。
+		// ⭐⭐ 2026-10-16（宝龙达 · 效果表收敛）：⭐ 宝龙达固件**只支持 关／单色／自动循环** ✅
+		//   ⇒ ⭐ 强制走「固件效果表」这一路（⭐ 形状是 (Id, Label) ✅），⭐ 且只留那三项 ✅。
 		//   ⚠️ 必须**同时**改下面键盘行的 SelectedIndexChanged（⭐ 它用同一张表按索引取 Id ⚠️）——
-		//      否则下拉显示两项、索引却映射到呼吸/波浪 ⇒ ⭐ 选「单色」实际发的是别的效果 ❌。
+		//      否则下拉显示三项、索引却映射到呼吸/波浪 ⇒ ⭐ 选「单色」实际发的是别的效果 ❌。
 		if (Program.hw?.UsesBaolongda == true)
 		{
 			flag = true;
@@ -16528,6 +16539,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			int mode = Program.rgb?.KbHidMode ?? (-1);
 			num = ((mode >= 0) ? Array.FindIndex(array2, ((int Mode, string Name) e) => e.Mode == mode) : (-1));
+		}
+		if (num < 0 && Program.hw?.UsesBaolongda == true)
+		{
+			// ⭐ 旧配置里可能还存着已撤掉的 Manual（模式 3 —— 本机固件写不进）
+			//   ⇒ ⭐ 显示为「单色」（模式 2 ＋ 用户颜色），⛔ 不假装仍支持 ✅
+			num = Array.FindIndex(array, ((string Id, string Label) e) => e.Id == "Single");
 		}
 		if (num < 0)
 		{

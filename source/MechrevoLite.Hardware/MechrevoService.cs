@@ -3855,6 +3855,29 @@ public class MechrevoService
 		return (celsius > 0) ? (celsius + "℃") : "未设置";
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（真机「颜色改不了 / 下发恒 #FFFFFF」）：⭐ 键盘灯单色（ARGB）的**唯一解析入口** ✅
+	/// <para>⚠️ 根因：⭐ 宝龙达 WMI 只有功能号 17 的 3 字节 RGB ⇒ 界面选「预设色板」时只存
+	/// <c>MonochromeIndex</c>（1~29），直接读 <c>ColorArgb</c> 会拿到**默认白** ❌
+	/// ⇒ ⭐ 必须换成调色板里的真实颜色（<see cref="LightChannelSettings.EffectiveColorArgb" />）✅。</para>
+	/// <para>⭐ 非宝龙达**逐位不变**：仍只在 <c>Single</c> 时带 <c>ColorArgb</c> ✅。</para>
+	/// </summary>
+	private Color? ResolveKeyboardColor(string effect, LightChannelSettings settings)
+	{
+		if (string.IsNullOrWhiteSpace(effect) || MechrevoHw.IsLightEffectOff(effect))
+		{
+			return null;
+		}
+		if (_hw != null && _hw.UsesBaolongda)
+		{
+			// ⭐ 宝龙达：固定色（模式 2）全靠功能号 17 的 RGB ⇒ 无论效果 Id 叫什么，都带真实颜色 ✅
+			return new Color?(Color.FromArgb(settings.EffectiveColorArgb()));
+		}
+		return (string.Equals(effect, "Single", StringComparison.Ordinal)
+			? new Color?(Color.FromArgb(settings.ColorArgb))
+			: (Color?)null);
+	}
+
 	private bool TryApplyKeyboardViaBackend(string effect, int light0to4, Color? singleColor)
 	{
 		MechrevoHw hw = _hw;
@@ -3868,16 +3891,29 @@ public class MechrevoService
 		//   ⇒ ⭐ 用户在第一档区间看到的是"灯灭"而不是"变暗" ❌（⭐ "亮度不能调节"的一个真实成因 ⚠️）
 		//   ⇒ ⭐ 现在统一走 <see cref="MechrevoHw.BaolongdaBrightnessFromUi" />（⭐ 0 ⇒ 0；正数 ⇒ 1~3 ✅）
 		byte level = MechrevoHw.BaolongdaBrightnessFromUi(light0to4);
-		// ⭐⭐ 2026-10-16（键盘灯四项模式）：⭐ 效果 Id → 模式（功能号 16）用**同一张表** ✅
-		//   ⚠️ 来源定性：⭐ 0／2 是官方原版；⚠️ 1／3 来自基于官方修改的第三方版（⭐ `JiaoLong7.3`）
-		//     ⇒ ⭐ 原厂**定义了但从不写入** ⚠️ ⇒ ⭐ 未验证项，待真机确认（⛔ 不得当作"官方支持四种" ⚠️）
+		// ⭐⭐ 2026-10-16（键盘灯模式）：⭐ 效果 Id → 模式（功能号 16）用**同一张表** ✅
+		//   ⚠️ 2026-10-17 收敛：⭐ 只有 2（固定色）／1（自动循环）可写；⛔ 3（自定义颜色）
+		//     本机固件写不进（真机写 3 回读仍为 2）⇒ 映射表里已撤掉，Manual 会落到下面的降级（模式 2）✅
 		byte mode;
 		if (!MechrevoHw.TryMapBaolongdaKeyboardMode(effect, out mode))
 		{
 			mode = 2;
 		}
 		bool on = (level > 0) && !MechrevoHw.IsLightEffectOff(effect);
-		int argb = singleColor.HasValue ? singleColor.Value.ToArgb() : unchecked((int)0xFFFFFFFF);
+		// ⭐⭐ 2026-10-17（真机「每次下发都是白」）：⭐ 调用方没带颜色时**不再把白色写下去** ❌
+		//   ⇒ ⭐ 宝龙达下从已保存配置解析真实颜色（预设色板 → ARGB）；
+		//      开关类入口（SetKeyboardPower）也走这里 ✅；⚠️ 非宝龙达不会用到这枚颜色（下行返回 false）✅
+		int argb = singleColor?.ToArgb() ?? unchecked((int)0xFFFFFFFF);
+		if (!singleColor.HasValue && hw.UsesBaolongda)
+		{
+			LightChannelSettings storedColor = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
+			argb = ResolveKeyboardColor(effect, storedColor)?.ToArgb() ?? storedColor.EffectiveColorArgb();
+			if (on)
+			{
+				Logger.WriteError("宝龙达 键盘灯：⚠️ 调用方没带颜色 ⇒ ⭐ 用**已保存的用户颜色** #"
+					+ (argb & 0xFFFFFF).ToString("X6") + " ✅（⛔ 不再默认白色 ✅）");
+			}
+		}
 		if (!hw.TrySetKeyboardLightingViaBackend(on, argb, level, mode, out bool confirmed))
 		{
 			return false; // ⭐ 不是非 GCU 后端在管事 ⇒ 交回原路 ✅
@@ -3920,7 +3956,8 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			{
 				effect0 = settings0.Effect;
 				speed0 = settings0.Speed;
-				singleColor0 = ((effect0 == "Single") ? new Color?(Color.FromArgb(settings0.ColorArgb)) : ((Color?)null));
+				// ⭐ 2026-10-17：⭐ 预设色板 → 真实 ARGB（宝龙达 WMI 只认 3 字节 RGB）✅
+				singleColor0 = ResolveKeyboardColor(effect0, settings0);
 			}
 			else
 			{
@@ -3944,7 +3981,8 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		{
 			text = settings.Effect;
 			speed = settings.Speed;
-			singleColor = ((text == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null));
+			// ⭐ 2026-10-17：⭐ 预设色板 → 真实 ARGB（宝龙达 WMI 只认 3 字节 RGB）✅
+			singleColor = ResolveKeyboardColor(text, settings);
 		}
 		else
 		{
@@ -4511,7 +4549,8 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			{
 				effect = settings.Effect;
 				speed = settings.Speed;
-				singleColor = ((effect == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null));
+				// ⭐ 2026-10-17：⭐ 预设色板 → 真实 ARGB（与宝龙达 WMI 同口径）✅
+				singleColor = ResolveKeyboardColor(effect, settings);
 			}
 			else
 			{

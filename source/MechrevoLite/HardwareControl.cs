@@ -317,6 +317,78 @@ public static class HardwareControl
 
 	private static string _quarantineReason = "";
 
+	// ================= 2026-10-17（真机诊断包 0.291.9.9 定因）：「GPU 温度变 —」与「功耗读数不对」是同一个根因 =================
+	// 证据（机主诊断包 %TEMP%\_diag9 · 20:34~20:40）：
+	//   20:36:25.934 最后一条「GPU 温度（非 GCU 来源）… 45℃」（NVML）
+	//   20:36:38.495 遥测行 GPU 温度第一次变成「—」
+	//   20:36:29 → 20:40:32 的每一帧遥测：CPU 功率恒 29 W、GPU 功率恒 10 W（4 分钟一位小数都没动），
+	//     而同一行的 CPU 温度（60→62）与风扇转速一直在变
+	// ⇒ 不是读数错了，是**本地采样链停了**：`RefreshLocalMonitoringCore` 以前只有两个驱动 ——
+	//   ① `CustomModeForm._powerWallTimer`（2 s · `Enabled = Visible` ⇒ **页面一关就停**）
+	//   ② 悬浮窗 1 s Timer（默认不开）
+	//   主界面那个常驻 2 s 遥测定时器（`SettingsForm.RefreshSensors`）**只读不采**
+	// ⇒ ① `_gpuInfoReceivedAt` 不再刷新 ⇒ 6 s 后 `TelemetryTemp` 按新鲜度判据把它画成「—」；
+	//   ② `cpuPower`/`gpuPower` 是静态字段、**没有任何新鲜度闸门** ⇒ 冻结值被当实时值一直显示。
+	// 修法：① 加**与界面无关**的常驻采样泵（本组字段）；② 给功耗加**新鲜度闸门**（见 `LocalPowerIsFresh`）。
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17：⭐ <b>本地监控是否处于「已启用」状态</b>（⭐ <see cref="EnableLocalMonitoring"/> 置真 ·
+	/// <see cref="DisableLocalMonitoring"/> 置假 ✅）。
+	/// <para>⚠️ 用途：⭐ 区分「LHM 正在后台重建（临时为 null）」与「监控已整体停用/进程正在退出」
+	/// —— 前者仍可由 NVML 补 GPU 温度，后者⛔ 一次原生调用都不许发 ✅。</para>
+	/// </summary>
+	private static bool _localMonitoringEnabled;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17：<b>与任何界面无关的常驻本地采样泵</b> ✅
+	/// （⭐ 每 <see cref="LocalSamplingPumpIntervalMs"/> 跑一次 <see cref="SampleLocalPowerCore"/> 的**核心部分** ✅）。
+	///
+	/// <para>⚠️⚠️ <b>为什么必须有它</b>：⭐ 在它之前，采样链只由 ⭐ <c>CustomModeForm._powerWallTimer</c>
+	/// （<c>Enabled = Visible</c> ⚠️ ⇒ 页面一关就停）＋ ⭐ 悬浮窗 Timer（默认不开）驱动
+	/// ⇒ ⭐ 用户关掉自定义模式页后：⭐ GPU 温度 6 s 后变「—」❌、⭐ CPU/GPU 功耗**冻结**在关页那一刻 ❌
+	/// （⭐ 真机日志：20:36:29 起 CPU 恒 29 W / GPU 恒 10 W 长达 4 分钟 ⚠️）。</para>
+	///
+	/// <para>⭐ <b>为什么安全</b>：<list type="bullet">
+	/// <item>⭐ 只在 <see cref="EnableLocalMonitoring"/> 之后跑、<see cref="DisableLocalMonitoring"/> 立刻 <c>Dispose</c>
+	/// ⇒ ⭐ 退出/释放之后一次都不碰 LHM/NVML ✅；</item>
+	/// <item>⭐ 若最近 <see cref="LocalSamplingPumpIdleGuardMs"/> 内**已经有人采过**
+	/// （⭐ 自定义模式页 / ⭐ 悬浮窗 / ⭐ 手动入口 ✅）⇒ ⭐ 本轮**直接跳过** ⇒ ⛔ 不重复采样、⛔ 不与 UI 线程抢 <c>lhmLock</c> ✅；</item>
+	/// <item>⛔ 不跑「供电/电池」那几项（`includeAuxiliary:false`）—— 那些仍由主界面既有的 2 s 刷新负责 ✅；</item>
+	/// <item>⭐ 采样链自身已有 (a)(b)(c)(d) 四层防护 ⇒ ⭐ 回调里再兜一层 try/catch ✅。</item>
+	/// </list></para>
+	/// </summary>
+	private static System.Threading.Timer _localSamplingPump;
+
+	/// <summary>⭐ 采样泵重入保护（⭐ 1 = 本轮回调在跑 ✅）。</summary>
+	private static int _localSamplingPumpInFlight;
+
+	/// <summary>⭐ 最近一次**任何调用方**开始采样的时刻（<see cref="Environment.TickCount64"/>；0 = 还没采过）—— 采样泵据此让位。</summary>
+	private static long _lastLocalSampleTick;
+
+	/// <summary>
+	/// ⭐ 功耗字段（<see cref="cpuPower"/> / <see cref="gpuPower"/>）**真正被写入**的时刻
+	/// （<see cref="Environment.TickCount64"/>；0 = 还没写过）。
+	/// <para>⚠️ 与 <see cref="_lastLocalSampleTick"/> 分开记：⭐ 那个是「有人来采过」（可能中途早退），
+	/// ⭐ 这个是「值真的被刷新过」⇒ ⭐ 界面的功耗新鲜度判据只能用后者 ✅。</para>
+	/// </summary>
+	private static long _lastPowerRefreshTick;
+
+	/// <summary>
+	/// ⭐ 采样泵周期（ms）。⚠️ 必须**明显短于** <see cref="MechrevoHw.FanInfoMaximumAge"/>（6 s），
+	/// 否则 GPU 温度会在两帧之间被新鲜度判据判成「—」❌。
+	/// </summary>
+	private const int LocalSamplingPumpIntervalMs = 2500;
+
+	/// <summary>⭐ 最近这段时间内已经有人采过 ⇒ 采样泵让位（ms）。</summary>
+	private const int LocalSamplingPumpIdleGuardMs = 2000;
+
+	/// <summary>
+	/// ⭐ 主界面功耗读数的<b>新鲜度上限</b>：超过就不显示（⛔ 不把冻结值当实时值）。
+	/// <para>⭐ 取值理由：⭐ 采样泵 2.5 s 一次 ⇒ 正常情况年龄 ≤ 2.5 s；⭐ 留 4 倍余量给线程池抖动/系统忙，
+	/// 仍然**远小于**真机上那种「冻结 4 分钟」的时长 ✅。⭐ 纯显示判据：⛔ 不改任何 W 的换算 ✅。</para>
+	/// </summary>
+	internal static readonly TimeSpan LocalPowerFreshAge = TimeSpan.FromMilliseconds(10000.0);
+
 	internal static readonly PowerWallVerifier powerWall = new PowerWallVerifier();
 
 	public static bool readFans;
@@ -435,6 +507,10 @@ public static class HardwareControl
 			_rebuildAttempts = 0;
 			_nextRebuildAtTicks = 0L;
 			Interlocked.Exchange(ref _samplingFailures, 0);
+			// ⭐⭐ 2026-10-17：⭐ 起动**常驻采样泵**（⭐ 见 `_localSamplingPump` 的注释 ——
+			//   它就是「关掉自定义模式页后 GPU 温度变 —、功耗冻结」的根因修复 ✅）。
+			_localMonitoringEnabled = true;
+			StartLocalSamplingPumpLocked();
 		}
 	}
 
@@ -442,6 +518,10 @@ public static class HardwareControl
 	{
 		lock (lhmLock)
 		{
+			// ⭐⭐ 2026-10-17：⭐ 先停采样泵 ⇒ 之后一次都不会再碰 LHM/NVML ✅
+			//   （⭐ 与下面 `lhm = null` 同效：即便有残留回调，也会在 `lhm == null` 早退 ✅）
+			_localMonitoringEnabled = false;
+			StopLocalSamplingPumpLocked();
 			// (d) 生命周期：先断开引用再 Dispose；LhmMonitor.Dispose() 内部置 _disposed，
 			// 之后即便还有残留的定时器 tick 落到 RefreshLocalMonitoring，也只会看到 lhm == null 直接早退，
 			// 绝不会在监控对象已释放后继续采样。
@@ -455,6 +535,80 @@ public static class HardwareControl
 			cpuPower = (gpuPower = null);
 			vramUsedMb = (vramUsage = null);
 		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-17：⭐ 起动常驻采样泵（⭐ 调用方必须已持有 <c>lhmLock</c> 并已把 <see cref="_localMonitoringEnabled"/> 置真 ✅）。
+	/// <para>⚠️ 幂等：⭐ 已经在跑就什么都不做 ✅；⭐ UI 审计模式不启动（⭐ 与 `SettingsForm._sensorTimer` 同口径 ⚠️）。</para>
+	/// </summary>
+	private static void StartLocalSamplingPumpLocked()
+	{
+		if (Program.UiAuditMode || _localSamplingPump != null)
+		{
+			return;
+		}
+		Interlocked.Exchange(ref _lastLocalSampleTick, 0L);
+		_localSamplingPump = new System.Threading.Timer(LocalSamplingPumpTick, null, LocalSamplingPumpIntervalMs, LocalSamplingPumpIntervalMs);
+		Logger.WriteLine($"本地采样泵已启动（{LocalSamplingPumpIntervalMs} ms · ⭐ 与界面无关：自定义模式页/悬浮窗都不开时也照常刷新"
+			+ " GPU 温度（NVML）与 CPU/GPU 功耗 ✅ ⇒ ⛔ 不再出现「关页 6 秒后温度变 —、功耗冻结」❌）");
+	}
+
+	/// <summary>⭐ 2026-10-17：⭐ 停常驻采样泵（⭐ 调用方必须已持有 <c>lhmLock</c> ✅）。</summary>
+	private static void StopLocalSamplingPumpLocked()
+	{
+		System.Threading.Timer pump = _localSamplingPump;
+		_localSamplingPump = null;
+		// ⚠️ 只 Dispose、**不等待**正在跑的回调：这里持有 lhmLock，若等回调就可能与"回调正在等 lhmLock"互等 ❌。
+		//   回调本身在 `lhm == null` / `_localMonitoringEnabled == false` 时都会立刻早退 ✅。
+		pump?.Dispose();
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-17：⭐ 采样泵回调 —— ⭐ **只碰采样链，不碰任何界面/控件** ✅。
+	/// <para>⭐ 判据：⭐ 最近 <see cref="LocalSamplingPumpIdleGuardMs"/> 内已经有人采过 ⇒ ⭐ 让位（⛔ 不重复采样）✅。</para>
+	/// </summary>
+	private static void LocalSamplingPumpTick(object state)
+	{
+		if (Interlocked.CompareExchange(ref _localSamplingPumpInFlight, 1, 0) != 0)
+		{
+			return; // ⭐ 上一轮还没跑完 ⇒ ⭐ 本轮直接跳过（⛔ 不堆积）✅
+		}
+		try
+		{
+			if (!Volatile.Read(in _localMonitoringEnabled))
+			{
+				return;
+			}
+			long lastTick = Interlocked.Read(in _lastLocalSampleTick);
+			if (lastTick != 0L && Environment.TickCount64 - lastTick < LocalSamplingPumpIdleGuardMs)
+			{
+				return; // ⭐ 刚有人采过（⭐ 自定义模式页/悬浮窗/手动入口 ✅）⇒ ⭐ 让位 ✅
+			}
+			// ⭐ `includeAuxiliary:false`：⛔ 不刷供电/电池（那些仍由主界面既有的 2 s 刷新负责 ✅）
+			SampleLocalPowerCore(includeAuxiliary: false);
+		}
+		catch
+		{
+			// (a) 采样泵绝不允许把异常带到线程池外层（⭐ 采样链自身已兜底，这里只是最后一道 ✅）
+		}
+		finally
+		{
+			Interlocked.Exchange(ref _localSamplingPumpInFlight, 0);
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-17：⭐ 功耗读数是不是「⭐ 刚刚真的被刷新过」✅ —— 供界面把冻结值判成「不可用」⛔ 不冒充实时值。
+	/// <para>⚠️ 只看 <see cref="_lastPowerRefreshTick"/>（值真被写入的时刻）⇒ ⭐ 中途早退的采样不算 ✅。</para>
+	/// </summary>
+	internal static bool LocalPowerIsFresh(TimeSpan maximumAge)
+	{
+		long tick = Interlocked.Read(in _lastPowerRefreshTick);
+		if (tick == 0L)
+		{
+			return false;
+		}
+		return Environment.TickCount64 - tick <= (long)maximumAge.TotalMilliseconds;
 	}
 
 	/// <summary>
@@ -1378,6 +1532,21 @@ public static class HardwareControl
 		LhmMonitor? lhmMonitor = lhm;
 		if (lhmMonitor == null || lhmMonitor.IsDisposed)
 		{
+			// ⭐⭐ 2026-10-17（真机诊断包 0.291.9.9 定因）：⭐ LHM 正在后台重建 / 已释放时，
+			//   GPU 温度**与 LHM 无关**（⭐ 宝龙达没有厂商 GPU 温度 ⇒ 只能来自 NVML ⚠️）
+			//   ⇒ ⭐ 仍由 NVML 补一次 ✅（⭐ 否则重建那几秒里温度会闪成「—」❌）。
+			//   ⚠️ 三条硬边界：① ⭐ 只有**监控仍处于启用状态**才做（⭐ 未启用/正在退出 ⇒ 一次原生调用都不发 ⚠️）；
+			//     ② ⭐ 必须在 `_localSamplingQuarantined` 之外（⭐ 降级期一次原生调用都不发 ✅）；
+			//     ③ ⭐ 包在 `countsAsHealthFailure:false` 里 ⇒ 失败只跳过本步、⛔ 不影响健康判定 ✅。
+			//   ⭐ 分支内部的「厂商值优先」判据在 `RefreshGpuTempFromNvmlWhenNoVendor` 里，⛔ 未改 ✅
+			//      （⭐ 厂商有值时它直接 return ✅）。
+			if (_localMonitoringEnabled && !_localSamplingQuarantined)
+			{
+				TryStep(delegate
+				{
+					RefreshGpuTempFromNvmlWhenNoVendor();
+				}, "gpu-temp-nvml-early", countsAsHealthFailure: false);
+			}
 			return;
 		}
 		// ⭐⭐ 2026-10-16（冷启动 GPU 温度空窗）：⭐ `nvidia-smi` 早期来源 ✅ ——
@@ -1466,6 +1635,10 @@ public static class HardwareControl
 		}
 		cpuPower = ResolveCpuPower(num, fallbackCpuPower);
 		gpuPower = ResolveGpuPower(num2, IsUsablePower(num2) ? ((float?)null) : gpuPowerViaNvml);
+		// ⭐⭐ 2026-10-17：⭐ 功耗字段**真的被刷新**了 ⇒ 打时间戳（⭐ 界面新鲜度判据只看这个 ✅）
+		//   ⚠️ 必须放在这里（写值之后），⛔ 不能放方法入口 —— 入口到这儿之间有好几道早退，
+		//      "来采过"≠"值刷新过" ⚠️（⭐ 见 `_lastPowerRefreshTick` 的注释 ✅）。
+		Interlocked.Exchange(ref _lastPowerRefreshTick, Environment.TickCount64);
 		(long, long)? tuple = ((num6 > 0 && num7 > 0) ? ((long, long)?)null : memoryViaNvml);
 		long num3 = ((num6 > 0) ? num6 : (tuple?.Item1 ?? 0));
 		long num4 = ((num7 > 0) ? num7 : (tuple?.Item2 ?? 0));
@@ -1678,15 +1851,33 @@ public static class HardwareControl
 
 	internal static void SampleLocalPower()
 	{
+		SampleLocalPowerCore(includeAuxiliary: true);
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-17：<see cref="SampleLocalPower"/> 的实体（⭐ 界面调用方走 <c>includeAuxiliary:true</c> ·
+	/// ⭐ 常驻采样泵走 <c>false</c> ✅）。
+	/// <para>⚠️ <paramref name="includeAuxiliary"/> = false 时**只跑采样链核心**（⭐ LHM/NVML/功耗/频率/显存 ✅
+	/// ＋ ⭐ 健康判定/隔离到期重试 ✅），⛔ 不跑「功耗墙判定 / 供电方式 / 电池功率」——
+	/// 那三项仍由主界面既有的 2 s 刷新（`SettingsForm.RefreshSensors`）负责，⛔ 不重复做 ⚠️。</para>
+	/// </summary>
+	private static void SampleLocalPowerCore(bool includeAuxiliary)
+	{
 		// (a) 异常防护：整条采样链在这里兜底（SampleLocalPower 会被 UI 线程的 2s Timer 直接调用，
 		// 任何漏出来的异常都会穿过消息循环把进程带走）。
 		try
 		{
+			// ⭐ 2026-10-17：⭐ 先记"有人来采过"（⭐ 采样泵据此让位，⛔ 不重复采样 ✅）。
+			//   ⚠️ 与 `_lastPowerRefreshTick` 分工不同：那个在**值真的被写入**之后才打 ✅。
+			Interlocked.Exchange(ref _lastLocalSampleTick, Environment.TickCount64);
 			RefreshLocalMonitoring();
-			// 供电/电池刷新失败不影响「本地功耗采样链」的健康判定（见 TryStep 的 countsAsHealthFailure）。
-			TryStep(ObservePowerWall, "powerwall", countsAsHealthFailure: false);
-			TryStep(() => RefreshPowerInput(), "power-input", countsAsHealthFailure: false);
-			TryStep(() => RefreshBatteryRate(), "battery-rate", countsAsHealthFailure: false);
+			if (includeAuxiliary)
+			{
+				// 供电/电池刷新失败不影响「本地功耗采样链」的健康判定（见 TryStep 的 countsAsHealthFailure）。
+				TryStep(ObservePowerWall, "powerwall", countsAsHealthFailure: false);
+				TryStep(() => RefreshPowerInput(), "power-input", countsAsHealthFailure: false);
+				TryStep(() => RefreshBatteryRate(), "battery-rate", countsAsHealthFailure: false);
+			}
 			if (_localSamplingQuarantined)
 			{
 				// (c) 降级中：只做上面的轻量刷新，并检查是否到了自动重试的时间点。

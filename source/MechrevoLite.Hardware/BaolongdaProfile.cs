@@ -17,6 +17,7 @@
 //
 // 许可/署名：与本树同一实现，见 THIRD-PARTY-NOTICES.md 与 LICENSES\。
 
+using System;
 using MechrevoLite.Gpu;
 
 namespace MechrevoLite.Hardware;
@@ -96,6 +97,44 @@ internal static class BaolongdaProfile
 	internal static int BrightnessMax(DgpuGenerationKind generation)
 	{
 		return (generation == DgpuGenerationKind.Gen40 || generation == DgpuGenerationKind.Gen50) ? 4 : 3;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17：键盘灯（功能号 16）**本平台实际可写**的模式值 —— ⭐ 只有 1（自动循环）与 2（固定色）✅。
+	/// <para>⭐ 依据：40 系真机（MRID6-23）实测**写模式 3 后回读仍为 2** ⇒ ⭐ 固件不接受模式 3 ❌；
+	/// 原厂枚举里的 3 也只是定义、从不写入 ⚠️ ⇒ ⭐ 按能力位铁律**不提供该选项** ✅。</para>
+	/// <para>⚠️ 0（关）不作为"写模式"使用：⭐ 关灯 ＝ 写亮度（功能号 18）＝ 0 ✅。</para>
+	/// </summary>
+	internal static bool IsKeyboardModeWritable(byte mode)
+	{
+		return mode == 1 || mode == 2;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17：⭐ 宝龙达键盘灯**可写**的效果 Id ✅
+	/// （⭐ 与 <see cref="IsKeyboardModeWritable" /> 同一口径：Off 走亮度 0、Single→2、Rainbow→1；
+	/// ⛔ 不含 Manual／模式 3）。
+	/// </summary>
+	internal static readonly string[] KeyboardEffectIds = { "Off", "Single", "Rainbow" };
+
+	/// <summary>
+	/// ⭐ 2026-10-17：把任意已保存的效果 Id 收敛到**本机真能写**的那三项 ✅。
+	/// <para>⚠️ 旧配置里的 <c>Manual</c>（模式 3，本机写不进）⇒ ⭐ 固定色 <c>Single</c>
+	/// （模式 2 ＋ 用户颜色），⛔ 不再假装支持「自定义颜色」✅；空/未知值同样收敛到 <c>Single</c> ✅。</para>
+	/// </summary>
+	internal static string NormalizeKeyboardEffect(string effect)
+	{
+		if (!string.IsNullOrWhiteSpace(effect))
+		{
+			foreach (string id in KeyboardEffectIds)
+			{
+				if (string.Equals(id, effect, StringComparison.OrdinalIgnoreCase))
+				{
+					return id;
+				}
+			}
+		}
+		return "Single";
 	}
 
 	// ══════════════════════════════════════════════════════════════════

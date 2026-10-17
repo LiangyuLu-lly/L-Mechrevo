@@ -2909,11 +2909,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			else
 			{
-				// ⚠️ 本入口没带颜色/亮度 ⇒ ⭐ 用保守默认（白色 + 3 级）并如实记日志 ✅
-				const int defaultArgb = unchecked((int)0xFFFFFFFF);
-				const int defaultBrightness = 3;
-				Logger.WriteError($"宝龙达 灯光：⭐ 本入口只带开关（topic={topic}）⇒ 点亮用保守默认"
-					+ $"（白色 0x{defaultArgb:X8} · 亮度 {defaultBrightness}/3）⚠️"
+				// ⭐⭐ 2026-10-17（真机「每次下发都是白」）：⭐ 本入口只带开关 ⇒ **沿用已保存的用户颜色/亮度** ✅
+				//   ⚠️ 原来硬编码白色 0xFFFFFFFF ⇒ ⭐ 每次点亮都把用户颜色冲成白 ❌
+				LightChannelSettings stored = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
+				int defaultArgb = stored.EffectiveColorArgb();
+				int defaultBrightness = Math.Clamp(Math.Max(1, stored.Light), 1, BaolongdaProfile.BrightnessMax(DgpuGeneration));
+				Logger.WriteError($"宝龙达 灯光：⭐ 本入口只带开关（topic={topic}）⇒ 点亮**沿用已保存颜色**"
+					+ $"（#{(defaultArgb & 0xFFFFFF):X6} · 界面亮度 {stored.Light} ⇒ 硬件 {defaultBrightness}/{BaolongdaProfile.BrightnessMax(DgpuGeneration)}）✅"
 					+ " —— ⭐ 界面若另有配色/亮度入口，那条会各自下发 ✅");
 				if (!TrySetKeyboardLightingViaBackend(true, defaultArgb, defaultBrightness, out confirmed))
 				{
@@ -3115,23 +3117,26 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				}
 				else
 				{
-					argb = 0xFFFFFF;
-					Logger.WriteError("宝龙达 键盘灯效：⚠️ 界面没给颜色、⭐ **回读也读不到当前值** ⇒"
-						+ " 用保守默认**白色** 0xFFFFFF ✅（⭐ 如实记录 ⚠️）");
+					// ⭐⭐ 2026-10-17（真机「每次下发都是白」）：⭐ 回读不到时**不要用白色** ❌
+					//   ⇒ ⭐ 退回**用户保存的颜色**（预设色板 → 真实 ARGB ✅），⛔ 不拿默认白冲掉用户选择 ✅
+					LightChannelSettings storedColor = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
+					argb = storedColor.EffectiveColorArgb();
+					Logger.WriteError("宝龙达 键盘灯效：⚠️ 界面没给颜色、⭐ 回读也读不到当前值 ⇒"
+						+ " 用**已保存的用户颜色** #" + (argb & 0xFFFFFF).ToString("X6") + " ✅（⛔ 不再硬编码白色 ✅）");
 				}
-				// ⭐⭐ 2026-10-16（键盘灯四项模式 · 效果 Id → 模式）：⭐ 由**单一来源**映射 ✅
-				//   （⭐ 同表也供界面的下拉与索引映射用 ⇒ ⭐ 三处口径必然一致 ✅）
-				//   ⚠️ 来源定性（⭐ 2026-10-17 按【原厂包】调用点更正）：
-				//     ✅ 2（固定色）与 ⭐ 1（自动循环 `RGBAutoCyclic`）＝ **原厂实际使用** ✅
-				//     ⚠️ 0（`Mode_Off`）原厂**零调用点** —— ⛔ 原厂不用模式 0 关灯（关灯 ＝ 写亮度 18 ＝ 0 ✅）
-				//     ⚠️ 3（`CustomColors`）原厂**定义了但从不写入** ⚠️（⛔ 非「社区探索所得」—— ⭐ 四个值原厂枚举里本来就有 ✅）
-				//     ⇒ ⭐ **1 ／ 3 本机是否真变色仍须真机确认**（⛔ 不得当作"官方支持四种" ⚠️）
+				// ⭐⭐ 2026-10-16（键盘灯模式 · 效果 Id → 模式）：⭐ 由**单一来源**映射 ✅
+				//   （⭐ 同表也供界面的下拉与索引映射用 ⇒ ⭐ 各处口径必然一致 ✅）
+				//   ⚠️ 来源定性（⭐ 2026-10-17）：
+				//     ✅ 2（固定色）与 ⭐ 1（自动循环）＝ **原厂实际使用** ✅
+				//     ⚠️ 0（关）：⛔ 不用模式 0 关灯（关灯 ＝ 写亮度 18 ＝ 0 ✅）
+				//     ⛔ 3（自定义颜色）：⭐ 40 系真机写 3 后回读**仍为 2** ⇒ 本平台**不支持** ❌
+				//        ⇒ ⭐ 已从界面撤掉；旧配置里的 Manual 在此降级为固定色（模式 2）✅
 				byte mode;
 				if (!TryMapBaolongdaKeyboardMode(effect, out mode))
 				{
 					mode = 2;
 					Logger.WriteError("宝龙达 键盘灯效：⚠️ 效果「" + effect + "」**没有对应的固件模式** ⇒ ⭐ 降级为固定色（模式 2）✅"
-						+ "（⭐ 本机固件的模式只有 关／自动循环／固定色／自定义颜色 四种 ⚠️；"
+						+ "（⭐ 本机固件可写的模式只有 自动循环／固定色 两种 ⚠️；"
 						+ "⭐ speed/direction 在宝龙达协议里没有对应字段 ⇒ ⭐ 已忽略 ✅）");
 				}
 				// ⭐⭐ 2026-10-16（键盘灯「亮度不对」修正）：⭐ 亮度换算收归**唯一来源** ✅
@@ -3326,6 +3331,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⚠️ 我们原来**每次都把 16/17/18 全写一遍** ⇒ 改颜色时顺带重写亮度，
 			//     固件可能据此重新应用配置 ⇒ 颜色被顶掉
 			//     （真机现象：亮度可调、颜色/效果无反应，而 16/17/18 回读全"成功" —— 完全对得上）
+			// ⭐⭐ 2026-10-17（真机「模式 3 写不进」）：⭐ 本平台固件只接受模式 1／2 ⚠️
+			//   ⭐ 真机依据（MRID6-23 / 40 系）：⭐ 写 3 后回读**仍为 2** ⇒ ⭐ 模式 3 不被接受 ❌
+			//   ⇒ ⭐ 这里**兜底收敛**（即使调用方仍传 3）⇒ ⭐ 按固定色 2 下发，⛔ 不假装支持 ✅
+			if (!BaolongdaProfile.IsKeyboardModeWritable(mode))
+			{
+				Logger.WriteError("宝龙达 键盘灯：⚠️ 模式 " + mode + " 本机固件不支持（40 系实测写 3 回读仍为 2）"
+					+ " ⇒ ⭐ 降级为固定色（模式 2）✅ —— ⛔ 不假装写进去了 ✅");
+				mode = 2;
+			}
 			// ⭐ ② 模式（功能号 16）—— **只在变化时写**
 			bool modeKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte curMode);
 			bool needMode = !modeKnown || curMode != mode;
@@ -3404,16 +3418,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⭐⭐ 2026-10-16：⭐ 宝龙达键盘灯「效果 Id → 模式（功能号 16）」的**单一事实来源** ✅
 	/// （⭐ 下拉、⭐ 索引→Id 映射、⭐ 点进 LightForm 那扇窗、⭐ 以及下发 ⭐ **四处共用** ✅）。
 	///
-	/// <para>⚠️⚠️ <b>来源定性（⭐ 必须写准，⛔ 不得说成"官方支持四种" ⚠️）</b>：
-	/// ✅ <c>FixedColor=2</c> 与 ⭐ <c>AutoCyclic=1</c> 是**原厂实际使用** ⚠️（2026-10-17 按【原厂包】调用点更正：
-	/// ⭐ <c>Mode_RGBFixedMode</c> 与 <c>Mode_RGBAutoCyclic</c> **都有真实调用点** ✅）；
-	/// ⚠️ <c>Off=0</c> 与 <c>CustomColors=3</c> 原厂**定义了但从不写入** ⚠️（⛔ 不是「社区探索所得」—— ⭐ 四个值原厂枚举里本来就有 ✅；⭐ 关灯走写亮度 18 ＝ 0 ✅）；
-	/// （⭐ 第三方的贡献只是把**原厂未使用的入口**暴露到界面 ✅）
-	/// ⇒ ⭐ 原厂**定义了但从不写入** ⚠️ ⇒ ⭐ 属**未验证项**（⚠️ 并非「社区探索所得」✅）
-	/// 但 ⭐ **机主那台（MRID6）仍须真机确认** ✅。</para>
+	/// <para>⭐⭐ <b>可写模式只有两个</b>：<c>2</c>（固定色 ✅ 原厂实际使用）与
+	/// <c>1</c>（自动循环 ✅ 原厂实际使用）；<c>0</c> 不作为"写模式"使用 ——
+	/// ⭐ 关灯 ＝ 写亮度（功能号 18）＝ 0 ✅。</para>
 	///
-	/// <para>⇒ ⭐ 结论：⭐ 四项**都要真机验** —— ⚠️ <c>1</c>／<c>3</c> 完全未验 ⚠️；
-	/// ⛔ 不得因为"表里有"就当作可用（⭐ 能力位铁律：⭐ 能点的就必须有反应 ✅）。</para>
+	/// <para>⛔ <b><c>3</c>（自定义颜色）不在本表</b>：⭐ 40 系真机（MRID6-23）实测
+	/// **写 3 后回读仍为 2** ⇒ ⭐ 固件不接受 ❌；⭐ 本协议也没有多段颜色载荷
+	/// ⇒ ⭐ 按能力位铁律**不提供该选项**（⛔ 不假装支持 ✅）。
+	/// 旧配置里的 <c>Manual</c> 走「没有对应固件模式 ⇒ 降级固定色（模式 2）」✅。</para>
 	/// </summary>
 	internal static bool TryMapBaolongdaKeyboardMode(string? effect, out byte mode)
 	{
@@ -3437,11 +3449,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			mode = 1; // ✅ 原厂实际使用（⭐ 原厂包调用点已证）⇒ ⚠️ 本机是否真变色仍须真机确认
 			return true;
 		}
-		if (effect.Equals("Manual", StringComparison.OrdinalIgnoreCase))
-		{
-			mode = 3; // ⚠️ 原厂定义了但从不写入 ⇒ ⭐ 未验证项，待真机确认
-			return true;
-		}
+		// ⭐⭐ 2026-10-17：⭐ **不再映射到模式 3** —— ⭐ 本平台固件不接受（40 系真机写 3 回读仍为 2）❌
+		//   ⇒ ⭐ 让调用方走已有的「没有对应固件模式 ⇒ 降级为固定色（模式 2）」路径 ✅
+		//   （⛔ 不把 Manual 当成"官方支持的自定义颜色" ⚠️；⭐ 单色 = 模式 2 ＋ 功能号 17 ✅）
 		return false;
 	}
 
