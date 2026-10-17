@@ -3690,7 +3690,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				SaveBaolongdaFanCurve(CloneCurve(_fanBoostSavedCurve, enabled: false));
 			}
 			// ② 两路满转（单位 = 100 RPM）
-			int units = BaolongdaProfile.FanManualMaxUnits100Rpm;
+			// ⭐⭐ 2026-10-19（机主：「风扇强冷记得修」）：⭐ 之前**写死 60**（6000 RPM），
+			//   而 40 系的实际上限常见是 4200~5000 ⇒ ⭐ 写超上限可能被固件忽略/夹住，看起来"没反应"。
+			//   ⭐ 现在按**曲线存档里的 MaxRpm**换算（该值就是本机实际上限），再夹到协议的 1..60 ✅
+			int maxRpm = 4200;
+			try
+			{
+				BaolongdaFanCurveSettings curve = _fanBoostSavedCurve ?? LoadBaolongdaFanCurve();
+				if (curve != null && curve.MaxRpm > 0)
+				{
+					maxRpm = curve.MaxRpm;
+				}
+			}
+			catch
+			{
+			}
+			int units = Math.Clamp(maxRpm / 100, 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
+			Logger.WriteLine($"[fan] 软件强冷：目标 {maxRpm} RPM ⇒ 写 {units}（x100RPM）");
 			bool wrote = TrySetFanManualViaBackend(enable: true, units, units, out bool writeConfirmed);
 			// ③ 回读校验：转速确实高于怠速才算成功
 			Thread.Sleep(300);
