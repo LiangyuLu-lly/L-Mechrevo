@@ -2859,6 +2859,16 @@ public class MechrevoService
 				Logger.WriteLine($"SwitchQuick(highperf,{on}) ⭐ 走**Windows 电源模式联动**（不依赖 GCU）");
 				return true;
 			}
+			// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达）：⭐ 没有 GCU ⇒ 本机通道：暂停曲线闭环 + 两路满转 + 回读校验
+			if (_hw.UsesBaolongda && string.Equals(key, "fanboost", StringComparison.Ordinal))
+			{
+				bool bdHandled = _hw.TrySetFanBoostViaBackend(on, out bool bdConfirmed);
+				if (bdHandled)
+				{
+					Logger.WriteLine($"SwitchQuick(fanboost,{on}) ⭐ 走**本机通道**（功能号 21/13）⇒ 确认={bdConfirmed}（⛔ 未发 MQTT）");
+					return bdConfirmed;
+				}
+			}
 			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达没有 GCU ⇒ 写 Windows 的摄像头隐私授权 ✅
 			//   ⚠️ 语义：`on=true`（摄像头可用）= ConsentStore Allow；`on=false` = Deny
 			//   ⚠️ 与 GCU 的 WEBCAM_ON/OFF 不同（那是厂商 EC 级）⇒ UI 文案要写成「摄像头隐私」

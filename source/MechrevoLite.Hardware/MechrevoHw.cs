@@ -2421,7 +2421,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//      ⭐ `SwitchQuick` 开头的 `if (!SupportsQuickSwitch(key)) return false;` 直接拒掉
 			//      ⇒ 界面显示"下发被拒、已回滚"（机主日志 `[QS-apply] 键=highperf 下发结果=False`）✅
 			"highperf" => true, 
-			"fanboost" => SupportsFanBoost, 
+			// ⭐ 2026-10-19（风扇强冷 · 无 GCU）：宝龙达用本机通道（功能号 21 满转 + 13 回读）✅
+		"fanboost" => SupportsFanBoost || UsesBaolongda, 
 			"lightbar" => SupportsLightbar, 
 			"logolight" => SupportsLogoLight, 
 			"touchpadtoggle" => TouchpadToggleSeen, 
@@ -3649,6 +3650,84 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⭐ `FanType=1` = ⭐ **小扇/CPU** ⚠️ —— ⭐ 真机两组读数太接近，⭐ **还没交叉验证** ⚠️
 	/// ⇒ ⭐ 所以本方法**要求调用方显式传两个通道**（⭐ 而不是替它猜 ✅），⭐ 且日志把两个通道都记全 ✅。</para>
 	/// </summary>
+	/// <summary>⭐ 软件强冷是否处于开启态（⭐ 崩溃/重启后据此恢复曲线）✅</summary>
+	private static bool _fanBoostActive;
+
+	/// <summary>⭐ 强冷前的曲线快照（关闭时原样恢复）✅</summary>
+	private static BaolongdaFanCurveSettings _fanBoostSavedCurve;
+
+	internal static bool FanBoostActive => _fanBoostActive;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达无 GCU）：⭐ 用**本机通道**实现"强冷"——
+	/// ① 暂停软件曲线闭环（避免两个逻辑抢写）② 两路手动写**最大转速**（功能号 21）
+	/// ③ 读功能号 13 **回读确认转速真的上去了** ④ 关闭时恢复强冷前的曲线并重启闭环 ✅
+	/// <para>⚠️ 非宝龙达恒 false（走原来的 `FanBoost` MQTT 路径，逐位不变）✅</para>
+	/// <para>⛔ 不假装成功：写成功但转速没上去 ⇒ `confirmed=false`，界面按未确认处理 ✅</para>
+	/// </summary>
+	internal bool TrySetFanBoostViaBackend(bool on, out bool confirmed)
+	{
+		confirmed = false;
+		if (!UsesBaolongda)
+		{
+			return false;
+		}
+		if (on)
+		{
+			_fanBoostSavedCurve = LoadBaolongdaFanCurve();
+			_fanBoostActive = true;
+			// ① 暂停闭环（先存快照再关）
+			if (_fanBoostSavedCurve != null && _fanBoostSavedCurve.Enabled)
+			{
+				SaveBaolongdaFanCurve(CloneCurve(_fanBoostSavedCurve, enabled: false));
+			}
+			// ② 两路满转（单位 = 100 RPM）
+			int units = BaolongdaProfile.FanManualMaxUnits100Rpm;
+			bool wrote = TrySetFanManualViaBackend(enable: true, units, units, out bool writeConfirmed);
+			// ③ 回读校验：转速确实高于怠速才算成功
+			Thread.Sleep(300);
+			bool readOk = TryReadFanSpeedsViaBackend(out int firstRpm, out int secondRpm);
+			confirmed = wrote && readOk && (firstRpm >= 1500 || secondRpm >= 1500);
+			Logger.WriteLine($"[fan] 软件强冷：开 ⇒ 写={wrote}({writeConfirmed}) · 回读 first={firstRpm} second={secondRpm} ⇒ 确认={confirmed}");
+			return wrote;
+		}
+		// 关闭：恢复快照（含 Enabled 状态）
+		TrySetFanManualViaBackend(enable: false, 0, 0, out bool _);
+		_fanBoostActive = false;
+		BaolongdaFanCurveSettings saved = _fanBoostSavedCurve;
+		_fanBoostSavedCurve = null;
+		if (saved != null)
+		{
+			bool restored = SaveBaolongdaFanCurve(saved);
+			Logger.WriteLine($"[fan] 软件强冷：关 ⇒ 已恢复强冷前曲线（enabled={saved.Enabled}）ok={restored}");
+			confirmed = restored;
+		}
+		else
+		{
+			Logger.WriteLine("[fan] 软件强冷：关 ⇒ 没有快照可恢复（保持手动模式关闭）");
+			confirmed = true;
+		}
+		return true;
+	}
+
+	/// <summary>⭐ 复制一份曲线设置（只改 Enabled），用作"暂停闭环/恢复"的快照 ✅</summary>
+	private static BaolongdaFanCurveSettings CloneCurve(BaolongdaFanCurveSettings c, bool enabled)
+	{
+		return new BaolongdaFanCurveSettings
+		{
+			Enabled = enabled,
+			FormatVersion = c.FormatVersion,
+			HysteresisC = c.HysteresisC,
+			IntervalMs = c.IntervalMs,
+			MinRpm = c.MinRpm,
+			MaxRpm = c.MaxRpm,
+			Channel0Temperatures = c.Channel0Temperatures,
+			Channel0Rpms = c.Channel0Rpms,
+			Channel1Temperatures = c.Channel1Temperatures,
+			Channel1Rpms = c.Channel1Rpms
+		};
+	}
+
 	internal bool TrySetFanManualViaBackend(bool enable, int firstChannelUnits100Rpm, int secondChannelUnits100Rpm, out bool confirmed)
 	{
 		confirmed = false;
