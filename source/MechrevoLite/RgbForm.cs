@@ -428,7 +428,13 @@ public class RgbForm : RForm
 		// ⚠️ 2026-10-12（用户拍板「键盘灯光也修复」）：判据换成 KeyboardLightingDecision（内部即
 		// LightingState.DecideKeyboardLighting）⇒「用户明确关过」那条标记**只在硬件也报 Off 时才算数**
 		// （硬件报 On 时它是陈旧的，由 Program.SyncKbPowerFromHardwareIfDiverged 清掉并回写成开）。
-		bool canWrite = !Program.UiAuditMode && KeyboardLightingDecision.ShouldWrite(Program.hw != null && Program.hw.IsGcuConnected, Program.hw != null && Program.hw.KeyboardPower);
+		// ⭐⭐ 2026-10-17（真机反馈「logo 和键盘开关都无效」）：⭐ 宝龙达**没有 GCU** ⇒ `IsGcuConnected` 恒 false
+		//   ⇒ ⭐ 这条 HID/GCU 门控会**误挡**宝龙达的写入 ⇒ 界面点了没反应、只弹 `hid-notready` ❌
+		//   ⭐ 而宝龙达走的是 **WMI 通道**（`TrySetKeyboardLightingViaBackend` → 功能号 16/17/18），
+		//      **不需要 HID/GCU**，且它自己有"写后回读"的三层校验 ⇒ ⭐ 宝龙达下**跳过本门控** ✅
+		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 门控与改动前**逐位相同** ✅
+		bool baolongdaSkipGate = Program.hw?.UsesBaolongda ?? false;
+		bool canWrite = !Program.UiAuditMode && (baolongdaSkipGate || KeyboardLightingDecision.ShouldWrite(Program.hw != null && Program.hw.IsGcuConnected, Program.hw != null && Program.hw.KeyboardPower));
 		if (canWrite && Program.service != null)
 		{
 			MechrevoHw hw = Program.hw;
@@ -800,7 +806,8 @@ public class RgbForm : RForm
 		// 没明确关过 ⇒ 放行；用户明确关过 ⇒ 挡住并**明确提示**（⛔ 不再无声 return）。
 		// 2026-10-09（kbdctrl）：开关打开时照旧放宽（下游 SetKeyboardBrightnessPreservingEffect 走新链路）。
 		_gcuBrightGen++;
-		if (Program.UiAuditMode || !KeyboardLightingDecision.ShouldWrite(Program.hw != null && Program.hw.IsGcuConnected, Program.hw != null && Program.hw.KeyboardPower))
+		// ⭐⭐ 2026-10-17：同 PublishGcuFirmwareEffect 那处 —— 宝龙达（无 GCU）跳过这条 HID/GCU 门控 ✅
+		if (Program.UiAuditMode || (!(Program.hw?.UsesBaolongda ?? false) && !KeyboardLightingDecision.ShouldWrite(Program.hw != null && Program.hw.IsGcuConnected, Program.hw != null && Program.hw.KeyboardPower)))
 		{
 			KeyboardLightingDecision.Notify(GcuKeyboardLightingRouted);
 			return;
