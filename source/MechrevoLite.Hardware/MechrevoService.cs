@@ -2837,6 +2837,24 @@ public class MechrevoService
 					return osdOk;
 				}
 			}
+			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：走 **Windows 模拟按键**（纯 user32）
+			//   ⚠️ 判据分两种，⛔ 不能混：
+			//      · `capslock` —— **所有机型**都走这里。它是本轮**新增**的开关，纯系统级，
+			//        不依赖任何后端（WMI/GCU/EC 都不参与）。
+			//      · `numpad` —— **只宝龙达**走这里。老 GCU 机型的 `numpad` **必须保持**原 MQTT 路径
+			//        （`NUMPAD_LOCK` / `NUMPAD_UNLOCK`），⛔ 一个字都不能动（逐位不变）。
+			//   实现见 `MechrevoLite.Helpers.NativeLockKey`：读状态 `GetKeyState`（只看锁定位）、
+			//   写状态 `keybd_event`（带扩展键标志，按下＋抬起一次），并且**幂等**（已到位就不发）。
+			if (string.Equals(key, "capslock", StringComparison.Ordinal)
+				|| (string.Equals(key, "numpad", StringComparison.Ordinal) && _hw.UsesBaolongda))
+			{
+				bool isCapsLock = string.Equals(key, "capslock", StringComparison.Ordinal);
+				bool keyOk = isCapsLock
+					? MechrevoLite.Helpers.NativeLockKey.TrySetCapsLock(on, out string keyNote)
+					: MechrevoLite.Helpers.NativeLockKey.TrySetNumLock(on, out keyNote);
+				Logger.WriteError($"SwitchQuick({key},{on}) ⭐ 走系统锁定键（模拟按键 · 纯 user32）⇒ ⭐ 回读确认={keyOk} · {keyNote}（⛔ 未发任何 MQTT ✅）");
+				return keyOk;
+			}
 			string action = key switch
 			{
 				"touchpad" => (!on) ? "TOUCHPAD_OFF" : "TOUCHPAD_ON", 

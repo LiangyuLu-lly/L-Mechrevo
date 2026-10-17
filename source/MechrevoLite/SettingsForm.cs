@@ -161,7 +161,7 @@ public class SettingsForm : RForm
 	private static readonly (string Title, string[] Keys)[] QuickSwitchGroups = new (string, string[])[4]
 	{
 		(Strings.QuickGroupInput, new string[7] { "touchpad", "touchpadtoggle", "wifi", "bt", "webcam", "micmute", "numpad" }),
-		(Strings.QuickGroupKeyboard, new string[4] { "winkey", "fnkey", "copilot", "osd" }),
+		(Strings.QuickGroupKeyboard, new string[5] { "winkey", "fnkey", "copilot", "osd", "capslock" }),
 		(Strings.QuickGroupPower, new string[12]
 		{
 			"usb", "highperf", "fanboost", "acrecovery", "cpuadvperf", "gamewhitelist", "taskbarautohide", "transparency", "darktheme", "deepsleep",
@@ -179,7 +179,7 @@ public class SettingsForm : RForm
 	/// 理由：磁贴行必须与「更多开关」**用同一份文案**（否则同一个开关在两处叫不同名字，
 	/// 用户答复②要求的"同源"就不成立了）；两处例外（磁贴短名）见 <see cref="QuickTileText" />。
 	/// </summary>
-	private static readonly (string, string)[] QuickSwitchLabels = new (string, string)[29]
+	private static readonly (string, string)[] QuickSwitchLabels = new (string, string)[30]
 	{
 		("touchpad", Strings.QuickTouchpad),
 		("wifi", "WiFi"),
@@ -192,6 +192,12 @@ public class SettingsForm : RForm
 		("winkey", Strings.QuickWinkey),
 		("fnkey", Strings.QuickFnkey),
 		("numpad", Strings.QuickNumpad),
+		// ⭐ 2026-10-17（新增开关）：大小写锁定。它与 `numpad` 一样是**键盘自身的锁定键**，
+		// 不在厂商 WMI/EC 通道里 ⇒ 走 Windows 模拟按键（`MechrevoLite.Helpers.NativeLockKey`）。
+		// ⚠️ 文案用**字面量**而不是 `Strings.*`：`Strings*.resx` 是**混合行尾**
+		//    （CRLF=14 / 裸 LF=5343），用编辑器改它会把整篇行尾改掉 ⇒ 本表既有的
+		//    `("wifi", "WiFi")` 就是字面量先例 ✅
+		("capslock", "大小写锁定"),
 		("osd", Strings.QuickOsd),
 		("usb", Strings.QuickUsb),
 		("copilot", Strings.QuickCopilot),
@@ -752,6 +758,12 @@ public class SettingsForm : RForm
 
 	private DateTime _lastQuickSwitchUi = DateTime.MinValue;
 
+	/// <summary>
+	/// ⭐ 2026-10-17：<c>capslock</c> / <c>numpad</c> 直读系统锁定态时，**每个键首次必打一行**日志，
+	/// 之后只在值发生变化时打。用途：证明"这条读路径到底有没有跑过"（否则它静默生效，
+	/// 日志里完全看不出来，无法与"根本没跑"区分）。
+	/// </summary>
+	private readonly HashSet<string> _lockKeyLoggedOnce = new HashSet<string>(StringComparer.Ordinal);
 	private bool _syncingSwitches;
 
 	// 2026-10-11（修回归「修复以后直接点不动了」）：「息屏（不睡眠）」点击后，开关的勾选态至少显示这么久再回落。
@@ -4208,6 +4220,26 @@ public class SettingsForm : RForm
 						checkBox.Checked = micState.Value;
 					}
 				}
+				else if (text == "capslock" || (text == "numpad" && (Program.hw?.UsesBaolongda ?? false)))
+				{
+					// ⭐ 2026-10-17（大小写 / 数字小键盘）：这两个是**键盘自身的锁定键**，状态由
+					// Windows 的键盘状态机持有 ⇒ **直读、不缓存**，与写入侧（`NativeLockKey.TrySet`）
+					// 同源 ✅（同一组 user32 API，⛔ 不会各读一套）。
+					// ⚠️ `numpad` **只在宝龙达**走这里；老 GCU 机型仍读 `hw.QuickSwitches`
+					//    （那是 GCU 上报的 `NumPad` 字段）⇒ ⛔ 不能覆盖，逐位不变。
+					bool lockedNow = string.Equals(text, "capslock", StringComparison.Ordinal)
+						? MechrevoLite.Helpers.NativeLockKey.IsCapsLockOn()
+						: MechrevoLite.Helpers.NativeLockKey.IsNumLockOn();
+					// ⚠️ **每个键首次必打**一行（`_lockKeyLoggedOnce`），之后只在值要被改掉时才打
+					//     —— 否则这条读路径静默生效，日志里与"根本没跑"无法区分 ✅
+					bool firstLockSync = _lockKeyLoggedOnce.Add(text);
+					if (firstLockSync || checkBox.Checked != lockedNow)
+					{
+						Logger.WriteLine($"[QS-lock] 直读系统锁定键：键={text} 界面值={checkBox.Checked} -> 实际={MechrevoLite.Helpers.NativeLockKey.Describe(lockedNow)}"
+							+ (firstLockSync ? "（首次读取 · 证明本读路径已生效）" : ""));
+					}
+					checkBox.Checked = lockedNow;
+				}
 				else
 				{
 					if (Program.hw == null || !Program.hw.QuickSwitches.TryGetValue(text, out var value))
@@ -4513,6 +4545,7 @@ public class SettingsForm : RForm
 		case "fnkey":
 		case "copilot":
 		case "numpad":
+		case "capslock":
 			return UiGlyph.Kind.Keyboard;
 		case "osd":
 		case "taskbarautohide":
@@ -4561,8 +4594,15 @@ public class SettingsForm : RForm
 		MechrevoDeviceCapabilities caps = (Program.hw?.Capabilities) ?? _deviceCapabilities;
 		switch (key)
 		{
+		case "capslock":
+			// ⭐ 2026-10-17（新增开关）：大小写锁定是**纯系统级**能力（Windows 键盘状态机），
+			// 不依赖任何后端 ⇒ 所有机型都可用，恒 true。
+			return true;
 		case "numpad":
-			return caps.Numpad;
+			// ⚠️ 老 GCU 机型：仍按能力位 `caps.Numpad`（与改动前逐字一致）。
+			// ⭐ 宝龙达：没有 GCU ⇒ `caps.Numpad` 恒假 ⇒ 补一支（走模拟按键）。
+			// ⚠️ 非宝龙达逐位不变。
+			return caps.Numpad || (Program.hw?.UsesBaolongda ?? false);
 		case "acrecovery":
 			return caps.AcRecovery;
 		case "fanboost":

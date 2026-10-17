@@ -2391,7 +2391,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"webcam" => WebcamSeen, 
 			"winkey" => WinKeySeen, 
 			"fnkey" => FnKeySeen, 
-			"numpad" => NumpadSeen, 
+			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：这两个**不是 WMI 开关** ——
+			//   宝龙达的 WMI 功能号表（8 起）里只有 `FnLock=11` / `TPLock=12`，没有它们；
+			//   它们本来就是键盘自身的锁定键 ⇒ 由 Windows 的键盘状态机负责，靠"模拟一次按键"切换
+			//   （实现见 `MechrevoLite.Helpers.NativeLockKey`：只调 user32 的
+			//    `GetKeyState` / `keybd_event`，⛔ 不碰 EC、⛔ 不碰厂商寄存器、⛔ 不需驱动或提权）。
+			//   ⚠️ `capslock` 是**新增开关**，对**所有机型**可用（纯系统级，不依赖任何后端）。
+			//   ⚠️ `numpad` 原本只在 GCU 上报过（`NumpadSeen`）时才显示；宝龙达没有 GCU
+			//      ⇒ 原来恒 false ⇒ 开关根本不出现 ⇒ 现补宝龙达一支（同样走模拟按键）。
+			//   ⚠️ **非宝龙达逐位不变**：老 GCU 机型仍只看 `NumpadSeen`（与改动前逐字一致）。
+			"capslock" => true, 
+			"numpad" => NumpadSeen || UsesBaolongda, 
 			"osd" => true, 
 			// ⭐⭐ 2026-10-17 真机修复（蛟龙16 · 板号 `MRID6` · 用户反馈「关机 USB 供电点不动」）：
 			//   ⚠️ `SwitchUsbCharger` 的**唯一**通道是 ⭐ MQTT `Setting/Control`
