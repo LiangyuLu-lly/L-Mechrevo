@@ -1102,7 +1102,19 @@ public sealed class SettingsDialog : RForm
 	protected override void OnLoad(EventArgs e)
 	{
 		base.OnLoad(e);
-		ResponsiveLayout.PerformLayoutTree(this);
+		// ⭐⭐ 2026-10-17（设置窗预热卡顿 · 实测定位后去掉一次重复的整树重排）：
+		//   带 `from=` 的埋点实测（本机 175% DPI，一次预热）：
+		//     [layout-tree] SettingsDialog elapsed=1735ms from=OnLoad:1115
+		//     [layout-tree] SettingsDialog elapsed=1625ms from=ShrinkToContent:1055
+		//   ⇒ 两次排的是**同一棵树**，合计 3360ms，占预热总 4578ms 的 **73%**（其余是 ctor 562ms + 收尾）。
+		//   ⭐ 为什么去掉的是**这一处**而不是 `ShrinkToContent` 里那处：
+		//     `ShrinkToContent()` 改了 `ClientSize` ⇒ **必须**重排才能让子控件按新宽度收敛；
+		//     而首次 show 时客户区尺寸一定会从默认值变到计算值 ⇒ `ShrinkToContent` 内部**必定**会排一次
+		//     ⇒ 这里这次必然与它重复。
+		//   ⚠️ 兜底：万一某次 `ShrinkToContent` 判定尺寸没变（不排），这里也不再排；
+		//     那种情况下控件树在 `EnsureSettingsDialogBuilt` 阶段已按该尺寸布好，不需要重排 ✅
+		//   ⚠️ 任何会改几何的变化（DPI / 根表行数 / 三处行可见性）仍由
+		//     `_layoutSignatureDirty` 机制在 `ShowAdjacentTo` 那条路径上触发重排，行为不变。
 		ShrinkToContent();
 		if (_owner != null)
 		{

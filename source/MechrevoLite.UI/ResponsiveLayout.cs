@@ -121,13 +121,40 @@ public static class ResponsiveLayout
 			select control.Bottom + control.Margin.Bottom).DefaultIfEmpty(0).Max();
 	}
 
-	public static void PerformLayoutTree(Control root)
+	/// <summary>
+	/// ⭐ 2026-10-17（设置窗预热卡顿定位）：本方法的嵌套深度。
+	/// 只在**最外层**调用结束时打一行耗时日志 —— 递归里的每个子节点不打，否则一次调用就会刷出上百行。
+	/// </summary>
+	[ThreadStatic]
+	private static int _layoutTreeDepth;
+
+	/// <param name="callerMember">调用方方法名（由编译器自动填入，供日志标注"这次重排是谁发起的"）。</param>
+	/// <param name="callerLine">调用方行号（同上）。</param>
+	public static void PerformLayoutTree(Control root,
+		[System.Runtime.CompilerServices.CallerMemberName] string callerMember = "",
+		[System.Runtime.CompilerServices.CallerLineNumber] int callerLine = 0)
 	{
-		root.PerformLayout();
-		foreach (Control control in root.Controls)
+		long layoutStartedTicks = Environment.TickCount64;
+		bool isTopLevel = _layoutTreeDepth == 0;
+		_layoutTreeDepth++;
+		try
 		{
-			PerformLayoutTree(control);
+			root.PerformLayout();
+			foreach (Control control in root.Controls)
+			{
+				PerformLayoutTree(control);
+			}
+			root.PerformLayout();
 		}
-		root.PerformLayout();
+		finally
+		{
+			_layoutTreeDepth--;
+			if (isTopLevel)
+			{
+				// ⚠️ 断点用途：设置窗预热"卡一下"就是本方法被重复调用所致。
+				// `from=` 直接给出**发起方方法名与行号** —— 这是定位"哪一次是多余的"的关键证据。
+				Logger.WriteLine($"[layout-tree] root={root.GetType().Name} name=「{root.Name}」 childCount={root.Controls.Count} elapsed={Environment.TickCount64 - layoutStartedTicks}ms from={callerMember}:{callerLine}");
+			}
+		}
 	}
 }
