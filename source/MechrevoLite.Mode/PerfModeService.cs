@@ -477,6 +477,46 @@ internal sealed class PerfModeService
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（UI 切档联动）：⭐ 主界面/托盘切模式时**直接**按模式设 Windows 电源模式
+	/// （GCU 机型走的是 `SwitchMode` → MQTT，**不会**经过 <see cref="ActivateAsync" /> ⇒ 需要单独一个入口 ✅）
+	/// <para>映射：2=静音 ⇒ 最佳能效 · 0=平衡 ⇒ 平衡 · 1=狂暴/静音狂暴 ⇒ 最佳性能</para>
+	/// </summary>
+	public void ApplyWindowsPowerOverlayForUiMode(int mode, bool silentTurbo)
+	{
+		if (!WindowsPowerOverlayEnabled)
+		{
+			return;
+		}
+		int overlay = mode switch
+		{
+			2 => 2,
+			0 => 0,
+			1 => 1,
+			_ => -1
+		};
+		if (overlay < 0)
+		{
+			return;
+		}
+		ApplyWindowsPowerOverlayValue(overlay);
+	}
+
+	/// <summary>⭐ 把 Windows 电源模式设成给定 overlay（0=平衡 / 1=最佳性能 / 2=最佳能效），失败只记日志。</summary>
+	private void ApplyWindowsPowerOverlayValue(int overlay)
+	{
+		try
+		{
+			string name = (overlay == 1) ? "最佳性能" : ((overlay == 2) ? "最佳能效" : "平衡");
+			PowerNative.SetPowerMode(overlay);
+			Logger.WriteLine($"[power] Windows 电源模式 → {name}（overlay={overlay} · 纯 Windows API，不依赖 GCU/能力位）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[power] Windows 电源模式设置失败（已吞掉）：" + ex.Message);
+		}
+	}
+
 	private void ApplyWindowsPowerOverlay(string modeId)
 	{
 		if (AppConfig.Get("bd_power_overlay", 1) == 0)
