@@ -41,15 +41,17 @@ internal static class KeyboardWmiProbe
 				+ " 16=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardMode)
 				+ " 17=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardColor)
 				+ " 18=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness));
+			// ⭐⭐ 2026-10-19（机主实测 30 系）：原顺序 mode→color→brightness 下，18 回读恒 0（灯不亮）
+			//   ⇒ 改成原厂顺序：**先亮度 → 再模式 → 再颜色** ✅
+			bool w0 = wmi.TryWriteByte(BaolongdaWmi.Function.RgbKeyboardBrightness, 3);
+			Thread.Sleep(400);
+			L("写 18=3 (ok=" + w0 + ") => 回读 18=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness));
 			bool w1 = wmi.TryWriteByte(BaolongdaWmi.Function.RgbKeyboardMode, 2);
 			Thread.Sleep(500);
 			L("写 16=2 (ok=" + w1 + ") => 回读 16=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardMode));
 			bool w2 = wmi.TryWriteColor(255, 0, 0);
 			Thread.Sleep(500);
 			L("写 17=Red (ok=" + w2 + ") => 回读 17=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardColor));
-			bool w3 = wmi.TryWriteByte(BaolongdaWmi.Function.RgbKeyboardBrightness, 1);
-			Thread.Sleep(400);
-			L("写 18=1 (ok=" + w3 + ") => 回读 18=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness));
 			L("请目视：键盘灯变红了吗？亮度变了吗？");
 		}
 		catch (Exception ex)

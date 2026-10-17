@@ -657,7 +657,8 @@ internal sealed class BaolongdaWmi : IDisposable
 		try
 		{
 			byte[] outData = Invoke(MethodSet, Function.RgbKeyboardColor, new byte[3] { red, green, blue });
-			return outData != null && outData.Length > 4 && outData[3] == (byte)Function.RgbKeyboardColor;
+			// ⚠️ 3 字节载荷时 OutData[3] 不一定是功能号回显（机主实测被误判 ok=False）⇒ 只要求非空
+			return outData != null && outData.Length > 4;
 		}
 		catch (Exception ex)
 		{
