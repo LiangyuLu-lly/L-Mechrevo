@@ -102,7 +102,7 @@ internal sealed class LegacyMifsWmi : IDisposable
 		{
 			30 => 2, 
 			32 => 4, 
-			_ => throw new IOException("Invalid MIFS response length."), 
+			_ => throw LogAndThrowUnknownLength(output.Length), 
 		};
 		byte raw = output[index];
 		switch (raw)
@@ -124,6 +124,17 @@ internal sealed class LegacyMifsWmi : IDisposable
 				+ " ⇒ ⭐ 现有映射只覆盖原始 0/1/2/3 ⇒ ⭐ 该机型的原始→内部映射可能与 40 系不同 ⚠️）");
 			throw new IOException($"Unknown MIFS performance mode (raw={raw}).");
 		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-17：响应长度不在已知两档（30 / 32）时 —— ⭐ **也必须留下可见证据** ⚠️
+	/// （⭐ 旧代码只抛一句"Invalid MIFS response length"、不带实际长度 ⇒ ⭐ 排障时看不出"到底回了多少字节" ❌）。
+	/// </summary>
+	private static IOException LogAndThrowUnknownLength(int actualLength)
+	{
+		Logger.WriteError($"老接口 MIFS：**未知响应长度 {actualLength} 字节**（⭐ 已知只有 30 / 32 两档"
+			+ " ⇒ ⭐ 该机型的 MIFS 响应帧可能与本树假设不同 ⚠️）");
+		return new IOException($"Invalid MIFS response length ({actualLength}).");
 	}
 
 	internal LegacyMifsSnapshot ReadMode()
