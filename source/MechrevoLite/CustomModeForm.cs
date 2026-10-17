@@ -1802,7 +1802,12 @@ public class CustomModeForm : RForm
 		PerfModeDefinition? mode = FindMode(_modeId);
 		// 2026-10-04: firmware-profile mode edits a *preset* firmware config, which is the
 		// normal 30-series behaviour. Keep the Gen40+ preset lock for regular LM use.
-		bool locked = hw != null && IsGen40Plus(hw) && (mode == null || !mode.IsCustom) && !_firmwareMode;
+		// ⭐⭐ 2026-10-17（宝龙达 · 机主反馈「滑块是灰的」）：⭐ 这条锁的**原始理由**是
+		//   「Gen40+ 的预设档由固件（GCU）持有，改 LM 里的值不会生效、还会被固件顶回去」⚠️
+		//   ⇒ ⭐ 宝龙达**没有 GCU** ⇒ 这个理由不成立；而且它的 PL/温度墙**能走 WMI 23 真下发**
+		//      （见 `PerfModeCapabilities.SupportsWmiPowerFields`）⇒ ⭐ 不该再锁 ✅
+		//   ⚠️ 加 `hw.IsGcuConnected` 判据：GCU 机型（含 Gen40+）**逐位不变** ✅
+		bool locked = hw != null && hw.IsGcuConnected && IsGen40Plus(hw) && (mode == null || !mode.IsCustom) && !_firmwareMode;
 		_optionsLocked = locked;
 		foreach (Control control in OptionControls())
 		{
