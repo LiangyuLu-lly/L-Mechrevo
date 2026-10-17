@@ -2390,7 +2390,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"bt" => BluetoothSeen, 
 			"webcam" => WebcamSeen, 
 			"winkey" => WinKeySeen, 
-			"fnkey" => FnKeySeen, 
+			"fnkey" => FnKeySeen || UsesBaolongda, 
 			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：这两个**不是 WMI 开关** ——
 			//   宝龙达的 WMI 功能号表（8 起）里只有 `FnLock=11` / `TPLock=12`，没有它们；
 			//   它们本来就是键盘自身的锁定键 ⇒ 由 Windows 的键盘状态机负责，靠"模拟一次按键"切换
