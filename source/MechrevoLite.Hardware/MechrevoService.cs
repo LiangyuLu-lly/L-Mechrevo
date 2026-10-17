@@ -2843,6 +2843,20 @@ public class MechrevoService
 				Logger.WriteLine($"SwitchQuick({key},{on})：⚠️ 本地 Radio 不可用（未探测到或无访问权限）⇒ 不下发");
 				return false;
 			}
+			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达没有 GCU ⇒ 写 Windows 的摄像头隐私授权 ✅
+			//   ⚠️ 语义：`on=true`（摄像头可用）= ConsentStore Allow；`on=false` = Deny
+			//   ⚠️ 与 GCU 的 WEBCAM_ON/OFF 不同（那是厂商 EC 级）⇒ UI 文案要写成「摄像头隐私」
+			if (_hw.UsesBaolongda && string.Equals(key, "webcam", StringComparison.Ordinal))
+			{
+				if (CameraPrivacy.Available)
+				{
+					bool camOk = CameraPrivacy.TrySetDenied(!on, out string camNote);
+					Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ 走**系统摄像头隐私**（ConsentStore）⇒ 确认={camOk}（{camNote}）");
+					return camOk;
+				}
+				Logger.WriteLine($"SwitchQuick(webcam,{on})：⚠️ 摄像头隐私键不可用（无权限/不存在）⇒ 不下发");
+				return false;
+			}
 			// ⭐⭐ 2026-10-16（宝龙达 · OSD 提示）：⭐ 走**本地实现**（⭐ 它连 WMI 都不用 ✅）
 			//   ⭐ 机主原话「⭐ OSD显示开关不可用（⭐ LM好像有自己的OSD部分 ✅）」⇒ ⭐ 让这个开关管 LM 自己的 OSD ✅
 			//   ⚠️ 原来那条 `OSD_HIDDEN_ON/OFF` **只能走 GCU 的 MQTT** ❌ ⇒ ⭐ 宝龙达恒失败 ⇒ ⭐ 点了没反应 ⚠️

@@ -2388,7 +2388,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"touchpad" => true, 
 			"wifi" => WifiSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Wifi)), 
 			"bt" => BluetoothSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Bluetooth)), 
-			"webcam" => WebcamSeen, 
+			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达没有 GCU ⇒ 用 Windows 的摄像头隐私授权
+			//   （⭐ 与 GCU 的 WEBCAM_ON/OFF 不同：那是厂商 EC 级，宝龙达给不了 ✅）
+			"webcam" => WebcamSeen || (UsesBaolongda && CameraPrivacy.Available), 
 			"winkey" => WinKeySeen, 
 			"fnkey" => FnKeySeen || UsesBaolongda, 
 			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：这两个**不是 WMI 开关** ——
@@ -4567,6 +4569,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				{
 					QuickSwitches["bt"] = btOn;
 					Logger.WriteLine($"宝龙达状态回读：⭐ bt ⇒ {(btOn ? "开" : "关")}（⭐ 来源：Windows Radio · {btNote} ✅）");
+				}
+			}
+			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 状态来自注册表 ConsentStore（桌面应用那一项优先）
+			if (CameraPrivacy.TryGetDenied(out bool camDenied, out string camNote))
+			{
+				bool camOn = !camDenied;
+				if (!QuickSwitches.TryGetValue("webcam", out bool camCur) || camCur != camOn)
+				{
+					QuickSwitches["webcam"] = camOn;
+					Logger.WriteLine($"宝龙达状态回读：⭐ webcam ⇒ {(camOn ? "开" : "关")}（⭐ 来源：Windows 摄像头隐私 · {camNote} ✅）");
 				}
 			}
 			// ⭐⭐ 2026-10-16（OSD 提示 · 本地方案）：⭐ 这个开关的状态**来自本地配置** ✅
