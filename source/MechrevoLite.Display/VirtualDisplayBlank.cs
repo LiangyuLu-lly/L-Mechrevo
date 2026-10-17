@@ -67,6 +67,14 @@ internal static class VirtualDisplayBlank
 	/// </summary>
 	private static bool _topologySwitched;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（真机反馈「外接显示器情况下关闭息屏后内屏亮、外屏不亮」）：
+	///   ⭐ 息屏**前**记录当时的显示拓扑，恢复时**按它**切回 ⚠️
+	///   ⛔ 不再无条件 `displayswitch /internal` —— 那是「仅电脑屏幕」，
+	///      会**把所有外接屏关掉** ⇒ 有外接屏的用户恢复后外屏就黑了 ❌
+	/// </summary>
+	private static DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID _topologyBeforeBlank;
+
 	/// <summary>usbmmidd 单设备最多 4 个虚拟显示屏，且 enableidd 一次只关 1 个（驱动 idd_instructions.txt 语义）。</summary>
 	internal const int MaxVirtualMonitors = 4;
 
@@ -145,6 +153,8 @@ internal static class VirtualDisplayBlank
 			}
 			_active = true;
 			_blankStartedUtc = DateTime.UtcNow;
+			// ⭐ 息屏前先记拓扑（必须在 displayswitch /external 之前）⇒ 恢复时按它切回 ✅
+			_topologyBeforeBlank = ReadCurrentTopology();
 		}
 		Task.Run(delegate
 		{
@@ -310,7 +320,8 @@ internal static class VirtualDisplayBlank
 					{
 						_topologySwitched = false;
 					}
-					SwitchTopology(external: false);
+					// ⭐ 2026-10-17：按息屏前记录的拓扑恢复（⛔ 不再无条件 /internal —— 那会关掉外接屏）
+					RestoreTopology();
 					Thread.Sleep(PostRestoreDelayMs);
 				}
 				string driverDir = GetDriverDir();
@@ -495,7 +506,54 @@ internal static class VirtualDisplayBlank
 		RunHidden(tool, "enableidd 1", driverDir);
 	}
 
-	/// <summary>切换显示拓扑：external=true ⇒ 只显示外接/虚拟屏（物理屏灭）；false ⇒ 切回内屏。</summary>
+	/// <summary>读当前显示拓扑（QDC_ONLY_ACTIVE_PATHS）。失败/异常 ⇒ INTERNAL（最保守）。</summary>
+	private static DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID ReadCurrentTopology()
+	{
+		try
+		{
+			if (DisplayNative.GetDisplayConfigBufferSizes(DisplayNative.QUERY_DEVICE_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS, out uint pathCount, out uint modeCount) != 0)
+			{
+				return DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID.DISPLAYCONFIG_TOPOLOGY_INTERNAL;
+			}
+			uint pc = Math.Max(1u, pathCount);
+			uint mc = Math.Max(1u, modeCount);
+			DisplayNative.DISPLAYCONFIG_PATH_INFO[] paths = new DisplayNative.DISPLAYCONFIG_PATH_INFO[pc];
+			DisplayNative.DISPLAYCONFIG_MODE_INFO[] modes = new DisplayNative.DISPLAYCONFIG_MODE_INFO[mc];
+			if (DisplayNative.QueryDisplayConfig(DisplayNative.QUERY_DEVICE_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS, ref pc, paths, ref mc, modes, out DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID topology) != 0)
+			{
+				return DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID.DISPLAYCONFIG_TOPOLOGY_INTERNAL;
+			}
+			return topology;
+		}
+		catch
+		{
+			return DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID.DISPLAYCONFIG_TOPOLOGY_INTERNAL;
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-17：按**息屏前记录的拓扑**恢复（映射到 displayswitch 的 4 个参数）。
+	/// ⛔ 旧实现无条件 `/internal`（仅电脑屏幕）⇒ 有外接屏的用户恢复后外屏全黑 ❌
+	/// </summary>
+	private static void RestoreTopology()
+	{
+		string arg = _topologyBeforeBlank switch
+		{
+			DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID.DISPLAYCONFIG_TOPOLOGY_CLONE => "/clone",
+			DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID.DISPLAYCONFIG_TOPOLOGY_EXTEND => "/extend",
+			DisplayNative.DISPLAYCONFIG_TOPOLOGY_ID.DISPLAYCONFIG_TOPOLOGY_EXTERNAL => "/external",
+			_ => "/internal",
+		};
+		Logger.WriteLine("VirtualDisplayBlank: restore topology by pre-blank kind=" + _topologyBeforeBlank + " => displayswitch " + arg + ".");
+		string displayswitch = Path.Combine(Environment.SystemDirectory, "displayswitch.exe");
+		int exitCode = RunHidden(displayswitch, arg, null);
+		if (exitCode != 0)
+		{
+			Logger.WriteLine("VirtualDisplayBlank: displayswitch " + arg + " exit=" + exitCode + ".");
+		}
+	}
+
+	/// <summary>切换显示拓扑：external=true ⇒ 只显示外接/虚拟屏（物理屏灭）。</summary>
 	private static void SwitchTopology(bool external)
 	{
 		string displayswitch = Path.Combine(Environment.SystemDirectory, "displayswitch.exe");
