@@ -323,6 +323,11 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 ;    解决（见 [Code] 的 NetDlTryInstallRuntime；失败才弹选择框）；万一装完仍缺运行时，apphost 会弹
 ;    微软自带那句英文提示 —— ⛔ 启动壳已在 r25 移除，不再有「壳的中文提示」这一层。
 ;    ⚠️ 静默安装（/SILENT、/VERYSILENT）本来就走不到这里：skipifsilent 已挡住。
+; ** 2026-10-17：按「可选任务 pawnio」安装 PawnIO 驱动（读 CPU 温度所需）
+;   只在该任务被勾选时执行；失败**不阻断安装**（命令末尾 exit 0 兜掉返回码）——
+;     驱动装不上最坏只是 CPU 温度显示「—」，不该让整个安装失败
+;   runhidden：脚本会下载 + 静默装，不需要黑窗；waituntilterminated 保证装完再启动 LM。
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: runhidden waituntilterminated; Tasks: pawnio
 Filename: "{app}\L-Mechrevo.exe"; Description: "{cm:LaunchApp}"; Flags: postinstall skipifsilent nowait
 
 [UninstallRun]
@@ -379,7 +384,14 @@ Name: "{group}\{cm:UninstallProgram,L-Mechrevo}"; Filename: "{uninstallexe}";
 Name: "{autodesktop}\L-Mechrevo"; Filename: "{app}\L-Mechrevo.exe"; WorkingDir: "{app}"; Tasks: desktopicon; 
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; 
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}";
+; ** 2026-10-17（真机反馈「30 系 CPU 温度不识别」）：CPU 温度靠 LM 自带的 LHM，而 LHM 读 CPU 温度
+;   需要 PawnIO 驱动（读 MSR）⇒ 没装驱动时 UI 只能显示「—」
+;   合规：PawnIO 驱动本体是 GPL-2.0（https://github.com/namazso/PawnIO）⇒ 我们**不分发**它，
+;     只在**用户勾选**本任务时，由 {app}\Install-PawnIO.ps1 从上游官方 release **现下载**，
+;     校验 SHA-256 ＋ Authenticode 签名通过后才静默安装（脚本自带这两道校验）。
+;   默认勾选（checkedonce = 升级时记住上次选择）；静默安装（/SILENT）时自动跳过。
+Name: "pawnio"; Description: "安装 PawnIO 驱动（读取 CPU 温度所需，需联网下载约 1-2 MB）"; GroupDescription: "推荐组件"; Flags: checkedonce 
 
 [UninstallDelete]
 ; 2026-10-09：%APPDATA%\MechrevoLite 与 C:\ProgramData\MechrevoLite 故意不写在这里 ——
