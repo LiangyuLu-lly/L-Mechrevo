@@ -38,14 +38,19 @@ internal static class NvapiPStates
 	// NVAPI 的函数不是 nvapi64.dll 的直接导出，必须走 nvapi_QueryInterface(functionId)。
 	// 下面这些 ID 是 NVAPI 公开接口编号（与官方头文件 / NvAPIWrapper 的 FunctionId 表一致）：
 	//   NvAPI_Initialize            0x0150E828
-	//   NvAPI_Unload                0xD22BDD7E
 	//   NvAPI_GetErrorMessage       0x6C2D048C
 	//   NvAPI_EnumPhysicalGPUs      0xE5AC921F
 	//   NvAPI_GPU_GetPstates20      0x6FF81213
 	//   NvAPI_GPU_SetPstates20      0x0F4DAE6B
+	//
+	// ⛔⛔ 2026-10-18（本机实测崩溃，**别再改回去**）：**正常路径绝不调用 NvAPI_Unload**。
+	//   LM 进程里 NvAPIWrapper（`NvidiaGpuControl`）也调 P-States20，它把 `nvapi_QueryInterface`
+	//   返回的函数指针**缓存**起来且**从不 Initialize**。只要本类 Unload 一次，wrapper 下一次
+	//   `GPUApi.EnumPhysicalGPUs()` 就直接 0xC0000005（本机 `nvapi-p0-probe --interop` 已复现，
+	//   dump：crash at NvAPIWrapper.Native.GPUApi.EnumPhysicalGPUs）。
+	//   ⇒ 本类改成「进程内只 Initialize 一次（静态标志、失败可重试）+ 永不 Unload」；
+	//     进程退出由系统回收 NVAPI 状态。互操作实测 10/10 一致、无崩溃（同一探针的 --interop）。
 	private const uint FunctionIdInitialize = 0x0150E828u;
-
-	private const uint FunctionIdUnload = 0xD22BDD7Eu;
 
 	private const uint FunctionIdGetErrorMessage = 0x6C2D048Cu;
 
@@ -56,6 +61,10 @@ internal static class NvapiPStates
 	private const uint FunctionIdGpuSetPstates20 = 0x0F4DAE6Bu;
 
 	private static readonly object Gate = new object();
+
+	// ⭐ 进程内只 Initialize 一次：0=未初始化 / 1=已初始化。失败不置 1（下次调用可重试）。
+	//   ⛔ 配套纪律：绝不 Unload（原因见文件上方 FunctionId 注释里的崩溃实测）。
+	private static int _initialized;
 
 	// ⚠️ ThreadStatic：UI 线程（读范围）与后台应用线程（写偏移）可能同时调用 NVAPI；
 	//    用线程本地错误串，避免 A 线程刚失败、B 线程读到 A 的原因（只影响日志，不影响控制流）。
@@ -266,20 +275,17 @@ internal static class NvapiPStates
 		try
 		{
 			api = NvapiApi.Load();
-			int status = api.Initialize();
-			if (status != 0)
+			if (!EnsureInitialized(api, out error))
 			{
-				error = "NvAPI_Initialize 返回 " + api.Error(status);
 				api.Dispose();
 				api = null;
 				return false;
 			}
 			IntPtr[] handles = new IntPtr[NvapiMaxPhysicalGpus];
-			status = api.EnumPhysicalGPUs(handles, out uint count);
+			int status = api.EnumPhysicalGPUs(handles, out uint count);
 			if (status != 0)
 			{
 				error = "NvAPI_EnumPhysicalGPUs 返回 " + api.Error(status);
-				api.Unload();
 				api.Dispose();
 				api = null;
 				return false;
@@ -287,7 +293,6 @@ internal static class NvapiPStates
 			if (count == 0 || handles[0] == IntPtr.Zero)
 			{
 				error = "NVAPI 没有枚举到物理 GPU";
-				api.Unload();
 				api.Dispose();
 				api = null;
 				return false;
@@ -304,21 +309,34 @@ internal static class NvapiPStates
 		}
 	}
 
+	/// <summary>
+	/// 进程内只调一次 <c>NvAPI_Initialize</c>；成功后永久置位，**永不 Unload**
+	/// （与 NvAPIWrapper 共用同一份 nvapi64 状态，Unload 会让 wrapper 后续调用 0xC0000005，已复现）。
+	/// <para>初始化失败时不置位，下一次调用可重试；错误通过 <paramref name="error" /> 如实返回。</para>
+	/// </summary>
+	private static bool EnsureInitialized(NvapiApi api, out string error)
+	{
+		error = null;
+		if (Volatile.Read(in _initialized) != 0)
+		{
+			return true;
+		}
+		int status = api.Initialize();
+		if (status != 0)
+		{
+			error = "NvAPI_Initialize 返回 " + api.Error(status);
+			return false;
+		}
+		Interlocked.Exchange(ref _initialized, 1);
+		return true;
+	}
+
+	/// <summary>
+	/// ⚠️ 只是释放本类的托管句柄，**不做 Unload**（见 <see cref="EnsureInitialized" /> 的说明）。
+	/// </summary>
 	private static void Close(NvapiApi api)
 	{
-		if (api == null)
-		{
-			return;
-		}
-		try
-		{
-			api.Unload();
-		}
-		catch
-		{
-			// Unload 失败不影响已经拿到的结果；下一次调用会重新 Initialize。
-		}
-		api.Dispose();
+		api?.Dispose();
 	}
 
 	private static bool TryReadP0(NvapiApi api, IntPtr gpu, out NvapiPstatesInfo info, out NvapiPstate p0, out int coreIndex, out int memIndex, out string error)
@@ -435,9 +453,6 @@ internal static class NvapiPStates
 	private delegate int NvapiInitializeDelegate();
 
 	[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-	private delegate int NvapiUnloadDelegate();
-
-	[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 	private delegate int NvapiGetErrorMessageDelegate(int status, StringBuilder message);
 
 	[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -453,8 +468,6 @@ internal static class NvapiPStates
 	{
 		internal NvapiInitializeDelegate Initialize;
 
-		internal NvapiUnloadDelegate Unload;
-
 		internal NvapiGetErrorMessageDelegate GetErrorMessage;
 
 		internal NvapiEnumPhysicalGpusDelegate EnumPhysicalGPUs;
@@ -467,7 +480,6 @@ internal static class NvapiPStates
 		{
 			NvapiApi api = new NvapiApi();
 			api.Initialize = GetDelegate<NvapiInitializeDelegate>(FunctionIdInitialize);
-			api.Unload = GetDelegate<NvapiUnloadDelegate>(FunctionIdUnload);
 			api.GetErrorMessage = GetDelegate<NvapiGetErrorMessageDelegate>(FunctionIdGetErrorMessage);
 			api.EnumPhysicalGPUs = GetDelegate<NvapiEnumPhysicalGpusDelegate>(FunctionIdEnumPhysicalGpus);
 			api.GetPstates20 = GetDelegate<NvapiGpuGetPstates20Delegate>(FunctionIdGpuGetPstates20);
