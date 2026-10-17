@@ -882,6 +882,33 @@ public class MechrevoService
 
 	public async Task<bool> SetCustomDetail(Dictionary<string, string> fields)
 	{
+		// ⭐⭐ 2026-10-19（机主：PL1/PL2 不可调 · 日志 `WriteFirmwareField:PL1=120 -> Failed`）：
+		//   ⭐ 宝龙达没有 GCU ⇒ 这几个键**先**走本机 WMI 功能号 23（`TryApplyPowerLimitViaBackend`），
+		//      剩下的字段才发给 MQTT ✅
+		//   ⚠️ 非宝龙达：`UsesBaolongda` 假 ⇒ 整段跳过，逐位不变 ✅
+		if (_hw != null && _hw.UsesBaolongda && fields != null && fields.Count > 0)
+		{
+			List<string> consumedKeys = new List<string>();
+			foreach (KeyValuePair<string, string> kv in fields)
+			{
+				if (TryApplyPowerLimitViaBackend(kv.Key, kv.Value))
+				{
+					consumedKeys.Add(kv.Key);
+				}
+			}
+			foreach (string k in consumedKeys)
+			{
+				fields.Remove(k);
+			}
+			if (consumedKeys.Count > 0)
+			{
+				Logger.WriteLine($"SetCustomDetail：宝龙达 ⇒ 走本机 WMI 的字段 = [{string.Join(",", consumedKeys)}] · 剩余发 MQTT = {fields.Count} 个");
+			}
+			if (fields.Count == 0)
+			{
+				return true;
+			}
+		}
 		CancellationTokenSource requestCts = new CancellationTokenSource();
 		Interlocked.Exchange(ref _customDetailCts, requestCts)?.Cancel();
 		// 2026-10-09（批量下发超时口径 + 重发前收敛）：批次取消令牌挂在方法最外层，
