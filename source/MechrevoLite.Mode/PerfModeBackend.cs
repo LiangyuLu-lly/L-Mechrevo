@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MechrevoLite.Display;
+using MechrevoLite.Gpu;
 using MechrevoLite.Hardware;
 
 namespace MechrevoLite.Mode;
@@ -162,6 +163,20 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 
 	public Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct)
 	{
+		// ⭐⭐ 2026-10-19（宝龙达 · GPU 偏移真正生效）：宝龙达没有 GCU ⇒ 原来的 `ApplyGcuGpuOverclock`
+		//   走的是厂商 MQTT `LCHWOC` 字段，必然失败（机主实测：核心滑块值恒 0）。
+		//   这里改走 NVAPI P-States 20 的 P0 时钟偏移（core + mem 一起写、写完回读、不一致如实报失败）。
+		//   ⚠️ 非宝龙达仍走原来的 `ApplyGcuGpuOverclock`，调用与参数**逐字不变**。
+		if (_hw.UsesBaolongda)
+		{
+			int targetCore = (on ? core : 0);
+			int targetMemory = (on ? memory : 0);
+			bool ok = NvapiPStates.TrySetP0Offsets(targetCore, targetMemory, out int appliedCore, out int appliedMemory);
+			string detail = NvapiPStates.LastError;
+			Logger.WriteLine($"[gpu-oc] 宝龙达 NVAPI P0：请求 core={targetCore} mem={targetMemory} MHz ⇒ ok={ok} · 回读 core={appliedCore} mem={appliedMemory} MHz"
+				+ (string.IsNullOrEmpty(detail) ? "" : " · " + detail));
+			return Task.FromResult(ok);
+		}
 		return _service.ApplyGcuGpuOverclock(on, core, memory);
 	}
 

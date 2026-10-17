@@ -1227,6 +1227,27 @@ public class MechrevoService
 		}
 	}
 
+	/// <summary>
+	/// ⭐ 2026-10-19（宝龙达 · GPU 偏移校验范围）：与 <c>CustomModeForm.GpuOffsetUiRange</c> **同源**
+	/// = NVAPI P0 驱动范围 ∩ <c>-900..+2000 MHz</c>。非宝龙达恒返回 false（调用方保持原判据）。
+	/// </summary>
+	private bool TryGetBaolongdaGpuOffsetUiRange(bool core, out int minimum, out int maximum)
+	{
+		minimum = 0;
+		maximum = 0;
+		if (_hw == null || !_hw.UsesBaolongda)
+		{
+			return false;
+		}
+		if (!NvapiPStates.TryGetP0OffsetRange(out int coreMin, out int coreMax, out int memMin, out int memMax))
+		{
+			return false;
+		}
+		minimum = Math.Max(core ? coreMin : memMin, NvapiPStates.UiOffsetMinimumMhz);
+		maximum = Math.Min(core ? coreMax : memMax, NvapiPStates.UiOffsetMaximumMhz);
+		return maximum > minimum;
+	}
+
 	private bool ValidateCustomField(string key, string text)
 	{
 		if (!int.TryParse(text, out var result))
@@ -1260,9 +1281,25 @@ public class MechrevoService
 		case "GpuDynamicBoost":
 			return _hw.GpuDynamicBoostAdjustable && InRange(result, _hw.GpuDbMinimum, _hw.GpuDbMaximum);
 		case "GpuCoreClockOffsetOC":
+		{
+			// ⭐⭐ 2026-10-19（宝龙达 · GPU 偏移）：宝龙达的可用范围来自 NVAPI P0（与 CustomModeForm 的
+			//   GpuOffsetUiRange 同源：驱动范围 ∩ -900..+2000）。这里必须同口径，否则 UI 能拖到 +600、
+			//   校验却按 hw 的 ±500 拒掉，用户看到的就是"应用后又被弹回 0"。
+			//   ⚠️ 非宝龙达：helper 直接返回 false，判定与改动前逐字一致。
+			if (TryGetBaolongdaGpuOffsetUiRange(core: true, out int coreMin, out int coreMax))
+			{
+				return InOffsetRange(result, coreMin, coreMax);
+			}
 			return _hw.SupportsGpuOverclock && _hw.GpuCoreOffsetAdjustable && InOffsetRange(result, _hw.GpuCoreOffsetUserMinimum, _hw.GpuCoreOffsetUserMaximum);
+		}
 		case "GpuMemoryClockOffsetOC":
+		{
+			if (TryGetBaolongdaGpuOffsetUiRange(core: false, out int memMin, out int memMax))
+			{
+				return InOffsetRange(result, memMin, memMax);
+			}
 			return _hw.SupportsGpuOverclock && _hw.GpuMemoryOffsetAdjustable && InOffsetRange(result, _hw.GpuMemoryOffsetUserMinimum, _hw.GpuMemoryOffsetUserMaximum);
+		}
 		case "CpuTccOffsetSwitch":
 		{
 			bool flag = _hw.TccAdjustable;

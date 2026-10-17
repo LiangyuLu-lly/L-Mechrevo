@@ -827,19 +827,12 @@ public class CustomModeForm : RForm
 			SyncGpuOverclockDependents();
 		});
 		// ⭐⭐ 2026-10-19（机主：GPU 核心频率偏移滑块"不行"——灰的、值恒 0）：
-		//   ⚠️ 范围来自**厂商字段** `GpuCoreOffsetUserMinimum/Maximum`；宝龙达没有 GCU ⇒ 恒 0/0
-		//      ⇒ `DeviceRange` 判为不可调 ⇒ 滑块禁用 ❌
-		//   ⭐ 宝龙达下若范围无效且本机**支持 GPU 超频**（NVAPI 后端在），用一组保守近似范围
-		//      （-100 ~ +200 MHz）；⚠️ 只是给 UI 一个可操作区间，⛔ 不代表硬件接受 ——
-		//      ⭐ 写入仍走 NVAPI 并**回读确认**，写不进去会如实报失败（⛔ 不假装成功）✅
-		int coreMin = hw?.GpuCoreOffsetUserMinimum ?? (-1);
-		int coreMax = hw?.GpuCoreOffsetUserMaximum ?? (-1);
-		if ((hw?.UsesBaolongda ?? false) && (coreMin < 0 || coreMax <= coreMin) && (hw?.SupportsGpuOverclock ?? false))
-		{
-			coreMin = -100;
-			coreMax = 200;
-			Logger.WriteLine("[gpu-oc] 宝龙达：厂商未给核心偏移范围 ⇒ 使用近似范围 -100~+200 MHz（写入仍以回读为准）");
-		}
+		//   ⚠️ 原来范围只来自**厂商 GCU 字段** `GpuCoreOffsetUserMinimum/Maximum`；宝龙达没有 GCU
+		//      ⇒ 常常是 -1/-1 ⇒ `DeviceRange` 判为不可调 ⇒ 滑块禁用/值恒 0 ❌
+		//   ⭐ 现在统一由 `GpuOffsetUiRange` 给范围：宝龙达读 **NVAPI P0 驱动范围**，再与 -900..+2000 MHz 取交集；
+		//      读不到才退回原有 UI 兜底（-100~+200），注释见该方法。⛔ 范围只是 UI 可操作区间，
+		//      真正写入仍走 NVAPI P0 并**回读确认**（写不进去会如实报失败）。
+		(int coreMin, int coreMax, int memMin, int memMax) = GpuOffsetUiRange(hw);
 		(int, int, int, bool) tuple13 = DeviceRange(coreMin, coreMax, hw?.EffectiveGpuCoreClockOffset ?? 0, allowNegative: true);
 		tuple4 = AddSliderRow(Strings.CoreOffset, tuple13.Item1, tuple13.Item2, tuple13.Item3, (int v) =>
 		{
@@ -852,7 +845,7 @@ public class CustomModeForm : RForm
 		// 2026-10-09：文案改为「核心偏移过高，有损坏硬件的风险」——不再带占位符，故去掉 string.Format
 		// （阈值不写进提示，避免窄窗口长句折行；阈值判定逻辑一字未动，见 CoreOffsetWarnThreshold/SyncOcRiskVisuals）。
 		_coreOcRiskRow = MakeOcRiskRow(Strings.GpuCoreOffsetRisk);
-		(int, int, int, bool) tuple14 = DeviceRange(hw?.GpuMemoryOffsetUserMinimum ?? (-1), hw?.GpuMemoryOffsetUserMaximum ?? (-1), hw?.EffectiveGpuMemoryClockOffset ?? 0, allowNegative: true);
+		(int, int, int, bool) tuple14 = DeviceRange(memMin, memMax, hw?.EffectiveGpuMemoryClockOffset ?? 0, allowNegative: true);
 		(_memOc, _memOcVal) = AddSliderRow(Strings.MemoryOffset, tuple14.Item1, tuple14.Item2, tuple14.Item3, (int v) =>
 		{
 			// 2026-10-09：同上 —— 显存偏移也只在点「应用」时下发。
@@ -3595,6 +3588,66 @@ public class CustomModeForm : RForm
 		};
 	}
 
+	/// <summary>
+	/// 2026-10-19（宝龙达 · GPU 偏移范围）：核心/显存滑块的统一范围来源。
+	/// <para>⭐ 宝龙达没有 GCU ⇒ 厂商字段 <c>GpuCoreOffsetUserMinimum/Maximum</c> 常常是 -1/-1
+	/// ⇒ 原来滑块被禁用。现在直接读 **NVAPI P-States 20 的 P0 驱动范围**，再与
+	/// <c>-900..+2000 MHz</c>（第三方 7.3 的 MinCoreOffset/MaxCoreOffset）取交集。</para>
+	/// <para>⚠️ 读不到 NVAPI 范围时：核心保留**既有**兜底 <c>-100..+200 MHz</c>（来源：commit 6ab74f8 的
+	/// 宝龙达 UI 近似范围，只是让滑块可操作，⛔ 不是硬件范围；写入仍以回读为准）；显存不另造兜底，
+	/// 保持后端给出的范围（读不到就禁用，宁可不给也不给一个写不进去的滑块）。</para>
+	/// <para>⚠️ 非宝龙达：逐字返回原来的 <c>hw.GpuCoreOffsetUserMinimum/Maximum</c> 等值，行为不变。</para>
+	/// </summary>
+	private static (int CoreMin, int CoreMax, int MemMin, int MemMax) GpuOffsetUiRange(MechrevoHw hw)
+	{
+		int coreMin = hw?.GpuCoreOffsetUserMinimum ?? (-1);
+		int coreMax = hw?.GpuCoreOffsetUserMaximum ?? (-1);
+		int memMin = hw?.GpuMemoryOffsetUserMinimum ?? (-1);
+		int memMax = hw?.GpuMemoryOffsetUserMaximum ?? (-1);
+		if (!(hw?.UsesBaolongda ?? false))
+		{
+			return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
+		}
+		if (NvapiPStates.TryGetP0OffsetRange(out int driverCoreMin, out int driverCoreMax, out int driverMemMin, out int driverMemMax))
+		{
+			int uiCoreMin = Math.Max(driverCoreMin, NvapiPStates.UiOffsetMinimumMhz);
+			int uiCoreMax = Math.Min(driverCoreMax, NvapiPStates.UiOffsetMaximumMhz);
+			int uiMemMin = Math.Max(driverMemMin, NvapiPStates.UiOffsetMinimumMhz);
+			int uiMemMax = Math.Min(driverMemMax, NvapiPStates.UiOffsetMaximumMhz);
+			bool coreAxisValid = uiCoreMax > uiCoreMin;
+			bool memAxisValid = uiMemMax > uiMemMin;
+			if (coreAxisValid)
+			{
+				coreMin = uiCoreMin;
+				coreMax = uiCoreMax;
+			}
+			if (memAxisValid)
+			{
+				memMin = uiMemMin;
+				memMax = uiMemMax;
+			}
+			if (coreAxisValid || memAxisValid)
+			{
+				Logger.WriteLineIfChanged("gpu-oc-ui-range-baolongda",
+					$"[gpu-oc] 宝龙达 UI 范围：驱动 P0 core={driverCoreMin}..{driverCoreMax} mem={driverMemMin}..{driverMemMax} MHz ⇒ 与 -900..+2000 取交集 core={(coreAxisValid ? uiCoreMin + ".." + uiCoreMax : "(不可用)")} mem={(memAxisValid ? uiMemMin + ".." + uiMemMax : "(不可用)")} MHz");
+				return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
+			}
+			Logger.WriteLine("[gpu-oc] 宝龙达 NVAPI P0 范围与 -900..+2000 取交集后两轴都无效，改用既有兜底: core=" + uiCoreMin + ".." + uiCoreMax + " mem=" + uiMemMin + ".." + uiMemMax);
+		}
+		else
+		{
+			Logger.WriteLine("[gpu-oc] 宝龙达 NVAPI P0 范围读不到: " + NvapiPStates.LastError);
+		}
+		if ((coreMin < 0 || coreMax <= coreMin) && (hw?.SupportsGpuOverclock ?? false))
+		{
+			// 既有兜底（commit 6ab74f8）：仅 UI 可操作区间，来源不是硬件；写不进去时由回读如实报失败。
+			coreMin = -100;
+			coreMax = 200;
+			Logger.WriteLine("[gpu-oc] 宝龙达：NVAPI/厂商均未给核心偏移范围 ⇒ 保留既有 UI 兜底 -100~+200 MHz（非硬件范围，写入仍以回读为准）");
+		}
+		return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
+	}
+
 	private static (int Min, int Max, int Value, bool Adjustable) DeviceRange(int minimum, int maximum, int current, bool allowNegative = false)
 	{
 		if ((allowNegative || minimum >= 0) && maximum > minimum)
@@ -3874,8 +3927,9 @@ public class CustomModeForm : RForm
 					// （否则用户刚拖好的值会被悄悄抹掉）；其余滑块/开关的 ApplyRange 路径一字未动。
 					if (!_gpuOcDirty)
 					{
-						_gpuOcCoreAdjustable = ApplyRange(_coreOc, _coreOcVal, hw.GpuCoreOffsetUserMinimum, hw.GpuCoreOffsetUserMaximum, hw.EffectiveGpuCoreClockOffset, allowNegative: true);
-						_gpuOcMemoryAdjustable = ApplyRange(_memOc, _memOcVal, hw.GpuMemoryOffsetUserMinimum, hw.GpuMemoryOffsetUserMaximum, hw.EffectiveGpuMemoryClockOffset, allowNegative: true);
+						(int refreshCoreMin, int refreshCoreMax, int refreshMemMin, int refreshMemMax) = GpuOffsetUiRange(hw);
+						_gpuOcCoreAdjustable = ApplyRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset, allowNegative: true);
+						_gpuOcMemoryAdjustable = ApplyRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset, allowNegative: true);
 					}
 				}
 				else if (_gpuOcArmed & supportsGpuOverclock)

@@ -300,6 +300,18 @@ internal static class Program
 			Logger.WriteLine("[kbd-probe] " + probeLog);
 			return;
 		}
+		// ⭐⭐ 2026-10-19（宝龙达 · GPU 核心/显存偏移）：NVAPI P-States 20 真机探针。
+		//   用法：L-Mechrevo.exe --gpu-oc-probe
+		//   读 P0 基线 → 核心/显存各 +50 → 回读 → 各 +100 → 回读 → 归零 → 回读；
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-gpu-oc-probe-*.txt。
+		case "--gpu-oc-probe":
+		{
+			string probeLog = GpuOcProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[gpu-oc-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
 		// 2026-10-05 step7A (upstream 0.290.6 A-41): capability probe CLI.
 		// L-Mechrevo.exe --cpu-tuning-probe [output.json]
 		case "--cpu-tuning-probe":
