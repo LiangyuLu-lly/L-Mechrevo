@@ -3305,6 +3305,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⚠️ 40 系官方在"模式 2 → 颜色"之间还等 500ms；**30 系官方没有延迟** ⇒ 本机不加 ✅
 			// ⭐ ② 先模式（⭐ 功能号 16）—— ⭐ 由调用方按效果 Id 映射（⭐ 单一来源 ✅）
 			bool modeOk = wmi.TrySetKeyboardMode(mode);
+			// ⭐⭐ 2026-10-17（依据：第三方 JiaoLong7.3 + 官方 40 系 `SetSP_KeyboardColor`）：
+			//   ⭐ 两家 40 系实现都是「写模式 2 → **await Task.Delay(500)** → 写颜色」⚠️
+			//   ⭐ 而官方 **30 系**是「模式 2 → 立即写颜色」（无延迟）✅
+			//   ⇒ ⭐ 40/50 系**必须**在模式与颜色之间等 500ms，否则颜色会被固件丢掉 ❌
+			//      （真机现象：彩虹/轮播显示成单一颜色、单色有效 —— 正是颜色没进去）
+			//   ⚠️ 30 系不加延迟（与官方 30 系一致）；⛔ 只在写入线程上等，不阻塞 UI ✅
+			DgpuGenerationKind kbGen = DgpuGeneration;
+			if (kbGen == DgpuGenerationKind.Gen40 || kbGen == DgpuGenerationKind.Gen50)
+			{
+				Thread.Sleep(500);
+			}
 			// ⭐ ③ 再颜色（⭐ 功能号 17，⭐ 三字节 R,G,B ✅）
 			int r = (colorArgb >> 16) & 0xFF;
 			int g = (colorArgb >> 8) & 0xFF;
@@ -3424,7 +3435,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return 0;
 		}
-		return (byte)Math.Clamp(ui0to4, 1, 3);
+		// ⭐⭐ 2026-10-17（依据：第三方 JiaoLong7.3 的 `WMIRGBKeyboardBrightnessLevel`）：
+		//   ⭐ 它明确枚举了 `Level_0..Level_4`（**0~4 共 5 档**）⚠️
+		//   ⭐ 而官方 40 系（v0.3.15）与第三方 7.3（40 系改）**都有**这一档
+		//   ⇒ ⭐ **40 系（Gen40/50）按 0~4 透传** ✅
+		//   ⚠️ 30 系目前**只确认到 0~3**（30 系官方包里没找到完整枚举）⇒ ⭐ 保守夹到 3
+		//   ⚠️ 原来无条件 `Clamp(1,3)` ⇒ ⭐ 40 系的第 4 档被吞掉（用户会觉得"亮度调不上去"）❌
+		DgpuGenerationKind gen = Program.hw?.DgpuGeneration ?? DgpuGenerationKind.Unknown;
+		int max = (gen == DgpuGenerationKind.Gen40 || gen == DgpuGenerationKind.Gen50) ? 4 : 3;
+		return (byte)Math.Clamp(ui0to4, 1, max);
 	}
 
 	/// <summary>

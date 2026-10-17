@@ -1091,9 +1091,14 @@ internal sealed class BaolongdaWmi : IDisposable
 	}
 
 	/// <summary>⭐ 键盘灯亮度（功能号 18，⭐ 0~3 级）。</summary>
-	internal bool TrySetKeyboardBrightness(byte level0to3)
+	internal bool TrySetKeyboardBrightness(byte level0to4)
 	{
-		return TryWriteByte(Function.RgbKeyboardBrightness, level0to3 > 3 ? (byte)3 : level0to3);
+		// ⭐⭐ 2026-10-17（依据：第三方 JiaoLong7.3 的 `WMIRGBKeyboardBrightnessLevel` = Level_0..Level_4）：
+		//   ⭐ 亮度值域是 **0~4（5 档）**，不是 0~3 ⚠️
+		//   ⇒ 原来 `> 3 ? 3 : v` 会把 40 系的第 4 档**静默夹成 3** ⇒ 看起来"亮度调不上去" ❌
+		//   ⚠️ 上限判据交给调用方（`BaolongdaBrightnessFromUi` 按 GPU 代数决定 30 系 3 / 40 系 4）✅
+		//      ⭐ 这里只做最后的 0~4 安全夹，⛔ 不再按 3 夹 ✅
+		return TryWriteByte(Function.RgbKeyboardBrightness, level0to4 > 4 ? (byte)4 : level0to4);
 	}
 
 	/// <summary>⭐ 键盘灯模式（功能号 16）—— ⭐ <c>0 = 关</c> · <c>2 = RGB 固定色</c>（⭐ 参考实现只用到这两个）。</summary>

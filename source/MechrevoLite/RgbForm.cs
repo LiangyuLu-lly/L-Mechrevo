@@ -491,7 +491,11 @@ public class RgbForm : RForm
 		// 2026-10-17 (真机: 4070 键盘灯亮度调不了): 宝龙达硬件亮度只有 0~3
 		// (BaolongdaBrightnessFromUi 把 >3 夹到 3), 而滑块原来是 0~4 => 第4档和第3档完全相同
 		// => 宝龙达下上限收到 3; 非宝龙达仍是 0~4 (逐位不变)
-		int brightMax = (Program.hw?.UsesBaolongda ?? false) ? 3 : 4;
+		// 40/50 系：亮度 0~4 五档（第三方 JiaoLong7.3 WMIRGBKeyboardBrightnessLevel.Level_4 可证）；
+		// 30 系：目前只确认到 0~3；非宝龙达（GCU）仍 0~4 => 逐位不变
+		bool bd40 = Program.hw?.UsesBaolongda == true
+			&& (Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40 || Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen50);
+		int brightMax = !(Program.hw?.UsesBaolongda ?? false) ? 4 : (bd40 ? 4 : 3);
 		_brightSlider = new RSlider
 		{
 			Minimum = 0,
