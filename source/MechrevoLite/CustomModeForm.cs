@@ -490,6 +490,18 @@ public class CustomModeForm : RForm
 		_deleteButton = MakeModeButton("buttonModeDelete", Strings.PerfModeDelete, DeleteCustomModeAsync);
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayoutPanel.Controls.Add(modeFlow, 0, rowCount++);
+		// ⭐⭐ 2026-10-17（真机反馈「选了自定义 1 又跳回狂暴」）：⭐ 宝龙达**没有固件自定义档** ⚠️
+		//   ⇒ `PerfModeCapabilities.SupportsFirmwareSlot = !UsesBaolongda` = false ⇒ 切固件档必然失败
+		//      ⇒ ⭐ 下拉里选「自定义 N」后会**回弹到当前档**（用户看到的就是"自己又跳回狂暴"）❌
+		//   ⭐ 而自定义档在宝龙达上本来就只有**软件配置**（PL1/PL2/温度墙走 WMI 功能号 23，
+		//      配置存 `perf_custom*_` 键）—— ⛔ 不需要、"也切不了"固件档。
+		//   ⇒ ⭐ 宝龙达下把**整行模式选择（下拉 + 新建/重命名/删除）隐藏** ✅
+		//      ⭐ 用户仍可编辑 PL1/PL2/温度墙并「应用」⇒ 落到本机配置（这条本来就有 ✅）
+		//   ⚠️ 非宝龙达 ⇒ 恒 false ⇒ ⭐ 逐位不变 ✅
+		if (Program.hw?.UsesBaolongda ?? false)
+		{
+			modeFlow.Visible = false;
+		}
 		_nameRow = new FlowLayoutPanel
 		{
 			Name = "modeNameRow",
