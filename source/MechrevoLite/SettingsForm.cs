@@ -162,9 +162,10 @@ public class SettingsForm : RForm
 	{
 		(Strings.QuickGroupInput, new string[7] { "touchpad", "touchpadtoggle", "wifi", "bt", "webcam", "micmute", "numpad" }),
 		(Strings.QuickGroupKeyboard, new string[5] { "winkey", "fnkey", "copilot", "osd", "capslock" }),
-		(Strings.QuickGroupPower, new string[12]
+		// ⭐ 2026-10-19（机主要求）：`apuboost`（APU 防缩缸）归到「电源与系统」组，紧挨 `highperf` ✅
+		(Strings.QuickGroupPower, new string[13]
 		{
-			"usb", "highperf", "fanboost", "acrecovery", "cpuadvperf", "gamewhitelist", "taskbarautohide", "transparency", "darktheme", "deepsleep",
+			"usb", "highperf", "apuboost", "fanboost", "acrecovery", "cpuadvperf", "gamewhitelist", "taskbarautohide", "transparency", "darktheme", "deepsleep",
 			"monitoroff",
 			"winupdate"
 		}),
