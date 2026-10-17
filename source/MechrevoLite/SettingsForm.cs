@@ -581,9 +581,11 @@ public class SettingsForm : RForm
 	/// ⭐ 关灯**不走本表**：⭐ 关灯 ＝ ⭐ <b>写亮度（功能号 18）＝ 0</b> ✅
 	/// （⭐ 见 <c>MechrevoHw.TrySetKeyboardLightingViaBackend</c> ✅）。</para>
 	/// </summary>
-	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[3]
+	// ⭐⭐ 2026-10-19（机主：「键盘下拉里面的关和左边开关功能重复」）：⭐ 下拉里**去掉「关」** ✅
+	//   ⭐ 开/关由左边那颗开关负责（写亮度 0），下拉只选"开着的时候是什么效果" ✅
+	//   ⚠️ 顺序保持 Single(2) → Rainbow(1)，与 `MechrevoHw.TryMapBaolongdaKeyboardMode` 一致 ✅
+	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[2]
 	{
-		("Off", Strings.Off),
 		("Single", Strings.EffectSingle),
 		("Rainbow", Strings.EffectRainbow)
 	};
