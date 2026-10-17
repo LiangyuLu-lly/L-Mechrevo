@@ -3910,6 +3910,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	private volatile bool _baolongdaFanCurveApplied;
 
+	// ⭐⭐ 2026-10-17（接手修复）：两个通道各一个决策器 —— 回差/去重都在这里 ✅
+	//   ⚠️ 此前 `FanCurveDecider` 写好了却**没人调用** ⚠️ ⇒ 3 s 定时器每 tick 都无条件重写
+	//   ⇒ 现在只在目标变化时写，另每 30 s 重申一次手动控制权（⭐ 防固件自己退回自动 ⚠️）
+	private readonly FanCurveDecider _baolongdaCurveDecider0 = new FanCurveDecider();
+
+	private readonly FanCurveDecider _baolongdaCurveDecider1 = new FanCurveDecider();
+
+	private const int BaolongdaCurveReassertMs = 30000;
+
+	private long _baolongdaCurveLastWriteTick;
+
 	/// <summary>⭐ 软件闭环当前是否已接管风扇（⭐ 用于"退出/关闭时交回固件" ✅）。</summary>
 	internal bool BaolongdaFanCurveApplied => _baolongdaFanCurveApplied;
 
@@ -3931,25 +3942,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			return false;
 		}
 		bool ok = BaolongdaFanCurveStore.Save(settings);
+		// ⭐ 曲线被保存（含只改开关）⇒ 决策器清零 ⇒ 下一个 tick **必定重写**
+		//   （⛔ 否则会拿旧回差状态压住新曲线，用户会以为"保存了没反应" ⚠️）
+		_baolongdaCurveDecider0.Reset();
+		_baolongdaCurveDecider1.Reset();
 		if (!settings.Enabled)
 		{
-					// ⭐⭐ 2026-10-16（"回读"需求）：⭐ 启动时把"⭐ 本机哪些功能号是通的"⭐ 打**一次** ✅
-		//   ⭐ 为什么不周期打：⭐ 快照里的温度/转速每 3 秒都变 ⚠️ ⇒ ⭐ 周期打就是刷屏 ❌
-		//   ⭐ 这一份清单 ⭐ **正好也是诊断包要的内容**（⭐ 让机主一眼看出本机支持情况 ✅）
-		try
-		{
-			BaolongdaStateSnapshot supportSnap = BaolongdaStateSnapshot.Capture(_baolongda?.Wmi);
-			foreach (string supportLine in supportSnap.DescribeSupportList())
-			{
-				Logger.WriteLine("宝龙达状态支持清单：" + supportLine);
-			}
-			Logger.WriteLine("宝龙达状态支持清单（⭐ 说明）：⭐ 上面的 ✅ 表示**本机该功能号可读** ✅；"
-				+ "⚠️ 表示读不到 ⇒ ⭐ 相关的界面开关**应当隐藏**（⛔ 免得点了没反应 ✅）");
-		}
-		catch (Exception exSnap)
-		{
-			Logger.WriteLine("宝龙达状态支持清单：⭐ 采集失败（已吞掉）：" + exSnap.Message);
-		}RestoreBaolongdaFanFirmwareControl();
+			RestoreBaolongdaFanFirmwareControl();
 		}
 		else
 		{
@@ -3999,23 +3998,41 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//    ⚠️ 而且 ⭐ **原来那两个 max RPM（4400/8200）是抄来的参考值** ⚠️ ⇒ ⭐ 现在整个不需要它了 ✅
 			FanCurvePoint[] channel0Points = FanCurveEngine.BuildPoints(settings.Channel0Temperatures, settings.Channel0Rpms);
 			FanCurvePoint[] channel1Points = FanCurveEngine.BuildPoints(settings.Channel1Temperatures, settings.Channel1Rpms);
-			// ⚠️⚠️ 温度来源的**配对沿用改动前**的关联（gpuTemp↔ch0 · cpuTemp↔ch1）✅
-			//    ⭐ ⛔ 但**归属本身仍未真机确认** ⚠️ ⇒ ⭐ 这里刻意不写 CPU/GPU 语义 ✅
-			int channel0Rpm = FanCurveEngine.ResolveRpm(channel0Points, gpuTemp, settings.MinRpm, settings.MaxRpm);
-			int channel1Rpm = FanCurveEngine.ResolveRpm(channel1Points, cpuTemp, settings.MinRpm, settings.MaxRpm);
+			// ⚠️ 空曲线 ⇒ **不许写**（⛔ 绝不能把"没有曲线"当成"用最低转速"——那等于瞎转风扇）✅
+			if (channel0Points.Length == 0 || channel1Points.Length == 0)
+			{
+				Logger.WriteLineIfChanged("baolongda-fancurve-nopoints",
+					"宝龙达风扇曲线：⚠️ 至少一个通道没有可用曲线点 ⇒ ⭐ 本轮不写（⛔ 不拿最低转速顶替 ✅）");
+				return false;
+			}
+			// ⭐⭐ 决策器（回差 3℃）：升温立刻写、降温要过回差、**目标没变就不写** ✅
+			//   ⚠️ 温度来源的配对沿用改动前：gpuTemp↔ch0 · cpuTemp↔ch1 ✅
+			int? decided0 = _baolongdaCurveDecider0.Decide(channel0Points, gpuTemp, settings.MinRpm, settings.MaxRpm, settings.HysteresisC);
+			int? decided1 = _baolongdaCurveDecider1.Decide(channel1Points, cpuTemp, settings.MinRpm, settings.MaxRpm, settings.HysteresisC);
+			long nowTick = Environment.TickCount64;
+			bool reassertDue = (nowTick - _baolongdaCurveLastWriteTick) >= BaolongdaCurveReassertMs;
+			if (!decided0.HasValue && !decided1.HasValue && !reassertDue)
+			{
+				// ⭐ 两条通路都没变 ⇒ **本轮一个字节都不写**（⭐ 这是原先缺的那层防抖 ✅）
+				return false;
+			}
+			// ⭐ 没变的那一路用决策器记着的**上次落笔值**（⛔ 不用 ResolveRpm 重算，否则绕过回差 ✅）
+			int channel0Rpm = decided0 ?? _baolongdaCurveDecider0.LastRpm;
+			int channel1Rpm = decided1 ?? _baolongdaCurveDecider1.LastRpm;
 			int channel0Units = FanCurveEngine.ToUnits100Rpm(channel0Rpm);
 			int channel1Units = FanCurveEngine.ToUnits100Rpm(channel1Rpm);
 			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致 ✅
-			//    ⭐ ch0 = `FanType 0` · ⭐ ch1 = `FanType 1` ⚠️（⭐ 语义归属未确认 ✅）
+			//    ⭐ ch0 = `FanType 0` · ⭐ ch1 = `FanType 1` ⚠️（⭐ 语义归属未真机确认 ✅）
 			if (!TrySetFanManualViaBackend(enable: true, channel0Units, channel1Units, out bool confirmed))
 			{
 				return false;
 			}
+			_baolongdaCurveLastWriteTick = nowTick;
 			_baolongdaFanCurveApplied = true;
 			Logger.WriteLineIfChanged("baolongda-fancurve-step",
 				$"宝龙达风扇曲线（⭐ 软件闭环 · ⭐ 单位 RPM ✅）：⭐ ch0 温度 {gpuTemp}℃ → ⭐ {channel0Rpm} RPM（⭐ 档位 {channel0Units}）"
 				+ $" · ⭐ ch1 温度 {cpuTemp}℃ → ⭐ {channel1Rpm} RPM（⭐ 档位 {channel1Units}）"
-				+ $" · ⭐ 确认={confirmed} ⚠️（⭐ 通道归属待真机确认 ✅）");
+				+ $" · ⭐ 确认={confirmed} · ⭐ 本轮{(reassertDue && !decided0.HasValue && !decided1.HasValue ? "仅重申" : "有变化")}（⭐ 通道归属待真机确认 ⚠️）");
 			return true;
 		}
 		catch (Exception ex)
@@ -4038,6 +4055,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return;
 		}
+		// ⭐ 交回固件后**下一次启用必须重写**（⛔ 不能因为"目标没变"就跳过首写）✅
+		_baolongdaCurveDecider0.Reset();
+		_baolongdaCurveDecider1.Reset();
+		_baolongdaCurveLastWriteTick = 0;
 		try
 		{
 			// ⭐⭐ 先**读一次**手动开关 ⚠️ ⇒ ⭐ **只有它真的是"开"⭐ 才写** ✅
@@ -4481,23 +4502,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//   ⚠️ 为什么在**启动**就要做：⭐ 上次若是**被强杀**（⭐ 任务管理器 / ⭐ 崩溃 ✅）
 		//      ⇒ ⭐ 风扇会**停在我们上次写的转速上** ⚠️（⭐ 因为"手动开关"是写在 EC 里的、⭐ 会留着 ✅）
 		//   ⭐ 本方法**先读再决定**：⭐ 手动开关本来就关着 ⇒ ⛔ **一个字节都不写** ✅
-				// ⭐⭐ 2026-10-16（"回读"需求）：⭐ 启动时把"⭐ 本机哪些功能号是通的"⭐ 打**一次** ✅
-		//   ⭐ 为什么不周期打：⭐ 快照里的温度/转速每 3 秒都变 ⚠️ ⇒ ⭐ 周期打就是刷屏 ❌
-		//   ⭐ 这一份清单 ⭐ **正好也是诊断包要的内容**（⭐ 让机主一眼看出本机支持情况 ✅）
-		try
-		{
-			BaolongdaStateSnapshot supportSnap = BaolongdaStateSnapshot.Capture(_baolongda?.Wmi);
-			foreach (string supportLine in supportSnap.DescribeSupportList())
-			{
-				Logger.WriteLine("宝龙达状态支持清单：" + supportLine);
-			}
-			Logger.WriteLine("宝龙达状态支持清单（⭐ 说明）：⭐ 上面的 ✅ 表示**本机该功能号可读** ✅；"
-				+ "⚠️ 表示读不到 ⇒ ⭐ 相关的界面开关**应当隐藏**（⛔ 免得点了没反应 ✅）");
-		}
-		catch (Exception exSnap)
-		{
-			Logger.WriteLine("宝龙达状态支持清单：⭐ 采集失败（已吞掉）：" + exSnap.Message);
-		}RestoreBaolongdaFanFirmwareControl();
+		RestoreBaolongdaFanFirmwareControl();
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath});"
 			+ $" 功耗墙范围 PL1/PL2=[{Pl1Minimum},{Pl1Maximum}]W · 温度墙=[{TccMinimum},{TccMaximum}]℃（⭐ 本地记忆 PL1={Pl1} PL2={Pl2} 温度墙={TccTarget} ⚠️ 非从机器读回）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
@@ -8451,23 +8456,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⭐ 2026-10-16：⭐ 宝龙达后端同样要放（⭐ 它持有 WMI 实例 ✅）
 		//   ⭐⭐ 而且在放之前 ⭐ **必须先把风扇交回固件** ⚠️
 		//      （⭐ 否则风扇会**停在我们上次写的转速上** ⚠️ —— ⭐ 那是用户在关机前会明显感到的问题 ✅）
-				// ⭐⭐ 2026-10-16（"回读"需求）：⭐ 启动时把"⭐ 本机哪些功能号是通的"⭐ 打**一次** ✅
-		//   ⭐ 为什么不周期打：⭐ 快照里的温度/转速每 3 秒都变 ⚠️ ⇒ ⭐ 周期打就是刷屏 ❌
-		//   ⭐ 这一份清单 ⭐ **正好也是诊断包要的内容**（⭐ 让机主一眼看出本机支持情况 ✅）
-		try
-		{
-			BaolongdaStateSnapshot supportSnap = BaolongdaStateSnapshot.Capture(_baolongda?.Wmi);
-			foreach (string supportLine in supportSnap.DescribeSupportList())
-			{
-				Logger.WriteLine("宝龙达状态支持清单：" + supportLine);
-			}
-			Logger.WriteLine("宝龙达状态支持清单（⭐ 说明）：⭐ 上面的 ✅ 表示**本机该功能号可读** ✅；"
-				+ "⚠️ 表示读不到 ⇒ ⭐ 相关的界面开关**应当隐藏**（⛔ 免得点了没反应 ✅）");
-		}
-		catch (Exception exSnap)
-		{
-			Logger.WriteLine("宝龙达状态支持清单：⭐ 采集失败（已吞掉）：" + exSnap.Message);
-		}RestoreBaolongdaFanFirmwareControl();
+		RestoreBaolongdaFanFirmwareControl();
 		_baolongda?.Dispose();
 		_baolongda = null;
 		DataChanged = null;

@@ -169,11 +169,11 @@ internal sealed class BaolongdaFanCurveSettings
 	}
 
 	/// <summary>⭐ 深拷贝（⭐ 数组类型是可变引用 ⇒ ⭐ 传出去前必须拷贝，⛔ 免得外部改到内部状态 ✅）。</summary>
-	internal BaolongdaFanCurveSettings Clone()
+	internal BaolongdaFanCurveSettings Clone(bool? enabledOverride = null)
 	{
 		return new BaolongdaFanCurveSettings
 		{
-			Enabled = Enabled,
+			Enabled = enabledOverride ?? Enabled,
 			FormatVersion = FormatVersion,
 			HysteresisC = HysteresisC,
 			IntervalMs = IntervalMs,
@@ -186,6 +186,12 @@ internal sealed class BaolongdaFanCurveSettings
 			IsUnreadableArchive = IsUnreadableArchive,
 			StatusNote = StatusNote
 		};
+	}
+
+	/// <summary>⭐ 拷贝一份、只改 <see cref="Enabled" /> ✅（⭐ 供界面「启用/关闭软件闭环」开关用 ✅）。</summary>
+	internal BaolongdaFanCurveSettings WithEnabled(bool enabled)
+	{
+		return Clone(enabled);
 	}
 }
 

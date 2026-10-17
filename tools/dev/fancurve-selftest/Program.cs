@@ -338,6 +338,17 @@ internal static class Program
 		Eq("往返 ⇒ ch1 转速末点", 1800 + 15, back.Channel1Rpms[15]);
 		Eq("往返 ⇒ 不该有错误日志", 0, Logger.Errors.Count);
 
+		// ---- 用例 4b：WithEnabled —— 界面开关"只改 Enabled、⛔ 不动曲线" ✅（2026-10-17 接手修复）----
+		BaolongdaFanCurveSettings off = saved.WithEnabled(false);
+		True("WithEnabled(false) ⇒ Enabled=false", !off.Enabled);
+		Eq("WithEnabled(false) ⇒ 曲线原样（ch0 温度首点）", 30, off.Channel0Temperatures[0]);
+		Eq("WithEnabled(false) ⇒ 转速上限原样", 5100, off.MaxRpm);
+		Eq("WithEnabled(false) ⇒ 回差原样", 5, off.HysteresisC);
+		True("WithEnabled(false) ⇒ 原对象不被改动（仍是 true）", saved.Enabled);
+		BaolongdaFanCurveSettings on = off.WithEnabled(true);
+		True("WithEnabled(true) ⇒ 能再打开", on.Enabled);
+		True("WithEnabled(true) ⇒ 也不是旧存档", !on.IsUnreadableArchive);
+
 		// ---- 用例 5：v2 但某条曲线点数不对 ⇒ ⭐ **整份读不懂** ✅（⭐ 自检发现的设计修正 ⚠️）----
 		//    ⚠️ 为什么不是"⭐ 该条退回默认、⭐ 别的照用"⚠️：
 		//    ⭐ 温度数组与转速数组描述的是**同一条曲线** ✅ ⇒ ⭐ 一个用默认、⭐ 一个用用户的
