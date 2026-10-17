@@ -2393,7 +2393,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"fnkey" => FnKeySeen, 
 			"numpad" => NumpadSeen, 
 			"osd" => true, 
-			"usb" => true, 
+			// ⭐⭐ 2026-10-17 真机修复（蛟龙16 · 板号 `MRID6` · 用户反馈「关机 USB 供电点不动」）：
+			//   ⚠️ `SwitchUsbCharger` 的**唯一**通道是 ⭐ MQTT `Setting/Control`
+			//      （`USB_CHARGER_ON/OFF`，见 `MechrevoService.SwitchUsbCharger`）⇒ ⭐ **必须有 GCU** ⚠️
+			//   ⇒ ⭐ 宝龙达（无 GCU）**没有任何下发通路** ⇒ ⭐ 原来无条件 `true` ⇒ ⭐ 开关可见但点了没反应 ❌
+			//   ⇒ ⭐ 现按能力位判据「⭐ 已接好下发路径」收紧：⭐ 宝龙达下**整条隐藏** ✅
+			//   ⚠️ **非宝龙达逐位不变**：⭐ 老接口/GCU 机型仍恒 `true`（⭐ 与改动前逐字一致 ✅）。
+			"usb" => !UsesBaolongda, 
 			"deepsleep" => DeepSleepSeen, 
 			"copilot" => CopilotSeen, 
 			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen, 

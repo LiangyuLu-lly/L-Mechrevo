@@ -72,7 +72,15 @@ Source: "files\Resources\DefaultCurve_Turbo.json"; DestDir: "{app}\Resources"; F
 Source: "files\Resources\qrcode1.jpg"; DestDir: "{app}\Resources"; Flags: ignoreversion 
 Source: "files\Resources\qrcode2.jpg"; DestDir: "{app}\Resources"; Flags: ignoreversion 
 Source: "files\Resources\qrcode3.png"; DestDir: "{app}\Resources"; Flags: ignoreversion 
-Source: "files\Resources\qrcode4.png"; DestDir: "{app}\Resources"; Flags: ignoreversion 
+Source: "files\Resources\qrcode4.png"; DestDir: "{app}\Resources"; Flags: ignoreversion
+; ⭐⭐ 2026-10-17 修复（真机反馈「熄屏不睡眠点不动 · 报错缺失组件 usbmmidd_v2」）：
+;   ⚠️ 根因：⭐ 驱动组件【一直在】`installer-src\files\usbmmidd_v2`（7 个文件 ✅），
+;      但 ⛔ **本文件的 [Files] 从来没有引用过它**（`git log -S usbmmidd -- installer-src/install_script.iss` 空 ✅）
+;      ⇒ ⭐ 装完 `{app}\usbmmidd_v2` 根本不存在 ⇒ ⭐ `VirtualDisplayBlank.VerifyDriverFiles` 判缺失
+;      ⇒ ⭐ 点「熄屏」只回一句「组件缺失」❌（⭐ 与 UWACPIDriver 那次「文件在、但没被安装」同一类坑 ⚠️）
+;   ✅ 修法：⭐ 用通配符整目录铺到 `{app}\usbmmidd_v2`（⭐ 与 `GetDriverDir()` 的路径逐字一致 ✅）
+;   ⚠️ 许可：⭐ 该驱动按自带 `usbmmidd_v2\License.txt`（Amyuni）分发，⛔ 不另给许可文本（原样带上 ✅）
+Source: "files\usbmmidd_v2\*"; DestDir: "{app}\usbmmidd_v2"; Flags: ignoreversion 
 Source: "files\zh-CN\L-Mechrevo.resources.dll"; DestDir: "{app}\zh-CN"; Flags: ignoreversion 
 Source: "files\zh-CN\Microsoft.Win32.TaskScheduler.resources.dll"; DestDir: "{app}\zh-CN"; Flags: ignoreversion 
 Source: "files\THIRD_PARTY_NOTICES,2.txt"; DestDir: "{app}\LICENSES"; DestName: "THIRD_PARTY_NOTICES.txt"; Flags: ignoreversion
@@ -2461,6 +2469,15 @@ begin
     if BoardU = 'MRID6-23' then
     begin
       Log('LM-GCU-SKIP: 板号 = MRID6-23（宝龙达模具 · 蛟龙16Pro 40系）=> 本机【不安装 GCU】');
+      Result := True;
+      Exit;
+    end;
+    // ⭐ ①b 精确命中【裸】`MRID6`（⭐ 2026-10-17 真机：⭐ 蛟龙16 · R7-6800H ＋ RTX 3070Ti ✅）
+    //    ⚠️ 旧判据只认「精确 `MRID6-23`」＋「前缀 `MRID6-`」⇒ ⭐ 裸 `MRID6` 两条都不命中 ❌
+    //    ⇒ ⭐ 整台机照旧装 GCU、后端退回 legacy ⇒ ⭐ 一连串"点了没反应"⚠️（⭐ 与后端白名单逐条一致 ✅）
+    if BoardU = 'MRID6' then
+    begin
+      Log('LM-GCU-SKIP: 板号 = MRID6（宝龙达模具 · 蛟龙16 30系 · 裸板号）=> 本机【不安装 GCU】');
       Result := True;
       Exit;
     end;

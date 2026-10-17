@@ -202,7 +202,7 @@ internal sealed class BaolongdaWmi : IDisposable
 				//      （⭐ 例如厂商驱动/服务被卸载后，⭐ 固件侧接口未解锁 ⚠️）
 				if (IsBaolongdaBoardCandidate())
 				{
-					Logger.WriteError("宝龙达 WMI 探测失败：⭐ 主板型号是宝龙达候选（`MRID6-*`）且 "
+					Logger.WriteError("宝龙达 WMI 探测失败：⭐ 主板型号是宝龙达候选（`MRID6` / `MRID6-*`）且 "
 						+ "`root\\WMI:MICommonInterface` **类存在**，⭐ 但**读一次 CPU 温度（功能号 22）失败** "
 						+ "⇒ ⭐ 本机认不出宝龙达 ❌。"
 						+ "⚠️ 可选成因：⭐ **官方控制台/它的驱动被卸载后固件侧接口未解锁** ⚠️、"
@@ -248,7 +248,7 @@ internal sealed class BaolongdaWmi : IDisposable
 			//    ⭐ 判据用**静态板号**（⭐ 只读注册表 ✅ · ⭐ 与后端白名单**同一套** ✅）⇒ ⭐ 不误伤同方 ✅
 			if (IsBaolongdaBoardCandidate())
 			{
-				Logger.WriteError("宝龙达 WMI 探测失败：⭐ 主板型号是宝龙达候选（`MRID6-*`）但 "
+				Logger.WriteError("宝龙达 WMI 探测失败：⭐ 主板型号是宝龙达候选（`MRID6` / `MRID6-*`）但 "
 					+ "`root\\WMI:MICommonInterface` **这个类不存在** ⇒ ⭐ 本机认不出宝龙达 ❌。"
 					+ "⚠️ 已知成因：⭐ **卸载官方控制台（JiaoLong Control）后可能出现此现象** ⚠️；"
 					+ "⭐ 请随诊断包一起反馈（⭐ 宝龙达诊断段会打印该类与 `PNP0C14` 设备的存在性 ✅）");
@@ -608,15 +608,21 @@ internal sealed class BaolongdaWmi : IDisposable
 				throw new IOException("宝龙达 MIFS 写档位失败（详见上一行日志）。");
 			}
 		}, ct).ConfigureAwait(continueOnCapturedContext: false);
+		int lastSeen = -1;
 		for (int attempt = 0; attempt < 5; attempt++)
 		{
 			ct.ThrowIfCancellationRequested();
-			if ((await Task.Run((Func<LegacyMifsSnapshot>)ReadMode, ct).ConfigureAwait(continueOnCapturedContext: false)).OperatingMode == operatingMode)
+			lastSeen = (await Task.Run((Func<LegacyMifsSnapshot>)ReadMode, ct).ConfigureAwait(continueOnCapturedContext: false)).OperatingMode;
+			if (lastSeen == operatingMode)
 			{
 				return true;
 			}
 			await Task.Delay(150, ct).ConfigureAwait(continueOnCapturedContext: false);
 		}
+		// ⭐ 2026-10-17：⭐ 与 `LegacyMifsWmi.SwitchModeAsync` **同一口径** ——
+		//   如实记下「写了什么 / 回读是什么」，这是判「固件不认」还是「映射不同」的唯一证据 ✅
+		Logger.WriteError($"宝龙达 WMI：写档位内部值 {operatingMode} ⇒ 5 次回读仍是 {lastSeen}（每次间隔 150ms）"
+			+ " ⇒ ⭐ 如实判为【未确认】（⚠️ 不是「写失败」：⛔ 本判据只证明回读不一致 ⚠️）");
 		return false;
 	}
 
@@ -649,7 +655,11 @@ internal sealed class BaolongdaWmi : IDisposable
 				operatingMode = 0;
 				return true;
 			default:
-				Logger.WriteLine($"宝龙达 WMI：未知的性能模式原始值 {outData[4]}（⭐ 请把这一行发回）");
+				// ⭐ 2026-10-17：⭐ 未知原始值必须**默认级别可见**（`WriteLine` 的级别由内容判定，
+				//   不保证在「仅错误」下落盘 ⚠️）⇒ ⭐ 用 `WriteError`（⭐ 与 LegacyMifsWmi 同一口径 ✅）
+				Logger.WriteError($"宝龙达 WMI：**未知的性能模式原始值 {outData[4]}**"
+					+ $"（⭐ 响应长度={outData.Length} · 取值下标=4 ⇒ ⭐ 已知映射只覆盖原始 0/1/2/3"
+					+ " ⇒ ⭐ 该机型映射可能与 40 系不同 ⚠️）请把这一行发回");
 				return false;
 			}
 		}

@@ -166,7 +166,13 @@ internal sealed class BaolongdaBackend : IDisposable
 	/// <para>⭐ <b>判据</b>：⭐ 读 ⭐ <c>HKLM\HARDWARE\DESCRIPTION\System\BIOS</c> 的
 	/// ⭐ <c>BaseBoardProduct</c>（⭐ **只读** ✅ · ⭐ 与 <see cref="CpuVendor" /> 同一个键 ✅）。
 	/// ⭐ 白名单：⭐ ① ⭐ <c>MRID6-23</c> ⭐ **精确命中**（⭐ 三台真机证据 ✅）·
-	/// ⭐ ② ⭐ <c>MRID6-</c> ⭐ **前缀**（⚠️ **30 系板号未知 ⇒ 标为待验证** ⚠️）。</para>
+	/// ⭐ ② ⭐ <c>MRID6</c> ⭐ **精确命中**（⭐ 2026-10-17 新增 · 蛟龙16 · 6800H＋3070Ti 真机 ✅）·
+	/// ⭐ ③ ⭐ <c>MRID6-</c> ⭐ **前缀**（⭐ 覆盖 `MRID6-XX` 变体 ✅）。</para>
+	///
+	/// <para>⚠️ <b>为什么不用纯前缀 <c>MRID6</c></b>：⭐ 那样 <c>MRID60</c> / <c>MRID6A</c> 这类**假想板号**
+	/// 也会被放进来 ⚠️ —— ⭐ 与本类"⭐ 宁可不认宝龙达，⭐ 也绝不误伤同方 ✅"的原则相悖
+	/// ⇒ ⭐ 用「**精确 <c>MRID6</c>** ＋ **连字符前缀 <c>MRID6-</c>**」两条并列更稳 ✅
+	/// （⭐ 二者合起来 = ⭐ `MRID6` 家族全覆盖，⭐ 且不会匹配"以 `MRID6` 开头但后面不是连字符"的板号 ✅）。</para>
 	///
 	/// <para>⭐⭐ <b>白名单安全性的真机依据（⭐ 用户 2026-10-16 提供 ✅）</b>：
 	/// ⭐ 扫了 **28 个诊断包**（⭐ 共 6 个不同机型 ✅），⭐ 板号分布为 ——
@@ -204,21 +210,13 @@ internal sealed class BaolongdaBackend : IDisposable
 			note = "⚠️ 主板型号读不到（⭐ 空值 ✅）⇒ ⭐ **按「不是宝龙达」处理** ✅（⭐ 安全方向 ✅）";
 			return false;
 		}
-		// ⭐ ① 精确命中：⭐ 三台真机证据（⭐ 机器 A/B/C ✅）
-		if (string.Equals(board, "MRID6-23", StringComparison.OrdinalIgnoreCase))
+		if (BoardWhitelist.Matches(board))
 		{
-			note = $"主板型号「{board}」⭐ 精确命中白名单 ✅（⭐ 真机验证过 ✅）";
-			return true;
-		}
-		// ⭐ ② 前缀命中：⚠️ 30 系板号未知 ⇒ ⭐ **待验证** ⚠️（⭐ 先放行，⭐ 但要看得见 ✅）
-		if (board.StartsWith("MRID6-", StringComparison.OrdinalIgnoreCase))
-		{
-			note = $"主板型号「{board}」⭐ 命中 `MRID6-` 前缀（⚠️ **30/40 系板号尚未全部确认 ⇒ 标为待验证** ⚠️）"
-				+ " ⇒ ⭐ 先按宝龙达放行 ✅（⭐ 若日后发现是误判，⭐ 请把该板号加进**排除表** ✅）";
+			note = $"主板型号「{board}」⭐ 命中宝龙达白名单 ✅（⭐ `MRID6` 精确 / `MRID6-` 前缀 ✅）";
 			return true;
 		}
 		// ⭐ ③ 其余一律**不认**（⭐ 含所有同方机型 ✅）
-		note = $"主板型号「{board}」⛔ **不在宝龙达白名单**（⭐ 已知宝龙达为 `MRID6-23` / `MRID6-` 前缀 ✅）"
+		note = $"主板型号「{board}」⛔ **不在宝龙达白名单**（⭐ 已知宝龙达为 `MRID6` 精确 / `MRID6-` 前缀 ✅）"
 			+ " ⇒ ⭐ 按用户澄清「⭐ 其他蛟龙都是同方模具 ✅」⭐ 判定为**同方** ⇒ ⭐ 让它走老接口/GCU ✅";
 		return false;
 	}

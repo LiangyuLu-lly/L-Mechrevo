@@ -1,0 +1,63 @@
+// ⭐⭐ 2026-10-17（宝龙达模具白名单 · **纯判据** · 零依赖）：
+// 从 `BaolongdaBackend.IsBaolongdaModelWhitelisted` 里**抽出来的单一条判据**。
+//
+// <para>⭐⭐ <b>为什么单独一个文件、且一个依赖都不引</b>：
+//   ⭐ 2026-10-17 的真机事故 = ⭐ **这条判据漏了裸 `MRID6`**（蛟龙16 · 6800H＋3070Ti）
+//   ⇒ ⭐ 整台机退回 legacy 后端 ⇒ ⭐ 下游一连串「点了没反应」❌。
+//   而**开发机是同方 `GM5HG0A`** ⚠️ ⇒ ⭐ 它永远走不到"命中"那一支
+//   ⇒ ⭐ 只在开发机上看一眼**根本验不了判据本身** ⚠️。
+//   ⇒ ⭐ 所以把判据抽成**无依赖的纯函数**，⭐ 由 `tools\dev\board-whitelist-probe` 直接 link 这个文件做断言 ✅
+//     （⭐ 与 `fancurve-selftest` / `ecport-probe` 同一套"link 生产源文件"惯例 ✅）。</para>
+//
+// <para>⚠️ <b>改这里的唯一纪律</b>：⭐ 只认「**精确** `MRID6`」＋「**连字符前缀** `MRID6-`」，
+//   ⛔ 不要图省事改成纯前缀 `MRID6` —— ⭐ 那样 `MRID60` / `MRID6A` 这类假想板号也会被放进来 ⚠️，
+//   与本项目「⭐ 宁可不认宝龙达，⭐ 也绝不误伤同方」的原则相悖 ❌。</para>
+
+using System;
+
+namespace MechrevoLite.Hardware;
+
+/// <summary>
+/// ⭐ 宝龙达模具**板号白名单**（⭐ 单一事实来源 · ⭐ 纯函数 · ⭐ 无依赖 ⇒ 可单测）。
+///
+/// <para>⭐ <b>接受</b>：<c>MRID6</c>（裸板号 · 2026-10-17 真机：蛟龙16 · 6800H＋3070Ti）·
+/// <c>MRID6-23</c>（40 系 · 三台真机证据）· <c>MRID6-*</c>（后续变体，⚠️ 待逐台验证）。</para>
+///
+/// <para>⛔ <b>不接受</b>：同方全部已知板号
+/// （<c>GM5HG0A</c> / <c>GM6IX8B</c> / <c>KUANGSHI-JIGUANG Series-*</c> / <c>YAOSHI Series-*</c> / 空值）
+/// · ⚠️ 以及 <c>MRID60</c> / <c>MRID6A</c> 这类「以 <c>MRID6</c> 开头但后面不是连字符」的假想板号。</para>
+///
+/// <para>⚠️ <b>失败方向</b>：空值 / null ⇒ <c>false</c>（⭐ 按"不是宝龙达"处理 ✅ —— 落回老接口/GCU
+/// ⭐ 总比误伤同方好 ✅）。</para>
+/// </summary>
+internal static class BoardWhitelist
+{
+	/// <summary>⭐ 白名单判据本体（⭐ 大小写不敏感 · ⭐ 两侧空白先裁掉）。
+	/// ⚠️ 参数写成 <c>string</c>（⛔ 不用 <c>string?</c>）—— ⭐ 本工程的 <c>Nullable</c> 是**关**的，
+	/// 写 <c>string?</c> 会多一条 `CS8632` 告警 ⚠️（⭐ 本树告警基线是 1455，⭐ 不增 ✅）。</summary>
+	internal static bool Matches(string board)
+	{
+		string text = (board ?? string.Empty).Trim();
+		if (text.Length == 0)
+		{
+			return false;
+		}
+		// ⭐ ① 40 系：⭐ `MRID6-23`（⭐ 三台真机证据 ✅）
+		if (string.Equals(text, "MRID6-23", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+		// ⭐ ② 30 系：⭐ **裸 `MRID6`**（⭐ 2026-10-17 真机 · 蛟龙16 · 6800H＋3070Ti ✅）
+		//   ⚠️ **这条就是漏判修复的核心** —— ⛔ 去掉它立刻回到"整机退回 legacy"的事故状态 ❌
+		if (string.Equals(text, "MRID6", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+		// ⭐ ③ `MRID6-` 连字符前缀：⭐ 覆盖 `MRID6-XX` 后续变体 ✅
+		if (text.StartsWith("MRID6-", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+		return false;
+	}
+}

@@ -80,10 +80,14 @@ internal static class DiagnosticBaolongdaInfo
 		bool hit = BaolongdaBackend.IsBaolongdaModelWhitelisted(out string note);
 		sb.AppendLine("白名单判定 = " + (hit ? "✅ 命中 ⇒ 本机可认作宝龙达" : "⛔ 未命中 ⇒ 本机按同方/GCU 处理"));
 		sb.AppendLine("判定说明 = " + note);
-		sb.AppendLine("⭐ 判据依据：⭐ 宝龙达为 `MRID6-23`（⭐ 真机证实）；⭐ 同方机型实测板号为 "
-			+ "GM5HG0A / GM6IX8B / KUANGSHI-* / YAOSHI-* / Standard ⇒ ⭐ 均**不是** `MRID6-` 前缀 ✅");
-		sb.AppendLine("⚠️ 已知不确定：⭐ 30 系蛟龙板号**未证实** ⚠️ ⇒ ⭐ 若它不是 `MRID6-*`，"
-			+ "本机会按同方走 GCU（⭐ 保守无害 ✅）");
+		sb.AppendLine("⭐ 判据依据：⭐ 宝龙达板号为 `MRID6`（⭐ 裸板号 · 2026-10-17 真机：蛟龙16 · 6800H＋3070Ti）、"
+			+ "`MRID6-23`（⭐ 40 系 · 蛟龙16Pro · 真机证实）、`MRID6-*`（⭐ 后续变体）；"
+			+ "⛔ 同方机型实测板号为 GM5HG0A / GM6IX8B / KUANGSHI-* / YAOSHI-* / Standard ⇒ ⭐ 均**不命中** ✅");
+		sb.AppendLine("⚠️ 历史踩坑（⭐ 2026-10-17）：⭐ 旧判据只认「精确 `MRID6-23`」＋「前缀 `MRID6-`」"
+			+ "⇒ ⭐ **裸 `MRID6` 两条都不命中** ❌ ⇒ ⭐ 整台机退回 legacy 后端 ⇒ ⭐ 一堆功能「点了没反应」⚠️"
+			+ "（⭐ 现已修复：⭐ 裸 `MRID6` 精确命中 ✅）");
+		sb.AppendLine("⚠️ 仍待逐台证实的：⭐ `MRID6-*` 里**除 `MRID6` / `MRID6-23` 之外**的变体"
+			+ "（⭐ 这两个已真机证实 ✅）⇒ ⭐ 若某个变体其实是同方模具，⭐ 届时把它加进排除表 ✅");
 	}
 
 	private static string ReadBaseBoardProduct()
