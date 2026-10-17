@@ -579,7 +579,14 @@ public static class HardwareControl
 			//   ⭐ 判据：⭐ "⭐ 我们记过、⭐ 且现在还是那个数"⭐ ⇒ ⭐ 是我们写的 ✅；
 			//      ⭐ 厂商写了自己的值 ⇒ ⭐ 两个数不等 ⇒ ⭐ 自动走回厂商分支 ✅。
 			bool facadeIsOurs = IsGpuTempFacadeWrittenByUs(hw);
-			if (hw.GpuTemp > 0 && !facadeIsOurs)
+			// ⭐⭐ 2026-10-17（真机反馈「40 系官方控制台能读显卡温度，但 LM 的 4070 读不到」）：
+			//   ⭐ 宝龙达**没有厂商 GPU 温度**（无 GCU 推送）⚠️ ⇒ 这条「厂商值」分支对它**不该成立** ❌
+			//   ⚠️ 而它是**静默的**（不进任何日志）⇒ 真机诊断包里既没有"取到"也没有"没取到"的行
+			//      ⇒ ⭐ 表现就是"读不到但查不出原因" ✅（本次就是这么被卡住的）
+			//   ⇒ ⭐ 宝龙达下**强制走 LHM/NVML 支路** ✅；并在拿到/没拿到时都留下**可诊断的日志** ✅
+			//   ⚠️ 非宝龙达（GCU 机型）⇒ `!isBaolongda` 恒 true ⇒ ⭐ 条件与改动前**逐字一致** ✅
+			bool isBaolongdaGpu = Program.hw?.UsesBaolongda ?? false;
+			if (hw.GpuTemp > 0 && !facadeIsOurs && !isBaolongdaGpu)
 			{
 				gpuTemp = hw.GpuTemp; // ⭐ 厂商（⭐ GCU ✅）优先 ⇒ ⭐ 与改动前一致 ✅
 				gpuTempFilled = true;
@@ -590,6 +597,14 @@ public static class HardwareControl
 				// ⭐⭐ 2026-10-16（nvidia-smi 早期来源）：⭐ 本支 = "⭐ 门面层里没有【厂商】值" ✅ ——
 				//   ① ⭐ 先问**真正的本地来源**（⭐ LHM ⇒ ⭐ NVML ✅）⇒ ⭐ 它们一旦给值就让 nvidia-smi 让位 ✅
 				//   ② ⭐ 都没给、⭐ 而门面层里还有**我们自己写的**早期值 ⇒ ⭐ 沿用它 ✅
+				// ⭐ 2026-10-17：宝龙达下把"问谁 / 各自给了什么"记下来（⚠️ 限流 60s，⛔ 不刷屏）
+				if (isBaolongdaGpu)
+				{
+					Logger.WriteLineThrottled("bd-gpu-temp-probe",
+						$"GPU 温度探路（宝龙达）：门面值={hw.GpuTemp} · facadeIsOurs={facadeIsOurs}"
+						+ $" · LHM={(lhmMonitor.GpuTemperature.HasValue ? lhmMonitor.GpuTemperature.Value.ToString("F0") + "℃" : "无")}"
+						+ $" · NVML已隔离={NvmlHelper.Unavailable} · 将依次试 LHM ⇒ NVML ⇒ nvidia-smi 早期值", 60000);
+				}
 				float? lhmGpu = lhmMonitor.GpuTemperature;
 				if (lhmGpu.HasValue && lhmGpu.Value > 0f)
 				{
