@@ -37,6 +37,17 @@ if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     exit 5
 }
 
+# ⭐⭐ 2026-10-19（机主要求）：把全程输出**同时写一份日志到脚本同目录** ✅
+#   文件名：bd-kbd-probe-yyyyMMdd-HHmmss.log（⛔ 不写到 %TEMP%，方便机主直接发给我们）
+$LogPath = Join-Path $PSScriptRoot ("bd-kbd-probe-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".log")
+try {
+    Start-Transcript -Path $LogPath -Force | Out-Null
+    Write-Host ("📝 日志：{0}" -f $LogPath) -ForegroundColor DarkGray
+} catch {
+    Write-Host ("⚠️ 写日志失败（继续运行，只是不落盘）：{0}" -f $_.Exception.Message) -ForegroundColor Yellow
+    $LogPath = $null
+}
+
 $Ns = "root\WMI"
 $Class = "MICommonInterface"
 # 方法名候选（不同批次固件有差异）：
@@ -136,6 +147,8 @@ if (-not $TestWrite) {
         $prev = $cur
         Start-Sleep -Seconds 1
     }
+    if ($LogPath) { try { Stop-Transcript | Out-Null } catch { } }
+    Write-Host ("`n📝 日志已保存：{0}" -f $LogPath) -ForegroundColor DarkGray
     exit 0
 }
 
@@ -163,6 +176,8 @@ if ($TestWrite) {
     }
 }
 
+if ($LogPath) { try { Stop-Transcript | Out-Null } catch { } }
 Write-Host "`n（结束）" -ForegroundColor DarkGray
+if ($LogPath) { Write-Host ("📝 日志已保存：{0}" -f $LogPath) -ForegroundColor DarkGray }
 # ⭐ 直接双击/右键运行时窗口会一闪而过 ⇒ 停住等回车（用启动器 -NoExit 时也会经过这里，按回车即可）
 if ($Host.Name -eq "ConsoleHost") { Read-Host "按回车关闭窗口" | Out-Null }
