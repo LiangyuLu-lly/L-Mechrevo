@@ -152,3 +152,5 @@ if ($TestWrite) {
 }
 
 Write-Host "`n（结束）" -ForegroundColor DarkGray
+# ⭐ 直接双击/右键运行时窗口会一闪而过 ⇒ 停住等回车（用启动器 -NoExit 时也会经过这里，按回车即可）
+if ($Host.Name -eq "ConsoleHost") { Read-Host "按回车关闭窗口" | Out-Null }
