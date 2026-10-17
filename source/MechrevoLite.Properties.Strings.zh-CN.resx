@@ -4571,6 +4571,9 @@
     
   
   </data>
+<data name="PerfModeLocalProfileSwitched" xml:space="preserve">
+    <value>已切换到本机配置（本机无固件档；改动请点【应用】下发）</value>
+  </data>
 <data name="PerfModeNoSlotSeed" xml:space="preserve">
     
     

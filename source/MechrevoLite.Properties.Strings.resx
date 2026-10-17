@@ -4552,6 +4552,9 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="PerfModeLocalProfileSwitched" xml:space="preserve">
+    <value>Switched to a local profile (no firmware slot on this machine; press Apply to push changes)</value>
+  </data>
 <data name="PerfModeNoSlotSeed" xml:space="preserve">
     
     

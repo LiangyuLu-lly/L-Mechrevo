@@ -498,10 +498,10 @@ public class CustomModeForm : RForm
 		//   ⇒ ⭐ 宝龙达下把**整行模式选择（下拉 + 新建/重命名/删除）隐藏** ✅
 		//      ⭐ 用户仍可编辑 PL1/PL2/温度墙并「应用」⇒ 落到本机配置（这条本来就有 ✅）
 		//   ⚠️ 非宝龙达 ⇒ 恒 false ⇒ ⭐ 逐位不变 ✅
-		if (Program.hw?.UsesBaolongda ?? false)
-		{
-			modeFlow.Visible = false;
-		}
+		// ⭐⭐ 2026-10-19（机主：「配置下拉依旧没修」）：⭐ **不再隐藏**这一行 ✅
+		//   宝龙达没有固件档，但自定义档是**本机配置**（PL/温度墙/曲线存 `mode_tune_*`）⇒
+		//   下拉选择只切换"正在编辑哪一份配置"，不需要固件槽 ⇒ 完全可以正常用 ✅
+		//   （之前整行隐藏，用户看到的是"下拉没修"；见 SelectModeAsync 里新加的宝龙达分支）
 		_nameRow = new FlowLayoutPanel
 		{
 			Name = "modeNameRow",
@@ -2166,6 +2166,16 @@ public class CustomModeForm : RForm
 		}
 		DiscardPendingChanges();
 		BindMode(id);
+		// ⭐⭐ 2026-10-19（宝龙达 · 自定义档是"本机配置"）：⭐ 无固件档可切 ⇒ 不调 ActivateModeAsync
+		//   （它必然失败并把界面回弹到别的档，用户看到"选了又跳回去"）✅
+		//   ⚠️ 改动仍由【应用】下发（PL1/PL2/温度墙 → WMI 23；曲线 → 20/21 软件闭环）✅
+		if (Program.hw?.UsesBaolongda ?? false)
+		{
+			_status.Text = Strings.PerfModeLocalProfileSwitched;
+			_status.ForeColor = UiVisualStyle.Muted;
+			Logger.WriteLine("[perfmode] 宝龙达：模式下拉切到 " + id + "（本机配置，无固件档可切）");
+			return true;
+		}
 		bool ok = await ActivateModeAsync(id);
 		if (ok)
 		{

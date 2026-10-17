@@ -1535,6 +1535,9 @@ internal class Strings
 
 	internal static string PerfModeNoSlotSeed => ResourceManager.GetString("PerfModeNoSlotSeed", resourceCulture);
 
+	/// <summary>⭐ 宝龙达：模式下拉切到某个自定义配置时，提示"这是本机配置"（无固件档可切）。</summary>
+	internal static string PerfModeLocalProfileSwitched => ResourceManager.GetString("PerfModeLocalProfileSwitched", resourceCulture);
+
 	internal static string PerfModeOcArmed => ResourceManager.GetString("PerfModeOcArmed", resourceCulture);
 
 	internal static string PerfModeOutcomeFailedItems => ResourceManager.GetString("PerfModeOutcomeFailedItems", resourceCulture);
