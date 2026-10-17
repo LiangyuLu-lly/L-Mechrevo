@@ -187,6 +187,12 @@ public static class PerfModeApplyPlanner
 				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: false, settings.GpuFanDuty, PerfApplyVerify.FanDuty));
 			}
 		}
+		// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：⭐ 只有"能写厂商 WMI 的本机后端"（宝龙达）才生成该步 ✅
+		//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ GCU/老接口逐位不变 ✅
+		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite && settings.GpuPowerLimitW.HasValue)
+		{
+			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyGpuPowerLimit, null, null, settings.GpuPowerLimitW.Value, IsCpuCurve: false, null, PerfApplyVerify.ServiceEcho));
+		}
 		if (settings.FanBoost.HasValue)
 		{
 			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyFanBoost, null, null, settings.FanBoost.Value ? 1 : 0));

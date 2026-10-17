@@ -13,6 +13,14 @@ public sealed record PerfModeSettings
 
 	public int? GpuTgp { get; init; }
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机字段）：⭐ 宝龙达没有 GCU 的 `GpuConfigurableTGPTarget`，
+	/// 但能通过 **NVML** 写 `nvmlDeviceSetPowerManagementLimit`（毫瓦）✅
+	/// <para>⚠️ 与 <see cref="GpuTgp" /> 的区别：那个是**厂商固件字段**（GCU 语义），这个是**本机 NVML** 语义。</para>
+	/// <para>⚠️ 只在能读到有效约束的机器上由 UI 显示；落盘仍是 `mode_tune_*`（结构不变）✅</para>
+	/// </summary>
+	public int? GpuPowerLimitW { get; init; }
+
 	public bool? GpuDynamicBoostOn { get; init; }
 
 	public int? GpuDynamicBoost { get; init; }

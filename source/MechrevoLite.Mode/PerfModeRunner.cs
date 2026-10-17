@@ -115,6 +115,7 @@ public static class PerfModeRunner
 			PerfApplyStepKind.SwitchFirmwareSlot => backend.SwitchFirmwareSlotAsync(step.Number, ct), 
 			PerfApplyStepKind.WriteFirmwareField => backend.WriteDetailFieldAsync(step.WireKey, step.Value, ct), 
 			PerfApplyStepKind.WriteFanCurve => backend.WriteFanCurveAsync(step.IsCpuCurve, step.Curve, ct), 
+			PerfApplyStepKind.ApplyGpuPowerLimit => backend.ApplyGpuPowerLimitAsync(step.Number, ct),
 			PerfApplyStepKind.ApplyGpuOverclock => backend.ApplyGpuOverclockAsync(step.Number == 1, step.GpuOffsets?.Core ?? 0, step.GpuOffsets?.Memory ?? 0, ct), 
 			PerfApplyStepKind.ApplyFanBoost => backend.SetFanBoostAsync(step.Number == 1, ct), 
 			PerfApplyStepKind.ApplyRefreshRate => backend.SetRefreshRateAsync(step.Number, ct), 

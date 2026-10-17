@@ -17,6 +17,9 @@ public interface IPerfModeBackend
 
 	Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct);
 
+	/// <summary>⭐ 2026-10-19：⭐ 显卡功耗上限（W）—— 本机 NVML 实现；不支持的后端返回 false ✅</summary>
+	Task<bool> ApplyGpuPowerLimitAsync(int watts, CancellationToken ct);
+
 	Task<bool> SetSlotNameAsync(string name, CancellationToken ct);
 
 	Task<bool> SetFanBoostAsync(bool on, CancellationToken ct);

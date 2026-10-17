@@ -12,5 +12,7 @@ public enum PerfApplyStepKind
 	ApplyCpuBoost,
 	ApplyPowerOverlay,
 	ApplyRefreshRate,
-	ApplyGpuOverclock
+	ApplyGpuOverclock,
+	/// <summary>⭐ 2026-10-19：⭐ 显卡功耗上限（NVML `SetPowerManagementLimit` · 毫瓦换算在 NvmlHelper 内）✅</summary>
+	ApplyGpuPowerLimit
 }

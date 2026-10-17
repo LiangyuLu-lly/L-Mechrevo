@@ -121,6 +121,17 @@ public static class NvmlHelper
 	[DllImport("nvml.dll")]
 	private static extern int nvmlDeviceGetPowerUsage(nint device, out uint powerMilliWatts);
 
+	// ⭐⭐ 2026-10-19（显卡功耗上限 · 参考 JiaolongControl 的 NVML 做法，只取协议）：
+	//   ⭐ NVML 的单位是**毫瓦**（nvidia-smi -pl 才是瓦）⇒ 读写都换算 ✅
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetPowerManagementLimitConstraints(nint device, out uint minLimitMilliWatts, out uint maxLimitMilliWatts);
+
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetPowerManagementLimit(nint device, out uint limitMilliWatts);
+
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceSetPowerManagementLimit(nint device, uint limitMilliWatts);
+
 	[DllImport("nvml.dll")]
 	private static extern int nvmlDeviceGetMemoryInfo(nint device, out nvmlMemory_t memory);
 
@@ -612,4 +623,81 @@ public static class NvmlHelper
 	}
 
 	internal static string DisabledReason => _disabledReason;
+
+	/// <summary>
+	/// ⭐ 读显卡功耗上限的**驱动允许区间**（W）。⭐ 失败（无 NVML/无约束/该机型不支持）⇒ false。
+	/// <para>⚠️ 单位：NVML 是毫瓦，这里统一换成 **W** 再返回 ✅</para>
+	/// </summary>
+	internal static bool TryGetPowerLimitBounds(out int minW, out int maxW, out int currentW)
+	{
+		minW = 0;
+		maxW = 0;
+		currentW = 0;
+		if (Unavailable)
+		{
+			return false;
+		}
+		try
+		{
+			if (nvmlDeviceGetHandleByIndex_v2(0u, out nint device) != 0 || device == 0)
+			{
+				return false;
+			}
+			if (nvmlDeviceGetPowerManagementLimitConstraints(device, out uint minMw, out uint maxMw) != 0)
+			{
+				return false;
+			}
+			if (nvmlDeviceGetPowerManagementLimit(device, out uint curMw) != 0)
+			{
+				curMw = 0u;
+			}
+			minW = (int)(minMw / 1000u);
+			maxW = (int)(maxMw / 1000u);
+			currentW = (int)(curMw / 1000u);
+			return maxW > 0 && maxW >= minW;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 设显卡功耗上限（W）：⭐ 先读约束并**钳制**，写入后**回读**（偏差 ≤1 W 才算成功）✅
+	/// <para>⛔ 不猜范围、⛔ 不假装成功：失败就是 false，调用方按"没支持"处理 ✅</para>
+	/// </summary>
+	internal static bool TrySetPowerLimitWatts(int watts, out int appliedW)
+	{
+		appliedW = 0;
+		if (Unavailable)
+		{
+			return false;
+		}
+		try
+		{
+			if (nvmlDeviceGetHandleByIndex_v2(0u, out nint device) != 0 || device == 0)
+			{
+				return false;
+			}
+			if (nvmlDeviceGetPowerManagementLimitConstraints(device, out uint minMw, out uint maxMw) != 0)
+			{
+				return false;
+			}
+			uint want = (uint)Math.Clamp(watts * 1000, (int)minMw, (int)maxMw);
+			if (nvmlDeviceSetPowerManagementLimit(device, want) != 0)
+			{
+				return false;
+			}
+			if (nvmlDeviceGetPowerManagementLimit(device, out uint curMw) != 0)
+			{
+				return false;
+			}
+			appliedW = (int)(curMw / 1000u);
+			return Math.Abs(appliedW - (int)(want / 1000u)) <= 1;
+		}
+		catch
+		{
+			return false;
+		}
+	}
 }

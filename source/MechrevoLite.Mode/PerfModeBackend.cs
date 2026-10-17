@@ -148,6 +148,18 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		return ok;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（显卡功耗上限）：⭐ 走本机 **NVML**（`nvmlDeviceSetPowerManagementLimit`），
+	/// 由 <c>NvmlHelper</c> 负责"读约束→钳制→写→回读"✅
+	/// <para>⚠️ 只对"本机后端"有意义；GCU 机型仍走厂商字段 `GpuConfigurableTGPTarget`（不在本方法里）✅</para>
+	/// </summary>
+	public Task<bool> ApplyGpuPowerLimitAsync(int watts, CancellationToken ct)
+	{
+		bool ok = NvmlHelper.TrySetPowerLimitWatts(watts, out int applied);
+		Logger.WriteLine($"[gpu-power] 设功耗上限 {watts}W ⇒ ok={ok} · 回读={applied}W");
+		return Task.FromResult(ok);
+	}
+
 	public Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct)
 	{
 		return _service.ApplyGcuGpuOverclock(on, core, memory);
