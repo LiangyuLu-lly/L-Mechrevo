@@ -2192,33 +2192,17 @@ public class SettingsForm : RForm
 				{
 					cb.CheckedChanged += async (object? _, EventArgs _) =>
 					{
-						// ⭐⭐ 2026-10-17（诊断增强 · 只加日志、⛔ 不改行为）：
-						//   真机诊断包显示「点 Fn 键开关后没有任何 SwitchQuick 日志」⇒ 点击没到服务层。
-						//   这里把"到没到 / 被谁挡"逐条记下来，下一次诊断包即可定因 ✅
-						if (_syncingSwitches)
+						if (!_syncingSwitches)
 						{
-							Logger.WriteLineIfChanged("qs-click-syncing-" + key2,
-								$"快捷开关点击（{key2}）：⚠️ 被 _syncingSwitches 挡下（界面正在按硬件状态回写）⇒ 本次忽略");
-							return;
-						}
-						_lastQuickSwitchUi = DateTime.Now;
-						MechrevoHw hw = Program.hw;
-						Logger.WriteLine($"快捷开关点击：{key2} → {(cb.Checked ? "开" : "关")}"
-							+ $"（hw={(hw == null ? "空" : (hw.IsConnected ? "已连接" : "未连接"))}"
-							+ $" · service={(Program.service == null ? "空" : "有")}）");
-						if (Program.service == null)
-						{
-							Logger.WriteLineIfChanged("qs-click-nosvc-" + key2, $"快捷开关点击（{key2}）：⚠️ 服务为空 ⇒ 不下发");
-							return;
-						}
-						if (hw != null && hw.IsConnected)
-						{
-							await ApplyQuickSwitchAsync(cb, (bool requested) => Program.service.SwitchQuick(key2, requested));
-						}
-						else
-						{
-							Logger.WriteLineIfChanged("qs-click-nohw-" + key2,
-								$"快捷开关点击（{key2}）：⚠️ hw 空或未连接 ⇒ 不下发（界面会按硬件真值回拨）");
+							_lastQuickSwitchUi = DateTime.Now;
+							if (Program.service != null)
+							{
+								MechrevoHw hw = Program.hw;
+								if (hw != null && hw.IsConnected)
+								{
+									await ApplyQuickSwitchAsync(cb, (bool requested) => Program.service.SwitchQuick(key2, requested));
+								}
+							}
 						}
 					};
 				}
