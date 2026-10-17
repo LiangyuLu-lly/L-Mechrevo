@@ -3364,7 +3364,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			byte level = (byte)Math.Clamp(brightness0to3, 0, BaolongdaProfile.BrightnessMax(kbGen));
 			bool brightKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte curBright);
 			bool needBright = !brightKnown || curBright != level;
-			bool brightOk = !needBright || wmi.TrySetKeyboardBrightness(level);
+			bool brightOk;
+			if (!needBright)
+			{
+				brightOk = true;
+			}
+			else
+			{
+				// ⭐⭐ 2026-10-19（机主：「参照 7.3 的实现，另外的灯效」）：
+				//   ⭐ 第三方 7.3 设亮度用的是**复位序列**：先写满(4) → 再写 0 → 最后写目标值 ✅
+				//   ⭐ 我们原来"只写变化项、直接写目标" ⇒ 固件可能不认（真机上亮度/灯效常不生效）⚠️
+				//   ⚠️ 中间那次 0 会让灯瞬灭 ~120ms（7.3 同样如此）✅
+				byte maxLevel = (byte)BaolongdaProfile.BrightnessMax(kbGen);
+				wmi.TrySetKeyboardBrightness(maxLevel);
+				Thread.Sleep(120);
+				wmi.TrySetKeyboardBrightness(0);
+				Thread.Sleep(120);
+				brightOk = wmi.TrySetKeyboardBrightness(level);
+				Logger.WriteLine($"[kbd] 亮度复位序列：{maxLevel} → 0 → {level}（7.3 做法）⇒ ok={brightOk}");
+			}
 			// ⭐⭐ 回读：⭐ 逐值比对（⭐ 旧代码只判"非 0 ＝ 开" ⇒ ⭐ 选自动循环/自定义时会误判成功 ❌）
 			bool modeMatch = TryConfirmModeExact(wmi, mode);
 			bool brightMatch = TryConfirmKeyboardBrightness(wmi, level);
