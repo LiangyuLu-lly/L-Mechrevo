@@ -50,6 +50,13 @@ function Get-Instances {
     return $all
 }
 
+function Get-RelPath($instanceName) {
+    # WMI 相对路径：MICommonInterface.InstanceName="ACPI\PNP0C14\MIFS_0"
+    # ⚠️ 反斜杠在路径字符串里必须成对，否则 ManagementObject 解析失败（就报"对象的当前状态使该操作无效"）
+    $escaped = $instanceName.Replace("\", "\\")
+    return ('{0}.InstanceName="{1}"' -f $Class, $escaped)
+}
+
 function Invoke-Frame($instanceName, [byte]$mode, [byte]$func, [byte[]]$payload) {
     $buf = New-Object 'byte[]' $BufferLength
     $buf[1] = $mode
@@ -57,7 +64,7 @@ function Invoke-Frame($instanceName, [byte]$mode, [byte]$func, [byte[]]$payload)
     if ($payload -and $payload.Length -gt 0) {
         [Array]::Copy($payload, 0, $buf, 4, [Math]::Min($payload.Length, $BufferLength - 4))
     }
-    $mo = New-Object System.Management.ManagementObject($Ns, $instanceName, $null)
+    $mo = New-Object System.Management.ManagementObject($Ns, (Get-RelPath $instanceName), $null)
     try {
         $in = $mo.GetMethodParameters($Method)
         $in["InData"] = $buf
@@ -141,6 +148,7 @@ else {
             $cur = Snapshot $insts
         } catch {
             Write-Host ("[{0}] 读取失败：{1}" -f (Get-Date -Format 'HH:mm:ss'), $_.Exception.Message) -ForegroundColor Red
+            Write-Host ("        实例={0}" -f ($insts[0].InstanceName)) -ForegroundColor DarkYellow
             Start-Sleep -Seconds 1
             continue
         }
