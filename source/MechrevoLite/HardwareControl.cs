@@ -1635,6 +1635,11 @@ public static class HardwareControl
 		}
 		cpuPower = ResolveCpuPower(num, fallbackCpuPower);
 		gpuPower = ResolveGpuPower(num2, IsUsablePower(num2) ? ((float?)null) : gpuPowerViaNvml);
+		// ⭐⭐ 2026-10-19（机主：「4070 功耗也不对」）：⭐ 只读诊断 —— 把**原始来源**打出来（同值去重，不刷屏）✅
+		//   ⭐ 目的：下次诊断包能一眼分清"读数错"还是"口径不同（读到的是上限/别的值）"✅
+		//   ⚠️ 纯日志：⛔ 不改任何换算、⛔ 不参与显示判据 ✅
+		Logger.WriteLineIfChanged("gpu-power-raw",
+			$"[gpu-power] vendor={num2:F1}W · nvml={(gpuPowerViaNvml.HasValue ? gpuPowerViaNvml.Value.ToString("F1") : "null")}W · resolved={(gpuPower.HasValue ? gpuPower.Value.ToString("F1") : "null")}W");
 		// ⭐⭐ 2026-10-17：⭐ 功耗字段**真的被刷新**了 ⇒ 打时间戳（⭐ 界面新鲜度判据只看这个 ✅）
 		//   ⚠️ 必须放在这里（写值之后），⛔ 不能放方法入口 —— 入口到这儿之间有好几道早退，
 		//      "来采过"≠"值刷新过" ⚠️（⭐ 见 `_lastPowerRefreshTick` 的注释 ✅）。
