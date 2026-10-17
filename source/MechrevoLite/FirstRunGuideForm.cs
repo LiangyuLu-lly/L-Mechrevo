@@ -34,6 +34,18 @@ public sealed class FirstRunGuideForm : RForm
 
 	private string _igpuOnlyChoice = ChoiceUnknown;
 
+	/// <summary>
+	/// ⭐ 2026-10-17（用户要求 · 宝龙达没有核显模式）：「首次提示的核显模式只给同方开放」
+	/// ⇒ 宝龙达机型上第 4 步（「你的电脑有「集显模式」这一档吗?」）**整步不建**。
+	/// <para>⚠️ 三处联动，缺一不可：① 不建第 4 步控件（RowCount 跟着减 1）②
+	/// <see cref="PersistIgpuOnlyChoice" /> 直接 return（不写 <c>igpu_only_ui</c> / <c>igpu_only_asked</c>）
+	/// ③ 判据只对**完整引导**生效（<paramref name="igpuOnlyStepOnly" /> 的单问模式在宝龙达下
+	/// 压根不会被调用，见 SettingsForm.ShowIgpuOnlyGuideIfNeeded 的宝龙达排除）。</para>
+	/// <para>⚠️ 能力层依据：宝龙达 WMI 功能号 9 <c>GpuMode</c> 只有 <c>Hybrid=0</c> / <c>Discrete=1</c>，
+	/// **没有 iGPU-only 这一档**。⛔ 非宝龙达逐位不变（本字段恒 false）。</para>
+	/// </summary>
+	private readonly bool _skipIgpuOnlyStep;
+
 	// 2026-10-09（telemetryguide）：第 5 步「匿名使用统计与匿名日志」的勾选框。
 	// 它与「设置 → 隐私与反馈」里那个开关**读写同一个 config 键** usage_telemetry（缺省 1），
 	// 初始勾选态取自同一个读取点 UsageTelemetry.Enabled —— 所以两边永远显示同一个值，不会各写各的。
@@ -79,6 +91,12 @@ public sealed class FirstRunGuideForm : RForm
 	/// </param>
 	public FirstRunGuideForm(bool igpuOnlyStepOnly)
 	{
+		// ⭐⭐ 2026-10-17（用户要求 · 宝龙达没有核显模式）：
+		//   完整引导里**跳过第 4 步**（「你的电脑有「集显模式」这一档吗?」）。
+		//   ⚠️ 单问模式（igpuOnlyStepOnly=true）不适用 —— 那个窗口存在的唯一目的就是问这一问，
+		//     而它在宝龙达下压根不会被打开（SettingsForm.ShowIgpuOnlyGuideIfNeeded 已挡掉）。
+		//   ⚠️ Program.hw 为 null（后端未就绪）时按非宝龙达处理（保守：维持原行为）。
+		_skipIgpuOnlyStep = !igpuOnlyStepOnly && (Program.hw?.UsesBaolongda ?? false);
 		Text = (igpuOnlyStepOnly ? Strings.IgpuOnlyGuideTitle : Strings.FirstRun);
 		StartPosition = FormStartPosition.CenterParent;
 		FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -179,7 +197,7 @@ public sealed class FirstRunGuideForm : RForm
 			AutoSize = true,
 			AutoSizeMode = AutoSizeMode.GrowAndShrink,
 			ColumnCount = 1,
-			RowCount = (igpuOnlyStepOnly ? 1 : 5),
+			RowCount = (igpuOnlyStepOnly ? 1 : (_skipIgpuOnlyStep ? 4 : 5)),
 			Padding = (igpuOnlyStepOnly ? new Padding(12, 4, 12, 4) : new Padding(16, 12, 16, 12)),
 			Margin = Padding.Empty,
 			BackColor = UiVisualStyle.Window
@@ -195,13 +213,23 @@ public sealed class FirstRunGuideForm : RForm
 		// 第 4 步：问法必须「具体可查」，不用「支持纯核显模式吗」这类术语（§3 ①）
 		// 单问模式用短正文（FirstRunStep4BodyShort，仍含「BIOS 或官方控制台」与
 		// 「集显模式 / 核显模式 / iGPU Only」关键词）；完整引导原文一字不动。
-		tableLayoutPanel3.Controls.Add(CreateStep("?", Strings.FirstRunStep4Title, igpuOnlyStepOnly ? Strings.FirstRunStep4BodyShort : Strings.FirstRunStep4Body, warning: false, CreateIgpuOnlyChoiceRow(igpuOnlyStepOnly), compact: igpuOnlyStepOnly), 0, stepRow);
+		// ⭐ 2026-10-17：宝龙达机型**整步不建**（_skipIgpuOnlyStep，见字段注释）——
+		//   没有这一档的机器不该被问，也不该把答案写进 igpu_only_ui / igpu_only_asked。
+		if (!_skipIgpuOnlyStep)
+		{
+			tableLayoutPanel3.Controls.Add(CreateStep("?", Strings.FirstRunStep4Title, igpuOnlyStepOnly ? Strings.FirstRunStep4BodyShort : Strings.FirstRunStep4Body, warning: false, CreateIgpuOnlyChoiceRow(igpuOnlyStepOnly), compact: igpuOnlyStepOnly), 0, stepRow);
+		}
 		// 2026-10-09（telemetryguide）：第 5 步 —— 「匿名使用统计与匿名日志」（用户要求"这个开关应该在引导时候说明"）。
 		// 只加在**完整**首次引导里：单问模式是给升级用户补问「核显模式」那一问的，
 		// 与它无关，也不加（那一问的控件、语义与判据一字未动，双弹修复逻辑也不受影响）。
 		if (!igpuOnlyStepOnly)
 		{
-			stepRow++;
+			// ⭐ 2026-10-17：第 4 步被跳过时它没占用 stepRow，第 5 步直接落在当前行；
+			//   否则先推进一行（第 4 步占用了 stepRow 那一行）。
+			if (!_skipIgpuOnlyStep)
+			{
+				stepRow++;
+			}
 			tableLayoutPanel3.Controls.Add(CreateStep("5", Strings.FirstRunStep5Title, Strings.FirstRunStep5Body, warning: false, CreateTelemetryChoiceRow()), 0, stepRow);
 		}
 		panel.Controls.Add(tableLayoutPanel3);
@@ -457,6 +485,15 @@ public sealed class FirstRunGuideForm : RForm
 
 	private void PersistIgpuOnlyChoice()
 	{
+		// ⭐⭐ 2026-10-17（宝龙达没有核显模式）：第 4 步整步没建 ⇒ 这一问不存在 ⇒ **绝不落盘**。
+		//   ⚠️ 这不是"写了再忽略"，而是**根本不写**：若写了 `igpu_only_asked=1`，
+		//     用户以后换到同方机器就永远不再问这一问（隐性数据损坏）。
+		//   ⚠️ `igpu_only_ui` 同理不写 —— 宝龙达没有这一档，写 show/hide 都会误导设置页判据。
+		//   ⚠️ 非宝龙达逐位不变：_skipIgpuOnlyStep 恒 false，走下面的原逻辑。
+		if (_skipIgpuOnlyStep)
+		{
+			return;
+		}
 		// 审计/截图模式（UiAuditRunner 也会 new 本窗体）不得写配置
 		if (Program.UiAuditMode)
 		{
