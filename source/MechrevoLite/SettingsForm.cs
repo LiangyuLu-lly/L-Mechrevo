@@ -15714,6 +15714,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 						if (selectedIndex < array2.Length)
 						{
 							string id = array2[selectedIndex].Item1;
+							// ⭐⭐ 2026-10-19（机主：「禁用颜色选择不是禁用编辑按钮，要不然亮度不可用」）：
+							//   ⭐ 原厂在彩虹模式下把**颜色**那一项禁用（颜色无效），但亮度/开关/效果下拉**保持可用** ✅
+							//   ⇒ ⭐ 这里只动 `buttonKeyboardColor.Enabled` 一个控件，切回「单色」立刻恢复 ✅
+							//   ⚠️ 仅宝龙达（GCU 的彩虹档沿用原逻辑）✅
+							if (Program.hw?.UsesBaolongda == true && buttonKeyboardColor != null && !buttonKeyboardColor.IsDisposed)
+							{
+								bool rainbow = string.Equals(id, "Rainbow", StringComparison.OrdinalIgnoreCase);
+								if (buttonKeyboardColor.Enabled == rainbow)
+								{
+									buttonKeyboardColor.Enabled = !rainbow;
+									Logger.WriteLine($"[light] 宝龙达键盘灯效={id} ⇒ 颜色按钮 {(rainbow ? "禁用（彩虹模式下颜色无意义，亮度不受影响）" : "恢复可用")}");
+								}
+							}
 							LightChannelSettings settings = LightingSettingsStore.Load("Keyboard/Ctrl", array2[0].Item1);
 							if (!sw.Checked)
 							{
