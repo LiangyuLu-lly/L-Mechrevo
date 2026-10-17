@@ -16276,7 +16276,15 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 							if (flag)
 							{
 								LightingSettingsStore.SavePower(topic, requested);
-								if (requested)
+								// ⭐⭐ 2026-10-19（机主实测「Logo 灯开→显示关」）：⭐ 这里原来会再调一次
+								//   `ApplyLightChannelEffectAsync` ⇒ 它内部**又**按旧快照的 `PowerOn` 发一次
+								//   `PublishLightPower(..., false)`（诊断包日志：on=True 与 on=False 只隔 0.55 s）❌
+								//   ⭐ LOGO 通道只有「开 / 关」（功能号 15），**没有效果字段可应用**
+								//   （日志原文：「界面给的效果 Single／亮度 4 没有对应字段 ⇒ 已忽略」）
+								//   ⇒ ⭐ 非键盘通道**不再走效果应用**，杜绝第二次下发 ✅
+								//   ⚠️ 键盘通道保持原样（它确实需要写效果/颜色）✅
+								bool isKeyboardChannel = string.Equals(topic, "Keyboard/Ctrl", StringComparison.OrdinalIgnoreCase);
+								if (requested && isKeyboardChannel)
 								{
 									LightChannelSettings settings = LightingSettingsStore.Load(topic, effects[0].Effect);
 									Program.ApplyLightChannelEffectAsync(topic, settings, 120, () => LightingSettingsStore.Load(topic, effects[0].Effect).PowerOn);
