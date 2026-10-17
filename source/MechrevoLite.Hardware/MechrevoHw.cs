@@ -4059,8 +4059,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			BaolongdaFanCurveSettings settings = BaolongdaFanCurveStore.Load();
 			if (!settings.Enabled)
 			{
+				// ⭐⭐ 2026-10-19（机主：风扇曲线不生效，且日志里**一条曲线行都没有**）：
+				//   ⭐ 这里原来**静默 return** ⇒ 无法区分"没启用"还是"根本没进来" ❌
+				//   ⭐ 现在每次状态变化都记一行（去重，不刷屏）✅
+				Logger.WriteLineIfChanged("baolongda-fancurve-disabled",
+					$"宝龙达风扇曲线：⭐ 未启用（Enabled=false）⇒ 本轮不写任何字节 · 曲线源={settings.Channel0Temperatures.Length}点/ch0 · 归档可读={!settings.IsUnreadableArchive}");
 				return false;
 			}
+			Logger.WriteLineIfChanged("baolongda-fancurve-enabled",
+				$"宝龙达风扇曲线：⭐ 已启用 ⇒ 开始按温度下发（ch0={settings.Channel0Temperatures.Length}点 · ch1={settings.Channel1Temperatures.Length}点）");
 			// ⭐ 温度来源：⭐ 用**已有的属性**（⭐ 它们已是"⭐ LHM/NVML 优先、⭐ 厂商兜底"⭐ 的结果 ✅）
 			int cpuTemp = CpuTemp;
 			int gpuTemp = GpuTemp;
