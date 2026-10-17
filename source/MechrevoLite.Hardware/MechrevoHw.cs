@@ -6661,10 +6661,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text16 = o["HighPerformancePowerModeSwitch"]?.ToString();
 		if (text16 != null)
 		{
-			// ⭐ 2026-10-17（宝龙达 · 无 GCU）：状态来自 LM 自己的开关（AppConfig bd_power_overlay）✅
-			QuickSwitches["highperf"] = UsesBaolongda
-				? (MechrevoLite.Mode.PerfModeService.Instance?.WindowsPowerOverlayEnabled ?? true)
-				: !text16.Contains("OFF", StringComparison.OrdinalIgnoreCase);
+			// ⭐ 2026-10-19（解耦 GCU）：⭐ 状态一律以 LM 自己的开关为准（AppConfig bd_power_overlay），
+			//   ⛔ 不再看 GCU 回包 `HighPerformancePowerModeSwitch`（那只是"厂商也设过"的痕迹）✅
+			bool hiOn = MechrevoLite.Mode.PerfModeService.Instance?.WindowsPowerOverlayEnabled ?? true;
+			QuickSwitches["highperf"] = hiOn;
+			HighPerformanceSeen = true;
 			HighPerformanceSeen = true;
 		}
 		string text17 = o["AcRecoverySwitch_Status"]?.ToString();

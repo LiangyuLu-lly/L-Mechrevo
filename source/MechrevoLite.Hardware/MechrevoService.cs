@@ -2845,7 +2845,9 @@ public class MechrevoService
 			}
 			// ⭐⭐ 2026-10-17（「高性能电源」解耦 GCU）：⭐ 无 GCU 时不再发注定失败的 MQTT，
 			//   改成"跟着性能档位设 Windows 电源模式"（powrprof overlay；狂暴=最佳性能/平衡=平衡/安静=最佳能效）✅
-			if (_hw.UsesBaolongda && string.Equals(key, "highperf", StringComparison.Ordinal))
+			// ⭐ 2026-10-19（用户：「GCU 也解耦，走 Windows 替换我的客户端」）⇒ **所有机型**都走 Windows，
+			//   不再限定宝龙达；GCU 的 HIGHPERFORMANCEPOWERMODE_ON/OFF 那条 MQTT 分支不再被用到 ✅
+			if (string.Equals(key, "highperf", StringComparison.Ordinal))
 			{
 				MechrevoLite.Mode.PerfModeService perf = MechrevoLite.Mode.PerfModeService.Instance;
 				if (perf == null)

@@ -4641,6 +4641,12 @@ public class SettingsForm : RForm
 			return caps.AcRecovery;
 		case "fanboost":
 			return caps.FanBoost;
+		case "highperf":
+			// ⭐⭐ 2026-10-17（「高性能电源」彻底解耦 GCU）：⭐ 它是**纯配置开关** ——
+			//   ⭐ 打开 = 切档时由 LM 用 **Windows API** 设「电源模式」（powrprof overlay），
+			//      ⛔ 不需要厂商能力位、也不发 MQTT ⇒ ⭐ 所有机型都该显示 ✅
+			//   ⚠️ 原来只靠 `HighPerformanceSeen`（GCU 上报）⇒ 没上报的机器直接隐藏（机主截图就是这种）
+			return true;
 		case "monitoroff":
 		case "taskbarautohide":
 		case "transparency":
