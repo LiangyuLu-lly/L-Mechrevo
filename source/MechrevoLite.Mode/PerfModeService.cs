@@ -430,16 +430,17 @@ internal sealed class PerfModeService
 
 	public async Task<PerfApplyOutcome?> ActivateAsync(string modeId, string reason, bool forceParameters = false)
 	{
-		// ⭐⭐ 2026-10-17（宝龙达 · 「高性能电源」GCU 无关实现）：⭐ 切档时同步 Windows「电源模式」
+		// ⭐⭐ 2026-10-17（「高性能电源」**彻底解耦 GCU**）：⭐ 切档时由 **LM 自己**同步 Windows「电源模式」
 		//   （设置 → 系统 → 电源 → 电源模式：最佳性能 / 平衡 / 最佳能效）✅
-		//   ⚠️ 纯 Windows API（powrprof `PowerSetActiveOverlayScheme`）⇒ ⛔ 不依赖 GCU、不写 EC ✅
-		//   ⚠️ 仅宝龙达执行；GCU 机型由厂商链路负责 ⇒ 逐位不变 ✅
-		ApplyBaolongdaPowerOverlay(modeId);
+		//   ⚠️ 纯 Windows API（powrprof `PowerSetActiveOverlayScheme`）⇒ ⛔ 不依赖 GCU、不按能力位、不写 EC ✅
+		//   ⭐ 用户口径：「GCU 也解耦（不按能力位来了），走 Windows 替换我的客户端」
+		//      ⇒ ⭐ **所有机型**都由这里设（GCU 机型不再等厂商链路）✅
+		ApplyWindowsPowerOverlay(modeId);
 		return await ActivateIfCurrentAsync(modeId, reason, forceParameters, null).ConfigureAwait(continueOnCapturedContext: false);
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-17（宝龙达 · 「高性能电源」）：⭐ 按档位把 Windows **电源模式 overlay** 设成
+	/// ⭐⭐ 2026-10-17（「高性能电源」· **GCU 解耦**）：⭐ 按档位把 Windows **电源模式 overlay** 设成
 	/// 最佳性能 / 平衡 / 最佳能效 —— 这与厂商无关，就是 Windows 自己的三档：
 	/// <list type="bullet">
 	/// <item><c>0</c> = 平衡 <c>00000000-0000-0000-0000-000000000000</c></item>
@@ -447,15 +448,11 @@ internal sealed class PerfModeService
 	/// <item><c>2</c> = 最佳能效 <c>961cc777-2547-4f9d-8174-7d86181b8a7a</c></item>
 	/// </list>
 	/// <para>默认映射：安静 ⇒ 2、平衡 ⇒ 0、狂暴/静音狂暴 ⇒ 1；自定义档按其 <see cref="PerfModeSettings.WindowsPowerMode" />（设了才动）。</para>
+	/// <para>⭐ **所有机型都执行**（含 GCU）—— 用户要求"走 Windows 替换厂商客户端"，不再看能力位。</para>
 	/// <para>⚠️ 开关：AppConfig <c>bd_power_overlay</c>（默认 1 = 开；设 0 即关闭本行为）。</para>
 	/// </summary>
-	private void ApplyBaolongdaPowerOverlay(string modeId)
+	private void ApplyWindowsPowerOverlay(string modeId)
 	{
-		MechrevoHw hw = _hw;
-		if (hw == null || !hw.UsesBaolongda)
-		{
-			return;
-		}
 		if (AppConfig.Get("bd_power_overlay", 1) == 0)
 		{
 			return;
@@ -489,11 +486,11 @@ internal sealed class PerfModeService
 		{
 			string name = (overlay == 1) ? "最佳性能" : ((overlay == 2) ? "最佳能效" : "平衡");
 			PowerNative.SetPowerMode(overlay);
-			Logger.WriteLine($"[power] 宝龙达：Windows 电源模式 → {name}（overlay={overlay} · 纯 Windows API，不依赖 GCU）");
+			Logger.WriteLine($"[power] Windows 电源模式 → {name}（overlay={overlay} · 纯 Windows API，不依赖 GCU/能力位）");
 		}
 		catch (Exception ex)
 		{
-			Logger.WriteLine("[power] 宝龙达：Windows 电源模式设置失败（已吞掉）：" + ex.Message);
+			Logger.WriteLine("[power] Windows 电源模式设置失败（已吞掉）：" + ex.Message);
 		}
 	}
 
