@@ -524,6 +524,21 @@ public class FanCurveForm : RForm
 			MechrevoHw hw = Program.hw;
 			if (hw != null)
 			{
+				// ** 2026-10-17（风扇曲线接入）：** 宝龙达**没有固件曲线表** ⚠️
+				//   => 它走的是**软件闭环**（读温度 -> 查曲线 -> 写功能号 21），数据存 `BaolongdaFanCurveStore`
+				//   => 本窗复用同一套绘制控件，只是把 **RPM 换算成占空比 %** 显示
+				//   ⚠️ 通道映射（owner 已确认）：`FanType 0`（大扇）= **GPU** <-> `_gpuPanel`
+				//      · `FanType 1`（小扇）= **CPU** <-> `_cpuPanel`
+				if (hw.UsesBaolongda)
+				{
+					BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve();
+					_cpuPanel.Load(TempsToBytes(s.Channel1Temperatures), RpmsToPercent(s.Channel1Rpms, s.MinRpm, s.MaxRpm));
+					_gpuPanel.Load(TempsToBytes(s.Channel0Temperatures), RpmsToPercent(s.Channel0Rpms, s.MinRpm, s.MaxRpm));
+					_status.Text = "风扇曲线：软件闭环（宝龙达）"
+						+ (s.Enabled ? " · 已启用" : " · 未启用")
+						+ $" · 范围 {s.MinRpm}~{s.MaxRpm} RPM";
+					return;
+				}
 				_cpuPanel.Load(hw.CpuCurveUpT, hw.CpuCurveDuty);
 				_gpuPanel.Load(hw.GpuCurveUpT, hw.GpuCurveDuty);
 				_status.Text = Strings.FanTablePrefix + (string.IsNullOrEmpty(hw.TableName) ? Strings.Unknown : hw.TableName);
@@ -623,6 +638,41 @@ public class FanCurveForm : RForm
 			return;
 		}
 		MechrevoHw hw = Program.hw;
+		// ** 2026-10-17（风扇曲线接入）：** 宝龙达走**软件闭环**，不经过 GCU/MQTT ⚠️
+		//   => 把占空比 % 换算回 RPM 后存进 `BaolongdaFanCurveStore`，并**立即应用一次**
+		//   ⚠️ 非宝龙达 => 下面的 GCU 逻辑**逐位不变**
+		if (hw != null && hw.UsesBaolongda)
+		{
+			BaolongdaFanCurveSettings prev = hw.LoadBaolongdaFanCurve();
+			_cpuPending = (_gpuPending = false);
+			try
+			{
+				int[] cpuPercent = _cpuPanel.Duties.ToArray();
+				int[] gpuPercent = _gpuPanel.Duties.ToArray();
+				BaolongdaFanCurveSettings next = new BaolongdaFanCurveSettings
+				{
+					Enabled = true,
+					HysteresisC = prev.HysteresisC,
+					IntervalMs = prev.IntervalMs,
+					MinRpm = prev.MinRpm,
+					MaxRpm = prev.MaxRpm,
+					Channel0Temperatures = prev.Channel0Temperatures,
+					Channel0Rpms = PercentToRpms(gpuPercent, prev.MinRpm, prev.MaxRpm),
+					Channel1Temperatures = prev.Channel1Temperatures,
+					Channel1Rpms = PercentToRpms(cpuPercent, prev.MinRpm, prev.MaxRpm),
+				};
+				bool ok = hw.SaveBaolongdaFanCurve(next);
+				_status.Text = ok ? ("风扇曲线已保存并启用 · " + DateTime.Now.ToString("HH:mm:ss")) : "风扇曲线保存失败";
+				RaiseFanCurveSaved(confirmed: ok);
+			}
+			catch (Exception exb)
+			{
+				Logger.WriteLine("宝龙达风扇曲线保存失败: " + exb.Message);
+				_status.Text = "风扇曲线保存失败";
+				RaiseFanCurveSaved(confirmed: false);
+			}
+			return;
+		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：本函数是「保存风扇曲线到 GCU」⇒ 真正需要 GCU。
 		if (hw == null || !hw.IsGcuConnected)
 		{
@@ -686,6 +736,50 @@ public class FanCurveForm : RForm
 				_saveTimer.Start();
 			}
 		}
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// ** 2026-10-17（风扇曲线接入 · 宝龙达）：RPM 与占空比 % 的换算
+	//   ⚠️ 为什么能这样换算：宝龙达**没有可靠的通道 max RPM**
+	//      => 用存档里的 `MinRpm` / `MaxRpm` 当分母（**我们设的**边界，不是硬件上限）
+	//   ⚠️ 精度：16 点 x 0~100% => RPM 步进 ≈ (Max-Min)/100，可接受
+	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>温度数组 int[] -> byte[]（绘制控件口径；超界夹到 0~254）。</summary>
+	private static byte[] TempsToBytes(int[] temps)
+	{
+		byte[] r = new byte[temps.Length];
+		for (int i = 0; i < temps.Length; i++)
+		{
+			r[i] = (byte)Math.Clamp(temps[i], 0, 254);
+		}
+		return r;
+	}
+
+	/// <summary>RPM 数组 -> 占空比 %（0~100）。⚠️ 分母是我们设的 Min/Max，不是硬件上限。</summary>
+	private static byte[] RpmsToPercent(int[] rpms, int minRpm, int maxRpm)
+	{
+		byte[] r = new byte[rpms.Length];
+		int span = Math.Max(1, maxRpm - minRpm);
+		for (int i = 0; i < rpms.Length; i++)
+		{
+			int pct = (int)Math.Round((rpms[i] - minRpm) * 100.0 / span);
+			r[i] = (byte)Math.Clamp(pct, 0, 100);
+		}
+		return r;
+	}
+
+	/// <summary>占空比 %（0~100）-> RPM 数组。</summary>
+	private static int[] PercentToRpms(int[] percent, int minRpm, int maxRpm)
+	{
+		int[] r = new int[percent.Length];
+		int span = Math.Max(1, maxRpm - minRpm);
+		for (int i = 0; i < percent.Length; i++)
+		{
+			int pct = Math.Clamp(percent[i], 0, 100);
+			r[i] = minRpm + (int)Math.Round(pct * span / 100.0);
+		}
+		return r;
 	}
 
 	private static bool CurveMatches(int[] requested, byte[] actual, byte[] temperatures)
