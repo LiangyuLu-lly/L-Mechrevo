@@ -1914,6 +1914,13 @@ public class SettingsForm : RForm
 			else if (key2 == "fanboost")
 			{
 				_fanBoostBox = cb;
+				// ⭐ 2026-10-19（强冷核对 ②）：**建控件时**就按真实状态给勾选态（宝龙达没有 GCU ⇒
+				//   状态在 `FanBoostActive`）。⚠️ 必须在 `CheckedChanged +=` **之前**赋值，
+				//   否则会被当成一次用户点击触发下发（⛔ 启动时不该写风扇）✅
+				MechrevoHw hwFanBoostInit = Program.hw;
+				cb.Checked = ((hwFanBoostInit != null && hwFanBoostInit.UsesBaolongda)
+					? MechrevoHw.FanBoostActive
+					: (hwFanBoostInit?.FanBoost ?? false));
 				cb.CheckedChanged += async (object? _, EventArgs _) =>
 				{
 					if (!_syncingSwitches)
@@ -4293,7 +4300,12 @@ public class SettingsForm : RForm
 			}
 			if (_fanBoostBox != null && Program.hw != null)
 			{
-				_fanBoostBox.Checked = Program.hw.FanBoost;
+				// ⭐ 2026-10-19（强冷核对 ① 可见 + ② 状态真实）：宝龙达的强冷状态在
+				//   `MechrevoHw.FanBoostActive`（本机通道：功能号 21 满转 + 13 回读）；
+				//   `hw.FanBoost`（GCU 上报字段）在宝龙达上**恒 false** ⇒ 原来 12 秒宽限一过
+				//   定时器就把开关拨回去（用户看到的"点了又弹回"）✅
+				//   ⚠️ 非宝龙达逐位不变（仍读 hw.FanBoost）✅
+				_fanBoostBox.Checked = Program.hw.UsesBaolongda ? MechrevoHw.FanBoostActive : Program.hw.FanBoost;
 			}
 		}
 		finally
@@ -5366,7 +5378,14 @@ public class SettingsForm : RForm
 		{
 			if (key == "fanboost")
 			{
-				return hw.SupportsFanBoost ? new bool?(hw.FanBoost) : ((bool?)null);
+				// ⭐ 2026-10-19（强冷核对 ②）：宝龙达没有 GCU ⇒ `hw.SupportsFanBoost` 恒 false、
+				//   `hw.FanBoost` 也不会被本机通道更新 ⇒ 读**静态** `FanBoostActive`（与写入侧同源）✅
+				//   ⚠️ 非宝龙达逐位不变 ✅
+				if (hw.SupportsFanBoost)
+				{
+					return new bool?(hw.FanBoost);
+				}
+				return hw.UsesBaolongda ? new bool?(MechrevoHw.FanBoostActive) : ((bool?)null);
 			}
 			bool value;
 			return hw.QuickSwitches.TryGetValue(key, out value) ? new bool?(value) : ((bool?)null);

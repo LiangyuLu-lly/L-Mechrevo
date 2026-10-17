@@ -43,7 +43,24 @@
 //    ⇒ ⭐ ⛔ **不开** `FanSettings` 能力位（⭐ 因为⚠️ 风扇两通道归属未确认 ⇒ ⭐ 会违反铁律 ✅）
 //    ⇒ ⭐ ⛔ **不下发任何转速**（⭐ 真机未验证功能号 20/21 的写入 ⚠️ ⇒ ⭐ 见方案 §6.2 ✅）
 //
-// 许可/署名：与本树同一实现，见 THIRD-PARTY-NOTICES.md 与 LICENSES\。
+// 2026-10-19（0.291.9.13 · 宝龙达风扇曲线 · ⭐ 默认曲线校准 ＋ ⭐ 双风扇联动开关）：
+//   ⭐ ① ⭐ 默认温度点：⭐ **40~100℃ · 16 点均匀**（每点 +4℃）✅
+//   ⭐ ② ⭐ 默认 RPM：⭐ **按该机型"满转"乘百分比形状**生成 ✅
+//        · 40 系（板号 `MRID6-23`）⭐ 满转 **6000 RPM**（原厂口径 `rpm / 60f`；真机 1965 RPM ⇒ 33% 已验证）✅
+//        · 30 系（板号裸 `MRID6` · 6800H）⭐ 满转 **3500 RPM**（原厂口径 `Item1 / 35f`）✅
+//        · 百分比形状锚点：⭐ 40℃≈30% · ⭐ 70℃≈58% · ⭐ 90℃≈73% · ⭐ 100%=100%（线性插值）✅
+//   ⚠️⚠️ **重要定性**：这条默认曲线是【我们软件的默认起点】，⛔ **不是厂商下发的曲线数据** ⚠️
+//        —— 宝龙达协议（功能号 20/21）**根本没有曲线表** ✅（只有"手动开关 ＋ 固定转速"）
+//        ⇒ ⭐ 机主可以随时在「风扇曲线」窗口自行调整，⭐ 存档里的值永远优先 ✅
+//   ⭐ ③ ⭐ 新增 `syncenabled`（双风扇 **0.85 联动**开关，默认 **true**）✅
+//        ⚠️ 旧存档（v2 早期）没有这个键 ⇒ ⭐ 读出时按 **true** 处理（向后兼容，⛔ 不当作坏档）✅
+//
+// ⭐ 算法/数值形状来源（⭐ 只取"做法/形状/系数"，⛔ 未复制任何代码）：
+//   参考自 斗战者(GPL-3.0)/开源蛟龙(MIT)，仅取数值形状与算法思路，未复制代码 ✅
+//     · 斗战者 12 点 40~100℃、RPM 1900→4400 的"低温柔和、高温陡升"形状；
+//     · 蛟龙 `AutoFanControl` 的双风扇 0.85 联动（`SharedHeatPipeSyncRatio`）。
+//   ⚠️ 本文件只保留"形状锚点/联动系数"这几个数字，全部实现为本仓自写 ✅
+//   ⚠️ 数值定性：⭐ 这些是**我们软件的默认起点**，⛔ **不是厂商数据**，⭐ 用户可自行调整 ✅
 
 using System;
 using System.Collections.Generic;
@@ -63,9 +80,14 @@ namespace MechrevoLite.Hardware;
 /// ⚠️ <b>哪个是 CPU、⭐ 哪个是 GPU 尚未真机确认</b> ⚠️（⭐ 功能号 13 读到两个通道，⭐ 但归属没定 ✅）
 /// ⇒ ⭐ ⛔ 本类型**不出现** Cpu/Gpu 字样 ✅ —— ⭐ 等 `--fan-watch` 确认后，
 /// ⭐ 在**外面**加一层语义映射 ✅（⭐ ⛔ 不回来改数据模型 ⚠️）。</para>
-/// <para>⚠️ ⭐ <b>默认曲线是【占位值】</b> ⚠️（⭐ <see cref="DefaultRpms" /> ✅）——
-/// ⭐ 因为宝龙达**没有可靠的通道 max RPM** ⚠️ ⇒ ⭐ 给不出"⭐ 正确"⭐ 的默认 ✅。
-/// ⭐ 但 <see cref="Enabled" /> **默认 false** ✅ ⇒ ⭐ 这条占位曲线**不会被静默应用** ✅。</para>
+/// <para>⭐⭐ <b>默认曲线已按代际校准</b>（⭐ 见 <see cref="DefaultRpms(int)" /> ✅）：
+/// ⭐ 温度 **40~100℃ · 16 点均匀** · ⭐ RPM = **本机满转 × 百分比形状** ✅
+/// （40 系 6000 RPM / 30 系 3500 RPM）。
+/// ⚠️ 它是**我们软件的默认起点**，⛔ **不是厂商数据** ⚠️ —— 宝龙达协议没有曲线表，
+/// ⭐ 用户随时可在「风扇曲线」窗口自行调整（⭐ 存档值永远优先）✅。</para>
+/// <para>⭐ 安全性：<see cref="Enabled" /> **默认 false** ✅ ⇒ ⭐ 这条默认曲线**不会被静默应用** ✅。</para>
+/// <para>⭐⭐ <b>双风扇联动</b>：<see cref="SyncEnabled" />（默认 true）—— 打开时两路按
+/// <c>max(自己, (int)(对方 × 0.85))</c> 互相带动，适配共用热管 ✅。</para>
 /// </summary>
 internal sealed class BaolongdaFanCurveSettings
 {
@@ -86,19 +108,53 @@ internal sealed class BaolongdaFanCurveSettings
 	internal const int DefaultIntervalMs = 1000;
 
 	/// <summary>
-	/// ⚠️ ⭐ 默认转速下界（RPM ✅）—— ⭐ **占位值** ⚠️（⭐ 等真机确认通道 max 后再定 ✅）。
-	/// <para>⭐ 刻意**不从 0 起** ✅：⭐ 风扇长期停转对笔记本散热不利 ⚠️（⭐ 与既有"⭐ 最低 20%"⭐ 同一考虑 ✅）。</para>
+	/// ⭐ 默认转速下界（RPM ✅）—— ⭐ 沿用既有口径 **1200 RPM** ✅（⭐ 刻意不从 0 起：长期停转不利于散热）。
+	/// <para>⚠️ 30 系满转只有 3500 ⇒ 默认曲线最前面两点（1050/1181 RPM）会被本下界抬到 1200 ✅
+	/// —— ⭐ 这是**安全下界**，⛔ 不是曲线算错 ✅。</para>
 	/// </summary>
 	internal const int DefaultMinRpm = 1200;
 
+	/// <summary>⭐ 默认温度点起点（℃）✅。</summary>
+	internal const int DefaultTemperatureStartC = 40;
+
+	/// <summary>⭐ 默认温度点终点（℃）✅。</summary>
+	internal const int DefaultTemperatureEndC = 100;
+
 	/// <summary>
-	/// ⚠️ ⭐ 默认转速上界（RPM ✅）—— ⭐ **占位值** ⚠️，⭐ 刻意**保守**（⭐ 远低于协议上限 6000 ✅）。
-	/// <para>⭐ 宁可低：⭐ 上限猜大了会让风扇狂转 ⚠️（⭐ 而猜小只是偏保守 ✅）。</para>
+	/// ⭐ 40 系（板号 `MRID6-23`）的**满转** = **6000 RPM** ✅
+	/// <para>⭐ 依据：原厂 40 系控制台把风扇百分比算作 `rpm / 60f` ⇒ 100% = 6000 RPM
+	/// （真机 1965 RPM ⇒ 33% 已验证）✅</para>
 	/// </summary>
-	internal const int DefaultMaxRpm = 4200;
+	internal const int FullRpm40Series = 6000;
+
+	/// <summary>
+	/// ⭐ 30 系（板号裸 `MRID6` · 6800H）的**满转** = **3500 RPM** ✅
+	/// <para>⭐ 依据：原厂 30 系控制台把风扇百分比算作 `Item1 / 35f` ⇒ 100% = 3500 RPM ✅</para>
+	/// </summary>
+	internal const int FullRpm30Series = 3500;
+
+	/// <summary>
+	/// ⭐ 没有硬件上下文（自检 / 未接后端）时的默认满转 —— 按 **40 系 6000 RPM** 处理 ✅。
+	/// <para>⚠️ 真正的下发路径**必须**由调用方把本机满转传进来：
+	/// <c>MechrevoHw.LoadBaolongdaFanCurve()</c> 传 <c>FanRpmMaxForPercent</c>（40 系 6000 / 30 系 3500）✅
+	/// —— ⭐ 复用与 <c>MechrevoHw.FanRpmMaxForPercent</c> **同一条代际判据** ✅。</para>
+	/// </summary>
+	internal const int DefaultFullRpm = FullRpm40Series;
+
+	/// <summary>⭐ 默认转速上界（RPM ✅）＝ <see cref="DefaultFullRpm" /> ✅（⭐ 默认曲线 100 ℃ 正好到满转）。</summary>
+	internal const int DefaultMaxRpm = DefaultFullRpm;
 
 	/// <summary>⭐ 软件闭环是否启用 ⚠️（⭐ 默认 **false** —— ⭐ 通道归属未确认前不许启用 ✅）。</summary>
 	internal bool Enabled { get; init; }
+
+	/// <summary>
+	/// ⭐⭐ **双风扇 0.85 联动**开关（⭐ 默认 **true** ✅）—— ⭐ 只对宝龙达软件闭环有意义 ✅。
+	/// <para>打开：两路各算完后按 ⭐ <c>max(自己, (int)(对方 × 0.85))</c> 互相带动 ✅
+	/// （⭐ 适配共用热管：一侧热起来时另一侧不能还慢悠悠 ✅）。关闭：两路**各算各的** ✅。</para>
+	/// <para>⚠️ <b>向后兼容</b>：旧的 v2 存档里**没有** <c>syncenabled</c> 键 ⇒ ⭐ 读出时按 **true** 处理 ✅
+	/// （⛔ 不当作坏档、⛔ 不要求用户重设曲线 ✅）。</para>
+	/// </summary>
+	internal bool SyncEnabled { get; init; } = true;
 
 	/// <summary>⭐ 存档版本号（⭐ 读出来时是文件里声明的值；⭐ 新建时是 <see cref="CurrentFormatVersion" /> ✅）。</summary>
 	internal int FormatVersion { get; init; } = CurrentFormatVersion;
@@ -129,7 +185,7 @@ internal sealed class BaolongdaFanCurveSettings
 
 	/// <summary>
 	/// ⭐⭐ 这份存档**读不懂**吗 ⚠️（⭐ 旧占空比格式 / ⭐ 版本号不认识 / ⭐ 某个值坏掉 ✅）。
-	/// <para>⭐ 为 true 时 ⭐ <see cref="Enabled" /> **必为 false** ✅、⭐ 且曲线是**默认占位值** ✅
+	/// <para>⭐ 为 true 时 ⭐ <see cref="Enabled" /> **必为 false** ✅、⭐ 且曲线是**按代际校准的默认值** ✅
 	/// ⇒ ⭐ ⛔ **不会被应用** ✅。⭐ 供 UI 如实告知用户"⭐ 存档没迁移、⭐ 请重新设一次" ✅。</para>
 	/// <para>⭐ 具体原因见 <see cref="StatusNote" /> ✅ —— ⭐ ⛔ 不是"⭐ 没启用"⭐ 这么含糊 ⚠️。</para>
 	/// </summary>
@@ -138,34 +194,107 @@ internal sealed class BaolongdaFanCurveSettings
 	/// <summary>⭐ 读档时的**如实说明**（⭐ 空 = ⭐ 没有特殊情况 ✅）—— ⭐ 供 UI/日志展示 ✅。</summary>
 	internal string StatusNote { get; init; } = string.Empty;
 
-	/// <summary>⭐ 默认温度点（⭐ 40~95℃ 均匀铺开 ✅ —— ⭐ 与既有曲线的常见形状一致 ✅）。</summary>
+	/// <summary>
+	/// ⭐ 默认温度点：⭐ **<see cref="DefaultTemperatureStartC" />~<see cref="DefaultTemperatureEndC" />℃ ·
+	/// 16 点均匀**（每点 +4℃）✅
+	/// <para>⭐ 与既有曲线同为 16 点 ⇒ 存储格式、界面滑点都不变 ✅。</para>
+	/// </summary>
 	internal static int[] DefaultTemperatures()
 	{
 		int[] array = new int[PointCount];
 		for (int i = 0; i < PointCount; i++)
 		{
-			// ⭐ 40℃ 起、⭐ 每点 +3~4℃ ⇒ ⭐ 最后一点 ≈ 95℃ ✅
-			array[i] = 40 + (int)Math.Round(i * (95.0 - 40.0) / (PointCount - 1));
+			array[i] = DefaultTemperatureStartC
+				+ i * (DefaultTemperatureEndC - DefaultTemperatureStartC) / (PointCount - 1);
 		}
 		return array;
 	}
 
 	/// <summary>
-	/// ⚠️ ⭐ 默认转速曲线（RPM ✅）—— ⭐ ⭐ **这是占位值，⭐ 不是"⭐ 正确值"** ⚠️
-	/// <para>⭐ 形状：⭐ <see cref="DefaultMinRpm" /> → ⭐ <see cref="DefaultMaxRpm" /> 线性铺开 ✅
-	/// （⭐ 40℃ 给 1200 RPM、⭐ 95℃ 给 4200 RPM ✅）。</para>
-	/// <para>⚠️ 之所以只能给占位：⭐ 宝龙达**没有可靠的通道 max RPM** ⚠️
-	/// ⇒ ⭐ 编不出"⭐ 按百分比换算"⭐ 的等价物 ✅。⭐ 等真机测出各通道转速范围后再收敛 ✅。</para>
-	/// <para>⭐ 安全性：⭐ <see cref="Enabled" /> 默认 false ✅ ⇒ ⭐ 本曲线**不会**被静默应用 ✅。</para>
+	/// ⭐ 默认转速曲线（RPM ✅）—— ⭐ 无硬件上下文时按 <see cref="DefaultFullRpm" />（40 系 6000）生成 ✅。
+	/// <para>⚠️ 带硬件路径请用 <see cref="DefaultRpms(int)" /> 传本机满转（30 系 3500）✅。</para>
 	/// </summary>
 	internal static int[] DefaultRpms()
 	{
+		return DefaultRpms(DefaultFullRpm);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 默认转速曲线（RPM ✅）：⭐ **本机满转 × 百分比形状** ✅
+	/// <para>⭐ 形状锚点（<see cref="DefaultRpmPercent" />）：⭐ 40℃≈30% · ⭐ 70℃≈58% ·
+	/// ⭐ 90℃≈73% · ⭐ 100%=100%（⭐ 线性插值 ✅）。</para>
+	/// <para>⚠️ <paramref name="fullRpm" /> ≤ 0 ⇒ 回退到 <see cref="DefaultFullRpm" />（40 系）⚠️；
+	/// 真正下发路径必须传本机满转（40 系 <see cref="FullRpm40Series" /> / 30 系 <see cref="FullRpm30Series" />）✅。</para>
+	/// <para>⚠️ 这是**我们软件的默认起点**，⛔ **不是厂商数据** —— 宝龙达协议没有曲线表 ✅
+	/// ⇒ 用户可在「风扇曲线」窗口自行调整（⭐ 存档值永远优先）✅。</para>
+	/// </summary>
+	internal static int[] DefaultRpms(int fullRpm)
+	{
+		int full = (fullRpm > 0) ? fullRpm : DefaultFullRpm;
+		int[] temperatures = DefaultTemperatures();
 		int[] array = new int[PointCount];
 		for (int i = 0; i < PointCount; i++)
 		{
-			array[i] = DefaultMinRpm + (int)Math.Round(i * (DefaultMaxRpm - DefaultMinRpm) / (double)(PointCount - 1));
+			double percent = DefaultRpmPercent(temperatures[i]);
+			// ⭐ 明确用 AwayFromZero：中点（如 30 系 2082.5）向上取整，⛔ 不用银行家舍入（结果更直观）✅
+			int rpm = (int)Math.Round(full * percent / 100.0, MidpointRounding.AwayFromZero);
+			array[i] = Math.Clamp(rpm, 0, full);
 		}
 		return array;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 默认 RPM 的**百分比形状**（0~100 ✅）—— ⭐ 锚点线性插值：
+	/// 40℃ = 30% · 70℃ = 58% · 90℃ = 73% · 100℃ = 100% ✅
+	/// <para>⭐ 形状取自 斗战者(GPL-3.0) 12 点曲线（40~100℃、1900→4400 RPM）的
+	/// "低温柔和、高温陡升"特征，⭐ 仅取**数值形状**，⛔ 未复制代码 ✅（⛔ 不是厂商数据）。</para>
+	/// <para>⭐ 边界：≤40℃ ⇒ 30%（⛔ 不外推到更低）· ≥100℃ ⇒ 100%（⛔ 不超 100%）✅。</para>
+	/// </summary>
+	internal static double DefaultRpmPercent(int tempC)
+	{
+		if (tempC <= DefaultTemperatureStartC)
+		{
+			return 30.0;
+		}
+		if (tempC >= DefaultTemperatureEndC)
+		{
+			return 100.0;
+		}
+		if (tempC <= 70)
+		{
+			return 30.0 + (tempC - 40) * (58.0 - 30.0) / (70 - 40);
+		}
+		if (tempC <= 90)
+		{
+			return 58.0 + (tempC - 70) * (73.0 - 58.0) / (90 - 70);
+		}
+		return 73.0 + (tempC - 90) * (100.0 - 73.0) / (DefaultTemperatureEndC - 90);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 生成一份**默认曲线**（⭐ 已按代际校准 ✅）：⭐ 温度 40~100℃/16 点、RPM 按本机满转 × 形状 ✅。
+	/// <para>⭐ 存档不存在 / 读不懂时用本方法返回（⭐ <c>Enabled=false</c> ⇒ ⛔ 不会被静默应用 ✅）。</para>
+	/// <para>⚠️ <paramref name="fullRpm" /> ≤ 0 ⇒ 回退到 <see cref="DefaultFullRpm" />（40 系）⚠️。</para>
+	/// </summary>
+	internal static BaolongdaFanCurveSettings CreateDefault(int fullRpm)
+	{
+		int bandMax = (fullRpm > 0) ? fullRpm : DefaultFullRpm;
+		int[] temperatures = DefaultTemperatures();
+		int[] rpms = DefaultRpms(bandMax);
+		return new BaolongdaFanCurveSettings
+		{
+			Enabled = false,
+			FormatVersion = CurrentFormatVersion,
+			SyncEnabled = true,
+			HysteresisC = FanCurveEngine.DefaultHysteresisC,
+			IntervalMs = DefaultIntervalMs,
+			MinRpm = DefaultMinRpm,
+			MaxRpm = bandMax,
+			Channel0Temperatures = (int[])temperatures.Clone(),
+			Channel0Rpms = (int[])rpms.Clone(),
+			Channel1Temperatures = (int[])temperatures.Clone(),
+			Channel1Rpms = (int[])rpms.Clone()
+		};
 	}
 
 	/// <summary>⭐ 深拷贝（⭐ 数组类型是可变引用 ⇒ ⭐ 传出去前必须拷贝，⛔ 免得外部改到内部状态 ✅）。</summary>
@@ -175,6 +304,7 @@ internal sealed class BaolongdaFanCurveSettings
 		{
 			Enabled = enabledOverride ?? Enabled,
 			FormatVersion = FormatVersion,
+			SyncEnabled = SyncEnabled,
 			HysteresisC = HysteresisC,
 			IntervalMs = IntervalMs,
 			MinRpm = MinRpm,
@@ -192,6 +322,30 @@ internal sealed class BaolongdaFanCurveSettings
 	internal BaolongdaFanCurveSettings WithEnabled(bool enabled)
 	{
 		return Clone(enabled);
+	}
+
+	/// <summary>
+	/// ⭐ 拷贝一份、只改 <see cref="SyncEnabled" /> ✅（⭐ 供「风扇曲线」窗口的「双风扇联动」开关用 ✅）。
+	/// <para>⚠️ 曲线 / 启用态 / 上下界 / 回差**全部原样** ✅（⛔ 改一个开关不顺手改别的）。</para>
+	/// </summary>
+	internal BaolongdaFanCurveSettings WithSyncEnabled(bool syncEnabled)
+	{
+		return new BaolongdaFanCurveSettings
+		{
+			Enabled = Enabled,
+			FormatVersion = FormatVersion,
+			SyncEnabled = syncEnabled,
+			HysteresisC = HysteresisC,
+			IntervalMs = IntervalMs,
+			MinRpm = MinRpm,
+			MaxRpm = MaxRpm,
+			Channel0Temperatures = (int[])Channel0Temperatures.Clone(),
+			Channel0Rpms = (int[])Channel0Rpms.Clone(),
+			Channel1Temperatures = (int[])Channel1Temperatures.Clone(),
+			Channel1Rpms = (int[])Channel1Rpms.Clone(),
+			IsUnreadableArchive = IsUnreadableArchive,
+			StatusNote = StatusNote
+		};
 	}
 }
 
@@ -219,15 +373,21 @@ internal static class BaolongdaFanCurveStore
 
 	private const string FileName = "fan_curve_bd.cfg";
 
-	/// <summary>⭐ 读一次设置（⭐ 读不到/坏掉 ⇒ ⭐ 返回**默认**（⭐ `Enabled=false` ✅），⭐ 不外抛 ✅）。</summary>
-	internal static BaolongdaFanCurveSettings Load()
+	/// <summary>
+	/// ⭐ 读一次设置（⭐ 读不到/坏掉 ⇒ ⭐ 返回**默认**（⭐ `Enabled=false` ✅），⭐ 不外抛 ✅）。
+	/// <para>⭐⭐ 参数 <paramref name="fullRpm" /> = ⭐ **本机风扇满转**（40 系 6000 / 30 系 3500）✅
+	/// —— ⭐ **存档不存在 / 读不懂**时用它生成校准过的默认曲线 ✅。
+	/// ⚠️ 传 ≤0 ⇒ 按 40 系 <see cref="BaolongdaFanCurveSettings.DefaultFullRpm" /> 处理（⭐ 仅供自检/无硬件路径）✅。</para>
+	/// </summary>
+	internal static BaolongdaFanCurveSettings Load(int fullRpm = 0)
 	{
+		int bandMax = (fullRpm > 0) ? fullRpm : BaolongdaFanCurveSettings.DefaultFullRpm;
 		try
 		{
 			string path = GetPath();
 			if (!File.Exists(path))
 			{
-				return new BaolongdaFanCurveSettings();
+				return BaolongdaFanCurveSettings.CreateDefault(bandMax);
 			}
 			Dictionary<string, string> map = ReadMap(path);
 
@@ -237,16 +397,16 @@ internal static class BaolongdaFanCurveStore
 			if (hasFormat
 				&& !int.TryParse(formatRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out version))
 			{
-				return Unreadable(BaolongdaFanCurveSettings.LegacyDutyFormatVersion, $"format=「{formatRaw}」不是整数");
+				return Unreadable(BaolongdaFanCurveSettings.LegacyDutyFormatVersion, $"format=「{formatRaw}」不是整数", bandMax);
 			}
 			if (!hasFormat)
 			{
 				return Unreadable(BaolongdaFanCurveSettings.LegacyDutyFormatVersion,
-					"文件里没有 format 版本号 ⇒ 判定为旧的占空比格式（占空比无法换算成 RPM）");
+					"文件里没有 format 版本号 ⇒ 判定为旧的占空比格式（占空比无法换算成 RPM）", bandMax);
 			}
 			if (version != BaolongdaFanCurveSettings.CurrentFormatVersion)
 			{
-				return Unreadable(version, $"format={version}（本程序只认 {BaolongdaFanCurveSettings.CurrentFormatVersion}）");
+				return Unreadable(version, $"format={version}（本程序只认 {BaolongdaFanCurveSettings.CurrentFormatVersion}）", bandMax);
 			}
 
 			// ⭐⭐ v2：⭐ **严格**解析 ✅ —— ⭐ 任何一个出现的值读不懂 ⇒ ⭐ 整份算读不懂 ⚠️（⛔ 不猜 ✅）
@@ -254,14 +414,16 @@ internal static class BaolongdaFanCurveStore
 			if (!TryParseInt(map, "hysteresis", FanCurveEngine.DefaultHysteresisC, out int hysteresis, out string e1)) { problems.Add(e1); }
 			if (!TryParseInt(map, "intervalms", BaolongdaFanCurveSettings.DefaultIntervalMs, out int interval, out string e2)) { problems.Add(e2); }
 			if (!TryParseInt(map, "minrpm", BaolongdaFanCurveSettings.DefaultMinRpm, out int minRpm, out string e3)) { problems.Add(e3); }
-			if (!TryParseInt(map, "maxrpm", BaolongdaFanCurveSettings.DefaultMaxRpm, out int maxRpm, out string e4)) { problems.Add(e4); }
+			if (!TryParseInt(map, "maxrpm", bandMax, out int maxRpm, out string e4)) { problems.Add(e4); }
+			// ⭐ 双风扇联动：⭐ 旧存档**没有这个键** ⇒ ⭐ 默认 **1（开）**，⛔ 不当作坏档 ✅（向后兼容）
+			if (!TryParseInt(map, "syncenabled", 1, out int syncEnabled, out string e0)) { problems.Add(e0); }
 			if (!TryParseCurve(map, "ch0temp", out int[] ch0Temp, out string e5)) { problems.Add(e5); }
 			if (!TryParseCurve(map, "ch0rpm", out int[] ch0Rpm, out string e6)) { problems.Add(e6); }
 			if (!TryParseCurve(map, "ch1temp", out int[] ch1Temp, out string e7)) { problems.Add(e7); }
 			if (!TryParseCurve(map, "ch1rpm", out int[] ch1Rpm, out string e8)) { problems.Add(e8); }
 			if (problems.Count > 0)
 			{
-				return Unreadable(version, string.Join("；", problems));
+				return Unreadable(version, string.Join("；", problems), bandMax);
 			}
 
 			return new BaolongdaFanCurveSettings
@@ -269,6 +431,7 @@ internal static class BaolongdaFanCurveStore
 				// ⚠️ 默认 false：⭐ 文件里没写 `enabled=1` 就是**不启用** ✅（⭐ 安全默认 ✅）
 				Enabled = map.TryGetValue("enabled", out string e) && e == "1",
 				FormatVersion = BaolongdaFanCurveSettings.CurrentFormatVersion,
+				SyncEnabled = syncEnabled != 0,
 				HysteresisC = hysteresis,
 				IntervalMs = interval,
 				MinRpm = minRpm,
@@ -282,7 +445,7 @@ internal static class BaolongdaFanCurveStore
 		catch (Exception ex)
 		{
 			Logger.WriteLine("宝龙达风扇曲线：⭐ 读取失败（按默认值处理）：" + ex.Message);
-			return new BaolongdaFanCurveSettings();
+			return BaolongdaFanCurveSettings.CreateDefault(bandMax);
 		}
 	}
 
@@ -305,8 +468,10 @@ internal static class BaolongdaFanCurveStore
 			sb.AppendLine("# 宝龙达软件风扇曲线（⭐ 由 L-Mechrevo 自动生成，⭐ 手改请谨慎 ✅）");
 			sb.AppendLine("# ⚠️ 数值是**我们软件记的**（⭐ 机器读不回来）—— 见 docs\\notes 里第 4 步说明 ✅");
 			sb.AppendLine("# ⭐ 单位是 RPM（⛔ 不是占空比）✅；⭐ 通道 0/1 对应协议 FanType 0/1（⭐ 哪个是 CPU/GPU 待确认 ⚠️）✅");
+			sb.AppendLine("# syncenabled=1 ⇒ 双风扇 0.85 联动（共用热管）；旧版本存档没有该键 ⇒ 按 1 处理 ✅");
 			sb.Append("format=").Append(BaolongdaFanCurveSettings.CurrentFormatVersion).AppendLine();
 			sb.Append("enabled=").Append(settings.Enabled ? "1" : "0").AppendLine();
+			sb.Append("syncenabled=").Append(settings.SyncEnabled ? "1" : "0").AppendLine();
 			sb.Append("hysteresis=").Append(settings.HysteresisC).AppendLine();
 			sb.Append("intervalms=").Append(settings.IntervalMs).AppendLine();
 			sb.Append("minrpm=").Append(settings.MinRpm).AppendLine();
@@ -317,7 +482,7 @@ internal static class BaolongdaFanCurveStore
 			sb.Append("ch1rpm=").AppendLine(Join(settings.Channel1Rpms));
 			File.WriteAllText(path, sb.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
 			Logger.WriteLine($"宝龙达风扇曲线：⭐ 已保存（⭐ format={BaolongdaFanCurveSettings.CurrentFormatVersion} · ⭐ enabled={settings.Enabled}"
-				+ $" · ⭐ ch0={Join(settings.Channel0Rpms)} · ⭐ ch1={Join(settings.Channel1Rpms)}）");
+				+ $" · ⭐ 双风扇联动={settings.SyncEnabled} · ⭐ ch0={Join(settings.Channel0Rpms)} · ⭐ ch1={Join(settings.Channel1Rpms)}）");
 			return true;
 		}
 		catch (Exception ex)
@@ -363,7 +528,7 @@ internal static class BaolongdaFanCurveStore
 	/// <para>⭐ 日志用 ⭐ <see cref="Logger.WriteError" />（⭐ 默认「仅错误」级别也可见 ✅）
 	/// ＋ ⭐ <see cref="Logger.TryMarkChanged" /> 去重（⭐ 读档可能被调多次 ⇒ ⭐ 状态没变就不重复打 ✅）。</para>
 	/// </summary>
-	private static BaolongdaFanCurveSettings Unreadable(int detectedVersion, string reason)
+	private static BaolongdaFanCurveSettings Unreadable(int detectedVersion, string reason, int fullRpm)
 	{
 		try
 		{
@@ -378,10 +543,21 @@ internal static class BaolongdaFanCurveStore
 		catch
 		{
 		}
+		// ⭐ 读不懂时给"⭐ 按代际校准过"的默认曲线（仍 Enabled=false ⇒ ⛔ 不会被静默应用 ✅）
+		BaolongdaFanCurveSettings fallback = BaolongdaFanCurveSettings.CreateDefault(fullRpm);
 		return new BaolongdaFanCurveSettings
 		{
 			Enabled = false,
 			FormatVersion = detectedVersion,
+			SyncEnabled = fallback.SyncEnabled,
+			HysteresisC = fallback.HysteresisC,
+			IntervalMs = fallback.IntervalMs,
+			MinRpm = fallback.MinRpm,
+			MaxRpm = fallback.MaxRpm,
+			Channel0Temperatures = fallback.Channel0Temperatures,
+			Channel0Rpms = fallback.Channel0Rpms,
+			Channel1Temperatures = fallback.Channel1Temperatures,
+			Channel1Rpms = fallback.Channel1Rpms,
 			IsUnreadableArchive = true,
 			StatusNote = reason
 		};

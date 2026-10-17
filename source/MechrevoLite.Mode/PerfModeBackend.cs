@@ -139,6 +139,8 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		{
 			Enabled = true,
 			FormatVersion = current.FormatVersion,
+			// ⭐ 2026-10-19：双风扇联动开关随曲线一起保存（⛔ 写档位曲线不能顺手把它改回默认）✅
+			SyncEnabled = current.SyncEnabled,
 			HysteresisC = current.HysteresisC,
 			IntervalMs = current.IntervalMs,
 			MinRpm = current.MinRpm,

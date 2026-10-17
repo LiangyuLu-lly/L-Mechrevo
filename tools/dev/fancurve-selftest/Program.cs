@@ -271,9 +271,21 @@ internal static class Program
 		Eq("无存档 ⇒ FormatVersion=2", BaolongdaFanCurveSettings.CurrentFormatVersion, fresh.FormatVersion);
 		Eq("无存档 ⇒ 点数 16", BaolongdaFanCurveSettings.PointCount, fresh.Channel0Rpms.Length);
 		Eq("默认 band 下界 = 1200", BaolongdaFanCurveSettings.DefaultMinRpm, fresh.MinRpm);
-		Eq("默认 band 上界 = 4200", BaolongdaFanCurveSettings.DefaultMaxRpm, fresh.MaxRpm);
+		// 2026-10-19（默认曲线校准）：band 上界 = 满转（无硬件上下文按 40 系 6000）
+		Eq("默认 band 上界 = 满转 6000（40 系）", BaolongdaFanCurveSettings.FullRpm40Series, fresh.MaxRpm);
+		Eq("默认温度首点 = 40℃", 40, fresh.Channel0Temperatures[0]);
+		Eq("默认温度末点 = 100℃", 100, fresh.Channel0Temperatures[15]);
+		Eq("默认 RPM 首点 = 1800（40 系 30%）", 1800, fresh.Channel0Rpms[0]);
+		Eq("默认 RPM 末点 = 6000（40 系 100%）", 6000, fresh.Channel0Rpms[15]);
+		True("默认双风扇联动 = 开", fresh.SyncEnabled);
 		Eq("默认回差 = 3", FanCurveEngine.DefaultHysteresisC, fresh.HysteresisC);
 		Eq("无存档 ⇒ 不该打错误日志", 0, Logger.Errors.Count);
+
+		// ---- 用例 1b：30 系（满转 3500）⇒ 默认曲线按 3500 校准 ----
+		BaolongdaFanCurveSettings fresh30 = BaolongdaFanCurveStore.Load(BaolongdaFanCurveSettings.FullRpm30Series);
+		Eq("30 系 ⇒ band 上界 3500", BaolongdaFanCurveSettings.FullRpm30Series, fresh30.MaxRpm);
+		Eq("30 系 ⇒ RPM 首点 = 1050（30%）", 1050, fresh30.Channel0Rpms[0]);
+		Eq("30 系 ⇒ RPM 末点 = 3500（100%）", 3500, fresh30.Channel0Rpms[15]);
 
 		// ---- 用例 2：**旧格式**（⭐ 占空比 ＋ ⭐ modeid ＋ ⭐ 没有 format ✅）⇒ ⭐ 不启用 ＋ ⭐ 如实告知 ----
 		//    ⚠️ 注意 `enabled=1`：⭐ 旧存档是**开着**的 ⚠️ ⇒ ⭐ 更要证明它**不会**被启用 ✅
@@ -285,7 +297,7 @@ internal static class Program
 		True("旧格式（即使 enabled=1）⇒ ⭐ 仍不启用", !legacy.Enabled);
 		True("旧格式 ⇒ 标记 IsUnreadableArchive", legacy.IsUnreadableArchive);
 		True("旧格式 ⇒ StatusNote 非空（可给 UI 显示）", legacy.StatusNote.Length > 0);
-		Eq("旧格式 ⇒ 不该静默迁移（曲线退回默认占位值）", BaolongdaFanCurveSettings.DefaultMinRpm, legacy.Channel0Rpms[0]);
+		Eq("旧格式 ⇒ 不该静默迁移（曲线退回默认值）", 1800, legacy.Channel0Rpms[0]);
 		Logged("旧格式 ⇒ 打了【默认级别可见】的日志", "无法解释");
 
 		// ⭐ 再读一次 ⇒ ⭐ 去重生效（⭐ 不刷屏 ✅）
@@ -311,6 +323,7 @@ internal static class Program
 		BaolongdaFanCurveSettings saved = new BaolongdaFanCurveSettings
 		{
 			Enabled = true,
+			SyncEnabled = false,
 			HysteresisC = 5,
 			IntervalMs = 2000,
 			MinRpm = 900,
@@ -322,10 +335,12 @@ internal static class Program
 		};
 		True("Save 成功", BaolongdaFanCurveStore.Save(saved));
 		True("存档里写了 format=2", ReadConfig().Contains("format=2"));
+		True("存档里写了 syncenabled=0", ReadConfig().Contains("syncenabled=0"));
 		Logger.Reset();
 		BaolongdaFanCurveSettings back = BaolongdaFanCurveStore.Load();
 		True("往返 ⇒ Enabled 保持 true", back.Enabled);
 		True("往返 ⇒ 不是旧存档", !back.IsUnreadableArchive);
+		True("往返 ⇒ 双风扇联动 = false", !back.SyncEnabled);
 		Eq("往返 ⇒ HysteresisC", 5, back.HysteresisC);
 		Eq("往返 ⇒ IntervalMs", 2000, back.IntervalMs);
 		Eq("往返 ⇒ MinRpm", 900, back.MinRpm);
@@ -349,6 +364,23 @@ internal static class Program
 		True("WithEnabled(true) ⇒ 能再打开", on.Enabled);
 		True("WithEnabled(true) ⇒ 也不是旧存档", !on.IsUnreadableArchive);
 
+		// ---- 用例 4b-2：WithSyncEnabled —— 只改双风扇联动，⛔ 不动别的 ✅ ----
+		BaolongdaFanCurveSettings syncOn = saved.WithSyncEnabled(true);
+		True("WithSyncEnabled(true) ⇒ SyncEnabled=true", syncOn.SyncEnabled);
+		True("WithSyncEnabled ⇒ 启用态原样", syncOn.Enabled);
+		Eq("WithSyncEnabled ⇒ 曲线原样（ch0 转速首点）", 1500, syncOn.Channel0Rpms[0]);
+		Eq("WithSyncEnabled ⇒ 上下界原样", 5100, syncOn.MaxRpm);
+		True("WithSyncEnabled ⇒ 原对象不被改动（仍是 false）", !saved.SyncEnabled);
+
+		// ---- 用例 4c：旧 v2 存档**没有** syncenabled ⇒ ⭐ 按 true（向后兼容）✅ ----
+		WriteConfig("format=2\nenabled=0\nch0temp=" + Csv16(40) + "\nch0rpm=" + Csv16(11) + "\n"
+			+ "ch1temp=" + Csv16(40) + "\nch1rpm=" + Csv16(21) + "\n");
+		Logger.Reset();
+		BaolongdaFanCurveSettings oldV2 = BaolongdaFanCurveStore.Load();
+		True("旧 v2 缺 syncenabled ⇒ 按 true（向后兼容）", oldV2.SyncEnabled);
+		True("旧 v2 缺 syncenabled ⇒ 不当作坏档", !oldV2.IsUnreadableArchive);
+		Eq("旧 v2 缺 syncenabled ⇒ 不该有错误日志", 0, Logger.Errors.Count);
+
 		// ---- 用例 5：v2 但某条曲线点数不对 ⇒ ⭐ **整份读不懂** ✅（⭐ 自检发现的设计修正 ⚠️）----
 		//    ⚠️ 为什么不是"⭐ 该条退回默认、⭐ 别的照用"⚠️：
 		//    ⭐ 温度数组与转速数组描述的是**同一条曲线** ✅ ⇒ ⭐ 一个用默认、⭐ 一个用用户的
@@ -361,7 +393,7 @@ internal static class Program
 		True("点数错 ⇒ 整份不启用（⛔ 不半个用默认半个用用户的）", !partial.Enabled);
 		True("点数错 ⇒ 标记 IsUnreadableArchive", partial.IsUnreadableArchive);
 		Logged("点数错 ⇒ 可见日志点名 ch1temp 点数", "ch1temp 点数=3");
-		Eq("点数错 ⇒ 好的那条也不被采用（曲线回默认占位值）", BaolongdaFanCurveSettings.DefaultMinRpm, partial.Channel0Rpms[0]);
+		Eq("点数错 ⇒ 好的那条也不被采用（曲线回默认值）", 1800, partial.Channel0Rpms[0]);
 
 		// ⭐ 配对问题：⭐ 温度好、⭐ 转速坏 ⇒ ⭐ 同样整份读不懂（⭐ ⛔ 绝不拼"⭐ 默认温度 × ⭐ 用户转速"✅）
 		WriteConfig("format=2\nenabled=1\n"

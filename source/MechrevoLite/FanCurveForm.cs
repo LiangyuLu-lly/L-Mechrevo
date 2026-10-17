@@ -228,6 +228,14 @@ public class FanCurveForm : RForm
 
 	private bool _syncingBdEnable;
 
+	// 2026-10-19（机主：双风扇 0.85 联动开关放进「风扇曲线」窗口）：开关见 OnCurveUpdated 的同步逻辑
+	private RCheckBox _bdSyncChk;
+
+	private bool _syncingBdSync;
+
+	// 2026-10-19：双风扇联动复选框的正面解释（本窗第一个 ToolTip）
+	private readonly ToolTip _toolTip = new ToolTip();
+
 	private Label? _respectiveHint;
 
 	private bool _syncingRespective;
@@ -447,6 +455,31 @@ public class FanCurveForm : RForm
 			ToggleBaolongdaCurveEnable(_bdEnableChk.Checked);
 		};
 		flowLayoutPanel.Controls.Add(_bdEnableChk);
+		// 2026-10-19（机主确认位置 · 截图）：双风扇 0.85 联动开关放在「启用软件闭环」同一行、紧挨着它右边 ✅
+		//   依据：开源蛟龙 `AutoFanControl` 的 `SharedHeatPipeSyncRatio` = 0.85 是**自定义风扇闭环内部**的固定系数（参考自 斗战者(GPL-3.0)/开源蛟龙(MIT)，仅取数值形状与算法思路，未复制代码）
+		//   ⇒ 它属于「风扇曲线」这个功能域，⛔ 不是独立于曲线的系统开关
+		//   ⚠️ 只在宝龙达显示（与「启用软件闭环」同一可见性判据）；默认勾选（SyncEnabled 默认 true）
+		_bdSyncChk = new RCheckBox
+		{
+			Text = Strings.FanSyncSharedHeatPipe,
+			Checked = true,
+			ForeColor = UiVisualStyle.Text,
+			BackColor = UiVisualStyle.Window,
+			AutoSize = true,
+			Visible = false,
+			Margin = new Padding(D(12), D(4), 0, 0),
+			Cursor = Cursors.Hand
+		};
+		_toolTip.SetToolTip(_bdSyncChk, Strings.FanSyncSharedHeatPipeTip);
+		_bdSyncChk.CheckedChanged += (object sender, EventArgs e) =>
+		{
+			if (_syncingBdSync || !(Program.hw?.UsesBaolongda ?? false))
+			{
+				return;
+			}
+			ToggleBaolongdaSyncEnable(_bdSyncChk.Checked);
+		};
+		flowLayoutPanel.Controls.Add(_bdSyncChk);
 		_cpuPanel = new CurvePanel("CPU", UiVisualStyle.Accent, () =>
 		{
 			_cpuPending = true;
@@ -491,6 +524,7 @@ public class FanCurveForm : RForm
 				Program.hw.CustomModeChanged -= OnCustomChanged;
 				_saveTimer.Stop();
 				_saveTimer.Dispose();
+				_toolTip.Dispose();
 			};
 		}
 		else
@@ -499,6 +533,7 @@ public class FanCurveForm : RForm
 			{
 				_saveTimer.Stop();
 				_saveTimer.Dispose();
+				_toolTip.Dispose();
 			};
 		}
 		OnCurveUpdated();
@@ -567,14 +602,10 @@ public class FanCurveForm : RForm
 						+ (s.Enabled ? " · 已启用" : " · 未启用")
 						+ $" · 范围 {s.MinRpm}~{s.MaxRpm} RPM"
 						+ (s.IsUnreadableArchive ? " · " + s.StatusNote : "");
-					if (_bdEnableChk != null)
-					{
-						_syncingBdEnable = true;
-						_bdEnableChk.Visible = true;
-						_bdEnableChk.Enabled = !s.IsUnreadableArchive;
-						_bdEnableChk.Checked = s.Enabled;
-						_syncingBdEnable = false;
-					}
+					// ⭐⭐ 2026-10-19（机主：状态行/开关与 store 不一致的根因修复）：
+					//   ⭐ 每次刷新都**以 store 为准**重新同步两个开关（⛔ 不被 GCU 能力位等外部判据改掉）
+					//   ⚠️ 宝龙达下「启用软件闭环」**不依赖 GCU** ⇒ 这里不新增任何能力位判据 ✅
+					SyncBaolongdaCurveSwitches(s);
 					return;
 				}
 				_cpuPanel.Load(hw.CpuCurveUpT, hw.CpuCurveDuty);
@@ -588,9 +619,10 @@ public class FanCurveForm : RForm
 		}
 	}
 
-	// 2026-10-17（接手修复 · 待办 #1）：宝龙达软件闭环的「启用 / 关闭交回固件」开关
-	//   勾选 ⇒ 3 s 定时器持续按曲线下发（功能号 20/21）
-	//   取消 ⇒ SaveBaolongdaFanCurve(Enabled=false) ⇒ 两通道写 0 + 关手动开关 = 交回固件
+	// 2026-10-19（机主：开关状态与 store 不一致的根因修复）：
+	//   ① 勾选/取消**立即落盘**（SaveBaolongdaFanCurve 会真的写 fan_curve_bd.cfg）✅
+	//   ② 之后**重新从 store 读回**，状态行 / 开关 / 日志全部以读回值为准（⛔ 不拿「我们以为写进去的」当真）✅
+	//   ③ 日志固定一行：`[fan] 软件闭环 ⇒ 开/关（已保存）` ✅
 	private void ToggleBaolongdaCurveEnable(bool enabled)
 	{
 		MechrevoHw hw = Program.hw;
@@ -602,15 +634,104 @@ public class FanCurveForm : RForm
 		{
 			BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve();
 			bool ok = hw.SaveBaolongdaFanCurve(s.WithEnabled(enabled));
-			_status.Text = enabled
-				? (ok ? "风扇曲线：已启用软件闭环（关闭本窗后仍持续生效）" : "风扇曲线：启用失败")
-				: (ok ? "风扇曲线：已关闭，交回固件自动控制" : "风扇曲线：关闭失败");
-			RaiseFanCurveSaved(confirmed: ok);
+			// ⭐ 以**落盘后重新读回**的 store 值为准（⛔ 不拿内存里的「想存的」当真）
+			BaolongdaFanCurveSettings now = hw.LoadBaolongdaFanCurve();
+			SyncBaolongdaCurveSwitches(now);
+			Logger.WriteLine($"[fan] 软件闭环 ⇒ {(enabled ? "开" : "关")}（已保存）· 回读 enabled={now.Enabled} · ok={ok}");
+			_status.Text = !ok
+				? "风扇曲线：启用开关保存失败"
+				: (now.Enabled ? Strings.FanCurveSavedAndEnabled : Strings.FanCurveSavedNotEnabled);
+			RaiseFanCurveSaved(confirmed: ok && (now.Enabled == enabled));
 		}
 		catch (Exception ex)
 		{
 			Logger.WriteLine("宝龙达风扇曲线开关失败: " + ex.Message);
 			_status.Text = "风扇曲线：开关失败";
+			// 异常时按 store 真实值回滚开关，⛔ 不留「看起来已启用」的假象
+			try
+			{
+				SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve());
+			}
+			catch
+			{
+			}
+		}
+	}
+
+	// 2026-10-19（机主：双风扇 0.85 联动开关）：随曲线存档一起保存（SyncEnabled）
+	//   开 = 两路按 max(自己, 对方×0.85) 互相带动；关 = 两路各算各的
+	//   ⚠️ 只改 SyncEnabled，**不动**软件闭环的启用态（Enabled 原样）✅
+	private void ToggleBaolongdaSyncEnable(bool enabled)
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null)
+		{
+			return;
+		}
+		try
+		{
+			BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve();
+			bool ok = hw.SaveBaolongdaFanCurve(s.WithSyncEnabled(enabled));
+			BaolongdaFanCurveSettings now = hw.LoadBaolongdaFanCurve();
+			SyncBaolongdaCurveSwitches(now);
+			Logger.WriteLine($"[fan] 双风扇联动 ⇒ {(enabled ? "开" : "关")}（0.85 系数 · 已保存）· 回读 sync={now.SyncEnabled} · ok={ok}");
+			_status.Text = !ok
+				? "风扇曲线：双风扇联动保存失败"
+				: (now.SyncEnabled
+					? "风扇曲线：双风扇联动已开启（共用热管 · 0.85 系数）"
+					: "风扇曲线：双风扇联动已关闭（两路各算各的）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达双风扇联动保存失败: " + ex.Message);
+			_status.Text = "风扇曲线：双风扇联动保存失败";
+			try
+			{
+				SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve());
+			}
+			catch
+			{
+			}
+		}
+	}
+
+	// 2026-10-19（机主：开关显示关 / 引擎读到的 Enabled=false 不一致的根因修复）：
+	//   把「启用软件闭环」+「双风扇联动」两个开关**无条件**按 store 的当前值重新同步 ✅
+	//   ⚠️ 宝龙达专用；⛔ 不读 GCU 能力位（这两个开关都不依赖 GCU）✅
+	private void SyncBaolongdaCurveSwitches(BaolongdaFanCurveSettings s)
+	{
+		if (s == null)
+		{
+			return;
+		}
+		_syncingBdEnable = true;
+		try
+		{
+			if (_bdEnableChk != null)
+			{
+				_bdEnableChk.Visible = true;
+				// ⚠️ 宝龙达下这个开关**必须可勾选**（它不依赖 GCU）⇒ 只有「存档读不懂」才禁用
+				_bdEnableChk.Enabled = !s.IsUnreadableArchive;
+				_bdEnableChk.Checked = s.Enabled;
+			}
+		}
+		finally
+		{
+			_syncingBdEnable = false;
+		}
+		_syncingBdSync = true;
+		try
+		{
+			if (_bdSyncChk != null)
+			{
+				_bdSyncChk.Visible = true;
+				_bdSyncChk.Enabled = !s.IsUnreadableArchive;
+				_bdSyncChk.Checked = s.SyncEnabled;
+			}
+		}
+		finally
+		{
+			_syncingBdSync = false;
 		}
 	}
 
@@ -716,6 +837,8 @@ public class FanCurveForm : RForm
 				BaolongdaFanCurveSettings next = new BaolongdaFanCurveSettings
 				{
 					Enabled = prev.Enabled,
+					// ⭐ 2026-10-19：双风扇联动开关随曲线一起存（⛔ 保存曲线不能把它改回默认）✅
+					SyncEnabled = prev.SyncEnabled,
 					HysteresisC = prev.HysteresisC,
 					IntervalMs = prev.IntervalMs,
 					MinRpm = prev.MinRpm,
@@ -741,12 +864,15 @@ public class FanCurveForm : RForm
 						Logger.WriteLine("宝龙达曲线记录到档位失败（已吞掉）：" + exRec.Message);
 					}
 				}
-				// 保存不再等于启用（2026-10-17）⇒ 如实说清"存了但没启用"，别让机主以为在跑
+				// ⭐ 2026-10-19（机主：状态行说「已保存并启用」、开关却是关的）：
+				//   ⭐ 保存后**重新从 store 读回**，状态行 + 两个开关全部以读回值为准 ✅
+				//   ⚠️ 「保存」按钮的语义不变（仍是保存曲线点）✅
+				BaolongdaFanCurveSettings now = ok ? hw.LoadBaolongdaFanCurve() : prev;
+				SyncBaolongdaCurveSwitches(now);
 				_status.Text = !ok
 					? "风扇曲线保存失败"
-					: (next.Enabled
-						? ("风扇曲线已保存并启用 · " + DateTime.Now.ToString("HH:mm:ss"))
-						: ("风扇曲线已保存（未启用：勾选「启用软件闭环」后才会下发）· " + DateTime.Now.ToString("HH:mm:ss")));
+					: ((now.Enabled ? Strings.FanCurveSavedAndEnabled : Strings.FanCurveSavedNotEnabled)
+						+ " · " + DateTime.Now.ToString("HH:mm:ss"));
 				RaiseFanCurveSaved(confirmed: ok);
 			}
 			catch (Exception exb)

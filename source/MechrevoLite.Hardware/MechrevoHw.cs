@@ -3702,6 +3702,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			_fanBoostSavedCurve = LoadBaolongdaFanCurve();
 			_fanBoostActive = true;
+			// ⭐ 强冷 = 直接满转 ⇒ 平滑状态清零（⭐ 恢复闭环时从真实温度重新收敛）
+			ResetBaolongdaFanCurveSmoothing();
 			// ① 暂停闭环（先存快照再关）
 			if (_fanBoostSavedCurve != null && _fanBoostSavedCurve.Enabled)
 			{
@@ -3711,6 +3713,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// ⭐⭐ 2026-10-19（机主：「风扇强冷记得修」）：⭐ 之前**写死 60**（6000 RPM），
 			//   而 40 系的实际上限常见是 4200~5000 ⇒ ⭐ 写超上限可能被固件忽略/夹住，看起来"没反应"。
 			//   ⭐ 现在按**曲线存档里的 MaxRpm**换算（该值就是本机实际上限），再夹到协议的 1..60 ✅
+			//   ⭐ 2026-10-19（默认曲线校准后）：新装机的 MaxRpm 默认 = 本机满转（40 系 6000 / 30 系 3500）✅
 			int maxRpm = 4200;
 			try
 			{
@@ -3724,29 +3727,31 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 			}
 			int units = Math.Clamp(maxRpm / 100, 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
-			Logger.WriteLine($"[fan] 软件强冷：目标 {maxRpm} RPM ⇒ 写 {units}（x100RPM）");
 			bool wrote = TrySetFanManualViaBackend(enable: true, units, units, out bool writeConfirmed);
 			// ③ 回读校验：转速确实高于怠速才算成功
 			Thread.Sleep(300);
 			bool readOk = TryReadFanSpeedsViaBackend(out int firstRpm, out int secondRpm);
 			confirmed = wrote && readOk && (firstRpm >= 1500 || secondRpm >= 1500);
-			Logger.WriteLine($"[fan] 软件强冷：开 ⇒ 写={wrote}({writeConfirmed}) · 回读 first={firstRpm} second={secondRpm} ⇒ 确认={confirmed}");
+			Logger.WriteLine($"[fan] 强冷：开 ⇒ 写={wrote}（目标 {maxRpm} RPM = 档位 {units}）回读 first={firstRpm} second={secondRpm} 确认={confirmed}"
+				+ $"（手动开关回读={writeConfirmed}）");
 			return wrote;
 		}
 		// 关闭：恢复快照（含 Enabled 状态）
 		TrySetFanManualViaBackend(enable: false, 0, 0, out bool _);
 		_fanBoostActive = false;
+		// ⭐ 强冷结束 ⇒ 平滑状态清零（⭐ 让恢复后的闭环从真实温度重新收敛，⛔ 不沿用强冷前的旧平滑值）
+		ResetBaolongdaFanCurveSmoothing();
 		BaolongdaFanCurveSettings saved = _fanBoostSavedCurve;
 		_fanBoostSavedCurve = null;
 		if (saved != null)
 		{
 			bool restored = SaveBaolongdaFanCurve(saved);
-			Logger.WriteLine($"[fan] 软件强冷：关 ⇒ 已恢复强冷前曲线（enabled={saved.Enabled}）ok={restored}");
+			Logger.WriteLine($"[fan] 强冷：关 ⇒ 已恢复强冷前曲线（enabled={saved.Enabled} · 联动={saved.SyncEnabled}）ok={restored}");
 			confirmed = restored;
 		}
 		else
 		{
-			Logger.WriteLine("[fan] 软件强冷：关 ⇒ 没有快照可恢复（保持手动模式关闭）");
+			Logger.WriteLine("[fan] 强冷：关 ⇒ 没有快照可恢复（保持手动模式关闭）");
 			confirmed = true;
 		}
 		return true;
@@ -3759,6 +3764,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			Enabled = enabled,
 			FormatVersion = c.FormatVersion,
+			SyncEnabled = c.SyncEnabled,
 			HysteresisC = c.HysteresisC,
 			IntervalMs = c.IntervalMs,
 			MinRpm = c.MinRpm,
@@ -4228,13 +4234,70 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	private long _baolongdaCurveLastWriteTick;
 
+	// ⭐⭐ 2026-10-19（温度平滑 · 参考自 开源蛟龙(MIT) `AutoFanControl` 的 AlphaUp/AlphaDown 做法，
+	//   ⛔ 未复制代码）：⭐ 上升快（散热优先）、⭐ 下降慢（防抖、护噪音）✅
+	//   引用标注：参考自 斗战者(GPL-3.0)/开源蛟龙(MIT)，仅取数值形状与算法思路，未复制代码 ✅
+	//   ⚠️ 每通道一个**静态**平滑值（本进程只有一台机器 ⇒ 不需要实例化）✅
+	//   ⚠️ `double.NaN` = "还没初始化" ⇒ 第一次读到有效温度时**直接取原值**（⛔ 不从 0 慢慢爬）✅
+	private const double BaolongdaFanCurveAlphaUp = 0.5;
+
+	private const double BaolongdaFanCurveAlphaDown = 0.2;
+
+	/// <summary>
+	/// ⭐ 双风扇**联动系数**（0.85）✅ —— ⭐ 参考自 开源蛟龙(MIT) `AutoFanControl` 的
+	/// <c>SharedHeatPipeSyncRatio</c>（⚠️ 只取这个**系数**，⛔ 未复制代码）✅
+	/// <para>⭐ 语义：`max(自己, (int)(对方 × 0.85))` ⇒ ⭐ 一侧转速高时把另一侧"带起来"（共用热管）✅</para>
+	/// </summary>
+	private const double BaolongdaFanCurveSyncRatio = 0.85;
+
+	/// <summary>⭐ 通道 0（`FanType 0` = GPU）的平滑温度（℃）；NaN = 未初始化 ✅。</summary>
+	private static double _baolongdaFanCurveSmoothedGpuTemp = double.NaN;
+
+	/// <summary>⭐ 通道 1（`FanType 1` = CPU）的平滑温度（℃）；NaN = 未初始化 ✅。</summary>
+	private static double _baolongdaFanCurveSmoothedCpuTemp = double.NaN;
+
+	/// <summary>
+	/// ⭐⭐ 温度**平滑**（⭐ 参考自 开源蛟龙(MIT) `AutoFanControl` 的 AlphaUp/AlphaDown 做法，⛔ 未复制代码）✅
+	/// <para>⭐ 上升 α=0.5、下降 α=0.2：⭐ 升温**跟得快**（散热优先）、⭐ 降温**走得慢**（防抖、护噪音）✅</para>
+	/// <para>⚠️ 温度读不到（≤0）时 ⭐ **不**把它当作"温度很低"喂给平滑器 ✅（⛔ 一次读失败就把风扇拉到底）：
+	/// 已有平滑值 ⇒ 沿用；还没有 ⇒ 返回 0（由调用方按曲线第一点处理，⭐ 与改动前一致 ✅）。</para>
+	/// </summary>
+	private static int SmoothBaolongdaFanCurveTemp(ref double smoothedTempC, int rawTempC)
+	{
+		if (rawTempC <= 0)
+		{
+			return double.IsNaN(smoothedTempC)
+				? rawTempC
+				: (int)Math.Round(smoothedTempC, MidpointRounding.AwayFromZero);
+		}
+		if (double.IsNaN(smoothedTempC))
+		{
+			smoothedTempC = rawTempC;
+			return rawTempC;
+		}
+		double alpha = (rawTempC >= smoothedTempC) ? BaolongdaFanCurveAlphaUp : BaolongdaFanCurveAlphaDown;
+		smoothedTempC += alpha * (rawTempC - smoothedTempC);
+		return (int)Math.Round(smoothedTempC, MidpointRounding.AwayFromZero);
+	}
+
+	/// <summary>⭐ 清零两路平滑温度（⭐ 强冷前后 / 交回固件时用 ⇒ 恢复闭环后从真实温度重新收敛 ✅）。</summary>
+	private static void ResetBaolongdaFanCurveSmoothing()
+	{
+		_baolongdaFanCurveSmoothedGpuTemp = double.NaN;
+		_baolongdaFanCurveSmoothedCpuTemp = double.NaN;
+	}
+
 	/// <summary>⭐ 软件闭环当前是否已接管风扇（⭐ 用于"退出/关闭时交回固件" ✅）。</summary>
 	internal bool BaolongdaFanCurveApplied => _baolongdaFanCurveApplied;
 
-	/// <summary>⭐ 宝龙达软件闭环曲线的门面层入口（⭐ 供 UI 读设置 ✅）。数据来源 <see cref="BaolongdaFanCurveStore" /> ✅。</summary>
+	/// <summary>
+	/// ⭐ 宝龙达软件闭环曲线的门面层入口（⭐ 供 UI 读设置 ✅）。数据来源 <see cref="BaolongdaFanCurveStore" /> ✅。
+	/// <para>⭐⭐ 这里把**本机满转**传进存储层 ⇒ 存档不存在时生成的默认曲线按代际校准 ✅
+	/// （40 系 6000 / 30 系 3500 —— 复用 <see cref="FanRpmMaxForPercent" /> **同一条判据** ✅）。</para>
+	/// </summary>
 	internal BaolongdaFanCurveSettings LoadBaolongdaFanCurve()
 	{
-		return BaolongdaFanCurveStore.Load();
+		return BaolongdaFanCurveStore.Load(FanRpmMaxForPercent);
 	}
 
 	/// <summary>
@@ -4265,9 +4328,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
-	/// ⭐⭐ 软件闭环的**一步**：⭐ 读温度 ⇒ ⭐ 查曲线 ⇒ ⭐ 写功能号 21 ✅
+	/// ⭐⭐ 软件闭环的**一步**：⭐ 读温度 ⇒ ⭐ **平滑** ⇒ ⭐ 查曲线 ⇒ ⭐ **双风扇 0.85 联动** ⇒ ⭐ 写功能号 21 ✅
 	/// <para>⚠️⚠️ <b>未确认通道归属前，本方法【什么都不写】** ⚠️（⭐ 见
 	/// <see cref="FanChannelMappingConfirmed" /> ✅）—— ⭐ 只记一行日志，⭐ 便于审查者确认闸门有效 ✅。</para>
+	/// <para>⭐⭐ <b>强冷优先</b>：<c>_fanBoostActive</c> ⇒ ⭐ 在**平滑/联动之前**直接返回
+	/// （⛔ 强冷是直接满转，不能被曲线逻辑改写）✅。</para>
 	/// <para>⭐ 非宝龙达后端 ⇒ ⭐ 直接返回 false（⭐ GCU/同方**一行不改** ✅）。</para>
 	/// </summary>
 	internal bool ApplyBaolongdaFanCurveStep()
@@ -4275,6 +4340,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		BaolongdaWmi wmi = _baolongda?.Wmi;
 		if (wmi == null || _disposed)
 		{
+			return false;
+		}
+		// ⭐⭐ 2026-10-19（机主要求 · 强冷核对 c）：⭐ 强冷 = "直接满转" ⇒ **必须在温度平滑/联动之前短路** ✅
+		//   ⚠️ 强冷开启时存档 Enabled 已被 `TrySetFanBoostViaBackend` 置 false（曲线本来就会在下面返回）✅
+		//   ⭐ 这里再显式兜一层：⛔ 绝不让平滑/联动改写强冷写下去的满转 ✅
+		if (_fanBoostActive)
+		{
+			Logger.WriteLineIfChanged("baolongda-fancurve-boost",
+				"[fan] 曲线：强冷进行中 ⇒ 跳过软件闭环（⛔ 不覆盖强冷的直接满转）");
 			return false;
 		}
 		// ⚠️⚠️ 硬闸：⭐ 通道归属没确认 ⇒ ⭐ **绝不写** ⚠️（⭐ 写错会让 CPU 风扇按 GPU 温度转 ❌）
@@ -4288,7 +4362,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			BaolongdaFanCurveSettings settings = BaolongdaFanCurveStore.Load();
+			// ⭐⭐ 2026-10-19：⭐ 把**本机满转**传进存储层（40 系 6000 / 30 系 3500）⇒ 新装机默认曲线按代际校准 ✅
+			BaolongdaFanCurveSettings settings = BaolongdaFanCurveStore.Load(FanRpmMaxForPercent);
 			if (!settings.Enabled)
 			{
 				// ⭐⭐ 2026-10-19（机主：风扇曲线不生效，且日志里**一条曲线行都没有**）：
@@ -4299,7 +4374,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				return false;
 			}
 			Logger.WriteLineIfChanged("baolongda-fancurve-enabled",
-				$"宝龙达风扇曲线：⭐ 已启用 ⇒ 开始按温度下发（ch0={settings.Channel0Temperatures.Length}点 · ch1={settings.Channel1Temperatures.Length}点）");
+				$"宝龙达风扇曲线：⭐ 已启用 ⇒ 开始按温度下发（ch0={settings.Channel0Temperatures.Length}点 · ch1={settings.Channel1Temperatures.Length}点 · 双风扇联动={settings.SyncEnabled}）");
 			// ⭐ 温度来源：⭐ 用**已有的属性**（⭐ 它们已是"⭐ LHM/NVML 优先、⭐ 厂商兜底"⭐ 的结果 ✅）
 			int cpuTemp = CpuTemp;
 			int gpuTemp = GpuTemp;
@@ -4308,6 +4383,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteLineIfChanged("baolongda-fancurve-notemp", "宝龙达风扇曲线：⚠️ 两个温度都没有有效值 ⇒ 本轮跳过（⛔ 不瞎写风扇 ✅）");
 				return false;
 			}
+			// ⭐⭐ 2026-10-19（温度平滑）：⭐ 先平滑再查曲线 ⇒ 避免温度毛刺让转速一跳一跳 ✅
+			//   ⚠️ 平滑值用**整数℃**进决策器（回差/日志都是整数 ✅）；保留 double 状态供下一轮迭代 ✅
+			int gpuTempSmooth = SmoothBaolongdaFanCurveTemp(ref _baolongdaFanCurveSmoothedGpuTemp, gpuTemp);
+			int cpuTempSmooth = SmoothBaolongdaFanCurveTemp(ref _baolongdaFanCurveSmoothedCpuTemp, cpuTemp);
 			// ⭐⭐ 2026-10-16（第 1 步）：⭐ 曲线改 **RPM** ✅ ⇒ ⭐ 不再有「⭐ 占空比 × ⭐ max RPM ÷ 100」这一步 ✅
 			//    ⚠️ 而且 ⭐ **原来那两个 max RPM（4400/8200）是抄来的参考值** ⚠️ ⇒ ⭐ 现在整个不需要它了 ✅
 			FanCurvePoint[] channel0Points = FanCurveEngine.BuildPoints(settings.Channel0Temperatures, settings.Channel0Rpms);
@@ -4321,8 +4400,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			// ⭐⭐ 决策器（回差 3℃）：升温立刻写、降温要过回差、**目标没变就不写** ✅
 			//   ⚠️ 温度来源的配对沿用改动前：gpuTemp↔ch0 · cpuTemp↔ch1 ✅
-			int? decided0 = _baolongdaCurveDecider0.Decide(channel0Points, gpuTemp, settings.MinRpm, settings.MaxRpm, settings.HysteresisC);
-			int? decided1 = _baolongdaCurveDecider1.Decide(channel1Points, cpuTemp, settings.MinRpm, settings.MaxRpm, settings.HysteresisC);
+			int? decided0 = _baolongdaCurveDecider0.Decide(channel0Points, gpuTempSmooth, settings.MinRpm, settings.MaxRpm, settings.HysteresisC);
+			int? decided1 = _baolongdaCurveDecider1.Decide(channel1Points, cpuTempSmooth, settings.MinRpm, settings.MaxRpm, settings.HysteresisC);
 			long nowTick = Environment.TickCount64;
 			bool reassertDue = (nowTick - _baolongdaCurveLastWriteTick) >= BaolongdaCurveReassertMs;
 			if (!decided0.HasValue && !decided1.HasValue && !reassertDue)
@@ -4333,20 +4412,55 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// ⭐ 没变的那一路用决策器记着的**上次落笔值**（⛔ 不用 ResolveRpm 重算，否则绕过回差 ✅）
 			int channel0Rpm = decided0 ?? _baolongdaCurveDecider0.LastRpm;
 			int channel1Rpm = decided1 ?? _baolongdaCurveDecider1.LastRpm;
+			// ⭐⭐ 2026-10-19（双风扇 0.85 联动 · 参考自 开源蛟龙(MIT) `AutoFanControl` 的
+			//   `SharedHeatPipeSyncRatio` **做法/系数**，⛔ 未复制代码）：
+			//   ⭐ 共用热管 ⇒ 两路按 `max(自己, (int)(对方 × 0.85))` 互相带动，避免"一侧过热、另一侧低速"✅
+			//   ⭐ 开关来自曲线存档 `SyncEnabled`（默认 true；旧存档缺字段按 true）✅
+			//   ⚠️ 关掉 ⇒ 两路**各算各的**（逐位等于联动前的行为）✅
+			int channel0RpmBeforeSync = channel0Rpm;
+			int channel1RpmBeforeSync = channel1Rpm;
+			if (settings.SyncEnabled)
+			{
+				channel0Rpm = Math.Max(channel0RpmBeforeSync, (int)(channel1RpmBeforeSync * BaolongdaFanCurveSyncRatio));
+				channel1Rpm = Math.Max(channel1RpmBeforeSync, (int)(channel0RpmBeforeSync * BaolongdaFanCurveSyncRatio));
+			}
+			// ⭐⭐ 抬升后**仍要按各通道满转夹紧** ✅（40 系 6000 / 30 系 3500；非宝龙达/读不到则退回协议上限）
+			int fullRpm = FanRpmMaxForPercent;
+			if (fullRpm <= 0)
+			{
+				fullRpm = FanCurveEngine.ProtocolMaxRpm;
+			}
+			channel0Rpm = Math.Clamp(channel0Rpm, 0, fullRpm);
+			channel1Rpm = Math.Clamp(channel1Rpm, 0, fullRpm);
 			int channel0Units = FanCurveEngine.ToUnits100Rpm(channel0Rpm);
 			int channel1Units = FanCurveEngine.ToUnits100Rpm(channel1Rpm);
 			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致 ✅
-			//    ⭐ ch0 = `FanType 0` · ⭐ ch1 = `FanType 1` ⚠️（⭐ 语义归属未真机确认 ✅）
-			if (!TrySetFanManualViaBackend(enable: true, channel0Units, channel1Units, out bool confirmed))
+			//    ⭐ ch0 = `FanType 0`（GPU）· ⭐ ch1 = `FanType 1`（CPU）✅
+			bool handled = TrySetFanManualViaBackend(enable: true, channel0Units, channel1Units, out bool confirmed);
+			// ⭐⭐ 2026-10-19（机主要求 · 日志格式 + 如实回读）：
+			//   `[fan] 曲线：cpu=..℃/gpu=..℃ → rpm cpu=.. gpu=..（联动后..）→ 写 ok=..`
+			//   ⚠️ `ok=` 用的是 `TrySetFanManualViaBackend` 的**回读确认**（⛔ 不是"调用没抛异常"）✅
+			Logger.WriteLineIfChanged("baolongda-fancurve-step",
+				$"[fan] 曲线：cpu={cpuTemp}℃/gpu={gpuTemp}℃（平滑 cpu={cpuTempSmooth}/gpu={gpuTempSmooth}）"
+				+ $" → rpm cpu={channel1RpmBeforeSync} gpu={channel0RpmBeforeSync}"
+				+ $"（联动后 cpu={channel1Rpm} gpu={channel0Rpm}）"
+				+ $" → 写 ok={confirmed}"
+				+ $" · 档位 cpu={channel1Units} gpu={channel0Units}"
+				+ (settings.SyncEnabled ? "" : " · 联动=关")
+				+ (reassertDue && !decided0.HasValue && !decided1.HasValue ? " · 仅重申" : ""));
+			if (!handled)
 			{
+				Logger.WriteLineIfChanged("baolongda-fancurve-write-fail",
+					"[fan] 曲线：⚠️ 写入调用失败（后端不可用 / 异常被吞）⇒ 本轮未确认（⛔ 不假装成功）");
 				return false;
 			}
 			_baolongdaCurveLastWriteTick = nowTick;
 			_baolongdaFanCurveApplied = true;
-			Logger.WriteLineIfChanged("baolongda-fancurve-step",
-				$"宝龙达风扇曲线（⭐ 软件闭环 · ⭐ 单位 RPM ✅）：⭐ ch0 温度 {gpuTemp}℃ → ⭐ {channel0Rpm} RPM（⭐ 档位 {channel0Units}）"
-				+ $" · ⭐ ch1 温度 {cpuTemp}℃ → ⭐ {channel1Rpm} RPM（⭐ 档位 {channel1Units}）"
-				+ $" · ⭐ 确认={confirmed} · ⭐ 本轮{(reassertDue && !decided0.HasValue && !decided1.HasValue ? "仅重申" : "有变化")}（⭐ 通道归属待真机确认 ⚠️）");
+			if (!confirmed)
+			{
+				Logger.WriteLineIfChanged("baolongda-fancurve-unconfirmed",
+					$"[fan] 曲线：⚠️ 已下发但**回读未确认**（手动开关回读不一致或读不到）· 本轮值 cpu={channel1Rpm} gpu={channel0Rpm}（⛔ 不谎报成功）");
+			}
 			return true;
 		}
 		catch (Exception ex)
@@ -4372,6 +4486,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⭐ 交回固件后**下一次启用必须重写**（⛔ 不能因为"目标没变"就跳过首写）✅
 		_baolongdaCurveDecider0.Reset();
 		_baolongdaCurveDecider1.Reset();
+		// ⭐ 2026-10-19：同时清零温度平滑 ⇒ 重新启用时从真实温度重新收敛（⛔ 不在旧平滑值上慢慢爬）✅
+		ResetBaolongdaFanCurveSmoothing();
 		_baolongdaCurveLastWriteTick = 0;
 		try
 		{

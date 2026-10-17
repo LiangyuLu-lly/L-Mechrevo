@@ -3467,6 +3467,18 @@ If you have suggestions or feedback, welcome to contact QQ: 2871715852.</value>
 <data name="FanCurveBaolongdaEnable" xml:space="preserve">
     <value>Enable software fan curve (no firmware table)</value>
   </data>
+<data name="FanCurveSavedAndEnabled" xml:space="preserve">
+    <value>Fan curve saved and enabled</value>
+  </data>
+<data name="FanCurveSavedNotEnabled" xml:space="preserve">
+    <value>Fan curve saved but not enabled (tick the switch on the left to apply)</value>
+  </data>
+<data name="FanSyncSharedHeatPipe" xml:space="preserve">
+    <value>Fan sync (shared heat pipe)</value>
+  </data>
+<data name="FanSyncSharedHeatPipeTip" xml:space="preserve">
+    <value>Both fans drive each other through the shared heat pipe, so one side never overheats while the other stays slow.</value>
+  </data>
 <data name="QuickCameraPrivacy" xml:space="preserve">
     <value>Camera privacy</value>
   </data>

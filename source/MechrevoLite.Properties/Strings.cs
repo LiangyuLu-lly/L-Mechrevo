@@ -1248,6 +1248,19 @@ internal class Strings
 	/// （宝龙达没有固件曲线表 ⇒ 这条曲线只能由本程序按温度下发）。</summary>
 	internal static string FanCurveBaolongdaEnable => ResourceManager.GetString("FanCurveBaolongdaEnable", resourceCulture);
 
+	/// <summary>⭐ 2026-10-19（机主：状态行必须跟随 store 的 Enabled）：⭐ 已保存并启用。</summary>
+	internal static string FanCurveSavedAndEnabled => ResourceManager.GetString("FanCurveSavedAndEnabled", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19：⭐ 已保存但未启用（勾选左边开关才会生效）。</summary>
+	internal static string FanCurveSavedNotEnabled => ResourceManager.GetString("FanCurveSavedNotEnabled", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19（机主：双风扇 0.85 联动开关 · 放在「风扇曲线」窗口）：
+	/// 复选框文案「双风扇联动（共用热管）」。</summary>
+	internal static string FanSyncSharedHeatPipe => ResourceManager.GetString("FanSyncSharedHeatPipe", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19：⭐ 双风扇联动的正面解释（tooltip）。</summary>
+	internal static string FanSyncSharedHeatPipeTip => ResourceManager.GetString("FanSyncSharedHeatPipeTip", resourceCulture);
+
 	internal static string QuickCopilot => ResourceManager.GetString("QuickCopilot", resourceCulture);
 
 	internal static string QuickCpuAdvPerf => ResourceManager.GetString("QuickCpuAdvPerf", resourceCulture);

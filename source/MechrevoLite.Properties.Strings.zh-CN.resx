@@ -3517,6 +3517,18 @@
 <data name="FanCurveBaolongdaEnable" xml:space="preserve">
     <value>启用软件闭环（本机无固件曲线表）</value>
   </data>
+<data name="FanCurveSavedAndEnabled" xml:space="preserve">
+    <value>风扇曲线已保存并启用</value>
+  </data>
+<data name="FanCurveSavedNotEnabled" xml:space="preserve">
+    <value>风扇曲线已保存但未启用（勾选左边开关才会生效）</value>
+  </data>
+<data name="FanSyncSharedHeatPipe" xml:space="preserve">
+    <value>双风扇联动（共用热管）</value>
+  </data>
+<data name="FanSyncSharedHeatPipeTip" xml:space="preserve">
+    <value>两个风扇按共用热管的特性互相带动，避免一侧过热而另一侧低速。</value>
+  </data>
 <data name="QuickCameraPrivacy" xml:space="preserve">
     <value>摄像头隐私</value>
   </data>
