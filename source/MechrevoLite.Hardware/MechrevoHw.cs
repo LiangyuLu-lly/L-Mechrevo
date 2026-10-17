@@ -2497,6 +2497,22 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// GPU 温度只能来自 ⭐ LHM / ⭐ NVML ⇒ ⭐ 所以由调用方（<c>HardwareControl.ApplySensorPriority</c> ✅）
 	/// **取到值之后**调本方法 ✅。⛔ 本方法**只打时间戳**、⭐ 不写温度值、⭐ 不碰 GCU 的字段语义 ✅。</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（真机反馈「30 系 CPU 温度不识别」）：⭐ 由 **LHM 兜底**给出有效 CPU 温度时，
+	///   把 <c>_cpuInfoReceivedAt</c> 也盖上时间戳 ⚠️
+	/// <para>⚠️ <b>为什么必须有</b>：界面那格 CPU 温度的判据是
+	///   <c>HardwareControl.cpuTemp &gt; 0 &amp;&amp; IsSensorInfoFresh(cpu: true, …)</c>，
+	///   而 <c>_cpuInfoReceivedAt</c> 原来**只有两条路**会写：宝龙达功能号 22 读到有效值、GCU 推送 ⚠️。
+	///   ⭐ 30 系宝龙达的 22 **返回 0**（无效）、又没有 GCU ⇒ ⭐ 这个时间戳**永远是 0** ⇒
+	///   ⭐ `IsSensorInfoFresh` 恒 false ⇒ ⭐ **即使 LHM 拿到了温度，UI 也永远显示「—」** ❌
+	///   （⭐ 症状正是"CPU 温度不识别" ✅）</para>
+	/// <para>⚠️ 非宝龙达 / GCU 机型：本方法不会被走到，行为逐位不变 ✅</para>
+	/// </summary>
+	internal void MarkCpuInfoReceived()
+	{
+		Interlocked.Exchange(ref _cpuInfoReceivedAt, Environment.TickCount64);
+	}
+
 	internal void MarkGpuInfoReceived()
 	{
 		Interlocked.Exchange(ref _gpuInfoReceivedAt, Environment.TickCount64);

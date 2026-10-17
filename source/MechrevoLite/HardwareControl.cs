@@ -475,6 +475,9 @@ public static class HardwareControl
 				if (fromLhm.HasValue && fromLhm.Value > 0f)
 				{
 					cpuTemp = (int)Math.Round(fromLhm.Value);
+					// ⭐⭐ 2026-10-17（修「30 系 CPU 温度不识别」）：⭐ LHM 给出有效值时**也要盖 CPU 时间戳** ⚠️
+					//   否则 `IsSensorInfoFresh(cpu:true)` 恒 false ⇒ 界面永远显示「—」❌
+					hw.MarkCpuInfoReceived();
 					if (Interlocked.Exchange(ref _lhmCpuTempLogged, 1) == 0)
 					{
 						Logger.WriteLine($"传感器兜底：⭐ 厂商未提供 CPU 温度 ⇒ 改用 **LM 自带的 LHM**"
