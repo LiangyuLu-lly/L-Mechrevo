@@ -488,17 +488,21 @@ public class RgbForm : RForm
 		table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, (_paramLabelCol > 0) ? _paramLabelCol : D(96)));
 		table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 		int row = 0;
+		// 2026-10-17 (真机: 4070 键盘灯亮度调不了): 宝龙达硬件亮度只有 0~3
+		// (BaolongdaBrightnessFromUi 把 >3 夹到 3), 而滑块原来是 0~4 => 第4档和第3档完全相同
+		// => 宝龙达下上限收到 3; 非宝龙达仍是 0~4 (逐位不变)
+		int brightMax = (Program.hw?.UsesBaolongda ?? false) ? 3 : 4;
 		_brightSlider = new RSlider
 		{
 			Minimum = 0,
-			Maximum = 4,
-			Value = Math.Clamp(lightChannelSettings.Light, 0, 4),
+			Maximum = brightMax,
+			Value = Math.Clamp(lightChannelSettings.Light, 0, brightMax),
 			MinimumSize = new Size(D(104), D(20)),
 			Height = D(24)
 		};
 		Label brightValueLabel = new Label
 		{
-			Text = Math.Clamp(lightChannelSettings.Light, 0, 4) + "/4",
+			Text = Math.Clamp(lightChannelSettings.Light, 0, brightMax) + "/" + brightMax,
 			AutoSize = true,
 			ForeColor = UiVisualStyle.Muted,
 			Margin = new Padding(D(6), 0, 0, 0)
@@ -514,9 +518,9 @@ public class RgbForm : RForm
 		brightPanel.Controls.Add(brightValueLabel);
 		_brightSlider.ValueChanged += (object? _, EventArgs _) =>
 		{
-			int brightLevel = Math.Clamp(_brightSlider.Value, 0, 4);
+			int brightLevel = Math.Clamp(_brightSlider.Value, 0, brightMax);
 			PersistGcuLightAndPublishBrightness(brightLevel);
-			brightValueLabel.Text = brightLevel + "/4";
+			brightValueLabel.Text = brightLevel + "/" + brightMax;
 		};
 		AddRow(Strings.Brightness, brightPanel);
 		if (string.Equals(lightChannelSettings.Effect, "Manual", StringComparison.Ordinal))
