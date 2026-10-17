@@ -3451,8 +3451,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//   ⚠️ 30 系目前**只确认到 0~3**（30 系官方包里没找到完整枚举）⇒ ⭐ 保守夹到 3
 		//   ⚠️ 原来无条件 `Clamp(1,3)` ⇒ ⭐ 40 系的第 4 档被吞掉（用户会觉得"亮度调不上去"）❌
 		DgpuGenerationKind gen = Program.hw?.DgpuGeneration ?? DgpuGenerationKind.Unknown;
-		int max = (gen == DgpuGenerationKind.Gen40 || gen == DgpuGenerationKind.Gen50) ? 4 : 3;
-		return (byte)Math.Clamp(ui0to4, 1, max);
+		return (byte)Math.Clamp(ui0to4, 1, BaolongdaProfile.BrightnessMax(gen));
 	}
 
 	/// <summary>
@@ -3498,7 +3497,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//  ⚠️ 30 系仍待确认：旧版 30 系原厂控制台（v0.2.35）用的是**除以 35**（⇒ 3500 RPM），
 	//    但那是另一套年代／可能不同模具的包 ⇒ ⛔ 暂不套用；30 系真机请对照官方控制台百分比，
 	//    若不一致就把这里按代数拆开（⚠️ 唯一改动点）✅
-	internal const int BaolongdaFanRpmAtFullPercent = 6000;
+	internal const int BaolongdaFanRpmAtFullPercent = BaolongdaProfile.FanPercentDenominatorRpm;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-17（接手 · 按原厂口径修正）：⭐ 风扇百分比的**分母**（RPM ✅）。
@@ -3742,11 +3741,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//         ⭐ `CpuShortPower [5,150]` · ⭐ `CpuTempWall [60,105]` ✅
 	//      ⚠️ **不采用**它 UI 滑块的 `30~255`（⭐ 那是 byte 上限、⭐ 写 255 到 PL1 有风险 ❌）✅
 	//      ⚠️ 而门面层的写入还会再夹一次（⭐ 见 `TryApplyCpuPowerLimitViaBackend` ✅）
-	private const int BaolongdaPlMinWatts = 5;
-	private const int BaolongdaPl1MaxWatts = 120;
-	private const int BaolongdaPl2MaxWatts = 150;
-	private const int BaolongdaTccMinCelsius = 60;
-	private const int BaolongdaTccMaxCelsius = 105;
+	private const int BaolongdaPlMinWatts = BaolongdaProfile.PlMinWatts;
+	private const int BaolongdaPl1MaxWatts = BaolongdaProfile.Pl1MaxWatts;
+	private const int BaolongdaPl2MaxWatts = BaolongdaProfile.Pl2MaxWatts;
+	private const int BaolongdaTccMinCelsius = BaolongdaProfile.TccMinCelsius;
+	private const int BaolongdaTccMaxCelsius = BaolongdaProfile.TccMaxCelsius;
 
 	// ⭐⭐ 2026-10-16（"未设置"语义 · 用户指导「⭐ 开源的都有方案的不是吗」）：⭐ **不再编造默认值** ✅
 	//   ⚠️ 为什么删掉原来那组 `45/65/95`：⭐ 它是**从蛟龙两个不同层级各取一个数拼出来的**
@@ -3762,7 +3761,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//      ⭐ ① ⭐ 界面对未设置的行显示「（未设置）」（⭐ 见 `CustomModeForm` ✅）
 	//      ⭐ ② ⭐ 下发时**跳过**未设置的项（⭐ 见 `TryApplyCpuPowerLimitViaBackend` ✅）
 	//      ⭐ ③ ⭐ 未设置时**一个子命令都不发**（⭐ 而不是拿编造值去凑满三项 ✅）
-	private const int BaolongdaUnset = 0;
+	private const int BaolongdaUnset = BaolongdaProfile.Unset;
 	private int _baolongdaMemPl1;
 	private int _baolongdaMemPl2;
 	private int _baolongdaMemTempWall;
@@ -3843,10 +3842,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⭐ 参考实现的通道口径（⚠️ **未确认**，⭐ 等 `--fan-watch` 的结论 ✅）：
 	/// ⭐ 宝龙达 ⭐ <c>FanType = 0</c> ⇒ ⭐ **大扇 / GPU** · ⭐ <c>FanType = 1</c> ⇒ ⭐ **小扇 / CPU** ⚠️
 	/// </summary>
-	internal const int BaolongdaFanTypeLarge = 0;
+	internal const int BaolongdaFanTypeLarge = BaolongdaProfile.FanTypeLarge;
 
 	/// <summary>⭐ 见 <see cref="BaolongdaFanTypeLarge" /> ⚠️（⭐ 未确认 ✅）。</summary>
-	internal const int BaolongdaFanTypeSmall = 1;
+	internal const int BaolongdaFanTypeSmall = BaolongdaProfile.FanTypeSmall;
 
 	// ⚠️ 占空比 → `x100RPM` 需要"该通道最大转速" ⚠️
 	// ⭐⭐ 2026-10-16（0.291.9.4 · 第 1 步）：⭐ 这里原来有两个「⭐ 参考 max RPM」⭐ 常量 ⚠️
@@ -4454,6 +4453,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			+ $" 功耗墙范围 PL1/PL2=[{Pl1Minimum},{Pl1Maximum}]W · 温度墙=[{TccMinimum},{TccMaximum}]℃（⭐ 本地记忆 PL1={Pl1} PL2={Pl2} 温度墙={TccTarget} ⚠️ 非从机器读回）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."
 			+ $" fans={backend.Wmi.FanCount} modes={backend.Wmi.ModeCount}");
+		// ⭐⭐ 2026-10-17（平台声明式 · 第 1 步）：⭐ 把"声明的事实"打一行 ✅
+		//   ⚠️ 纯日志：⛔ 不改变任何行为；⭐ 以后诊断包里能直接看到"这台机器按什么口径算"✅
+		Logger.WriteLine("宝龙达平台事实表（声明）："
+			+ $"转速百分比分母={BaolongdaProfile.FanPercentDenominatorRpm} RPM · "
+			+ $"手动转速上限={BaolongdaProfile.FanManualMaxUnits100Rpm}（x100RPM） · "
+			+ $"功耗墙范围 PL1=[{BaolongdaProfile.PlMinWatts},{BaolongdaProfile.Pl1MaxWatts}]W "
+			+ $"PL2=[{BaolongdaProfile.PlMinWatts},{BaolongdaProfile.Pl2MaxWatts}]W "
+			+ $"温度墙=[{BaolongdaProfile.TccMinCelsius},{BaolongdaProfile.TccMaxCelsius}]℃ · "
+			+ $"温度来源顺序 {BaolongdaProfile.DescribeTemperatureSources()}");
 		// ⭐⭐ 2026-10-16（"接传感器"）：⭐ 同一个 3 s 定时器里**顺便刷一遍传感器** ✅
 		//    ⭐ 读的是 ⭐ 风扇转速（功能号 13）＋ ⭐ CPU 温度（功能号 22，⭐ 仅作**兜底** ✅）
 		//    ⚠️ 温度**优先用 LM 自带的 LHM**（⭐ 用户要求 ✅）⇒ ⭐ 本方法只把宝龙达的值放进
