@@ -319,6 +319,17 @@ public class SettingsForm : RForm
 	// 2026-10-15：老机型（规则 B）**不建**滑块行 ⇒ _chargeSliderTable 恒为 null，但开关行/副标题行仍在宿主表里
 	// 需要被收起来 ⇒ 单独记下宿主表（有滑块行时两者指向同一实例）。
 	private TableLayoutPanel _chargeLimitHostTable;
+	// ⭐⭐ 2026-10-17（宝龙达机型 · 真机反馈「一电池限充还在」）：
+	//   宝龙达模具**没有任何限充通路** —— EC 直写物理上做不到（该模具没有 UWACPIDriver，
+	//   `\\.\ACPIDriver` 打不开，真机诊断包已证）；GCU 官方三档也走不通（宝龙达机型根本没有 GCU）。
+	//   ⇒ 三档按钮（长效/平衡/工作站）与整张电池卡片都不该出现。
+	// ⚠️ 为什么不在 `EcChargeLimit.IsAvailableOnThisMachine()` 里补判：那里虽然已有宝龙达分支，
+	//   但 `ec_charge_limit=1` 的「强制放行」是**在它之前**早退的 ⇒ 用户若残留该键（本机真机就是
+	//   这种情况：面板被点亮、三档可点但点了只弹「GCU 未连接」），UI 照样会被点亮。
+	//   而 `EcChargeLimit.cs` 是**零改动红线**（用户明令）⇒ 判据只能放在界面侧的唯一汇聚点。
+	// ⚠️ 记下第 2 行（三档按钮行）的原始行高：隐藏时一并收 0，否则卡片顶部会留下一块空白带。
+	private int _chargeLimitTierRowHeight;
+	private bool _chargeLimitTierHidden;
 
 	private RButton? buttonSilentTurbo;
 
@@ -7542,6 +7553,9 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		int num = 0;
 		int num2 = 0;
 		int num3 = ResponsiveLayout.LogicalToDevice(this, 36);
+		// ⭐ 2026-10-17（宝龙达 · 修「电池限充还在」）：记下第 2 行（三档按钮行）的原始行高，
+		// 供 ApplyChargeLimitTierVisibility() 在宝龙达机型上收 0（不留空白带）。
+		_chargeLimitTierRowHeight = num3;
 		// 2026-10-09（无极限充滑块）：新增第 3 行＝「启用无极限充功能(实验性)」两态开关（26 逻辑像素）、
 		// 第 4 行＝「限充」滑块行（32，默认关 ⇒ 由 ApplyChargeSliderVisibility() 收到 0，不留占位）。
 		// 2026-10-10（限充代系门控）：仅 30 系不建「无极限充」开关行与滑块行（其余世代都建）—— 30 系 RowCount=3、
@@ -8009,6 +8023,65 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		table.Height = (int)Math.Round(num);
 		panelBattery.MinimumSize = new Size(0, table.Bottom + panelBattery.Padding.Bottom);
 		Logger.WriteLine($"限充行显隐：{(hidden ? "隐藏" : "显示")} EC 直写方式专属各行（开关行/副标题/无极限充开关/警告/滑块）—— 规则 A（机型不支持/EC 通道不可用）或规则 B（10/16/20/30 系，可能损坏硬件）⇒ 只保留 GCU 路；⛔ 三档按钮行不受影响、未删任何控件");
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（宝龙达机型 · 真机反馈「一电池限充还在」）：三档按钮行（长效/平衡/工作站）的
+	/// **可见性唯一出口**。宝龙达模具**没有任何限充通路**（EC 直写无 UWACPIDriver；GCU 三档无 GCU）
+	/// ⇒ <paramref name="hidden" /> 为 true 时把三颗按钮与它们所在的 modePanel 一起收起，第 2 行行高收 0。
+	/// <para>⛔ <b>不删控件、不删代码路径</b>（用户明令「注意不删三个按钮」）—— 只是 Visible/行高，
+	/// 与 <see cref="ApplyChargeLimitRowVisibility" /> 的做法同源。</para>
+	/// <para>⚠️ 与 <see cref="ApplyChargeLimitStageEnablement" /> 的分工：那个只管 <c>Enabled</c>，
+	/// 本方法只管 <c>Visible</c> + 行高；两者互不覆盖（隐藏时 Enabled 是什么都无所谓）。</para>
+	/// <para>⚠️ 幂等短路：同一状态重复调用直接返回（本方法由 ApplyChargeLimitSliderGating 调用，
+	/// 而后者在构造后还会被 RefreshDeviceCapabilities 多次调用）——避免反复重算表高。</para>
+	/// <para>⚠️ 非宝龙达机型 <paramref name="hidden" /> 恒 false ⇒ 每颗按钮 Visible=true、
+	/// 行高恢复成 <see cref="_chargeLimitTierRowHeight" /> ⇒ 与改动前逐像素一致。</para>
+	/// </summary>
+	private void ApplyChargeLimitTierVisibility(bool hidden)
+	{
+		if (_chargeLimitTierRowHeight <= 0)
+		{
+			// 构造期还没跑过 BuildChargeLimitControls（行高未登记）⇒ 不碰，等它建好后再由下一次刷新落地。
+			return;
+		}
+		if (_chargeLimitTierHidden == hidden)
+		{
+			return;
+		}
+		_chargeLimitTierHidden = hidden;
+		if (_batteryModeButtons != null)
+		{
+			RButton[] batteryModeButtons = _batteryModeButtons;
+			for (int i = 0; i < batteryModeButtons.Length; i++)
+			{
+				batteryModeButtons[i].Visible = !hidden;
+			}
+			// 三档按钮的宿主 modePanel 一并收起：只藏按钮而留着面板，行高 36 仍会占位（空白带）。
+			Control modePanel = batteryModeButtons[0].Parent;
+			if (modePanel != null)
+			{
+				modePanel.Visible = !hidden;
+			}
+		}
+		TableLayoutPanel table = _chargeLimitHostTable;
+		if (table != null && table.RowStyles.Count > 2)
+		{
+			table.RowStyles[2] = new RowStyle(SizeType.Absolute, hidden ? 0 : _chargeLimitTierRowHeight);
+			float num = 0f;
+			foreach (RowStyle rowStyle in table.RowStyles)
+			{
+				num += rowStyle.Height;
+			}
+			table.Height = (int)Math.Round(num);
+			if (panelBattery != null)
+			{
+				panelBattery.MinimumSize = new Size(0, table.Bottom + panelBattery.Padding.Bottom);
+			}
+		}
+		Logger.WriteLine($"限充三档显隐：{(hidden ? "隐藏" : "显示")} 三档按钮行（长效/平衡/工作站）—— "
+			+ (hidden ? "本机是宝龙达模具，没有任何限充通路（EC 直写无 UWACPIDriver、GCU 三档无 GCU）" : "非宝龙达机型，恢复原行高")
+			+ "；⛔ 未删任何控件、未删任何代码路径（只改 Visible 与行高）");
 	}
 
 	/// <summary>
@@ -8654,6 +8727,18 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	{
 		bool flag = EcChargeLimit.IsAvailableOnThisMachine() && !unsupportedModel;
 		sliderBattery.Enabled = flag;
+		// ⭐⭐ 2026-10-17（宝龙达机型 · 真机反馈「一电池限充还在」）：
+		//   宝龙达模具**没有任何限充通路** —— EC 直写物理上做不到（该模具没有 UWACPIDriver，
+		//   `\\.\ACPIDriver` 打不开，真机诊断包已证；`EcChargeLimit.IsAvailableOnThisMachine()`
+		//   里本来就有这条宝龙达分支）；GCU 官方三档也走不通（宝龙达机型根本没有 GCU，无 MQTT 通路）。
+		//   ⇒ 三档按钮与整张电池卡片都不该出现（用户真机截图：三档 + 逃生口挂在设置里，点了只弹
+		//   「GCU 未连接，限充模式设置失败」⇒ 违反铁律「能点的就必须有反应」）。
+		// ⚠️ 为什么**不能**只依赖 `IsAvailableOnThisMachine()` 的宝龙达分支：`ec_charge_limit=1`
+		//   的「强制放行」是在它**之前**早退的 ⇒ 用户若残留该键（该机主真机就是这种情况），
+		//   flag 会变 true ⇒ 三档可点 + 整个面板上屏 ❌。而 `EcChargeLimit.cs` 是**零改动红线**（用户明令）
+		//   ⇒ 判据只能放在界面侧这个「可见性唯一汇聚点」。
+		// ⚠️ 非宝龙达机型 `baolongdaNoChargeLimit` 恒 false ⇒ 下面两处判断与改动前**逐位一致**。
+		bool baolongdaNoChargeLimit = Program.hw?.UsesBaolongda == true;
 		// 2026-10-16（EC 直写逃生口）：`ec_charge_limit=0` 时 `IsAvailableOnThisMachine()` 恒 false ⇒ flag=false
 		// ⇒ 整张电池卡片被隐藏 —— 而「关闭 EC 直写」的那颗开关**就在这张卡片里**（第 6 行）⇒ 用户勾上之后
 		// 连撤销入口一起消失，等于把自己锁在门外。⇒ 这一支**保卡片可见**：此时 EC 各行已由
@@ -8676,8 +8761,12 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		if (panelBattery != null)
 		{
-			panelBattery.Visible = flag || (explicitEcOff && !unsupportedModel) || Program.UiAuditMode;
+			// ⭐ 2026-10-17：宝龙达 ⇒ 整张电池卡片**隐藏**（`Program.UiAuditMode` 仍放行，审计的是假硬件、
+			//   需要完整布局做回归；这与改动前的 UiAuditMode 分支语义一致）。
+			panelBattery.Visible = Program.UiAuditMode || (!baolongdaNoChargeLimit && (flag || (explicitEcOff && !unsupportedModel)));
 		}
+		// ⭐ 2026-10-17：宝龙达下三档按钮行也收起（⛔ 不删控件、不删代码路径，只改 Visible 与行高）。
+		ApplyChargeLimitTierVisibility(baolongdaNoChargeLimit);
 		// 2026-10-08 17:00：非 50 系滑块不上屏，这两句不会被人看到（50 系滑块的行内说明与开关共用同一条措辞）。
 		toolTip.SetToolTip(sliderBattery, flag ? Strings.ChargeLimitWindowsNote : ChargeLimitDisabledReason(RuntimeModelSupport.Current()));
 		// 2026-10-08：开关与三档快捷值跟随同一条 EC 通道的可用性，不能只灰滑块。

@@ -7153,11 +7153,32 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// 该机型是否支持「模式 × 配置」绑定（官方 30 系控制台：三个模式各绑一个固件配置）。
 	/// 判据（2026-10-04 用户拍板）：显卡代际 Gen30 <b>或</b> GcuVariant=="30"。
 	/// 40/50 系不满足该判据 → 行为完全不变。
+	/// <para>⭐⭐ 2026-10-17（宝龙达机型 · 真机反馈「性能模式变成三档加下拉了」，用户原话
+	/// 「应当还是保存四个按钮 没有下拉 3档加下拉是同方独有的」）：⭐ <b>宝龙达模具先挡掉</b> ——
+	/// 「模式 × 配置」是<b>同方官方 30 系控制台</b>的能力，宝龙达 WMI 功能号表里<b>根本没有</b>
+	/// ProfileIndex 相关项 ⇒ 本属性对宝龙达必须恒 false。</para>
+	/// <para>⚠️ <b>必须挡在 Gen30 判据之前</b>：宝龙达机型常配 30 系显卡（如 RTX 3070Ti），
+	/// 仅凭 <c>DgpuGeneration == Gen30</c> 会判真 ⇒ 连锁两处错误 UI：
+	/// ① 设置窗的 <c>ApplyPerfConfigRowVisibility()</c> 显示「配置 N」下拉行；
+	/// ② 设置窗构造函数里 <c>flagCustomMode = flag17 &amp;&amp; !(SupportsModeProfileConfig || Force30Ui.Enabled)</c>
+	/// ⇒ 「自定义」按钮被隐藏 ⇒ 只剩三档（用户报的正是这个）。
+	/// ⚠️ 上面两处都是 UI 程序集（MechrevoLite）里的私有成员 ⇒ 这里刻意只写代码名、不用 cref，
+	/// 避免跨程序集 cref 解析失败多出 CS1574 警告（本仓库告警数是硬上限）。</para>
+	/// <para>⚠️ 实验开关 <c>Force30Ui</c> / <c>Force30Perf</c> <b>一行未动</b>：
+	/// <c>Force30Ui.Enabled</c> 在各调用点<b>单独 OR</b>（照旧可做 UI 对照）；
+	/// <c>Force30Perf</c> 住在 <see cref="MechrevoService.IsGcu30"/> 里，本挡位把它一并挡在宝龙达之外 ——
+	/// 这是<b>有意</b>的：该实验的用途是"验证 40A GCU 能不能正确切 30 系性能方式"，
+	/// 而宝龙达机型<b>没有 GCU</b>（无 MQTT 通路）⇒ 该实验在宝龙达上本就没有意义。</para>
 	/// </summary>
 	public bool SupportsModeProfileConfig
 	{
 		get
 		{
+			// ⭐ 2026-10-17：宝龙达没有「模式 × 配置」协议 ⇒ 恒 false（见方法注释的连锁后果说明）。
+			if (UsesBaolongda)
+			{
+				return false;
+			}
 			if (DgpuGeneration == DgpuGenerationKind.Gen30)
 			{
 				return true;
