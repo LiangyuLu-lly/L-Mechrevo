@@ -3280,13 +3280,20 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				LogKeyboardLightingState(wmi, "关灯后");
 				return true;
 			}
-			// ⭐ ② 先颜色（⭐ 功能号 17，⭐ 三字节 R,G,B ✅）
+			// ⭐⭐ 2026-10-17（真机反馈「键盘灯没颜色 / 氛围灯无效」）：⭐ **顺序必须【模式 → 颜色】** ⚠️
+			//   ⭐ 依据（30 系官方控制台 `SetSP_KeyboardColor`，v0.2.35）：
+			//     `SetValue(RGBKeyboardMode, Mode_RGBFixedMode)` **先写模式 2**
+			//     然后 `SetValue(RGBKeyboardColor, new byte[3]{r,g,b})` **再写颜色** ✅
+			//   ⚠️ 旧实现是「颜色 → 模式」⇒ ⭐ 写模式会**重置/覆盖颜色** ⇒ 真机回读颜色恒 0,0,0 ❌
+			//     （0.291.9.6 诊断包实证：写 rgb=#FFFFFF 后功能号 17 回读 0,0,0，而 16/18 都能读回 ✅）
+			//   ⚠️ 40 系官方在"模式 2 → 颜色"之间还等 500ms；**30 系官方没有延迟** ⇒ 本机不加 ✅
+			// ⭐ ② 先模式（⭐ 功能号 16）—— ⭐ 由调用方按效果 Id 映射（⭐ 单一来源 ✅）
+			bool modeOk = wmi.TrySetKeyboardMode(mode);
+			// ⭐ ③ 再颜色（⭐ 功能号 17，⭐ 三字节 R,G,B ✅）
 			int r = (colorArgb >> 16) & 0xFF;
 			int g = (colorArgb >> 8) & 0xFF;
 			int b = colorArgb & 0xFF;
 			bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
-			// ⭐ ③ 再模式（⭐ 功能号 16）—— ⭐ 由调用方按效果 Id 映射（⭐ 单一来源 ✅）
-			bool modeOk = wmi.TrySetKeyboardMode(mode);
 			// ⭐ ④ 最后亮度（⭐ 功能号 18，⭐ 0~3 ✅）
 			byte level = (byte)Math.Clamp(brightness0to3, 0, 3);
 			bool brightOk = wmi.TrySetKeyboardBrightness(level);
