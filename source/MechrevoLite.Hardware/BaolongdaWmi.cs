@@ -160,6 +160,24 @@ internal sealed class BaolongdaWmi : IDisposable
 	/// <summary>⭐ 实测模式档数（3 或 4；0 = 还没测出来）。</summary>
 	internal int ModeCount { get; private set; }
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-17：**功能号 22（CPU 温度）在探测期是否读得通**。
+	/// <para>⚠️ 语义**如实**：<c>false</c> = 这个功能号在本机**读不到**（⭐ 30 系宝龙达的已知现象 ⚠️），
+	/// ⛔ **不是**"本机没有 CPU"✅ —— 温度仍由 LM 自带 LHM 兜底显示 ✅。</para>
+	/// <para>⭐ 用途：⭐ 诊断包/日志如实输出，⛔ 不作任何"整机是否可用"的判据
+	/// （⭐ 这正是 2026-10-17 那轮致命 bug 的反面：⛔ 不能拿单项可读性决定整机接管 ✅）。</para>
+	/// </summary>
+	internal bool CpuTempAvailable { get; private set; }
+
+	/// <summary>⭐ 探测期读到的 CPU 温度（℃）；<see cref="CpuTempAvailable" /> 为 <c>false</c> 时无意义。</summary>
+	internal int CpuTempCelsius { get; private set; }
+
+	/// <summary>
+	/// ⭐ 探测时**成立的那一条活体证据**（⭐ 便于日志/诊断一眼看出"凭什么接管"）。
+	/// <para>⭐ 空串 = 板号白名单命中但**所有**只读功能号都没读通（⭐ 仍接管，但记录如实 ✅）。</para>
+	/// </summary>
+	internal string LivenessEvidence { get; private set; } = string.Empty;
+
 	private BaolongdaWmi(string instancePath)
 	{
 		_instancePath = instancePath;
@@ -191,31 +209,71 @@ internal sealed class BaolongdaWmi : IDisposable
 			created = new BaolongdaWmi(path);
 			// ⭐ 拿类 GUID（⭐ 诊断关键：⭐ 若与老同方那份 `B60BFB48-…` 不同，⭐ 就解释了为什么 LegacyMifsWmi 探不到）
 			created.ProbeClassGuid();
-			// ⭐ 活体证明：⭐ 真读一次 CPU 温度（⭐ 只读）
-			if (!created.TryReadCpuTemperature(out int celsius))
+			// ⭐⭐⭐ 2026-10-17（真机致命 bug 修复 · 30 系宝龙达整机失效）：
+			//
+			//   背景（机主真机反馈 + 诊断包实证）：
+			//     旧判据把「**功能号 22（CPU 温度）能读**」当作**唯一**活体证明。
+			//     而 **30 系宝龙达机型**（主板 `MRID6` · 6800H + 3070Ti）实测**读不到功能号 22** ——
+			//     与已知证据吻合：官方 **30 系**控制台的 `WMIMethodName` 只到 18，
+			//     **40 系**才到 23（含 `CPUThermometer=22`）⇒ 30 系固件很可能真的没有这一项。
+			//   ⇒ 后果：⭐ **一个可选功能读不到，却让整机退回 legacy** ⚠️
+			//      ⇒ 所有宝龙达能力全部失效（性能模式提示失败 / FN 锁不显示 / 灯光不显示 /
+			//        色彩增强未隐藏 / Win 键锁 / 小键盘锁 / 触摸板 / 校色空壳 全部跟着坏 ❌）
+			//
+			//   ⭐ **设计原则（写死在这里，防止后人再犯）**：
+			//     **探测**（要不要接管这个后端）与**能力位**（这个后端的每项功能能不能用）是**两层** ——
+			//     ⛔ 绝不能用一个功能的可读性去决定「整机是否接管」。
+			//     探测只判「**这个接口是不是活的**」；每项能力由
+			//     `ProbeCapabilities()`（诊断用）与 `BaolongdaBackend.BuildCapabilities()`
+			//     （⭐ **逐项运行时自检** ✅）各自独立决定 —— 后者本来就是按功能号 10/23/9 分别自检的 ✅。
+			//
+			//   ⭐ 分级判据：
+			//     ① **板号命中白名单**（⭐ 静态证据 · 与后端白名单同一套 ✅）＋ **类存在**
+			//        （⭐ `FindInstancePath()` 已保证 ✅）⇒ ⭐ **必须接管**；
+			//        功能号 22 读不到只记日志，⛔ 不再一票否决 ✅
+			//     ② 板号**未**命中白名单 ⇒ 保持较严的活体证明：**多判据任一成功**即接管
+			//        （⭐ 见 `ProbeLiveness()`：功能号 22 / 8 / 11 / 12 / 13，**每条都带语义校验** ✅）
+			//   ⚠️ ⛔ 绝不变成"能打开就接管"：**类存在**这一前置条件**始终保留** ✅
+			//      （⭐ 非宝龙达机型根本没有 `MICommonInterface` 这个类 ⇒ `FindInstancePath()` 早已静默返回 null ✅）
+			bool boardWhitelisted = IsBaolongdaBoardCandidate();
+			string liveness = created.ProbeLiveness();
+			created.LivenessEvidence = liveness ?? string.Empty;
+			if (!boardWhitelisted && liveness == null)
 			{
-				Logger.WriteLine("宝龙达 WMI 探测：实例打开了但读不到 CPU 温度 ⇒ 判为不可用（⛔ 不接管）");
-				// ⚠️⚠️ 2026-10-16：⭐ **第二个盲点** —— ⭐ 上面那行是 `WriteLine`，⭐ 级别由**消息内容**判定 ⚠️
-				//    ⇒ ⭐ 默认「仅错误」级别下**可能不落盘** ❌ ⇒ ⭐ 机主反馈时我们同样看不到 ⚠️
-				//    ⇒ ⭐ 板号是宝龙达候选时，⭐ **必须**补一条默认级别可见的记录 ✅
-				//    ⭐ 这一支覆盖的正是"⭐ 类在、⭐ 但 ACPI/EC 方法不响应"⭐ 的情形
-				//      （⭐ 例如厂商驱动/服务被卸载后，⭐ 固件侧接口未解锁 ⚠️）
-				if (IsBaolongdaBoardCandidate())
-				{
-					Logger.WriteError("宝龙达 WMI 探测失败：⭐ 主板型号是宝龙达候选（`MRID6` / `MRID6-*`）且 "
-						+ "`root\\WMI:MICommonInterface` **类存在**，⭐ 但**读一次 CPU 温度（功能号 22）失败** "
-						+ "⇒ ⭐ 本机认不出宝龙达 ❌。"
-						+ "⚠️ 可选成因：⭐ **官方控制台/它的驱动被卸载后固件侧接口未解锁** ⚠️、"
-						+ "⭐ 权限不足（⭐ 未以管理员运行 ✅）、⭐ 或 BIOS 设置被改 ⚠️。"
-						+ "⭐ 请随诊断包一起反馈（⭐ 宝龙达诊断段会打印类/实例/设备存在性 ✅）");
-				}
+				// 板号未命中白名单、且**所有**活体判据都不成立 ⇒ ⛔ 不接管（安全方向：宁可不认，绝不误认）
+				Logger.WriteLine("宝龙达 WMI 探测：类存在但**所有**活体判据都不成立 ⇒ 判为不可用（⛔ 不接管）");
 				created.Dispose();
 				return null;
 			}
+			if (boardWhitelisted)
+			{
+				// ⭐ 板号白名单命中 ⇒ 静态证据优先 ⇒ **必须接管**（把活体证据如实记下来）
+				// ⚠️ 用 `WriteError`：默认「仅错误」级别下也要落盘（⭐ 这是"凭什么接管"的关键证据 ✅）
+				Logger.WriteError($"宝龙达 WMI 探测：⭐ 主板型号命中宝龙达白名单 ⇒ ⭐ **接管**（静态证据优先 ✅）"
+					+ $" · ⭐ 活体证据={liveness ?? "⚠️ 无（所有只读功能号都没读通，仍按白名单接管 ⚠️）"}"
+					+ $" · 类GUID={created.ClassGuid} · 实例=\"{path}\"");
+				if (!created.CpuTempAvailable)
+				{
+					// ⭐ 如实记录：CPU 温度这一项不可用 —— 但⛔ **不影响其余能力**（这就是本次修复的核心 ✅）
+					// ⚠️ 同样用 `WriteError`：这是 30 系机型的关键指纹，诊断包必须能看到 ✅
+					Logger.WriteError("宝龙达 WMI：⭐ 功能号 22（CPU 温度）**读不到** ⇒ ⭐ CPU 温度能力=**不可用**"
+						+ "（⭐ 由 LM 自带 LHM 兜底显示，⛔ **不会显示成 0℃** ✅）"
+						+ " ⚠️ 这是 **30 系宝龙达** 的已确认现象（官方 30 系控制台也不使用功能号 22）"
+						+ " ⭐ **不影响其余宝龙达能力**（⭐ 探测已与能力位解耦 ✅）");
+				}
+			}
+			else
+			{
+				Logger.WriteLine($"宝龙达 WMI 探测：板号未命中白名单，但活体证据成立 ⇒ 接管（证据={liveness}）");
+			}
 			// ⭐ 实测风扇个数与模式档数（⭐ 只读；⭐ 用返回长度/有效性判断，⛔ 不猜）
+			//   ⚠️ 这两项**只用于日志/诊断**（消费者只有 `DiagnosticBaolongdaInfo` / 启动日志 / `FanWatchRunner`）
+			//      ⇒ ⭐ 探测失败只是保持 0（"没测出来"），⛔ **不影响任何功能** ✅
 			created.ProbeCapabilities();
 			Logger.WriteLine($"宝龙达 WMI 探测成功：⭐ 实例=\"{created._instancePath}\" · ⭐ 类GUID={created.ClassGuid} · "
-				+ $"⭐ 风扇={created.FanCount} 个 · ⭐ 模式={created.ModeCount} 档 · CPU温度={celsius}℃");
+				+ $"⭐ 风扇={created.FanCount} 个 · ⭐ 模式={created.ModeCount} 档 · "
+				+ $"⭐ CPU温度={(created.CpuTempAvailable ? created.CpuTempCelsius + "℃" : "⚠️功能号22不可用")}"
+				+ $" · ⭐ 活体证据={created.LivenessEvidence}");
 			return created;
 		}
 		catch (Exception ex)
@@ -224,6 +282,61 @@ internal sealed class BaolongdaWmi : IDisposable
 			created?.Dispose();
 			return null;
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17：**活体证明**（⭐ 全程只读）—— 判断「这个 WMI 接口是不是**活的**」。
+	/// <para>⛔ **不判断任何具体能力**：⭐ 这是"探测层"，能力位是另一层（⭐ 见 <see cref="TryCreate" /> 里的说明 ✅）。</para>
+	/// <para>⭐ 返回**成立的第一条**证据描述（⭐ 便于日志/诊断看出"凭什么接管"）；⭐ **全部不成立 ⇒ <c>null</c>** ✅。</para>
+	/// <para>⭐⭐ 每条判据都带**语义校验**（⛔ 不是"能打开就算"、⛔ 也不是"返回长度够就算"）——
+	/// 因为本项目反复踩过「**读到东西 ≠ 读到对的东西**」「**0xFF 填充值**」这类坑 ⚠️：</para>
+	/// <list type="number">
+	/// <item>⭐ 功能号 22（CPU 温度）：读数必须落在 <c>1..254</c>（⭐ <c>0</c> 与 <c>255</c> 都判无效 ✅）</item>
+	/// <item>⭐ 功能号 8（性能模式）：原始值必须 <c>≤ 3</c>（⭐ 已知映射只覆盖 0/1/2/3 ✅；⭐ 0xFF 会被排除 ✅）</item>
+	/// <item>⭐ 功能号 11 / 12（Fn 锁 / 触摸板锁）：**带 <c>OutData[3]</c> 回显校验** ✅
+	///   —— 回应里必须**回显我们请求的功能号** ⇒ ⭐ 证明这个接口在按我们的协议应答 ✅（最强证据）</item>
+	/// <item>⭐ 功能号 13（风扇转速）：返回长度 ≥ 8 **且** RPM 值合理（⭐ 两个通道都 <c>&lt; 20000</c>
+	///   ⇒ ⭐ 排除 <c>0xFF</c> 填充出来的 <c>65535</c> ✅）</item>
+	/// </list>
+	/// <para>⚠️ 顺序：⭐ 先试 22（⭐ 顺便把 CPU 温度能力记下来）⭐，再 8 ⭐，再 11/12（回显校验）⭐，最后 13 ✅。</para>
+	/// </summary>
+	private string ProbeLiveness()
+	{
+		// ── ① 功能号 22：CPU 温度（⭐ 原判据，仍保留为**首选**证据）──
+		if (TryReadCpuTemperature(out int celsius))
+		{
+			CpuTempAvailable = true;
+			CpuTempCelsius = celsius;
+			return $"功能号22(CPU温度)={celsius}℃";
+		}
+		// ── ② 功能号 8：性能模式（⭐ 只认 0..3 的原始值）──
+		//   ⚠️ 这里**刻意调 `TryReadByte` 而不是 `TryReadOperatingMode`**：后者对未知原始值会打
+		//      `WriteError("未知的性能模式原始值 …")` —— ⭐ 那是**运行期**该报的错（说明映射对不上），
+		//      但在**探测期**打出来会误导（⭐ 探测只是问"活不活"，不是"映射对不对"）⚠️。
+		if (TryReadByte(Function.SystemPerMode, out byte rawMode) && rawMode <= 3)
+		{
+			return $"功能号8(性能模式)=raw{rawMode}";
+		}
+		// ── ③ 功能号 11 / 12：Fn 锁 / 触摸板锁（⭐ 带回显校验，最可靠）──
+		if (TryReadByteChecked(Function.FnLock, out byte fnLock))
+		{
+			return $"功能号11(Fn锁)={fnLock}（回显校验通过）";
+		}
+		if (TryReadByteChecked(Function.TPLock, out byte tpLock))
+		{
+			return $"功能号12(触摸板锁)={tpLock}（回显校验通过）";
+		}
+		// ── ④ 功能号 13：风扇转速（⭐ 带合理性校验，排除 0xFF 填充）──
+		if (TryReadFanSpeeds(out FanSpeeds speeds))
+		{
+			// ⭐ 合理性：两个主通道都要在 0..20000 之间（⭐ 协议上限 6000 ⇒ 20000 足够宽松 ✅）；
+			//   ⚠️ 若固件对不支持的功能号回 `0xFF` 填充 ⇒ 会解析成 65535 ⇒ ⭐ 这里排除掉 ✅
+			if (speeds.First is >= 0 and < 20000 && speeds.Second is >= 0 and < 20000)
+			{
+				return $"功能号13(风扇)={speeds.First}/{speeds.Second} RPM";
+			}
+		}
+		return null;
 	}
 
 	/// <summary>

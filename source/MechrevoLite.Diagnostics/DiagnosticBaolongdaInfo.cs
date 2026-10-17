@@ -881,6 +881,16 @@ internal static class DiagnosticBaolongdaInfo
 		}
 		sb.AppendLine("接口实例 = " + wmi.InstancePath);
 		sb.AppendLine("风扇数 = " + wmi.FanCount + " · 模式档数 = " + wmi.ModeCount);
+		// ⭐⭐ 2026-10-17（30 系宝龙达致命 bug 之后补）：⭐ 把**探测依据**与**CPU 温度能力**如实打出来 ✅
+		//   ⚠️ 为什么重要：⭐ 机主那台 30 系的症状是"整机退回 legacy"，
+		//   ⭐ 而根因是「功能号 22 读不到」被当成了**整机是否接管**的判据 ⚠️
+		//   ⇒ ⭐ 以后拿到诊断包，⭐ 一眼就能看出「白名单命中 ⇒ 接管」还是「活体证据不成立 ⇒ 不接管」✅
+		sb.AppendLine("探测活体证据 = " + (string.IsNullOrEmpty(wmi.LivenessEvidence)
+			? "⚠️ 无（⭐ 板号白名单命中时仍会接管 ✅；⭐ 板号未命中则不接管 ⛔）"
+			: wmi.LivenessEvidence));
+		sb.AppendLine("CPU 温度（功能号 22）= " + (wmi.CpuTempAvailable
+			? "✅ 可读（" + wmi.CpuTempCelsius + "℃）"
+			: "⚠️ **不可用**（⭐ 30 系宝龙达的已知现象；⭐ 温度改由 LM 自带 LHM 兜底，⛔ 不会显示成 0℃）"));
 		sb.AppendLine();
 		AppendOne(sb, wmi, BaolongdaWmi.Function.SystemPerMode, "8", "系统性能模式");
 		AppendGpuMode(sb, wmi);
