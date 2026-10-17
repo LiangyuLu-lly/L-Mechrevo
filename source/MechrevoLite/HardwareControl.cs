@@ -972,6 +972,56 @@ public static class HardwareControl
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-17（修「4070 GPU 温度已取到却又变回—」）：⭐ **与 LHM 闸门解耦**的 GPU 温度读取 ✅
+	///
+	/// <para>⚠️⚠️ <b>为什么要提前</b>：原来唯一会写 GPU 温度的是 `ApplySensorPriority`，
+	/// 而它排在 `lhm-update` / `lhm-read` **两道闸门之后** ⚠️ ⇒ 闸门一失败就 `return`，
+	/// 门面层从此不再刷新 ⇒ 只靠 `KeepAliveGpuTempOnSampleFailure()` 续 30 s ⇒ 之后界面变「—」❌
+	/// （真机诊断包 `0.291.9.8-180311` 的时间线正是这样：13~28 s 有值 → 44 s 后「—」）。</para>
+	///
+	/// <para>⭐ <b>为什么安全</b>：
+	/// <list type="bullet">
+	/// <item>只读 <see cref="NvmlHelper.GetGpuTemperature" />（⭐ 加固层自带隔离/节流 ✅）；</item>
+	/// <item>调用点排在 `_localSamplingQuarantined` **之后** ⇒ ⛔ 降级期间一次原生调用都不发 ✅；</item>
+	/// <item>包在 `TryStep(..., countsAsHealthFailure:false)` 里 ⇒ 失败只跳过本步、⛔ 不影响健康判定 ✅；</item>
+	/// <item>⭐ **厂商有值时（GCU 机型）直接返回** ⇒ ⛔ 不覆盖厂商值，行为逐位不变 ✅。</item>
+	/// </list></para>
+	/// </summary>
+	private static void RefreshGpuTempFromNvmlWhenNoVendor()
+	{
+		MechrevoHw hw;
+		try
+		{
+			hw = Program.hw;
+		}
+		catch
+		{
+			return;
+		}
+		if (hw == null || NvmlHelper.Unavailable)
+		{
+			return;
+		}
+		// ⭐ 厂商给了值（GCU 机型）⇒ ⛔ 不碰；非宝龙达 + 门面值不是我们写的 ⇒ 老路 ✅
+		if (hw.GpuTemp > 0 && !IsGpuTempFacadeWrittenByUs(hw) && !hw.UsesBaolongda)
+		{
+			return;
+		}
+		float? temp = NvmlHelper.GetGpuTemperature();
+		if (!temp.HasValue || temp.Value <= 0f)
+		{
+			return; // ⚠️ 待机时 NVML 常返回 0 ⇒ 不写（⛔ 不谎报）✅
+		}
+		int celsius = (int)Math.Round(temp.Value);
+		hw.MarkExternalGpuTemp(celsius);
+		// ⭐ 记成"我们写的" ⇒ 下一轮 `ApplySensorPriority` 不会误判成厂商值 ✅
+		Interlocked.Exchange(ref _gpuTempFacadeWritten, celsius);
+		Interlocked.Exchange(ref _gpuTempExternalGoodTick, Environment.TickCount64);
+		Interlocked.Exchange(ref _gpuTempKeepAliveState, 0);
+		MarkGpuTempRealSourceReady();
+	}
+
+	/// <summary>
 	/// ⭐⭐（同上）：⭐ 标记"⭐ **真正的本地来源**（LHM / NVML）已经就绪" ✅ ⇒ ⭐ <c>nvidia-smi</c>
 	/// 从此**让位**（⭐ <see cref="ShouldTryEarlyNvidiaSmi"/> 第 ① 条 ✅）。
 	/// <para>⚠️ 让位日志只在"⭐ 确实用过 <c>nvidia-smi</c>"⭐（⭐ <see cref="_gpuTempSmiState"/> 为 1 ✅）
@@ -1346,6 +1396,16 @@ public static class HardwareControl
 		{
 			return;
 		}
+		// ⭐⭐ 2026-10-17（真机诊断包 `0.291.9.8-180311` 定因 · 修「4070 显卡温度又变回 —」）：
+		//   证据：18:02:13~28 由 NVML 取到 41/42℃ 并写回门面层 ✅；之后 LHM 两道闸门失败 ⇒
+		//     `ApplySensorPriority` 不再执行 ⇒ 门面层不再刷新 ⇒ `KeepAlive`(30 s) 到期 ⇒ 44 s 后界面又「—」❌
+		//   ⇒ ⭐ 把「无厂商值时的 NVML 温度」提前到**两道 LHM 闸门之前** ✅
+		//     ⚠️ 仍排在 `_localSamplingQuarantined` **之后** ⇒ ⛔ 不破坏"降级期间一次原生调用都不发"的保护 ✅
+		//   ⚠️ 独立一步：失败只跳过本步（`countsAsHealthFailure:false` ⇒ ⛔ 不参与健康判定）✅
+		TryStep(delegate
+		{
+			RefreshGpuTempFromNvmlWhenNoVendor();
+		}, "gpu-temp-nvml-early", countsAsHealthFailure: false);
 		if (!TryStep(lhmMonitor.Update, "lhm-update"))
 		{
 			return;
