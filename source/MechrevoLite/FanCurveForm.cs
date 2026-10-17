@@ -429,7 +429,7 @@ public class FanCurveForm : RForm
 		//   ⇒ 必须有个关得掉的入口（关 = 两通道归零 + 关手动开关 = 交回固件）
 		_bdEnableChk = new RCheckBox
 		{
-			Text = "启用软件闭环（本机无固件曲线表）",
+			Text = Strings.FanCurveBaolongdaEnable,
 			Checked = false,
 			ForeColor = UiVisualStyle.Text,
 			BackColor = UiVisualStyle.Window,

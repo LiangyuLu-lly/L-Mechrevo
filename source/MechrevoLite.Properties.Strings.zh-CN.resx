@@ -3499,6 +3499,12 @@
     
   
   </data>
+<data name="FanCurveBaolongdaEnable" xml:space="preserve">
+    <value>启用软件闭环（本机无固件曲线表）</value>
+  </data>
+<data name="QuickCameraPrivacy" xml:space="preserve">
+    <value>摄像头隐私</value>
+  </data>
 <data name="QuickCopilot" xml:space="preserve">
     
     

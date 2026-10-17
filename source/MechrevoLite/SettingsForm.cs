@@ -4511,7 +4511,7 @@ public class SettingsForm : RForm
 	/// </summary>
 	private static string QuickCameraLabel(string fallback)
 	{
-		return (Program.hw?.UsesBaolongda ?? false) ? "摄像头隐私" : fallback;
+		return (Program.hw?.UsesBaolongda ?? false) ? Strings.QuickCameraPrivacy : fallback;
 	}
 
 	/// <summary>「更多开关」里该 key 的文案（提级后的 <see cref="QuickSwitchLabels" />，与那一组完全同源）。</summary>
@@ -4555,7 +4555,7 @@ public class SettingsForm : RForm
 		//   ⚠️ 开关行仍写全「摄像头隐私」（语义不同，见 QuickCameraLabel 的注释）✅
 		if (string.Equals(key, "webcam", StringComparison.OrdinalIgnoreCase) && (Program.hw?.UsesBaolongda ?? false))
 		{
-			return "摄像头";
+			return Strings.QuickCamera; // ⚠️ 磁贴短名复用既有本地化文案（⛔ 不硬编码）
 		}
 		return QuickSwitchText(key);
 	}

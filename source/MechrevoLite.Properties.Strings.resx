@@ -3449,6 +3449,12 @@ If you have suggestions or feedback, welcome to contact QQ: 2871715852.</value>
     
   
   </data>
+<data name="FanCurveBaolongdaEnable" xml:space="preserve">
+    <value>Enable software fan curve (no firmware table)</value>
+  </data>
+<data name="QuickCameraPrivacy" xml:space="preserve">
+    <value>Camera privacy</value>
+  </data>
 <data name="QuickCopilot" xml:space="preserve">
     
     

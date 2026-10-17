@@ -1225,6 +1225,14 @@ internal class Strings
 
 	internal static string QuickCamera => ResourceManager.GetString("QuickCamera", resourceCulture);
 
+	/// <summary>⭐ 2026-10-17（宝龙达 · 摄像头隐私开关）：⭐ 与控制台"摄像头"区分 ——
+	/// 宝龙达下它写的是 **Windows 摄像头隐私授权**（ConsentStore），⛔ 不是 EC 级断电。</summary>
+	internal static string QuickCameraPrivacy => ResourceManager.GetString("QuickCameraPrivacy", resourceCulture);
+
+	/// <summary>⭐ 2026-10-17（宝龙达 · 风扇曲线）：⭐ 「启用软件闭环」复选框文案
+	/// （宝龙达没有固件曲线表 ⇒ 这条曲线只能由本程序按温度下发）。</summary>
+	internal static string FanCurveBaolongdaEnable => ResourceManager.GetString("FanCurveBaolongdaEnable", resourceCulture);
+
 	internal static string QuickCopilot => ResourceManager.GetString("QuickCopilot", resourceCulture);
 
 	internal static string QuickCpuAdvPerf => ResourceManager.GetString("QuickCpuAdvPerf", resourceCulture);
