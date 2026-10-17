@@ -321,6 +321,18 @@ public class RgbForm : RForm
 
 	private bool IsGcuKeyboardFallback()
 	{
+		// ⭐⭐ 2026-10-17（真机反馈「30 键盘灯光菜单里没有颜色选项」）：
+		//   ⭐ 颜色行（预设 29 色板 + 自定义颜色）**只在 BuildGcuFirmwareParams() 里建** ⚠️
+		//   ⭐ 而宝龙达 IsGcuConnected 恒 false ⇒ 下面两个判据都 false ⇒ 走 _hidPanel（HID 那套）
+		//      ⇒ ⭐ **压根没有颜色行** ❌ —— 这就是"没有颜色选项"的根因 ✅
+		//   ⇒ ⭐ 宝龙达下直接走固件参数面板：它建颜色行，且下发走 
+		//      PublishGcuFirmwareEffect → SetKeyboardEffect → ⭐ TryApplyKeyboardViaBackend
+		//      （那条**有宝龙达分派**，最终写 WMI 功能号 16/17/18 ✅）
+		//   ⚠️ 非宝龙达 ⇒ 恒 false ⇒ ⭐ 下面判据逐位不变 ✅
+		if (Program.hw?.UsesBaolongda ?? false)
+		{
+			return true;
+		}
 		// 2026-10-09（② 的配套）：这里原来用 IsSingleZoneRgb（旧判据 = KeyboardType∈{1,2}），
 		// 判据收窄成「ordinal=1 才是单分区」后，4 分区机型(2)会掉进下面的策略判据、可能被切到
 		// per-key HID 帧流。通道归属与灯效表判据解耦：这里改用 IsGcuZoneKeyboardPath（仍 {1,2}，
