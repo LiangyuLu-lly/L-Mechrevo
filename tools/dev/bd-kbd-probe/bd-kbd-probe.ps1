@@ -6,8 +6,8 @@
 #   ③ 是否需要"先开灯"（写 10=1）才写模式/颜色
 #
 # 用法（需管理员；LM 也是管理员，但 PowerShell 要单独提权）：
-#   pwsh -File bd-kbd-probe.ps1                # 只读：列实例 + 读 10/16/17/18
-#   pwsh -File bd-kbd-probe.ps1 -Watch 30      # 30 秒内每 1 s 读一次，只打印变化的行
+#   pwsh -File bd-kbd-probe.ps1                # ⭐ 默认：只读快照 → 倒计时 10 s → 自动采样 30 s
+#   pwsh -File bd-kbd-probe.ps1 -Countdown 5 -Watch 60   # 自定义倒计时/采样时长
 #   pwsh -File bd-kbd-probe.ps1 -TestWrite     # ⚠️ 会写：16=2 → 17=红 → 18=1，每步都回读
 #   pwsh -File bd-kbd-probe.ps1 -TestWrite -TurnOnFirst   # 先写 10=1 再走上面的写测试
 #
@@ -24,7 +24,9 @@ param(
     [int]$Watch = 0,
     [switch]$TestWrite,
     [switch]$TurnOnFirst,
-    [int]$BufferLength = 64
+    [int]$BufferLength = 64,
+    # ⭐ 自带倒计时：先给你时间打开官方控制台，再自动开始采样（秒）
+    [int]$Countdown = 10
 )
 
 $ErrorActionPreference = "Stop"
@@ -104,11 +106,21 @@ function Snapshot {
 Write-Host "`n=== 当前值（功能号 10 / 16 / 17首字节 / 18）===" -ForegroundColor Cyan
 Snapshot | Format-Table -AutoSize
 
-if ($Watch -gt 0) {
-    Write-Host "`n=== 监视 $Watch 秒（每 1 s 一次，只打印变化）===" -ForegroundColor Cyan
-    Write-Host "👉 现在请在官方控制台里点：开关灯 / 换颜色 / 调亮度，观察哪一列变化。" -ForegroundColor Yellow
+# ⭐⭐ 2026-10-19（机主要求「自带倒计时」）：不写参数也能用 ——
+#   先打快照 → 倒计时（默认 10 s，够你切到官方控制台）→ 自动采样（默认 30 s，只打变化行）
+$watchSec = if ($Watch -gt 0) { $Watch } else { 30 }
+if (-not $TestWrite) {
+    if ($Countdown -gt 0) {
+        Write-Host "`n=== 倒计时 $Countdown 秒：请切到官方控制台，准备点「关灯 / 开灯 / 换颜色 / 调亮度」===" -ForegroundColor Yellow
+        for ($c = $Countdown; $c -gt 0; $c--) {
+            Write-Host ("   {0,2} 秒..." -f $c) -ForegroundColor Yellow
+            Start-Sleep -Seconds 1
+        }
+    }
+    Write-Host "`n=== 开始采样 $watchSec 秒（每 1 s 一次，只打印变化）===" -ForegroundColor Cyan
+    Write-Host "👉 现在点官方控制台：关灯 → 开灯 → 换颜色 → 调亮度" -ForegroundColor Yellow
     $prev = $null
-    $deadline = (Get-Date).AddSeconds($Watch)
+    $deadline = (Get-Date).AddSeconds($watchSec)
     while ((Get-Date) -lt $deadline) {
         $cur = Snapshot
         if ($prev) {
