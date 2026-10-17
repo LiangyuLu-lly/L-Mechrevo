@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "note": "与根目录 NOT-OPEN-SOURCE.md 同步维护。blocked = 不可开源（发布前必须剔除/改写）；allowed_open = 可开源但需署名；markers = 反编译代码特征词（源码里出现即视为疑似搬运）。",
+  "blocked": [
+    {
+      "path": "docs/notes/原厂控制台-蛟龙游戏控制中心-分析-20261017.md",
+      "level": "L1",
+      "reason": "厂商专有 · 原厂控制台反编译代码片段"
+    },
+    {
+      "path": "docs/notes/30系官方控制台-分析-20261017.md",
+      "level": "L1",
+      "reason": "厂商专有 · 30 系原厂控制台反编译代码片段"
+    },
+    {
+      "path": "docs/notes/官方控制台-输入开关实现-20261017.md",
+      "level": "L1",
+      "reason": "厂商专有 · 原厂控制台方法调用片段"
+    },
+    {
+      "path": "docs/notes/第三方JiaoLong7.3-灯光指令-20261017.md",
+      "level": "L2",
+      "reason": "第三方修改版控制台反编译 · 无 LICENSE（上游本身是厂商代码修改版）"
+    },
+    {
+      "path": "docs/notes/第三方JiaoLong7.3-四个开关实现-20261017.md",
+      "level": "L2",
+      "reason": "第三方修改版控制台反编译 · 无 LICENSE"
+    },
+    {
+      "path": "docs/notes/充电阈值基线-静态挖掘-20261016.md",
+      "level": "L2",
+      "reason": "JiaoLong16Pro-Battery-threshold 无 LICENSE · 只取事实"
+    }
+  ],
+  "allowed_open": [
+    {
+      "path": "docs/notes/宝龙达接口-从开源实现读出的事实.md",
+      "level": "L3",
+      "reason": "JiaolongControl（MIT）· 可开源，保留出处与许可"
+    },
+    {
+      "path": "docs/notes/蛟龙16Pro-真机抓包证据-20261016.md",
+      "level": "L3",
+      "reason": "我们自己的抓包数据 · 可开源（注意脱敏）"
+    }
+  ],
+  "markers": [
+    "WMIMethodServices.",
+    "SetValue(WMIMethodName",
+    "GetValue<WMIMethodName",
+    "_CPUGPUFanSpeed",
+    "FANTextBlock",
+    "FANProgressBar",
+    "LogHelper.WriteLog",
+    "public void SetSP_",
+    "Set_MaxFanSpeedSlider"
+  ]
+}
