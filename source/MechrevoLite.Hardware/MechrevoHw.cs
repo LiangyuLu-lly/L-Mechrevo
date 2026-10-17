@@ -2415,8 +2415,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"deepsleep" => DeepSleepSeen, 
 			"copilot" => CopilotSeen, 
 			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen, 
-			// ⭐ 2026-10-17（「高性能电源」解耦 GCU）：无 GCU 时由 LM 用 Windows API 实现 ⇒ 开关可用 ✅
-			"highperf" => HighPerformanceSeen || UsesBaolongda, 
+			// ⭐⭐ 2026-10-19（「高性能电源」完全解耦）：⭐ 它是**纯配置开关** ——
+			//   打开 = 切档时 LM 用 **Windows API**（powrprof overlay）设电源模式，⛔ 不需要任何硬件能力位。
+			//   ⚠️ 原来 `HighPerformanceSeen || UsesBaolongda` ⇒ 这台 GCU 机器上报值为假 ⇒
+			//      ⭐ `SwitchQuick` 开头的 `if (!SupportsQuickSwitch(key)) return false;` 直接拒掉
+			//      ⇒ 界面显示"下发被拒、已回滚"（机主日志 `[QS-apply] 键=highperf 下发结果=False`）✅
+			"highperf" => true, 
 			"fanboost" => SupportsFanBoost, 
 			"lightbar" => SupportsLightbar, 
 			"logolight" => SupportsLogoLight, 
