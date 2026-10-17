@@ -467,7 +467,8 @@ internal sealed class PerfModeService
 			Logger.WriteLine($"[power] 高性能电源联动 ⇒ {(value ? "开" : "关")}");
 			if (value)
 			{
-				ApplyWindowsPowerOverlay(Active?.Id ?? string.Empty);
+				// ⭐ 后台执行（回读+重试会 sleep，不能卡 UI 线程）
+				_ = Task.Run(() => ApplyWindowsPowerOverlay(Active?.Id ?? string.Empty));
 			}
 			else
 			{
@@ -499,21 +500,63 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
-		ApplyWindowsPowerOverlayValue(overlay);
+		// ⭐ 后台执行：里面有"回读 + 重试（最多 ~1.4 s）"，⛔ 不能卡 UI 线程 ✅
+		_ = Task.Run(() => ApplyWindowsPowerOverlayValue(overlay));
 	}
 
 	/// <summary>⭐ 把 Windows 电源模式设成给定 overlay（0=平衡 / 1=最佳性能 / 2=最佳能效），失败只记日志。</summary>
 	private void ApplyWindowsPowerOverlayValue(int overlay)
 	{
+		string name = (overlay == 1) ? "最佳性能" : ((overlay == 2) ? "最佳能效" : "平衡");
+		// ⭐⭐ 2026-10-19（机主反馈「延迟很大、有概率失败」）：⭐ 写后**回读确认 + 重试** ✅
+		//   ⚠️ 原因一：厂商链路（GCU/其它工具）可能在切档后不久**再写一次** overlay ⇒ 把我们的值覆盖掉；
+		//   ⚠️ 原因二：Windows 侧生效不是同步的（设置页要过一会儿才反映）
+		//   ⇒ ⭐ 做法：设置 → 等 350 ms → 回读；不一致就重试（最多 4 次 ≈ 1.4 s），
+		//      最终以**回读值**为准写日志（⛔ 不谎称成功）✅
+		string expectedGuid = (overlay == 1) ? "ded574b5-45a0-4f42-8737-46345c09c238"
+			: ((overlay == 2) ? "961cc777-2547-4f9d-8174-7d86181b8a7a" : "00000000-0000-0000-0000-000000000000");
+		for (int attempt = 1; attempt <= 4; attempt++)
+		{
+			try
+			{
+				PowerNative.SetPowerMode(overlay);
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine($"[power] Windows 电源模式设置失败（第 {attempt} 次，已吞掉）：{ex.Message}");
+				return;
+			}
+			Thread.Sleep(350);
+			if (!TryReadOverlay(out string actual, out uint rc))
+			{
+				continue;
+			}
+			if (string.Equals(actual, expectedGuid, StringComparison.OrdinalIgnoreCase))
+			{
+				Logger.WriteLine($"[power] Windows 电源模式 → {name}（overlay={overlay} · 回读确认 ✅ 第 {attempt} 次 · 纯 Windows API）");
+				return;
+			}
+			Logger.WriteLine($"[power] Windows 电源模式设置后回读不一致（第 {attempt} 次）：期望 {expectedGuid} 实际 {actual}（rc={rc}）⇒ 重试");
+		}
+		TryReadOverlay(out string finalActual, out uint finalRc);
+		Logger.WriteLine($"[power] ⚠️ Windows 电源模式**未能确认**变成 {name}（overlay={overlay}）：最终回读 {finalActual}（rc={finalRc}）—— 如实记为未确认，不当作成功");
+	}
+
+	/// <summary>⭐ 只读：当前 Windows 电源模式 overlay 的 GUID（失败返回 false）。</summary>
+	private static bool TryReadOverlay(out string guid, out uint rc)
+	{
+		guid = string.Empty;
+		rc = 0;
 		try
 		{
-			string name = (overlay == 1) ? "最佳性能" : ((overlay == 2) ? "最佳能效" : "平衡");
-			PowerNative.SetPowerMode(overlay);
-			Logger.WriteLine($"[power] Windows 电源模式 → {name}（overlay={overlay} · 纯 Windows API，不依赖 GCU/能力位）");
+			rc = PowerNative.PowerGetActualOverlayScheme(out Guid g);
+			guid = g.ToString("D");
+			return true;
 		}
 		catch (Exception ex)
 		{
-			Logger.WriteLine("[power] Windows 电源模式设置失败（已吞掉）：" + ex.Message);
+			Logger.WriteLine("[power] 读取电源模式 overlay 失败：" + ex.Message);
+			return false;
 		}
 	}
 
