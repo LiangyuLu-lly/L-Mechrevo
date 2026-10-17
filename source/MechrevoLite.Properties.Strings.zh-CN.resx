@@ -4305,6 +4305,9 @@
     
   
   </data>
+<data name="GpuPowerLimit" xml:space="preserve">
+    <value>显卡功耗上限 (W)</value>
+  </data>
 <data name="GpuTgp" xml:space="preserve">
     
     

@@ -1465,6 +1465,9 @@ internal class Strings
 
 	internal static string GpuTgp => ResourceManager.GetString("GpuTgp", resourceCulture);
 
+	/// <summary>⭐ 2026-10-19：⭐ 显卡功耗上限（本机 NVML 字段，与厂商 TGP 区分）。</summary>
+	internal static string GpuPowerLimit => ResourceManager.GetString("GpuPowerLimit", resourceCulture);
+
 	internal static string MemoryOffset => ResourceManager.GetString("MemoryOffset", resourceCulture);
 
 	internal static string ModeTuneFanBoost => ResourceManager.GetString("ModeTuneFanBoost", resourceCulture);

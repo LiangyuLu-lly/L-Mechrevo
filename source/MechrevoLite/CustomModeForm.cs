@@ -185,6 +185,11 @@ public class CustomModeForm : RForm
 
 	private RSlider _tgp;
 
+	/// <summary>⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：只有能读到有效约束时才创建 ✅</summary>
+	private RSlider _gpuPowerLimit;
+
+	private RNumericUpDown _gpuPowerLimitVal;
+
 	private RSlider _db;
 
 	private RSlider _coreOc;
@@ -767,6 +772,19 @@ public class CustomModeForm : RForm
 		});
 		_tgp = tuple4.Item1;
 		_tgpVal = tuple4.Item2;
+		// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：⭐ 只有**能读到有效约束**（max>min）才建这一行
+		//   ⛔ 读不到就不显示（宁可不给，也不给一个写不进去的滑块）✅
+		if (NvmlHelper.TryGetPowerLimitBounds(out int plMinW, out int plMaxW, out int plCurW) && plMaxW > plMinW)
+		{
+			int plStart = ((plCurW >= plMinW && plCurW <= plMaxW) ? plCurW : plMaxW);
+			var plRow = AddSliderRow(Strings.GpuPowerLimit, plMinW, plMaxW, plStart, (int v) =>
+			{
+				Queue("GpuPowerLimitW", v.ToString());
+			});
+			_gpuPowerLimit = plRow.Item1;
+			_gpuPowerLimitVal = plRow.Item2;
+			Logger.WriteLine($"[gpu-power] UI 显示功耗上限滑块：{plMinW}~{plMaxW} W（当前 {plCurW} W）");
+		}
 		_dbChk = AddCheckRow(Strings.GpuDynamicBoost, hw?.GpuDbSwitch ?? false, (bool on) =>
 		{
 			Queue("GpuDynamicBoostSwitch", on ? "1" : "0");
@@ -3500,7 +3518,11 @@ public class CustomModeForm : RForm
 					{
 						GpuDynamicBoostOn = (result == 1)
 					}, 
-					"GpuDynamicBoost" => perfModeSettings with
+					"GpuPowerLimitW" => perfModeSettings with
+			{
+				GpuPowerLimitW = new int?(result)
+			},
+			"GpuDynamicBoost" => perfModeSettings with
 					{
 						GpuDynamicBoost = result
 					}, 
