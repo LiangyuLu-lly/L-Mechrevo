@@ -84,6 +84,13 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 	{
 		try
 		{
+			// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线）：⭐ 没有 GCU ⇒ 不写固件表，
+			//   改成"占空比 % → RPM → 存进 BaolongdaFanCurveStore 并启用"（本机 3 s 软件闭环下发 20/21）✅
+			//   ⚠️ 非宝龙达仍走原来的 `SetFanCurve`（GCU）⇒ 逐位不变 ✅
+			if (_hw.UsesBaolongda)
+			{
+				return ApplyBaolongdaFanCurve(cpu, duty);
+			}
 			await _hw.SetFanCurve((!cpu) ? 1 : 0, duty).ConfigureAwait(continueOnCapturedContext: false);
 			return true;
 		}
@@ -92,6 +99,53 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			Logger.WriteLine("PerfModeBackend.WriteFanCurve(" + (cpu ? "CPU" : "GPU") + ") failed: " + ex.Message);
 			return false;
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线）：⭐ 把"16 点占空比 %"换成 RPM 存进
+	/// <see cref="BaolongdaFanCurveSettings" /> 并**启用**（3 s 定时器按它下发功能号 20/21）✅
+	/// <para>⚠️ 通道映射（owner 已确认）：<c>ch0 = FanType 0 = GPU</c> · <c>ch1 = FanType 1 = CPU</c>
+	/// ⇒ `cpu=true` 写 ch1、`cpu=false` 写 ch0 ✅</para>
+	/// <para>⚠️ 换算分母用**存档里的** <c>MinRpm/MaxRpm</c>（与曲线窗口同一口径），⛔ 不另编一个分母 ✅</para>
+	/// <para>⚠️ 存档读不懂（旧格式）⇒ 返回 false，⛔ 不拿默认值顶替 ✅</para>
+	/// </summary>
+	private bool ApplyBaolongdaFanCurve(bool cpu, int[] dutyPercent)
+	{
+		if (dutyPercent == null || dutyPercent.Length != 16)
+		{
+			return false;
+		}
+		BaolongdaFanCurveSettings current = _hw.LoadBaolongdaFanCurve();
+		if (current.IsUnreadableArchive)
+		{
+			Logger.WriteLine("[fan] 宝龙达本地曲线：⚠️ 存档读不懂 ⇒ 本轮不写（⛔ 不拿默认值顶替）");
+			return false;
+		}
+		int min = current.MinRpm;
+		int max = current.MaxRpm;
+		double span = Math.Max(0, max - min);
+		int[] rpms = new int[dutyPercent.Length];
+		for (int i = 0; i < dutyPercent.Length; i++)
+		{
+			int pct = Math.Clamp(dutyPercent[i], 0, 100);
+			rpms[i] = min + (int)Math.Round(pct * span / 100.0);
+		}
+		BaolongdaFanCurveSettings next = new BaolongdaFanCurveSettings
+		{
+			Enabled = true,
+			FormatVersion = current.FormatVersion,
+			HysteresisC = current.HysteresisC,
+			IntervalMs = current.IntervalMs,
+			MinRpm = current.MinRpm,
+			MaxRpm = current.MaxRpm,
+			Channel0Temperatures = current.Channel0Temperatures,
+			Channel0Rpms = cpu ? current.Channel0Rpms : rpms,
+			Channel1Temperatures = current.Channel1Temperatures,
+			Channel1Rpms = cpu ? rpms : current.Channel1Rpms
+		};
+		bool ok = _hw.SaveBaolongdaFanCurve(next);
+		Logger.WriteLine($"[fan] 宝龙达本地曲线已保存（{(cpu ? "CPU/ch1" : "GPU/ch0")} · {min}~{max} RPM · enabled=true）⇒ ok={ok}");
+		return ok;
 	}
 
 	public Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct)

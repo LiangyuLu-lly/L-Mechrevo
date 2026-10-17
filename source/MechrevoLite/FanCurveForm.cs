@@ -726,6 +726,21 @@ public class FanCurveForm : RForm
 					Channel1Rpms = PercentToRpms(cpuPercent, prev.MinRpm, prev.MaxRpm),
 				};
 				bool ok = hw.SaveBaolongdaFanCurve(next);
+				// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线接入）：把本轮的 16 点占空比**同时记进该档配置** ✅
+				//   ⇒ 自定义档「应用」时 `PerfModeApplyPlanner` 会生成 `WriteFanCurve` 步骤，
+				//     再由 `PerfModeBackend` 换成 RPM 写回 `BaolongdaFanCurveStore`（本机软件闭环 20/21）✅
+				//   ⚠️ `RecordFanCurves` 内部已按 route 判据过滤（非固件槽档只记日志、不落盘）✅
+				if (ok)
+				{
+					try
+					{
+						MechrevoLite.Mode.PerfModeService.Instance?.RecordFanCurves(TargetModeId, cpuPercent, gpuPercent);
+					}
+					catch (Exception exRec)
+					{
+						Logger.WriteLine("宝龙达曲线记录到档位失败（已吞掉）：" + exRec.Message);
+					}
+				}
 				// 保存不再等于启用（2026-10-17）⇒ 如实说清"存了但没启用"，别让机主以为在跑
 				_status.Text = !ok
 					? "风扇曲线保存失败"

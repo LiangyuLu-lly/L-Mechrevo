@@ -171,6 +171,22 @@ public static class PerfModeApplyPlanner
 				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
 		}
+		// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线本地化）：⭐ 无固件槽的后端**不产生** GCU 的
+		//   `WriteFanCurve`（上面那个大块整块跳过），但风扇曲线**能**走本机软件闭环（功能号 20/21）✅
+		//   ⇒ ⭐ 这里单独生成步骤；执行侧（`PerfModeBackend.WriteFanCurveAsync`）在宝龙达下改为
+		//      把"占空比 %"换算成 RPM、存进 `BaolongdaFanCurveStore` 并启用 ✅
+		//   ⚠️ 仅 `SupportsWmiPowerFields`（=宝龙达）且确实要改参数时生成 ⇒ GCU/老接口逐位不变 ✅
+		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite)
+		{
+			if (settings.CpuFanDuty != null && settings.CpuFanDuty.Length == 16)
+			{
+				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: true, settings.CpuFanDuty, PerfApplyVerify.FanDuty));
+			}
+			if (settings.GpuFanDuty != null && settings.GpuFanDuty.Length == 16)
+			{
+				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: false, settings.GpuFanDuty, PerfApplyVerify.FanDuty));
+			}
+		}
 		if (settings.FanBoost.HasValue)
 		{
 			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyFanBoost, null, null, settings.FanBoost.Value ? 1 : 0));

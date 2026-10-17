@@ -8535,7 +8535,12 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// Force30Ui.Enabled —— 打开后「自定义」按钮也按 30 系样式隐藏。它只影响下面这个
 		// Visible 与 ReflowPerformanceButtons 的排布；⚠️ 自定义模式本身的可用性/取值/命令
 		// 一概不变（ResolveModeProfileIndex 里的 custom 分支与 SupportsModeProfileConfig 一字未动）。
-		bool flagCustomMode = flag17 && !((Program.hw?.SupportsModeProfileConfig ?? false) || Force30Ui.Enabled);
+		// ⭐⭐ 2026-10-17（宝龙达 · 自定义档本地化）：⭐ 宝龙达没有固件自定义槽，
+		//   但它的参数（PL1/PL2/温度墙 → WMI 23 · GPU 超频 → NVAPI · 风扇曲线 → 20/21 软件闭环）
+		//   **都能本地下发** ⇒ 入口不该再依赖 flag17（那三个能力位它一个都不上报）✅
+		//   ⚠️ 30 系「模式 × 配置」机型仍按 `SupportsModeProfileConfig` 隐藏（判据未变）✅
+		bool bdCustomEntry = Program.hw?.UsesBaolongda ?? false;
+		bool flagCustomMode = (flag17 || bdCustomEntry) && !((Program.hw?.SupportsModeProfileConfig ?? false) || Force30Ui.Enabled);
 		if (buttonCustomMode != null)
 		{
 			buttonCustomMode.Visible = flagCustomMode;
