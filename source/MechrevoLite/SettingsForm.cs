@@ -585,13 +585,15 @@ public class SettingsForm : RForm
 	// ⭐⭐ 2026-10-19（机主：「键盘下拉里面的关和左边开关功能重复」）：⭐ 下拉里**去掉「关」** ✅
 	//   ⭐ 开/关由左边那颗开关负责（写亮度 0），下拉只选"开着的时候是什么效果" ✅
 	//   ⚠️ 顺序保持 Single(2) → Rainbow(1)，与 `MechrevoHw.TryMapBaolongdaKeyboardMode` 一致 ✅
-	// ⭐⭐ 2026-10-19（机主实测：除「单色」之外的效果都不可用）：
-	//   ⭐ 40/30 系真机上「彩虹（模式 1）」写下去回读不成立（日志 `回读一致=False`）⇒ ⭐ 只保留**单色** ✅
-	//   ⚠️ 按能力位铁律：做不到的就不放进界面（⛔ 不给"能点但没用"的选项）
-	//   ⭐ 将来若有机器证明彩虹真能生效，再按机型放回来（⛔ 不要无条件放开）
-	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[1]
+	// ⭐⭐ 2026-10-19 第二轮（机主：「先不禁用，参照 7.3 的实现」）：
+	//   ⭐ 恢复「彩虹」，并按第三方 7.3 的做法（**同一套 WMI 16/17/18**）补写入细节：
+	//     · 7.3 设亮度是「先 4 → 再 0 → 再目标值」的**复位序列**（我们的"只写变化项"可能因此被固件忽略）
+	//     · 7.3 设彩虹 = `RGBKeyboardMode = Mode_RGBAutoCyclic(1)`，固定色 = 2 + 颜色(17)
+	//   ⚠️ 先放回界面让机主真机验证；若仍不生效，再按"能力位"隐回去（⛔ 不长期给无效项）
+	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[2]
 	{
-		("Single", Strings.EffectSingle)
+		("Single", Strings.EffectSingle),
+		("Rainbow", Strings.EffectRainbow)
 	};
 
 	/// <summary>
