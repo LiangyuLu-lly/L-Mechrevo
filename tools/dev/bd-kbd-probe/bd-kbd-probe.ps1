@@ -24,7 +24,8 @@ param(
     [int]$Watch = 0,
     [switch]$TestWrite,
     [switch]$TurnOnFirst,
-    [int]$BufferLength = 64,
+    # ⚠️ 必须与生产代码 `BaolongdaWmi.BufferLength` 一致（32）
+    [int]$BufferLength = 32,
     # ⭐ 自带倒计时：先给你时间打开官方控制台，再自动开始采样（秒）
     [int]$Countdown = 10
 )
@@ -51,7 +52,9 @@ try {
 $Ns = "root\WMI"
 $Class = "MICommonInterface"
 # 方法名候选（不同批次固件有差异）：
-$MethodCandidates = @("MICommonInterface", "GetSetULong", "GetSetLong", "MICommon")
+# ⚠️ 生产代码里就是这一个（`BaolongdaWmi.WmiMethodName`）——
+#    机主 23:09 那份日志证明：MICommonInterface / GetSetULong / GetSetLong / MICommon **全都不存在**
+$MethodCandidates = @("MiInterface", "MICommonInterface", "GetSetULong")
 
 function Get-Instances {
     $all = @(Get-CimInstance -Namespace $Ns -ClassName $Class -ErrorAction Stop)
@@ -100,6 +103,9 @@ foreach ($i in $insts) {
     $m = Resolve-Method $i
     $resolved[$i.InstanceName] = $m
     Write-Host ("  {0} ⇒ 方法名 {1}" -f $i.InstanceName, ($(if ($m) { $m } else { "❌ 未找到" }))) -ForegroundColor ($(if ($m) { "Green" } else { "Red" }))
+    if (-not $m) {
+        Write-Host "  ⚠️ 该实例没有 MiInterface 方法 —— 请把本日志发给我们（说明该固件的接口名不同）" -ForegroundColor Yellow
+    }
 }
 
 function Snapshot {
