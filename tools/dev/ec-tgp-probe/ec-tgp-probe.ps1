@@ -21,7 +21,9 @@ param(
     [int]$Seconds = 0,
     [int]$IntervalSec = 2,
     # 可选：同时把控制台输出录到文件（提权运行时用，便于事后比对）
-    [string]$LogPath = ""
+    [string]$LogPath = "",
+    # 可选：每帧都打印（默认只打印变化行）
+    [switch]$PrintAll
 )
 
 $ErrorActionPreference = "Stop"
@@ -132,8 +134,13 @@ while ((Get-Date) -lt $deadline) {
                 $changed += ("0x{0:X3}: {1} → {2}" -f $a, $prev.Ec[$a], $snap.Ec[$a])
             }
         }
-        if ($changed.Count -gt 0) {
+        if ((-not $PrintAll) -and $changed.Count -gt 0) {
             Write-Host ("[{0}] {1}" -f (Get-Date -Format 'HH:mm:ss'), ($changed -join ' | ')) -ForegroundColor Green
+        }
+        elseif ($PrintAll) {
+            $g = $snap.Gpu
+            $gpuText = if ($g) { "enforced=$($g.Enforced) draw=$($g.Draw)" } else { "nvidia-smi N/A" }
+            Write-Host ("[{0}] {1} | 0x743={2:X2} 0x746={3:X2}" -f (Get-Date -Format 'HH:mm:ss'), $gpuText, $snap.Ec[1859], $snap.Ec[1862]) -ForegroundColor Green
         }
     }
     $prev = $snap
