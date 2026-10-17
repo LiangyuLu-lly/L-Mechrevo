@@ -905,8 +905,8 @@ internal static class DiagnosticBaolongdaInfo
 		AppendOne(sb, wmi, BaolongdaWmi.Function.SystemAcType, "19", "交流类型");
 		AppendOne(sb, wmi, BaolongdaWmi.Function.MaxFanSpeedSwitch, "20", "风扇手动开关");
 		// ⭐⭐ 2026-10-17（接手）：⭐ 功能号 21 的**读语义已由原厂包确认** ——
-		//   ⛔ **不是"最大转速"**，⭐ 而是**手动转速设定值**：原厂 `MaxFanSpeed.Text = value`、
-		//   再由它反算滑块位置（`Set_MaxFanSpeedSlider`）⇒ 读值 = 上次写下去的 `x100 RPM` ✅。
+		//   ⛔ **不是"最大转速"**，⭐ 而是**手动转速设定值**：原厂读回它只用于回显/定位手动转速滑块，
+		//   值就是上次写下去的 `x100 RPM` ✅（⭐ 只取事实，⛔ 不贴其代码 —— 法律风险）。
 		//   ⇒ ⭐ 我们**不再**拿它当百分比分母（真机读到 50 ⇒ 曾被当成 5000 RPM，导致 40% vs 官方 33% ❌）。
 		//   下面仍把原始字节打出来，⭐ 供核对"手动设定值到底是多少" ✅。
 		AppendOne(sb, wmi, BaolongdaWmi.Function.MaxFanSpeed, "21", "风扇手动转速设定值（⚠️ 读=上次设的转速，不是最大转速）");
