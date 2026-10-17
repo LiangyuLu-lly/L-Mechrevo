@@ -12637,21 +12637,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			buttonTurbo.Activated = silentTurbo != true;
 		}
 		SetContextMenu();
-		bool flag = await mechrevoService.SwitchMode(mode) == MechrevoService.ModeSwitchResult.Ok;
-		// ⭐⭐ 2026-10-19（「高性能电源」· UI 切档联动）：⭐ GCU 机型的切档走 MQTT，**不经过** PerfModeService.ActivateAsync
-		//   ⇒ ⭐ 必须在这里单独把 Windows 电源模式同步一次（纯 Windows API，与厂商无关）✅
-		//   ⚠️ 只在开关打开时生效（`WindowsPowerOverlayEnabled` 内部判）；失败只记日志、不影响切档结果 ✅
-		if (flag)
+		// ⭐⭐ 2026-10-19（「高性能电源」· **与切档同时下发**）：⭐ 机主口径「代码顺序 —— 直接跟着 GCU 发命令同时，不要等回读」
+		//   ⭐ 因此在 `SwitchMode`（GCU/MQTT）**之前**就把 Windows 电源模式发出去，两边"同时"到 ✅
+		//   ⚠️ 不阻塞：内部只调一次 powrprof，不等回读、不重试、不 sleep ✅
+		//   ⚠️ 只在开关打开时生效（`WindowsPowerOverlayEnabled` 内部判）；失败只记日志、不影响切档 ✅
+		try
 		{
-			try
-			{
-				MechrevoLite.Mode.PerfModeService.Instance?.ApplyWindowsPowerOverlayForUiMode(mode, silentTurbo == true);
-			}
-			catch (Exception exPow)
-			{
-				Logger.WriteLine("[power] UI 切档同步电源模式失败（已吞掉）：" + exPow.Message);
-			}
+			MechrevoLite.Mode.PerfModeService.Instance?.ApplyWindowsPowerOverlayForUiMode(mode, silentTurbo == true);
 		}
+		catch (Exception exPow)
+		{
+			Logger.WriteLine("[power] UI 切档同步电源模式失败（已吞掉）：" + exPow.Message);
+		}
+		bool flag = await mechrevoService.SwitchMode(mode) == MechrevoService.ModeSwitchResult.Ok;
 		if (request == Volatile.Read(in _performanceRequest))
 		{
 			MechrevoHw? hw2 = Program.hw;
