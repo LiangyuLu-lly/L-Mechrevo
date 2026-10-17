@@ -70,7 +70,9 @@ function Invoke-Frame($instanceName, [byte]$mode, [byte]$func, [byte[]]$payload)
         $in["InData"] = $buf
         $out = $mo.InvokeMethod($Method, $in, $null)
         if (-not $out) { return $null }
-        return [byte[]]$out["OutData"]
+        # ⚠️ 不要写成 [byte[]]$out["OutData"]：PS 5.1 里它是 PSObject 包装，强转会抛
+        #    "无法将类型为 System.Management.Automation.PSObject 的对象强制转换为类型 System.Array"
+        return ,$out["OutData"]
     } finally {
         $mo.Dispose()
     }
@@ -78,8 +80,9 @@ function Invoke-Frame($instanceName, [byte]$mode, [byte]$func, [byte[]]$payload)
 
 function Read-Func($instanceName, [byte]$func) {
     $o = Invoke-Frame $instanceName 250 $func $null
-    if (-not $o -or $o.Length -le 4) { return $null }
-    return [int]$o[4]
+    if ($null -eq $o) { return $null }
+    if (@($o).Count -le 4) { return $null }
+    return [int](@($o)[4])
 }
 
 function Snapshot($insts) {
