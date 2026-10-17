@@ -119,7 +119,7 @@ internal static class LightingSettingsStore
 	{
 		if (!TryLoad(topic, out var settings))
 		{
-			return new LightChannelSettings(defaultEffect, 4, 1, Color.White.ToArgb(), PowerOn: true);
+			return new LightChannelSettings(defaultEffect, 4, 1, Color.White.ToArgb(), PowerOn: false);
 		}
 		return settings;
 	}
@@ -158,7 +158,7 @@ internal static class LightingSettingsStore
 		int light = 4;
 		int speed = 1;
 		int colorArgb = Color.White.ToArgb();
-		bool powerOn = true;
+		bool powerOn = false;
 		int[]? manualIndexes = null;
 		int breathingIndex = 1;
 		int monoIndex = 4;
