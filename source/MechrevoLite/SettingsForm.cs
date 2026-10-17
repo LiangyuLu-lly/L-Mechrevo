@@ -15969,6 +15969,16 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			_logoPowerSw = logoPowerSw;
 			_logoEffectCombo = logoEffectCombo;
+		// ⭐⭐ 2026-10-19（机主：「Logo 灯光没有正确屏蔽特效下拉框，宝龙达只有开关」）：
+		//   ⭐ 宝龙达的 Logo 灯只有 开/关（功能号 15），没有效果字段 ⇒ **整颗下拉不显示** ✅
+		//   ⭐ 开关本身照常可用（`TrySetLogoLightViaBackend`）✅
+		//   ⚠️ 非宝龙达保持原样 ✅
+		if (Program.hw?.UsesBaolongda == true)
+		{
+			logoEffectCombo.Visible = false;
+			logoEffectCombo.Enabled = false;
+			Logger.WriteLine("[light] 宝龙达：Logo 灯只有开/关 ⇒ 已隐藏特效下拉");
+		}
 		});		BuildLightChannelRow("rowHinge", Strings.LightChannelHinge, "HidLightbar_Hinge/Ctrl", Strings.LightHingeTitle, LightForm.HingeEffects, 3, (RCheckBox hingePowerSw, ComboBox hingeEffectCombo) =>
 		{
 			_hingePowerSw = hingePowerSw;
