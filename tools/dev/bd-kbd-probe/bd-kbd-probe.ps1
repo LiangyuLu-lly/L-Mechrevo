@@ -18,7 +18,7 @@ param(
     [switch]$TestWrite,
     [switch]$TurnOnFirst,
     [int]$BufferLength = 32,
-    [int]$Countdown = 10
+    [int]$Countdown = 3   # ⭐ 机主要求：倒计时默认 3 秒（够切到官方控制台）
 )
 
 $ErrorActionPreference = "Stop"
