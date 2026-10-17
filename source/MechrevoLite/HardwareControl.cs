@@ -16,6 +16,61 @@ public static class HardwareControl
 	// ⭐⭐ 2026-10-16：⭐ "CPU 温度已切到 LHM" 只记一次（⭐ 免得 3 秒一行刷爆日志 ⚠️）
 	private static int _lhmCpuTempLogged;
 
+	/// <summary>⭐ 2026-10-17：ACPI 热区兜底只记一次日志。</summary>
+	private static int _acpiCpuTempLogged;
+
+	/// <summary>⭐ ACPI 热区温度缓存的上次读取时刻（TickCount64）。</summary>
+	private static long _acpiTempLastTicks;
+
+	/// <summary>⭐ ACPI 热区温度缓存值（℃；0 = 无/失败）。</summary>
+	private static int _acpiTempCached;
+
+	/// <summary>
+	/// ⭐ 2026-10-17（30 系宝龙达 CPU 温度不识别 · 第三档兜底）：
+	/// 读 <c>root\WMI:MSAcpi_ThermalZoneTemperature</c>（**免驱动**，只需管理员）。
+	/// <para>⚠️ 单位是 0.1K ⇒ (raw / 10) − 273.15；取多个热区的**最高值**（通常有 CPU 与主板两个）。</para>
+	/// <para>⚠️ 用 <see cref="System.Management.ManagementObjectSearcher" />（⛔ 不用 Get-CimInstance ——
+	/// 本项目 `DiagnosticBaolongdaInfo.cs:22` 记过：那个口径查不到会**假否定** ⚠️）。</para>
+	/// <para>⚠️ 限频 30 秒（WMI 查询不轻）；任何异常都吞掉返回 0（⛔ 不影响别的传感器）。</para>
+	/// </summary>
+	private static int ReadAcpiThermalZoneCelsius()
+	{
+		long now = Environment.TickCount64;
+		if (now - Interlocked.Read(in _acpiTempLastTicks) < 30000)
+		{
+			return _acpiTempCached;
+		}
+		Interlocked.Exchange(ref _acpiTempLastTicks, now);
+		int best = 0;
+		try
+		{
+			using System.Management.ManagementObjectSearcher searcher =
+				new System.Management.ManagementObjectSearcher("root\\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature");
+			foreach (System.Management.ManagementBaseObject row in searcher.Get())
+			{
+				try
+				{
+					int raw = Convert.ToInt32(row["CurrentTemperature"]);
+					int celsius = (int)Math.Round(raw / 10.0 - 273.15);
+					// ⚠️ 合理性判据：CPU 温度不可能 ≤ 0℃ 或 ≥ 120℃ ⇒ 那是无效/未初始化的热区
+					if (celsius > best && celsius > 0 && celsius < 120)
+					{
+						best = celsius;
+					}
+				}
+				catch
+				{
+				}
+			}
+		}
+		catch
+		{
+			// ⛔ 静默：ACPI 热区不是每台机器都有 / 可能被拒绝访问 —— 那只是"没有这一档"，不是故障
+		}
+		Volatile.Write(ref _acpiTempCached, best);
+		return best;
+	}
+
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（0.291.9.1 · 定性日志）：⭐ GPU 温度**三个来源都没给**是否已记过 ✅
 	/// （⭐ 0=没记过 · ⭐ 1=记过 ✅）。
@@ -482,6 +537,26 @@ public static class HardwareControl
 					{
 						Logger.WriteLine($"传感器兜底：⭐ 厂商未提供 CPU 温度 ⇒ 改用 **LM 自带的 LHM**"
 							+ $"（传感器={lhmMonitor.CpuTemperatureSensorName}，值={cpuTemp}℃）✅");
+					}
+				}
+				else
+				{
+					// ⭐⭐ 2026-10-17（30 系宝龙达 CPU 温度不识别 · 第三档兜底）：
+					//   ⭐ 30 系宝龙达的 WMI 功能号 22 **返回 0**（无效）；而 LHM 读 CPU 核心温度需要
+					//      Ring0 驱动（PawnIO 读 MSR）⚠️ ⇒ 没装驱动时 LHM 也给不出值 ❌
+					//   ⭐ 但 ACPI 热区（`MSAcpi_ThermalZoneTemperature`）**免驱动**、只需管理员 ✅
+					//      ⇒ ⭐ 作为**最后一档**兜底：ACPI 给什么就是什么（通常是封装温度，比核心温度低几度）
+					//   ⚠️ 语义如实：⭐ 这是**热区温度**，⛔ 不是核心温度 —— 但**有胜于无**（总比「—」好）
+					//   ⚠️ 限频 30s（WMI 查询不轻），失败静默不计入崩溃
+					int acpiTemp = ReadAcpiThermalZoneCelsius();
+					if (acpiTemp > 0)
+					{
+						cpuTemp = acpiTemp;
+						if (Interlocked.Exchange(ref _acpiCpuTempLogged, 1) == 0)
+						{
+							Logger.WriteLine($"传感器兜底：⭐ 厂商与 LHM 都没给 CPU 温度 ⇒ 改用 **ACPI 热区**"
+								+ $"（值={acpiTemp}℃ ⚠️ 封装温度口径，非核心温度）✅");
+						}
 					}
 				}
 			}
