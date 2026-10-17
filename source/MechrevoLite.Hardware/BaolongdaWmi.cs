@@ -651,6 +651,21 @@ internal sealed class BaolongdaWmi : IDisposable
 	}
 
 	/// <summary>写两个字节（<c>InData[4]=第一、[5]=第二</c>）—— ⭐ 用于风扇（FanType + 值）与 CPUPower（子命令 + 值）。</summary>
+	/// <summary>⭐ 2026-10-19（探针用）：⭐ 写功能号 17 的 3 字节 RGB ✅</summary>
+	internal bool TryWriteColor(byte red, byte green, byte blue)
+	{
+		try
+		{
+			byte[] outData = Invoke(MethodSet, Function.RgbKeyboardColor, new byte[3] { red, green, blue });
+			return outData != null && outData.Length > 4 && outData[3] == (byte)Function.RgbKeyboardColor;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 WMI：写颜色失败：" + ex.Message);
+			return false;
+		}
+	}
+
 	internal bool TryWriteTwo(Function function, byte first, byte second)
 	{
 		try

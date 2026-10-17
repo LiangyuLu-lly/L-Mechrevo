@@ -290,6 +290,16 @@ internal static class Program
 		}
 		switch (text)
 		{
+		// ⭐⭐ 2026-10-19（机主要求「直接调 LM 接口」）：⭐ 键盘灯 WMI 探针走**主程序自己的通道**
+		//   ⛔ 不再依赖 PowerShell（PS 5.1 对 WMI 的封送反复出问题）
+		//   ⭐ 用法：L-Mechrevo.exe --kbd-probe      （结果写 %APPDATA%\MechrevoLite\log.txt，并另存一份到桌面）
+		case "--kbd-probe":
+		{
+			string probeLog = KeyboardWmiProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[kbd-probe] " + probeLog);
+			return;
+		}
 		// 2026-10-05 step7A (upstream 0.290.6 A-41): capability probe CLI.
 		// L-Mechrevo.exe --cpu-tuning-probe [output.json]
 		case "--cpu-tuning-probe":
