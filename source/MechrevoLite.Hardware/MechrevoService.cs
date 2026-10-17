@@ -4355,6 +4355,20 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardPower(bool on)
 	{
+		// ⭐⭐ 2026-10-17（真机反馈「logo 和键盘开关都无效」+ 用户澄清「宝龙达键盘灯其实关就是亮度 0，
+		//   不存在真的开关」）：⭐ **宝龙达没有独立的"电源开/关"命令** ⚠️
+		//   ⭐ 它的关灯手段就是**把亮度（功能号 18）写成 0** ✅（参考实现界面原文
+		//      「背光亮度设置为 0 时将关闭键盘灯光」；斗战者也全仓没有独立关灯操作，值域 0~3）。
+		//   ⚠️ 而原先本方法**没有任何宝龙达分派** ⇒ 永远落到 `SetLightPower("Keyboard/Ctrl")`（MQTT/GCU 通道）
+		//      ⇒ ⭐ 宝龙达（无 GCU）**永远无效** ❌ —— 这就是「键盘开关点了没反应」的根因。
+		//   ⇒ ⭐ 宝龙达下**转发到 `SetKeyboardEffect`**（它有分派、内部即 `TryApplyKeyboardViaBackend`）：
+		//      ⭐ 开 ⇒ 用「单色 + 正常亮度」；⭐ 关 ⇒ 用「关（Off）+ 亮度 0」✅
+		//      ⭐ 那里 `on = (level > 0) && !IsLightEffectOff(effect)` ⇒ 关时写亮度 0，与上面事实完全一致 ✅
+		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 下面原来的两行**逐字不变** ✅
+		if (_hw != null && _hw.UsesBaolongda)
+		{
+			return SetKeyboardEffect(on ? "Single" : "Off", on ? 4 : 0);
+		}
 		// 2026-10-09（kbdctrl）：开关打开时开关灯也走新的 Keyboard/Ctrl 链路；关闭时逐字走原路径。
 		if (KeyboardCtrlPublishSwitch.Enabled)
 		{
