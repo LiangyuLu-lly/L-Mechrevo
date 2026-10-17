@@ -826,7 +826,21 @@ public class CustomModeForm : RForm
 			Queue("OverClockingSwitch", on ? "1" : "0");
 			SyncGpuOverclockDependents();
 		});
-		(int, int, int, bool) tuple13 = DeviceRange(hw?.GpuCoreOffsetUserMinimum ?? (-1), hw?.GpuCoreOffsetUserMaximum ?? (-1), hw?.EffectiveGpuCoreClockOffset ?? 0, allowNegative: true);
+		// ⭐⭐ 2026-10-19（机主：GPU 核心频率偏移滑块"不行"——灰的、值恒 0）：
+		//   ⚠️ 范围来自**厂商字段** `GpuCoreOffsetUserMinimum/Maximum`；宝龙达没有 GCU ⇒ 恒 0/0
+		//      ⇒ `DeviceRange` 判为不可调 ⇒ 滑块禁用 ❌
+		//   ⭐ 宝龙达下若范围无效且本机**支持 GPU 超频**（NVAPI 后端在），用一组保守近似范围
+		//      （-100 ~ +200 MHz）；⚠️ 只是给 UI 一个可操作区间，⛔ 不代表硬件接受 ——
+		//      ⭐ 写入仍走 NVAPI 并**回读确认**，写不进去会如实报失败（⛔ 不假装成功）✅
+		int coreMin = hw?.GpuCoreOffsetUserMinimum ?? (-1);
+		int coreMax = hw?.GpuCoreOffsetUserMaximum ?? (-1);
+		if ((hw?.UsesBaolongda ?? false) && (coreMin < 0 || coreMax <= coreMin) && (hw?.SupportsGpuOverclock ?? false))
+		{
+			coreMin = -100;
+			coreMax = 200;
+			Logger.WriteLine("[gpu-oc] 宝龙达：厂商未给核心偏移范围 ⇒ 使用近似范围 -100~+200 MHz（写入仍以回读为准）");
+		}
+		(int, int, int, bool) tuple13 = DeviceRange(coreMin, coreMax, hw?.EffectiveGpuCoreClockOffset ?? 0, allowNegative: true);
 		tuple4 = AddSliderRow(Strings.CoreOffset, tuple13.Item1, tuple13.Item2, tuple13.Item3, (int v) =>
 		{
 			// 2026-10-09：GPU 核心偏移改为「只改数值 + 置脏」，不再拖动即下发；
