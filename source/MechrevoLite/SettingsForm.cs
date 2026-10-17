@@ -6209,6 +6209,22 @@ public class SettingsForm : RForm
 	/// </summary>
 	private static bool IgpuOnlyUiRowAvailable()
 	{
+		// ⭐⭐ 2026-10-17（用户要求 · 宝龙达没有核显模式）：
+		//   「宝龙达没有核显模式 · 设置里面核显模式显示也只给同方开放」
+		//   ⇒ 宝龙达机型上这一行**彻底不出现**，连「手动强制显示」这个后路都不给。
+		//   ⚠️ 为什么必须显式排除、不能只靠下面的显卡代际判据：
+		//     下面的判据只排除 Gen30 / NoDgpu，而 `dgpu_generation` 在**未探测出来**时是
+		//     Unknown ⇒ Unknown 不等于 Gen30 ⇒ 仍会判"可用"⇒ 在宝龙达上照样显示。
+		//     所以这里按**后端**（是不是宝龙达）先判，与显卡代际无关。
+		//   ⚠️ 判据优先级高于配置：即使配置文件里是 igpu_only_ui=show（手动强制显示），
+		//     宝龙达下也**不显示**——这正是用户要的"连后路都不给"。
+		//   ⚠️ 能力层依据：宝龙达 WMI 功能号 9 `GpuMode` 只有 Hybrid=0 / Discrete=1，
+		//     **没有 iGPU-only 这一档**。
+		//   ⚠️ 非宝龙达逐位不变：本方法对其余机型的返回值与改动前完全一致。
+		if (Program.hw?.UsesBaolongda ?? false)
+		{
+			return false;
+		}
 		DgpuGenerationKind generation = GpuGenerationProvider.Current().Generation;
 		return generation != DgpuGenerationKind.Gen30 && generation != DgpuGenerationKind.NoDgpu;
 	}
@@ -7063,10 +7079,23 @@ public class SettingsForm : RForm
 		{
 			return;
 		}
-		// 2026-10-09（igpuask-once）：首次引导的第 4 步就是「核显模式」那一问 —— 显示前先把这一问占用掉
-		// （内存位 + 落盘），否则启动期/托盘唤起那一对 BeginInvoke 里的升级引导会在本窗体的嵌套消息循环里
-		// 再把同一个问题弹一次。返回 false（用户已表过态）不影响完整引导本身照常弹出。
-		TryClaimIgpuOnlyGuide();
+		// ⭐⭐ 2026-10-17（用户要求 · 宝龙达没有核显模式）：
+		//   「首次提示的核显模式只给同方开放」⇒ 宝龙达下第 4 步那一问**不问**。
+		//   ⚠️ 这里**必须跳过 TryClaimIgpuOnlyGuide()**，不能只是"不显示"：
+		//     它会在显示前把 `igpu_only_asked=1` 落盘。若宝龙达下也写，用户以后
+		//     换到同方机器就**永远不再问**这一问 ⇒ 那样是隐性数据损坏。
+		//   ⚠️ `igpu_only_ui` 也不写：宝龙达没有这一档，写 show/hide 都会误导设置页判据
+		//     （见 IgpuOnlyUiRowAvailable 的宝龙达排除）。
+		//   ⚠️ 完整引导本身照常弹（第 1/2/3/5 步对宝龙达一样有用），只是第 4 步不建
+		//     —— 见 FirstRunGuideForm 里的 skipIgpuOnlyStep。
+		//   ⚠️ 非宝龙达逐位不变：多出的只是一个恒 false 的条件。
+		if (!(Program.hw?.UsesBaolongda ?? false))
+		{
+			// 2026-10-09（igpuask-once）：首次引导的第 4 步就是「核显模式」那一问 —— 显示前先把这一问占用掉
+			// （内存位 + 落盘），否则启动期/托盘唤起那一对 BeginInvoke 里的升级引导会在本窗体的嵌套消息循环里
+			// 再把同一个问题弹一次。返回 false（用户已表过态）不影响完整引导本身照常弹出。
+			TryClaimIgpuOnlyGuide();
+		}
 		using FirstRunGuideForm firstRunGuideForm = new FirstRunGuideForm();
 		DialogResult dialogResult = firstRunGuideForm.ShowDialog(this);
 		AppConfig.Set("onboarding_version", 1);
@@ -7093,11 +7122,19 @@ public class SettingsForm : RForm
 		if (AppConfig.Get("igpu_only_asked", 0) != 1)
 		{
 			MechrevoHw? hw = Program.hw;
+			// ⭐⭐ 2026-10-17（用户要求 · 宝龙达没有核显模式）：
+			//   「首次提示的核显模式只给同方开放」⇒ 宝龙达下这一问**完全不弹、也不占用**。
+			//   ⚠️ 必须挡在 TryClaimIgpuOnlyGuide() 之前：否则会写 `igpu_only_asked=1`，
+			//     用户以后换同方机器就永远不再问（隐性数据损坏）。
+			//   ⚠️ `hw == null`（后端还没就绪）时按**非宝龙达**处理（保守：维持原行为），
+			//     所以这里用 `hw?.UsesBaolongda ?? false` 而不是先判 hw 非空。
+			//   ⚠️ 非宝龙达逐位不变：多出的只是一个恒 false 的条件。
+			bool baolongdaMachine = hw?.UsesBaolongda ?? false;
 			// 2026-10-06（igpuscope）：「只在判据不可靠的机型上问」用的也是同一个「可靠能力位」判据 ——
 			// 40 系（哪怕它上报了 40 系的 iGPUModeOnlySupport）同样要问一次：40 系的决定权已经交回用户开关。
 			// 2026-10-09（igpuask-once）：TryClaimIgpuOnlyGuide() 必须在**创建窗体之前**调用 ——
 			// 它把 igpu_only_asked=1 先落盘（+ 进程内静态位），这是"绝不重复弹"的唯一保证点。
-			if ((hw == null || (hw.DgpuGeneration != DgpuGenerationKind.Gen30 && !hw.HasReliableIgpuOnlyCapability)) && TryClaimIgpuOnlyGuide())
+			if (!baolongdaMachine && (hw == null || (hw.DgpuGeneration != DgpuGenerationKind.Gen30 && !hw.HasReliableIgpuOnlyCapability)) && TryClaimIgpuOnlyGuide())
 			{
 				using FirstRunGuideForm firstRunGuideForm = new FirstRunGuideForm(igpuOnlyStepOnly: true);
 				firstRunGuideForm.ShowDialog(this);
@@ -17071,6 +17108,21 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			// 打开设置前先按当前选择同步「核显模式显示」三选行（首次引导/升级弹窗可能刚改过它）
 			SyncIgpuOnlyUiChoice();
+			// ⭐⭐ 2026-10-17（用户要求 · 宝龙达没有核显模式 · 用户原话
+			//   「设置里面核显模式显示也只给同方开放」）：
+			//   这里**再同步一次可见性**，堵住两条会让这一行"漏出来"的路：
+			//   ① `SettingsDialog` 构造时把传入面板硬设成 `Visible = true`（SettingsDialog.cs:276），
+			//      而 `SyncIgpuOnlyUiChoice()` 只改三颗按钮的 Enabled、**不改 Visible**；
+			//   ② `EnsureSettingsDialogBuilt()` 是幂等的：若外壳是在 `Program.hw` 就绪**之前**
+			//      被预热的，`IgpuOnlyUiRowAvailable()` 当时可能返回 true ⇒ 行被建进对话框，
+			//      之后判据变 false 也不会重建 ⇒ 行留在那儿。
+			//   ⇒ 每次打开前按**当前**判据落一次 Visible，与 RefreshDeviceCapabilities 里的
+			//     同一处同步（见其 `_igpuOnlyUiPanel.Visible = igpuRow;`）口径一致。
+			//   ⚠️ 非宝龙达逐位不变：这一行的可见性本来就该等于该判据，重复落一次同值无副作用。
+			if (_igpuOnlyUiPanel != null)
+			{
+				_igpuOnlyUiPanel.Visible = IgpuOnlyUiRowAvailable();
+			}
 			if (_settingsDialog.Visible)
 			{
 				_settingsDialog.Close();
