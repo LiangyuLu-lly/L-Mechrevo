@@ -21,7 +21,7 @@ set "SCRIPT=%~dp0bd-kbd-probe.ps1"
 set "ARGS=%*"
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "Start-Process -FilePath 'powershell' -Verb RunAs -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-File','%SCRIPT%') %ARGS%"
+  "Start-Process -FilePath 'powershell' -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -NoExit -File ""%SCRIPT%"" %ARGS%'"
 
 if errorlevel 1 (
     echo.
