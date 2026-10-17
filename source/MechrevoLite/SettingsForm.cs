@@ -585,10 +585,13 @@ public class SettingsForm : RForm
 	// ⭐⭐ 2026-10-19（机主：「键盘下拉里面的关和左边开关功能重复」）：⭐ 下拉里**去掉「关」** ✅
 	//   ⭐ 开/关由左边那颗开关负责（写亮度 0），下拉只选"开着的时候是什么效果" ✅
 	//   ⚠️ 顺序保持 Single(2) → Rainbow(1)，与 `MechrevoHw.TryMapBaolongdaKeyboardMode` 一致 ✅
-	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[2]
+	// ⭐⭐ 2026-10-19（机主实测：除「单色」之外的效果都不可用）：
+	//   ⭐ 40/30 系真机上「彩虹（模式 1）」写下去回读不成立（日志 `回读一致=False`）⇒ ⭐ 只保留**单色** ✅
+	//   ⚠️ 按能力位铁律：做不到的就不放进界面（⛔ 不给"能点但没用"的选项）
+	//   ⭐ 将来若有机器证明彩虹真能生效，再按机型放回来（⛔ 不要无条件放开）
+	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[1]
 	{
-		("Single", Strings.EffectSingle),
-		("Rainbow", Strings.EffectRainbow)
+		("Single", Strings.EffectSingle)
 	};
 
 	/// <summary>
