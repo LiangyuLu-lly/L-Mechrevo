@@ -584,6 +584,11 @@ public static class HardwareControl
 			{
 				return; // ⭐ 刚有人采过（⭐ 自定义模式页/悬浮窗/手动入口 ✅）⇒ ⭐ 让位 ✅
 			}
+			// ⭐⭐ 2026-10-19（机主：「4070 显卡温度读取」才是要修的）：⭐⭐ 之前泵里**只**调了
+			//   `SampleLocalPowerCore` ⇒ ⭐ 只刷功耗、**不刷 GPU 温度时间戳** ⚠️
+			//   ⇒ 温度仍会在 6 s（`FanInfoMaximumAge`）后被显示闸门画成「—」❌
+			//   ⇒ ⭐ 现在先补一次 NVML 温度写入（厂商有值则内部直接 return，⛔ 不覆盖厂商值）✅
+			RefreshGpuTempFromNvmlWhenNoVendor();
 			// ⭐ `includeAuxiliary:false`：⛔ 不刷供电/电池（那些仍由主界面既有的 2 s 刷新负责 ✅）
 			SampleLocalPowerCore(includeAuxiliary: false);
 		}
