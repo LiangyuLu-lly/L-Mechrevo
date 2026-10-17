@@ -4683,8 +4683,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// ⭐⭐ 2026-10-16（宝龙达适配）：宝龙达模具（⭐ 蛟龙16Pro 等）—— ⭐ 必须**排在老接口之前**判，
 				// 因为两者协议同族、老接口的 GUID 校验在宝龙达机上**也会通过**（⭐ 真机实测 GUID 完全一致 ⚠️）
 				// ⇒ ⭐ 若先判老接口，宝龙达后端**永远轮不到**，我们新接的风扇/温度/灯效就都用不上 ✅
-				// ⚠️ 不会误伤老机型：\`BaolongdaWmi.TryCreate\` 要求**真读一次 CPU 温度**才算活体 ✅，
-				//    老机型读不到就回落 `<see cref="MechrevoBackendKind.LegacyMifs" />` ⇒ ⭐ 行为不变 ✅。
+				// ⚠️ 不会误伤同方（⭐ **真正的保证是 `BaolongdaBackend.TryCreate` 里的【机型白名单】硬闸门** ✅）：
+				//    ⭐ 探到 `MICommonInterface` 后还会**先查板号白名单**（`MRID6` 精确 / `MRID6-` 前缀 ✅），
+				//    ⭐ 不在白名单 ⇒ ⭐ 立即弃掉 ⇒ ⭐ 回落 `<see cref="MechrevoBackendKind.LegacyMifs" />` ✅
+				// ⚠️⚠️ 2026-10-17 更正：旧说法「`BaolongdaWmi.TryCreate` 要求**真读一次 CPU 温度**才算活体」
+				//    ⭐ **已不再成立** ⚠️ —— 该判据过严，导致 **30 系宝龙达（`MRID6`·6800H+3070Ti）读不到功能号 22
+				//    就整机退回 legacy**（性能模式/FN 锁/灯光/触摸板/校色 全部失效 ❌）。
+				//    ⭐ 现在**探测与能力位解耦**：⭐ 白名单命中 ⇒ 必接管（功能号 22 只记日志 ✅）；
+				//    ⭐ 白名单未命中 ⇒ 多判据任一成功（⭐ 见 `BaolongdaWmi.ProbeLiveness` ✅）。
 				if (kind == MechrevoBackendKind.Baolongda && created is BaolongdaBackend baolongdaBackend)
 				{
 					_baolongda = baolongdaBackend;
