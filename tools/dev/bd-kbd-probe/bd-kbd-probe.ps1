@@ -34,7 +34,7 @@ $id = [Security.Principal.WindowsIdentity]::GetCurrent()
 $pr = New-Object Security.Principal.WindowsPrincipal($id)
 if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "❌ 需要管理员（WMI 方法调用会被拒）" -ForegroundColor Red
-    exit 5
+    return
 }
 
 # ⭐⭐ 2026-10-19（机主要求）：把全程输出**同时写一份日志到脚本同目录** ✅
@@ -149,7 +149,7 @@ if (-not $TestWrite) {
     }
     if ($LogPath) { try { Stop-Transcript | Out-Null } catch { } }
     Write-Host ("`n📝 日志已保存：{0}" -f $LogPath) -ForegroundColor DarkGray
-    exit 0
+    return
 }
 
 if ($TestWrite) {
