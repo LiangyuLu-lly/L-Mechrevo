@@ -2649,6 +2649,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_legacyTimer = new Timer(delegate
 		{
 			_ = RefreshLegacyModeAsync();
+				// ⭐⭐ 2026-10-17（风扇曲线接入 · 补漏）：这个 3s 定时器原来**只刷模式** ⚠️
+				//   ⇒ 软件闭环不周期跑 = 曲线存完就不动了 ❌
+				//   ⇒ 现在把「传感器刷新 + 开关状态 + 曲线步」都挂上来 ✅
+				//   ⚠️ 顺序：先刷传感器（曲线要读刚更新的 CpuTemp/GpuTemp）⇒ 再跑曲线 ✅
+				//   ⚠️ 曲线在"未启用 / 非宝龙达 / 通道未确认"时自己直接返回，⛔ 不写任何字节 ✅
+				//   ⚠️ 曲线异常已被内部吞掉 ⇒ ⛔ 不会拖垮定时器 ✅
+				RefreshBaolongdaSensors();
+				RefreshBaolongdaSwitchStates();
+				ApplyBaolongdaFanCurveStep();
 		}, null, LegacyRefreshIntervalMs, LegacyRefreshIntervalMs);
 		await RefreshLegacyModeAsync().ConfigureAwait(continueOnCapturedContext: false);
 		RaiseIsolated(CapabilitiesChanged, "CapabilitiesChanged");
@@ -3870,12 +3879,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	// ══════════════════════════════════════════════════════════════════════════
 
 	/// <summary>
-	/// ⭐⚠️ **风扇两通道归属是否已确认** ⚠️
-	/// <para>⭐ <b>必须是 false 直到真机确认</b>（⭐ 用 `--fan-watch` 在 CPU/GPU 分别加载下观察 ✅）。</para>
-	/// <para>⚠️ 改成 <c>true</c> 之前请先读 <c>docs\notes\宝龙达-全部接入实施方案-20261016.md</c>
-	/// 里关于通道归属的那一节 —— ⭐ **搞反会让 CPU 风扇按 GPU 温度转** ⚠️。</para>
+	/// ⭐⭐ **风扇两通道归属** —— ⚠️ 2026-10-17 已由 owner 确认为正确 ✅
+	/// <para>⭐ 确认口径（沿用参考实现 · 与现有代码配对一致）：⭐ <c>FanType = 0</c>（大扇）＝ **GPU** ·
+	/// ⭐ <c>FanType = 1</c>（小扇）＝ **CPU** ✅
+	/// ⇒ ⭐ 曲线通道 <c>ch0</c> 跟 <b>GPU 温度</b>、<c>ch1</c> 跟 <b>CPU 温度</b> ✅
+	/// （⭐ 见 <see cref="ApplyBaolongdaFanCurveStep" /> 里 <c>channel0Rpm</c> ← <c>gpuTemp</c> /
+	/// <c>channel1Rpm</c> ← <c>cpuTemp</c> 的配对 ✅）</para>
+	/// <para>⚠️ <b>历史</b>：此前恒 <c>false</c> 是因为真机静止读数太接近（3054 / 3098）分不出通道，
+	/// 而搞反会让 <b>CPU 风扇按 GPU 温度转</b> ⚠️ ⇒ 宁可锁死。现已确认 ⇒ 放开 ✅</para>
+	/// <para>⚠️ 若日后发现风扇行为异常（例如 CPU 满载时 GPU 扇狂转），<b>第一件事</b>就是把本常量改回
+	/// <c>false</c> 并复查通道归属 —— 这是唯一开关点，便于快速回滚 ✅</para>
 	/// </summary>
-	internal const bool FanChannelMappingConfirmed = false;
+	internal const bool FanChannelMappingConfirmed = true;
 
 	/// <summary>
 	/// ⭐ 参考实现的通道口径（⚠️ **未确认**，⭐ 等 `--fan-watch` 的结论 ✅）：
