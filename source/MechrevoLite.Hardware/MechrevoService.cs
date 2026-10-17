@@ -2843,6 +2843,20 @@ public class MechrevoService
 				Logger.WriteLine($"SwitchQuick({key},{on})：⚠️ 本地 Radio 不可用（未探测到或无访问权限）⇒ 不下发");
 				return false;
 			}
+			// ⭐⭐ 2026-10-17（「高性能电源」解耦 GCU）：⭐ 无 GCU 时不再发注定失败的 MQTT，
+			//   改成"跟着性能档位设 Windows 电源模式"（powrprof overlay；狂暴=最佳性能/平衡=平衡/安静=最佳能效）✅
+			if (_hw.UsesBaolongda && string.Equals(key, "highperf", StringComparison.Ordinal))
+			{
+				MechrevoLite.Mode.PerfModeService perf = MechrevoLite.Mode.PerfModeService.Instance;
+				if (perf == null)
+				{
+					Logger.WriteLine("SwitchQuick(highperf)：⚠️ PerfModeService 不可用 ⇒ 不下发");
+					return false;
+				}
+				perf.WindowsPowerOverlayEnabled = on;
+				Logger.WriteLine($"SwitchQuick(highperf,{on}) ⭐ 走**Windows 电源模式联动**（不依赖 GCU）");
+				return true;
+			}
 			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达没有 GCU ⇒ 写 Windows 的摄像头隐私授权 ✅
 			//   ⚠️ 语义：`on=true`（摄像头可用）= ConsentStore Allow；`on=false` = Deny
 			//   ⚠️ 与 GCU 的 WEBCAM_ON/OFF 不同（那是厂商 EC 级）⇒ UI 文案要写成「摄像头隐私」

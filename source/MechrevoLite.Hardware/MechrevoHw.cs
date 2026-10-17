@@ -2415,7 +2415,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"deepsleep" => DeepSleepSeen, 
 			"copilot" => CopilotSeen, 
 			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen, 
-			"highperf" => HighPerformanceSeen, 
+			// ⭐ 2026-10-17（「高性能电源」解耦 GCU）：无 GCU 时由 LM 用 Windows API 实现 ⇒ 开关可用 ✅
+			"highperf" => HighPerformanceSeen || UsesBaolongda, 
 			"fanboost" => SupportsFanBoost, 
 			"lightbar" => SupportsLightbar, 
 			"logolight" => SupportsLogoLight, 
@@ -6649,7 +6650,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text16 = o["HighPerformancePowerModeSwitch"]?.ToString();
 		if (text16 != null)
 		{
-			QuickSwitches["highperf"] = !text16.Contains("OFF", StringComparison.OrdinalIgnoreCase);
+			// ⭐ 2026-10-17（宝龙达 · 无 GCU）：状态来自 LM 自己的开关（AppConfig bd_power_overlay）✅
+			QuickSwitches["highperf"] = UsesBaolongda
+				? (MechrevoLite.Mode.PerfModeService.Instance?.WindowsPowerOverlayEnabled ?? true)
+				: !text16.Contains("OFF", StringComparison.OrdinalIgnoreCase);
 			HighPerformanceSeen = true;
 		}
 		string text17 = o["AcRecoverySwitch_Status"]?.ToString();

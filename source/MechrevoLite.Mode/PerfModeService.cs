@@ -451,6 +451,32 @@ internal sealed class PerfModeService
 	/// <para>⭐ **所有机型都执行**（含 GCU）—— 用户要求"走 Windows 替换厂商客户端"，不再看能力位。</para>
 	/// <para>⚠️ 开关：AppConfig <c>bd_power_overlay</c>（默认 1 = 开；设 0 即关闭本行为）。</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐ 2026-10-17（「高性能电源」开关）：⭐ 是否"跟着性能档位改 Windows 电源模式"（默认 **开**）。
+	/// <para>⚠️ 由「更多开关」里的 <c>highperf</c> 控制；无 GCU 时走 Windows API（见 <see cref="ApplyWindowsPowerOverlay" />）✅</para>
+	/// </summary>
+	public bool WindowsPowerOverlayEnabled
+	{
+		get
+		{
+			return AppConfig.Get("bd_power_overlay", 1) != 0;
+		}
+		set
+		{
+			AppConfig.Set("bd_power_overlay", value ? 1 : 0);
+			Logger.WriteLine($"[power] 高性能电源联动 ⇒ {(value ? "开" : "关")}");
+			if (value)
+			{
+				ApplyWindowsPowerOverlay(Active?.Id ?? string.Empty);
+			}
+			else
+			{
+				PowerNative.SetPowerMode(0);
+				Logger.WriteLine("[power] 已关闭联动 ⇒ Windows 电源模式回到「平衡」");
+			}
+		}
+	}
+
 	private void ApplyWindowsPowerOverlay(string modeId)
 	{
 		if (AppConfig.Get("bd_power_overlay", 1) == 0)
