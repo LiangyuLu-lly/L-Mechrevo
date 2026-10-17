@@ -2428,7 +2428,11 @@ public class CustomModeForm : RForm
 		// edited, so the curve shown belongs to that config. Running the block below
 		// would call EnsureFirmwareSlotAsync() and convert the built-in preset mode
 		// into a firmware-slot route -- a side effect on LM's mode model we do not want.
-		if (perf != null && !_firmwareMode)
+		// ⭐⭐ 2026-10-19（宝龙达 · 自定义档"不能用"）：⭐ 没有 GCU ⇒ `EnsureFirmwareSlotAsync` 必然失败，
+		//   界面会停在「读不到该模式的厂商出厂参数，无法转到自定义档」❌
+		//   ⭐ 宝龙达下跳过这一步：曲线窗口直接开（曲线走本机软件闭环 20/21，不依赖固件槽）✅
+		//   ⚠️ 非宝龙达逐位不变 ✅
+		if (perf != null && !_firmwareMode && !(Program.hw?.UsesBaolongda ?? false))
 		{
 			PerfModeDefinition mode = FindMode(_modeId);
 			if ((object)mode != null && mode.Route == PerfModeRoute.BuiltIn)
