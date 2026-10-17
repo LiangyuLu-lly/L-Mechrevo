@@ -40,6 +40,40 @@ try {
     $LogPath = $null
 }
 
+
+# ⭐⭐ 2026-10-19（最后一招）：PS 5.1 对 WMI 返回值的封送（PSObject）反复出问题
+#   ⇒ ⭐ 直接用 Add-Type 内联一段 C#，**与主程序逐字同构**（同一 API、同一帧格式）✅
+#   ⭐ Win10 自带 .NET Framework 4.x + System.Management ⇒ 不需要装任何东西 ✅
+if (-not ("BdProbe" -as [type])) {
+    Add-Type -ReferencedAssemblies System.Management -TypeDefinition @"
+using System;
+using System.Management;
+public static class BdProbe
+{
+    public static byte[] Invoke(string instanceName, byte mode, byte func, byte[] payload, int len)
+    {
+        byte[] buf = new byte[len];
+        buf[1] = mode;
+        buf[3] = func;
+        if (payload != null && payload.Length > 0)
+        {
+            Array.Copy(payload, 0, buf, 4, Math.Min(payload.Length, len - 4));
+        }
+        string rel = "MICommonInterface.InstanceName=\"" + instanceName.Replace("\\", "\\\\") + "\"";
+        using (ManagementObject mo = new ManagementObject("root\\\\WMI", rel, null))
+        {
+            ManagementBaseObject inP = mo.GetMethodParameters("MiInterface");
+            inP["InData"] = buf;
+            using (ManagementBaseObject outP = mo.InvokeMethod("MiInterface", inP, null))
+            {
+                return outP["OutData"] as byte[];
+            }
+        }
+    }
+}
+"@
+}
+
 $Ns = "root\WMI"
 $Class = "MICommonInterface"
 $Method = "MiInterface"
@@ -58,24 +92,8 @@ function Get-RelPath($instanceName) {
 }
 
 function Invoke-Frame($instanceName, [byte]$mode, [byte]$func, [byte[]]$payload) {
-    $buf = New-Object 'byte[]' $BufferLength
-    $buf[1] = $mode
-    $buf[3] = $func
-    if ($payload -and $payload.Length -gt 0) {
-        [Array]::Copy($payload, 0, $buf, 4, [Math]::Min($payload.Length, $BufferLength - 4))
-    }
-    $mo = New-Object System.Management.ManagementObject($Ns, (Get-RelPath $instanceName), $null)
-    try {
-        $in = $mo.GetMethodParameters($Method)
-        $in["InData"] = $buf
-        $out = $mo.InvokeMethod($Method, $in, $null)
-        if (-not $out) { return $null }
-        # ⚠️ 不要写成 [byte[]]$out["OutData"]：PS 5.1 里它是 PSObject 包装，强转会抛
-        #    "无法将类型为 System.Management.Automation.PSObject 的对象强制转换为类型 System.Array"
-        return ,$out["OutData"]
-    } finally {
-        $mo.Dispose()
-    }
+    # ⭐ 全部交给内联 C#（BdProbe.Invoke），PowerShell 只负责传参/打印 ⇒ 不再碰 PSObject 封送 ✅
+    return [BdProbe]::Invoke($instanceName, $mode, $func, $payload, $BufferLength)
 }
 
 function Read-Func($instanceName, [byte]$func) {
