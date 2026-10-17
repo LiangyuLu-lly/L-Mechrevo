@@ -3532,7 +3532,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⛔ 不是"读功能号 21 当 max"（那个读数是**手动转速设定值** ⚠️）。</para>
 	/// <para>⚠️ 非宝龙达 ⇒ 返回 0（⭐ 分母由各机型自己的 duty 口径负责 ✅）。</para>
 	/// </summary>
-	public int FanRpmMaxForPercent => UsesBaolongda ? BaolongdaFanRpmAtFullPercent : 0;
+	// ⭐⭐ 2026-10-19（30 系官方口径）：⭐ 原厂 30 系控制台把"风扇转速百分比"算作
+	//   `Item1 / 35f`（见 `official-30-v0.2.35` 的 `Init_SettingsAsync`）⇒ ⭐ 满转 = **3500 RPM** 而不是 6000 ✅
+	//   ⚠️ 40 系仍是 6000（原厂 40 系 `rpm / 60f`，真机 1965 RPM ⇒ 33% 已验证）✅
+	//   ⚠️ 非宝龙达恒 0（走原来的 duty 读法，逐位不变）✅
+	public int FanRpmMaxForPercent => UsesBaolongda
+		? ((DgpuGeneration == DgpuGenerationKind.Gen30) ? 3500 : BaolongdaFanRpmAtFullPercent)
+		: 0;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **意向方法** —— "⭐ 应用一组 CPU 功耗/温度墙" ✅
