@@ -53,7 +53,29 @@
 
 ---
 
-## 三、本来就不在 git 里的材料（✅ 天然不进开源版）
+## 三、反编译原文的专用位置（✅ 2026-10-17 已统一）
+
+> 用户口径：「**反编译原文要保留的**，你以后专门放一个位置就行」。
+
+🆕 所有反编译产物统一放：
+
+```
+D:\openLM\_upstream\decompiled-originals\
+  official-40-v0.3.15\        蛟龙游戏控制中心.decompiled.cs     （原厂 40 系 · 144,711 B）
+  official-30-v0.2.35\        蛟龙游戏控制中心.decompiled.cs     （原厂 30 系 · 119,791 B）
+  thirdparty-JiaoLong7.3\     第三方蛟龙游戏控制中心.decompiled.cs（第三方 · 272,836 B）
+  gcu-service\                GCUService.decompiled.cs           （同方 GCU · 2,282,338 B）
+  MANIFEST.md                  ⭐ 来源/大小/sha256/复现命令/使用规则
+```
+
+- ✅ 这个目录在 `_upstream\` 下 ⇒ `.gitignore:67` 已忽略 ⇒ **不进 git、不进安装包、不进开源版**
+- ✅ 原文**保留**（不删、不改写）；查证时直接在这里 grep 即可
+- ⛔ 仍然**不许**把这里的片段复制进 `source\`（含注释），也不许复制进 `docs\` 之外的分发位置
+- ⚠️ `docs\notes\` 里**已经**贴了原文的那 6 份文档保持"⛔ 不可开源"标记不变；
+  发布开源版时按本清单剔除即可 —— **原文不受影响，它本来就不在 git 里**
+- ⚠️ 这是**本机存档**（`_upstream` 不进 git ⇒ 换机器需重新解包反编译，命令见 `MANIFEST.md`）
+
+## 四、本来就不在 git 里的材料（✅ 天然不进开源版）
 
 以下目录被 `.gitignore` 忽略 ⇒ **不会被开源发布带走**；但**本地存档时同样按上面的口径对待**，
 ⛔ 不要为了"方便"把它们塞进 `docs\` 或 `source\`：
@@ -74,7 +96,7 @@ installer-src\files\GCU\payload\   GCU 厂商载荷
 
 ---
 
-## 四、发布前怎么查（自动检查）
+## 五、发布前怎么查（自动检查）
 
 ```powershell
 py -3 tools\check_open_source_scope.py            # 只报，不退出码
@@ -91,7 +113,7 @@ py -3 tools\check_open_source_scope.py --strict   # 有违规 ⇒ 退出码 1（
 
 ---
 
-## 五、结论（给下一个接手的人）
+## 六、结论（给下一个接手的人）
 
 - `source\` **可以开源**：只有协议事实，没有厂商代码（2026-10-17 已清理并复核 0 命中）
 - `docs\notes\` **不能整目录开源**：按上面 L1/L2 剔除后再发布

@@ -77,10 +77,29 @@ def main():
         for p in sorted(stale):
             print(f"     - {p}")
 
+    # ①b 受保护目录必须仍在 .gitignore 里（防止有人把存档材料顺手 add 进 git）
+    guarded = scope.get("guarded_dirs", [])
+    print("\n## ①b 受保护目录（⛔ 必须保持被 .gitignore 忽略）")
+    guard_bad = []
+    for g in guarded:
+        path = norm(g["path"])
+        ignored = subprocess.run(["git", "-C", ROOT, "check-ignore", "-q", "--", path]).returncode == 0
+        leaked = [t for t in tracked if t == path or t.startswith(path)]
+        if ignored and not leaked:
+            print(f"  ✅ {path}  —— {g['reason']}")
+        else:
+            guard_bad.append(path)
+            print(f"  ❌ {path}  被跟踪文件 {len(leaked)} 个 · gitignore={'是' if ignored else '否'}  —— {g['reason']}")
+    if not guarded:
+        print("  （清单未配置 guarded_dirs）")
+
     # ② 扫描特征词
     print("\n## ② 全仓扫描：反编译代码特征词")
     hits = {}
+    self_rel = norm(os.path.relpath(SCOPE, ROOT)).replace("\\", "/")
     for rel in tracked:
+        if rel == self_rel:
+            continue  # 清单自己当然含有这些特征词（它就是定义）
         if not is_text(rel):
             continue
         full = os.path.join(ROOT, rel)
@@ -103,12 +122,13 @@ def main():
     unmarked = [r for r in hits if r not in blocked and r not in allowed]
     print("\n## ③ 结论")
     print(f"  ⛔ 需剔除（清单内且仍被跟踪）：{len(still)}")
+    print(f"  ❌ 受保护目录泄漏（被 add 进 git）：{len(guard_bad)}")
     print(f"  ⚠️ 新增未标记：{len(unmarked)}")
     if unmarked:
         print("  ⇒ 这些文件含反编译特征词但不在清单里：请要么删除/改写，要么登记进")
         print("     tools\\open_source_scope.json 的 blocked / allowed_open（并同步 NOT-OPEN-SOURCE.md）。")
 
-    bad = bool(still) or bool(unmarked)
+    bad = bool(still) or bool(unmarked) or bool(guard_bad)
     if strict and bad:
         return 1
     return 0

@@ -45,6 +45,16 @@
       "reason": "我们自己的抓包数据 · 可开源（注意脱敏）"
     }
   ],
+  "guarded_dirs": [
+    { "path": "_upstream/", "reason": "厂商安装包 / 第三方项目包 / EC·BIOS 固件 / 反编译原文（decompiled-originals）" },
+    { "path": "archive/", "reason": "历史 checkpoint / 解包 / 反编译" },
+    { "path": "diagnostics/", "reason": "诊断包（含机主机器日志，涉隐私）" },
+    { "path": "交付/", "reason": "交付给作者的源码快照" },
+    { "path": "backup/", "reason": "installer 文件备份" },
+    { "path": "rebuild/", "reason": "本地构建输出" },
+    { "path": "installer-src/Output/", "reason": "安装包产物" },
+    { "path": "installer-src/files/GCU/payload/", "reason": "GCU 厂商载荷" }
+  ],
   "markers": [
     "WMIMethodServices.",
     "SetValue(WMIMethodName",
