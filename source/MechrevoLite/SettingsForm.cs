@@ -179,7 +179,7 @@ public class SettingsForm : RForm
 	/// 理由：磁贴行必须与「更多开关」**用同一份文案**（否则同一个开关在两处叫不同名字，
 	/// 用户答复②要求的"同源"就不成立了）；两处例外（磁贴短名）见 <see cref="QuickTileText" />。
 	/// </summary>
-	private static readonly (string, string)[] QuickSwitchLabels = new (string, string)[30]
+	private static readonly (string, string)[] QuickSwitchLabels = new (string, string)[31]
 	{
 		("touchpad", Strings.QuickTouchpad),
 		("wifi", "WiFi"),
