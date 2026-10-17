@@ -89,6 +89,18 @@ internal sealed class BaolongdaBackend : IDisposable
 			{
 				guidNote = "⚠️ 与老同方那份**不同** ⇒ ⭐ 这正是 LegacyMifsWmi（硬校验 GUID）**探不到**的原因";
 			}
+			// ⭐⭐ 2026-10-19（30 系事故）：⭐ 按板号决定"厂商温度通道"是否可用 ——
+			//   裸 `MRID6` = 30 系（6800H+3070Ti）⇒ 功能号 22 恒 0 ⇒ 关掉该通道，让温度回落 LHM/NVML ✅
+			//   ⚠️ `MRID6-23` = 40 系 ⇒ 保持可用 ✅
+			try
+			{
+				IsBaolongdaModelWhitelisted(out string boardForTemp);
+				BaolongdaWmi.VendorTemperatureUnsupported = string.Equals((boardForTemp ?? string.Empty).Trim(), "MRID6", StringComparison.OrdinalIgnoreCase);
+				Logger.WriteLine($"宝龙达后端：板号={(boardForTemp ?? "(空)")} · 厂商温度通道={(BaolongdaWmi.VendorTemperatureUnsupported ? "关（30 系 func22 恒 0）" : "开")}");
+			}
+			catch
+			{
+			}
 			Logger.WriteLine($"宝龙达后端：⭐ 探测到接口 —— 实例=\"{wmi.InstancePath}\" · 类GUID={(wmi.ClassGuid.Length == 0 ? "(无)" : wmi.ClassGuid)} "
 				+ $"· 风扇={wmi.FanCount} 个 · 模式={wmi.ModeCount} 档 ⇒ {guidNote}");
 

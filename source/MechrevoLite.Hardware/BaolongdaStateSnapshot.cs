@@ -108,7 +108,10 @@ internal sealed class BaolongdaStateSnapshot
 		snap.KeyboardBrightness = ReadByteSafe(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness);
 		snap.SystemAcType = ReadByteSafe(wmi, BaolongdaWmi.Function.SystemAcType);
 		snap.FanManualSwitch = ReadByteSafe(wmi, BaolongdaWmi.Function.MaxFanSpeedSwitch);
-		snap.CpuTemperature = ReadByteSafe(wmi, BaolongdaWmi.Function.CpuThermometer);
+		// ⭐ 30 系：功能号 22 恒 0 ⇒ 快照里留 **null**（⛔ 不要把 0 当温度）
+		snap.CpuTemperature = BaolongdaWmi.VendorTemperatureUnsupported
+			? null
+			: ReadByteSafe(wmi, BaolongdaWmi.Function.CpuThermometer);
 		snap.CpuCustomEnabled = ReadByteSafe(wmi, BaolongdaWmi.Function.CpuPower);
 		// ⭐ 显卡模式：⭐ 走协议层的专用读（⭐ 它带"⭐ 未知取值当失败"⭐ 的判据 ✅）
 		try

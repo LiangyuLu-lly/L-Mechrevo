@@ -922,9 +922,25 @@ internal sealed class BaolongdaWmi : IDisposable
 	/// 读 CPU 温度（功能号 22，⭐ <c>OutData[4]</c> 摄氏度）。
 	/// <para>⭐ **上界校验**（⭐ 取自 Bellator 的做法）：⭐ <c>0</c> 与 <c>255</c> 都视为**无效**（⭐ 免得把无效读数当 0℃）✅</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-19：⭐ **厂商温度通道是否不可用**（30 系 = true）。
+	/// <para>⭐ 由 <c>BaolongdaBackend.TryCreate</c> 按**板号**置位（裸 `MRID6` = 30 系 ⇒ true）✅</para>
+	/// <para>⚠️ 只影响"要不要读功能号 22/温度"，⛔ 不影响风扇/键盘灯/功耗墙等其它功能 ✅</para>
+	/// </summary>
+	internal static bool VendorTemperatureUnsupported { get; set; }
+
 	internal bool TryReadCpuTemperature(out int celsius)
 	{
 		celsius = -1;
+		// ⭐⭐ 2026-10-19（30 系真机事故 · 诊断包 0.291.9.9-203933）：
+		//   ⚠️ 30 系（裸板号 `MRID6`）被误判成宝龙达后端，而它的**功能号 22 恒返回 0**
+		//   ⇒ 温度「读不到」（风扇功能号 13 有值，所以看着像"只有温度坏了"）。
+		//   ⭐ 处理：30 系**不读**功能号 22，直接返回 false ⇒ 调用方回落到 LHM/NVML ✅
+		//   ⚠️ 40 系（`MRID6-23`）不受影响 ✅
+		if (VendorTemperatureUnsupported)
+		{
+			return false;
+		}
 		try
 		{
 			byte[] outData = Invoke(MethodGet, Function.CpuThermometer);
