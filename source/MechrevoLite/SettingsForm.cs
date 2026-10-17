@@ -1914,7 +1914,12 @@ public class SettingsForm : RForm
 							MechrevoHw hw = Program.hw;
 							if (hw != null && hw.IsConnected)
 							{
-								await ApplyQuickSwitchAsync(cb, Program.service.SwitchFanBoost);
+								// ⭐⭐ 2026-10-19（机主：「风扇强冷不可点击」）：⭐ 这里原来**直接**调
+								//   `SwitchFanBoost`（GCU/MQTT 专用）⇒ 宝龙达上必然失败，表现为"点了没反应" ❌
+								//   ⭐ 改走统一入口 `SwitchQuick("fanboost", on)`：宝龙达分支会走本机通道
+								//      （暂停曲线闭环 + 功能号 21 满转 + 13 回读）✅
+								//   ⚠️ GCU 机型：`SwitchQuick` 内部对 fanboost 的判据与原来等价（同样发 MQTT）✅
+								await ApplyQuickSwitchAsync(cb, (bool on) => Program.service.SwitchQuick("fanboost", on));
 							}
 						}
 					}
