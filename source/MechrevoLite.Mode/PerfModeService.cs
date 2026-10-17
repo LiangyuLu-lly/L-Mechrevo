@@ -184,6 +184,13 @@ internal sealed class PerfModeService
 		try
 		{
 			perfApplyOutcome = await PerfModeRunner.RunAsync(modeId, steps, _backend, ct).ConfigureAwait(continueOnCapturedContext: false);
+			// ⭐⭐ 2026-10-17（宝龙达 · 自定义档本地化）：⭐ 无固件槽的后端**不会**有 SwitchFirmwareSlot 步骤，
+			//   但 PL1/PL2/温度墙会走 WMI 23 真下发 ⇒ 标记 LocalApply，让 ModeSwitched 按"字段全成功"判定 ✅
+			//   ⚠️ 非宝龙达（GCU/老接口）不置位 ⇒ 行为逐位不变 ✅
+			if (_hw != null && _hw.UsesBaolongda)
+			{
+				perfApplyOutcome = perfApplyOutcome with { LocalApply = true };
+			}
 		}
 		finally
 		{
