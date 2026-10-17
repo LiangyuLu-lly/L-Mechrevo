@@ -16132,12 +16132,24 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			//      LightForm 那扇窗的列表**都用这张收敛后的表 ✅ —— ⭐ 三处口径必然一致 ✅。
 			//   ⭐ 非宝龙达 ⇒ **原样返回** ⇒ ⭐ 逐位不变 ✅。
 			effects = EffectsForCurrentBackend(effects);
+			// ⭐⭐ 2026-10-17（真机反馈「氛围灯有颜色设置但无效」）：⭐ 宝龙达的 LOGO 灯**只有【开／关】** ⚠️
+			//   ⭐ 依据：协议里它只有一个字节功能号 15（AmbientLight，0/1）—— ⛔ 没有颜色、⛔ 没有效果、
+			//      ⛔ 没有亮度/帧率/角度/速度（BaolongdaWmi.TrySetLogoLight(on) / TryReadLogoLight(out on) 可证 ✅）。
+			//   ⚠️ 而 EffectsForCurrentBackend 对**所有**灯光行都返回同一张 4 项表
+			//      ⇒ ⭐ LOGO 行会露出这 4 项 ⇒ ⭐ 点了不会有效果（违反能力位铁律）❌
+			//   ⇒ ⭐ 宝龙达下 **LOGO 行不显示效果下拉**（只保留开/关开关）✅；非宝龙达 ⭐ 逐位不变 ✅。
+			bool logoRowNoEffect = rowName == "rowLogo" && (Program.hw?.UsesBaolongda ?? false);
 			TableLayoutPanel tableLayoutPanel3 = MakeRow(rowName);
 			FillRow(tableLayoutPanel3, label, out var sw2, out var effectCombo2, () =>
 			{
 				OpenLightForm(topic, title, effects);
 			});
 			storeControls(sw2, effectCombo2);
+			if (logoRowNoEffect)
+			{
+				// ⚠️ 只隐藏下拉，⛔ 不删控件、⛔ 不改开关逻辑、⛔ 不动任何下发
+				effectCombo2.Visible = false;
+			}
 			(string, string)[] array2 = effects;
 			for (int num3 = 0; num3 < array2.Length; num3++)
 			{
