@@ -2859,6 +2859,20 @@ public class MechrevoService
 				Logger.WriteLine($"SwitchQuick(highperf,{on}) ⭐ 走**Windows 电源模式联动**（不依赖 GCU）");
 				return true;
 			}
+			// ⭐⭐ 2026-10-19（APU 防缩缸）：⭐ 纯 Windows 电源策略（处理器性能提升模式 → 5）
+			//   ⚠️ 所有机型都走这里（与 GCU 无关）✅
+			if (string.Equals(key, "apuboost", StringComparison.Ordinal))
+			{
+				MechrevoLite.Mode.PerfModeService perfBoost = MechrevoLite.Mode.PerfModeService.Instance;
+				if (perfBoost == null)
+				{
+					Logger.WriteLine("SwitchQuick(apuboost)：⚠️ PerfModeService 不可用 ⇒ 不下发");
+					return false;
+				}
+				perfBoost.ApuAntiDegradeEnabled = on;
+				Logger.WriteLine($"SwitchQuick(apuboost,{on}) ⭐ 走 Windows 电源策略（boost mode=5）");
+				return true;
+			}
 			// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达）：⭐ 没有 GCU ⇒ 本机通道：暂停曲线闭环 + 两路满转 + 回读校验
 			if (_hw.UsesBaolongda && string.Equals(key, "fanboost", StringComparison.Ordinal))
 			{

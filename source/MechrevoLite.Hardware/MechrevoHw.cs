@@ -2422,7 +2422,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//      ⇒ 界面显示"下发被拒、已回滚"（机主日志 `[QS-apply] 键=highperf 下发结果=False`）✅
 			"highperf" => true, 
 			// ⭐ 2026-10-19（风扇强冷 · 无 GCU）：宝龙达用本机通道（功能号 21 满转 + 13 回读）✅
-		"fanboost" => SupportsFanBoost || UsesBaolongda, 
+		"fanboost" => SupportsFanBoost || UsesBaolongda,
+		// ⭐ 2026-10-19（APU 防缩缸）：⭐ 纯 Windows 电源策略 ⇒ 所有机型可用 ✅
+		"apuboost" => true, 
 			"lightbar" => SupportsLightbar, 
 			"logolight" => SupportsLogoLight, 
 			"touchpadtoggle" => TouchpadToggleSeen, 
@@ -4680,6 +4682,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				{
 					QuickSwitches["highperf"] = hiOn;
 					Logger.WriteLine($"宝龙达状态回读：⭐ highperf ⇒ {(hiOn ? "开" : "关")}（⭐ 来源：LM 配置 bd_power_overlay）");
+				}
+			}
+			// ⭐ 2026-10-19（APU 防缩缸）：⭐ 状态直接读 Windows 策略（boost mode == 5）✅
+			{
+				bool apuOn = MechrevoLite.Mode.PerfModeService.Instance?.ApuAntiDegradeEnabled ?? false;
+				if (!QuickSwitches.TryGetValue("apuboost", out bool apuCur) || apuCur != apuOn)
+				{
+					QuickSwitches["apuboost"] = apuOn;
+					Logger.WriteLine($"宝龙达状态回读：⭐ apuboost ⇒ {(apuOn ? "开" : "关")}（⭐ 来源：Windows 电源策略）");
 				}
 			}
 			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 状态来自注册表 ConsentStore（桌面应用那一项优先）

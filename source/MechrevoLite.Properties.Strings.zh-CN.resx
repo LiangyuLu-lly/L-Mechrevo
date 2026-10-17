@@ -4305,6 +4305,9 @@
     
   
   </data>
+<data name="ApuAntiDegrade" xml:space="preserve">
+    <value>APU 防缩缸</value>
+  </data>
 <data name="GpuPowerLimit" xml:space="preserve">
     <value>显卡功耗上限 (W)</value>
   </data>

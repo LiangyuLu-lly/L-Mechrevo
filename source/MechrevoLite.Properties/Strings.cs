@@ -1468,6 +1468,9 @@ internal class Strings
 	/// <summary>⭐ 2026-10-19：⭐ 显卡功耗上限（本机 NVML 字段，与厂商 TGP 区分）。</summary>
 	internal static string GpuPowerLimit => ResourceManager.GetString("GpuPowerLimit", resourceCulture);
 
+	/// <summary>⭐ 2026-10-19：⭐ 「APU 防缩缸」开关文案（把处理器性能提升模式设成"高效、积极且有保障"）。</summary>
+	internal static string ApuAntiDegrade => ResourceManager.GetString("ApuAntiDegrade", resourceCulture);
+
 	internal static string MemoryOffset => ResourceManager.GetString("MemoryOffset", resourceCulture);
 
 	internal static string ModeTuneFanBoost => ResourceManager.GetString("ModeTuneFanBoost", resourceCulture);

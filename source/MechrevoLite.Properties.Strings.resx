@@ -4279,6 +4279,9 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="ApuAntiDegrade" xml:space="preserve">
+    <value>APU anti-degradation</value>
+  </data>
 <data name="GpuPowerLimit" xml:space="preserve">
     <value>GPU power limit (W)</value>
   </data>

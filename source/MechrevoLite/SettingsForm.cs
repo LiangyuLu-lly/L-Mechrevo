@@ -203,6 +203,8 @@ public class SettingsForm : RForm
 		("copilot", Strings.QuickCopilot),
 		("acrecovery", Strings.QuickAcRecovery),
 		("highperf", Strings.QuickHighPerf),
+		// ⭐ 2026-10-19（机主要求）：APU 防缩缸（处理器性能提升模式 → 高效、积极且有保障）
+		("apuboost", Strings.ApuAntiDegrade),
 		("fanboost", Strings.FanBoostStrong),
 		("deepsleep", Strings.QuickDeepSleep),
 		("touchpadtoggle", Strings.QuickTouchpadToggle),
@@ -4619,6 +4621,11 @@ public class SettingsForm : RForm
 	/// </summary>
 	private bool StaticQuick(string key)
 	{
+		// ⭐ 2026-10-19（APU 防缩缸）：纯 Windows 电源策略，任何机型都可用 ⇒ 恒显示 ✅
+		if (string.Equals(key, "apuboost", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
 		MechrevoDeviceCapabilities caps = (Program.hw?.Capabilities) ?? _deviceCapabilities;
 		switch (key)
 		{

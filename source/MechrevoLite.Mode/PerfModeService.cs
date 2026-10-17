@@ -455,6 +455,38 @@ internal sealed class PerfModeService
 	/// ⭐ 2026-10-17（「高性能电源」开关）：⭐ 是否"跟着性能档位改 Windows 电源模式"（默认 **开**）。
 	/// <para>⚠️ 由「更多开关」里的 <c>highperf</c> 控制；无 GCU 时走 Windows API（见 <see cref="ApplyWindowsPowerOverlay" />）✅</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主要求）：「APU 防缩缸」—— ⭐ 把 Windows「处理器性能提升模式」
+	/// （GUID `be337238-0d82-4146-a960-4f3749d470c7`）设成 **5 = 高效、积极且有保障**
+	/// （AC + DC 同时改，`PowerNative.SetCPUBoost` 内部就是两路都写）✅
+	/// <para>⭐ 打开时把**原值**记到 `apuboost_prev`，关闭时原样还原（⛔ 不写死 0）✅</para>
+	/// <para>⚠️ 纯 Windows 电源策略，与厂商/GCU 无关 ✅</para>
+	/// </summary>
+	public bool ApuAntiDegradeEnabled
+	{
+		get
+		{
+			return PowerNative.GetCPUBoost() == 5;
+		}
+		set
+		{
+			if (value)
+			{
+				int prev = PowerNative.GetCPUBoost();
+				if (prev != 5)
+				{
+					AppConfig.Set("apuboost_prev", prev);
+					PowerNative.SetCPUBoost(5);
+					Logger.WriteLine($"[power] APU 防缩缸：开 ⇒ 处理器性能提升模式 5（高效、积极且有保障）· 原值={prev} 已记");
+				}
+				return;
+			}
+			int restore = AppConfig.Get("apuboost_prev", 1);
+			PowerNative.SetCPUBoost(restore);
+			Logger.WriteLine($"[power] APU 防缩缸：关 ⇒ 还原处理器性能提升模式 = {restore}");
+		}
+	}
+
 	public bool WindowsPowerOverlayEnabled
 	{
 		get
