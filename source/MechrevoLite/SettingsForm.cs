@@ -1875,7 +1875,9 @@ public class SettingsForm : RForm
 		{
 			(string, string) tuple2 = array3[i];
 			string key2 = tuple2.Item1;
-			string item3 = tuple2.Item2;
+			string item3 = string.Equals(key2, "webcam", StringComparison.OrdinalIgnoreCase)
+				? QuickCameraLabel(tuple2.Item2)
+				: tuple2.Item2;
 			RCheckBox cb = new RCheckBox
 			{
 				Name = "quick_" + key2,
@@ -4499,6 +4501,19 @@ public class SettingsForm : RForm
 		return null;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达下 `webcam` 写的是 **Windows 摄像头隐私授权**
+	/// （`ConsentStore\webcam`），⛔ 不是 EC/固件级断电 ⇒ 文案必须如实写「**摄像头隐私**」，
+	/// 别让用户以为按了就等于把摄像头断电了。
+	/// <para>⚠️ 非宝龙达仍用 <see cref="Strings.QuickCamera" />（GCU 的 `WEBCAM_ON/OFF` 是厂商级）⇒ 逐位不变 ✅</para>
+	/// <para>⚠️ 用字面量而不是改 `Strings*.resx`：那个文件是**混合行尾**（CRLF 14 / 裸 LF 5343），
+	/// 用编辑器改会整篇改行尾；本表里 `("wifi", "WiFi")` 就是既有先例 ✅</para>
+	/// </summary>
+	private static string QuickCameraLabel(string fallback)
+	{
+		return (Program.hw?.UsesBaolongda ?? false) ? "摄像头隐私" : fallback;
+	}
+
 	/// <summary>「更多开关」里该 key 的文案（提级后的 <see cref="QuickSwitchLabels" />，与那一组完全同源）。</summary>
 	private static string QuickSwitchText(string key)
 	{
@@ -4507,7 +4522,9 @@ public class SettingsForm : RForm
 		{
 			if (string.Equals(labels[i].Item1, key, StringComparison.OrdinalIgnoreCase))
 			{
-				return labels[i].Item2;
+				return string.Equals(labels[i].Item1, "webcam", StringComparison.OrdinalIgnoreCase)
+					? QuickCameraLabel(labels[i].Item2)
+					: labels[i].Item2;
 			}
 		}
 		return key;
@@ -4533,6 +4550,12 @@ public class SettingsForm : RForm
 		if (string.Equals(key, "monitoroff", StringComparison.OrdinalIgnoreCase))
 		{
 			return Strings.QuickTileScreenOff;
+		}
+		// ⭐ 2026-10-17（摄像头 · 隐私开关）：磁贴只有 44px 高 ⇒ 用短名「摄像头」；
+		//   ⚠️ 开关行仍写全「摄像头隐私」（语义不同，见 QuickCameraLabel 的注释）✅
+		if (string.Equals(key, "webcam", StringComparison.OrdinalIgnoreCase) && (Program.hw?.UsesBaolongda ?? false))
+		{
+			return "摄像头";
 		}
 		return QuickSwitchText(key);
 	}
