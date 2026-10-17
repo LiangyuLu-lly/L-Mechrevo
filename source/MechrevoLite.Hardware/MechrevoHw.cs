@@ -3478,88 +3478,36 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			+ "（⭐ 判据用 16：0=关 · 非0=开；⚠️ 10 恒 0 故不作判据 ⚠️）");
 	}
 
-	private int _baolongdaFanRpmMaxCache;
-
-	private bool _baolongdaFanRpmMaxIsReference;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 转速百分比）：⭐ 风扇百分比的**分母**（RPM ✅）——
-	/// ⭐ <b>单一事实来源</b>：⭐ 主界面遥测、⭐ 托盘提示、⭐ 风扇曲线**三处共用它** ✅。
-	///
-	/// <para>⚠️⚠️ <b>为什么必须有它（用户 2026-10-16 追问点出的内部矛盾）</b>：
-	/// ⭐ 此前 <c>BaolongdaFanCurveSettings.DefaultMaxRpm = 4200</c> 已经**在曲线那边当分母用了** ✅，
-	/// ⭐ 而主界面/托盘却因为"宝龙达没有 max RPM"**不显示百分比** ❌
-	/// ⇒ ⭐ <b>一处有一处没有 ⇒ 自相矛盾</b> ⚠️。⭐ 本属性把它收敛成**一个来源** ✅。</para>
-	///
-	/// <para>⭐ <b>取值顺序</b>：⭐ ① 试读**功能号 21**（<c>MaxFanSpeed</c>）——
-	/// ⭐ 只接受落在【合理风扇区间 <c>1000~12000 RPM</c>】内的解释（⭐ 原样 ／ ⭐ ×100 两种候选，
-	/// ⚠️ 因为它的**读语义尚未真机验证** ⚠️）⇒ ⭐ 命中即<b>实测值</b> ✅；
-	/// ⭐ ② 读不到 ⇒ ⭐ 退化为 <see cref="BaolongdaFanCurveSettings.DefaultMaxRpm" />（4200）
-	/// 并置 <see cref="FanRpmMaxIsReference" />=<c>true</c> ⚠️。</para>
-	///
-	/// <para>⚠️ <b>4200 的来源（已查实，⭐ 不是实测）</b>：⭐ 注释自述是**占位值** ——
-	/// 「⭐ 刻意保守（⭐ 远低于协议上限 6000 ✅）· ⭐ 宁可低：⭐ 上限猜大了会让风扇狂转 ⚠️」
-	/// ⇒ ⭐ 它**不是**从斗战者 <c>FanLargeMax = 4400</c> 改来的，⭐ 也**不是**任何真机读数 ✅
-	/// ⇒ ⭐ 所以用它算出的百分比只能当**粗略参考** ⚠️（⭐ 因此本类如实暴露"是不是参考值" ✅）。</para>
-	/// </summary>
-	public int FanRpmMaxForPercent
-	{
-		get
-		{
-			if (!UsesBaolongda)
-			{
-				return 0; // ⭐ 非宝龙达：分母由各机型自己的 duty 口径负责 ⇒ ⭐ 本属性不参与 ✅
-			}
-			int cached = _baolongdaFanRpmMaxCache;
-			if (cached > 0)
-			{
-				return cached;
-			}
-			int resolved = 0;
-			try
-			{
-				BaolongdaWmi wmi = _baolongda?.Wmi;
-				if (wmi != null && wmi.TryReadByte(BaolongdaWmi.Function.MaxFanSpeed, out byte raw))
-				{
-					// ⚠️ 功能号 21 的**读语义未验证** ⇒ ⭐ 只接受落在合理风扇区间的解释 ✅
-					//   ⭐ 候选 ①：原样（RPM）· ⭐ 候选 ②：×100（⭐ 若它沿用"写"的 RPM÷100 口径 ✅）
-					foreach (int cand in new int[2] { raw, raw * 100 })
-					{
-						if (cand >= 1000 && cand <= 12000)
-						{
-							resolved = cand;
-							break;
-						}
-					}
-				}
-			}
-			catch
-			{
-				resolved = 0;
-			}
-			if (resolved > 0)
-			{
-				_baolongdaFanRpmMaxCache = resolved;
-				_baolongdaFanRpmMaxIsReference = false;
-				Logger.WriteError($"宝龙达 风扇百分比：⭐ 分母取自【功能号 21 实测】= {resolved} RPM ✅"
-					+ "（⭐ 主界面 ／ ⭐ 托盘 ／ ⭐ 风扇曲线三处共用它 ✅）");
-				return resolved;
-			}
-			_baolongdaFanRpmMaxCache = BaolongdaFanCurveSettings.DefaultMaxRpm;
-			_baolongdaFanRpmMaxIsReference = true;
-			Logger.WriteError($"宝龙达 风扇百分比：⚠️ 功能号 21 读不到**本机实测 max**"
-				+ $" ⇒ ⭐ 退化为**参考分母** {BaolongdaFanCurveSettings.DefaultMaxRpm} RPM ⚠️"
-				+ "（⭐ 该值是占位值、⛔ **不是**本机实测 ⚠️ ⇒ ⭐ 百分比只能当**粗略参考** ✅；"
-				+ "⭐ 与风扇曲线的 <c>MaxRpm</c> 是**同一个数** ✅）");
-			return _baolongdaFanRpmMaxCache;
-		}
-	}
+	// ⭐⭐ 2026-10-17（接手 · 按**原厂口径**修正转速百分比）：⭐ 100% 对应的 RPM ✅
+	//
+	//  ⭐⭐ 依据：原厂 40 系控制台 `蛟龙游戏控制中心.dll`（v0.3.15 · Bitland 签名）反编译 ——
+	//     FanSpeed.Text = _CPUGPUFanSpeed.Item1 + " RPM";   // 功能号 13：[4..5] 小端 = RPM
+	//     float num = (float)_CPUGPUFanSpeed.Item1 / 60f;   // ⭐ 分母 = 60 ⇒ 100% = 6000 RPM
+	//     FANProgressBar.Value = (int)Math.Round(num);
+	//     FANTextBlock.Text = num.ToString("F0") + "%";
+	//  真机对照（40 系 `MRID6-23` / 4070）：官方 1965 RPM ⇒ **33%**（1965 ÷ 6000 = 32.75 ✅）。
+	//
+	//  ⭐ 6000 不是猜的：功能号 21 的**写**口径是 `x100 RPM`、协议上限 60
+	//    （原厂手动转速范围 22~58 ⇒ 2200~5800 RPM）⇒ 60 × 100 = 6000 就是这套编码的满刻度，
+	//    原厂也正好拿它当百分比分母 ✅。
+	//
+	//  ⚠️⚠️ **为什么不再读功能号 21**：原厂把它的读数当作**手动转速设定值**
+	//    （`MaxFanSpeed.Text = value`，再由它反算滑块位置 `Set_MaxFanSpeedSlider`），
+	//    ⛔ 从来不是"最大转速"。旧实现把读数（真机 = 50）当分母 ⇒ 5000
+	//    ⇒ 1996 RPM 显示 **40%**，而官方同一时刻是 **33%** ❌ —— 这就是"和官方对不上"的根因。
+	//
+	//  ⚠️ 30 系仍待确认：旧版 30 系原厂控制台（v0.2.35）用的是 `rpm / 35f`（⇒ 3500 RPM），
+	//    但那是另一套年代／可能不同模具的包 ⇒ ⛔ 暂不套用；30 系真机请对照官方控制台百分比，
+	//    若不一致就把这里按代数拆开（⚠️ 唯一改动点）✅
+	internal const int BaolongdaFanRpmAtFullPercent = 6000;
 
 	/// <summary>
-	/// ⭐⭐（同上）：⭐ 当前 <see cref="FanRpmMaxForPercent" /> 是不是**参考值**（⭐ 而非本机实测 ⚠️）
-	/// —— ⭐ 供 UI ／ 日志**如实标注** ✅（⭐ 铁律：读不到就显示未知，⛔ 绝不编数字 ✅）。
+	/// ⭐⭐ 2026-10-17（接手 · 按原厂口径修正）：⭐ 风扇百分比的**分母**（RPM ✅）。
+	/// <para>依据与原委见 <see cref="BaolongdaFanRpmAtFullPercent" /> —— 原厂 40 系是 `rpm ÷ 60`，
+	/// ⛔ 不是"读功能号 21 当 max"（那个读数是**手动转速设定值** ⚠️）。</para>
+	/// <para>⚠️ 非宝龙达 ⇒ 返回 0（⭐ 分母由各机型自己的 duty 口径负责 ✅）。</para>
 	/// </summary>
-	public bool FanRpmMaxIsReference => _baolongdaFanRpmMaxIsReference;
+	public int FanRpmMaxForPercent => UsesBaolongda ? BaolongdaFanRpmAtFullPercent : 0;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **意向方法** —— "⭐ 应用一组 CPU 功耗/温度墙" ✅

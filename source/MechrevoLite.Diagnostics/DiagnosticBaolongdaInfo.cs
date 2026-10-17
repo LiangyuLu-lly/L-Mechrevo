@@ -904,26 +904,26 @@ internal static class DiagnosticBaolongdaInfo
 		AppendOne(sb, wmi, BaolongdaWmi.Function.RgbKeyboardBrightness, "18", "键盘灯亮度");
 		AppendOne(sb, wmi, BaolongdaWmi.Function.SystemAcType, "19", "交流类型");
 		AppendOne(sb, wmi, BaolongdaWmi.Function.MaxFanSpeedSwitch, "20", "风扇手动开关");
-		// ⭐⭐ 2026-10-16（宝龙达 · 转速百分比）：⭐ **补试读功能号 21**（`MaxFanSpeed`）✅ ——
-		//   ⚠️ 核查发现本节**从未试读过它**（只读了 8/13/20/22/23）⇒ ⭐ "功能号 21 能不能读到
-		//   **本机最大转速**"此前**无人知道** ⚠️。⭐ 它是风扇百分比**分母**的第一候选 ✅。
-		//   ⚠️ 写是双字节 `[FanType, RPM÷100]`（⭐ 见 `TrySetMaxFanSpeed` ✅）⇒ ⭐ **读的语义未验证**
-		//   ⇒ ⭐ 所以下面把**原始字节**也打出来，让诊断包自行判断 ⛔（⭐ 不猜 ✅）。
-		AppendOne(sb, wmi, BaolongdaWmi.Function.MaxFanSpeed, "21", "风扇最大转速");
+		// ⭐⭐ 2026-10-17（接手）：⭐ 功能号 21 的**读语义已由原厂包确认** ——
+		//   ⛔ **不是"最大转速"**，⭐ 而是**手动转速设定值**：原厂 `MaxFanSpeed.Text = value`、
+		//   再由它反算滑块位置（`Set_MaxFanSpeedSlider`）⇒ 读值 = 上次写下去的 `x100 RPM` ✅。
+		//   ⇒ ⭐ 我们**不再**拿它当百分比分母（真机读到 50 ⇒ 曾被当成 5000 RPM，导致 40% vs 官方 33% ❌）。
+		//   下面仍把原始字节打出来，⭐ 供核对"手动设定值到底是多少" ✅。
+		AppendOne(sb, wmi, BaolongdaWmi.Function.MaxFanSpeed, "21", "风扇手动转速设定值（⚠️ 读=上次设的转速，不是最大转速）");
 		try
 		{
 			if (wmi.TryReadBytesChecked(BaolongdaWmi.Function.MaxFanSpeed, 4, out byte[] mfsRaw)
 				&& mfsRaw != null && mfsRaw.Length >= 4)
 			{
 				sb.AppendLine($"     · 功能号 21 原始 4 字节 = {mfsRaw[0]},{mfsRaw[1]},{mfsRaw[2]},{mfsRaw[3]}"
-					+ $" ⇒ 单字节={mfsRaw[0]} · 小端16位={(mfsRaw[1] << 8) + mfsRaw[0]}"
-					+ $" · 大端16位={(mfsRaw[0] << 8) + mfsRaw[1]}"
-					+ " · ⚠️ 也可能是 RPM÷100 口径 ⚠️ ⇒ **语义待判定**（⭐ 不猜 ✅）");
+					+ $" ⇒ 单字节={mfsRaw[0]}（= 手动设定 {mfsRaw[0] * 100} RPM）"
+					+ $" · 小端16位={(mfsRaw[1] << 8) + mfsRaw[0]} · 大端16位={(mfsRaw[0] << 8) + mfsRaw[1]}"
+					+ " · ⭐ 原厂口径：⛔ 不是最大转速 ⇒ 已经不拿它当百分比分母 ✅");
 			}
 			else
 			{
 				sb.AppendLine("     · 功能号 21 只读到 1 字节或读不到"
-					+ " ⇒ ⚠️ 不能据此推 max（⭐ 若读不到就只能退化为**参考分母** ✅）");
+					+ " ⇒ ⚠️ 这只影响\"手动设定值\"的显示；⭐ 百分比分母是常量 6000、与本项无关 ✅");
 			}
 		}
 		catch (Exception ex21)

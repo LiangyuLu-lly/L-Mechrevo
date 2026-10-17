@@ -15326,36 +15326,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 		int temp = (isCpu ? hw.CpuTemp : hw.GpuTemp);
 		int rpm = (isCpu ? hw.CpuFanRpm : hw.GpuFanRpm);
-		// ⭐⭐ 2026-10-16（0.291.9.1 · 修"⭐ 宝龙达机型百分比恒为 <c>0%</c>"⭐）：
-		//   ⚠️⚠️ <b>根因</b>：⭐ <c>CpuFanDuty</c>/<c>GpuFanDuty</c> ⭐ <b>只有 GCU 载荷会填</b> ❌
-		//      ⇒ ⭐ 宝龙达（⭐ 没有 GCU 推送 ⚠️）下**恒为 0** ⚠️ ⇒ ⭐ 于是界面上跟着显示 ⭐ <c>0%</c> ❌
-		//   ⚠️ 而 <c>0%</c> 是 ⭐ <b>误导性的</b> ⚠️：⭐ 用户会以为"⭐ 风扇没转" ❌，
-		//      而实际那一行同时显示着 ⭐ <c>1836rpm</c> ⭐ —— ⭐ <b>风扇正在转</b> ✅
-		//   ⇒ ⭐ <b>修法</b>：⭐ **宝龙达路径下把 duty 当作"未知"（<c>null</c>）** ✅
-		//      ⇒ ⭐ 展示层就不打那个百分比 ✅（⭐ 只显示 <c>1836 rpm</c> ✅）
-		//   ⚠️ 为什么**不用** <c>RPM ÷ 最大转速</c> 算一个：⭐ 宝龙达协议里
-		//      ⭐ <b>没有"风扇最大转速"这个东西</b> ⚠️；⭐ 代码里那对参考值 <c>4400/8200</c>
-		//      ⭐ 是 ⭐ <b>联想 N176</b> 的 ⚠️ ⇒ ⭐ <b>不能套到蛟龙</b> ❌
-		//      ⇒ ⭐ <b>宁可不显示，⭐ 也不显示错的</b> ✅（⭐ 与"⭐ 不许谎报"⭐ 同一原则 ✅）
-		//   ⚠️ 对 GCU 机型：⭐ <c>UsesBaolongda</c> 为假 ⇒ ⭐ 照旧传真实 duty ✅ ⇒
-		//      ⭐ 下面的判据一字未改 ⇒ ⭐ <b>行为逐位不变</b> ✅（⭐ 含"⭐ duty=0 时照旧显示 <c>0%</c>"⚠️）
-		// ⭐⭐ 2026-10-16（宝龙达 · 转速百分比）：⭐ 判据由「宝龙达 ⇒ 一律不显示」改为
-		//   「**有没有可靠分母**」✅ —— ⚠️ 原判据的前提是"宝龙达协议里没有风扇最大转速"⚠️，
-		//   但那个前提**从未被真正验证过**（⭐ 诊断段此前**根本没试读过功能号 21** ⚠️）。
-		//   ⭐ 现在：⭐ ① 先试读**功能号 21**（⭐ 见 `MechrevoHw.FanRpmMaxForPercent` ✅）——
-		//             ⭐ 读到**本机实测 max** ⇒ ⭐ 用 `RPM ÷ max` 算**准确百分比** ✅
-		//             （⭐ 与风扇曲线**共用同一个分母** ✅ ⇒ ⭐ 修掉"一处有一处没有"的自相矛盾 ✅）；
-		//           ⭐ ② 读不到 ⇒ ⭐ 退化为**参考分母** ⇒ ⭐ **仍然不显示** ⚠️
-		//             （⚠️ 参考值 4200 会让 4856rpm 算出 115% ⇒ ⭐ 那是**错的数字** ❌
-		//              ⇒ ⭐ 遵守本段既有立场「⭐ 宁可不显示，⭐ 也不显示错的」✅）。
-		//   ⚠️ 对 GCU 机型：⭐ `UsesBaolongda` 为假 ⇒ ⭐ 走 else ⇒ **判据一字未改** ✅
-		//      ⇒ ⭐ **行为逐位不变** ✅（⭐ 含"⭐ duty=0 时照旧显示 <c>0%</c>" ⚠️）
+		// ⭐⭐ 2026-10-17（接手 · 按原厂口径修正转速百分比）：⭐ 宝龙达的百分比 = ⭐ RPM ÷ 6000 ✅
+		//   依据：原厂 40 系控制台 v0.3.15 的 `float num = rpm / 60f`（⭐ 完整代码与真机对照见
+		//   `MechrevoHw.BaolongdaFanRpmAtFullPercent` 的注释）。
+		//   ⚠️ 旧实现先读功能号 21 当分母 —— 原厂把那个读数当**手动转速设定值**、⛔ 不是最大转速
+		//      ⇒ 真机读到 50 ⇒ 分母 5000 ⇒ 1996 RPM 显示 40%，而官方是 33% ❌ 已弃用。
+		//   ⭐ 真机对照（MRID6-23 / 4070）：官方 1965 RPM ⇒ 33%（1965 ÷ 6000 = 32.75 ✅）。
+		//   ⚠️ 对 GCU 机型：`UsesBaolongda` 为假 ⇒ 走 else ⇒ 判据一字未改（含 duty=0 照旧显示 0%）✅
 		int? duty;
 		if (hw.UsesBaolongda)
 		{
 			int rpmMaxForPercent = hw.FanRpmMaxForPercent;
 			int rpmNow = isCpu ? hw.CpuFanRpm : hw.GpuFanRpm;
-			duty = (!hw.FanRpmMaxIsReference && rpmMaxForPercent > 0 && rpmNow > 0)
+			duty = (rpmMaxForPercent > 0 && rpmNow > 0)
 				? (int?)Math.Min(100, (int)Math.Round(rpmNow * 100.0 / rpmMaxForPercent))
 				: (int?)null;
 		}
