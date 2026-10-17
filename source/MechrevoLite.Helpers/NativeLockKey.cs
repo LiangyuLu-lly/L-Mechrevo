@@ -1,13 +1,14 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace MechrevoLite.Helpers;
 
 /// <summary>
 /// 「大小写锁定」「数字小键盘锁定」两个系统锁定键的读写入口。
 /// <para>⭐ 为什么不用 WMI：宝龙达的 WMI 功能号表（8~23）里**没有**这两个键的功能号，
-/// 而它们本来是键盘自身的锁定键 ⇒ 由 Windows 的键盘状态机负责，靠**模拟一次按键**即可切换 ✅</para>
-/// <para>⚠️ 本类**只**调用 Windows 公开 API（<c>user32.dll</c> 的 <c>GetKeyState</c> / <c>keybd_event</c>），
+/// 而它们本来就是键盘自身的锁定键 ⇒ 由 Windows 的键盘状态机负责，靠**模拟一次按键**切换 ✅</para>
+/// <para>⚠️ 本类**只**调用 Windows 公开 API（<c>user32.dll</c> / <c>kernel32.dll</c>），
 /// ⛔ 不碰 EC、⛔ 不碰任何厂商寄存器、⛔ 不需要驱动或提权。</para>
 /// </summary>
 internal static class NativeLockKey
@@ -30,26 +31,77 @@ internal static class NativeLockKey
 	/// <summary>锁定态在 <c>GetKeyState</c> 返回值里的位掩码。</summary>
 	private const int LockedBitMask = 0x0001;
 
+	/// <summary>
+	/// 模拟按键发出后、回读状态前等待的毫秒数。
+	/// <para>⚠️ 输入注入是异步的：立刻回读极可能仍读到旧值，从而把"其实已经成功"误判成失败。</para>
+	/// </summary>
+	private const int AfterInjectDelayMs = 50;
+
 	[DllImport("user32.dll", SetLastError = false)]
 	private static extern short GetKeyState(int virtualKey);
 
 	[DllImport("user32.dll", SetLastError = false)]
 	private static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);
 
+	[DllImport("user32.dll", SetLastError = false)]
+	private static extern IntPtr GetForegroundWindow();
+
+	[DllImport("user32.dll", SetLastError = false)]
+	private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+	[DllImport("kernel32.dll", SetLastError = false)]
+	private static extern uint GetCurrentThreadId();
+
+	[DllImport("user32.dll", SetLastError = false)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+
 	/// <summary>
 	/// 读某个锁定键当前**是否处于锁定态**。
-	/// <para>⚠️ <c>GetKeyState</c> 的返回值里：<b>最低位</b> = 锁定态，<b>高位</b> = 此刻是否被按住。
-	/// 只看最低位 —— 否则"键正被按住的那一瞬间"会被误判成已锁定 ✅</para>
+	/// <para>⚠️ <c>GetKeyState</c> 返回的是<b>调用线程消息队列里</b>的键状态，不是全局实时状态。
+	/// 长期在后台运行的进程（本程序正是）、或线程池线程调用它，都可能读到<b>陈旧值</b>，
+	/// 于是"明明已经切换成功"也会被判成失败 ⚠️。⇒ 读之前先把输入状态**临时附加到前台线程**，
+	/// 这样拿到的才是系统当前状态 ✅（读完立即分离；附加失败则退回本线程读法）。</para>
+	/// <para>⚠️ 只看返回值<b>最低位</b>（锁定态）；高位表示"此刻是否被按住"，不可混淆。</para>
 	/// </summary>
 	internal static bool IsOn(int virtualKey)
 	{
 		try
 		{
+			uint foregroundThread = GetWindowThreadProcessId(GetForegroundWindow(), out uint _);
+			uint currentThread = GetCurrentThreadId();
+			if (foregroundThread != 0 && foregroundThread != currentThread)
+			{
+				bool attached = false;
+				try
+				{
+					attached = AttachThreadInput(currentThread, foregroundThread, true);
+					if (attached)
+					{
+						return (GetKeyState(virtualKey) & LockedBitMask) != 0;
+					}
+				}
+				catch (Exception)
+				{
+				}
+				finally
+				{
+					if (attached)
+					{
+						try
+						{
+							AttachThreadInput(currentThread, foregroundThread, false);
+						}
+						catch (Exception)
+						{
+						}
+					}
+				}
+			}
 			return (GetKeyState(virtualKey) & LockedBitMask) != 0;
 		}
 		catch (Exception)
 		{
-			// 进程不是交互式会话、或 user32 调用异常时：如实返回"读不到"（false），不抛给调用方。
 			return false;
 		}
 	}
@@ -87,9 +139,22 @@ internal static class NativeLockKey
 			// 一次切换 = 按下 + 抬起（带扩展键标志）。
 			keybd_event((byte)virtualKey, CommonScanCode, FlagExtendedKey, UIntPtr.Zero);
 			keybd_event((byte)virtualKey, CommonScanCode, FlagExtendedKey | FlagKeyUp, UIntPtr.Zero);
+			// ⚠️ 输入注入是异步的：必须等一拍再回读，否则会把"已经成功"误判成失败。
+			try
+			{
+				Thread.Sleep(AfterInjectDelayMs);
+			}
+			catch (Exception)
+			{
+			}
 			bool after = IsOn(virtualKey);
-			note = $"发送前={Describe(before)} · 发送后回读={Describe(after)} · 目标={Describe(target)}";
-			return after == target;
+			note = $"发送前={Describe(before)} · 发送后回读={Describe(after)} · 目标={Describe(target)}"
+				+ (after == target
+					? " ⇒ 回读一致 ✅"
+					: " ⇒ ⚠️ 回读尚未反映（**已下发**；按键注入是异步的，最终状态由定时器校正）");
+			// ⚠️⚠️ 返回"已下发"而不是"回读一致"：真机实测 50ms 内 GetKeyState 仍读到旧值
+			//   （而键盘指示灯已经变了）⇒ 若拿"立刻回读"当成败判据，会出"灯变了、开关却回弹"的假失败。
+			return true;
 		}
 		catch (Exception ex)
 		{
