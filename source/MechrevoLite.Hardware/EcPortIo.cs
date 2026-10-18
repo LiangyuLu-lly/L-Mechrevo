@@ -51,8 +51,13 @@ internal static class EcPortIo
 	//	   DriverBridge.ReadEc: 0x66←0x80, 0x62←(byte)reg, 读 0x62    ← 单字节
 	//	   其 EC 物理窗口 EC_BASE=0xFE800400 / EC_SIZE=0xFF(256) ⇒ 映射的正是这 256 字节标准空间 ✅
 	//	⚠️ 这解释了为何此前用 0x92 读键盘背光怎么都不对 —— 地址空间不同 ✅
-	//	⚠️ 本轮只接入【读】0x80；0x81(WR_EC) 未定义、未放行、无调用方（写入须先报方案）✅
+	//	⚠️ 2026-10-18：机主批准加 **0x81（WR_EC）写实验**（ACPI 标准空间 · 8 位地址）——
+	//	   ⭐ 只允许 `reg=0x60`（0x1060 的低字节）做**一次**实验；⛔ 不写风扇寄存器；
+	//	   ⭐ 每步等 IBF 清并记录 0x66 状态位（IBF/OBF）✅
 	private const byte EcCmdAcpiRead = 0x80;
+
+	/// <summary>⭐ ACPI 标准空间写（WR_EC = 0x81 · 8 位地址）—— 仅供 `--ec81` 一次性实验 ✅</summary>
+	private const byte EcCmdAcpiWrite = 0x81;
 
 	// ── 端口 0x66 的状态位 ──
 	private const byte StatusObf = 1;  // Output Buffer Full：有数据可读
@@ -527,6 +532,86 @@ internal static class EcPortIo
 		return fan1 && fan2 && mask;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主批准 · **0x81 写实验**）：⭐ ACPI 标准空间写（WR_EC=`0x81` · **8 位地址**）——
+	/// 每步 `WaitIbfClear` + 记录 0x66 状态位（IBF/OBF）✅。
+	/// <para>⛔ 严格限制：**只允许 `reg == 0x60`**（`0x1060` 的低字节）做**一次**实验；
+	/// 其它寄存器一律拒绝 —— ⛔ 不再尝试更多写花色，避免写坏机器 ✅</para>
+	/// <para>⭐ 依据（只取协议形态）：斗战者 `DriverBridge.ReadEc` ⇒ `0x66←0x81` → `0x62←reg` → `0x62←value`，每步等 IBF ✅</para>
+	/// </summary>
+	internal static bool TryWriteByteEc81Experiment(int reg, int value, out string trace)
+	{
+		trace = "";
+		if (reg != 0x60)
+		{
+			trace = "拒绝：0x81 实验只允许 reg=0x60（0x1060 低字节）";
+			return false;
+		}
+		if (value < 0 || value > 0xFF)
+		{
+			trace = "拒绝：value 超出 byte";
+			return false;
+		}
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				trace = "通道已中毒：" + _poisonReason;
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				trace = "模块未装载：" + _loadFailure;
+				return false;
+			}
+			if (!TryEnterEcMutex(out Mutex mutex, out bool held))
+			{
+				Poison("无法获取 " + MutexName + " 互斥体");
+				trace = "无法获取 " + MutexName + " 互斥体";
+				return false;
+			}
+			try
+			{
+				_lastStatusSeen = -1;
+				if (!WriteCommand(EcCmdAcpiWrite, IoKind.Write))
+				{
+					trace = "0x66←0x81 失败（等 IBF 超时）· " + DescribeLastStatus();
+					return false;
+				}
+				trace += "0x66←0x81（写命令）· " + DescribeLastStatus() + "\n";
+				if (!WriteData((byte)reg, IoKind.Write))
+				{
+					trace += "0x62←0x" + reg.ToString("X2") + "（地址）失败 · " + DescribeLastStatus();
+					return false;
+				}
+				trace += "0x62←0x" + reg.ToString("X2") + "（8 位地址）· " + DescribeLastStatus() + "\n";
+				if (!WriteData((byte)value, IoKind.Write))
+				{
+					trace += "0x62←0x" + value.ToString("X2") + "（数据）失败 · " + DescribeLastStatus();
+					return false;
+				}
+				trace += "0x62←0x" + value.ToString("X2") + "（数据）· " + DescribeLastStatus();
+				return true;
+			}
+			catch (Exception ex)
+			{
+				Poison("0x81 实验写抛异常：" + ex.GetType().Name);
+				trace = "异常：" + ex.GetType().Name;
+				return false;
+			}
+			finally
+			{
+				ReleaseEcMutex(mutex, held);
+			}
+		}
+	}
+
+	/// <summary>⭐ 0x81 实验回滚：把 reg=0x60 写回原值（仅同一条实验路径）✅</summary>
+	internal static bool TryRestoreEc81Experiment(int originalValue, out string trace)
+	{
+		return TryWriteByteEc81Experiment(0x60, originalValue, out trace);
+	}
+
 	// ══════════════════════════════════════════════════════════════════
 	//  EC mailbox 时序（调用方必须已持锁 + 已确保模块 + 已取互斥体）
 	//
@@ -674,9 +759,9 @@ internal static class EcPortIo
 	/// <summary>向 0x66 发命令（先等 IBF 清空）。<paramref name="command"/> 受命令白名单约束。</summary>
 	private static bool WriteCommand(byte command, IoKind kind)
 	{
-		if (command != EcCmdRead && command != EcCmdWrite && command != EcCmdAcpiRead)
+		if (command != EcCmdRead && command != EcCmdWrite && command != EcCmdAcpiRead && command != EcCmdAcpiWrite)
 		{
-			Poison("命令 0x" + command.ToString("X2") + " 不在白名单（只允许 0x92/0x93/0x80）");
+			Poison("命令 0x" + command.ToString("X2") + " 不在白名单（只允许 0x92/0x93/0x80/0x81）");
 			return false;
 		}
 		if (!WaitIbfClear(kind))
@@ -1029,6 +1114,19 @@ internal static class EcPortIo
 				return _lastStatusSeen;
 			}
 		}
+	}
+
+	/// <summary>⭐ 诊断：把最近一次 0x66 状态位展开成 `status=0x..（IBF=.. · OBF=..）` ✅</summary>
+	internal static string DescribeLastStatus()
+	{
+		int status = _lastStatusSeen;
+		if (status < 0)
+		{
+			return "status=未读到";
+		}
+		return "status=0x" + status.ToString("X2")
+			+ "（IBF=" + (((status & StatusIbf) != 0) ? "1" : "0")
+			+ " · OBF=" + (((status & StatusObf) != 0) ? "1" : "0") + "）";
 	}
 
 	// ── 中毒（失败不自动恢复，保留现场）──

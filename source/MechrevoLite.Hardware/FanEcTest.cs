@@ -40,6 +40,7 @@ internal static class FanEcTest
 	internal static int Run(string[] args)
 	{
 		bool forceAcpi = false;
+		bool forceEc81 = false;
 		if (args != null)
 		{
 			foreach (string arg in args)
@@ -47,6 +48,10 @@ internal static class FanEcTest
 				if (string.Equals(arg, "--acpi", StringComparison.OrdinalIgnoreCase))
 				{
 					forceAcpi = true;
+				}
+				else if (string.Equals(arg, "--ec81", StringComparison.OrdinalIgnoreCase))
+				{
+					forceEc81 = true;
 				}
 			}
 		}
@@ -90,6 +95,13 @@ internal static class FanEcTest
 			bool acpiIdentity = EcPortIo.TryReadEcIdentityAcpi(out _, out _, out string acpiIdNote);
 			L("ACPI 身份：" + acpiIdNote + " ⇒ " + (acpiIdentity ? "通过 ✅" : "未通过 ⚠️"));
 			L("");
+			// ⭐⭐ 2026-10-18（机主批准 · 0x81 写实验）：⭐ `--ec81` 只做**一次** 0x81 写实验，不跑 LPC/0x93 写
+			if (forceEc81)
+			{
+				L("⭐ `--ec81`：只做 0x81（WR_EC）一次性写实验（⛔ 不写风扇寄存器、不做其它写花色）");
+				bool ec81Ok = RunEc81Experiment(L);
+				return ec81Ok ? 0 : 1;
+			}
 			if (!lpcIdentity && !acpiIdentity)
 			{
 				L("结论：⛔ 不可用 —— 两条通道身份均未通过");
@@ -366,6 +378,119 @@ internal static class FanEcTest
 				}
 			}
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主批准 · **0x81 写实验**）：⭐ 只读对照（`0x92` vs `0x80` 标准空间扫描）
+	/// + **一次** `0x81` 写实验（`reg=0x60` ← `0x1060` 原值|0x80）+ 写后 20ms 两条路径回读 + finally 回滚 ✅。
+	/// <para>⛔ 只写这一个字节；⛔ 不写风扇寄存器；失败即结论「BIOS 锁写」并停止 ✅</para>
+	/// </summary>
+	private static bool RunEc81Experiment(Action<string> L)
+	{
+		L("══ C. 0x81（WR_EC）写实验（ACPI 标准空间 · 8 位地址）══");
+		L("⚠️ 只做一次：reg=0x60（0x1060 低字节）← (原值 | 0x80)；写后 20ms 用 0x92 与 0x80 两条路径回读；随后回滚原值");
+		L("");
+
+		// ── 1) 只读对照：0x92 vs 0x80 ──
+		L("── 1) 只读对照：0x92（XRAM）vs 0x80（标准空间）──");
+		int[] addrs = { 0x2000, 0x1060, 0xC411, 0xC834, 0xC83C, 0xB20 };
+		string[] names = { "0x2000 芯片 ID", "0x1060 解锁", "0xC411 EC 版本", "0xC834 Fan1 转速", "0xC83C Fan1 目标", "0xB20 接管掩码" };
+		for (int i = 0; i < addrs.Length; i++)
+		{
+			bool readOk = EcPortIo.TryReadByteStable(addrs[i], out int value, out string note);
+			L("  " + names[i] + "：0x92 = " + (readOk ? "0x" + value.ToString("X2") : "读不到") + "（" + note + "）");
+		}
+		L("  0x80 扫描 0x00..0xFF（只列非 0x00/非 0xFF）：");
+		int[] regValues = new int[256];
+		int foundCount = 0;
+		for (int reg = 0; reg < 256; reg++)
+		{
+			regValues[reg] = -1;
+			if (!EcPortIo.TryReadByteAcpi(reg, out int value))
+			{
+				continue;
+			}
+			regValues[reg] = value;
+			if (value != 0x00 && value != 0xFF)
+			{
+				foundCount++;
+				L("    0x80[0x" + reg.ToString("X2") + "] = 0x" + value.ToString("X2"));
+			}
+		}
+		if (foundCount == 0)
+		{
+			L("    （没有读回可用的非 0 值 ⇒ 0x80 标准空间读也不可用）");
+		}
+		L("  已知值匹配（0x55 / 0x23 / 0x14）：");
+		int[] knownValues = { 0x55, 0x23, 0x14 };
+		string[] knownNames = { "0x2000", "0xC411", "0xC834/5" };
+		for (int k = 0; k < knownValues.Length; k++)
+		{
+			string hits = "";
+			for (int reg = 0; reg < 256; reg++)
+			{
+				if (regValues[reg] == knownValues[k])
+				{
+					hits += (hits.Length == 0 ? "" : ", ") + "0x" + reg.ToString("X2");
+				}
+			}
+			L("    " + knownNames[k] + " = 0x" + knownValues[k].ToString("X2") + " ⇒ 匹配寄存器：" + (hits.Length == 0 ? "无" : hits));
+		}
+		L("");
+
+		// ── 2) 0x81 写实验（只 1 个字节）──
+		L("── 2) 0x81 写实验（仅 reg=0x60 一次）──");
+		if (!EcPortIo.TryReadByteStable(0x1060, out int original, out string origNote))
+		{
+			L("⛔ 读 0x1060 失败（" + origNote + "）⇒ 不做 0x81 写（no write）");
+			L("结论：⛔ 无法进行 0x81 实验（0x1060 读不到）");
+			return false;
+		}
+		int wanted = original | 0x80;
+		L("0x1060 原值 = 0x" + original.ToString("X2") + " · 实验写入值 = 0x" + wanted.ToString("X2") + "（仅置 bit7）");
+		bool wrote = false;
+		bool ok = false;
+		try
+		{
+			wrote = EcPortIo.TryWriteByteEc81Experiment(0x60, wanted, out string trace);
+			L("0x81 写步骤（命令/地址/数据/IBF-OBF 状态）：");
+			foreach (string line in trace.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+			{
+				L("  " + line.TrimEnd('\r'));
+			}
+			if (wrote)
+			{
+				Thread.Sleep(20);
+				bool r92 = EcPortIo.TryReadByteStable(0x1060, out int v92, out string n92);
+				bool r80 = EcPortIo.TryReadByteAcpi(0x60, out int v80);
+				L("写后 20ms 回读：");
+				L("  ACPI 0x92 @0x1060 = " + (r92 ? "0x" + v92.ToString("X2") : "读不到") + "（" + n92 + "）· " + EcPortIo.DescribeLastStatus());
+				L("  ACPI 0x80 @0x60   = " + (r80 ? "0x" + v80.ToString("X2") : "读不到") + " · " + EcPortIo.DescribeLastStatus());
+				ok = (r92 && (v92 & 0x80) != 0) || (r80 && (v80 & 0x80) != 0);
+				L("bit7 观察（0x92 / 0x80）：" + ((r92 && (v92 & 0x80) != 0) ? "1" : "0") + " / "
+					+ ((r80 && (v80 & 0x80) != 0) ? "1" : "0") + " ⇒ " + (ok ? "写入生效 ✅" : "写入无效 ⚠️"));
+			}
+			else
+			{
+				L("⛔ 0x81 写命令未成功执行（见上）");
+			}
+		}
+		finally
+		{
+			if (wrote)
+			{
+				bool restored = EcPortIo.TryRestoreEc81Experiment(original, out string restoreTrace);
+				L("0x81 回滚：写回原值 0x" + original.ToString("X2") + " ⇒ ok=" + restored + " · " + restoreTrace);
+				Thread.Sleep(20);
+				bool rb = EcPortIo.TryReadByteStable(0x1060, out int rv, out _);
+				L("回滚后 0x92 @0x1060 = " + (rb ? "0x" + rv.ToString("X2") : "读不到"));
+			}
+		}
+		L("");
+		L(ok
+			? "结论：✅ 0x81 写路径**生效**（⭐ 下一轮再确认 16 位地址/bank 映射，⛔ 本轮不写风扇寄存器）"
+			: "结论：⛔ 0x81 写路径也无效 ⇒ **本机 EC RAM 写被 BIOS 锁死** ⇒ 按机主指示放弃风扇曲线/强冷（保持隐藏），写入交接；⛔ 不再尝试其它写花色");
+		return ok;
 	}
 
 	/// <summary>⭐ 读 EC 0xC834/0xC835（≈RPM/100，稳定读）并换算成 RPM；<paramref name="acpi" /> 选通道 ✅。</summary>
