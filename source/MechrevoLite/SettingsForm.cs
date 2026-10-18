@@ -17111,6 +17111,24 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	private void SyncLightRows()
 	{
 		MechrevoHw hw = Program.hw;
+		// ⭐⭐ 2026-10-19（机主：「Logo 灯的效果选择依旧不隐藏」）：
+		//   ⚠️ 原来只在**建行那一刻**按 `Program.hw?.UsesBaolongda` 隐藏一次；
+		//      而启动改懒加载后，建行时 hw 可能还没就绪 ⇒ 隐藏没生效（或之后又被显示）❌
+		//   ⭐ 现在每次同步灯光行都**重新按平台**设置一次显隐（幂等、只在值变化时写日志）✅
+		if (_logoEffectCombo != null)
+		{
+			bool hideLogoEffect = hw != null && hw.UsesBaolongda;
+			if (_logoEffectCombo.Visible == hideLogoEffect || _logoEffectCombo.Enabled == hideLogoEffect)
+			{
+				_logoEffectCombo.Visible = !hideLogoEffect;
+				_logoEffectCombo.Enabled = !hideLogoEffect;
+				if (hideLogoEffect)
+				{
+					Logger.WriteLineIfChanged("light-logo-effect-hidden",
+						"[light] 宝龙达：Logo 灯只有开/关 ⇒ 已隐藏特效下拉（每次同步灯自行确保）");
+				}
+			}
+		}
 		// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」）：每次刷新灯光行时确保计时器与配置一致
 		//   （默认 0 = 关闭 ⇒ 不创建任何计时器、无额外检查开销；幂等）✅
 		Program.hw?.ApplyKeyboardAutoOffSetting();
