@@ -824,6 +824,12 @@ public class SettingsForm : RForm
 
 	private static int _uiBuildLogOnce;
 
+	private long _uiBuildLayoutTicks;
+
+	private long _uiBuildLayoutCount;
+
+	private bool _uiBuildProfiling;
+
 	// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
 	//   构造期这两个控件是**局部变量**（定时器靠闭包访问）⇒ 现在提到字段，供「只读同步」复用。
 	//   · `_brightnessSlider` / `_brightnessValueLabel`：滑块与百分比标签；
@@ -5600,6 +5606,7 @@ public class SettingsForm : RForm
 	{
 		// ⭐⭐ 2026-10-19（机主：设置窗加载太多）：构建分段计时（先量再改；只打一次）✅
 		Stopwatch uiBuildTotal = Stopwatch.StartNew();
+		_uiBuildProfiling = true;
 		long uiBuildInitMs = 0L;
 		long uiBuildDisplayMs = 0L;
 		long uiBuildOtherMs = 0L;
@@ -6049,6 +6056,8 @@ public class SettingsForm : RForm
 		donateControl.Init();
 		labelBacklight.ForeColor = RForm.colorStandard;
 		labelBacklight.Click += LabelBacklight_Click;
+		// ⭐ 布局批处理（性能优化）：整段构建只触发一次最终布局（⛔ 不在每个 Add 后级联重排）
+		SuspendLayout();
 		uiBuildPhase.Restart();
 		BuildOfficialConsolePanel();
 		uiBuildDisplayMs += uiBuildPhase.ElapsedMilliseconds;
@@ -6057,6 +6066,8 @@ public class SettingsForm : RForm
 		uiBuildPhase.Restart();
 		BuildDashboardLayout();
 		uiBuildOtherMs += uiBuildPhase.ElapsedMilliseconds;
+		ResumeLayout(false);
+		PerformLayout();
 		// 2026-10-09（UI 打磨③，用户原话「这种长条的能不能拆成和Ghelper一样独立的呢」）：
 		// BuildDashboardLayout 里的 MakeCompactModeButton 会把性能/显卡两行按钮的 Margin 清成 Empty
 		// （那是"拼成一条长条"时代的写法），会把上面下发过的拆条 Margin 抹掉；而运行时那两次
@@ -6085,15 +6096,20 @@ public class SettingsForm : RForm
 		//   ⭐ 分段耗时日志（**只打一次**、默认级别可见）—— 先拿证据再改，⛔ 不猜 ✅
 		//   · 基础 = 总计 − 灯光组 − 性能 − 显示/核显；外设电量在构建阶段**不执行**（后台刷新）。
 		uiBuildTotal.Stop();
+		_uiBuildProfiling = false;
+		long uiBuildLayoutMs = (long)(_uiBuildLayoutTicks * 1000.0 / Stopwatch.Frequency);
 		long uiBuildTotalMs = uiBuildTotal.ElapsedMilliseconds;
 		long uiBuildLightMs = _uiBuildLightMs;
 		long uiBuildPerfMs = _uiBuildPerfMs;
 		long uiBuildBaseMs = Math.Max(0L, uiBuildTotalMs - uiBuildLightMs - uiBuildPerfMs - uiBuildDisplayMs);
 		if (Interlocked.Exchange(ref _uiBuildLogOnce, 1) == 0)
 		{
+			int uiBuildControlCount = CountAllControls(this);
 			Logger.WriteError($"[ui-build] 分段耗时：基础={uiBuildBaseMs} ms · 灯光组={uiBuildLightMs} ms · 性能={uiBuildPerfMs} ms"
 				+ $" · 外设电量=0 ms（构建阶段不执行，已改后台） · 显示/核显={uiBuildDisplayMs} ms · 总计={uiBuildTotalMs} ms"
 				+ $"（InitializeComponent={uiBuildInitMs} ms · 其它构建={uiBuildOtherMs} ms · 来源=设置窗构造）");
+			Logger.WriteError($"[ui-build] 组=灯光 总计={uiBuildLightMs} ms · 组=性能 总计={uiBuildPerfMs} ms · 组=显示/核显 总计={uiBuildDisplayMs} ms（创建/添加/布局细分见合计行）");
+			Logger.WriteError($"[ui-build] 合计：创建+添加≈{uiBuildTotalMs - uiBuildLayoutMs} ms · 布局={uiBuildLayoutMs} ms（次数={_uiBuildLayoutCount}，含嵌套） · 总计={uiBuildTotalMs} ms · 控件数={uiBuildControlCount}");
 		}
 	}
 
@@ -10747,6 +10763,38 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主批准：设置窗布局性能优化）：构建期**布局耗时/次数**统计（含嵌套；仅首次构建开启）✅。
+	/// </summary>
+	protected override void OnLayout(LayoutEventArgs levent)
+	{
+		if (!_uiBuildProfiling)
+		{
+			base.OnLayout(levent);
+			return;
+		}
+		long layoutStart = Stopwatch.GetTimestamp();
+		try
+		{
+			base.OnLayout(levent);
+		}
+		finally
+		{
+			_uiBuildLayoutTicks += Stopwatch.GetTimestamp() - layoutStart;
+			_uiBuildLayoutCount++;
+		}
+	}
+
+	/// <summary>⭐ 统计整棵控件树数量（仅构建日志用；⛔ 不改布局）✅。</summary>
+	private static int CountAllControls(Control root)
+	{
+		int count = root.Controls.Count;
+		foreach (Control child in root.Controls)
+		{
+			count += CountAllControls(child);
+		}
+		return count;
+	}
 	private void SettingsForm_VisibleChanged(object? sender, EventArgs e)
 	{
 		if (!Program.UiAuditMode)
