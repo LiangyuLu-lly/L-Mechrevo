@@ -326,6 +326,95 @@ internal static class EcPortIo
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 FN EC 取证专用）：**快速单次读**（只用于探针）✅。
+	/// <para>⚠️ 与 <see cref="TryReadByte" /> 的区别：**单次事务、不重试、不做稳定性多次采样**；
+	/// 读失败就返回 false（⛔ 不重试、⛔ 不污染正常读写路径的失败计数/中毒判定）✅。</para>
+	/// <para>⚠️ 仍走同一条只读协议（0x92 · 端口 0x62/0x66），并受端口白名单约束 ✅。</para>
+	/// </summary>
+	/// <param name="address">XRAM 地址（与 <see cref="TryReadByte" /> 相同口径）✅。</param>
+	/// <param name="value">读到的字节；失败为 -1 ✅。</param>
+	/// <param name="timeoutMs">单步等待超时（默认 4ms；探针要快 ⇒ 失败立即下一个地址）✅。</param>
+	internal static bool TryReadByteFast(int address, out int value, int timeoutMs = 4)
+	{
+		value = -1;
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				return false;
+			}
+			if (!TryEnterEcMutex(out Mutex mutex, out bool held))
+			{
+				return false;
+			}
+			try
+			{
+				return ReadByteCoreFast(address, out value, timeoutMs);
+			}
+			catch
+			{
+				// ⭐ 探针专用：异常也不中毒（只读、继续扫下一个地址）✅
+				return false;
+			}
+			finally
+			{
+				ReleaseEcMutex(mutex, held);
+			}
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 快速连续读（逐字节 <see cref="TryReadByteFast" />；只用于只读探针）✅。
+	/// <para>⚠️ 每个字节都算一次独立事务；失败记为 -1，继续下一个 ✅。</para>
+	/// </summary>
+	internal static bool TryReadBytesFast(int address, int count, out int[] values, int timeoutMs = 4)
+	{
+		values = new int[count];
+		bool allOk = true;
+		for (int i = 0; i < count; i++)
+		{
+			if (!TryReadByteFast(address + i, out int v, timeoutMs))
+			{
+				values[i] = -1;
+				allOk = false;
+			}
+			else
+			{
+				values[i] = v;
+			}
+		}
+		return allOk;
+	}
+
+	/// <summary>⭐ 快速读的单次事务核心（不重试、不记失败计数）✅。</summary>
+	private static bool ReadByteCoreFast(int address, out int value, int timeoutMs)
+	{
+		value = -1;
+		if (!WriteCommand(EcCmdRead, IoKind.Read, timeoutMs))
+		{
+			return false;
+		}
+		if (!WriteData((byte)((address >> 8) & 0xFF), IoKind.Read, timeoutMs))
+		{
+			return false;
+		}
+		if (!WriteData((byte)(address & 0xFF), IoKind.Read, timeoutMs))
+		{
+			return false;
+		}
+		if (!ReadData(out byte data, timeoutMs))
+		{
+			return false;
+		}
+		value = data;
+		return true;
+	}
+
+	/// <summary>
 	/// 写 XRAM 一个字节。
 	/// <para>⚠️ <b>目前无调用方</b>：限充按用户指示暂缓，故此路径尚未接入任何功能。
 	/// 保留它是为了协议完整性与将来的显式接入；它同样受端口白名单与中毒机制约束。</para>
@@ -909,14 +998,14 @@ internal static class EcPortIo
 	}
 
 	/// <summary>向 0x66 发命令（先等 IBF 清空）。<paramref name="command"/> 受命令白名单约束。</summary>
-	private static bool WriteCommand(byte command, IoKind kind)
+	private static bool WriteCommand(byte command, IoKind kind, int timeoutMs = TimeoutMs)
 	{
 		if (command != EcCmdRead && command != EcCmdWrite && command != EcCmdAcpiRead && command != EcCmdAcpiWrite)
 		{
 			Poison("命令 0x" + command.ToString("X2") + " 不在白名单（只允许 0x92/0x93/0x80/0x81）");
 			return false;
 		}
-		if (!WaitIbfClear(kind))
+		if (!WaitIbfClear(kind, timeoutMs))
 		{
 			return false;
 		}
@@ -924,9 +1013,9 @@ internal static class EcPortIo
 	}
 
 	/// <summary>向 0x62 写一个数据字节（先等 IBF 清空）。</summary>
-	private static bool WriteData(byte data, IoKind kind)
+	private static bool WriteData(byte data, IoKind kind, int timeoutMs = TimeoutMs)
 	{
-		if (!WaitIbfClear(kind))
+		if (!WaitIbfClear(kind, timeoutMs))
 		{
 			return false;
 		}
@@ -934,10 +1023,10 @@ internal static class EcPortIo
 	}
 
 	/// <summary>从 0x62 读一个数据字节（先等 OBF 置位）。</summary>
-	private static bool ReadData(out byte data)
+	private static bool ReadData(out byte data, int timeoutMs = TimeoutMs)
 	{
 		data = 0;
-		if (!WaitObfSet(IoKind.Read))
+		if (!WaitObfSet(IoKind.Read, timeoutMs))
 		{
 			return false;
 		}
@@ -945,9 +1034,9 @@ internal static class EcPortIo
 	}
 
 	/// <summary>轮询 0x66 直到 IBF（bit1）为 0，即 EC 已取走我们上一次写入的字节。</summary>
-	private static bool WaitIbfClear(IoKind kind)
+	private static bool WaitIbfClear(IoKind kind, int timeoutMs = TimeoutMs)
 	{
-		long deadline = Environment.TickCount64 + TimeoutMs;
+		long deadline = Environment.TickCount64 + timeoutMs;
 		while (true)
 		{
 			if (!PortIn(PortStatus, out byte status, kind))
@@ -961,7 +1050,7 @@ internal static class EcPortIo
 			}
 			if (Environment.TickCount64 >= deadline)
 			{
-				ReportSoftFailure(kind, "等 IBF 清空超时（" + TimeoutMs + "ms · 最后状态 = 0x"
+				ReportSoftFailure(kind, "等 IBF 清空超时（" + timeoutMs + "ms · 最后状态 = 0x"
 					+ status.ToString("X2") + " ⇒ EC 未取走我们写入的字节）");
 				return false;
 			}
@@ -970,9 +1059,9 @@ internal static class EcPortIo
 	}
 
 	/// <summary>轮询 0x66 直到 OBF（bit0）为 1，即 EC 已准备好一个可读字节。</summary>
-	private static bool WaitObfSet(IoKind kind)
+	private static bool WaitObfSet(IoKind kind, int timeoutMs = TimeoutMs)
 	{
-		long deadline = Environment.TickCount64 + TimeoutMs;
+		long deadline = Environment.TickCount64 + timeoutMs;
 		while (true)
 		{
 			if (!PortIn(PortStatus, out byte status, kind))
@@ -986,7 +1075,7 @@ internal static class EcPortIo
 			}
 			if (Environment.TickCount64 >= deadline)
 			{
-				ReportSoftFailure(kind, "等 OBF 置位超时（" + TimeoutMs + "ms · 最后状态 = 0x"
+				ReportSoftFailure(kind, "等 OBF 置位超时（" + timeoutMs + "ms · 最后状态 = 0x"
 					+ status.ToString("X2") + " ⇒ EC 未给出可读字节）");
 				return false;
 			}
