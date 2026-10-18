@@ -285,7 +285,7 @@ internal static class LightingSettingsStore
 			}
 			stringBuilder.Append(colors[i].ToString(CultureInfo.InvariantCulture));
 		}
-		return string.Join('\n', new string[10]
+		return string.Join('\n', new string[11]
 		{
 			"effect=" + settings.Effect,
 			"light=" + settings.Light.ToString(CultureInfo.InvariantCulture),
