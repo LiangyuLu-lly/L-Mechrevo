@@ -5093,6 +5093,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		if (on)
 		{
+			// ⭐⭐ 2026-10-18（回归修复 · 机主「宝龙达强冷点不了，点一下闪一下」）：
+			//   懒加载改造后「点强冷」这条路径**漏了** `EnsureFanCurveReady()` ⇒ EC 通道没打开 ⇒
+			//   `FanWriter` 写入直接失败（日志 `通道=None` / `读 3 次仅成功 0 次`）⇒ 乐观勾选又被回滚 = "闪一下"。
+			//   ⇒ ⭐ 每次开强冷前先做一次闸门/通道就绪（进程内缓存，幂等，纯只读探测）✅
+			EnsureFanCurveReady();
+			// 2026-10-18（诊断包实证：本机 EC 读 0/3 成功、`通道=None`）：根因常是 **PawnIO 未安装**
+			//   （EC 写入靠 PawnIO 模块；WMI 转速读取不需要它，所以"能看转速却点不了强冷"）。
+			//   ⇒ 这里先探一次，缺失时如实提示用户去装，而不是只报"EC 写入失败"。
+			if (!PawnIO.RyzenSmuService.IsPawnInstalled())
+			{
+				Logger.WriteError("[fan] ⛔ 强冷失败：PawnIO 驱动未安装 ⇒ EC 写入不可用（WMI 转速仍可读）。请到「CPU 调节」页点一次「安装 PawnIO 驱动」后重试。");
+			}
 			// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 强冷直接走 `FanWriter`（无需 cfg 验证）✅
 			//   ⚠️ 仍保留：EC 写失败回滚、单次写、13 轮询确认、交回固件安全顺序 ✅
 			_fanBoostSavedCurve = LoadBaolongdaFanCurve();
@@ -5150,7 +5162,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// ⭐ 日志格式（机主要求）：`[fan] 强冷：写 20→… · 目标=6000 · 实测峰值=… RPM（等待 6.5s）⇒ 确认=True/False`
 			Logger.WriteLine($"[fan] 强冷：写 EC→{units}（0xC83C/0xC83D={units} x100RPM · 0xB20=0x0A · 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}）"
 				+ $" · 目标={units * 100} · 实测峰值={peakRpm} RPM（等待 {waitedSeconds:0.0}s）⇒ 确认={confirmed}"
-				+ (reached ? "" : "（已写入但转速未达预期）"));
+				+ ((!targetsOk || !maskOk)
+					? "（⛔ EC 未写入：通道/写入失败，见下一行回滚详情）"
+					: (reached ? "" : "（已写入但转速未达预期）")));
 			if (!targetsOk || !maskOk)
 			{
 				FanWriter.TryReleaseToFirmware(out string releaseDetail);
@@ -5898,6 +5912,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_fanCurveVerifyNote = conclusion;
 		Logger.WriteLine($"[fan] 风扇接管只读验证（诊断）：{genName} · {ecDetail} · {wmiDetail} ⇒ {conclusion}");
 		Logger.WriteLine($"[fan] 风扇控制：宝龙达 ⇒ 直接开放（30/40 系已验证；cfg 仅诊断，不再作为 UI 开关条件）");
+		// 2026-10-18（机主：宝龙达应强制要求安装 PawnIO）：
+		//   宝龙达的风扇强冷 / 风扇曲线 / 电池充电阈值全部走 EC 写入 => 依赖 PawnIO；
+		//   WMI 转速读取不需要它 => 缺失时表现为「能看转速，点强冷一闪就回滚」（真机诊断包已复现）。
+		if (!PawnIO.RyzenSmuService.IsPawnInstalled())
+		{
+			Logger.WriteError("[fan] ⛔ 宝龙达机型但 PawnIO 驱动未安装 => 风扇强冷/曲线/电池充电阈值不可用；"
+				+ "请到「CPU 调节」页安装，或重新运行安装包（宝龙达机型已强制勾选该项）");
+		}
 		return ecOk;
 	}
 

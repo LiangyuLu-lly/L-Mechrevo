@@ -396,7 +396,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ;     只在**用户勾选**本任务时，由 {app}\Install-PawnIO.ps1 从上游官方 release **现下载**，
 ;     校验 SHA-256 ＋ Authenticode 签名通过后才静默安装（脚本自带这两道校验）。
 ;   默认勾选（checkedonce = 升级时记住上次选择）；静默安装（/SILENT）时自动跳过。
-Name: "pawnio"; Description: "安装 PawnIO 驱动（读取 CPU 温度所需，需联网下载约 1-2 MB）"; GroupDescription: "推荐组件"; Flags: checkedonce 
+Name: "pawnio"; Description: "安装 PawnIO 驱动（读取 CPU 温度所需，需联网下载约 1-2 MB）"; GroupDescription: "推荐组件";
+; 2026-10-18（机主：强冷点不了，诊断包显示本机 PawnIO 未安装）：
+;   ⚠️ `checkedonce` 会记住"用户上次取消过"⇒ 之后再装也永远不勾 ⇒ 驱动一直缺失 ⇒ EC 写入（风扇强冷/曲线/电池阈值）全失败。
+;   ⇒ 去掉 checkedonce：默认总是勾选；已安装时由 CurPageChanged 自动取消勾选并改写说明（不重复安装）✅ 
 
 [UninstallDelete]
 ; 2026-10-09：%APPDATA%\MechrevoLite 与 C:\ProgramData\MechrevoLite 故意不写在这里 ——
@@ -2490,6 +2493,26 @@ begin
         Log('LM-PAWNIO-SKIP: 已安装 PawnIO，但任务页勾选改写失败（忽略）');
       end;
       Log('LM-PAWNIO-SKIP: 已安装 PawnIO ⇒ 任务页中该项已取消勾选（不再重复安装）');
+    end
+    else
+    begin
+      // 2026-10-18（机主：宝龙达应强制要求安装 PawnIO）：
+      //   宝龙达的 风扇强冷 / 风扇曲线 / 电池充电阈值 全部依赖 PawnIO（EC 写入）⇒
+      //   任务页里强制勾选并改写说明，避免用户取消后 EC 功能全废。
+      if IsBaolongdaMold() then
+      begin
+        try
+          for I := 0 to WizardForm.TasksList.Items.Count - 1 do
+            if Pos('PawnIO', WizardForm.TasksList.Items[I]) > 0 then
+            begin
+              WizardForm.TasksList.Checked[I] := True;
+              WizardForm.TasksList.ItemCaption[I] := '安装 PawnIO 驱动（宝龙达机型必需：风扇强冷/曲线/电池阈值）';
+            end;
+        except
+          Log('LM-PAWNIO-FORCE: 宝龙达机型强制勾选 PawnIO 失败（忽略）');
+        end;
+        Log('LM-PAWNIO-FORCE: 宝龙达机型 ⇒ 已强制勾选 PawnIO 安装（EC 功能依赖它）');
+      end;
     end;
   end;
 end;
