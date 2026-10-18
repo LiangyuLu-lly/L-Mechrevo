@@ -3179,6 +3179,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				{
 					return false; // ⭐ 理论上不会发生（宝龙达在管事）⇒ 交回原路更安全 ✅
 				}
+				// ⭐⭐ 2026-10-19（30 系）：开关镜像只认 EC 0x1807；读不到就保留上一次（⛔ 不凭 WMI16 恢复 ON）✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen30)
+				{
+					if (TryReadKeyboardPowerFromEc(out bool ecOff, out int ecOffValue))
+					{
+						KeyboardPower = ecOff;
+						confirmed = !ecOff;
+						Logger.WriteError($"[kbd] 30 系关灯后开关状态：EC 0x1807=0x{ecOffValue:X2} ⇒ {(ecOff ? "ON" : "OFF")}"
+							+ $" · confirmed={confirmed}");
+					}
+					else
+					{
+						Logger.WriteError("[kbd] 30 系关灯后 EC 0x1807 读不到 ⇒ 保留上一次开关状态（⛔ 不凭 WMI16 改）");
+					}
+				}
 				return true; // ⭐ 已接管 → 判据由统一实现给出（功能号 16 模式值 ✅）⇒ ⛔ 不再走下面的重复回读 ✅
 			}
 			else
@@ -3220,6 +3235,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//      `SysEnums.cs` 的 `RGBKeyboardMode`）：⭐ `Mode_Off = 0` · ⭐ `Mode_RGBFixedMode = 2` ·
 			//      ⭐ `Unknow = 255` ⇒ ⭐ **「开」＝ 模式 ≠ 0** ✅ · ⭐ **「关」＝ 模式 0** ✅
 			//      （⭐ 本方法下发时正是这么写的：⭐ 关 ⇒ 模式 0 ✅ · ⭐ 开 ⇒ 模式 2 ✅）。
+			// ⭐⭐ 2026-10-19（30 系）：开关镜像只认 EC 0x1807（WMI16 仍是 2，不能拿来判「开」）✅
+			if (DgpuGeneration == DgpuGenerationKind.Gen30)
+			{
+				if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
+				{
+					KeyboardPower = ecOn;
+					confirmed = ecOn == on;
+					Logger.WriteError($"[kbd] 30 系开关确认：EC 0x1807=0x{ecValue:X2} ⇒ {(ecOn ? "ON" : "OFF")}"
+						+ $"（目标={(on ? "开" : "关")} · confirmed={confirmed}）");
+					return true;
+				}
+				// ⭐ EC 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16=2 恢复 ON）✅
+				Logger.WriteError("[kbd] 30 系开关确认：EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
+				return true;
+			}
 			for (int attempt = 0; attempt < 5; attempt++)
 			{
 				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
@@ -3273,6 +3303,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
 			{
+				// ⭐⭐ 2026-10-19（30 系）：开关确认只认 EC 0x1807（WMI16 仍是 2，不能拿来判「开」）✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen30)
+				{
+					if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
+					{
+						KeyboardPower = ecOn;
+						confirmed = ecOn == on;
+						Logger.WriteError($"[kbd] 30 系开关确认（topic）：EC 0x1807=0x{ecValue:X2} ⇒ {(ecOn ? "ON" : "OFF")}"
+							+ $"（目标={(on ? "开" : "关")} · confirmed={confirmed}）");
+						return true;
+					}
+					// ⭐ EC 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16=2 恢复 ON）✅
+					Logger.WriteError("[kbd] 30 系开关确认（topic）：EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
+					return true;
+				}
 				// ⭐ 口径同 TrySetLightPowerViaBackend：⭐ Mode_Off=0 ⇒ 关 ✅ · ⭐ 非 0 ⇒ 开 ✅ · ⭐ Unknow=255 ⇒ 读不到 ✅
 				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
 				{
@@ -3523,6 +3568,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
+			// ⭐⭐ 2026-10-19（机主：30 系关灯后开关自己跳回「开」）：
+			//   ⚠️ 30 系关灯写的是 **EC 0x1807=0x00**；WMI 16 仍是 2（固定色）/18 也可能不更新
+			//   ⇒ 开关状态**只认 EC 0x1807**：0x00 ⇒ OFF；!=0 ⇒ ON；⛔ 不再用 WMI 16/18 判开关 ✅
+			//   ⚠️ EC 读不到 ⇒ 返回 false（调用方保留上一次状态；⛔ 绝不凭 WMI16 恢复 ON）✅
+			if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
+			{
+				on = ecOn;
+				detail = $"30 系判据：EC 0x1807=0x{ecValue:X2} ⇒ {(ecOn ? "ON" : "OFF")}（⛔ 忽略 WMI16/18）";
+				return true;
+			}
+			if (DgpuGeneration == DgpuGenerationKind.Gen30)
+			{
+				detail = "30 系 EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16/18 判开关）";
+				return false;
+			}
 			bool modeRead = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte modeValue) && modeValue != 255;
 			bool brightRead = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte brightValue) && brightValue != 255;
 			if (modeRead)
@@ -3549,6 +3609,34 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			detail = ex.GetType().Name + " " + ex.Message;
 			return false;
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系「关灯后开关自己跳回开」）：⭐ **开关状态以 EC 0x1807 为准** ✅。
+	/// <para>0x00 ⇒ OFF；!=0 ⇒ ON；读失败返回 <c>false</c>（调用方保留上一次状态；⛔ 不凭 WMI16/18 恢复 ON）✅。</para>
+	/// <para>⚠️ 仅 Gen30；其它机型返回 false（继续走原 WMI 判据）✅。</para>
+	/// </summary>
+	internal bool TryReadKeyboardPowerFromEc(out bool on, out int ecValue)
+	{
+		on = false;
+		ecValue = -1;
+		if (DgpuGeneration != DgpuGenerationKind.Gen30)
+		{
+			return false;
+		}
+		if (!EcPortIo.TryReadByte(KeyboardEcBrightness.RegisterAddress, out int value))
+		{
+			return false;
+		}
+		ecValue = value;
+		on = value != 0;
+		string message = $"[kbd] 30 系开关状态：EC 0x1807=0x{value:X2} ⇒ {(on ? "ON" : "OFF")}"
+			+ (on ? "" : "（⛔ 忽略 WMI16=2 的“开”）");
+		if (Logger.TryMarkChanged("kbd30-ec-power", message))
+		{
+			Logger.WriteError(message);
+		}
+		return true;
 	}
 
 	/// <summary>
