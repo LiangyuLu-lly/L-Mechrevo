@@ -1558,14 +1558,33 @@ public class CustomModeForm : RForm
 			int lastSent = int.MinValue;
 			bar.ValueChanged += (object? _, EventArgs _) =>
 			{
-				if (valueInput.Value != (decimal)bar.Value)
+				// ⭐⭐⭐ 2026-10-19（crash：NumericUpDown 值超 Maximum 反复抛 ArgumentOutOfRangeException）：
+				//   ⭐ 先把数字框范围扩到包含滑块值，再 clamp 赋值（⛔ 不再先塞 Value 后撞上限）✅
+				if (bar.Value > valueInput.Maximum)
 				{
-					valueInput.Value = bar.Value;
+					valueInput.Maximum = bar.Value;
 				}
-				if (!_syncing && bar.Value != lastSent)
+				else if (bar.Value < valueInput.Minimum)
 				{
-					lastSent = bar.Value;
-					onChanged(bar.Value);
+					valueInput.Minimum = bar.Value;
+				}
+				int clampedBarValue = Math.Clamp(bar.Value, (int)valueInput.Minimum, (int)valueInput.Maximum);
+				try
+				{
+					if (valueInput.Value != (decimal)clampedBarValue)
+					{
+						valueInput.Value = clampedBarValue;
+					}
+				}
+				catch (ArgumentOutOfRangeException ex)
+				{
+					Logger.WriteError("[rslider] ⛔ 值超范围（slider=" + bar.Value + " · numeric="
+						+ valueInput.Minimum + "~" + valueInput.Maximum + "）：" + ex.Message);
+				}
+				if (!_syncing && clampedBarValue != lastSent)
+				{
+					lastSent = clampedBarValue;
+					onChanged(clampedBarValue);
 				}
 			};
 			valueInput.ValueChanged += (object? _, EventArgs _) =>
@@ -4467,17 +4486,21 @@ public class CustomModeForm : RForm
 	private static bool ApplyRange(RSlider bar, RNumericUpDown valueInput, int minimum, int maximum, int current, bool allowNegative = false)
 	{
 		(int, int, int, bool) tuple = DeviceRange(minimum, maximum, current, allowNegative);
+		// ⭐⭐⭐ 2026-10-19（crash 修复）：**先设 Min/Max 再设 Value（clamp）** ——
+		//   两边范围先各自扩到包含目标值 ⇒ 赋值不会越界；最后落到最终范围再 clamp 一次 ✅
 		bar.Minimum = Math.Min(bar.Minimum, tuple.Item1);
 		bar.Maximum = Math.Max(bar.Maximum, tuple.Item2);
-		bar.Value = Math.Clamp(tuple.Item3, bar.Minimum, bar.Maximum);
-		bar.Minimum = tuple.Item1;
-		bar.Maximum = tuple.Item2;
-		bar.Value = tuple.Item3;
 		valueInput.Minimum = Math.Min(valueInput.Minimum, tuple.Item1);
 		valueInput.Maximum = Math.Max(valueInput.Maximum, tuple.Item2);
-		valueInput.Value = tuple.Item3;
+		int clampedValue = Math.Clamp(tuple.Item3, tuple.Item1, tuple.Item2);
+		bar.Value = Math.Clamp(clampedValue, bar.Minimum, bar.Maximum);
+		valueInput.Value = Math.Clamp(clampedValue, (int)valueInput.Minimum, (int)valueInput.Maximum);
+		bar.Minimum = tuple.Item1;
+		bar.Maximum = tuple.Item2;
+		bar.Value = Math.Clamp(clampedValue, tuple.Item1, tuple.Item2);
 		valueInput.Minimum = tuple.Item1;
 		valueInput.Maximum = tuple.Item2;
+		valueInput.Value = Math.Clamp(clampedValue, tuple.Item1, tuple.Item2);
 		bar.Enabled = tuple.Item4;
 		valueInput.Enabled = tuple.Item4;
 		SetRowVisible(bar, tuple.Item4, valueInput);

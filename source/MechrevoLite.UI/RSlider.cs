@@ -383,7 +383,15 @@ public class RSlider : Control
 		{
 			currentValue = num;
 			Invalidate();
-			ValueChanged?.Invoke(this, EventArgs.Empty);
+			try
+			{
+				ValueChanged?.Invoke(this, EventArgs.Empty);
+			}
+			catch (ArgumentOutOfRangeException ex)
+			{
+				// ⭐⭐⭐ 2026-10-19（crash：数值框上限小于滑块值时反复抛）：⛔ 不让 UI 线程异常刷屏/崩溃 ✅
+				global::Logger.WriteError("[rslider] ⛔ 值超范围（value=" + num + " · range=" + minimum + "~" + maximum + "）：" + ex.Message);
+			}
 			if (Focused)
 			{
 				Announce(num.ToString());

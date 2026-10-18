@@ -839,6 +839,54 @@ public class LhmMonitor : IDisposable
 	/// ② 否则 `GPU Package Power` / `GPU Power`；⛔ 排除名字含 Limit/Capacity/TDP 的（上限类，不是实时功耗）✅。
 	/// <para>⚠️ 只读；只影响 AMD 核显，NVIDIA 机型仍走 NVML/原路径 ✅</para>
 	/// </summary>
+	// ⭐ 合理性/尖峰过滤状态（AMD 核显专用；NVIDIA 不进入）✅
+	private static readonly Dictionary<string, float> _igpuLastValidWatts = new Dictionary<string, float>();
+
+	private static readonly List<float> _igpuRecentWatts = new List<float>();
+
+	private static int _igpuAbnormalStreak;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：核显功耗偶发 400W）：
+	/// 单个分量的**合理性与尖峰过滤** —— 硬上限 120W；软尖峰：> 近 5 次中位数×5 且 >50W ⇒ 丢弃；
+	/// 丢弃时保留该分量上一次有效值（没有则跳过该分量）；连续异常计数给上层（≥5 ⇒ 显示—）✅。
+	/// </summary>
+	private static float? ValidateIgpuComponent(string name, float value)
+	{
+		string reason = null;
+		if (value > 120f)
+		{
+			reason = "超 iGPU 合理上限 120W";
+		}
+		else if (_igpuRecentWatts.Count >= 3)
+		{
+			List<float> sorted = new List<float>(_igpuRecentWatts);
+			sorted.Sort();
+			float median = sorted[sorted.Count / 2];
+			if (value > median * 5f && value > 50f)
+			{
+				reason = "尖峰（>中位数×5 且 >50W，中位数=" + median.ToString("F1") + "W）";
+			}
+		}
+		if (reason == null)
+		{
+			_igpuAbnormalStreak = 0;
+			_igpuLastValidWatts[name] = value;
+			_igpuRecentWatts.Add(value);
+			if (_igpuRecentWatts.Count > 5)
+			{
+				_igpuRecentWatts.RemoveAt(0);
+			}
+			return value;
+		}
+		_igpuAbnormalStreak++;
+		Logger.WriteError("[gpu-power] ⚠️ 丢弃异常样本：" + name + "=" + value.ToString("F1") + "W（" + reason + "）");
+		if (_igpuLastValidWatts.TryGetValue(name, out float last))
+		{
+			return last;
+		}
+		return null;
+	}
 	private static (float? Power, string Source) SelectAmdIgpuPower(List<(HardwareType Type, string Hardware, string Name, float Value)> sensors)
 	{
 		List<(string Name, float Value)> candidates = new List<(string, float)>();
@@ -855,19 +903,26 @@ public class LhmMonitor : IDisposable
 			return (null, "");
 		}
 		// ① SoC + Core 同时存在 ⇒ 相加（板载 iGPU 的两段真实功耗）
+		//   ⭐⭐ 2026-10-19（机主实测：LHM 在 780M 上名字是 `GPU Core` / `GPU SoC`，**不带 Power 后缀**）：
+		//   匹配同时认 SoC/Core（是否带 Power 都行）；每个分量先过**合理性与尖峰过滤**再相加 ✅
 		bool hasSoc = false;
 		bool hasCore = false;
 		float sum = 0f;
 		List<string> sumNames = new List<string>();
 		foreach ((string Name, float Value) candidate in candidates)
 		{
-			bool isSoc = candidate.Name.IndexOf("SoC Power", StringComparison.OrdinalIgnoreCase) >= 0;
-			bool isCore = candidate.Name.IndexOf("Core Power", StringComparison.OrdinalIgnoreCase) >= 0;
+			bool isSoc = candidate.Name.IndexOf("SoC", StringComparison.OrdinalIgnoreCase) >= 0;
+			bool isCore = candidate.Name.IndexOf("Core", StringComparison.OrdinalIgnoreCase) >= 0;
 			if (isSoc || isCore)
 			{
+				float? validated = ValidateIgpuComponent(candidate.Name, candidate.Value);
+				if (!validated.HasValue)
+				{
+					continue;
+				}
 				hasSoc |= isSoc;
 				hasCore |= isCore;
-				sum += candidate.Value;
+				sum += validated.Value;
 				sumNames.Add(candidate.Name);
 			}
 		}
@@ -878,6 +933,14 @@ public class LhmMonitor : IDisposable
 				Logger.WriteLineIfChanged("gpu-power-amd-sum", "[gpu-power] AMD 核显：SoC + Core 同时存在 ⇒ 相加（" + string.Join(" + ", sumNames) + "）");
 			}
 			return (sum, string.Join("+", sumNames));
+		}
+		if (_igpuAbnormalStreak >= 5)
+		{
+			if (Logger.TryMarkChanged("gpu-power-igpu-abnormal-streak", "[gpu-power] ⚠️ 连续异常 ⇒ 显示—"))
+			{
+				Logger.WriteError("[gpu-power] ⚠️ 连续异常 ⇒ 显示—");
+			}
+			return (null, "");
 		}
 		// ② 封装/整卡值
 		foreach ((string Name, float Value) candidate in candidates)
