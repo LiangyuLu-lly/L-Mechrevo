@@ -67,6 +67,9 @@ internal static class FanProbe
 			// ────────────────────────────────────────────────────────────────
 			bool ecVerified = ProbeEcFanRegistersReadOnly(L);
 			L("");
+			// ⭐⭐ 2026-10-18（写失败排查）：⭐ 追加 **ACPI EC 只读对照**（⛔ 不写任何字节）
+			EcChannelCompare.LogAcpiReadOnly(L);
+			L("");
 
 			// ────────────────────────────────────────────────────────────────
 			// 0. WMI 只读对照（⛔ 一个 Set 都不发）

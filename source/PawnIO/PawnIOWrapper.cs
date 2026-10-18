@@ -67,7 +67,14 @@ public sealed class PawnIOWrapper : IDisposable
 	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern bool DeviceIoControl(nint dev, Ctl code, byte[] inB, uint inSz, byte[] outB, uint outSz, out uint ret, nint ovl);
 
-	[DllImport("kernel32.dll")]
+	/// <summary>
+	/// ⭐ 2026-10-18（EC 写排查 · 仪表化）：⭐ 最近一次 <see cref="Execute" /> 的 Win32 错误码
+	/// （0 = 成功；非 0 = 失败，如 5=拒绝访问 / 87=参数错误 / 1=不支持）。✅
+	/// <para>⚠️ 只用于**诊断日志**（⛔ 不参与任何控制流判断）✅</para>
+	/// </summary>
+	public int LastError { get; private set; }
+
+	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern bool DeviceIoControl(SafeFileHandle dev, Ctl code, [In] byte[] inB, uint inSz, [Out] byte[] outB, uint outSz, out uint ret, nint ovl);
 
 	public ConnectResult Connect()
@@ -121,6 +128,7 @@ public sealed class PawnIOWrapper : IDisposable
 
 	public bool Execute(string functionName, ulong[]? input, ulong[]? output)
 	{
+		LastError = 0;
 		if (!IsModuleLoaded)
 		{
 			return false;
@@ -143,6 +151,8 @@ public sealed class PawnIOWrapper : IDisposable
 		byte[] array3 = ((num2 > 0) ? new byte[num2 * 8] : null);
 		if (!DeviceIoControl(_safe, Ctl.Execute, array, (uint)array.Length, array3, (uint)(array3?.Length ?? 0), out var ret, IntPtr.Zero) || !HasCompleteOutput(ret, num2))
 		{
+			// ⭐ 仪表化：记录失败原因（Win32 错误码）—— ⛔ 不改变控制流 ✅
+			LastError = Marshal.GetLastWin32Error();
 			return false;
 		}
 		if (num2 > 0)

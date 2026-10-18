@@ -73,6 +73,11 @@ internal static class FanEcTest
 			L("主板 = " + (board.Length == 0 ? "(空/读不到)" : board) + " ⇒ " + (is30 ? "30 系" : "40 系"));
 			L("");
 
+			// ⭐⭐ 2026-10-18（写失败排查）：⭐ **先做 ACPI EC 只读对照**（⛔ 不写任何字节）——
+			//   即使 LPC 身份不通过，也要留下 ACPI 通道读数（用于判断"写是否该走 ACPI EC"）✅
+			EcChannelCompare.LogAcpiReadOnly(L);
+			L("");
+
 			// ── ① 身份（闸门只认身份：0x2000 == 0x55 且 0xC411 非 0/0xFF）──
 			L("── ① EC 身份 ──");
 			bool identityOk = EcLpcIo.TryReadEcIdentity(out _, out _, out string idNote);
@@ -103,6 +108,8 @@ internal static class FanEcTest
 				L("解锁：" + unlockNote);
 				L("解锁后 0x1060 = 0x" + (unlockAfter < 0 ? "读不到" : unlockAfter.ToString("X2"))
 					+ "（bit7=" + (((unlockAfter & UnlockBit) != 0) ? "1" : "0") + "）");
+				// ⭐⭐ 2026-10-18（写失败排查）：⭐ 打印解锁写的 **ioctl 返回码 + 完整端口序列** ✅
+				LogWriteTrace(L, "解锁写 0x1060 端口序列");
 				if (!unlockOk)
 				{
 					L("");
@@ -164,10 +171,12 @@ internal static class FanEcTest
 			wroteEc = true; // ⭐ 先置恢复标志：即使下面异常，finally 也会恢复 ✅
 			bool w1 = EcLpcIo.TryWriteFanTarget(EcLpcIo.Fan1TargetAddress, targetUnits, out int rb1);
 			L("写 0xC83C=" + targetUnits + " ⇒ ok=" + w1 + " · 回读=" + (rb1 < 0 ? "读不到" : rb1.ToString()));
+			LogWriteTrace(L, "写 0xC83C 端口序列");
 			bool w2 = EcLpcIo.TryWriteFanManualMask(fan1Manual: true, fan2Manual: false, out int rbMask);
 			L("写 0xB20（bit1=1，保留其它位）⇒ ok=" + w2 + " · 回读=0x"
 				+ (rbMask < 0 ? "读不到" : rbMask.ToString("X2"))
 				+ "（bit1=" + (((rbMask & 0x02) != 0) ? "1" : "0") + " · bit3=" + (((rbMask & 0x08) != 0) ? "1" : "0") + "）");
+			LogWriteTrace(L, "写 0xB20 端口序列");
 			L("");
 
 			// ── ⑤ 等起转 → 读 EC + WMI 13 ──
@@ -224,6 +233,7 @@ internal static class FanEcTest
 				{
 					bool restored = EcLpcIo.TryRestoreFanFirmware(out string restoreDetail);
 					L("风扇恢复 = " + restored + " · " + restoreDetail);
+					LogWriteTrace(L, "风扇恢复（最后一步 0xB20 清位）端口序列");
 					if (!restored)
 					{
 						L("⚠️ 风扇恢复未完全成功 —— 请立即把本报告发回；必要时重启机器 ⚠️");
@@ -243,6 +253,7 @@ internal static class FanEcTest
 						+ " ⇒ 回读=" + (unlockReadBack < 0 ? "读不到" : "0x" + unlockReadBack.ToString("X2"))
 						+ " ⇒ ok=" + unlockRestored
 						+ (unlockRestored ? " ✅" : " ⚠️（请把报告发回）"));
+					LogWriteTrace(L, "解锁恢复 端口序列");
 				}
 				catch (Exception ex)
 				{
@@ -269,6 +280,25 @@ internal static class FanEcTest
 			L("⚠️ 验证通过前，产品**不开放**风扇曲线/强冷（UI 已隐藏）；⭐ 请把本报告发回 ✅");
 		}
 		return exitCode;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（写失败排查 · 仪表化）：⭐ 把 `EcLpcIo.LastWriteTrace`（完整端口序列 + ioctl 返回码/错误码）
+	/// 逐行写进报告，供与开源蛟龙 `Blding64.EC_RAM_WRITE` 逐条并列对照 ✅。
+	/// </summary>
+	private static void LogWriteTrace(Action<string> log, string title)
+	{
+		log(title + "（ioctl 最后一条：ok=" + EcLpcIo.LastIoctlOk + " · Win32=" + EcLpcIo.LastIoctlError + "）");
+		string trace = EcLpcIo.LastWriteTrace;
+		if (string.IsNullOrWhiteSpace(trace))
+		{
+			log("  （无端口序列记录 —— 可能在模块装载/互斥体阶段就失败，未走到端口写）");
+			return;
+		}
+		foreach (string line in trace.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+		{
+			log("  " + line.TrimEnd('\r'));
+		}
 	}
 
 	/// <summary>⭐ 读 EC 0xC834/0xC835（上游口径 ≈ RPM/100）并换算成 RPM ✅。</summary>

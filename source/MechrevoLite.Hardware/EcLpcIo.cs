@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Threading;
 using PawnIO;
 
@@ -121,6 +122,31 @@ internal static class EcLpcIo
 	private static string _poisonReason = "";
 
 	private static int _ioCount;
+
+	// ⭐⭐ 2026-10-18（EC 写排查 · 仪表化）：⭐ 把**最近一次写操作**的完整端口序列（地址+值+ioctl 结果/错误码）
+	//   记下来，报告里可直接和开源蛟龙 `Blding64.EC_RAM_WRITE` 逐条并列 ✅
+	//   ⚠️ 只记录、⛔ 不改变任何控制流；⭐ 只在 `TryWriteByteOperation` 期间开启（普通读不记，⛔ 不刷屏）✅
+	private static readonly StringBuilder _ioTrace = new StringBuilder();
+
+	private static bool _ioTraceEnabled;
+
+	/// <summary>⭐ 最近一次写操作的**最后一条 ioctl** 是否成功（诊断用）✅</summary>
+	internal static bool LastIoctlOk { get; private set; }
+
+	/// <summary>⭐ 最近一次写操作的**最后一条 ioctl** 的 Win32 错误码（0=成功；诊断用）✅</summary>
+	internal static int LastIoctlError { get; private set; }
+
+	/// <summary>⭐ 最近一次写操作的完整端口序列（每行：端口/值/ioctl 结果；⭐ 诊断用）✅</summary>
+	internal static string LastWriteTrace
+	{
+		get
+		{
+			lock (Gate)
+			{
+				return _ioTrace.ToString();
+			}
+		}
+	}
 
 	/// <summary>连续读失败达此次数才升级为全局中毒（软失败）。与 <see cref="EcPortIo"/> 同值。</summary>
 	internal const int MaxConsecutiveReadFailures = 3;
@@ -389,6 +415,9 @@ internal static class EcLpcIo
 			}
 			try
 			{
+				// ⭐ 仪表化：只记录**这一次写操作**的完整端口序列（含 ioctl 结果/错误码）✅
+				_ioTrace.Clear();
+				_ioTraceEnabled = true;
 				bool wrote = WriteByteCore(DefaultSlot, address, value);
 				int check = -1;
 				bool readOk = wrote && ReadByteCore(DefaultSlot, address, out check);
@@ -409,6 +438,7 @@ internal static class EcLpcIo
 			}
 			finally
 			{
+				_ioTraceEnabled = false;
 				ReleaseMutex(mutex, held);
 			}
 		}
@@ -642,9 +672,14 @@ internal static class EcLpcIo
 	{
 		try
 		{
-			if (!_pawn.Execute("ioctl_pio_outb", new ulong[2] { port, value }, null))
+			bool ok = _pawn.Execute("ioctl_pio_outb", new ulong[2] { port, value }, null);
+			LastIoctlOk = ok;
+			LastIoctlError = ok ? 0 : _pawn.LastError;
+			Trace("pio_outb", port, value, null, ok, LastIoctlError, what);
+			if (!ok)
 			{
-				ReportSoftFailure("ioctl_pio_outb(0x" + port.ToString("X2") + ",0x" + value.ToString("X2") + " · " + what + ") 失败");
+				ReportSoftFailure("ioctl_pio_outb(0x" + port.ToString("X2") + ",0x" + value.ToString("X2") + " · " + what
+					+ ") 失败（Win32=" + LastIoctlError + "）");
 				return false;
 			}
 			_ioCount++;
@@ -652,6 +687,7 @@ internal static class EcLpcIo
 		}
 		catch (Exception ex)
 		{
+			Trace("pio_outb", port, value, null, false, -1, "异常：" + ex.GetType().Name);
 			Poison("PIO 写 0x" + port.ToString("X2") + " 抛异常：" + ex.GetType().Name);
 			return false;
 		}
@@ -664,20 +700,51 @@ internal static class EcLpcIo
 		try
 		{
 			ulong[] output = new ulong[1];
-			if (!_pawn.Execute("ioctl_pio_inb", new ulong[1] { port }, output))
+			bool ok = _pawn.Execute("ioctl_pio_inb", new ulong[1] { port }, output);
+			LastIoctlOk = ok;
+			LastIoctlError = ok ? 0 : _pawn.LastError;
+			byte read = ok ? (byte)(output[0] & 0xFF) : (byte)0;
+			Trace("pio_inb", port, null, ok ? (int?)read : null, ok, LastIoctlError, "读回");
+			if (!ok)
 			{
-				ReportSoftFailure("ioctl_pio_inb(0x" + port.ToString("X2") + ") 失败");
+				ReportSoftFailure("ioctl_pio_inb(0x" + port.ToString("X2") + ") 失败（Win32=" + LastIoctlError + "）");
 				return false;
 			}
 			_ioCount++;
-			value = (byte)(output[0] & 0xFF);
+			value = read;
 			return true;
 		}
 		catch (Exception ex)
 		{
+			Trace("pio_inb", port, null, null, false, -1, "异常：" + ex.GetType().Name);
 			Poison("PIO 读 0x" + port.ToString("X2") + " 抛异常：" + ex.GetType().Name);
 			return false;
 		}
+	}
+
+	/// <summary>⭐ 仪表化：把一条端口 I/O 追加到 <see cref="LastWriteTrace" />（⭐ 仅在写操作期间记录）✅</summary>
+	private static void Trace(string ioctl, ushort port, byte? writeValue, int? readValue, bool ok, int win32, string what)
+	{
+		if (!_ioTraceEnabled)
+		{
+			return;
+		}
+		_ioTrace.Append(ioctl).Append("(0x").Append(port.ToString("X2")).Append(", ");
+		if (writeValue.HasValue)
+		{
+			_ioTrace.Append("0x").Append(writeValue.Value.ToString("X2"));
+		}
+		else
+		{
+			_ioTrace.Append('—');
+		}
+		_ioTrace.Append(")");
+		if (readValue.HasValue)
+		{
+			_ioTrace.Append(" ⇒ 读回=0x").Append(readValue.Value.ToString("X2"));
+		}
+		_ioTrace.Append(" · ioctl_rc=").Append(ok ? "0(OK)" : "FAIL(Win32=" + win32 + ")");
+		_ioTrace.Append(" · ").Append(what).Append('\n');
 	}
 
 	/// <summary>
