@@ -4662,6 +4662,21 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardBrightnessPreservingEffect(int level0to4)
 	{
+		// ⭐⭐ 2026-10-19（机主：调亮度后再关灯，按钮会自己开）：Gen30 宝龙达且**用户意图=关** ⇒
+		//   ⛔ 直接跳过（不写亮度、⛔ 不把 EC 0x1807 写成非 0、⛔ 不改电源镜像）✅
+		if (_hw != null && _hw.UsesBaolongda && _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30)
+		{
+			bool intentOn = _hw.KeyboardPower;
+			if (!intentOn && _hw.TryReadKeyboardPowerFromEc(out bool ecOn, out int _))
+			{
+				intentOn = ecOn;
+			}
+			if (!intentOn)
+			{
+				Logger.WriteError("[kbd] 跳过保持亮度：用户意图=关灯 ⇒ 不写亮度（⛔ 不点亮）");
+				return Task.FromResult(result: true);
+			}
+		}
 		// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2 步）：⭐ 亮度调整同样先问门面层 ✅
 		//   ⭐ 非 GCU 后端 ⇒ ⭐ 读出当前效果/颜色（⭐ 沿用下面的读取逻辑）后走 WMI ✅；
 		//   ⭐ 否则 ⭐ 原样往下走 ✅

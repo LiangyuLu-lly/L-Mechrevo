@@ -148,8 +148,9 @@ internal static class KeyboardEcBrightness
 	/// <summary>⭐ 2026-10-19（追踪「谁在写 0x1807」）：每次真实 EC 写前打来源 + 前 3 帧调用链（⛔ 不打整栈）✅。</summary>
 	private static void TraceEcWrite(int level, byte target, string source, string channel)
 	{
+		bool powerMirrorOn = Program.hw != null && Program.hw.KeyboardPower;
 		Logger.WriteError($"[kbd-trace] 写 0x1807=0x{target:X2} ← 来源={source} · 档位={level}"
-			+ $" · 通道={channel} · 调用链={DescribeEcCallChain(3)}");
+			+ $" · 电源意图={(powerMirrorOn ? "开" : "关")} · 通道={channel} · 调用链={DescribeEcCallChain(3)}");
 	}
 
 	/// <summary>⭐ 截前 N 帧调用链（类型.方法 ← …），⛔ 不打完整栈 ✅。</summary>

@@ -1618,6 +1618,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private static int _kbdRawProbeState;
 
 	/// <summary>
+	/// ⭐ 2026-10-19（机主：开灯后过一会自己变关）：最近一次**用户灯效动作**的时间戳（TickCount64）。
+	/// <para>⚠️ 自动关灯 tick 在最近 5s 内有过用户动作时**不触发**（防止刚开灯就被误判为空闲而关掉）✅。</para>
+	/// </summary>
+	private long _kbdLastUserActionTick;
+
+	/// <summary>⭐ 2026-10-19：自动关灯的“最近用户动作”保护窗口（毫秒）✅。</summary>
+	private const int KeyboardAutoOffUserActionGuardMs = 5000;
+
+	/// <summary>
 	/// ⭐ 本机的**键盘灯自校准结果**（只读；<c>null</c> = 还没探测过）。
 	/// <para>⭐ UI 用它决定：亮度滑块上限（<see cref="KeyboardLightingCalibration.BrightnessMax" />）✅。</para>
 	/// </summary>
@@ -3628,7 +3637,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⚠️ 只在 Gen30 **且宝龙达** 才打（否则其它机型会被追踪日志刷屏）✅
 		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 		{
-			Logger.WriteError($"[kbd-trace] KeyboardPower={value} ← 来源={source} · 调用链={DescribeCallChain(3)}");
+			Logger.WriteError($"[kbd-trace] KeyboardPower={value}（电源意图={(value ? "开" : "关")}）"
+				+ $" ← 来源={source} · 调用链={DescribeCallChain(3)}");
 		}
 	}
 
@@ -3797,7 +3807,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 		{
 			Logger.WriteError($"[kbd-trace] TrySetKeyboardLightingViaBackend(on={on} · level={brightness0to3} · mode={mode})"
-				+ $" ← 调用链={DescribeCallChain(3)}");
+				+ $" · 电源镜像={(KeyboardPower ? "开" : "关")} ← 调用链={DescribeCallChain(3)}");
+		}
+		// ⭐ 2026-10-19：记录「最近用户灯效动作」时间（自动关灯 tick 据此 5s 内不触发）✅
+		if (Volatile.Read(ref _kbdAutoOffRestoring) == 0)
+		{
+			Interlocked.Exchange(ref _kbdLastUserActionTick, Environment.TickCount64);
 		}
 		try
 		{
@@ -4955,6 +4970,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				Volatile.Write(ref _kbdAutoOffSuppressUntilInput, 0);
 				return; // ⭐ 未超时 ⇒ 纯只读返回 ✅
+			}
+			// ⭐⭐ 2026-10-19（机主：开灯后过一会自己变关）：最近 5s 有过**用户灯效动作** ⇒ 不触发自动关
+			//   （防止刚开灯/刚拖亮度就被空闲计时器误判为空闲而关掉）✅
+			long lastUserAction = Interlocked.Read(ref _kbdLastUserActionTick);
+			if (lastUserAction != 0 && Environment.TickCount64 - lastUserAction < KeyboardAutoOffUserActionGuardMs)
+			{
+				Logger.WriteLineIfChanged("kbd-autooff-recent-action",
+					"[light] 自动关灯：最近 5s 有用户灯效动作 ⇒ 本轮不触发");
+				return;
 			}
 			if (Volatile.Read(ref _kbdAutoOffSuppressUntilInput) != 0)
 			{
@@ -8820,9 +8844,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text6 = o["powerStatus"]?.ToString();
 		if (text6 != null)
 		{
-			bool gcuKeyboardOn = text6 == "On";
-			TraceKeyboardPowerWrite(gcuKeyboardOn, "GCU payload 解析(powerStatus)");
-			KeyboardPower = gcuKeyboardOn;
+			// ⭐ 2026-10-19（单源状态机）：30 系宝龙达的电源镜像**只允许**由 EC 0x1807 回读/用户显式开关写入；
+			//   ⛔ GCU payload（powerStatus）不得再改它 ✅
+			if (!(UsesBaolongda && DgpuGeneration == DgpuGenerationKind.Gen30))
+			{
+				bool gcuKeyboardOn = text6 == "On";
+				TraceKeyboardPowerWrite(gcuKeyboardOn, "GCU payload 解析(powerStatus)");
+				KeyboardPower = gcuKeyboardOn;
+			}
 		}
 		string text7 = o["solution"]?.ToString();
 		if (text7 != null)
