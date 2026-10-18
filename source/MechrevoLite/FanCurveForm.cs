@@ -613,7 +613,8 @@ public class FanCurveForm : RForm
 					BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve(TargetModeId);
 					_cpuPanel.Load(TempsToBytes(s.Channel1Temperatures), RpmsToPercent(s.Channel1Rpms, s.MinRpm, s.MaxRpm));
 					_gpuPanel.Load(TempsToBytes(s.Channel0Temperatures), RpmsToPercent(s.Channel0Rpms, s.MinRpm, s.MaxRpm));
-					_status.Text = "风扇曲线：软件闭环（宝龙达）" + ((Program.hw?.FanCurveVerified ?? false) ? "" : " · ⚠️ 本机风扇接管尚未验证，暂不可用（运行 --fan-probe 查看）")
+					// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：状态行不再提示"未验证" ✅
+					_status.Text = "风扇曲线：软件闭环（宝龙达）"
 						+ (s.Enabled ? " · 已启用" : " · 未启用")
 						+ $" · 范围 {s.MinRpm}~{s.MaxRpm} RPM"
 						+ (s.IsUnreadableArchive ? " · " + s.StatusNote : "");
@@ -645,13 +646,7 @@ public class FanCurveForm : RForm
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ 未通过只读验证 ⇒ 不允许启用（⛔ 不给"能点但没用"的入口）✅
-		if (!hw.FanCurveVerified)
-		{
-			_status.Text = "本机风扇接管尚未验证，暂不可用（运行 --fan-probe 查看详情）";
-			SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve(TargetModeId));
-			return;
-		}
+		// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 启停开关直接生效，不再看 cfg ✅
 		try
 		{
 			BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve(TargetModeId);
@@ -731,10 +726,9 @@ public class FanCurveForm : RForm
 		{
 			if (_bdEnableChk != null)
 			{
-				// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ **未通过只读验证 ⇒ 隐藏入口**（⛔ 不给"能点但没用"）✅
-				bool fanVerified = Program.hw?.FanCurveVerified ?? false;
-				_bdEnableChk.Visible = fanVerified;
-				_bdEnableChk.Enabled = fanVerified && !s.IsUnreadableArchive;
+				// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 宝龙达直接显示两个开关 ✅
+				_bdEnableChk.Visible = true;
+				_bdEnableChk.Enabled = !s.IsUnreadableArchive;
 				_bdEnableChk.Checked = s.Enabled;
 			}
 		}
@@ -747,8 +741,8 @@ public class FanCurveForm : RForm
 		{
 			if (_bdSyncChk != null)
 			{
-				_bdSyncChk.Visible = (Program.hw?.FanCurveVerified ?? false);
-				_bdSyncChk.Enabled = (Program.hw?.FanCurveVerified ?? false) && !s.IsUnreadableArchive;
+				_bdSyncChk.Visible = true;
+				_bdSyncChk.Enabled = !s.IsUnreadableArchive;
 				_bdSyncChk.Checked = s.SyncEnabled;
 			}
 		}

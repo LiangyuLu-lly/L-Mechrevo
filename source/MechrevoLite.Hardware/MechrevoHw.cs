@@ -2506,7 +2506,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⭐ 现改为 **SetupAPI 直接禁用/启用摄像头设备**（通用，见 `CameraPnpControl` ✅）
 			//   ⇒ 能力位 = "本机有可控制的摄像头设备"；⛔ 无摄像头设备时才退回旧隐私键兜底（保功能）
 			//   ⚠️ GCU / 同方机型仍按 `WebcamSeen`（厂商 `WebCamEnable`）判 ⇒ **逐位不变** ✅
-			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCamera || CameraPrivacy.Available)),
+			// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+			//   ⭐ `webcam` 能力位原来直接调 `CameraPnpControl.HasCamera`（首次会做 SetupAPI 枚举）
+			//      ⇒ 打开设置/构建快捷开关行时就在 UI 线程枚举摄像头设备 ❌。
+			//   ⭐ 现在只读**缓存值**（`HasCameraCached`，未探测 = false，⛔ 不枚举）；
+			//      探测由启动后空闲后台预热（`Program.ScheduleIdleBackendWarmup`）做一次并缓存，
+			//      完成后异步 `RefreshDeviceCapabilities()` 把这一行补上 ✅
+			//   ⚠️ GCU 机型仍先看 `WebcamSeen`（能力位判据不变）✅
+			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCameraCached || CameraPrivacy.Available)),
 			"winkey" => WinKeySeen, 
 			"fnkey" => FnKeySeen || UsesBaolongda, 
 			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：这两个**不是 WMI 开关** ——
@@ -2537,9 +2544,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//      ⭐ `SwitchQuick` 开头的 `if (!SupportsQuickSwitch(key)) return false;` 直接拒掉
 			//      ⇒ 界面显示"下发被拒、已回滚"（机主日志 `[QS-apply] 键=highperf 下发结果=False`）✅
 			"highperf" => true, 
-			// ⭐ 2026-10-19（风扇强冷 · 无 GCU）：宝龙达用本机通道（功能号 21 满转 + 13 回读）✅
-			// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ **未通过只读验证 ⇒ 宝龙达不显示强冷入口** ✅
-		"fanboost" => SupportsFanBoost || (UsesBaolongda && FanCurveVerified),
+			// ⭐ 2026-10-19（风扇强冷 · 无 GCU）：宝龙达用本机通道（EC 目标档/掩码 + 13 回读）✅
+			// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 宝龙达**恒 true**，强冷入口直接出现 ✅
+		"fanboost" => SupportsFanBoost || UsesBaolongda,
 		// ⭐ 2026-10-19（APU 防缩缸）：⭐ 纯 Windows 电源策略 ⇒ 所有机型可用 ✅
 		"apuboost" => true, 
 			"lightbar" => SupportsLightbar, 
@@ -4970,7 +4977,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	private static bool _fanCurveDeferredCleanupDone;
 
-	/// <summary>⭐ 本机（按代际）风扇软件闭环是否**已验证可用**（⭐ 未验证 = false ⇒ UI 不开放）✅</summary>
+	/// <summary>⭐ 风扇接管只读验证结果（⭐ **仅诊断**：30/40 系已验证，UI/写入不再依赖本值）✅</summary>
 	/// <para>⭐⭐ 2026-10-18（机主：默认不开）：⭐ 默认 **false**；只有 `--fan-smu-ec-test` 验证通过并写入
 	/// `%APPDATA%\MechrevoLite\fan_ec_verified.cfg`（`fan_ec_verified_30=1` / `_40=1`）后，**下次启动**才放开 ✅</para>
 	internal bool FanCurveVerified
@@ -4981,14 +4988,29 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return false;
 			}
-			// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 第一次**真的需要**闸门时才做只读验证（⛔ 启动不读 EC）✅
-			EnsureFanCurveLazyInit();
+			// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+			//   ⭐ **getter 只读缓存/配置文件，⛔ 不触发 EC 验证**（原实现在这里调 `EnsureFanCurveLazyInit()`，
+			//      ⇒ 打开设置/构建行（`SupportsQuickSwitch("fanboost")` 读它）就会跑 EC 只读验证 + WMI 探测 ❌）。
+			//   ⭐ 真正需要风扇能力时显式调 `EnsureFanCurveReady()`：
+			//      · 用户开风扇曲线窗口 / 点强冷（`TrySetFanBoostViaBackend` on 分支）；
+			//      · 启动后空闲的后台预热（`RunDeferredFanStartupCleanup`，见 Program.ScheduleIdleBackendWarmup）✅
+			//   ⚠️ 未验证前返回 false（UI 隐藏入口）—— 与改动前**语义一致**，只是"何时探测"变了 ✅
 			if (DgpuGeneration == DgpuGenerationKind.Gen30)
 			{
 				return _fanCurveVerifiedGen30 ?? FanEcVerifyStore.Load(is30Series: true);
 			}
 			return _fanCurveVerifiedGen40 ?? FanEcVerifyStore.Load(is30Series: false);
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+	/// ⭐ **显式**确保风扇闸门只读验证已跑过（进程内缓存一次；⛔ 不发 WMI 写、⛔ 不写 EC）✅。
+	/// <para>调用点只允许"真正要用风扇能力"的地方：风扇曲线窗口 / 强冷开启 / 启动后空闲后台预热。</para>
+	/// </summary>
+	internal void EnsureFanCurveReady()
+	{
+		EnsureFanCurveLazyInit();
 	}
 
 	/// <summary>
@@ -5036,12 +5058,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_fanCurveDeferredCleanupDone = true;
 		long start = Environment.TickCount64;
 		EnsureFanCurveLazyInit();
-		bool verified = FanCurveVerified;
-		if (verified)
-		{
-			RestoreBaolongdaFanFirmwareControl();
-		}
-		Logger.WriteLine("[init] 首次打开设置 ⇒ 初始化风扇闸门/清理（耗时 " + (Environment.TickCount64 - start) + " ms，已缓存）· verified=" + verified);
+		// ⭐⭐ 2026-10-18（机主：删除闸门）：⭐ 不再看 cfg，直接做启动清理（交回固件）✅
+		RestoreBaolongdaFanFirmwareControl();
+		Logger.WriteLine("[init] 首次打开设置 ⇒ 初始化风扇闸门/清理（耗时 " + (Environment.TickCount64 - start) + " ms，已缓存）");
 	}
 
 	/// <summary>⭐ 最近一次只读验证结论（⭐ UI 说明行/日志用）✅</summary>
@@ -5068,14 +5087,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		if (on)
 		{
-			// ⭐⭐ 2026-10-18（机主批准 · 统一门面）：⭐ 强冷改走 `FanWriter`（ACPI EC → LPC/SMU-EC），
-			//   ⛔ 不再写 WMI 20/21（20=1 真机卡死）；⭐ 未验证 ⇒ 不执行（UI 也隐藏）✅
-			if (!FanCurveVerified)
-			{
-				Logger.WriteLineIfChanged("baolongda-fanboost-unverified",
-					"[fan] 强冷：⛔ 本机风扇写入尚未验证 ⇒ 不执行（UI 已隐藏；跑 --fan-smu-ec-test 验证）");
-				return false;
-			}
+			// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 强冷直接走 `FanWriter`（无需 cfg 验证）✅
+			//   ⚠️ 仍保留：EC 写失败回滚、单次写、13 轮询确认、交回固件安全顺序 ✅
 			_fanBoostSavedCurve = LoadBaolongdaFanCurve();
 			_fanBoostActive = true;
 			ResetBaolongdaFanCurveSmoothing();
@@ -5872,20 +5885,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		_fanCurveVerifyTick = Environment.TickCount64;
 		conclusion = verified
-			? $"✅ 已验证（{genName} · 配置文件标记 fan_ec_verified）"
+			? $"cfg 已标记（{genName} · 仅诊断）"
 			: (ecOk
-				? $"EC 只读可用（{genName}）· ⚠️ 写通路未验证 ⇒ 暂不开放（跑 --fan-smu-ec-test）"
+				? $"EC 只读可用（{genName}）· cfg 未标记（仅诊断；UI 已直接开放）"
 				: $"不可用（{genName} · EC 三地址未全部读到合理值）");
 		_fanCurveVerifyNote = conclusion;
-		Logger.WriteLine($"[fan] 风扇接管只读验证（{genName}）：{ecDetail} · {wmiDetail} ⇒ {conclusion}");
-		if (!verified)
-		{
-			Logger.WriteLine($"[fan] 未验证 ⇒ 隐藏风扇曲线/强冷入口（本机={genName}）· 详情请跑 --fan-probe / --fan-smu-ec-test");
-		}
-		else
-		{
-			Logger.WriteLine($"[fan] ✅ 已验证 ⇒ 放开风扇曲线/强冷入口（本机={genName} · 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}）");
-		}
+		Logger.WriteLine($"[fan] 风扇接管只读验证（诊断）：{genName} · {ecDetail} · {wmiDetail} ⇒ {conclusion}");
+		Logger.WriteLine($"[fan] 风扇控制：宝龙达 ⇒ 直接开放（30/40 系已验证；cfg 仅诊断，不再作为 UI 开关条件）");
 		return ecOk;
 	}
 
@@ -5903,13 +5909,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				+ "请检查 --fan-probe 报告，或重启后在「风扇曲线」里手动重新启用再试 ✅");
 			return false;
 		}
-		// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ **未验证前绝不写**（UI 也隐藏入口）✅
-		if (!FanCurveVerified)
-		{
-			Logger.WriteLineIfChanged("baolongda-fancurve-unverified",
-				"[fan] 曲线：⛔ 本机风扇接管**尚未通过只读验证** ⇒ ⛔ 不写任何字节（先跑 --fan-probe / 等机主回传报告）");
-			return false;
-		}
+		// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 不再因 cfg 未验证而早退；
+		//   ⚠️ 保留失败熔断/异常保护（见下）✅
 		try
 		{
 			return ApplyBaolongdaFanCurveStepCore();
@@ -6174,13 +6175,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ 未通过只读验证 ⇒ **启动也不做任何交回写**（⛔ 一个字节都不写）✅
-		if (!FanCurveVerified)
-		{
-			Logger.WriteLineIfChanged("baolongda-fanrestore-unverified",
-				"[fan] 启动自检：⛔ 本机风扇接管尚未通过只读验证 ⇒ ⛔ 不做任何交回写（20/21 一个字节都不写）");
-			return;
-		}
+		// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 启动/关闭清理直接执行；
+		//   ⭐ 交回顺序（先清掩码再清目标）与低转速保护在 `FanWriter.TryReleaseToFirmware` 内保证 ✅
 		// ⭐ 交回固件后**下一次启用必须重写**（⛔ 不能因为"目标没变"就跳过首写）✅
 		_baolongdaCurveDecider0.Reset();
 		_baolongdaCurveDecider1.Reset();
@@ -6670,6 +6666,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 启动阶段**不读 EC、不验证闸门、不做交回清理** ——
 		//   改为首次打开设置 / 首次需要风扇能力时懒加载（见 EnsureFanCurveLazyInit / RunDeferredFanStartupCleanup）✅
 		Logger.WriteLine("[init] 启动跳过设置预热（懒加载）：风扇闸门/EC 只读验证延后到首次需要");
+		Logger.WriteLine("[fan] 风扇控制：宝龙达 ⇒ 直接开放（30/40 系已验证）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath});"
 			+ $" 功耗墙范围 PL1/PL2=[{Pl1Minimum},{Pl1Maximum}]W · 温度墙=[{TccMinimum},{TccMaximum}]℃（⭐ 本地记忆 PL1={Pl1} PL2={Pl2} 温度墙={TccTarget} ⚠️ 非从机器读回）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."

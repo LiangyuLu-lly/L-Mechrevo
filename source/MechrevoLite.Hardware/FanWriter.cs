@@ -15,8 +15,8 @@
 //    · <see cref="TryReleaseToFirmware" />（目标 0 + 清位，交回固件）
 //    ⛔ 每次写后立刻回读比对；失败返回 false 并写日志；⛔ 不抛出异常。
 //
-// ⭐ 闸门：`FanEcVerifyStore` 保存“已验证”标记（%APPDATA%\MechrevoLite\fan_ec_verified.cfg）；
-//    默认无标记 ⇒ `FanCurveVerified=false` ⇒ UI 隐藏曲线/强冷；只有 `--fan-smu-ec-test` 验证通过才写入。
+// ⭐ 验证标记：`FanEcVerifyStore` 保存“已验证”标记（%APPDATA%\MechrevoLite\fan_ec_verified.cfg）；
+//    ⭐ 2026-10-18（机主：30/40 系均已实测可用）⇒ **仅作诊断**：UI/写入路径不再依赖该 cfg ✅
 
 using System;
 using System.IO;

@@ -1541,7 +1541,7 @@ internal sealed class PerfModeService
 			+ (boostWasActive ? $" · 原状态=开 ⇒ 已走关闭流程（快照恢复={boostConfirmed}）" : " · 原状态=关（无需关闭流程）"));
 		Logger.WriteError($"[reset] 风扇 EC 回读（{readVia}）：0xC83C={(fan1 < 0 ? "读不到" : fan1.ToString())} · 0xC83D={(fan2 < 0 ? "读不到" : fan2.ToString())}"
 			+ $" · 0xB20={(mask < 0 ? "读不到" : "0x" + mask.ToString("X2"))} ⇒ 目标归零={targetsZero} · 接管位(0x02|0x08)已清={maskClean}"
-			+ $" · 闸门 FanCurveVerified={hw.FanCurveVerified}（未放开 ⇒ UI 继续隐藏，但 EC 复位已照做）"
+			+ $" · 诊断标记 FanCurveVerified={hw.FanCurveVerified}（仅诊断；UI/写入已直接开放）"
 			+ (string.IsNullOrEmpty(releaseDetail) ? "" : " · " + releaseDetail));
 		if (!boostClosed || !curveDisabled || !released || !targetsZero || !maskClean)
 		{
