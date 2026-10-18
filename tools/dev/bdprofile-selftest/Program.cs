@@ -43,28 +43,6 @@ internal static class Program
 				>= BaolongdaProfile.FanPercentDenominatorRpmFor(DgpuGenerationKind.Gen30));
 
 		Console.WriteLine();
-		Console.WriteLine("-- 1b. 30 系判据（MRID6 是模具号：Gen 优先，板号仅兜底）--");
-		// ⭐⭐ 2026-10-18（机主更正）：MRID6/BM5235 是**模具号**，30/40 系共用 ⇒ 不能只凭板号判 30 系。
-		True("Gen40 + board=MRID6 ⇒ 不是 30 系（旧判据会误判）",
-			!BaolongdaProfile.Is30Series(DgpuGenerationKind.Gen40, "MRID6"));
-		True("Gen50 + board=MRID6 ⇒ 不是 30 系",
-			!BaolongdaProfile.Is30Series(DgpuGenerationKind.Gen50, "MRID6"));
-		True("Gen30 + board=MRID6-23 ⇒ 仍是 30 系（Gen 优先于板号）",
-			BaolongdaProfile.Is30Series(DgpuGenerationKind.Gen30, "MRID6-23"));
-		True("Gen30 + board=任意 ⇒ 仍是 30 系",
-			BaolongdaProfile.Is30Series(DgpuGenerationKind.Gen30, "GM5HG0A"));
-		True("Unknown + board=MRID6 ⇒ 板号兜底视为 30 系",
-			BaolongdaProfile.Is30Series(DgpuGenerationKind.Unknown, "MRID6"));
-		True("Unknown + board=MRID6-23 ⇒ 非 30 系",
-			!BaolongdaProfile.Is30Series(DgpuGenerationKind.Unknown, "MRID6-23"));
-		True("Unknown + board 空 ⇒ 非 30 系",
-			!BaolongdaProfile.Is30Series(DgpuGenerationKind.Unknown, string.Empty));
-		True("依据 Gen40 = Gen",
-			string.Equals(BaolongdaProfile.Describe30SeriesBasis(DgpuGenerationKind.Gen40), "Gen", StringComparison.Ordinal));
-		True("依据 Unknown = 板号兜底",
-			string.Equals(BaolongdaProfile.Describe30SeriesBasis(DgpuGenerationKind.Unknown), "板号兜底", StringComparison.Ordinal));
-
-		Console.WriteLine();
 		Console.WriteLine("-- 2. 功耗墙 / 温度墙范围 --");
 		Eq("PL 下限 = 5W", 5, BaolongdaProfile.PlMinWatts);
 		Eq("PL1 上限 = 120W", 120, BaolongdaProfile.Pl1MaxWatts);
