@@ -4340,6 +4340,13 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="ChargeSliderOffResetFailed" xml:space="preserve">
+    
+    
+    <value>Failed to restore 100% after turning off the unlimited charge slider; please select the Longevity tier manually</value>
+    
+  
+  </data>
 <data name="BatteryLimitInvalidParams" xml:space="preserve">
     
     

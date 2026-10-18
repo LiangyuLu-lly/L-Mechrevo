@@ -4366,6 +4366,13 @@
     
   
   </data>
+<data name="ChargeSliderOffResetFailed" xml:space="preserve">
+    
+    
+    <value>关闭无极限充后写回 100% 失败，请手动点「长效」档</value>
+    
+  
+  </data>
 <data name="BatteryLimitInvalidParams" xml:space="preserve">
     
     

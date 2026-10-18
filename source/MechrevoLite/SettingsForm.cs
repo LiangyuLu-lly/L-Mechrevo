@@ -8300,11 +8300,89 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 
 	/// <summary>
 	/// 2026-10-09（无极限充滑块 · 实验性功能）：开关**只控制显示与否** —— 落盘 <c>charge_limit_slider</c>
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：关闭无极限充时要恢复满充）：⭐ 写回 100% —— 先写、后收行，避免“行没了但限值还留着” ✅。
+	/// <para>通道判据：EC 直写可用（`IsEcDirectWriteAllowed()` 且未 `ec_charge_limit=0`）⇒ 走 EC 直写；
+	/// 否则走 GCU 官方路径（BatteryProtection=0 = 长效 100）✅</para>
+	/// <para>写后回读确认；失败**不重试**、诚实记日志并提示用户手动点「长效」档 ✅</para>
+	/// </summary>
+	private async Task WriteBackFullChargeAfterSliderOffAsync()
+	{
+		const string logPrefix = "[charge-limit] 关闭无极限充 ⇒";
+		try
+		{
+			bool ecAllowed = !IsEcDirectWriteOffConfigured() && EcChargeLimit.IsEcDirectWriteAllowed();
+			if (ecAllowed)
+			{
+				int current = EcChargeLimit.ReadPercent();
+				if (current == 100)
+				{
+					Logger.WriteLine(logPrefix + " 已是 100%，无需写回");
+					return;
+				}
+				(bool ok, int applied, int readback) = await Task.Run(delegate
+				{
+					bool written = EcChargeLimit.TrySet(100, out int appliedPercent, out _);
+					int rb = EcChargeLimit.ReadPercent();
+					return (written, appliedPercent, rb);
+				});
+				string rbText = readback < 0 ? "读不到" : readback + "%";
+				Logger.WriteLine(logPrefix + " 自动写回 100%（通道=EC直写 · 写入=" + ok + " · 回读=" + rbText + "）");
+				if (readback == 100)
+				{
+					AppConfig.Set("charge_limit", 100);
+					AppConfig.Flush();
+					BatteryControl.chargeFull = true;
+					VisualiseBattery(100);
+					return;
+				}
+				Logger.WriteError(logPrefix + " ⛔ 写回 100% 失败（通道=EC直写 · 原因=写入=" + ok
+					+ " 回读=" + rbText + "）⇒ 不重试，请手动点「长效」档");
+				ToastForm.ShowFailure(Strings.ChargeSliderOffResetFailed);
+				return;
+			}
+
+			MechrevoHw hw = Program.hw;
+			if (hw == null || !hw.IsConnected)
+			{
+				Logger.WriteError(logPrefix + " ⛔ 写回 100% 失败（通道=GCU · 原因=GCU 未连接）⇒ 不重试，请手动点「长效」档");
+				ToastForm.ShowFailure(Strings.ChargeSliderOffResetFailed);
+				return;
+			}
+			if (hw.BatteryProtection == 0)
+			{
+				Logger.WriteLine(logPrefix + " 已是 100%，无需写回（GCU BatteryProtection=0）");
+				return;
+			}
+			bool confirmed = await hw.SetBatteryProtection(0);
+			int gcuReadback = hw.BatteryProtection;
+			Logger.WriteLine(logPrefix + " 自动写回 100%（通道=GCU · 写入=" + confirmed + " · 回读=BatteryProtection=" + gcuReadback + "）");
+			if (!confirmed || gcuReadback != 0)
+			{
+				Logger.WriteError(logPrefix + " ⛔ 写回 100% 失败（通道=GCU · 原因=写入=" + confirmed
+					+ " 回读=" + gcuReadback + "）⇒ 不重试，请手动点「长效」档");
+				ToastForm.ShowFailure(Strings.ChargeSliderOffResetFailed);
+				return;
+			}
+			AppConfig.Set("charge_limit", 100);
+			AppConfig.Flush();
+			BatteryControl.chargeFull = true;
+			VisualiseBattery(100);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError(logPrefix + " ⛔ 写回 100% 失败（通道判定/写入异常 · 原因="
+				+ ex.GetType().Name + " " + ex.Message + "）⇒ 不重试，请手动点「长效」档");
+			ToastForm.ShowFailure(Strings.ChargeSliderOffResetFailed);
+		}
+	}
+
+	/// <summary>
 	/// （缺省 0＝关），再按新状态收放滑块行。⛔ 不读写滑块取值、不发 EC/GCU 指令、不动滑块的
 	/// Value / Minimum / Maximum / ValueChanged / MouseUp / KeyUp 与写入链路：
 	/// 用户设的上限一直在 config 的 <c>charge_limit</c> 里，隐藏↔显示来回切不会丢。
 	/// </summary>
-	private void OnChargeSliderToggleChanged()
+	private async void OnChargeSliderToggleChanged()
 	{
 		if (checkChargeSlider == null)
 		{
@@ -8344,6 +8422,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// 2026-10-10（限充安全警告 · 用户要求「警告加在开关下面，打开后显示，用红色字」）：
 		// 从关到开不再弹窗 —— 警告改为开关正下方的红色常驻行（ApplyChargeSliderVisibility 控制显隐），
 		// 打开时一直可见，比一闪而过的弹窗更符合「警告」语义。
+		// ⭐⭐ 2026-10-18（机主：关闭无极限充 ⇒ 自动写回 100%）：⭐ **先写回，再收行/更新三档高亮** ✅
+		if (!flag)
+		{
+			await WriteBackFullChargeAfterSliderOffAsync();
+		}
 		AppConfig.Flush();
 		ApplyChargeSliderVisibility();
 		panelBattery.PerformLayout();
