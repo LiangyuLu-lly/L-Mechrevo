@@ -40,5 +40,6 @@ THIRD-PARTY-NOTICES.md.
    lazily, only while a caller actually needs LPC EC access. As of 2026-10-18 (owner-approved fan
    takeover on Baolongda) EcLpcIo also has a **strictly whitelisted EC write path**: only
    0xC83C / 0xC83D / 0xB20, target values 0..68, read-modify-write for the mask, immediate read-back
-   verification, and every other address is rejected (poisons the channel). WinRing0 / inpoutx64 /
+   verification, plus a single-purpose unlock write to 0x1060 (only `value | 0x80`, only when
+   0x2000 == 0x55). Every other address is rejected (poisons the channel). WinRing0 / inpoutx64 /
    JiaoLongDriver64 are deliberately NOT used (their drivers are non-compliant to redistribute).

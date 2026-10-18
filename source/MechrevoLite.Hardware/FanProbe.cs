@@ -5,8 +5,8 @@
 //    ⭐ WMI 20/21 只保留**只读**对照；EC 写通路验证请用 `--fan-ec-test`（白名单写 + finally 恢复）。
 //
 // ⭐ 本探针只做：
-//    0a. **EC 只读验证**：读 `0xC83C`（Fan1 目标）· `0xC83D`（Fan2 目标）· `0xB20`（接管掩码），
-//        按"三地址都读得到 · 不是 0xFF 填充 · 目标档 0..0xC8"判可用/不可用 ✅
+//    0a. **EC 只读验证**：判据 = `0x2000 == 0x55` 且 `0xC411` 非 0/0xFF（⭐ 机主实测确认）；
+//        + 读 `0xC83C`（Fan1 目标）· `0xC83D`（Fan2 目标）· `0xB20`（接管掩码）· `0x1060`（解锁位）✅
 //    0.  **WMI 只读对照**：GET 13 / 20 / 21 的**原始 OutData hex** + 转速/开关/目标的只读解析 ✅
 //    0b. **结论**：可用 / 不可用 / 接口不存在（⭐ 30/40 系分开；⭐ 只认 EC 实测）✅
 //
@@ -150,7 +150,7 @@ internal static class FanProbe
 			}
 			else
 			{
-				verdict = "不可用（EC 三地址未全部读到合理值）";
+				verdict = "不可用（EC 身份未通过：0x2000 != 0x55 或 0xC411 为 0/0xFF）";
 			}
 			L("结论：" + verdict);
 			L("⭐ 下一步：在管理员下跑 `--fan-ec-test` 验证 EC **写**通路（本探针不写）；"
@@ -184,20 +184,25 @@ internal static class FanProbe
 			log("EC 0xC83C（Fan1 目标）= " + (r1 ? "0x" + fan1.ToString("X2") : "读不到")
 				+ " · 0xC83D（Fan2 目标）= " + (r2 ? "0x" + fan2.ToString("X2") : "读不到")
 				+ " · 0xB20（接管掩码）= " + (r3 ? "0x" + mask.ToString("X2") : "读不到"));
-			// ⭐⭐ 2026-10-18（机主实测「全 0 假阳性」）：⭐ 单独判**EC 身份** —— 0x2000 芯片 ID + 0xC411 版本
-			bool identityOk = EcLpcIo.TryReadEcIdentity(out int chipId, out int ecVersion, out string idNote);
-			log("EC 身份：" + idNote + " ⇒ " + (identityOk ? "EC 可访问 ✅" : "⛔ EC **不可访问**（全 0/0xFF 不算可读）"));
-			bool allZero = (fan1 == 0 && fan2 == 0 && mask == 0);
+			// ⭐⭐ 2026-10-18（机主实测确认）：⭐ 闸门**只认 EC 身份** —— 0x2000 == 0x55 且 0xC411 非 0/0xFF ✅
+			bool identityOk = EcLpcIo.TryReadEcIdentity(out _, out _, out string idNote);
+			log("EC 身份：" + idNote + " ⇒ " + (identityOk ? "EC 可访问 ✅" : "⛔ EC **不可访问**（判据：0x2000==0x55 且 0xC411 非 0/0xFF）"));
+			// ⭐ 目标寄存器在**固件自动控制时本来就是 0**（机主实测 + 0xC834/0xC835≈RPM/100 交叉吻合）
+			//   ⇒ ⛔ 不再要求"三地址非全 0"（那是假否决）；⭐ 只要求三地址能读、值在合理范围 ✅
 			bool regsOk = r1 && r2 && r3
-				&& mask != 0xFF
 				&& fan1 >= 0 && fan1 <= 0xC8
-				&& fan2 >= 0 && fan2 <= 0xC8
-				&& !allZero;
+				&& fan2 >= 0 && fan2 <= 0xC8;
 			ok = regsOk && identityOk;
-			log("判据：EC 身份可访问 · 三地址可读合理 · **非全 0** ⇒ " + (ok ? "通过 ✅" : "未通过 ⚠️"));
-			if (allZero)
+			log("判据：EC 身份可访问（0x2000==0x55 · 0xC411 非 0）+ 三地址可读、目标 0..0xC8 ⇒ " + (ok ? "通过 ✅" : "未通过 ⚠️"));
+			// ⭐ 解锁状态只读展示（⛔ 本探针不写 0x1060）
+			if (EcLpcIo.TryReadByte(EcLpcIo.EcUnlockAddress, out int unlockValue))
 			{
-				log("⚠️ 三地址**全 0** ⇒ 说明地址/时序不对（⭐ 不是「值为 0」）—— ⛔ 判不可访问 ✅");
+				log("0x1060（解锁寄存器）= 0x" + unlockValue.ToString("X2")
+					+ "（bit7=" + (((unlockValue & 0x80) != 0) ? "1（已解锁）" : "0（⚠️ 未解锁：写通路测试前需 `--fan-ec-test` 执行 0x1060 |= 0x80）") + "）");
+			}
+			else
+			{
+				log("0x1060（解锁寄存器）= 读不到");
 			}
 			if (!ok)
 			{

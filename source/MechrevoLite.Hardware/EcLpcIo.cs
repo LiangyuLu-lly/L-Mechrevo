@@ -289,7 +289,9 @@ internal static class EcLpcIo
 	//  ⭐⭐ 2026-10-18（机主批准 · **EC 白名单写**）：
 	//    ⭐ 背景：WMI 功能号 20=1 在真机上会**卡死**（连 try/finally 都跑不完）
 	//      ⇒ 风扇接管彻底改走 EC（与开源蛟龙 `Blding64` 同一套寄存器语义，⛔ 未复制代码）✅
-	//    ⭐ 白名单**只有 3 个地址**：0xC83C（Fan1/CPU 目标）· 0xC83D（Fan2/GPU 目标）· 0xB20（接管掩码）
+	//    ⭐ 风扇白名单**3 个地址**：0xC83C（Fan1/CPU 目标）· 0xC83D（Fan2/GPU 目标）· 0xB20（接管掩码）
+	//    ⭐⭐ 2026-10-18（机主批准 · 解锁）：⭐ 额外**仅一个**地址 `0x1060`，且**只允许 `当前值 | 0x80`**
+	//       （只置 bit7、保留其它位；回读确认 bit7=1；⭐ 只在 `0x2000 == 0x55` 时执行）✅
 	//    ⭐ 值域：目标 0..68（x100RPM）· 0xB20 只改 bit1/bit3（0x02/0x08，⭐ 读-改-写，保留其它位）✅
 	//    ⭐ 每次写完**立刻回读同一地址并比对**；失败/超时沿用本类中毒策略 ✅
 	//    ⚠️ 其它地址一律**拒绝并中毒**（⛔ 不给误写其它 EC 寄存器留口子）✅
@@ -313,6 +315,12 @@ internal static class EcLpcIo
 
 	private const int ManualMaskBitFan2 = 0x08;
 
+	/// <summary>⭐ EC 解锁寄存器地址（开源蛟龙 `EC_init()`：`0x1060 |= 0x80`）✅</summary>
+	internal const int EcUnlockAddress = 0x1060;
+
+	/// <summary>⭐ 解锁位（bit7）✅</summary>
+	private const int EcUnlockBit = 0x80;
+
 	/// <summary>⭐ EC 写白名单（⭐ 只有风扇 3 个地址）✅</summary>
 	internal static bool IsFanWriteAddress(int address)
 	{
@@ -320,11 +328,11 @@ internal static class EcLpcIo
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主实测「全 0 假阳性」后的**判据修正**）：⭐ EC **可访问性**判据 ——
-	/// ⭐ `0x2000` 芯片 ID 必须 `0x55`（或至少**非 0x00/0xFF**）**且** `0xC411` EC 版本**非 0x00/0xFF** ✅。
-	/// <para>⚠️ 为什么要这条：机主那台 `0xC83C/0xC83D/0xB20` 全读成 `0x00`，旧判据「三个地址都读得到」⇒ **假阳性** ❌；
-	/// 全 0 说明**地址/时序不对**（不是"值为 0"）⚠️ ⇒ ⭐ 全 0 一律判**不可访问** ✅</para>
-	/// <para>⛔ 本方法只读（只发读命令）；⛔ 不执行任何 EC 写（含 `0x1060 |= 0x80` 解锁）✅</para>
+	/// ⭐⭐ 2026-10-18（机主实测确认后的**最终判据**）：⭐ EC **可访问性**只认**身份** ——
+	/// ⭐ `0x2000` 芯片 ID **必须 == `0x55`** 且 `0xC411` EC 版本**非 0x00/0xFF** ✅。
+	/// <para>⚠️ 不再要求「风扇三地址非全 0」：⭐ 机主报告 `0xC83C/0xC83D` 在**固件自动控制时本来就是 0**，
+	/// 而 `0xC834/0xC835=0x14`（2000 RPM）与 WMI 13 吻合 ⇒ ⭐ 全 0 那条判据是**假否决**，已删除 ✅</para>
+	/// <para>⛔ 本方法只读（只发读命令）；⛔ 不执行任何 EC 写（解锁见 <see cref="TryUnlockEcRam" />）✅</para>
 	/// </summary>
 	internal static bool TryReadEcIdentity(out int chipId, out int version, out string note)
 	{
@@ -332,10 +340,11 @@ internal static class EcLpcIo
 		version = -1;
 		bool idRead = TryReadByte(0x2000, out chipId);
 		bool verRead = TryReadByte(0xC411, out version);
-		bool idValid = idRead && chipId != 0x00 && chipId != 0xFF;
+		// ⭐ 判据（机主 2026-10-18 报告确认）：0x2000 == 0x55 且 0xC411 非 0/0xFF
+		bool idValid = idRead && chipId == 0x55;
 		bool verValid = verRead && version != 0x00 && version != 0xFF;
 		note = "0x2000=" + (idRead ? "0x" + chipId.ToString("X2") : "读不到")
-			+ "（" + (idValid ? (chipId == 0x55 ? "0x55 ✅" : "非 0 ✅（⚠️ 不是 0x55）") : "无效 ⚠️") + "）"
+			+ "（" + (idValid ? "0x55 ✅" : (idRead ? "⚠️ 不是 0x55 ⇒ 判不可访问" : "无效 ⚠️")) + "）"
 			+ " · 0xC411=" + (verRead ? "0x" + version.ToString("X2") : "读不到")
 			+ "（" + (verValid ? "非 0 ✅" : "无效 ⚠️") + "）";
 		return idValid && verValid;
@@ -354,6 +363,13 @@ internal static class EcLpcIo
 			_lastReadFailure = "写地址不在白名单";
 			return false;
 		}
+		return TryWriteByteOperation(address, value, out readBack);
+	}
+
+	/// <summary>⭐ 底层白名单写操作（**调用方必须自行校验地址/值域**）+ 立刻回读比对 ✅。</summary>
+	private static bool TryWriteByteOperation(int address, byte value, out int readBack)
+	{
+		readBack = -1;
 		lock (Gate)
 		{
 			if (_poisoned)
@@ -396,6 +412,65 @@ internal static class EcLpcIo
 				ReleaseMutex(mutex, held);
 			}
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主批准 · 解锁）：⭐ **仅** `0x1060 ← 当前值 | 0x80`（只置 bit7，保留其它位）✅。
+	/// <para>⚠️ 严格限制：① 只在 `0x2000 == 0x55`（身份通过）时执行；② 值必须是 `current|0x80`；
+	/// ③ 写后回读确认 bit7=1 且值一致；④ 失败如实返回 false（调用方不得继续写风扇）✅</para>
+	/// <para>⭐ 依据：开源蛟龙 `EC_init()` —— `id = EC_RAM_READ(0x2000); if (id == 0x55) v = EC_RAM_READ(0x1060); EC_RAM_WRITE(0x1060, v|0x80);`
+	/// （⭐ 只取协议事实，⛔ 未复制代码）</para>
+	/// </summary>
+	internal static bool TryUnlockEcRam(out int before, out int after, out string note)
+	{
+		before = -1;
+		after = -1;
+		if (!TryReadEcIdentity(out int chipId, out int version, out string idNote))
+		{
+			note = "身份未通过 ⇒ ⛔ 不执行解锁（" + idNote + "）";
+			return false;
+		}
+		if (!TryReadByte(EcUnlockAddress, out before))
+		{
+			note = "读 0x1060 失败 ⇒ ⛔ 不执行解锁";
+			return false;
+		}
+		int wanted = before | EcUnlockBit;
+		if (before == wanted)
+		{
+			after = before;
+			note = "0x1060=0x" + before.ToString("X2") + " ⇒ ⭐ 已解锁（bit7=1），无需写 ✅";
+			return true;
+		}
+		if (!TryWriteByteOperation(EcUnlockAddress, (byte)wanted, out after))
+		{
+			note = "写 0x1060 失败（0x" + before.ToString("X2") + " → 回读="
+				+ (after < 0 ? "读不到" : "0x" + after.ToString("X2")) + "）⇒ ⛔ 不继续";
+			return false;
+		}
+		bool ok = (after & EcUnlockBit) != 0 && after == wanted;
+		note = "解锁写：0x1060 0x" + before.ToString("X2") + " → 0x" + after.ToString("X2")
+			+ "（bit7=" + (((after & EcUnlockBit) != 0) ? "1" : "0") + " ⇒ " + (ok ? "确认 ✅" : "未确认 ⚠️") + "）"
+			+ " · 身份 " + idNote;
+		return ok;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主批准 · finally 恢复）：⭐ 把 `0x1060` **写回测试前读到的原值**（仅此地址）✅。
+	/// <para>⚠️ 只给 `--fan-ec-test` 的 finally 用；写完回读比对，失败返回 false（如实上报）✅</para>
+	/// </summary>
+	internal static bool TryRestoreEcUnlockRegister(int originalValue, out int readBack)
+	{
+		readBack = -1;
+		if (originalValue < 0 || originalValue > 0xFF)
+		{
+			return false;
+		}
+		if (!TryWriteByteOperation(EcUnlockAddress, (byte)originalValue, out readBack))
+		{
+			return false;
+		}
+		return readBack == originalValue;
 	}
 
 	/// <summary>⭐ 写风扇目标档（**仅** 0xC83C/0xC83D · 值域 0..68）+ 回读比对 ✅。</summary>
