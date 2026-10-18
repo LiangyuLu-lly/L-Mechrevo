@@ -337,14 +337,14 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-18（宝龙达 · 风扇 EC 写通路）：**最小验证** `--fan-ec-test`。
-		//   ⭐ 白名单写：只碰 0xC83C / 0xC83D / 0xB20；Fan1 单通道：写目标+5 → 置 bit1 → 读 13；
-		//   ⭐ 转速 ≥ +200 RPM ⇒ 可用；⛔ 任何情况 finally 恢复（目标 0、清 0x02|0x08）。
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇 EC 写通路）：**最小验证** `--fan-ec-test [--acpi]`。
+		//   ⭐ 先 LPC 通道（白名单 3+1）写 Fan1 目标+5 → 置 bit1 → 读回；⛔ 失败自动改试 ACPI EC 写；
+		//   ⭐ `--acpi` 可强制只测 ACPI；转速 ≥ +200 RPM ⇒ 可用；⛔ finally 恢复（目标 0、清位、0x1060 原值）。
 		//   ⚠️ 需要管理员（PawnIO 驱动访问）；⛔ 不写 WMI 20/21。
 		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-ec-test-*.txt。
 		case "--fan-ec-test":
 		{
-			Environment.ExitCode = FanEcTest.Run();
+			Environment.ExitCode = FanEcTest.Run(args.Skip(1).ToArray());
 			Logger.Close();
 			return;
 		}

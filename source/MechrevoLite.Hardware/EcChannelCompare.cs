@@ -46,10 +46,12 @@ internal static class EcChannelCompare
 		for (int i = 0; i < Addresses.Length; i++)
 		{
 			int address = Addresses[i];
-			bool ok = EcPortIo.TryReadByte(address, out int value);
+			// ⭐ 2026-10-18：ACPI 侧也走**稳定读**（3 次取多数）—— 机主发现读数偶发不一致 ✅
+			bool ok = EcPortIo.TryReadByteStable(address, out int value, out string note);
 			if (ok)
 			{
-				log("  ACPI EC 0x" + address.ToString("X4") + "（" + Names[i] + "）= 0x" + value.ToString("X2"));
+				log("  ACPI EC 0x" + address.ToString("X4") + "（" + Names[i] + "）= 0x" + value.ToString("X2")
+					+ " · 稳定读：" + note);
 				if (address == 0x2000 && value == 0x55)
 				{
 					id55 = true;
@@ -58,11 +60,11 @@ internal static class EcChannelCompare
 			else
 			{
 				log("  ACPI EC 0x" + address.ToString("X4") + "（" + Names[i] + "）= ⛔ 读不到 · "
-					+ EcPortIo.LastReadFailure);
+					+ EcPortIo.LastReadFailure + "（" + note + "）");
 			}
 		}
 		log(id55
-			? "  ⇒ ⭐ ACPI EC 能读到 0x2000=0x55 ⇒ **两条通道都能读** ⇒ 写优先试 ACPI EC（⭐ 下一步验证，⛔ 本轮不写）"
-			: "  ⇒ ACPI EC 读 0x2000 不是 0x55 / 读不到 ⇒ ⭐ 仅记录（⛔ 本轮不写；等下一轮决定写通道）");
+			? "  ⇒ ⭐ ACPI EC 能稳定读到 0x2000=0x55 ⇒ **两条通道都能读** ⇒ 写改走 ACPI EC（本版已实现，先 LPC 后 ACPI）"
+			: "  ⇒ ACPI EC 读 0x2000 不是 0x55 / 读不到 ⇒ ⭐ 仅记录（写测试会自动跳过 ACPI 通道）");
 	}
 }

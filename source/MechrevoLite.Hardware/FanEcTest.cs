@@ -1,26 +1,25 @@
-// 2026-10-18（宝龙达 · 风扇接管）：⭐⭐ **EC 写通路最小验证** `--fan-ec-test` ⭐⭐
+// 2026-10-18（宝龙达 · 风扇接管）：⭐⭐ **EC 写通路最小验证** `--fan-ec-test [--acpi]` ⭐⭐
 //
-// ⭐⭐ 背景（机主 0.291.9.14 真机）：WMI 功能号 **20=1 会卡死**（连 try/finally 都跑不完）
-//    ⇒ 机主批准改走 **EC 直写**（与开源蛟龙 `Blding64` 同语义，⛔ 未复制代码）✅
-//    ⭐ 2026-10-18 机主实测：EC 读原语已修正（0x2000=0x55 · 0xC411=0x23 · 0xC834/0xC835=0x14 ≈ 2000 RPM，
-//      与 WMI 13 吻合）⇒ ⭐ 现在验证**写通路**；先只验 Fan1（CPU）一个通道。
+// ⭐⭐ 背景：WMI 功能号 20=1 会卡死；LPC/SuperIO（`EcLpcIo`）**读成功、写被 EC 拒绝**（ioctl 全 OK、回读不变）。
+//    ⭐ 机主实测：ACPI EC（`EcPortIo`，0x62/0x66）也能读到同一批值（0x2000=0x55 / 0xC834=0x14…）
+//    ⇒ ⭐ 写改走 ACPI EC 的 XRAM mailbox（命令 0x93；读是 0x92）✅
 //
-// ⭐ 步骤（⭐ 白名单写：只碰 0xC83C/0xC83D/0xB20 + 0x1060 的 bit7 解锁）：
-//    ① 读身份：0x2000 == 0x55 且 0xC411 非 0/0xFF（⛔ 不通过 ⇒ 0 写、结论不可用）
-//    ② 读 0x1060 解锁寄存器；bit7=0 ⇒ 写 `当前值 | 0x80`（只置 bit7、保留其它位）→ 回读确认 bit7=1
-//    ③ 只读基线：EC 0xC834/0xC835（≈ RPM/100）+ WMI 13 转速
-//    ④ 写 Fan1 目标 = 当前档 + 5（≤68）→ 0xB20 |= 0x02 → 等 2 s
-//    ⑤ 读 0xC834/0xC835 + WMI 13 ⇒ 转速涨 ≥ +200 RPM 判**可用**
-//    ⑥ **finally 恢复**：目标 0、清 0x02|0x08，再把 0x1060 写回**测试前读到的原值**
+// ⭐ 流程（先 LPC，失败自动改试 ACPI；⭐ `--acpi` 可强制只测 ACPI）：
+//    0. ACPI EC 只读对照（两通道读数并列）
+//    ① 身份（LPC / ACPI 各判一次：0x2000==0x55 且 0xC411 非 0/0xFF；**稳定读 3 次取多数**）
+//    ② LPC 写测试（若身份通过）：解锁 0x1060|0x80 → Fan1 目标+5 + 0xB20 bit1 → 2 s → 读回
+//       失败 ⇒ 自动进入 ③
+//    ③ ACPI 写测试：解锁 → Fan1 目标+5 + 0xB20 bit1 → 2 s → ACPI 读 0xC834/0xC835 + WMI 13
+//    ④ **finally 恢复**（两条通道各自）：目标 0 · 清 0x02|0x08 · 0x1060 写回原值
 //
 // ⛔ 安全边界（硬性）：
-//    · ⛔ 只写白名单地址（3 个风扇地址 + 0x1060 解锁位）；地址/值域在 `EcLpcIo` 内**二次校验**；
-//    · ⛔ 不写 WMI 20/21（⭐ 20=1 已知卡死）；WMI 只发 Get；
-//    · ⛔ 任何异常不抛出；⭐ 全程 try/finally，**一定执行恢复**；
-//    · ⛔ 不打包、不碰安装目录、不 kill LM。
+//    · ⛔ 只写白名单（3+1）：0xC83C / 0xC83D / 0xB20（仅 bit1/bit3）· 0x1060（仅 `|0x80`）；
+//    · ⛔ 不写 WMI 20/21（20=1 已知卡死）；WMI 只发 Get；
+//    · ⭐ 每次写后**立刻回读比对**（ACPI 侧用稳定读）；失败立即停止，不做无判据的写；
+//    · ⛔ 任何异常不抛出；⭐ 全程 try/finally，**一定执行恢复**；⛔ 不打包、不 kill LM。
 //
-// ⭐ 输出：桌面 `lm-fan-ec-test-<时间戳>.txt` + `%APPDATA%\MechrevoLite\log.txt`（前缀 `[fan-ec-test]`）。
-// ⭐ 用法：`L-Mechrevo.exe --fan-ec-test`（⭐ 需管理员：PawnIO 驱动访问）。
+// ⭐ 输出：桌面 `lm-fan-ec-test-<时间戳>.txt` + `log.txt`（前缀 `[fan-ec-test]`）。
+// ⭐ 用法：`L-Mechrevo.exe --fan-ec-test`（需管理员）· `L-Mechrevo.exe --fan-ec-test --acpi`
 //
 // 许可/署名：与本树同一实现，见 THIRD-PARTY-NOTICES.md 与 LICENSES\。
 
@@ -32,14 +31,25 @@ using System.Threading;
 namespace MechrevoLite.Hardware;
 
 /// <summary>
-/// ⭐⭐ 宝龙达风扇 **EC 写通路最小验证**（<c>--fan-ec-test</c>）：Fan1 单通道 · 白名单写 · finally 恢复 ✅。
+/// ⭐⭐ 宝龙达风扇 **EC 写通路最小验证**（<c>--fan-ec-test</c>）：LPC 失败自动改试 ACPI EC ✅。
 /// </summary>
 internal static class FanEcTest
 {
 	private const byte UnlockBit = 0x80;
 
-	internal static int Run()
+	internal static int Run(string[] args)
 	{
+		bool forceAcpi = false;
+		if (args != null)
+		{
+			foreach (string arg in args)
+			{
+				if (string.Equals(arg, "--acpi", StringComparison.OrdinalIgnoreCase))
+				{
+					forceAcpi = true;
+				}
+			}
+		}
 		string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
 			"lm-fan-ec-test-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt");
 		try
@@ -56,15 +66,11 @@ internal static class FanEcTest
 			try { Logger.WriteLine("[fan-ec-test] " + s); } catch { }
 		}
 
-		BaolongdaWmi wmi = null;
-		bool wroteEc = false;
-		bool unlockAttempted = false;
-		int unlockOriginal = -1;
 		int exitCode = 1;
 		try
 		{
-			L("=== 宝龙达风扇 EC 写通路最小验证（--fan-ec-test · Fan1 单通道）===");
-			L("⚠️ 安全：只写 0xC83C/0xC83D/0xB20（风扇）+ 0x1060 的 bit7（解锁）；try/finally 一定恢复");
+			L("=== 宝龙达风扇 EC 写通路验证（--fan-ec-test · 先 LPC 后 ACPI）===");
+			L("⚠️ 只写白名单 3+1 地址（0xC83C/0xC83D/0xB20/0x1060；0x1060 仅 |0x80）；每次写后回读；finally 恢复");
 			L("⚠️ 不写 WMI 20/21（20=1 真机卡死）；WMI 只发 Get");
 			L("");
 
@@ -73,148 +79,68 @@ internal static class FanEcTest
 			L("主板 = " + (board.Length == 0 ? "(空/读不到)" : board) + " ⇒ " + (is30 ? "30 系" : "40 系"));
 			L("");
 
-			// ⭐⭐ 2026-10-18（写失败排查）：⭐ **先做 ACPI EC 只读对照**（⛔ 不写任何字节）——
-			//   即使 LPC 身份不通过，也要留下 ACPI 通道读数（用于判断"写是否该走 ACPI EC"）✅
+			// ── 0. 双通道只读对照 ──
 			EcChannelCompare.LogAcpiReadOnly(L);
 			L("");
 
-			// ── ① 身份（闸门只认身份：0x2000 == 0x55 且 0xC411 非 0/0xFF）──
-			L("── ① EC 身份 ──");
-			bool identityOk = EcLpcIo.TryReadEcIdentity(out _, out _, out string idNote);
-			L("EC 身份：" + idNote + " ⇒ " + (identityOk ? "可访问 ✅" : "⛔ 不可访问（判据：0x2000==0x55 且 0xC411 非 0/0xFF）"));
-			if (!identityOk)
-			{
-				L("");
-				L("结论：⛔ 不可用 —— EC 身份不通过");
-				L("⛔ 本命令**未写任何 EC 字节**（身份不通过 = 禁止任何写）");
-				return 1;
-			}
+			// ── ① 身份（稳定读）──
+			L("── ① EC 身份（稳定读：3 次取多数）──");
+			bool lpcIdentity = EcLpcIo.TryReadEcIdentity(out _, out _, out string lpcIdNote);
+			L("LPC 身份：" + lpcIdNote + " ⇒ " + (lpcIdentity ? "通过 ✅" : "未通过 ⚠️"));
+			bool acpiIdentity = EcPortIo.TryReadEcIdentityAcpi(out _, out _, out string acpiIdNote);
+			L("ACPI 身份：" + acpiIdNote + " ⇒ " + (acpiIdentity ? "通过 ✅" : "未通过 ⚠️"));
 			L("");
-
-			// ── ② 解锁（0x1060 |= 0x80；只置 bit7，保留其它位）──
-			L("── ② 解锁寄存器 0x1060 ──");
-			if (!EcLpcIo.TryReadByte(EcLpcIo.EcUnlockAddress, out unlockOriginal))
+			if (!lpcIdentity && !acpiIdentity)
 			{
-				L("读 0x1060 失败 ⇒ ⛔ 不可用（无法安全解锁/恢复），不写任何 EC 字节");
+				L("结论：⛔ 不可用 —— 两条通道身份均未通过");
+				L("⛔ 本命令**未写任何 EC 字节**");
 				return 1;
 			}
-			L("解锁前 0x1060 = 0x" + unlockOriginal.ToString("X2") + "（bit7=" + (((unlockOriginal & UnlockBit) != 0) ? "1" : "0") + "）");
-			int unlockAfter = unlockOriginal;
-			if ((unlockOriginal & UnlockBit) == 0)
+			if (forceAcpi)
 			{
-				unlockAttempted = true;
-				bool unlockOk = EcLpcIo.TryUnlockEcRam(out _, out int ubAfter, out string unlockNote);
-				unlockAfter = ubAfter;
-				L("解锁：" + unlockNote);
-				L("解锁后 0x1060 = 0x" + (unlockAfter < 0 ? "读不到" : unlockAfter.ToString("X2"))
-					+ "（bit7=" + (((unlockAfter & UnlockBit) != 0) ? "1" : "0") + "）");
-				// ⭐⭐ 2026-10-18（写失败排查）：⭐ 打印解锁写的 **ioctl 返回码 + 完整端口序列** ✅
-				LogWriteTrace(L, "解锁写 0x1060 端口序列");
-				if (!unlockOk)
+				L("⭐ `--acpi`：跳过 LPC 写测试，只测 ACPI EC 写");
+			}
+
+			// ── ② LPC 写测试（身份通过且未强制 ACPI）──
+			if (lpcIdentity && !forceAcpi)
+			{
+				L("══ A. LPC/SuperIO 写测试（原通道）══");
+				bool lpcAvailable = RunLpcWriteTest(L);
+				L("");
+				if (lpcAvailable)
 				{
+					L("结论：✅ **LPC 写通路可用**");
+					exitCode = 0;
+				}
+				else
+				{
+					L("⚠️ LPC 写通路失败（ioctl 成功但 EC 不认 / 或解锁失败）⇒ **自动改试 ACPI EC 写**");
 					L("");
-					L("结论：⛔ 不可用 —— 解锁失败，⛔ 不继续写风扇（finally 会尝试恢复 0x1060）");
+				}
+			}
+
+			// ── ③ ACPI 写测试（LPC 失败 / 被 --acpi 强制 / LPC 身份未通过）──
+			if (exitCode != 0)
+			{
+				if (!acpiIdentity)
+				{
+					L("结论：⛔ 不可用 —— ACPI 身份未通过，不写任何 EC 字节");
 					return 1;
 				}
-			}
-			else
-			{
-				L("已解锁（bit7=1）⇒ 无需写 0x1060 ✅");
-			}
-			L("");
-
-			// ── ③ 只读基线：EC 0xC834/0xC835（≈RPM/100）+ WMI 13 ──
-			L("── ③ 只读基线 ──");
-			bool ecRpmOkBefore = ReadEcRpmBytes(L, "基线", out int ecRpmBefore);
-			L("EC 0xC83C（Fan1 目标）= " + ReadHex(EcLpcIo.Fan1TargetAddress)
-				+ " · 0xC83D（Fan2 目标）= " + ReadHex(EcLpcIo.Fan2TargetAddress)
-				+ " · 0xB20（接管掩码）= " + ReadHex(EcLpcIo.FanManualMaskAddress));
-			try
-			{
-				wmi = BaolongdaWmi.TryCreate();
-			}
-			catch
-			{
-				wmi = null;
-			}
-			int wmiRpmBefore = -1;
-			BaolongdaWmi.FanSpeeds speedsBefore = default;
-			if (wmi != null)
-			{
-				if (wmi.TryReadFanSpeeds(out speedsBefore))
-				{
-					wmiRpmBefore = Math.Max(speedsBefore.First, speedsBefore.Second);
-				}
-				L("WMI 13 基线转速 = " + (wmiRpmBefore >= 0 ? wmiRpmBefore + " RPM（" + speedsBefore.First + "/" + speedsBefore.Second + "）" : "读不到"));
-				L("WMI 20/21 只读 hex：" + RawHex(wmi, BaolongdaWmi.Function.MaxFanSpeedSwitch, 0)
-					+ " / " + RawHex(wmi, BaolongdaWmi.Function.MaxFanSpeed, 0));
-			}
-			else
-			{
-				L("WMI：⚠️ 没有 MICommonInterface 实例 ⇒ 用 EC 0xC834/0xC835 估算转速");
-			}
-			int baselineRpm = (wmiRpmBefore >= 0) ? wmiRpmBefore : (ecRpmOkBefore ? ecRpmBefore : -1);
-			L("基线转速（用于判定）= " + (baselineRpm >= 0 ? baselineRpm + " RPM（来源=" + (wmiRpmBefore >= 0 ? "WMI13" : "EC 0xC834/5×100") + "）" : "读不到"));
-			if (baselineRpm < 0)
-			{
+				L("══ B. ACPI EC 写测试（0x93 mailbox）══");
+				bool acpiAvailable = RunAcpiWriteTest(L);
 				L("");
-				L("结论：⛔ 不可用 —— 无法读基线转速（WMI 13 与 EC 0xC834/0xC835 都读不到），不写");
-				return 1;
-			}
-			L("");
-
-			// ── ④ 写 Fan1 目标 + 置 bit1 ──
-			int currentUnits = Math.Clamp(baselineRpm / 100, 0, EcLpcIo.FanTargetMaxUnits100Rpm);
-			int targetUnits = Math.Min(currentUnits + 5, EcLpcIo.FanTargetMaxUnits100Rpm);
-			L("── ④ 写测试（Fan1 单通道）──");
-			L("目标：0xC83C ← " + targetUnits + "（" + (targetUnits * 100) + " RPM）· 0xB20 |= 0x02（Fan1 手动接管）");
-			wroteEc = true; // ⭐ 先置恢复标志：即使下面异常，finally 也会恢复 ✅
-			bool w1 = EcLpcIo.TryWriteFanTarget(EcLpcIo.Fan1TargetAddress, targetUnits, out int rb1);
-			L("写 0xC83C=" + targetUnits + " ⇒ ok=" + w1 + " · 回读=" + (rb1 < 0 ? "读不到" : rb1.ToString()));
-			LogWriteTrace(L, "写 0xC83C 端口序列");
-			bool w2 = EcLpcIo.TryWriteFanManualMask(fan1Manual: true, fan2Manual: false, out int rbMask);
-			L("写 0xB20（bit1=1，保留其它位）⇒ ok=" + w2 + " · 回读=0x"
-				+ (rbMask < 0 ? "读不到" : rbMask.ToString("X2"))
-				+ "（bit1=" + (((rbMask & 0x02) != 0) ? "1" : "0") + " · bit3=" + (((rbMask & 0x08) != 0) ? "1" : "0") + "）");
-			LogWriteTrace(L, "写 0xB20 端口序列");
-			L("");
-
-			// ── ⑤ 等起转 → 读 EC + WMI 13 ──
-			L("── ⑤ 等待 2 s 后读转速 ──");
-			Thread.Sleep(2000);
-			bool ecRpmOkAfter = ReadEcRpmBytes(L, "写后", out int ecRpmAfter);
-			int wmiRpmAfter = -1;
-			BaolongdaWmi.FanSpeeds speedsAfter = default;
-			if (wmi != null && wmi.TryReadFanSpeeds(out speedsAfter))
-			{
-				wmiRpmAfter = Math.Max(speedsAfter.First, speedsAfter.Second);
-				L("WMI 13 写后转速 = " + wmiRpmAfter + " RPM（" + speedsAfter.First + "/" + speedsAfter.Second + "）");
-			}
-			else
-			{
-				L("WMI 13 写后转速 = 读不到");
-			}
-			int afterRpm = (wmiRpmAfter >= 0) ? wmiRpmAfter : (ecRpmOkAfter ? ecRpmAfter : -1);
-			L("写后转速（用于判定）= " + (afterRpm >= 0 ? afterRpm + " RPM（来源=" + (wmiRpmAfter >= 0 ? "WMI13" : "EC 0xC834/5×100") + "）" : "读不到"));
-			ReadEcRegisters(L, "写后寄存器", out _, out _, out _);
-			L("");
-
-			// ── ⑥ 判定 ──
-			int delta = (afterRpm >= 0) ? (afterRpm - baselineRpm) : int.MinValue;
-			bool available = w1 && w2 && afterRpm >= 0 && delta >= 200;
-			L("── ⑥ 结论 ──");
-			L("转速变化 = " + (delta == int.MinValue ? "无法读取" : delta + " RPM") + "（判据：≥ +200 RPM）");
-			if (available)
-			{
-				L("结论：✅ **EC 写通路可用**（Fan1 目标写入 + 0xB20 bit1 置位 ⇒ 转速上升 " + delta + " RPM）");
-				L("⭐ 下一步：机主回传本报告 ⇒ 再验 Fan2（0xC83D + bit3），然后接产品闭环 ✅");
-				exitCode = 0;
-			}
-			else
-			{
-				L("结论：⛔ **EC 写通路不可用/未确认** —— 写入未使转速明显上升（<+200 RPM）");
-				L("⚠️ 可能原因：0x1060 解锁未真正生效 / 0xB20 写被拒 / 目标地址语义不同 / 风扇已在高转速");
-				L("⭐ 请把本报告发回（含解锁前后 0x1060 与写入回读）");
+				if (acpiAvailable)
+				{
+					L("结论：✅ **ACPI EC 写通路可用**（LPC 写被 EC 拒绝，但 ACPI EC 接受）");
+					L("⭐ 下一步：机主回传本报告 ⇒ 再验 Fan2（0xC83D + bit3），然后接产品闭环 ✅");
+					exitCode = 0;
+				}
+				else
+				{
+					L("结论：⛔ **两条写通道都被拒** ⇒ 判定「本机 EC RAM 写被 BIOS 锁死」");
+					L("⇒ 按机主指示：**放弃风扇曲线/强冷**（保持 UI 隐藏），并写入交接说明 ⚠️");
+				}
 			}
 		}
 		catch (Exception ex)
@@ -222,94 +148,250 @@ internal static class FanEcTest
 			L("测试异常：" + ex.GetType().Name + " " + ex.Message);
 			L(ex.StackTrace ?? "");
 		}
+		return exitCode;
+	}
+
+	/// <summary>⭐ LPC 通道写测试（Fan1 + 0xB20 bit1 + 解锁），内部 try/finally 恢复 ✅。</summary>
+	private static bool RunLpcWriteTest(Action<string> L)
+	{
+		bool wroteFan = false;
+		bool unlockAttempted = false;
+		int unlockOriginal = -1;
+		try
+		{
+			// ②a 解锁
+			L("── ②a 解锁寄存器 0x1060（LPC）──");
+			if (!EcLpcIo.TryReadByteStable(EcLpcIo.EcUnlockAddress, out unlockOriginal, out string lockNote))
+			{
+				L("读 0x1060 失败（" + lockNote + "）⇒ ⛔ 不写");
+				return false;
+			}
+			L("解锁前 0x1060 " + lockNote);
+			int unlockAfter = unlockOriginal;
+			if ((unlockOriginal & UnlockBit) == 0)
+			{
+				unlockAttempted = true;
+				bool unlockOk = EcLpcIo.TryUnlockEcRam(out _, out int ubAfter, out string unlockNote);
+				unlockAfter = ubAfter;
+				L("解锁：" + unlockNote);
+				L("解锁后 0x1060 = 0x" + (unlockAfter < 0 ? "读不到" : unlockAfter.ToString("X2")));
+				LogLpcTrace(L, "解锁写 0x1060 端口序列");
+				if (!unlockOk)
+				{
+					L("⛔ LPC 解锁失败 ⇒ 不继续写风扇");
+					return false;
+				}
+			}
+			else
+			{
+				L("LPC 侧已解锁（bit7=1），无需写 0x1060");
+			}
+
+			// ②b 基线
+			L("── ②b 只读基线（LPC）──");
+			bool ecBeforeOk = ReadEcRpmBytes(L, "LPC 基线", acpi: false, out int ecRpmBefore);
+			L("LPC 0xC83C=" + ReadHexLpc(EcLpcIo.Fan1TargetAddress)
+				+ " · 0xC83D=" + ReadHexLpc(EcLpcIo.Fan2TargetAddress)
+				+ " · 0xB20=" + ReadHexLpc(EcLpcIo.FanManualMaskAddress));
+			int wmiBefore = ReadWmiRpm(out string wmiNote);
+			L("WMI 13 基线：" + (wmiBefore >= 0 ? wmiBefore + " RPM（" + wmiNote + "）" : "读不到（" + wmiNote + "）"));
+			int baselineRpm = (wmiBefore >= 0) ? wmiBefore : (ecBeforeOk ? ecRpmBefore : -1);
+			if (baselineRpm < 0)
+			{
+				L("⛔ 无法读基线转速，不写");
+				return false;
+			}
+			L("基线转速（判定用）= " + baselineRpm + " RPM（来源=" + (wmiBefore >= 0 ? "WMI13" : "EC×100") + "）");
+
+			// ②c 写 Fan1 + 置 bit1
+			int currentUnits = Math.Clamp(baselineRpm / 100, 0, EcLpcIo.FanTargetMaxUnits100Rpm);
+			int targetUnits = Math.Min(currentUnits + 5, EcLpcIo.FanTargetMaxUnits100Rpm);
+			L("── ②c 写 Fan1 目标 = " + targetUnits + "（" + (targetUnits * 100) + " RPM）+ 0xB20 |= 0x02 ──");
+			wroteFan = true;
+			bool w1 = EcLpcIo.TryWriteFanTarget(EcLpcIo.Fan1TargetAddress, targetUnits, out int rb1);
+			L("写 0xC83C=" + targetUnits + " ⇒ ok=" + w1 + " · 回读=" + (rb1 < 0 ? "读不到" : rb1.ToString()));
+			LogLpcTrace(L, "写 0xC83C 端口序列");
+			bool w2 = EcLpcIo.TryWriteFanManualMask(true, false, out int rbMask);
+			L("写 0xB20（bit1=1）⇒ ok=" + w2 + " · 回读=" + (rbMask < 0 ? "读不到" : "0x" + rbMask.ToString("X2")));
+			LogLpcTrace(L, "写 0xB20 端口序列");
+
+			// ②d 等 2 s → 读回
+			Thread.Sleep(2000);
+			bool ecAfterOk = ReadEcRpmBytes(L, "LPC 写后", acpi: false, out int ecRpmAfter);
+			int wmiAfter = ReadWmiRpm(out string wmiAfterNote);
+			int afterRpm = (wmiAfter >= 0) ? wmiAfter : (ecAfterOk ? ecRpmAfter : -1);
+			L("写后转速（判定用）= " + (afterRpm >= 0 ? afterRpm + " RPM（来源=" + (wmiAfter >= 0 ? "WMI13" : "EC×100") + "）" : "读不到"));
+			int delta = (afterRpm >= 0) ? afterRpm - baselineRpm : int.MinValue;
+			bool available = w1 && w2 && afterRpm >= 0 && delta >= 200;
+			L("LPC 转速变化 = " + (delta == int.MinValue ? "无法读取" : delta + " RPM") + "（判据 ≥+200）⇒ " + available);
+			return available;
+		}
 		finally
 		{
-			// ⭐⭐ 硬性要求：无论成功/失败/异常，都**恢复**（目标 0 + 清 0x02|0x08）；解锁位写回原值 ✅
-			if (wroteEc)
+			// ⭐ finally 恢复：目标 0 + 清位 + 0x1060 原值
+			if (wroteFan)
 			{
-				L("");
-				L("── ⑦ finally 恢复（目标 0 · 清 0x02|0x08 · 0x1060 写回原值）──");
 				try
 				{
-					bool restored = EcLpcIo.TryRestoreFanFirmware(out string restoreDetail);
-					L("风扇恢复 = " + restored + " · " + restoreDetail);
-					LogWriteTrace(L, "风扇恢复（最后一步 0xB20 清位）端口序列");
-					if (!restored)
-					{
-						L("⚠️ 风扇恢复未完全成功 —— 请立即把本报告发回；必要时重启机器 ⚠️");
-					}
+					bool restored = EcLpcIo.TryRestoreFanFirmware(out string detail);
+					L("LPC 风扇恢复 = " + restored + " · " + detail);
+					LogLpcTrace(L, "风扇恢复 端口序列");
 				}
 				catch (Exception ex)
 				{
-					L("⚠️ finally 风扇恢复异常（请把报告发回）：" + ex.GetType().Name + " " + ex.Message);
+					L("⚠️ LPC 风扇恢复异常：" + ex.GetType().Name + " " + ex.Message);
 				}
 			}
 			if (unlockAttempted && unlockOriginal >= 0)
 			{
 				try
 				{
-					bool unlockRestored = EcLpcIo.TryRestoreEcUnlockRegister(unlockOriginal, out int unlockReadBack);
-					L("解锁恢复：0x1060 写回 0x" + unlockOriginal.ToString("X2")
-						+ " ⇒ 回读=" + (unlockReadBack < 0 ? "读不到" : "0x" + unlockReadBack.ToString("X2"))
-						+ " ⇒ ok=" + unlockRestored
-						+ (unlockRestored ? " ✅" : " ⚠️（请把报告发回）"));
-					LogWriteTrace(L, "解锁恢复 端口序列");
+					bool ok = EcLpcIo.TryRestoreEcUnlockRegister(unlockOriginal, out int rb);
+					L("LPC 解锁恢复：0x1060 写回 0x" + unlockOriginal.ToString("X2")
+						+ " ⇒ 回读 0x" + (rb < 0 ? "读不到" : rb.ToString("X2")) + " ⇒ ok=" + ok);
+					LogLpcTrace(L, "解锁恢复 端口序列");
 				}
 				catch (Exception ex)
 				{
-					L("⚠️ finally 解锁恢复异常（请把报告发回）：" + ex.GetType().Name + " " + ex.Message);
+					L("⚠️ LPC 解锁恢复异常：" + ex.GetType().Name + " " + ex.Message);
 				}
 			}
-			if (wroteEc || unlockAttempted)
+		}
+	}
+
+	/// <summary>⭐ ACPI EC 通道写测试（Fan1 + 0xB20 bit1 + 解锁），内部 try/finally 恢复 ✅。</summary>
+	private static bool RunAcpiWriteTest(Action<string> L)
+	{
+		bool wroteFan = false;
+		bool unlockAttempted = false;
+		int unlockOriginal = -1;
+		try
+		{
+			// ③a 解锁
+			L("── ③a 解锁寄存器 0x1060（ACPI EC）──");
+			if (!EcPortIo.TryReadByteStable(EcPortIo.AcpiEcUnlockAddress, out unlockOriginal, out string lockNote))
 			{
-				Thread.Sleep(300);
-				L("恢复后 0x1060 = " + ReadHex(EcLpcIo.EcUnlockAddress));
-				ReadEcRegisters(L, "恢复后寄存器", out _, out _, out _);
+				L("读 0x1060 失败（" + lockNote + "）⇒ ⛔ 不写");
+				return false;
 			}
-			if (wmi != null)
+			L("解锁前 0x1060 " + lockNote);
+			int unlockAfter = unlockOriginal;
+			if ((unlockOriginal & UnlockBit) == 0)
+			{
+				unlockAttempted = true;
+				bool unlockOk = EcPortIo.TryUnlockEcRamAcpi(out _, out int ubAfter, out string unlockNote);
+				unlockAfter = ubAfter;
+				L("解锁：" + unlockNote);
+				L("解锁后 0x1060 = 0x" + (unlockAfter < 0 ? "读不到" : unlockAfter.ToString("X2")));
+				L("ACPI 写细节：" + EcPortIo.LastAcpiWriteTrace);
+				if (!unlockOk)
+				{
+					L("⛔ ACPI 解锁失败 ⇒ 不继续写风扇");
+					return false;
+				}
+			}
+			else
+			{
+				L("ACPI 侧已解锁（bit7=1），无需写 0x1060");
+			}
+
+			// ③b 基线
+			L("── ③b 只读基线（ACPI EC）──");
+			bool ecBeforeOk = ReadEcRpmBytes(L, "ACPI 基线", acpi: true, out int ecRpmBefore);
+			L("ACPI 0xC83C=" + ReadHexAcpi(EcPortIo.AcpiFan1TargetAddress)
+				+ " · 0xC83D=" + ReadHexAcpi(EcPortIo.AcpiFan2TargetAddress)
+				+ " · 0xB20=" + ReadHexAcpi(EcPortIo.AcpiFanManualMaskAddress));
+			int wmiBefore = ReadWmiRpm(out string wmiNote);
+			L("WMI 13 基线：" + (wmiBefore >= 0 ? wmiBefore + " RPM（" + wmiNote + "）" : "读不到（" + wmiNote + "）"));
+			int baselineRpm = (wmiBefore >= 0) ? wmiBefore : (ecBeforeOk ? ecRpmBefore : -1);
+			if (baselineRpm < 0)
+			{
+				L("⛔ 无法读基线转速，不写");
+				return false;
+			}
+			L("基线转速（判定用）= " + baselineRpm + " RPM（来源=" + (wmiBefore >= 0 ? "WMI13" : "EC×100") + "）");
+
+			// ③c 写 Fan1 + 置 bit1（全部 ACPI EC）
+			int currentUnits = Math.Clamp(baselineRpm / 100, 0, EcPortIo.AcpiFanTargetMaxUnits100Rpm);
+			int targetUnits = Math.Min(currentUnits + 5, EcPortIo.AcpiFanTargetMaxUnits100Rpm);
+			L("── ③c 写 Fan1 目标 = " + targetUnits + "（" + (targetUnits * 100) + " RPM）+ 0xB20 |= 0x02（ACPI）──");
+			wroteFan = true;
+			bool w1 = EcPortIo.TryWriteAcpiFanTarget(EcPortIo.AcpiFan1TargetAddress, targetUnits, out int rb1);
+			L("写 0xC83C=" + targetUnits + " ⇒ ok=" + w1 + " · 回读=" + (rb1 < 0 ? "读不到" : rb1.ToString())
+				+ " · " + EcPortIo.LastAcpiWriteTrace);
+			bool w2 = EcPortIo.TryWriteAcpiFanManualMask(true, false, out int rbMask, out string maskNote);
+			L("写 0xB20（bit1=1）⇒ ok=" + w2 + " · " + maskNote + " · " + EcPortIo.LastAcpiWriteTrace);
+
+			// ③d 等 2 s → ACPI + WMI 读回
+			Thread.Sleep(2000);
+			bool ecAfterOk = ReadEcRpmBytes(L, "ACPI 写后", acpi: true, out int ecRpmAfter);
+			int wmiAfter = ReadWmiRpm(out string wmiAfterNote);
+			L("WMI 13 写后：" + (wmiAfter >= 0 ? wmiAfter + " RPM（" + wmiAfterNote + "）" : "读不到（" + wmiAfterNote + "）"));
+			int afterRpm = (wmiAfter >= 0) ? wmiAfter : (ecAfterOk ? ecRpmAfter : -1);
+			L("写后转速（判定用）= " + (afterRpm >= 0 ? afterRpm + " RPM（来源=" + (wmiAfter >= 0 ? "WMI13" : "EC×100") + "）" : "读不到"));
+			L("ACPI 写后 0xC83C=" + ReadHexAcpi(EcPortIo.AcpiFan1TargetAddress)
+				+ " · 0xB20=" + ReadHexAcpi(EcPortIo.AcpiFanManualMaskAddress));
+			int delta = (afterRpm >= 0) ? afterRpm - baselineRpm : int.MinValue;
+			bool available = w1 && w2 && afterRpm >= 0 && delta >= 200;
+			L("ACPI 转速变化 = " + (delta == int.MinValue ? "无法读取" : delta + " RPM") + "（判据 ≥+200）⇒ " + available);
+			return available;
+		}
+		finally
+		{
+			if (wroteFan)
 			{
 				try
 				{
-					wmi.Dispose();
+					bool restored = EcPortIo.TryRestoreFanFirmwareAcpi(out string detail);
+					L("ACPI 风扇恢复 = " + restored + " · " + detail);
+					L("ACPI 恢复写细节：" + EcPortIo.LastAcpiWriteTrace);
 				}
-				catch
+				catch (Exception ex)
 				{
+					L("⚠️ ACPI 风扇恢复异常：" + ex.GetType().Name + " " + ex.Message);
 				}
 			}
-			L("");
-			L("⚠️ 验证通过前，产品**不开放**风扇曲线/强冷（UI 已隐藏）；⭐ 请把本报告发回 ✅");
-		}
-		return exitCode;
-	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-18（写失败排查 · 仪表化）：⭐ 把 `EcLpcIo.LastWriteTrace`（完整端口序列 + ioctl 返回码/错误码）
-	/// 逐行写进报告，供与开源蛟龙 `Blding64.EC_RAM_WRITE` 逐条并列对照 ✅。
-	/// </summary>
-	private static void LogWriteTrace(Action<string> log, string title)
-	{
-		log(title + "（ioctl 最后一条：ok=" + EcLpcIo.LastIoctlOk + " · Win32=" + EcLpcIo.LastIoctlError + "）");
-		string trace = EcLpcIo.LastWriteTrace;
-		if (string.IsNullOrWhiteSpace(trace))
-		{
-			log("  （无端口序列记录 —— 可能在模块装载/互斥体阶段就失败，未走到端口写）");
-			return;
-		}
-		foreach (string line in trace.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-		{
-			log("  " + line.TrimEnd('\r'));
+			if (unlockAttempted && unlockOriginal >= 0)
+			{
+				try
+				{
+					bool ok = EcPortIo.TryRestoreEcUnlockRegisterAcpi(unlockOriginal, out int rb);
+					L("ACPI 解锁恢复：0x1060 写回 0x" + unlockOriginal.ToString("X2")
+						+ " ⇒ 回读 0x" + (rb < 0 ? "读不到" : rb.ToString("X2")) + " ⇒ ok=" + ok
+						+ " · " + EcPortIo.LastAcpiWriteTrace);
+				}
+				catch (Exception ex)
+				{
+					L("⚠️ ACPI 解锁恢复异常：" + ex.GetType().Name + " " + ex.Message);
+				}
+			}
 		}
 	}
 
-	/// <summary>⭐ 读 EC 0xC834/0xC835（上游口径 ≈ RPM/100）并换算成 RPM ✅。</summary>
-	private static bool ReadEcRpmBytes(Action<string> log, string tag, out int rpm)
+	/// <summary>⭐ 读 EC 0xC834/0xC835（≈RPM/100，稳定读）并换算成 RPM；<paramref name="acpi" /> 选通道 ✅。</summary>
+	private static bool ReadEcRpmBytes(Action<string> log, string tag, bool acpi, out int rpm)
 	{
 		rpm = -1;
-		bool r1 = EcLpcIo.TryReadByte(0xC834, out int fan1Byte);
-		bool r2 = EcLpcIo.TryReadByte(0xC835, out int fan2Byte);
-		log(tag + "：0xC834=" + (r1 ? "0x" + fan1Byte.ToString("X2") : "读不到")
-			+ " · 0xC835=" + (r2 ? "0x" + fan2Byte.ToString("X2") : "读不到")
-			+ (r1 && r2 ? " ⇒ ≈ " + (Math.Max(fan1Byte, fan2Byte) * 100) + " RPM（×100 口径）" : ""));
+		bool r1;
+		bool r2;
+		int fan1Byte;
+		int fan2Byte;
+		string note1;
+		string note2;
+		if (acpi)
+		{
+			r1 = EcPortIo.TryReadByteStable(0xC834, out fan1Byte, out note1);
+			r2 = EcPortIo.TryReadByteStable(0xC835, out fan2Byte, out note2);
+		}
+		else
+		{
+			r1 = EcLpcIo.TryReadByteStable(0xC834, out fan1Byte, out note1);
+			r2 = EcLpcIo.TryReadByteStable(0xC835, out fan2Byte, out note2);
+		}
+		string ch = acpi ? "ACPI" : "LPC";
+		log(tag + "：" + ch + " 0xC834=" + (r1 ? "0x" + fan1Byte.ToString("X2") + "（" + note1 + "）" : "读不到（" + note1 + "）")
+			+ " · 0xC835=" + (r2 ? "0x" + fan2Byte.ToString("X2") + "（" + note2 + "）" : "读不到（" + note2 + "）")
+			+ (r1 && r2 ? " ⇒ ≈ " + (Math.Max(fan1Byte, fan2Byte) * 100) + " RPM" : ""));
 		if (r1 && r2)
 		{
 			rpm = Math.Max(fan1Byte, fan2Byte) * 100;
@@ -318,37 +400,59 @@ internal static class FanEcTest
 		return false;
 	}
 
-	private static bool ReadEcRegisters(Action<string> log, string tag, out int fan1, out int fan2, out int mask)
+	/// <summary>⭐ 只读 WMI 13 转速（⭐ 不写任何 WMI 风扇命令）✅。</summary>
+	private static int ReadWmiRpm(out string detail)
 	{
-		bool r1 = EcLpcIo.TryReadByte(EcLpcIo.Fan1TargetAddress, out fan1);
-		bool r2 = EcLpcIo.TryReadByte(EcLpcIo.Fan2TargetAddress, out fan2);
-		bool r3 = EcLpcIo.TryReadByte(EcLpcIo.FanManualMaskAddress, out mask);
-		log(tag + "：0xC83C=" + (r1 ? "0x" + fan1.ToString("X2") : "读不到")
-			+ " · 0xC83D=" + (r2 ? "0x" + fan2.ToString("X2") : "读不到")
-			+ " · 0xB20=" + (r3 ? "0x" + mask.ToString("X2")
-				+ "（bit1=" + (((mask & 0x02) != 0) ? "1" : "0") + " · bit3=" + (((mask & 0x08) != 0) ? "1" : "0") + "）" : "读不到"));
-		return r1 && r2 && r3;
-	}
-
-	private static string ReadHex(int address)
-	{
-		return EcLpcIo.TryReadByte(address, out int v) ? "0x" + v.ToString("X2") : "读不到";
-	}
-
-	private static string RawHex(BaolongdaWmi wmi, BaolongdaWmi.Function function, byte fanType)
-	{
+		detail = "WMI 不可用";
+		int rpm = -1;
 		try
 		{
-			if (!wmi.TryInvokeRawGet(function, new byte[1] { fanType }, out byte[] raw) || raw == null)
+			using BaolongdaWmi wmi = BaolongdaWmi.TryCreate();
+			if (wmi == null)
 			{
-				return "读不到";
+				detail = "没有 MICommonInterface 实例";
+				return -1;
 			}
-			int count = Math.Min(8, raw.Length);
-			return "[" + (count > 0 ? BitConverter.ToString(raw, 0, count).Replace('-', ' ') : "空") + "]";
+			if (wmi.TryReadFanSpeeds(out BaolongdaWmi.FanSpeeds speeds))
+			{
+				rpm = Math.Max(speeds.First, speeds.Second);
+				detail = "WMI13=" + speeds.First + "/" + speeds.Second;
+			}
+			else
+			{
+				detail = "WMI13 读不到";
+			}
 		}
-		catch
+		catch (Exception ex)
 		{
-			return "读不到";
+			detail = "WMI 异常：" + ex.GetType().Name;
+		}
+		return rpm;
+	}
+
+	private static string ReadHexLpc(int address)
+	{
+		return EcLpcIo.TryReadByteStable(address, out int v, out _) ? "0x" + v.ToString("X2") : "读不到";
+	}
+
+	private static string ReadHexAcpi(int address)
+	{
+		return EcPortIo.TryReadByteStable(address, out int v, out _) ? "0x" + v.ToString("X2") : "读不到";
+	}
+
+	/// <summary>⭐ 打印 LPC 写的完整端口序列 + ioctl 返回码 ✅。</summary>
+	private static void LogLpcTrace(Action<string> log, string title)
+	{
+		log(title + "（ioctl 最后一条：ok=" + EcLpcIo.LastIoctlOk + " · Win32=" + EcLpcIo.LastIoctlError + "）");
+		string trace = EcLpcIo.LastWriteTrace;
+		if (string.IsNullOrWhiteSpace(trace))
+		{
+			log("  （无端口序列记录 —— 可能在模块装载/互斥体阶段就失败）");
+			return;
+		}
+		foreach (string line in trace.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+		{
+			log("  " + line.TrimEnd('\r'));
 		}
 	}
 

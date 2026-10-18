@@ -354,25 +354,80 @@ internal static class EcLpcIo
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主发现读数偶发不一致后）：⭐ LPC 通道**稳定读** —— 最多 3 次取出现 ≥2 次的值 ✅。
+	/// <para>⚠️ 机主实测 `0xC411` 两次读到 `0x23`/`0x42` ⇒ 单次读数不可信；⭐ 身份判据改走本方法 ✅</para>
+	/// </summary>
+	internal static bool TryReadByteStable(int address, out int value, out string note, int attempts = 3)
+	{
+		value = -1;
+		int[] values = new int[attempts];
+		int okCount = 0;
+		string all = "";
+		for (int i = 0; i < attempts; i++)
+		{
+			bool ok = TryReadByte(address, out values[i]);
+			if (ok)
+			{
+				okCount++;
+			}
+			all += (i > 0 ? "/" : "") + (ok ? "0x" + values[i].ToString("X2") : "读不到");
+		}
+		if (okCount < 2)
+		{
+			note = "读 " + attempts + " 次仅成功 " + okCount + " 次（" + all + "）";
+			return false;
+		}
+		int best = -1;
+		int bestCount = 0;
+		for (int i = 0; i < attempts; i++)
+		{
+			if (values[i] < 0)
+			{
+				continue;
+			}
+			int count = 0;
+			for (int j = 0; j < attempts; j++)
+			{
+				if (values[j] == values[i])
+				{
+					count++;
+				}
+			}
+			if (count > bestCount)
+			{
+				bestCount = count;
+				best = values[i];
+			}
+		}
+		if (bestCount < 2)
+		{
+			note = "读数不一致（" + all + "）⇒ 无法判定";
+			return false;
+		}
+		value = best;
+		note = all + " ⇒ 取 0x" + best.ToString("X2") + "（" + bestCount + "/" + okCount + "）";
+		return true;
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主实测确认后的**最终判据**）：⭐ EC **可访问性**只认**身份** ——
 	/// ⭐ `0x2000` 芯片 ID **必须 == `0x55`** 且 `0xC411` EC 版本**非 0x00/0xFF** ✅。
 	/// <para>⚠️ 不再要求「风扇三地址非全 0」：⭐ 机主报告 `0xC83C/0xC83D` 在**固件自动控制时本来就是 0**，
 	/// 而 `0xC834/0xC835=0x14`（2000 RPM）与 WMI 13 吻合 ⇒ ⭐ 全 0 那条判据是**假否决**，已删除 ✅</para>
+	/// <para>⭐ 读数走**稳定读**（3 次取多数）—— 机主实测 `0xC411` 曾出现 `0x23`/`0x42` 不一致 ⚠️</para>
 	/// <para>⛔ 本方法只读（只发读命令）；⛔ 不执行任何 EC 写（解锁见 <see cref="TryUnlockEcRam" />）✅</para>
 	/// </summary>
 	internal static bool TryReadEcIdentity(out int chipId, out int version, out string note)
 	{
 		chipId = -1;
 		version = -1;
-		bool idRead = TryReadByte(0x2000, out chipId);
-		bool verRead = TryReadByte(0xC411, out version);
+		bool idRead = TryReadByteStable(0x2000, out chipId, out string idNote);
+		bool verRead = TryReadByteStable(0xC411, out version, out string verNote);
 		// ⭐ 判据（机主 2026-10-18 报告确认）：0x2000 == 0x55 且 0xC411 非 0/0xFF
 		bool idValid = idRead && chipId == 0x55;
 		bool verValid = verRead && version != 0x00 && version != 0xFF;
-		note = "0x2000=" + (idRead ? "0x" + chipId.ToString("X2") : "读不到")
-			+ "（" + (idValid ? "0x55 ✅" : (idRead ? "⚠️ 不是 0x55 ⇒ 判不可访问" : "无效 ⚠️")) + "）"
-			+ " · 0xC411=" + (verRead ? "0x" + version.ToString("X2") : "读不到")
-			+ "（" + (verValid ? "非 0 ✅" : "无效 ⚠️") + "）";
+		note = "0x2000 " + idNote + "（" + (idValid ? "0x55 ✅" : "⚠️ 判不可访问") + "）"
+			+ " · 0xC411 " + verNote + "（" + (verValid ? "非 0 ✅" : "无效 ⚠️") + "）";
 		return idValid && verValid;
 	}
 

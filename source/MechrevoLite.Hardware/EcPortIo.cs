@@ -281,6 +281,253 @@ internal static class EcPortIo
 	}
 
 	// ══════════════════════════════════════════════════════════════════
+	//  ⭐⭐ 2026-10-18（机主批准 · **ACPI EC 写**）：
+	//    ⭐ 背景：LPC/SuperIO 通道读成功、写 ioctl 全 OK，但 EC **不认**（回读不变）
+	//      ⇒ 写改走 ACPI EC 的 XRAM mailbox（命令 `0x93` = 写 · 与读 `0x92` 同一套地址空间）✅
+	//    ⭐ 白名单（**3+1**）：0xC83C（Fan1 目标）· 0xC83D（Fan2 目标）· 0xB20（接管掩码，仅 bit1/bit3）
+	//      · 0x1060（**仅** `当前值 | 0x80` 解锁）✅
+	//    ⭐ 每次写后**立刻用 ACPI EC 回读比对**（⚠️ 读数用**稳定读**：最多 3 次取多数，
+	//      因为机主发现 LPC 侧 0xC411 两次读到 0x23/0x42 不一致 ⚠️）✅
+	//    ⭐ 其它地址一律拒绝（⛔ 不给误写 EC 留口子）✅
+	// ══════════════════════════════════════════════════════════════════
+
+	/// <summary>⭐ ACPI EC 写白名单：Fan1 目标（0xC83C）✅</summary>
+	internal const int AcpiFan1TargetAddress = 0xC83C;
+
+	/// <summary>⭐ ACPI EC 写白名单：Fan2 目标（0xC83D）✅</summary>
+	internal const int AcpiFan2TargetAddress = 0xC83D;
+
+	/// <summary>⭐ ACPI EC 写白名单：接管掩码（0xB20）✅</summary>
+	internal const int AcpiFanManualMaskAddress = 0xB20;
+
+	/// <summary>⭐ ACPI EC 写白名单：解锁寄存器（0x1060，**仅** `|0x80`）✅</summary>
+	internal const int AcpiEcUnlockAddress = 0x1060;
+
+	/// <summary>⭐ 目标档上限（x100RPM）= 68 → 与 LPC 通道一致 ✅</summary>
+	internal const int AcpiFanTargetMaxUnits100Rpm = 68;
+
+	private const int AcpiManualMaskBits = 0x0A;
+
+	private const int AcpiManualMaskBitFan1 = 0x02;
+
+	private const int AcpiManualMaskBitFan2 = 0x08;
+
+	private const int AcpiUnlockBit = 0x80;
+
+	private static string _lastAcpiWriteTrace = "";
+
+	/// <summary>⭐ 最近一次 ACPI EC 写的**命令/地址/数据/回读**（诊断用，报告直接打印）✅</summary>
+	internal static string LastAcpiWriteTrace
+	{
+		get
+		{
+			lock (Gate)
+			{
+				return _lastAcpiWriteTrace;
+			}
+		}
+	}
+
+	/// <summary>⭐ ACPI EC 写白名单（3+1 个地址）✅</summary>
+	internal static bool IsAcpiFanWriteAddress(int address)
+	{
+		return address == AcpiFan1TargetAddress
+			|| address == AcpiFan2TargetAddress
+			|| address == AcpiFanManualMaskAddress
+			|| address == AcpiEcUnlockAddress;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 稳定读：最多读 <paramref name="attempts" /> 次，取**出现 ≥2 次**的值；不足 2 次成功/一致 ⇒ false ✅。
+	/// <para>⚠️ 机主实测 LPC 侧 `0xC411` 两次读到 `0x23`/`0x42` ⇒ 单次读数不可信；ACPI 侧同样加稳定读 ✅</para>
+	/// </summary>
+	internal static bool TryReadByteStable(int address, out int value, out string note, int attempts = 3)
+	{
+		value = -1;
+		int[] values = new int[attempts];
+		int okCount = 0;
+		string all = "";
+		for (int i = 0; i < attempts; i++)
+		{
+			bool ok = TryReadByte(address, out values[i]);
+			if (ok)
+			{
+				okCount++;
+			}
+			all += (i > 0 ? "/" : "") + (ok ? "0x" + values[i].ToString("X2") : "读不到");
+		}
+		if (okCount < 2)
+		{
+			note = "读 " + attempts + " 次仅成功 " + okCount + " 次（" + all + "）";
+			return false;
+		}
+		int best = -1;
+		int bestCount = 0;
+		for (int i = 0; i < attempts; i++)
+		{
+			if (values[i] < 0)
+			{
+				continue;
+			}
+			int count = 0;
+			for (int j = 0; j < attempts; j++)
+			{
+				if (values[j] == values[i])
+				{
+					count++;
+				}
+			}
+			if (count > bestCount)
+			{
+				bestCount = count;
+				best = values[i];
+			}
+		}
+		if (bestCount < 2)
+		{
+			note = "读数不一致（" + all + "）⇒ 无法判定";
+			return false;
+		}
+		value = best;
+		note = all + " ⇒ 取 0x" + best.ToString("X2") + "（" + bestCount + "/" + okCount + "）";
+		return true;
+	}
+
+	/// <summary>⭐ ACPI EC 身份（稳定读）：`0x2000 == 0x55` 且 `0xC411` 非 0/0xFF ✅</summary>
+	internal static bool TryReadEcIdentityAcpi(out int chipId, out int version, out string note)
+	{
+		chipId = -1;
+		version = -1;
+		bool idOk = TryReadByteStable(0x2000, out chipId, out string idNote);
+		bool verOk = TryReadByteStable(0xC411, out version, out string verNote);
+		bool valid = idOk && verOk && chipId == 0x55 && version != 0x00 && version != 0xFF;
+		note = "0x2000 " + idNote + " · 0xC411 " + verNote + " ⇒ " + (valid ? "身份通过 ✅" : "身份未通过 ⚠️");
+		return valid;
+	}
+
+	/// <summary>⭐ 白名单写 + **立刻用 ACPI EC 稳定回读比对**（⭐ 记录命令/地址/数据/回读）✅</summary>
+	private static bool TryWriteByteVerified(int address, int value, out int readBack)
+	{
+		readBack = -1;
+		if (!IsAcpiFanWriteAddress(address))
+		{
+			return false;
+		}
+		bool writeOk = TryWriteByte(address, value);
+		string writeNote = writeOk ? "write=OK" : "write=FAIL(" + LastReadFailure + ")";
+		bool readOk = TryReadByteStable(address, out readBack, out string readNote);
+		string trace = "ACPI EC 写：cmd=0x93 · addr=0x" + address.ToString("X4")
+			+ " · data=0x" + (value & 0xFF).ToString("X2") + " · " + writeNote
+			+ " · 回读 " + (readOk ? "0x" + readBack.ToString("X2") : "读不到")
+			+ "（" + readNote + "）";
+		lock (Gate)
+		{
+			_lastAcpiWriteTrace = trace;
+		}
+		return writeOk && readOk && readBack == (value & 0xFF);
+	}
+
+	/// <summary>⭐ ACPI EC 写风扇目标档（仅 0xC83C/0xC83D · 0..68）+ 回读比对 ✅</summary>
+	internal static bool TryWriteAcpiFanTarget(int address, int units100Rpm, out int readBack)
+	{
+		readBack = -1;
+		if (address != AcpiFan1TargetAddress && address != AcpiFan2TargetAddress)
+		{
+			return false;
+		}
+		if (units100Rpm < 0 || units100Rpm > AcpiFanTargetMaxUnits100Rpm)
+		{
+			return false;
+		}
+		return TryWriteByteVerified(address, units100Rpm, out readBack);
+	}
+
+	/// <summary>⭐ ACPI EC 读-改-写 0xB20（只改 bit1/bit3，保留其它位）+ 回读 ✅</summary>
+	internal static bool TryWriteAcpiFanManualMask(bool fan1Manual, bool fan2Manual, out int readBack, out string note)
+	{
+		readBack = -1;
+		note = "";
+		if (!TryReadByteStable(AcpiFanManualMaskAddress, out int current, out string curNote))
+		{
+			note = "读当前 0xB20 失败：" + curNote;
+			return false;
+		}
+		int wanted = (current & ~AcpiManualMaskBits)
+			| (fan1Manual ? AcpiManualMaskBitFan1 : 0)
+			| (fan2Manual ? AcpiManualMaskBitFan2 : 0);
+		if (current == wanted)
+		{
+			readBack = current;
+			note = "0xB20 已是目标值 0x" + current.ToString("X2") + "，无需写 ✅";
+			return true;
+		}
+		bool ok = TryWriteByteVerified(AcpiFanManualMaskAddress, wanted, out readBack);
+		note = "0xB20 0x" + current.ToString("X2") + " → 回读 0x"
+			+ (readBack < 0 ? "读不到" : readBack.ToString("X2")) + " ⇒ ok=" + ok;
+		return ok;
+	}
+
+	/// <summary>⭐ ACPI EC 解锁：**仅** `0x1060 ← 当前值 | 0x80`；身份通过才执行；回读确认 bit7 ✅</summary>
+	internal static bool TryUnlockEcRamAcpi(out int before, out int after, out string note)
+	{
+		before = -1;
+		after = -1;
+		if (!TryReadEcIdentityAcpi(out _, out _, out string idNote))
+		{
+			note = "身份未通过 ⇒ ⛔ 不解锁（" + idNote + "）";
+			return false;
+		}
+		if (!TryReadByteStable(AcpiEcUnlockAddress, out before, out string readNote))
+		{
+			note = "读 0x1060 失败：" + readNote;
+			return false;
+		}
+		int wanted = before | AcpiUnlockBit;
+		if (before == wanted)
+		{
+			after = before;
+			note = "0x1060=0x" + before.ToString("X2") + " ⇒ 已解锁（bit7=1），无需写 ✅";
+			return true;
+		}
+		bool ok = TryWriteByteVerified(AcpiEcUnlockAddress, wanted, out after);
+		bool bit7 = (after & AcpiUnlockBit) != 0;
+		note = "解锁 0x1060 0x" + before.ToString("X2") + " → 回读 0x"
+			+ (after < 0 ? "读不到" : after.ToString("X2")) + "（bit7=" + (bit7 ? "1" : "0") + "）⇒ ok=" + (ok && bit7);
+		return ok && bit7;
+	}
+
+	/// <summary>⭐ ACPI EC：把 0x1060 写回测试前原值（finally 恢复用）✅</summary>
+	internal static bool TryRestoreEcUnlockRegisterAcpi(int originalValue, out int readBack)
+	{
+		readBack = -1;
+		if (originalValue < 0 || originalValue > 0xFF)
+		{
+			return false;
+		}
+		return TryWriteByteVerified(AcpiEcUnlockAddress, originalValue, out readBack);
+	}
+
+	/// <summary>⭐ ACPI EC：交回固件（目标 0 + 清 0x02|0x08，保留其它位）+ 回读 ✅</summary>
+	internal static bool TryRestoreFanFirmwareAcpi(out string detail)
+	{
+		bool fan1 = TryWriteAcpiFanTarget(AcpiFan1TargetAddress, 0, out int rb1);
+		string t1 = LastAcpiWriteTrace;
+		bool fan2 = TryWriteAcpiFanTarget(AcpiFan2TargetAddress, 0, out int rb2);
+		string t2 = LastAcpiWriteTrace;
+		bool mask = TryWriteAcpiFanManualMask(fan1Manual: false, fan2Manual: false, out int rbMask, out string maskNote);
+		string t3 = LastAcpiWriteTrace;
+		detail = "0xC83C→" + (rb1 < 0 ? "读不到" : rb1.ToString())
+			+ " · 0xC83D→" + (rb2 < 0 ? "读不到" : rb2.ToString())
+			+ " · 0xB20→0x" + (rbMask < 0 ? "读不到" : rbMask.ToString("X2"))
+			+ " · " + maskNote;
+		lock (Gate)
+		{
+			_lastAcpiWriteTrace = t1 + "\n" + t2 + "\n" + t3;
+		}
+		return fan1 && fan2 && mask;
+	}
+
+	// ══════════════════════════════════════════════════════════════════
 	//  EC mailbox 时序（调用方必须已持锁 + 已确保模块 + 已取互斥体）
 	//
 	//  读：向 0x66 发 0x92 → 经 0x62 依次传「地址高字节、地址低字节」→ 从 0x62 读数据
