@@ -4342,7 +4342,7 @@
     <value>APU 防缩缸</value>
   </data>
 <data name="GpuPowerLimit" xml:space="preserve">
-    <value>显卡功耗上限 (W)</value>
+    <value>GPU 功耗限制（W）</value>
   </data>
 <data name="GpuTgp" xml:space="preserve">
     
