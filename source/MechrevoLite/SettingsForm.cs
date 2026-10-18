@@ -8925,7 +8925,18 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		bool flag12 = Show(caps.LcdOverdrive || (hw?.SupportsLcdOverdrive ?? false));
 		bool flag13 = flag10 | flag11 | flag12;
 		bool flag14 = Show(AppConfig.Is("force_liquid_cooling_menu") || caps.LiquidCooling || (hw?.SupportsLiquidCooling ?? false));
-		bool flag15 = Show(caps.TurboMode);
+		// 2026-10-18（机主：干净安装后「狂暴」不显示）：宝龙达后端 Capabilities.TurboMode=true，
+		//   但首次刷新时 hw 可能还是 null / 用的还是机型表（无 TurboModeSupport 位）⇒ 按钮被藏。
+		//   ⇒ 宝龙达机型**强制显示狂暴**（WMI 功能号 8 支持 3 档，已真机验证）。
+		// 2026-10-18（机主：GCU 同方机型「首次启动狂暴不显示、重启一次 LM 才出现」）：
+		//   ⭐ 根因 = 首次启动时 GCU 还没连上 ⇒ caps.TurboMode 为假 ⇒ 按钮被藏；
+		//      等 GCU 连上后那次刷新本应补出来，但首帧已按"隐藏"排过版 ⇒ 用户看到的就是"没有狂暴"。
+		//   ⭐ 修法 = **乐观显示**：GCU 服务已装且当前**还没连上**时，先按支持处理（等连上后以真实能力位为准，
+		//      若机型确实只有两档，连上后会自动收起）。⛔ 老接口/宝龙达不走这条（宝龙达另有强制显示）。
+		bool gcuExpectedOptimistic = !(hw?.IsConnected ?? false)
+			&& MechrevoHw.IsGcuServiceInstalled
+			&& !(hw?.UsesBaolongda ?? false);
+		bool flag15 = Show(caps.TurboMode || (hw?.UsesBaolongda ?? false) || gcuExpectedOptimistic);
 		// 2026-10-08（QA 开关，用户原话「你能不能给我开放静音狂暴按钮 … 我检查一下UI」）：
 		// 「静音狂暴」按钮的可见性 = 原判据（能力位 SilentTurboAvailability == Supported，本机 Gen40
 		// 的 TurboSubMode=false ⇒ 原判据为假）**或** 默认关闭的 QA 开关 UiQaShowAll.Enabled。
@@ -11357,7 +11368,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				}
 			});
 }
-		if (TrayShow(mechrevoDeviceCapabilities.TurboMode))
+		if (TrayShow(mechrevoDeviceCapabilities.TurboMode || (Program.hw?.UsesBaolongda ?? false)
+			|| ((Program.hw != null) && !Program.hw.IsConnected && MechrevoHw.IsGcuServiceInstalled && !Program.hw.UsesBaolongda)))
 		{
 			AddAsyncAction(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvailability.Supported ? Strings.TurboHighEnergy : Strings.Turbo, num == 2 && !isSilentTurboActive, async () =>
 			{

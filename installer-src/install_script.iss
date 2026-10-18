@@ -330,7 +330,10 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 ;     驱动装不上最坏只是 CPU 温度显示「—」，不该让整个安装失败
 ;   runhidden：脚本会下载 + 静默装，不需要黑窗；waituntilterminated 保证装完再启动 LM。
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: runhidden waituntilterminated; Tasks: pawnio; Check: ShouldInstallPawnIo
-Filename: "{app}\L-Mechrevo.exe"; Description: "{cm:LaunchApp}"; Flags: postinstall skipifsilent nowait
+; 2026-10-18（机主：安装完自动在后台拉起 LM，不显示主界面）：
+;   ⭐ 传 "startup" 参数 ⇒ 程序按「开机自启」路径启动 ⇒ 只驻留托盘、不显示主窗口（IsStartupLaunch）。
+;   ⛔ 不再是 finish 页的勾选项（postinstall 已去掉）⇒ 静默/普通安装都会自动后台启动。
+Filename: "{app}\L-Mechrevo.exe"; Parameters: "startup"; StatusMsg: "正在后台启动 L-Mechrevo（托盘）…"; Flags: nowait
 
 [UninstallRun]
 ; --- 历史（2026-10-09 上一轮，已被下面现行策略取代，保留备查）---
