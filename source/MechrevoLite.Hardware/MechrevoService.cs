@@ -4241,6 +4241,14 @@ public class MechrevoService
 		{
 			tempWallC = Math.Clamp(tempWallC, BaolongdaProfile.TccMinCelsius, BaolongdaProfile.TccMaxCelsius);
 		}
+		// ⭐⭐ 2026-10-19（机主真机：只拉 PL2 不生效；必须同步 fPPT=fast；fast < slow 会被固件忽略）：
+		//   Wujie：fast(PL2) < slow(PL1) ⇒ 自动把 fast 抬到 slow（记日志提示）✅
+		if (hw.WujieSmuApu && pl1 > 0 && pl2 > 0 && pl2 < pl1)
+		{
+			Logger.WriteError("[smu] Wujie 应用：PL2(" + pl2 + ") < PL1(" + pl1 + ") ⇒ fast 自动抬到 slow=" + pl1 + "（固件要求 fast ≥ slow 才不被忽略）");
+			pl2 = pl1;
+		}
+
 		// ③ 一条都不发（三项都未设置）⇒ 与 WMI 路径同口径：已接管、不假装写了
 		if (pl1 <= 0 && pl2 <= 0 && tempWallC <= 0)
 		{
@@ -4255,7 +4263,64 @@ public class MechrevoService
 		bool wroteWall = false;
 		string pl1Status;
 		string pl2Status;
-		if (pl1 > 0 && pl2 > 0)
+		if (hw.WujieSmuApu)
+		{
+			// ⭐ Wujie：**先写 slow(PL1) → stapm，再写 fast(PL2=fPPT)**（顺序固定；两条命令都回 OK 才算写成功）✅
+			pl1Status = "未写";
+			pl2Status = "未写";
+			if (pl1 > 0)
+			{
+				PawnIO.SmuStatus staple = smu.SetStapmLimit(pl1);
+				PawnIO.SmuStatus slowSt = smu.SetSlowLimit(pl1);
+				pl1Status = $"stapm={staple}/slow={slowSt}";
+				wrotePl1 = staple == PawnIO.SmuStatus.OK && slowSt == PawnIO.SmuStatus.OK;
+				ok &= wrotePl1;
+				if (wrotePl1)
+				{
+					hw.NoteBaolongdaSmuLimitsApplied(pl1, 0, 0);
+				}
+			}
+			if (pl2 > 0)
+			{
+				// ⭐⭐ 2026-10-19（机主真机：只拉 PL2 不生效 ⇒ fPPT=fast 是唯一生效限值）：
+				//   ⭐ 只改 PL2（PL1 未设置）时，若当前 slow/stapm > fast ⇒ 同步压到 fast（保持 slow/stapm ≤ fast）✅
+				if (pl1 <= 0)
+				{
+					try
+					{
+						PawnIO.SmuPowerSnapshot preSnap = smu.GetPowerSnapshot();
+						if (preSnap != null)
+						{
+							int curSlow = (int)Math.Round((double)preSnap.Slow);
+							int curStapm = (int)Math.Round((double)preSnap.Stapm);
+							if (curSlow > pl2)
+							{
+								smu.SetSlowLimit(pl2);
+								Logger.WriteError("[smu] Wujie 应用：当前 slow=" + curSlow + " > PL2=" + pl2 + " ⇒ 同步压到 slow=" + pl2 + "（保持 slow ≤ fast）");
+							}
+							if (curStapm > pl2)
+							{
+								smu.SetStapmLimit(pl2);
+								Logger.WriteError("[smu] Wujie 应用：当前 stapm=" + curStapm + " > PL2=" + pl2 + " ⇒ 同步压到 stapm=" + pl2 + "（保持 stapm ≤ fast）");
+							}
+						}
+					}
+					catch
+					{
+					}
+				}
+
+				PawnIO.SmuStatus fastSt = smu.SetFastLimit(pl2);
+				pl2Status = fastSt.ToString();
+				wrotePl2 = fastSt == PawnIO.SmuStatus.OK;
+				ok &= wrotePl2;
+				if (wrotePl2)
+				{
+					hw.NoteBaolongdaSmuLimitsApplied(0, pl2, 0);
+				}
+			}
+		}
+		else if (pl1 > 0 && pl2 > 0)
 		{
 			// ⭐ 正常路径（两项都已知）：按任务书口径一次下发三项 —— PL1 同时写 slow 与 stapm
 			smu.SetAllLimits(pl1, pl2, pl1, out PawnIO.SmuStatus stapmStatus, out PawnIO.SmuStatus fastStatus, out PawnIO.SmuStatus slowStatus);
@@ -4340,30 +4405,41 @@ public class MechrevoService
 			verified = VerifyBaolongdaSmuPower(hw, wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0,
 				wroteWall ? tempWallC : 0, out verifyDetail);
 		}
-		// ⭐⭐ 2026-10-19（机主口径 · 无界 APU）：写后回读日志（成功/失败都如实、⛔ 不重试）✅
+		// ⭐⭐ 2026-10-19（机主真机：只拉 PL2 不生效 / 必须同步 fPPT=fast）：
+		//   Wujie：显式打印三档写入与回读（PL1→stapm/slow；PL2→fast/fPPT）；fast 回读≠目标 ⇒ 如实失败、不重试 ✅
 		if (hw.WujieSmuApu)
 		{
-			int rbPl1 = -1;
-			int rbPl2 = -1;
+			int rbStapm = -1;
+			int rbSlow = -1;
+			int rbFast = -1;
 			try
 			{
 				PawnIO.SmuPowerSnapshot snap = smu.GetPowerSnapshot();
 				if (snap != null)
 				{
-					rbPl1 = (int)Math.Round((double)snap.Slow);
-					rbPl2 = (int)Math.Round((double)snap.Fast);
+					rbStapm = (int)Math.Round((double)snap.Stapm);
+					rbSlow = (int)Math.Round((double)snap.Slow);
+					rbFast = (int)Math.Round((double)snap.Fast);
 				}
 			}
 			catch
 			{
 			}
-			Logger.WriteError(wrotePl1
-				? "[smu] 写 PL1=" + pl1 + "W → 回读=" + rbPl1 + "W（ok=" + (verified && rbPl1 == pl1) + "）"
-				: "[smu] ⛔ 写 PL1 失败（原始值=" + pl1 + " / 回读=" + rbPl1 + "）⇒ 不重试");
-			Logger.WriteError(wrotePl2
-				? "[smu] 写 PL2=" + pl2 + "W → 回读=" + rbPl2 + "W（ok=" + (verified && rbPl2 == pl2) + "）"
-				: "[smu] ⛔ 写 PL2 失败（原始值=" + pl2 + " / 回读=" + rbPl2 + "）⇒ 不重试");
-		}		Logger.WriteError($"[smu-30] 30 系功耗墙（SMU 路径 · 无 WMI 23）：基线刷新={refreshed} "
+			Logger.WriteError("[smu] Wujie 应用：PL1=" + pl1 + " → stapm=" + rbStapm + "(=" + pl1 + ") · slow=" + rbSlow + "(=" + pl1 + ")");
+			Logger.WriteError("[smu] Wujie 应用：PL2=" + pl2 + " → fast=" + rbFast + "(=" + pl2 + ")");
+			Logger.WriteError("[smu] Wujie 应用：fPPT(fast) 当前=" + rbFast + ((rbFast == pl2) ? "（=目标）" : ("（⚠️ ≠目标 " + pl2 + "）")));
+			if (wrotePl1 && (rbStapm != pl1 || rbSlow != pl1))
+			{
+				verified = false;
+				Logger.WriteError("[smu] ⛔ Wujie：stapm/slow 回读≠目标 ⇒ 如实失败、不重试");
+			}
+			if (wrotePl2 && rbFast != pl2)
+			{
+				verified = false;
+				Logger.WriteError("[smu] ⛔ Wujie：fast(fPPT) 回读≠目标 ⇒ 如实失败、不重试");
+			}
+		}
+		Logger.WriteError($"[smu-30] 30 系功耗墙（SMU 路径 · 无 WMI 23）：基线刷新={refreshed} "
 			+ $"⇒ PL1(slow)={ShowPowerValue(pl1)} [{pl1Status}] · PL2(fast)={ShowPowerValue(pl2)} [{pl2Status}] "
 			+ $"· 温度墙(tctl)={ShowTempValue(tempWallC)} [{wallStatus}] "
 			+ $"⇒ 下发全部 OK={ok} · 回读确认={verified}（{verifyDetail}）"
