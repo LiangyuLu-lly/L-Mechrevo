@@ -108,7 +108,10 @@ internal static class BaolongdaProfile
 	/// </summary>
 	internal static int BrightnessMax(DgpuGenerationKind generation)
 	{
-		return (generation == DgpuGenerationKind.Gen40 || generation == DgpuGenerationKind.Gen50) ? 4 : 3;
+		// ⭐⭐ 2026-10-18（机主实测纠正）：⭐ 40 系键盘亮度只有 **0/1/2/3** 四档（最大 = 3）⚠️
+		//   ⚠️ 原来这里给 Gen40/50 返回 4 ⇒ UI 能拖到「4」但固件不支持 ⇒ 表现为「最大亮度不能用」❌
+		//   ⭐ 现在统一 3（与 30 系一致）；若将来某机型实测有第 5 档，再用运行时探测替换本常量 ✅
+		return 3;
 	}
 
 	/// <summary>
