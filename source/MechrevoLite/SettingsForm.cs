@@ -17115,6 +17115,39 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//   ⚠️ 原来只在**建行那一刻**按 `Program.hw?.UsesBaolongda` 隐藏一次；
 		//      而启动改懒加载后，建行时 hw 可能还没就绪 ⇒ 隐藏没生效（或之后又被显示）❌
 		//   ⭐ 现在每次同步灯光行都**重新按平台**设置一次显隐（幂等、只在值变化时写日志）✅
+		// ⭐⭐ 2026-10-19（机主：「Logo 那行的编辑按钮也隐藏」）：
+		//   ⚠️ 原来只在建行那一刻按 `Program.hw?.UsesBaolongda` 隐藏效果下拉/编辑按钮；
+		//      启动改懒加载后建行时 hw 可能为 null ⇒ 没隐藏 ❌
+		//   ⭐ 现在每次同步灯光行都重新应用一次（非键盘灯行：隐藏效果列 + 编辑按钮）✅
+		if (hw != null && hw.UsesBaolongda)
+		{
+			foreach (string lightRowName in new string[4] { "rowLightbar", "rowLogo", "rowHinge", "rowSync" })
+			{
+				Control[] foundRows = Controls.Find(lightRowName, true);
+				if (foundRows.Length == 0 || foundRows[0] is not TableLayoutPanel lightRow)
+				{
+					continue;
+				}
+				bool changedRow = false;
+				foreach (Control child in lightRow.Controls)
+				{
+					if (lightRow.GetColumn(child) == 3 && child.Visible)
+					{
+						child.Visible = false;
+						changedRow = true;
+					}
+				}
+				if (changedRow)
+				{
+					lightRow.ColumnStyles[0] = new ColumnStyle(SizeType.Percent, 80f);
+					lightRow.ColumnStyles[1] = new ColumnStyle(SizeType.Percent, 20f);
+					lightRow.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, 0f);
+					lightRow.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
+					Logger.WriteLineIfChanged("light-edit-btn-hidden-" + lightRowName,
+						"[light] 宝龙达：" + lightRowName + " 收掉效果列与「编辑」按钮（每次同步灯自行确保）");
+				}
+			}
+		}
 		if (_logoEffectCombo != null)
 		{
 			bool hideLogoEffect = hw != null && hw.UsesBaolongda;
