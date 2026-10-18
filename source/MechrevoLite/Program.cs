@@ -381,6 +381,15 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值 · 阶段 1）：`--battery-limit-probe`（⭐ 纯只读）。
+		//   ⭐ 只读参考实现给出的 6 个 XRAM 地址（0x8150~0x8154 / 0x83C0）+ 当前电池状态；
+		//   ⛔ 不写任何 EC 字节、⛔ 不发 WMI 写；结果写桌面 lm-battery-probe-*.txt。
+		case "--battery-limit-probe":
+		{
+			Environment.ExitCode = BatteryLimitProbe.Run();
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-18（SMU-EC 只读核对）：`--smu-ec-probe`。
 		//   ⭐ 核对 7.3 `RyzenAccess.Write_EC_EX/Read_EC_EX` 的真实通道（结论：LPC 端口 I/O，无 SMU 命令）；
 		//   ⭐ 双通道（ACPI/LPC）只读对照；⛔ 不发 SMU 命令、不写任何 EC 字节。
