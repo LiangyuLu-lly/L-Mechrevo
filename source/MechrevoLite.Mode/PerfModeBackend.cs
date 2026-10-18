@@ -55,7 +55,10 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		//   ⚠️ 未探测前 `SupportsSmuPowerControls=false` ⇒ 规划器不生成 SMU 步骤；
 		//      自定义模式窗口打开后会重新算能力位，语义不变 ✅
 		bool wujieApu = hw.WujieSmuApu;
-		bool smuReady = (hw.IsBaolongda30Series || wujieApu) && SmuAvailability.IsReadyCached;
+		// ⭐⭐ 2026-10-19（机主：Wujie 规划器误生成固件字段步）：Wujie 必须**主动探测一次** SMU（进程内缓存），
+		//   否则 `IsReadyCached=false` ⇒ `SupportsSmuPowerControls=false` ⇒ 回放/应用误判 ✅
+		//   ⚠️ 宝龙达 30 系保持原「只读缓存」口径（行为逐位不变）✅
+		bool smuReady = (hw.IsBaolongda30Series && SmuAvailability.IsReadyCached) || (wujieApu && SmuAvailability.IsReady);
 		return new PerfModeCapabilities
 		{
 			UsesAmdPowerFields = hw.UsesAmdPowerFields,

@@ -899,7 +899,7 @@ public class MechrevoService
 		//   ⭐ 宝龙达没有 GCU ⇒ 这几个键**先**走本机 WMI 功能号 23（`TryApplyPowerLimitViaBackend`），
 		//      剩下的字段才发给 MQTT ✅
 		//   ⚠️ 非宝龙达：`UsesBaolongda` 假 ⇒ 整段跳过，逐位不变 ✅
-		if (_hw != null && _hw.UsesBaolongda && fields != null && fields.Count > 0)
+		if (_hw != null && (_hw.UsesBaolongda || _hw.WujieSmuApu) && fields != null && fields.Count > 0)
 		{
 			List<string> consumedKeys = new List<string>();
 			foreach (KeyValuePair<string, string> kv in fields)

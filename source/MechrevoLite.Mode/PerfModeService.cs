@@ -773,7 +773,15 @@ internal sealed class PerfModeService
 			// 会**重试自定义档**，不会再拿老键里的内置档（静音/平衡）把它顶掉。
 			Logger.WriteLine($"PerfModes: {mode.Id} 未切换成功（reason={reason} route={mode.Route}）→ ActiveModeId 仍为 {ActiveModeId}；档位意图保持用户选择，等下一次重试。失败/未确认项：{outcome.Describe()}");
 		}
-		if (outcome.ModeSwitched)
+		// ⭐⭐ 2026-10-19（机主：Wujie 规划器误生成固件字段步/ActiveModeId 回退）：本机 SMU 应用成功的判据日志 ✅
+		if (caps.WujieSmuLocalOnly && mode.IsCustom)
+		{
+			string wujieApplyLog = "[perfmode] 无界 APU 本机应用：步骤=SMU(stapm/slow/fast/tctl) · 无固件字段步 · ModeSwitched=" + outcome.ModeSwitched;
+			if (Logger.TryMarkChanged("wujie-local-apply-result", wujieApplyLog))
+			{
+				Logger.WriteError(wujieApplyLog);
+			}
+		}		if (outcome.ModeSwitched)
 		{
 			if ((object)plan != null)
 			{
