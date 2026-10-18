@@ -15086,7 +15086,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			(string name, string temp, string power, string rpm, string duty) tuple2 = TelemetryParts(hw, isCpu: false);
 			// 2026-10-16（方案 A）：十片**逐字段**下发 —— 拆列后每个字段各自一片，
 			// ⛔ 不再把功耗/转速/占空比拼成一个字符串（那正是两行数字错开的根因）。
-			if ((0u | (SetTelemetryPiece(_telemetryCpuTemp, tuple.temp) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuPower, tuple.power) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuRpm, tuple.rpm) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuDuty, tuple.duty) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuTemp, tuple2.temp) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuPower, tuple2.power) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuRpm, tuple2.rpm) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuDuty, tuple2.duty) ? 1u : 0u)) != 0)
+			if ((0u | (SetTelemetryPiece(_telemetryCpuTemp, tuple.temp) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuPower, tuple.power) ? 1u : 0u) | (SetTelemetryPiece(_telemetryCpuRpm, tuple.rpm) ? 1u : 0u) | (SetTelemetryDutyPiece(_telemetryCpuDuty, tuple.duty) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuTemp, tuple2.temp) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuPower, tuple2.power) ? 1u : 0u) | (SetTelemetryPiece(_telemetryGpuRpm, tuple2.rpm) ? 1u : 0u) | (SetTelemetryDutyPiece(_telemetryGpuDuty, tuple2.duty) ? 1u : 0u)) != 0)
 			{
 				LayoutTelemetryPieces();
 			}
@@ -15101,6 +15101,46 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 		piece.Text = text;
 		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ **占空比片**专用 setter —— ⭐ &gt;100% 时用警示色提示
+	/// （⭐ 30 系原厂允许到 140%；⭐ 只改**显示颜色**，⛔ 不改任何下发值 ✅）。
+	/// </summary>
+	private static bool SetTelemetryDutyPiece(Label piece, string text)
+	{
+		if (piece == null)
+		{
+			return false;
+		}
+		bool changed = piece.Text != text;
+		if (changed)
+		{
+			piece.Text = text;
+		}
+		Color wanted = (ParseTrailingPercent(text) > 100) ? UiVisualStyle.Warn : UiVisualStyle.Text;
+		if (piece.ForeColor.ToArgb() != wanted.ToArgb())
+		{
+			piece.ForeColor = wanted;
+			changed = true;
+		}
+		return changed;
+	}
+
+	/// <summary>⭐ 解析 <c>"140%"</c> 这类文本里的百分比（⭐ 不是百分比格式 ⇒ -1）✅。</summary>
+	private static int ParseTrailingPercent(string text)
+	{
+		if (string.IsNullOrEmpty(text) || text[text.Length - 1] != '%')
+		{
+			return -1;
+		}
+		int end = text.Length - 1;
+		int start = end;
+		while (start > 0 && char.IsDigit(text[start - 1]))
+		{
+			start--;
+		}
+		return (start < end && int.TryParse(text.AsSpan(start, end - start), out int value)) ? value : -1;
 	}
 
 	private void LayoutTelemetryPieces()
@@ -15504,9 +15544,22 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			int rpmMaxForPercent = hw.FanRpmMaxForPercent;
 			int rpmNow = isCpu ? hw.CpuFanRpm : hw.GpuFanRpm;
-			duty = (rpmMaxForPercent > 0 && rpmNow > 0)
-				? (int?)Math.Min(100, (int)Math.Round(rpmNow * 100.0 / rpmMaxForPercent))
-				: (int?)null;
+			// ⭐⭐ 2026-10-18（机主 30 系反馈）：
+			//   ⭐ 原厂 30 系口径 `percent = Item1 / 35f` ⇒ 3500 RPM = 100%，**4900 RPM = 140%** 是官方允许的显示范围 ✅
+			//   ⚠️ 旧实现 `Math.Min(100, …)` ⇒ 30 系超过 100% 的部分永远显示 100%，比官方少一截 ❌
+			//   ⭐ 现在**不夹 100**，只留 140% 的显示安全上限（⭐ 40 系同样处理；⛔ 只改显示，不改任何下发值）✅
+			if (rpmMaxForPercent > 0 && rpmNow > 0)
+			{
+				int rawPercent = (int)Math.Round(rpmNow * 100.0 / rpmMaxForPercent);
+				int displayPercent = Math.Min(MechrevoHw.BaolongdaFanPercentDisplayMax, rawPercent);
+				duty = displayPercent;
+				// ⭐ 日志自证：⭐ >100% 时记一行（⭐ 每个整数百分比只记一次，⛔ 不刷屏）✅
+				LogBaolongdaFanPercent(isCpu, rpmNow, displayPercent);
+			}
+			else
+			{
+				duty = null;
+			}
 		}
 		else
 		{
@@ -15531,6 +15584,37 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		bool fanFresh = hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge, -1L);
 		bool zeroIsMeaningful = hw.FanZeroIsMeaningful;
 		return (name: isCpu ? "CPU" : "GPU", temp: TelemetryTemp(temp, hw.IsSensorInfoFresh(isCpu, MechrevoHw.FanInfoMaximumAge, -1L)), power: TelemetryPower(power), rpm: TelemetryRpm(rpm, fanFresh, zeroIsMeaningful), duty: TelemetryDuty(duty, fanFresh, zeroIsMeaningful));
+	}
+
+	/// <summary>⭐ 上次已记录过的宝龙达风扇百分比（⭐ 避免遥测每秒刷同一行；⭐ 只记 &gt;100% 的档）✅</summary>
+	private static int _baolongdaCpuPercentLogged = -1;
+
+	private static int _baolongdaGpuPercentLogged = -1;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（日志自证）：⭐ 宝龙达风扇百分比 **&gt;100%** 时记一行
+	/// （⭐ 30 系原厂允许 140%；⭐ 每个整数百分比只记一次，⛔ 不刷屏）✅
+	/// </summary>
+	private static void LogBaolongdaFanPercent(bool isCpu, int rpmNow, int percent)
+	{
+		if (percent <= 100)
+		{
+			return;
+		}
+		int last = isCpu ? _baolongdaCpuPercentLogged : _baolongdaGpuPercentLogged;
+		if (last == percent)
+		{
+			return;
+		}
+		if (isCpu)
+		{
+			_baolongdaCpuPercentLogged = percent;
+		}
+		else
+		{
+			_baolongdaGpuPercentLogged = percent;
+		}
+		Logger.WriteLine($"[fan] 百分比：rpm={rpmNow} ⇒ {percent}%（未夹 100）");
 	}
 
 	internal static string TelemetryTemp(int temp, bool fresh)

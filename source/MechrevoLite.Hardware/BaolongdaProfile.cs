@@ -56,6 +56,17 @@ internal static class BaolongdaProfile
 	/// <summary>⭐ 手动转速的协议上限（⭐ 功能号 21 的入参单位 = `x100 RPM` ⇒ 60 × 100 = 6000 ✅）。</summary>
 	internal const int FanManualMaxUnits100Rpm = 60;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 30 系**真实满转档位** = **49**（⭐ 4900 RPM ✅）。
+	/// <para>⭐ 依据：原厂 30 系口径 `percent = Item1 / 35f` ⇒ 3500 RPM = 100%，
+	/// **4900 RPM = 140%** 是官方允许的正常显示范围 ✅（⛔ 不是"超频"，⭐ 也不是写爆）。</para>
+	/// <para>⚠️ 旧强冷按曲线存档 `MaxRpm`（30 系默认 3500）⇒ 只到 100%，比官方少一截 ❌。</para>
+	/// </summary>
+	internal const int FanTrueMaxUnits30Series = 49;
+
+	/// <summary>⭐ 40 系**真实满转档位** = **60**（⭐ 6000 RPM，⭐ 原厂口径 100% ✅）。</summary>
+	internal const int FanTrueMaxUnits40Series = 60;
+
 	/// <summary>⭐ `FanType 0` = 大扇 / GPU（⭐ owner 已确认 · ⚠️ 语义仍待真机交叉验证 ✅）。</summary>
 	internal const int FanTypeLarge = 0;
 

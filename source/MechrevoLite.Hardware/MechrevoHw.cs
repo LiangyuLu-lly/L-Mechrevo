@@ -3967,12 +3967,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <para>⚠️ 非宝龙达 ⇒ 返回 0（⭐ 分母由各机型自己的 duty 口径负责 ✅）。</para>
 	/// </summary>
 	// ⭐⭐ 2026-10-19（30 系官方口径）：⭐ 原厂 30 系控制台把"风扇转速百分比"算作
-	//   `Item1 / 35f`（见 `official-30-v0.2.35` 的 `Init_SettingsAsync`）⇒ ⭐ 满转 = **3500 RPM** 而不是 6000 ✅
+	//   `Item1 / 35f`（见 `official-30-v0.2.35` 的 `Init_SettingsAsync`）⇒ ⭐ 分母 = **3500 RPM** 而不是 6000 ✅
 	//   ⚠️ 40 系仍是 6000（原厂 40 系 `rpm / 60f`，真机 1965 RPM ⇒ 33% 已验证）✅
 	//   ⚠️ 非宝龙达恒 0（走原来的 duty 读法，逐位不变）✅
+	//   ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 这个分母**只决定 100% 在哪**，⛔ 不表示 100% 就是上限 ——
+	//   30 系 4900 RPM（= 分母 3500 的 140%）是官方允许的正常转速 ⇒ ⭐ 显示层**不许夹 100**
+	//   （⭐ 见 <see cref="BaolongdaFanPercentDisplayMax" />；⭐ 只影响显示，⛔ 不改任何下发值）✅
 	public int FanRpmMaxForPercent => UsesBaolongda
 		? ((DgpuGeneration == DgpuGenerationKind.Gen30) ? 3500 : BaolongdaFanRpmAtFullPercent)
 		: 0;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 宝龙达风扇百分比的**显示上限** = **140%** ✅
+	/// <para>⭐ 依据：原厂 30 系 `percent = Item1 / 35f` ⇒ 4900 RPM = 140%，**官方允许显示**；
+	/// 40 系同样按 140% 封顶（⛔ 不会真到 140%，只是留出显示余量）✅</para>
+	/// <para>⚠️ 这是**显示层**的安全上限：⛔ 不影响功能号 20/21 的任何下发值
+	/// （⭐ 下发上限仍是 <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> = 60）✅</para>
+	/// <para>⚠️ 旧显示层 `Math.Min(100, …)` ⇒ 30 系 4900 RPM 只显示 100%，比官方少一截 ❌</para>
+	/// </summary>
+	internal const int BaolongdaFanPercentDisplayMax = 140;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙）：⭐ **意向方法** —— "⭐ 应用一组 CPU 功耗/温度墙" ✅
@@ -4097,6 +4110,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 强冷前的曲线快照（关闭时原样恢复）✅</summary>
 	private static BaolongdaFanCurveSettings _fanBoostSavedCurve;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 强冷**实测到的本机风扇上限**（RPM；0 = 还没测过）。
+	/// <para>⭐ 下次强冷按它取基准（⭐ 比代际基准更准；⭐ 固件把 21 夹回时以实测为准 ✅）。</para>
+	/// </summary>
+	private static int _baolongdaFanMeasuredMaxRpm;
+
 	/// <summary>⭐ 曲线闭环的"上次已写档位"（x100RPM）—— 用于差异比较，避免同值反复写 ✅</summary>
 	private static int _fanCurveLastCh0 = -1;
 
@@ -4138,11 +4157,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				SaveBaolongdaFanCurve(CloneCurve(_fanBoostSavedCurve, enabled: false));
 			}
-			// ② 两路满转（单位 = 100 RPM）
-			// ⭐⭐ 2026-10-19（机主：「风扇强冷记得修」）：⭐ 之前**写死 60**（6000 RPM），
-			//   而 40 系的实际上限常见是 4200~5000 ⇒ ⭐ 写超上限可能被固件忽略/夹住，看起来"没反应"。
-			//   ⭐ 现在按**曲线存档里的 MaxRpm**换算（该值就是本机实际上限），再夹到协议的 1..60 ✅
-			//   ⭐ 2026-10-19（默认曲线校准后）：新装机的 MaxRpm 默认 = 本机满转（40 系 6000 / 30 系 3500）✅
+			// ② ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 强冷要跑到**真正的满转** ——
+			//   ⭐ 原厂口径：30 系 `percent = Item1 / 35f` ⇒ 3500 RPM = 100%，**4900 RPM = 140% 是官方允许的**；
+			//     40 系 100% = 6000 RPM ✅
+			//   ⚠️ 旧实现按曲线存档 `MaxRpm` 换算（30 系默认 3500）⇒ 强冷只到 100%，比官方少一截 ❌
+			//   ⭐ 现在：代际真实基准（30 系 49 = 4900 / 40 系 60 = 6000）与曲线存档取**较大者**，
+			//     再夹到协议上限 60（⛔ 永不写 >60）✅
 			int maxRpm = 4200;
 			try
 			{
@@ -4155,32 +4175,63 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			catch
 			{
 			}
-			int units = Math.Clamp(maxRpm / 100, 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
-			bool wrote = TrySetFanManualViaBackend(enable: true, units, units, out bool writeConfirmed);
-			// ③ 回读校验：⭐ 6000 RPM 的机械加速要 1~2 s ⇒ 旧实现只等 300 ms **太短**（⭐ 会误判"没起来"）
-			//    ⇒ ⭐ 现在最多采 4 次（约 1.8 s），任一次达到 1500 RPM 即算确认 ✅
-			bool readOk = false;
-			int firstRpm = 0;
-			int secondRpm = 0;
-			for (int i = 0; i < 4; i++)
+			int trueMaxUnits = (DgpuGeneration == DgpuGenerationKind.Gen30)
+				? BaolongdaProfile.FanTrueMaxUnits30Series
+				: BaolongdaProfile.FanTrueMaxUnits40Series;
+			int curveUnits = Math.Clamp(maxRpm / 100, 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
+			int targetUnits = Math.Clamp(Math.Max(trueMaxUnits, curveUnits), 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
+			// ⭐ 上次实测到的本机上限更准 ⇒ 下次直接用（⭐ 进程内记忆）✅
+			if (_baolongdaFanMeasuredMaxRpm > 0)
 			{
-				Thread.Sleep((i == 0) ? 600 : 400);
-				if (TryReadFanSpeedsViaBackend(out int nowFirst, out int nowSecond))
-				{
-					readOk = true;
-					firstRpm = nowFirst;
-					secondRpm = nowSecond;
-					if (firstRpm >= 1500 || secondRpm >= 1500)
-					{
-						break;
-					}
-				}
+				targetUnits = Math.Clamp(Math.Max(targetUnits, _baolongdaFanMeasuredMaxRpm / 100), 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
 			}
-			confirmed = wrote && readOk && (firstRpm >= 1500 || secondRpm >= 1500);
-			Logger.WriteLine($"[fan] 强冷：写 20=1（两通道）⇒ 21={units}（{units * 100} RPM · 目标 {maxRpm} RPM）"
-				+ $" ⇒ 13={firstRpm}/{secondRpm} ⇒ 确认={confirmed}"
-				+ $"（手动开关回读={writeConfirmed}）");
+			int baselineRpm = 0;
+			if (TryReadFanSpeedsViaBackend(out int preFirst, out int preSecond))
+			{
+				baselineRpm = Math.Max(preFirst, preSecond);
+			}
+			// ⭐⭐ 30 系逐档验证（机主要求）：⭐ 先写 40 档 → 读 13 → 再写 49 档（⭐ 40 系直接写目标档）✅
+			bool wrote = true;
+			int achievedFirst = 0;
+			int achievedSecond = 0;
+			if (DgpuGeneration == DgpuGenerationKind.Gen30 && targetUnits > 40)
+			{
+				wrote = WriteBoostStep(40, out int stepFirst, out int stepSecond) && wrote;
+				achievedFirst = stepFirst;
+				achievedSecond = stepSecond;
+			}
+			wrote = WriteBoostStep(targetUnits, out achievedFirst, out achievedSecond) && wrote;
+			int achievedRpm = Math.Max(achievedFirst, achievedSecond);
+			bool readOk = achievedRpm > 0;
+			// ⭐ 判据（机主要求）：⭐ ≥ 对应档位 ×90%（跑到了）⭐ 或 ⭐ ≥ 原转速 ×1.1（明显提速）⇒ 均算确认 ✅
+			bool reachedTarget = achievedRpm >= targetUnits * 100 * 9 / 10;
+			bool spedUp = baselineRpm <= 0 || achievedRpm >= baselineRpm * 11 / 10;
+			confirmed = wrote && readOk && achievedRpm >= 1500 && (reachedTarget || spedUp);
+			if (readOk)
+			{
+				// ⭐ 记录本机实际上限（⭐ 固件夹回时这里就是真实值 ⇒ 下次强冷基准）✅
+				_baolongdaFanMeasuredMaxRpm = Math.Max(_baolongdaFanMeasuredMaxRpm, achievedRpm);
+			}
+			string clampNote = (readOk && !reachedTarget)
+				? $" · ⚠️ 固件把值夹回 ⇒ 本机实际上限 ≈ {achievedRpm} RPM（已记为下次基准）"
+				: "";
+			Logger.WriteLine($"[fan] 强冷：目标档 {targetUnits}（{targetUnits * 100} RPM · 代际基准 {trueMaxUnits} · 原转速 {baselineRpm}）"
+				+ $" ⇒ 写后 13={achievedFirst}/{achievedSecond} ⇒ 确认={confirmed}{clampNote}");
 			return wrote;
+
+			// ⭐ 强冷一步：⭐ 先开该通道手动接管（20=1）再写目标（21）→ ⭐ 等起转 → ⭐ 回读 13（⭐ 每次写入/回读都进日志）✅
+			bool WriteBoostStep(int units100Rpm, out int firstRpm, out int secondRpm)
+			{
+				bool ok = TrySetFanManualViaBackend(enable: true, units100Rpm, units100Rpm, out bool stepConfirmed);
+				// ⭐ 6000 RPM 的机械加速要 1~2 s ⇒ 给 1.2 s 再读（⭐ 旧实现只等 300 ms 会误判"没起来"）✅
+				Thread.Sleep(1200);
+				firstRpm = 0;
+				secondRpm = 0;
+				bool stepReadOk = TryReadFanSpeedsViaBackend(out firstRpm, out secondRpm);
+				Logger.WriteLine($"[fan] 强冷：目标档 {units100Rpm}（{units100Rpm * 100} RPM）"
+					+ $" ⇒ 写后 13={(stepReadOk ? firstRpm + "/" + secondRpm : "读不到")} ⇒ 开关回读={stepConfirmed}");
+				return ok;
+			}
 		}
 		// 关闭：恢复快照（含 Enabled 状态）
 		TrySetFanManualViaBackend(enable: false, 0, 0, out bool _);
