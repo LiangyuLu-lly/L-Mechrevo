@@ -2432,6 +2432,26 @@ public static class HardwareControl
 		}
 		cpuPower = ResolveCpuPower(num, fallbackCpuPower);
 		gpuPower = ResolveGpuPower(num2, IsUsablePower(num2) ? ((float?)null) : gpuPowerViaNvml);
+		// ⭐⭐ 2026-10-19（机主：无界 14X 核显功耗不随负载变化；GCU Monitor 能读到 2.0W）：
+		//   ⭐ AMD 核显（无 NVIDIA 独显）⇒ **ADL PMLog 优先于 LHM**（只读；NVIDIA 机型一律不进）✅
+		bool amdIgpu = CpuVendor.IsAmd && Program.hw != null && Program.hw.DgpuGeneration == DgpuGenerationKind.NoDgpu;
+		if (amdIgpu && AdlPowerReader.Available)
+		{
+			if (AdlPowerReader.TryRead(out float adlPower, out string adlSource))
+			{
+				gpuPower = adlPower;
+				string adlSelected = "[gpu-power] AMD 核显功耗来源=" + adlSource + " ⇒ " + adlPower.ToString("F1") + "W（优先于 LHM）";
+				if (Logger.TryMarkChanged("gpu-power-adl-selected", adlSelected))
+				{
+					Logger.WriteError(adlSelected);
+				}
+			}
+			else if (AdlPowerReader.Frozen)
+			{
+				// 冻结 ⇒ 悬浮窗显示「—」，⛔ 不回落到 LHM 的恒值 ✅
+				gpuPower = null;
+			}
+		}
 		// ⭐⭐ 2026-10-19（机主：「4070 功耗也不对」）：⭐ 只读诊断 —— 把**原始来源**打出来（同值去重，不刷屏）✅
 		//   ⭐ 目的：下次诊断包能一眼分清"读数错"还是"口径不同（读到的是上限/别的值）"✅
 		//   ⚠️ 纯日志：⛔ 不改任何换算、⛔ 不参与显示判据 ✅
