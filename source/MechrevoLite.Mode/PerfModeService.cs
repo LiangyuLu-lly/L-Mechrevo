@@ -705,7 +705,15 @@ internal sealed class PerfModeService
 			RaiseApplied(perfApplyOutcome);
 			return perfApplyOutcome;
 		}
-		PerfModeCapabilities caps = Capabilities();
+		// ⭐⭐ 2026-10-19（机主定稿）：无界 + 当前自定义档 ⇒ 明确记录"跳过性能档位下发"（来源=应用/对账）✅
+		if (hw.WujieSmuApu && mode.IsCustom)
+		{
+			string suppressLog = "[perfmode] 无界 APU：当前为自定义档 ⇒ 跳过性能档位下发（来源=应用/对账）";
+			if (Logger.TryMarkChanged("wujie-skip-mode-dispatch-activate", suppressLog))
+			{
+				Logger.WriteError(suppressLog);
+			}
+		}		PerfModeCapabilities caps = Capabilities();
 		IReadOnlyList<FirmwareSlotState> slots = PerfModeStore.LoadSlots(SlotCount);
 		FirmwareSlotPlan plan = null;
 		if (mode.Route == PerfModeRoute.FirmwareSlot)
@@ -1144,6 +1152,12 @@ internal sealed class PerfModeService
 	/// <para>⚠️ 只对无界 APU 生效；宝龙达/GCU/同方不进入（调用点判据 + 本方法再判一次）✅</para>
 	/// <para>⚠️ 失败不重试、只记日志、由后台线程调用（⛔ 不阻塞 UI）✅</para>
 	/// </summary>
+	/// <summary>⭐⭐ 2026-10-19（启动预热顺序）：④ 模式对账（串行 await；Wujie 已有“不被固件覆盖”门控）✅</summary>
+	internal Task ReconcileForStartupAsync()
+	{
+		return ReconcileAsync("startup warmup");
+	}
+
 	internal async Task ReplayWujieLocalProfileOnStartupAsync()
 	{
 		MechrevoHw hw = _hw;
@@ -1164,9 +1178,9 @@ internal sealed class PerfModeService
 		}
 		// ⭐ 指向自定义档 ⇒ 走与 ActivateLocalProfile 同路径把当前模式设为该档（持久化 + RaiseActiveChanged）✅
 		ActivateLocalProfile(mode.Id);
-		if (Logger.TryMarkChanged("wujie-startup-mode", "[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + "（来自配置）⇒ 模式=自定义 · 重放 SMU"))
+		if (Logger.TryMarkChanged("wujie-startup-mode", "[perfmode] 无界 APU 启动恢复（晚于 GCU 各项）：ActiveModeId=" + mode.Id + " ⇒ 重放 SMU"))
 		{
-			Logger.WriteError("[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + "（来自配置）⇒ 模式=自定义 · 重放 SMU");
+			Logger.WriteError("[perfmode] 无界 APU 启动恢复（晚于 GCU 各项）：ActiveModeId=" + mode.Id + " ⇒ 重放 SMU");
 		}
 
 		PerfModeSettings settings = mode.Settings;
@@ -1829,9 +1843,9 @@ internal sealed class PerfModeService
 				PerfModeDefinition persisted = Find(ActiveModeId);
 				if ((object)persisted != null && persisted.IsCustom)
 				{
-					if (Logger.TryMarkChanged("wujie-reconcile-keep-local", "[perfmode] 无界 APU：固件模式回读 ⇒ 保持本机自定义档 ActiveModeId=" + persisted.Id + "（⛔ 不覆盖）"))
+					if (Logger.TryMarkChanged("wujie-external-mode-change", "[perfmode] ⚠️ 检测到外部性能档位变化（来源=固件回读）⇒ 自定义档保持本机配置，不回写固件（ActiveModeId=" + persisted.Id + "）"))
 					{
-						Logger.WriteError("[perfmode] 无界 APU：固件模式回读 ⇒ 保持本机自定义档 ActiveModeId=" + persisted.Id + "（⛔ 不覆盖）");
+						Logger.WriteError("[perfmode] ⚠️ 检测到外部性能档位变化（来源=固件回读）⇒ 自定义档保持本机配置，不回写固件（ActiveModeId=" + persisted.Id + "）");
 					}
 					return;
 				}

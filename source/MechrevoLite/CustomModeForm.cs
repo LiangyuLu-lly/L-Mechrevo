@@ -436,10 +436,37 @@ public class CustomModeForm : RForm
 			MechrevoLite.Hardware.WujieSmuGate.LogPredicate();
 		}		// ⭐⭐ 2026-10-19（机主：无界 APU 改好功耗后重启不会自动应用）：
 		//   ⭐ 打开自定义窗口时也**核对一次**（幂等：一致跳过、不一致后台重放本机 SMU；⛔ 不阻塞 UI、⛔ 不发 GCU 命令）✅
-		if (!Program.UiAuditMode && (Program.hw?.WujieSmuApu ?? false))
+		// ⭐⭐ 2026-10-19（机主定稿：「无界重放」必须在能力/模式就绪之后，且当前为自定义档时⛔ 不发性能档位命令）：
+		//   顺序：能力刷新 → 模式对账（ReconcileForStartupAsync） → 无界重放；改为 Shown 之后串行执行 ✅
+		Shown += async (object? _, EventArgs _) =>
 		{
-			_ = PerfModeService.Instance?.ReplayWujieLocalProfileOnStartupAsync();
-		}
+			if (Program.UiAuditMode || !(Program.hw?.WujieSmuApu ?? false))
+			{
+				return;
+			}
+			try
+			{
+				Program.settingsForm?.RefreshDeviceCapabilities();
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[perfmode] 无界 APU 开窗恢复：能力刷新失败（已吞掉，继续）：" + ex.Message);
+			}
+			PerfModeService perf = PerfModeService.Instance;
+			if (perf == null)
+			{
+				return;
+			}
+			try
+			{
+				await perf.ReconcileForStartupAsync();
+				await perf.ReplayWujieLocalProfileOnStartupAsync();
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[perfmode] 无界 APU 开窗恢复失败（已吞掉、不重试）：" + ex.Message);
+			}
+		};
 		Panel panel = (_scrollHost = new Panel
 		{
 			Dock = DockStyle.Fill,

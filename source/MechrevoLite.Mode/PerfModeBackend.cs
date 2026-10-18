@@ -20,6 +20,29 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		_hw = hw ?? throw new ArgumentNullException("hw");
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主定稿）：无界 APU + 当前 ActiiveModeId 为自定义档 ⇒
+	/// **整条调用链都不发**性能档位/固件档命令（SwitchBuiltIn/SwitchFirmwareSlot/SwitchTurboSubMode/GCU 字段）✅。
+	/// <para>⭐ 每次抑制落一行去重日志；宝龙达/GCU/同方（WujieSmuApu=false）不进入 ✅</para>
+	/// </summary>
+	private bool SuppressWujieModeSwitch(string source)
+	{
+		if (_hw == null || !_hw.WujieSmuApu)
+		{
+			return false;
+		}
+		PerfModeDefinition active = PerfModeService.Instance?.Find(PerfModeStore.ActiveModeId);
+		if ((object)active == null || !active.IsCustom)
+		{
+			return false;
+		}
+		string message = "[perfmode] 无界 APU：当前为自定义档 ⇒ 跳过性能档位下发（来源=" + source + "）";
+		if (Logger.TryMarkChanged("wujie-skip-mode-dispatch", message))
+		{
+			Logger.WriteError(message);
+		}
+		return true;
+	}
 	public static PerfModeCapabilities CapabilitiesFrom(MechrevoHw hw)
 	{
 		ArgumentNullException.ThrowIfNull(hw, "hw");
@@ -86,21 +109,38 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 
 	public async Task<bool> SwitchBuiltInAsync(PerfModeKind kind, CancellationToken ct)
 	{
+		if (SuppressWujieModeSwitch("应用/对账"))
+		{
+			return true;
+		}
 		return await _service.SwitchMode(PerfModeMapping.ToServiceMode(kind)) == MechrevoService.ModeSwitchResult.Ok;
 	}
 
 	public Task<bool> SwitchTurboSubModeAsync(bool silent, CancellationToken ct)
 	{
+		if (SuppressWujieModeSwitch("应用/对账"))
+		{
+			return Task.FromResult(result: true);
+		}
 		return _service.SwitchTurboSubMode(silent, ct);
 	}
 
 	public Task<bool> SwitchFirmwareSlotAsync(int slotIndex, CancellationToken ct)
 	{
+		if (SuppressWujieModeSwitch("应用/对账"))
+		{
+			return Task.FromResult(result: true);
+		}
 		return _service.SwitchCustomProfileWithResend(slotIndex, ct);
 	}
 
 	public Task<bool> WriteDetailFieldAsync(string wireKey, string value, CancellationToken ct)
 	{
+		// ⭐ Wujie 自定义档：PL/温度墙/STAPM 走本机 SMU（由 SetCustomDetail 内部分派），其余固件字段一律不发 ✅
+		if (SuppressWujieModeSwitch("应用/固件字段") && wireKey != "PL1" && wireKey != "PL2" && wireKey != "CpuTccOffset" && wireKey != "SmuStapmTimeSeconds")
+		{
+			return Task.FromResult(result: true);
+		}
 		return _service.SetCustomDetail(new Dictionary<string, string> { [wireKey] = value });
 	}
 

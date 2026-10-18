@@ -3497,6 +3497,7 @@ internal static class Program
 			try
 			{
 				Logger.WriteError("[init] 启动空闲预热开始（后台，不阻塞 UI）");
+				Logger.WriteError("[init] 启动预热顺序：风扇清理 → 摄像头 → 能力刷新 → 模式对账 → 无界重放");
 				await Task.Delay(2500, _backendWarmupCts.Token).ConfigureAwait(continueOnCapturedContext: false);
 				MechrevoHw warmHw = hw;
 				if (warmHw == null)
@@ -3540,23 +3541,44 @@ internal static class Program
 					}
 					Logger.WriteError("[init] 后台初始化：摄像头枚举 ok=" + cameraFound + "（耗时 " + (Environment.TickCount64 - camStart) + " ms）");
 				}
-				// ⭐⭐ 2026-10-19（机主：无界 APU 改好功耗后重启不会自动应用）：
-				//   ⭐ 启动空闲预热里**后台**核对并重放当前激活自定义档的本机 SMU 步骤（幂等；⛔ 不发 GCU 命令）
-				if (warmHw.WujieSmuApu)
+				// ⭐⭐ 2026-10-19（机主定稿：无界重放必须排在 GCU 各项之后）：③ 能力刷新 → ④ 模式对账 → ⑤ 无界重放 ✅
+				//   ⛔ 每步失败只记日志、继续后续；尤其不能因 GCU 未连接跳过重放 ✅
+				SettingsForm warmForm = settingsForm;
+				if (warmForm != null && !warmForm.IsDisposed && warmForm.IsHandleCreated)
 				{
 					try
 					{
-						PerfModeService warmPerf = PerfModeService.Instance;
-						if (warmPerf != null)
-						{
-							await warmPerf.ReplayWujieLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
-						}
+						warmForm.Invoke((Action)warmForm.RefreshDeviceCapabilities);
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[init] 后台初始化：能力刷新失败（已吞掉，继续后续）：" + ex.Message);
+					}
+				}
+				PerfModeService warmPerf = PerfModeService.Instance;
+				if (warmPerf != null)
+				{
+					try
+					{
+						await warmPerf.ReconcileForStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[init] 后台初始化：模式对账失败（已吞掉，继续无界重放）：" + ex.Message);
+					}
+				}
+				if (warmHw.WujieSmuApu && warmPerf != null)
+				{
+					try
+					{
+						await warmPerf.ReplayWujieLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
 					}
 					catch (Exception ex)
 					{
 						Logger.WriteError("[perfmode] 无界 APU 启动恢复异常（已吞掉、不重试）：" + ex.Message);
 					}
 				}
+
 				SettingsForm form = settingsForm;
 				if (form != null && !form.IsDisposed && form.IsHandleCreated)
 				{
