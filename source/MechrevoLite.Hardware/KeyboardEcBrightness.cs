@@ -169,6 +169,20 @@ internal static class KeyboardEcBrightness
 	/// </summary>
 	internal static bool TrySetOff(BaolongdaWmi wmi, out int readback, out int wmi18, string source = "关灯写(EC)")
 	{
+		readback = -1;
+		wmi18 = -1;
+		// ⭐⭐ 门控铁律（与 TrySetLevel 同一判据）：**必须同时是宝龙达 + Gen30**
+		//   ⚠️ 本方法在调用 TrySetLevel **之前**就要读 EC/记忆 ⇒ ⛔ 不能绕过门控，否则会误伤同方 GCU ✅
+		MechrevoHw hw = Program.hw;
+		if (hw == null || hw.DgpuGeneration != DgpuGenerationKind.Gen30 || !hw.UsesBaolongda)
+		{
+			string skipMessage = $"[kbd] 30 系 EC 键盘：跳过（非宝龙达 · gen={(hw == null ? "hw=null" : hw.DgpuGeneration.ToString())}）";
+			if (Logger.TryMarkChanged("kbd30-ec-brightness-skip", skipMessage))
+			{
+				Logger.WriteError(skipMessage);
+			}
+			return false;
+		}
 		int remembered = GetLastLevel();
 		if (EcPortIo.TryReadByte(RegisterAddress, out int current))
 		{

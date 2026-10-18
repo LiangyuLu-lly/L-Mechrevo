@@ -3583,6 +3583,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			detail = "宝龙达后端不可用";
 			return false;
 		}
+		// ⭐ 2026-10-19（机主：状态=亮度仅限 30 系宝龙达）：首次进入时明确判据来源 ✅
+		if (UsesBaolongda && DgpuGeneration == DgpuGenerationKind.Gen30)
+		{
+			string ecStateMessage = "[kbd] 30 系宝龙达：开关状态=亮度（EC 0x1807）";
+			if (Logger.TryMarkChanged("kbd30-state-source", ecStateMessage))
+			{
+				Logger.WriteError(ecStateMessage);
+			}
+		}
+		else if (!UsesBaolongda)
+		{
+			string nonBaolongdaMessage = "[kbd] 非宝龙达：沿用原 WMI/GCU 判据（⛔ 不读 EC）";
+			if (Logger.TryMarkChanged("kbd-nonbd-state-source", nonBaolongdaMessage))
+			{
+				Logger.WriteError(nonBaolongdaMessage);
+			}
+		}
 		try
 		{
 			// ⭐⭐ 2026-10-19（机主：30 系关灯后开关自己跳回「开」）：
@@ -3687,12 +3704,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，EC 0x1807 含义不同）✅
 		if (!UsesBaolongda)
 		{
+			string nonBaolongdaMessage = "[kbd] 非宝龙达：沿用原 WMI/GCU 判据（⛔ 不读 EC）";
+			if (Logger.TryMarkChanged("kbd-nonbd-state-source", nonBaolongdaMessage))
+			{
+				Logger.WriteError(nonBaolongdaMessage);
+			}
 			string skipMessage = $"[kbd] 30 系 EC 键盘：跳过（非宝龙达 · gen={DgpuGeneration}）";
 			if (Logger.TryMarkChanged("kbd30-ec-skip", skipMessage))
 			{
 				Logger.WriteError(skipMessage);
 			}
 			return false;
+		}
+		// ⭐ 首次进入时明确日志：宝龙达 30 系的状态来源 = EC 0x1807
+		string ecStateMessage = "[kbd] 30 系宝龙达：开关状态=亮度（EC 0x1807）";
+		if (Logger.TryMarkChanged("kbd30-state-source", ecStateMessage))
+		{
+			Logger.WriteError(ecStateMessage);
 		}
 		if (!EcPortIo.TryReadByte(KeyboardEcBrightness.RegisterAddress, out int value))
 		{
