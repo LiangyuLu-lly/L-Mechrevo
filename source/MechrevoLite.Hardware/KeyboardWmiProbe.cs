@@ -66,6 +66,17 @@ internal static class KeyboardWmiProbe
 			bool r2 = wmi.TryWriteByte(BaolongdaWmi.Function.RgbKeyboardMode, 1);
 			Thread.Sleep(500);
 			L("再次写 16=1 (ok=" + r2 + ") => 回读 16=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardMode));
+			// ⭐⭐ 2026-10-18（机主：7.3 的彩虹有效、我们的探针无效）⇒「纯净彩虹测试」：
+			//   只写 16=1，之后 3 秒内**不碰任何 17/18**（7.3 也只写这一个字节），每秒回读一次
+			L("");
+			L("── 纯净彩虹测试（只写 16=1，不碰 17/18，每秒回读）──");
+			for (int k = 0; k < 3; k++)
+			{
+				bool okPure = wmi.TryWriteByte(BaolongdaWmi.Function.RgbKeyboardMode, 1);
+				Thread.Sleep(1000);
+				L("第 " + (k + 1) + " 次写 16=1 (ok=" + okPure + ") ⇒ 1s 后回读 16=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardMode));
+			}
+			L("⭐ 请目视：这 3 秒里键盘有没有变彩虹？（⭐ 若有，记下是哪一次写的之后变的）");
 			L("⭐ 请目视：键盘出现彩虹渐变/呼吸了吗？（把最终 16 值 + 目视结果一起发回）");
 			L("请目视：键盘灯变红了吗？亮度变了吗？");
 		}
