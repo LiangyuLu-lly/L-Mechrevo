@@ -70,6 +70,12 @@ public class RgbForm : RForm
 	private bool _syncingBrightnessUi;
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色 ⇒ 颜色无意义，但**亮度必须保留**）：
+	/// 颜色选择区的显隐状态（-1=未知 / 0=显示 / 1=隐藏）—— 只用于**状态变化时**打一行日志 ✅。
+	/// </summary>
+	private int _kbdColorUiHiddenState = -1;
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-19（运行时自校准）：本窗是否已排过键盘灯能力探测（0/1）。
 	/// <para>⚠️ 只防重复排队；"只跑一次"由 <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 缓存保证 ✅。</para>
 	/// </summary>
@@ -404,6 +410,40 @@ public class RgbForm : RForm
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色 ⇒ 颜色无意义、亮度保留）：
+	/// 效果被**外部入口**（设置界面的键盘效果下拉）切换后，**立刻**刷新本窗参数面板 ✅。
+	/// <para>⭐ 用途：彩虹 ⇒ 颜色区折叠 + 日志；切回单色 ⇒ 颜色区恢复（颜色值从配置读回，不丢）✅。</para>
+	/// <para>⚠️ 只重建 UI（<see cref="BuildGcuFirmwareParams" />），⛔ 不写任何硬件 ✅。</para>
+	/// </summary>
+	internal void RefreshKeyboardLightEffectUi()
+	{
+		if (IsDisposed || Disposing)
+		{
+			return;
+		}
+		if (InvokeRequired)
+		{
+			if (IsHandleCreated)
+			{
+				BeginInvoke(new Action(RefreshKeyboardLightEffectUi));
+			}
+			return;
+		}
+		if (!IsGcuKeyboardFallback())
+		{
+			return;
+		}
+		LightChannelSettings current = GcuSettings();
+		if (string.Equals(current.Effect, _gcuSyncedEffect, StringComparison.Ordinal))
+		{
+			return; // ⭐ 效果没变 ⇒ 不重建（避免无谓重画/日志）✅
+		}
+		BuildGcuFirmwareParams();
+		_hidPanel.PerformLayout();
+		_updateClientHeight?.Invoke();
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-19（机主：「亮度拖到最大没反应/回弹」）：硬件**回读到的实际亮度**到达 ✅。
 	/// <para>⚠️ 事件可能来自后台线程 ⇒ 必须 <c>BeginInvoke</c> 回 UI 线程再动控件 ✅。</para>
 	/// </summary>
@@ -649,6 +689,20 @@ public class RgbForm : RForm
 		//     下限取 1：硬件 0 = 灭（开/关由设置界面的开关负责），⛔ 不让"调暗"变成"关灯"。
 		//   ⚠️ 非宝龙达（GCU）仍是 0~4 ⇒ 逐位不变 ✅
 		bool baolongda = Program.hw?.UsesBaolongda ?? false;
+		// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色）：⭐ 彩虹模式下**整体隐藏颜色选择区**
+		//   （29 色预设色板 / 自定义颜色按钮 / 它们对应的标签都**不建** ⇒ 面板自动折叠）✅
+		//   ⚠️ **只隐藏颜色**：亮度滑块 / 亮度数值 / 亮度标签**始终保留可用** ——
+		//      软件彩虹每帧只写功能号 17（颜色），亮度是**独立写入**，用户必须能调 ✅
+		//   ⚠️ 仅宝龙达：其它机型（GCU/同方）行为逐位不变 ✅
+		bool rainbowEffect = string.Equals(lightChannelSettings.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase);
+		bool hideColorBlock = baolongda && rainbowEffect;
+		if (baolongda && _kbdColorUiHiddenState != (hideColorBlock ? 1 : 0))
+		{
+			_kbdColorUiHiddenState = hideColorBlock ? 1 : 0;
+			Logger.WriteError(hideColorBlock
+				? "[kbd] 彩虹模式 ⇒ 隐藏颜色、保留亮度（软件刷色，不写颜色；亮度仍可调）"
+				: "[kbd] 单色模式 ⇒ 颜色选择已恢复");
+		}
 		int brightMin = baolongda ? 1 : 0;
 		int brightMax = baolongda
 			? Math.Max(brightMin, MechrevoHw.EffectiveKeyboardBrightnessMax())
@@ -846,15 +900,18 @@ public class RgbForm : RForm
 					AddRow(Strings.BreathColor, breathPanel);
 				}
 			}
-			else if (!(KeyboardFirmwareEffects.IsSingleZoneRgb(Program.hw?.Capabilities.KeyboardType ?? 0)
-				&& string.Equals(lightChannelSettings.Effect, "Rainbow", StringComparison.Ordinal)))
+			else if (!hideColorBlock
+				&& !(KeyboardFirmwareEffects.IsSingleZoneRgb(Program.hw?.Capabilities.KeyboardType ?? 0)
+					&& string.Equals(lightChannelSettings.Effect, "Rainbow", StringComparison.Ordinal)))
 			{
 				// 2026-10-15（用户原话「因为彩虹灯效不能编辑颜色」「先就改单分区的」）：
 				// 单分区键盘的**彩虹**灯效由固件按渐变自行取色，用户改不了颜色 ⇒ 这一档下
 				// 「预设颜色」29 色板与「自定义颜色」两个入口都无意义，整块不建。
 				// ⚠️ 只对**单分区**生效（IsSingleZoneRgb）；四分区机型保持原样（其彩虹行为未验证，不动）。
-				// 恢复由 BuildGcuFirmwareParams() 重建保证：切离彩虹 ⇒ 两行自动回来（见 RgbForm :206-207）。
-					RColorButton customColorBtn = new RColorButton
+				// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色）：宝龙达下**所有**机型在彩虹模式都整块不建
+				//   （见上方 `hideColorBlock`）；切回单色由 BuildGcuFirmwareParams() 重建自动恢复，
+				//   且用户上次选的颜色存在配置里 ⇒ 高亮/选中随之恢复（⛔ 彩虹期间不丢颜色值）✅
+				RColorButton customColorBtn = new RColorButton
 				{
 					Size = new Size(D(46), D(24)),
 					// 2026-10-09（UI 反馈①，仅夜间）：「自定义单色」那颗若正是当前选中（UsePresetColor=false），
@@ -953,6 +1010,10 @@ public class RgbForm : RForm
 		_hidPanel.Controls.Add(table);
 		FitParameterTable(_hidPanel);
 		UiVisualStyle.ApplySection(_hidPanel);
+		// ⭐ 2026-10-19：彩虹隐藏颜色块后**重新布局**（AutoSize 面板 + 窗口高度跟随，避免留空白/跳动）✅
+		_hidPanel.PerformLayout();
+		table.PerformLayout();
+		_updateClientHeight?.Invoke();
 		void AddRow(string label, Control ctrl)
 		{
 			_paramLabels.Add(label);

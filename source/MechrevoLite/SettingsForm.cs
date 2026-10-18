@@ -15912,9 +15912,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 						if (selectedIndex < array2.Length)
 						{
 							string id = array2[selectedIndex].Item1;
-							// ⭐⭐ 2026-10-19（机主：「禁用颜色选择不是禁用编辑按钮，要不然亮度不可用」）：
-							//   ⭐ 原厂在彩虹模式下把**颜色**那一项禁用（颜色无效），但亮度/开关/效果下拉**保持可用** ✅
-							//   ⇒ ⭐ 这里只动 `buttonKeyboardColor.Enabled` 一个控件，切回「单色」立刻恢复 ✅
+							// ⭐⭐ 2026-10-19（机主：「彩虹=软件刷色，颜色无意义、亮度必须保留」）：
+							//   ⭐ 本控件是**旧 Aura 遗留**（启动时 InitAura 已隐藏），这里保留原有"禁用"防御；
+							//      用户真正能看到的颜色区在 `RgbForm`（编辑窗）——那里在彩虹模式下**整体隐藏**，
+							//      亮度滑块/数值/标签**始终保留可用**（见 RgbForm.RefreshKeyboardLightEffectUi）✅
 							//   ⚠️ 仅宝龙达（GCU 的彩虹档沿用原逻辑）✅
 							if (Program.hw?.UsesBaolongda == true && buttonKeyboardColor != null && !buttonKeyboardColor.IsDisposed)
 							{
@@ -15997,6 +15998,13 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 								}
 							}
 						}
+					}
+					// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色 ⇒ 颜色无意义、亮度保留）：
+					//   ⭐ 效果下拉切换后**立刻**刷新键盘灯编辑窗（彩虹⇒折叠颜色区，单色⇒恢复；亮度始终保留）✅
+					//   ⚠️ 只刷新 UI，⛔ 不写硬件；窗口没开/已释放时是空操作；⚠️ 仅宝龙达 ⇒ 其它机型逐位不变 ✅
+					if (Program.hw?.UsesBaolongda == true)
+					{
+						rgbForm?.RefreshKeyboardLightEffectUi();
 					}
 				}
 			}
