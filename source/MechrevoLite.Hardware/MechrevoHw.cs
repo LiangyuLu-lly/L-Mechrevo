@@ -1612,6 +1612,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private readonly object _kbdCapsGate = new object();
 
 	/// <summary>
+	/// ⭐ 2026-10-19（30 系「调亮度弹回」诊断）：替代序列 B/C **整个进程只各试一次**（0/1）。
+	/// <para>⚠️ 机主要求"任何失败都不重试、不弹窗刷屏" ⇒ 用一次性闸门，⛔ 不在每次拖动时反复试 ✅。</para>
+	/// </summary>
+	private static int _kbdAltSequenceTried;
+
+	/// <summary>
 	/// ⭐ 本机的**键盘灯自校准结果**（只读；<c>null</c> = 还没探测过）。
 	/// <para>⭐ UI 用它决定：亮度滑块上限（<see cref="KeyboardLightingCalibration.BrightnessMax" />）✅。</para>
 	/// </summary>
@@ -3662,60 +3668,97 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					+ " ⇒ ⭐ 降级为固定色（模式 2）✅ —— ⛔ 不假装写进去了 ✅");
 				mode = 2;
 			}
-			// ⭐ ② 模式（功能号 16）—— **只在变化时写**（彩虹已在上方拦截，这里只剩固定色模式 2）
-			bool modeKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte curMode);
-			bool modeChanged = !modeKnown || curMode != mode;
-			bool modeOk = !modeChanged || wmi.TrySetKeyboardMode(mode);
-			//   ⭐ 只在**真的改了模式**之后才等 500 ms（40/50 系官方与 7.3 都是这个时序）✅
-			//   ⚠️ 30 系不加延迟（与官方 30 系一致）；⛔ 只在写入线程上等，不阻塞 UI ✅
-			DgpuGenerationKind kbGen = DgpuGeneration;
-			if (modeChanged && (kbGen == DgpuGenerationKind.Gen40 || kbGen == DgpuGenerationKind.Gen50))
+			// ⭐⭐ 2026-10-19（0.292.1 诊断包 · 30 系「调亮度弹回 / 颜色没落下」）：
+			//   诊断事实（30 系真机）：只写"变化项"（亮度 1）⇒ 回读恒为 3（固件把亮度夹回）；
+			//   写 17 颜色 #D30607 ⇒ 回读 0,0,0（颜色也没真正落下去）。
+			//   ⇒ 说明该固件对亮度/颜色的接受有**前置条件**，我们的"只写变化项"顺序可能不满足它。
+			//   ⭐ 现在按参考实现的**完整顺序全量写**（⛔ 不再只写变化项、⛔ 不再用 3→0→目标 复位序列）：
+			//     16 模式=2 → 17 颜色=目标 RGB → 18 亮度=目标
+			//   ⭐ 每项写完**立刻逐项回读并打日志**（下次诊断包能看清 17/18 各自成败）✅
+			//   ⚠️ 40/50 系官方在"模式 2 → 颜色"之间等 500ms（仅模式真的变化时等，避免每次拖动都卡 0.5s）；
+			//      30 系不加延迟（与官方 30 系一致）✅
+			if (!BaolongdaProfile.IsKeyboardModeWritable(mode))
 			{
-				Thread.Sleep(500);
+				Logger.WriteError("宝龙达 键盘灯：⚠️ 模式 " + mode + " 本机固件不支持（40 系实测写 3 回读仍为 2）"
+					+ " ⇒ ⭐ 降级为固定色（模式 2）✅ —— ⛔ 不假装写进去了 ✅");
+				mode = 2;
 			}
-			// ⭐ ③ 颜色（功能号 17，三字节 R,G,B）—— 颜色**不可靠回读** ⇒ 每次都写 ✅
 			int r = (colorArgb >> 16) & 0xFF;
 			int g = (colorArgb >> 8) & 0xFF;
 			int b = colorArgb & 0xFF;
-			bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
-			// ⭐ ④ 亮度（功能号 18）—— **只在变化时写**（改颜色时不再重写亮度 ✅）
-			//   ⭐⭐ 2026-10-19（机主实测纠正 + 自校准）：⭐ 本机上限 = **探测值**
-			//     （探测失败才退回声明值）；⛔ 不再按 GPU 代数猜 4/3 ——
-			//     40 系实测只有 0~3，界面拖到 4 会被固件夹回/变成灭灯 ❌
 			byte level = (byte)Math.Clamp(brightness0to3, 0, EffectiveKeyboardBrightnessMax());
-			// ⭐⭐ 2026-10-18（机主：「键盘灯打开得手动调一下亮度才能开」）：
-			//   ⚠️ 亮了但亮度=0 ⇒ 看起来就是"没开"；用户必须再拖一下亮度才有光 ❌
-			//   ⭐ 规则：**开灯状态下亮度不允许是 0**（0 等于关），最低给 1 ✅
-			//   ⚠️ 关灯（mode=0 / on=false）不受影响，仍写 0 ✅
 			bool wantOn = on && mode != 0;
 			if (wantOn && level == 0)
 			{
 				level = 1;
 				Logger.WriteLine("[kbd] 开灯时亮度为 0 ⇒ 自动抬到 1（否则表现为\"开了不亮\"，需再拖亮度）");
 			}
-			bool brightKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte curBright);
-			bool needBright = !brightKnown || curBright != level;
-			bool brightOk;
-			if (!needBright)
+			DgpuGenerationKind kbGen = DgpuGeneration;
+			// ── ⭐① 16 模式（**每次都写**；只有"真的变化"才等 40/50 系的 500ms）──
+			bool modeKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte modeBefore);
+			bool modeChanged = !modeKnown || modeBefore != mode;
+			bool modeOk = wmi.TrySetKeyboardMode(mode);
+			if (modeChanged && (kbGen == DgpuGenerationKind.Gen40 || kbGen == DgpuGenerationKind.Gen50))
 			{
-				brightOk = true;
+				Thread.Sleep(500);
 			}
-			else
+			bool modeReadOk = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte modeReadback);
+			Logger.WriteError($"[kbd] 全量写 ① 16={mode}（写前={(modeKnown ? modeBefore.ToString() : "读不到")}）"
+				+ $" ⇒ 回读={(modeReadOk ? modeReadback.ToString() : "读不到")} · ok={modeOk}");
+			// ── ⭐② 17 颜色（**每次都写**，写完立刻回读）──
+			bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
+			bool colorReadOk = TryReadKeyboardColorViaBackend(wmi, out int colorReadback);
+			string colorReadText = colorReadOk ? "#" + (colorReadback & 0xFFFFFF).ToString("X6") : "读不到";
+			Logger.WriteError($"[kbd] 全量写 ② 17=#{r:X2}{g:X2}{b:X2} ⇒ 回读={colorReadText} · ok={colorOk}");
+			// ── ⭐③ 18 亮度（**每次都写**；⛔ 不再做 3→0→目标 复位序列；写完立刻回读）──
+			bool brightOk = wmi.TrySetKeyboardBrightness(level);
+			int brightReadback = ReadKeyboardBrightnessAfterWrite(wmi, level, attempts: 3, delayMs: 60);
+			Logger.WriteError($"[kbd] 全量写 ③ 18={level} ⇒ 回读={(brightReadback < 0 ? "读不到" : brightReadback.ToString())} · ok={brightOk}");
+			// ── ⭐④ 兜底诊断（**只有**「17 已落到目标、18 仍被夹回」才各试一次；⛔ 不重试/不循环）──
+			//   机主要求：若 17 能写进去而 18 不行 ⇒ 分别试「先 18 再 17」与「16 切换一次再写」各一次，
+			//   并把**哪套生效**写进日志（下次诊断包据此定案；⛔ 不假装成功）✅
+			bool colorMatchesTarget = colorReadOk && (colorReadback & 0xFFFFFF) == (colorArgb & 0xFFFFFF);
+			if (colorMatchesTarget && brightReadback >= 0 && brightReadback != level
+				&& Interlocked.Exchange(ref _kbdAltSequenceTried, 1) == 0)
 			{
-				// ⭐⭐ 2026-10-19（机主：「参照 7.3 的实现，另外的灯效」）：
-				//   ⭐ 第三方 7.3 设亮度用的是**复位序列**：先写满(4) → 再写 0 → 最后写目标值 ✅
-				//   ⭐ 我们原来"只写变化项、直接写目标" ⇒ 固件可能不认（真机上亮度/灯效常不生效）⚠️
-				//   ⚠️ 中间那次 0 会让灯瞬灭 ~120ms（7.3 同样如此）✅
-				//   ⭐⭐ 2026-10-19：⭐ 复位序列的"写满"也取**本机探测上限**（⛔ 不写超过上限的值）✅
-				byte maxLevel = (byte)EffectiveKeyboardBrightnessMax();
-				wmi.TrySetKeyboardBrightness(maxLevel);
-				Thread.Sleep(120);
-				wmi.TrySetKeyboardBrightness(0);
-				Thread.Sleep(120);
-				brightOk = wmi.TrySetKeyboardBrightness(level);
-				Logger.WriteLine($"[kbd] 亮度复位序列：{maxLevel} → 0 → {level}（7.3 做法）⇒ ok={brightOk}");
+				Logger.WriteError("[kbd] ⚠️ 17 已写入但 18 被夹回 ⇒ 按机主要求各试一次替代序列（⛔ 不重试）");
+				// 序列 B：先 18 再 17
+				bool seqB18 = wmi.TrySetKeyboardBrightness(level);
+				Thread.Sleep(60);
+				bool seqB17 = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
+				int seqBRead = ReadKeyboardBrightnessAfterWrite(wmi, level, attempts: 3, delayMs: 60);
+				Logger.WriteError($"[kbd] 兜底序列 B（18→17）⇒ 18 回读={(seqBRead < 0 ? "读不到" : seqBRead.ToString())}"
+					+ $" · 18ok={seqB18} 17ok={seqB17}");
+				if (seqBRead == level)
+				{
+					brightReadback = seqBRead;
+					Logger.WriteError("[kbd] ⭐ 兜底序列 B 生效（该固件走「先 18 后 17」）");
+				}
+				else
+				{
+					// 序列 C：16 切换一次（2 → 1 → 2）后再写 18 / 17
+					bool seqC16a = wmi.TrySetKeyboardMode(1);
+					Thread.Sleep(60);
+					bool seqC16b = wmi.TrySetKeyboardMode(2);
+					Thread.Sleep(60);
+					bool seqC18 = wmi.TrySetKeyboardBrightness(level);
+					Thread.Sleep(60);
+					bool seqC17 = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
+					int seqCRead = ReadKeyboardBrightnessAfterWrite(wmi, level, attempts: 3, delayMs: 60);
+					Logger.WriteError($"[kbd] 兜底序列 C（16 2→1→2 后 18→17）⇒ 18 回读={(seqCRead < 0 ? "读不到" : seqCRead.ToString())}"
+						+ $" · 16a={seqC16a} 16b={seqC16b} 18ok={seqC18} 17ok={seqC17}");
+					if (seqCRead == level)
+					{
+						brightReadback = seqCRead;
+						Logger.WriteError("[kbd] ⭐ 兜底序列 C 生效（该固件需先切换一次模式）");
+					}
+					else
+					{
+						Logger.WriteError("[kbd] ⚠️ 兜底序列 B/C 均未生效 ⇒ 如实记录（该固件可能确实不接受该亮度值）");
+					}
+				}
 			}
-			// ⭐⭐ 回读：⭐ 逐值比对（⭐ 旧代码只判"非 0 ＝ 开" ⇒ ⭐ 选自动循环/自定义时会误判成功 ❌）
+			// ── ⭐⑤ 回读判据（模式 + 亮度逐值比对；颜色只记录、不参与 confirmed）──
 			bool modeMatch = TryConfirmModeExact(wmi, mode);
 			bool brightMatch = TryConfirmKeyboardBrightness(wmi, level);
 			confirmed = modeMatch && brightMatch;
@@ -3723,8 +3766,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⭐ 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
 			//     UI 必须显示**实际生效值**、并记一条 `[kbd-cal]` 日志（⛔ 不拿用户拖到的值骗人）✅
 			RecordAppliedKeyboardBrightness(wmi, level);
-			Logger.WriteError($"宝龙达 键盘灯：⭐ 下发 rgb=#{r:X2}{g:X2}{b:X2} · 模式={mode} · 亮度={level}"
-				+ $" · ⭐ 本次**只写变化项**（模式={modeChanged} · 颜色=是 · 亮度={needBright}）"
+			Logger.WriteError($"宝龙达 键盘灯：⭐ **全量顺序** 16={mode} → 17=#{r:X2}{g:X2}{b:X2} → 18={level}"
+				+ $" · ⭐ 逐项回读：16={(modeReadOk ? modeReadback.ToString() : "读不到")} / 17={colorReadText}"
+				+ $" / 18={(brightReadback < 0 ? "读不到" : brightReadback.ToString())}"
 				+ $" ⇒ ⭐ ① 写成功={colorOk && modeOk && brightOk}（色={colorOk} 模式={modeOk} 亮度={brightOk}）"
 				+ $" · ⭐ ② 回读一致={confirmed}（模式={modeMatch} 亮度={brightMatch}）"
 				+ " · ⭐ ③ ⚠️ 灯效/亮度是否**真的**变了 —— **我们测不到，需目视确认** ⚠️");
