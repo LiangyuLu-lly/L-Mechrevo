@@ -3428,20 +3428,39 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			// ⭐ ② 模式（功能号 16）—— **只在变化时写**
 			bool modeKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte curMode);
-			bool needMode = !modeKnown || curMode != mode;
-			bool modeOk = !needMode || wmi.TrySetKeyboardMode(mode);
-			//   ⭐ 只在**真的写了模式**之后才等 500 ms（40/50 系官方与 7.3 都是这个时序）✅
+			bool modeChanged = !modeKnown || curMode != mode;
+			// ⭐⭐ 2026-10-19（机主：「彩虹灯效没用」）：⭐ 彩虹（模式 1）**每次都重写一次模式** ✅
+			//   ⭐ 依据（第三方 7.3）："设彩虹" = **只写** `RGBKeyboardMode = Mode_RGBAutoCyclic(1)`（无条件写）。
+			//   ⚠️ 若模式寄存器已经是 1、但视觉还停在单色（旧版本"先写颜色再写模式/亮度复位"留下的状态），
+			//     "只在变化时写"会**跳过**这一写 ⇒ 用户再选一次彩虹也永远恢复不了 ❌
+			//   ⚠️ 40/50 系的 500ms 延迟只在"模式真的变了"时等（⭐ 彩虹后面不写颜色，无需等）✅
+			bool modeNeedsWrite = modeChanged || mode == 1;
+			bool modeOk = !modeNeedsWrite || wmi.TrySetKeyboardMode(mode);
+			//   ⭐ 只在**真的改了模式**之后才等 500 ms（40/50 系官方与 7.3 都是这个时序）✅
 			//   ⚠️ 30 系不加延迟（与官方 30 系一致）；⛔ 只在写入线程上等，不阻塞 UI ✅
 			DgpuGenerationKind kbGen = DgpuGeneration;
-			if (needMode && (kbGen == DgpuGenerationKind.Gen40 || kbGen == DgpuGenerationKind.Gen50))
+			if (modeChanged && (kbGen == DgpuGenerationKind.Gen40 || kbGen == DgpuGenerationKind.Gen50))
 			{
 				Thread.Sleep(500);
 			}
-			// ⭐ ③ 颜色（功能号 17，三字节 R,G,B）—— 颜色**不可靠回读** ⇒ 每次都写 ✅
+			// ⭐ ③ 颜色（功能号 17，三字节 R,G,B）
 			int r = (colorArgb >> 16) & 0xFF;
 			int g = (colorArgb >> 8) & 0xFF;
 			int b = colorArgb & 0xFF;
-			bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
+			// ⭐⭐ 2026-10-19（机主：「彩虹灯效没用」· 按第三方 7.3 修正）：⭐ **自动循环（彩虹，模式 1）不写颜色** ✅
+			//   ⭐ 依据（第三方 7.3 `SetSP_KeyboardColorDefault` · 也是原厂的"恢复默认"）：
+			//     彩虹 = **只写** `RGBKeyboardMode = Mode_RGBAutoCyclic(1)`，全程**不碰颜色**；
+			//     颜色寄存器只属于**固定色模式 2**（7.3 的 `SetSP_KeyboardColor` = 模式 2 → 等 500ms → 颜色）✅
+			//   ⚠️ 旧实现无论什么模式都把功能号 17 写一遍 ⇒ 40 系固件在彩虹模式下收到颜色写后
+			//     **视觉上回到单色**（而模式寄存器仍读回 1 ⇒ 我们一直误判"写成功"）❌
+			//     —— 这正是机主说的「选彩虹但显示单色」的根因 ✅
+			bool rainbow = (mode == 1);
+			bool colorOk = rainbow || wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
+			if (rainbow)
+			{
+				Logger.WriteError("宝龙达 键盘灯：⭐ 彩虹（模式 1 ＝ 自动循环）⇒ ⭐ **按 7.3 不写颜色**（功能号 17 只属于固定色模式 2）"
+					+ " · ⛔ 不再让颜色写把彩虹顶回单色 ✅");
+			}
 			// ⭐ ④ 亮度（功能号 18）—— **只在变化时写**（改颜色时不再重写亮度 ✅）
 			//   ⭐⭐ 2026-10-19（机主实测纠正 + 自校准）：⭐ 本机上限 = **探测值**
 			//     （探测失败才退回声明值）；⛔ 不再按 GPU 代数猜 4/3 ——
@@ -3463,6 +3482,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			if (!needBright)
 			{
 				brightOk = true;
+			}
+			else if (rainbow)
+			{
+				// ⭐⭐ 2026-10-19（机主：「彩虹灯效没用」）：⭐ 彩虹下**跳过亮度复位序列**（满 → 0 → 目标）✅
+				//   ⚠️ 那个序列会在模式 1 已生效后再把亮度写满/写 0，40 系固件可能因此重新应用"固定色"配置
+				//     ⇒ 彩虹被打断、看起来又变回单色 ❌（7.3 里彩虹只写模式；亮度是**另一条独立操作**）
+				//   ⭐ 这里只写目标值，⛔ 不做 4→0 复位（固定色模式 2 仍保留 7.3 那套复位序列 ✅）
+				brightOk = wmi.TrySetKeyboardBrightness(level);
+				Logger.WriteError($"[kbd] 彩虹（模式 1）亮度：⭐ 直接写 {level}（⛔ 跳过 满→0→目标 复位序列，按 7.3）⇒ ok={brightOk}");
 			}
 			else
 			{
@@ -3487,8 +3515,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⭐ 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
 			//     UI 必须显示**实际生效值**、并记一条 `[kbd-cal]` 日志（⛔ 不拿用户拖到的值骗人）✅
 			RecordAppliedKeyboardBrightness(wmi, level);
-			Logger.WriteError($"宝龙达 键盘灯：⭐ 下发 rgb=#{r:X2}{g:X2}{b:X2} · 模式={mode} · 亮度={level}"
-				+ $" · ⭐ 本次**只写变化项**（模式={needMode} · 颜色=是 · 亮度={needBright}）"
+			Logger.WriteError($"宝龙达 键盘灯：⭐ 下发 rgb=#{r:X2}{g:X2}{b:X2} · 模式={mode}（{(rainbow ? "彩虹/自动循环" : "固定色")}） · 亮度={level}"
+				+ $" · ⭐ 本次**只写变化项**（模式={modeNeedsWrite}{(mode == 1 ? " · 彩虹无条件重写" : "")} · 颜色={(rainbow ? "跳过(彩虹)" : "是")} · 亮度={needBright}）"
 				+ $" ⇒ ⭐ ① 写成功={colorOk && modeOk && brightOk}（色={colorOk} 模式={modeOk} 亮度={brightOk}）"
 				+ $" · ⭐ ② 回读一致={confirmed}（模式={modeMatch} 亮度={brightMatch}）"
 				+ " · ⭐ ③ ⚠️ 灯效/亮度是否**真的**变了 —— **我们测不到，需目视确认** ⚠️");
