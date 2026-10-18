@@ -598,7 +598,7 @@ public class FanCurveForm : RForm
 					BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve();
 					_cpuPanel.Load(TempsToBytes(s.Channel1Temperatures), RpmsToPercent(s.Channel1Rpms, s.MinRpm, s.MaxRpm));
 					_gpuPanel.Load(TempsToBytes(s.Channel0Temperatures), RpmsToPercent(s.Channel0Rpms, s.MinRpm, s.MaxRpm));
-					_status.Text = "风扇曲线：软件闭环（宝龙达）"
+					_status.Text = "风扇曲线：软件闭环（宝龙达）" + ((Program.hw?.FanCurveVerified ?? false) ? "" : " · ⚠️ 本机风扇接管尚未验证，暂不可用（运行 --fan-probe 查看）")
 						+ (s.Enabled ? " · 已启用" : " · 未启用")
 						+ $" · 范围 {s.MinRpm}~{s.MaxRpm} RPM"
 						+ (s.IsUnreadableArchive ? " · " + s.StatusNote : "");
@@ -628,6 +628,13 @@ public class FanCurveForm : RForm
 		MechrevoHw hw = Program.hw;
 		if (hw == null)
 		{
+			return;
+		}
+		// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ 未通过只读验证 ⇒ 不允许启用（⛔ 不给"能点但没用"的入口）✅
+		if (!hw.FanCurveVerified)
+		{
+			_status.Text = "本机风扇接管尚未验证，暂不可用（运行 --fan-probe 查看详情）";
+			SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve());
 			return;
 		}
 		try
@@ -709,9 +716,10 @@ public class FanCurveForm : RForm
 		{
 			if (_bdEnableChk != null)
 			{
-				_bdEnableChk.Visible = true;
-				// ⚠️ 宝龙达下这个开关**必须可勾选**（它不依赖 GCU）⇒ 只有「存档读不懂」才禁用
-				_bdEnableChk.Enabled = !s.IsUnreadableArchive;
+				// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ **未通过只读验证 ⇒ 隐藏入口**（⛔ 不给"能点但没用"）✅
+				bool fanVerified = Program.hw?.FanCurveVerified ?? false;
+				_bdEnableChk.Visible = fanVerified;
+				_bdEnableChk.Enabled = fanVerified && !s.IsUnreadableArchive;
 				_bdEnableChk.Checked = s.Enabled;
 			}
 		}
@@ -724,8 +732,8 @@ public class FanCurveForm : RForm
 		{
 			if (_bdSyncChk != null)
 			{
-				_bdSyncChk.Visible = true;
-				_bdSyncChk.Enabled = !s.IsUnreadableArchive;
+				_bdSyncChk.Visible = (Program.hw?.FanCurveVerified ?? false);
+				_bdSyncChk.Enabled = (Program.hw?.FanCurveVerified ?? false) && !s.IsUnreadableArchive;
 				_bdSyncChk.Checked = s.SyncEnabled;
 			}
 		}

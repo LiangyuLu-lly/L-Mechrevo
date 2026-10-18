@@ -77,17 +77,41 @@ internal static class FanProbe
 				: BaolongdaFanCurveSettings.FullRpm40Series;
 			int fullUnits = fullRpm / 100;
 
+			// ────────────────────────────────────────────────────────────────
+			// 0a. ⭐⭐ 2026-10-18（机主最高优先级 · 先验证再开放）：⭐ **EC 只读验证**
+			//    ⭐ 三个地址：0xC83C = Fan1 目标 · 0xC83D = Fan2 目标 · 0xB20 = 手动接管掩码
+			//    ⛔ 只读：EC 数据一个字节都不写（只写 SuperIO 窗口地址寄存器用于寻址）✅
+			//    ⭐ 结论=不可用 ⇒ 后面**绝不写**（不跑写测试）✅
+			// ────────────────────────────────────────────────────────────────
+			bool ecVerified = ProbeEcFanRegistersReadOnly(L);
+			L("");
+
 			wmi = BaolongdaWmi.TryCreate();
 			if (wmi == null)
 			{
 				L("探针结果：⚠️ **没有 MICommonInterface 实例**（`root\\WMI:MICommonInterface` / `ACPI\\PNP0C14\\MIFS*` 都探不到）");
 				L("⇒ 本机不是宝龙达机型（⭐ 例：开发机 GM5HG0A 是同方模具）⇒ ⛔ 探针**一个写命令都没发** ✅");
 				L("⇒ ⭐ 请在宝龙达机型（蛟龙16Pro 30/40 系）上运行 `L-Mechrevo.exe --fan-probe` 才能得到每步回读结果。");
+				L("只读验证结论：接口不存在（EC=" + (ecVerified ? "可读 ✅" : "未通过 ⚠️") + " · WMI=MIFS 实例不存在）");
 				return path;
 			}
 			L("实例 = " + wmi.InstancePath + " · 类GUID = " + (wmi.ClassGuid.Length == 0 ? "(无)" : wmi.ClassGuid));
 			L("主板 = " + (board.Length == 0 ? "(空/读不到)" : board)
 				+ " ⇒ 本机满转按 **" + fullRpm + " RPM** 处理（协议上限 " + fullUnits + " x100RPM）");
+			L("");
+			// ────────────────────────────────────────────────────────────────
+			// 0b. ⭐ 只读验证结论（⭐ 机主最高优先级：结论=不可用 ⇒ 绝不写）
+			// ────────────────────────────────────────────────────────────────
+			L("── 0b. 只读验证结论 ──");
+			L("结论：" + (ecVerified
+					? "可用（EC 0xC83C/0xC83D/0xB20 只读验证通过）"
+					: "不可用（EC 三地址未全部读到合理值）")
+				+ " · WMI 13/20 只作对照打印（⭐ 机主 0.291.9.14 卡死证明 WMI 20 可读 ≠ 接管可用）");
+			if (!ecVerified)
+			{
+				L("⛔ 结论=不可用 ⇒ ⛔ 本探针**不会写任何字节**（a~e 写测试已跳过；⭐ 请把本报告发回，由机主决定）");
+				return path;
+			}
 			L("");
 
 			// ────────────────────────────────────────────────────────────────
@@ -469,6 +493,45 @@ internal static class FanProbe
 			sb.Append(data[i].ToString("X2"));
 		}
 		return sb.ToString();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主最高优先级 · 先验证再开放）：⭐ **EC 只读验证**。
+	/// <para>⭐ 读 `0xC83C`（Fan1 目标档）· `0xC83D`（Fan2 目标档）· `0xB20`（手动接管掩码）✅</para>
+	/// <para>⭐ 判据：三个地址都读得到 · 不是 `0xFF` 填充值 · 目标档在 `0..0xC8` ⇒ 可用 ✅</para>
+	/// <para>⛔ 只读：EC 数据一个字节都不写（只写 SuperIO 窗口地址寄存器用于寻址）✅</para>
+	/// </summary>
+	private static bool ProbeEcFanRegistersReadOnly(Action<string> log)
+	{
+		log("── 0a. EC 只读验证（⭐ 机主最高优先级 · 先验证再开放）──");
+		bool ok = false;
+		try
+		{
+			int fan1 = -1;
+			int fan2 = -1;
+			int mask = -1;
+			bool r1 = EcLpcIo.TryReadByte(0xC83C, out fan1);
+			bool r2 = EcLpcIo.TryReadByte(0xC83D, out fan2);
+			bool r3 = EcLpcIo.TryReadByte(0xB20, out mask);
+			log("EC 0xC83C（Fan1 目标）= " + (r1 ? "0x" + fan1.ToString("X2") : "读不到")
+				+ " · 0xC83D（Fan2 目标）= " + (r2 ? "0x" + fan2.ToString("X2") : "读不到")
+				+ " · 0xB20（接管掩码）= " + (r3 ? "0x" + mask.ToString("X2") : "读不到"));
+			ok = r1 && r2 && r3
+				&& mask != 0xFF
+				&& fan1 >= 0 && fan1 <= 0xC8
+				&& fan2 >= 0 && fan2 <= 0xC8;
+			log("判据：三地址都读得到 · 不是 0xFF 填充 · 目标档 0..0xC8 ⇒ " + (ok ? "通过 ✅" : "未通过 ⚠️"));
+			if (!ok)
+			{
+				log("EC 通道详情：" + EcLpcIo.DescribeChannel());
+			}
+			log("⚠️ 说明：本判据只认 EC 实测（⭐ 30/40 系分开；⭐ WMI 13/20 仅对照）");
+		}
+		catch (Exception ex)
+		{
+			log("EC 读取异常：" + ex.GetType().Name + " " + ex.Message);
+		}
+		return ok;
 	}
 
 	/// <summary>⭐ 只读主板型号（⭐ 只为了算"本机满转"：裸 `MRID6` = 30 系 4900 / `MRID6-*` = 40 系 6000）✅。</summary>
