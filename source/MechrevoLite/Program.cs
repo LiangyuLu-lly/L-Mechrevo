@@ -393,6 +393,15 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值 · 阶段 2）：`--battery-limit-test [--low 60 --high 80] [--disable]`。
+		//   ⭐ 白名单写（仅 0x8153/0x8154/0x8151/0x8150）；严格时序；失败不重试、不做清理写；
+		//   ⭐ 结果写桌面 lm-battery-limit-test-*.txt + [battery-limit-test] 日志。
+		case "--battery-limit-test":
+		{
+			Environment.ExitCode = BatteryLimitTest.Run(args.Skip(1).ToArray());
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-18（SMU-EC 只读核对）：`--smu-ec-probe`。
 		//   ⭐ 核对 7.3 `RyzenAccess.Write_EC_EX/Read_EC_EX` 的真实通道（结论：LPC 端口 I/O，无 SMU 命令）；
 		//   ⭐ 双通道（ACPI/LPC）只读对照；⛔ 不发 SMU 命令、不写任何 EC 字节。

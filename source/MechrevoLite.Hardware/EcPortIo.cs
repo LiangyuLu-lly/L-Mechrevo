@@ -623,6 +623,50 @@ internal static class EcPortIo
 		return mask && maskClear && fan1 && fan2 && targetsZero;
 	}
 
+	// ══════════════════════════════════════════════════════════════════
+	//  ⭐⭐ 2026-10-18（机主批准 · **充电阈值白名单写**）：
+	//    参考实现：JiaoLong16Pro-Battery-threshold（BM5235 / 2023 款实测；只取协议事实，⛔ 未复制代码）✅
+	//    白名单**仅 4 个地址**：
+	//      · 0x8153 / 0x8154 = 阈值高/低（**仅 1..100**）
+	//      · 0x8151 = 命令字（**仅 0x0D 启用 / 0x0E 准备 / 0x0F 关闭**）
+	//      · 0x8150 = 触发（**仅 0x10**）
+	//    ⚠️ 其它地址一律拒绝；每次写后立刻回读比对；⛔ 不重试、⛔ 不做额外清理写 ✅
+	// ══════════════════════════════════════════════════════════════════
+	internal const int BatteryHighParamRegister = 0x8153;
+
+	internal const int BatteryLowParamRegister = 0x8154;
+
+	internal const int BatteryCommandRegister = 0x8151;
+
+	internal const int BatteryTriggerRegister = 0x8150;
+
+	/// <summary>⭐ 充电阈值白名单写（4 地址 + 值域约束 + 回读比对）✅。</summary>
+	internal static bool TryWriteBatteryByte(int address, byte value, out int readBack)
+	{
+		readBack = -1;
+		if (address != BatteryHighParamRegister && address != BatteryLowParamRegister
+			&& address != BatteryCommandRegister && address != BatteryTriggerRegister)
+		{
+			return false;
+		}
+		if ((address == BatteryHighParamRegister || address == BatteryLowParamRegister)
+			&& (value < 1 || value > 100))
+		{
+			return false;
+		}
+		if (address == BatteryCommandRegister && value != 0x0D && value != 0x0E && value != 0x0F)
+		{
+			return false;
+		}
+		if (address == BatteryTriggerRegister && value != 0x10)
+		{
+			return false;
+		}
+		bool writeOk = TryWriteByte(address, value);
+		bool readOk = TryReadByteStable(address, out readBack, out _);
+		return writeOk && readOk && readBack == value;
+	}
+
 	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主批准 · **0x81 写实验**）：⭐ ACPI 标准空间写（WR_EC=`0x81` · **8 位地址**）——
 	/// 每步 `WaitIbfClear` + 记录 0x66 状态位（IBF/OBF）✅。
