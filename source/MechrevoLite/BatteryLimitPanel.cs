@@ -47,8 +47,7 @@ internal sealed class BatteryLimitPanel : Panel
 	// ⭐ 机主批准：高级开关（默认关；允许 SOC ≥ 停充阈值时启用，固件会先放电）✅
 	private readonly RCheckBox _allowInitialDischargeBox;
 
-	// ⭐ 机主要求：用仓库现有圆角按钮控件 RButton；半径**面板局部**调小（⛔ 不全局改）✅
-	private readonly RButton _applyButton;
+	private readonly Button _applyButton;
 
 	private readonly Label _statusLabel;
 
@@ -105,21 +104,22 @@ internal sealed class BatteryLimitPanel : Panel
 		_toolTip.SetToolTip(_enableBox, Strings.BatteryLimitEnableChargeTip);
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
 
-		_applyButton = new RButton
+		// ⭐ 2026-10-19（机主：自定义 RButton 在非 100% DPI 下不稳）：⭐ 改用**系统标准 Button**：
+		//   自带文字度量/外框留白 ⇒ ⛔ 不会裁字；Flat 样式、固定宽 88、高 = GetPreferredSize（通常 26~32）✅
+		_applyButton = new Button
 		{
-			// ⭐ 2026-10-19（机主：应用按钮裁切）：⭐ **固定逻辑尺寸 88×24**，⛔ AutoSize / ⛔ Dock=Fill ✅
 			AutoSize = false,
 			Dock = DockStyle.None,
+			Anchor = AnchorStyles.Top | AnchorStyles.Right,
+			FlatStyle = FlatStyle.Flat,
+			UseVisualStyleBackColor = false,
+			Padding = Padding.Empty,
 			Text = Strings.BatteryLimitSaveThreshold,
-			// ⭐ 2026-10-19（机主：125/150% 下仍裁）：⭐ 固定 88×24；行高按 **ceil(按钮)+ceil(上)+ceil(下)+D(3)**
-			//   计算，任何 DPI 下下方至少 3 设备像素；按钮整体上移 1px（Margin.Top=D(1)）✅
-			Size = new Size(ScaleCeil(88), ScaleCeil(24)),
-			Padding = new Padding(D(4), D(1), D(4), D(1)),
-			BorderRadius = D(4),
-			Margin = new Padding(D(2), ScaleCeil(1), 0, ScaleCeil(1)),
-			Anchor = AnchorStyles.Top | AnchorStyles.Right
+			Margin = new Padding(D(2), ScaleCeil(1), 0, ScaleCeil(1))
 		};
-		_applyButton.Font = UiVisualStyle.Font(8f);
+		_applyButton.Font = UiVisualStyle.Font(8.5f);
+		_applyButton.Size = new Size(ScaleCeil(88), _applyButton.GetPreferredSize(Size.Empty).Height);
+		_applyButton.FlatAppearance.BorderSize = 1;
 		_applyButton.AutoEllipsis = false;
 		_applyButton.Click += ApplyButton_Click;
 
@@ -231,7 +231,7 @@ internal sealed class BatteryLimitPanel : Panel
 		_highBox.BackColor = UiVisualStyle.Input;
 		_applyButton.ForeColor = text;
 		_applyButton.BackColor = UiVisualStyle.ButtonFace;
-		_applyButton.BorderColor = UiVisualStyle.Border;
+		_applyButton.FlatAppearance.BorderColor = UiVisualStyle.Border;
 		ApplyStatusColor();
 		Logger.WriteLineIfChanged("battery-ui-theme",
 			"[battery-ui] 主题=" + (UiVisualStyle.IsNightMode ? "Dark" : "Light")
@@ -493,9 +493,10 @@ internal sealed class BatteryLimitPanel : Panel
 			Minimum = min,
 			Maximum = max,
 			Value = value,
-			Dock = DockStyle.Fill,
+			Dock = DockStyle.None,
+			Anchor = AnchorStyles.Left | AnchorStyles.Right,
 			TextAlign = HorizontalAlignment.Right,
-			Margin = new Padding(D(2), D(1), D(6), D(1))
+			Margin = new Padding(D(2), D(2), D(6), D(2))
 		};
 	}
 
@@ -517,11 +518,9 @@ internal sealed class BatteryLimitPanel : Panel
 			Size switchPreferred = _enableBox.GetPreferredSize(Size.Empty);
 			// ⭐ 2026-10-19（预览工具：按钮溢出到下一行）：⭐ 行高必须 ≥ 按钮实际高度 + 上下 margin；
 			//   ⛔ 不再用 PreferredSize（固定 Size 时它可能小于实际 Height）✅
-			// ⭐ 机主要求：行高 = ceil(按钮高) + ceil(上 margin) + ceil(下 margin) + D(3)（留 3 设备像素）✅
-			int scaledButtonHeight = ScaleCeil(24);
-			int marginTop = ScaleCeil(1);
-			int marginBottom = ScaleCeil(1);
-			int rowHeight = Math.Max(scaledButtonHeight + marginTop + marginBottom + D(3), switchPreferred.Height + D(4));
+			// ⭐ 机主要求：行高 = max(按钮首选高, 开关首选高) + 上下 margin + 3 设备像素 ✅
+			int buttonHeight = Math.Max(buttonPreferred.Height, _applyButton.Height);
+			int rowHeight = Math.Max(buttonHeight + _applyButton.Margin.Vertical + D(3), switchPreferred.Height + D(4));
 			if (_grid.RowStyles.Count > 1)
 			{
 				if ((int)_grid.RowStyles[1].Height != rowHeight)
@@ -602,7 +601,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Size preferred = _applyButton.GetPreferredSize(Size.Empty);
 			Size actual = _applyButton.Size;
 			Size text = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font);
-			bool fail = actual.Width > 0 && (actual.Height < text.Height + 6 || actual.Width < text.Width + 8);
+			bool fail = actual.Width > 0 && (actual.Height < text.Height + 6 || actual.Width < text.Width + 8 || actual.Height < preferred.Height);
 			int rowHeight = _grid.RowStyles.Count > 1 ? (int)_grid.RowStyles[1].Height : 0;
 			bool overlapsRow = rowHeight > 0 && actual.Height + _applyButton.Margin.Vertical > rowHeight;
 			string message = "[battery-ui] 按钮：名=保存阈值 · stage=" + stage + " · preferred=" + preferred.Width + "x" + preferred.Height
