@@ -3205,6 +3205,22 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 						Logger.WriteError("[kbd] 30 系关灯后 EC 0x1807 读不到 ⇒ 保留上一次开关状态（⛔ 不凭 WMI16 改）");
 					}
 				}
+				// ⭐⭐ 2026-10-19（40 系）：开关镜像只认 WMI18；读不到保留上一次（⛔ 不凭 WMI16）✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
+				{
+					if (TryReadKeyboardPowerFromWmi18(out bool wmi18Off, out int wmi18OffLevel))
+					{
+						TraceKeyboardPowerWrite(wmi18Off, "40系关灯后-WMI18回读");
+						KeyboardPower = wmi18Off;
+						confirmed = !wmi18Off;
+						Logger.WriteError($"[kbd] 宝龙达 40 系关灯后开关状态：WMI18={wmi18OffLevel} ⇒ {(wmi18Off ? "ON" : "OFF")}"
+							+ $" · confirmed={confirmed}");
+					}
+					else
+					{
+						Logger.WriteError("[kbd] 宝龙达 40 系关灯后 WMI18 读不到 ⇒ 保留上一次开关状态（⛔ 不凭 WMI16 改）");
+					}
+				}
 				return true; // ⭐ 已接管 → 判据由统一实现给出（功能号 16 模式值 ✅）⇒ ⛔ 不再走下面的重复回读 ✅
 			}
 			else
@@ -3261,6 +3277,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				}
 				// ⭐ EC 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16=2 恢复 ON）✅
 				Logger.WriteError("[kbd] 30 系开关确认：EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
+				return true;
+			}
+			// ⭐⭐ 2026-10-19（40 系）：开关镜像只认 WMI18（WMI16 恒 2，不能拿来判「开」）✅
+			if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
+			{
+				if (TryReadKeyboardPowerFromWmi18(out bool wmi18On, out int wmi18Level))
+				{
+					TraceKeyboardPowerWrite(wmi18On, "40系开灯后-WMI18回读");
+					KeyboardPower = wmi18On;
+					confirmed = wmi18On == on;
+					Logger.WriteError($"[kbd] 宝龙达 40 系开关确认：WMI18={wmi18Level} ⇒ {(wmi18On ? "ON" : "OFF")}"
+						+ $"（目标={(on ? "开" : "关")} · confirmed={confirmed}）");
+					return true;
+				}
+				Logger.WriteError("[kbd] 宝龙达 40 系开关确认：WMI18 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
 				return true;
 			}
 			for (int attempt = 0; attempt < 5; attempt++)
@@ -3332,6 +3363,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					}
 					// ⭐ EC 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16=2 恢复 ON）✅
 					Logger.WriteError("[kbd] 30 系开关确认（topic）：EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
+					return true;
+				}
+				// ⭐⭐ 2026-10-19（40 系）：开关确认只认 WMI18（WMI16 恒 2，不能判「开」）✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
+				{
+					if (TryReadKeyboardPowerFromWmi18(out bool wmi18On, out int wmi18Level))
+					{
+						TraceKeyboardPowerWrite(wmi18On, "TryConfirm-topic-WMI18回读");
+						KeyboardPower = wmi18On;
+						confirmed = wmi18On == on;
+						Logger.WriteError($"[kbd] 宝龙达 40 系开关确认（topic）：WMI18={wmi18Level} ⇒ {(wmi18On ? "ON" : "OFF")}"
+							+ $"（目标={(on ? "开" : "关")} · confirmed={confirmed}）");
+						return true;
+					}
+					Logger.WriteError("[kbd] 宝龙达 40 系开关确认（topic）：WMI18 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
 					return true;
 				}
 				// ⭐ 口径同 TrySetLightPowerViaBackend：⭐ Mode_Off=0 ⇒ 关 ✅ · ⭐ 非 0 ⇒ 开 ✅ · ⭐ Unknow=255 ⇒ 读不到 ✅
@@ -3617,6 +3663,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				detail = "30 系 EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16/18 判开关）";
 				return false;
 			}
+			if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
+			{
+				if (TryReadKeyboardPowerFromWmi18(out bool wmi18On, out int wmi18Level))
+				{
+					on = wmi18On;
+					detail = $"宝龙达 40 系：开关状态=亮度（WMI18={wmi18Level} ⇒ {(wmi18On ? "ON" : "OFF")}；⛔ 不用 16）";
+					return true;
+				}
+				detail = "40 系 WMI18 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 判开关）";
+				return false;
+			}
 			bool modeRead = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte modeValue) && modeValue != 255;
 			bool brightRead = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte brightValue) && brightValue != 255;
 			if (modeRead)
@@ -3651,8 +3708,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// </summary>
 	private void TraceKeyboardPowerWrite(bool value, string source)
 	{
-		// ⚠️ 只在 Gen30 **且宝龙达** 才打（否则其它机型会被追踪日志刷屏）✅
-		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
+		// ⚠️ 只在宝龙达 30/40 系才打（否则其它机型会被追踪日志刷屏）✅
+		if (UsesBaolongda && (DgpuGeneration == DgpuGenerationKind.Gen30 || DgpuGeneration == DgpuGenerationKind.Gen40))
 		{
 			Logger.WriteError($"[kbd-trace] KeyboardPower={value}（电源意图={(value ? "开" : "关")}）"
 				+ $" ← 来源={source} · 调用链={DescribeCallChain(3)}");
@@ -3686,6 +3743,37 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return "n/a";
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（宝龙达 40 系：状态=亮度）：WMI18 是唯一状态源；`!=0 ⇒ ON`、`==0 ⇒ OFF` ✅。
+	/// <para>⛔ 40 系不再用 WMI16 判开关（16 恒 2）；读失败返回 false（调用方保留上一次状态）✅。</para>
+	/// </summary>
+	private bool TryReadKeyboardPowerFromWmi18(out bool on, out int brightness)
+	{
+		on = false;
+		brightness = -1;
+		if (DgpuGeneration != DgpuGenerationKind.Gen40 || !UsesBaolongda)
+		{
+			return false;
+		}
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return false;
+		}
+		if (!wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte value) || value == 255)
+		{
+			return false;
+		}
+		brightness = value;
+		on = value != 0;
+		string message = $"[kbd] 宝龙达 40 系：开关状态=亮度（WMI18={value} ⇒ {(on ? "ON" : "OFF")}）";
+		if (Logger.TryMarkChanged("kbd40-wmi18-state", message))
+		{
+			Logger.WriteError(message);
+		}
+		return true;
 	}
 
 	/// <summary>
@@ -3728,7 +3816,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		ecValue = value;
 		on = value != 0;
-		string message = $"[kbd] 30 系开关状态：EC 0x1807=0x{value:X2} ⇒ {(on ? "ON" : "OFF")}"
+		string message = $"[kbd] 宝龙达 30 系：开关状态=亮度（EC 0x1807=0x{value:X2} ⇒ {(on ? "ON" : "OFF")}）"
 			+ (on ? "" : "（⛔ 忽略 WMI16=2 的“开”）");
 		if (Logger.TryMarkChanged("kbd30-ec-power", message))
 		{
@@ -3831,8 +3919,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// ⭐ 2026-10-19（30 系只读诊断）：每进程一次 raw OutData 探测（⛔ 不写任何字节）✅
 		ProbeKeyboardRawOnce(wmi);
-		// ⭐ 2026-10-19（追踪「谁把开关/亮度改回开」）：只在 Gen30 **且宝龙达**才打（⛔ 不刷别的机型）✅
-		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
+		// ⭐ 2026-10-19（追踪「谁把开关/亮度改回开」）：只在宝龙达 30/40 系才打（⛔ 不刷别的机型）✅
+		if (UsesBaolongda && (DgpuGeneration == DgpuGenerationKind.Gen30 || DgpuGeneration == DgpuGenerationKind.Gen40))
 		{
 			Logger.WriteError($"[kbd-trace] TrySetKeyboardLightingViaBackend(on={on} · level={brightness0to3} · mode={mode})"
 				+ $" · 电源镜像={(KeyboardPower ? "开" : "关")} ← 调用链={DescribeCallChain(3)}");
@@ -3889,6 +3977,39 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 						+ $" · 回读={(ecOffReadback >= 0 ? "0x" + ecOffReadback.ToString("X2") : "读不到")}"
 						+ $" · WMI18={(ecOffWmi18 >= 0 ? ecOffWmi18.ToString() : "读不到")}"
 						+ " · ③ ⚠️ 灯是否真的灭了 —— **我们测不到，需目视确认** ⚠️");
+					LogKeyboardLightingState(wmi, "关灯后");
+					return true;
+				}
+				if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
+				{
+					// ⭐⭐ 2026-10-19（宝龙达 40 系：状态=亮度）：关灯 = WMI18=0；先记忆关灯前档位 ✅
+					int priorLevel = -1;
+					if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte prior18) && prior18 != 255 && prior18 > 0)
+					{
+						priorLevel = Math.Clamp((int)prior18, 1, EffectiveKeyboardBrightnessMax());
+						KeyboardEcBrightness.RememberCurrentLevel(priorLevel);
+					}
+					LogKeyboardLightingState(wmi, "关灯前");
+					bool wrote = wmi.TrySetKeyboardBrightness(0);
+					bool readOk = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte read18) && read18 != 255;
+					bool offOk = wrote && readOk && read18 == 0;
+					confirmed = offOk;
+					if (offOk)
+					{
+						RecordKeyboardBrightnessApplied(0);
+					}
+					else
+					{
+						RecordAppliedKeyboardBrightness(wmi, requestedLevel: 0);
+					}
+					if (TryReadKeyboardPowerFromWmi18(out bool wmi18On, out int wmi18Level))
+					{
+						TraceKeyboardPowerWrite(wmi18On, "40系关灯后-WMI18回读");
+						KeyboardPower = wmi18On;
+					}
+					Logger.WriteError($"[kbd] 宝龙达 40 系关灯：WMI18=0（写={(wrote ? "ok" : "失败")}"
+						+ $" · 回读={(readOk ? read18.ToString() : "读不到")}）· 记忆档位={KeyboardEcBrightness.GetLastLevel()}"
+						+ $" ⇒ {(offOk ? "成功" : "失败（不重试，如实报告；若固件忽略 18=0 则本机无真正关灯手段）")}");
 					LogKeyboardLightingState(wmi, "关灯后");
 					return true;
 				}
@@ -4003,6 +4124,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			bool brightOk;
 			bool ecBrightnessUsed = false;
 			bool ecBrightnessOk = false;
+			bool wmi18BrightnessUsed = false;
+			bool wmi18BrightnessOk = false;
 			int ecBrightnessReadback = -1;
 			int ecBrightnessWmi18 = -1;
 			if (kbGen == DgpuGenerationKind.Gen30 && UsesBaolongda)
@@ -4038,6 +4161,40 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					+ $" · WMI18={(ecBrightnessWmi18 >= 0 ? ecBrightnessWmi18.ToString() : "读不到")}"
 					+ $" ⇒ {(ecBrightnessOk ? "成功" : "失败（不重试）")}");
 			}
+			else if (kbGen == DgpuGenerationKind.Gen40 && UsesBaolongda)
+			{
+				// ⭐⭐ 2026-10-19（宝龙达 40 系：状态=亮度）：WMI18 是唯一状态源；
+				//   当前 18==0（关灯）⇒ 用 `kbd_last_brightness`（默认 3，clamp 到本机上限）开灯 ✅
+				wmi18BrightnessUsed = true;
+				int targetLevel = level;
+				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte current18) && current18 == 0)
+				{
+					int rememberedLevel = Math.Clamp(KeyboardEcBrightness.GetLastLevel(), 1, EffectiveKeyboardBrightnessMax());
+					if (rememberedLevel != targetLevel)
+					{
+						Logger.WriteError($"[kbd] 宝龙达 40 系开灯：WMI18=0 ⇒ 用上次亮度记忆={rememberedLevel}（请求档位={targetLevel}）");
+						targetLevel = rememberedLevel;
+					}
+				}
+				targetLevel = Math.Clamp(targetLevel, 1, EffectiveKeyboardBrightnessMax());
+				bool wrote = wmi.TrySetKeyboardBrightness((byte)targetLevel);
+				int readback = ReadKeyboardBrightnessAfterWrite(wmi, (byte)targetLevel, attempts: 3, delayMs: 60);
+				wmi18BrightnessOk = wrote && readback == targetLevel;
+				brightOk = wmi18BrightnessOk;
+				level = (byte)targetLevel;
+				if (wmi18BrightnessOk)
+				{
+					KeyboardEcBrightness.RememberCurrentLevel(targetLevel);
+				}
+				if (TryReadKeyboardPowerFromWmi18(out bool wmi18On, out int wmi18Level))
+				{
+					TraceKeyboardPowerWrite(wmi18On, "40系亮度路径后-WMI18回读");
+					KeyboardPower = wmi18On;
+				}
+				Logger.WriteError($"[kbd] 宝龙达 40 系亮度：档位={targetLevel} ⇒ WMI18 写={(wrote ? "ok" : "失败")}"
+					+ $" · 回读={(readback < 0 ? "读不到" : readback.ToString())} · 记忆={KeyboardEcBrightness.GetLastLevel()}"
+					+ $" ⇒ {(wmi18BrightnessOk ? "成功" : "失败（不重试，如实报告）")}");
+			}
 			else
 			{
 				bool brightKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte curBright);
@@ -4069,7 +4226,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			// ⭐⭐ 回读：⭐ 逐值比对（⭐ 旧代码只判"非 0 ＝ 开" ⇒ ⭐ 选自动循环/自定义时会误判成功 ❌）
 			bool modeMatch = TryConfirmModeExact(wmi, mode);
-			bool brightMatch = ecBrightnessUsed ? ecBrightnessOk : TryConfirmKeyboardBrightness(wmi, level);
+			bool brightMatch = ecBrightnessUsed
+				? ecBrightnessOk
+				: (wmi18BrightnessUsed ? wmi18BrightnessOk : TryConfirmKeyboardBrightness(wmi, level));
 			confirmed = modeMatch && brightMatch;
 			// ⭐⭐ 2026-10-19（机主：「拖到最大没反应/回弹」）：
 			//   ⭐ 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
@@ -4077,6 +4236,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			if (ecBrightnessUsed && ecBrightnessOk)
 			{
 				// ⭐ 30 系 EC 写成功：UI 直接显示目标档位（EC 回读已校验，⛔ 不用 WMI18 的旧值冒充）✅
+				RecordKeyboardBrightnessApplied(level);
+			}
+			else if (wmi18BrightnessUsed && wmi18BrightnessOk)
+			{
+				// ⭐ 40 系 WMI18 写成功且回读一致：UI 显示目标档位 ✅
 				RecordKeyboardBrightnessApplied(level);
 			}
 			else
@@ -8905,9 +9069,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text6 = o["powerStatus"]?.ToString();
 		if (text6 != null)
 		{
-			// ⭐ 2026-10-19（单源状态机）：30 系宝龙达的电源镜像**只允许**由 EC 0x1807 回读/用户显式开关写入；
+			// ⭐ 2026-10-19（单源状态机）：宝龙达 30/40 系的电源镜像**只允许**由亮度回读/用户显式开关写入；
 			//   ⛔ GCU payload（powerStatus）不得再改它 ✅
-			if (!(UsesBaolongda && DgpuGeneration == DgpuGenerationKind.Gen30))
+			if (!(UsesBaolongda && (DgpuGeneration == DgpuGenerationKind.Gen30 || DgpuGeneration == DgpuGenerationKind.Gen40)))
 			{
 				bool gcuKeyboardOn = text6 == "On";
 				TraceKeyboardPowerWrite(gcuKeyboardOn, "GCU payload 解析(powerStatus)");

@@ -4662,18 +4662,21 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardBrightnessPreservingEffect(int level0to4)
 	{
-		// ⭐⭐ 2026-10-19（机主：调亮度后再关灯，按钮会自己开）：Gen30 宝龙达且**用户意图=关** ⇒
-		//   ⛔ 直接跳过（不写亮度、⛔ 不把 EC 0x1807 写成非 0、⛔ 不改电源镜像）✅
-		if (_hw != null && _hw.UsesBaolongda && _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30)
+		// ⭐⭐ 2026-10-19（机主：调亮度后再关灯，按钮会自己开）：宝龙达 30/40 系且**当前=关** ⇒
+		//   ⛔ 直接跳过（不写亮度、⛔ 不把亮度写成非 0、⛔ 不改电源镜像）✅
+		if (_hw != null && _hw.UsesBaolongda
+			&& (_hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
+				|| _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40))
 		{
 			bool intentOn = _hw.KeyboardPower;
-			if (!intentOn && _hw.TryReadKeyboardPowerFromEc(out bool ecOn, out int _))
+			if (!intentOn && _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
+				&& _hw.TryReadKeyboardPowerFromEc(out bool ecOn, out int _))
 			{
 				intentOn = ecOn;
 			}
 			if (!intentOn)
 			{
-				Logger.WriteError("[kbd] 跳过保持亮度：用户意图=关灯 ⇒ 不写亮度（⛔ 不点亮）");
+				Logger.WriteError("[kbd] 跳过保持亮度：当前=关灯 ⇒ 不写亮度（⛔ 不点亮）");
 				return Task.FromResult(result: true);
 			}
 		}
@@ -5188,9 +5191,10 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		if (_hw != null && _hw.UsesBaolongda)
 		{
 			// ⭐⭐ 2026-10-19（机主：开关直接跟亮度走 + 关灯记忆上次亮度）：
-			//   Gen30 开灯 ⇒ 用 `kbd_last_brightness`（默认 3）；关灯 ⇒ 0（由 EC 写 0x00）✅
-			bool gen30Baolongda = _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
-			int powerOnLight = gen30Baolongda ? KeyboardEcBrightness.GetLastLevel() : 4;
+			//   宝龙达 30/40 开灯 ⇒ 用 `kbd_last_brightness`（默认 3）；关灯 ⇒ 0 ✅
+			bool baolongdaBrightnessModel = _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
+				|| _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+			int powerOnLight = baolongdaBrightnessModel ? KeyboardEcBrightness.GetLastLevel() : 4;
 			return SetKeyboardEffect(on ? "Single" : "Off", on ? powerOnLight : 0);
 		}
 		// 2026-10-09（kbdctrl）：开关打开时开关灯也走新的 Keyboard/Ctrl 链路；关闭时逐字走原路径。

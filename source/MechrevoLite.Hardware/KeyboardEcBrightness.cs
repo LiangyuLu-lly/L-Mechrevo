@@ -43,8 +43,8 @@ internal static class KeyboardEcBrightness
 		return Math.Clamp(AppConfig.Get(LastBrightnessKey, 3), 1, 3);
 	}
 
-	/// <summary>⭐ 记忆亮度档位（只接受 1..3；⛔ 0 不算"上次亮度"）✅。</summary>
-	private static void RememberLevel(int level)
+	/// <summary>⭐ 记忆亮度档位（只接受 1..3；⛔ 0 不算"上次亮度"；30/40 系宝龙达共用）✅。</summary>
+	internal static void RememberCurrentLevel(int level)
 	{
 		if (level >= 1 && level <= 3)
 		{
@@ -106,7 +106,7 @@ internal static class KeyboardEcBrightness
 			readback = current;
 			if (level > 0)
 			{
-				RememberLevel(level);
+				RememberCurrentLevel(level);
 				LogOn(level, target);
 			}
 			LogVisible("kbd-ec-already-" + level,
@@ -148,7 +148,7 @@ internal static class KeyboardEcBrightness
 		{
 			if (level > 0)
 			{
-				RememberLevel(level);
+				RememberCurrentLevel(level);
 				LogOn(level, target);
 			}
 			LogVisible("kbd-ec-ok-" + level + "-" + via,
@@ -190,7 +190,7 @@ internal static class KeyboardEcBrightness
 			if (currentLevel > 0)
 			{
 				remembered = currentLevel;
-				RememberLevel(currentLevel);
+				RememberCurrentLevel(currentLevel);
 			}
 		}
 		if (!TrySetLevel(0, wmi, out readback, out wmi18, source))
