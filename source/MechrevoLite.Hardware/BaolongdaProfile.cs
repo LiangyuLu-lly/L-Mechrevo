@@ -53,8 +53,33 @@ internal static class BaolongdaProfile
 	/// </summary>
 	internal const int FanPercentDenominatorRpm = 6000;
 
-	/// <summary>⭐ 手动转速的协议上限（⭐ 功能号 21 的入参单位 = `x100 RPM` ⇒ 60 × 100 = 6000 ✅）。</summary>
-	internal const int FanManualMaxUnits100Rpm = 60;
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙口径放宽）：⭐ 手动转速的**档位上限**（⭐ 功能号 21 的入参单位
+	/// = `x100 RPM`）⇒ **68 × 100 = 6800 RPM** ✅。
+	/// <para>⭐ 依据：参考自 **JiaolongControl (MIT)** 的 `MAX_FAN_BYTE = 68`（68 × 100 = 6800 RPM），
+	/// ⭐ 只取这个**数值事实**，⛔ 未复制代码 ✅。</para>
+	/// <para>⚠️ 只放宽上限，⛔ **不改"永不写超协议字节范围"的原则**（功能号 21 的 InData 是 byte ⇒ ≤255）✅；
+	/// ⭐ 实际能不能到 68 仍**以功能号 13 回读为准**（被固件夹回就把实测值当本机上限）✅。</para>
+	/// </summary>
+	internal const int FanManualMaxUnits100Rpm = 68;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙做法加 RPM 斜坡）：⭐ 曲线闭环**涨**速上限 = **800 RPM/s** ✅。
+	/// <para>⭐ 来源：参考自 **JiaolongControl (MIT)** 的 `MaxRampUpRpmPerSec = 800.0`
+	/// —— ⭐ 仅取**数值与"按 tick 限速"的思路**，⛔ 未复制代码 ✅。</para>
+	/// <para>⭐ 换算：每 tick 最多涨 `800 × tick秒 ÷ 100` 档（3 s tick ⇒ **24 档**）；
+	/// ⭐ 强冷**不走斜坡**（用户要立刻狂转）✅。</para>
+	/// </summary>
+	internal const int FanCurveRampUpRpmPerSec = 800;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙做法加 RPM 斜坡）：⭐ 曲线闭环**降**速上限 = **150 RPM/s** ✅。
+	/// <para>⭐ 来源：参考自 **JiaolongControl (MIT)** 的 `MaxRampDownRpmPerSec = 150.0`
+	/// —— ⭐ 仅取**数值与"按 tick 限速"的思路**，⛔ 未复制代码 ✅。</para>
+	/// <para>⭐ 换算：每 tick 最多降 `150 × tick秒 ÷ 100` 档（3 s tick ⇒ 4 档，⭐ 取整**保守**）；
+	/// ⭐ 降得慢是为防抖/护噪音 ✅。</para>
+	/// </summary>
+	internal const int FanCurveRampDownRpmPerSec = 150;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 30 系**真实满转档位** = **49**（⭐ 4900 RPM ✅）。

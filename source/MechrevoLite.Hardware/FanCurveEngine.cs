@@ -45,10 +45,12 @@ internal static class FanCurveEngine
 
 	/// <summary>
 	/// ⭐⭐ 协议档位上限（⭐ `RPM/100` 要装进一个 byte ⚠️）。
-	/// <para>⭐ 我们**既有实现**把档位夹到 <c>0..60</c>（⭐ 即 6000 RPM ✅）⇒ ⭐ 本常量与它**逐位一致** ✅
-	/// （⭐ ⛔ 不引入新的猜想 ⚠️）。</para>
+	/// <para>⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙放宽）：⭐ 上限由 60 放宽到 **68**（68 × 100 = 6800 RPM）✅
+	/// —— ⭐ 与 <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> **同一条事实来源** ✅
+	/// （⭐ 参考自 JiaolongControl (MIT) 的 `MAX_FAN_BYTE = 68`，⛔ 未复制代码）。</para>
+	/// <para>⚠️ 仍远小于 byte 上限 255；⭐ 实际能否到 68 **以功能号 13 回读为准** ✅。</para>
 	/// </summary>
-	internal const int ProtocolMaxUnits100Rpm = 60;
+	internal const int ProtocolMaxUnits100Rpm = BaolongdaProfile.FanManualMaxUnits100Rpm;
 
 	/// <summary>⭐ 协议上限对应的 RPM ✅。</summary>
 	internal const int ProtocolMaxRpm = ProtocolMaxUnits100Rpm * 100;

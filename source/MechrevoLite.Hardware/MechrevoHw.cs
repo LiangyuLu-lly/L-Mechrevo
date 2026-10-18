@@ -3947,8 +3947,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//     · 显示：四舍五入成**整数**百分比（`33%`）✅
 	//  真机对照（40 系 `MRID6-23` / 4070）：官方 1965 RPM ⇒ **33%**（1965 ÷ 6000 = 32.75 ✅）。
 	//
-	//  ⭐ 6000 不是猜的：功能号 21 的**写**口径是 `x100 RPM`、协议上限 60
-	//    （原厂手动转速范围 22~58 ⇒ 2200~5800 RPM）⇒ 60 × 100 = 6000 就是这套编码的满刻度 ✅。
+	//  ⭐ 6000 不是猜的：功能号 21 的**写**口径是 `x100 RPM`、分母 60（原厂 40 系百分比口径）
+	//    （原厂手动转速范围 22~58 ⇒ 2200~5800 RPM）⇒ 60 × 100 = 6000 就是 **40 系百分比**的满刻度 ✅。
+	//    ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙放宽）：⭐ 功能号 21 的**写入档位上限**已从 60 放宽到
+	//    <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> = **68**（6800 RPM，⭐ 参考 JiaolongControl (MIT)
+	//    的 `MAX_FAN_BYTE`，⛔ 未复制代码）—— ⚠️ 但**百分比分母不变**（40 系 6000 / 30 系 3500）✅
 	//
 	//  ⚠️⚠️ **为什么不再读功能号 21**：原厂把它当**手动转速设定值**用 ——
 	//    读回来的就是"上次写下去的那个值"（用来回显/定位手动滑块），⛔ 从来不是"最大转速"。
@@ -3982,7 +3985,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <para>⭐ 依据：原厂 30 系 `percent = Item1 / 35f` ⇒ 4900 RPM = 140%，**官方允许显示**；
 	/// 40 系同样按 140% 封顶（⛔ 不会真到 140%，只是留出显示余量）✅</para>
 	/// <para>⚠️ 这是**显示层**的安全上限：⛔ 不影响功能号 20/21 的任何下发值
-	/// （⭐ 下发上限仍是 <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> = 60）✅</para>
+	/// （⭐ 下发档位上限见 <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> = **68**，⭐ 6800 RPM ✅）</para>
 	/// <para>⚠️ 旧显示层 `Math.Min(100, …)` ⇒ 30 系 4900 RPM 只显示 100%，比官方少一截 ❌</para>
 	/// </summary>
 	internal const int BaolongdaFanPercentDisplayMax = 140;
@@ -4097,7 +4100,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⇒ ⭐ 因此额外保险：
 	/// ⭐ ① ⭐ **按参考实现的顺序**：⭐ **先开该通道手动开关（20=[fanType,1]）→ 再写目标（21）** ✅
 	/// （⭐ 旧代码先写 21 再写 20，且 20 只写了一个字节 ⇒ 手动接管从未开启 ⚠️）；
-	/// ⭐ ② ⭐ 转数夹在 ⭐ `[0, 60]`（⭐ 即 **0~6000 RPM** ✅）—— ⭐ 保守上限，⛔ 不让人手滑写爆 ✅；
+	/// ⭐ ② ⭐ 档位夹在 ⭐ `[0, 68]`（⭐ 即 **0~6800 RPM** ✅ —— 上限 68 参考自开源蛟龙(MIT)，⭐ 实际以 13 回读为准 ⚠️）—— ⭐ 保守上限，⛔ 不让人手滑写爆 ✅；
 	/// ⭐ ③ ⭐ `enable=false` 时 ⭐ **先关两通道手动开关并回读确认，再把 21 归零**（⭐ 交回固件自动控制 ✅，
 	/// ⛔ 顺序反过来会在手动仍开时把风扇写到 0 ⚠️）。</para>
 	/// <para>⚠️ <b>通道归属</b>：⭐ 按参考实现（蛟龙16Pro）⭐ `FanType=0` = ⭐ **大扇/GPU** ·
@@ -4162,7 +4165,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//     40 系 100% = 6000 RPM ✅
 			//   ⚠️ 旧实现按曲线存档 `MaxRpm` 换算（30 系默认 3500）⇒ 强冷只到 100%，比官方少一截 ❌
 			//   ⭐ 现在：代际真实基准（30 系 49 = 4900 / 40 系 60 = 6000）与曲线存档取**较大者**，
-			//     再夹到协议上限 60（⛔ 永不写 >60）✅
+			//     再夹到协议档位上限 **68**（⭐ 6800 RPM；⛔ 永不写 >68，⛔ 永不超 byte 范围）✅
 			int maxRpm = 4200;
 			try
 			{
@@ -4754,6 +4757,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private static double _baolongdaFanCurveSmoothedCpuTemp = double.NaN;
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙做法加 RPM 斜坡）：⭐ 曲线闭环**已下发的档位**
+	/// （x100RPM；<c>-1</c> = 未初始化）。
+	/// <para>⭐ 每 tick 只允许向目标靠拢：**涨 ≤24 档 / 降 ≤4 档**（3 s tick · 800/150 RPM/s）✅</para>
+	/// <para>⭐ 来源：参考自 <b>JiaolongControl (MIT)</b> 的 `MaxRampUp/DownRpmPerSec` 与
+	/// `CurrentSpeedByte` 做法 —— ⭐ 仅取**数值与斜坡思路**，⛔ 未复制代码 ✅。</para>
+	/// <para>⚠️ 强冷/交回固件会复位成 <c>-1</c> ⇒ ⭐ 下次曲线**首帧直接跟随目标**（⛔ 不从旧值/0 慢慢爬）✅</para>
+	/// </summary>
+	private static int _fanCurveRampCh0Units = -1;
+
+	private static int _fanCurveRampCh1Units = -1;
+
+	/// <summary>
 	/// ⭐⭐ 温度**平滑**（⭐ 参考自 开源蛟龙(MIT) `AutoFanControl` 的 AlphaUp/AlphaDown 做法，⛔ 未复制代码）✅
 	/// <para>⭐ 上升 α=0.5、下降 α=0.2：⭐ 升温**跟得快**（散热优先）、⭐ 降温**走得慢**（防抖、护噪音）✅</para>
 	/// <para>⚠️ 温度读不到（≤0）时 ⭐ **不**把它当作"温度很低"喂给平滑器 ✅（⛔ 一次读失败就把风扇拉到底）：
@@ -4777,11 +4792,40 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		return (int)Math.Round(smoothedTempC, MidpointRounding.AwayFromZero);
 	}
 
-	/// <summary>⭐ 清零两路平滑温度（⭐ 强冷前后 / 交回固件时用 ⇒ 恢复闭环后从真实温度重新收敛 ✅）。</summary>
+	/// <summary>⭐ 清零两路平滑温度 + 斜坡状态（⭐ 强冷前后 / 交回固件时用 ⇒ 恢复闭环后从真实温度/目标重新收敛 ✅）。</summary>
 	private static void ResetBaolongdaFanCurveSmoothing()
 	{
 		_baolongdaFanCurveSmoothedGpuTemp = double.NaN;
 		_baolongdaFanCurveSmoothedCpuTemp = double.NaN;
+		// ⭐ 斜坡状态也归零 ⇒ 下次曲线首帧直接跟随目标（⛔ 不从强冷满转慢慢降）✅
+		_fanCurveRampCh0Units = -1;
+		_fanCurveRampCh1Units = -1;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙做法加 RPM 斜坡）：⭐ 单通道**限速靠拢** ✅。
+	/// <para>⭐ <paramref name="state" /> = 上次下发档位（x100RPM，<c>-1</c> = 未初始化）；
+	/// ⭐ 返回**本次应下发档位**（⛔ 不直接返回目标 ⇒ 由调用方写下去）✅。</para>
+	/// <para>⭐ 首帧（<c>-1</c>）⇒ **直接跟随目标**（⭐ 与 JiaolongControl 的 `CurrentSpeedByte &lt; 0` 处理一致，
+	/// ⛔ 不从 0 慢慢爬）✅</para>
+	/// </summary>
+	private static int RampFanUnitsToward(ref int state, int targetUnits, int maxUpUnits, int maxDownUnits)
+	{
+		if (state < 0)
+		{
+			state = targetUnits;
+			return state;
+		}
+		int diff = targetUnits - state;
+		if (diff > 0)
+		{
+			state += Math.Max(0, Math.Min(diff, maxUpUnits));
+		}
+		else if (diff < 0)
+		{
+			state -= Math.Max(0, Math.Min(-diff, maxDownUnits));
+		}
+		return state;
 	}
 
 	/// <summary>⭐ 软件闭环当前是否已接管风扇（⭐ 用于"退出/关闭时交回固件" ✅）。</summary>
@@ -4901,12 +4945,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			int? decided1 = _baolongdaCurveDecider1.Decide(channel1Points, cpuTempSmooth, settings.MinRpm, settings.MaxRpm, settings.HysteresisC);
 			long nowTick = Environment.TickCount64;
 			bool reassertDue = (nowTick - _baolongdaCurveLastWriteTick) >= BaolongdaCurveReassertMs;
-			if (!decided0.HasValue && !decided1.HasValue && !reassertDue)
-			{
-				// ⭐ 两条通路都没变 ⇒ **本轮一个字节都不写**（⭐ 这是原先缺的那层防抖 ✅）
-				return false;
-			}
 			// ⭐ 没变的那一路用决策器记着的**上次落笔值**（⛔ 不用 ResolveRpm 重算，否则绕过回差 ✅）
+			//   ⚠️ 2026-10-18：这里**不再**因为"两条通路都没变"就提前 return —— ⭐ 斜坡可能还在向目标靠拢，
+			//   必须等**下发档位也到目标**之后才允许跳（⭐ 否则第一 tick 之后斜坡就永远停住 ⚠️）✅
 			int channel0Rpm = decided0 ?? _baolongdaCurveDecider0.LastRpm;
 			int channel1Rpm = decided1 ?? _baolongdaCurveDecider1.LastRpm;
 			// ⭐⭐ 2026-10-19（双风扇 0.85 联动 · 参考自 开源蛟龙(MIT) `AutoFanControl` 的
@@ -4921,22 +4962,43 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				channel0Rpm = Math.Max(channel0RpmBeforeSync, (int)(channel1RpmBeforeSync * BaolongdaFanCurveSyncRatio));
 				channel1Rpm = Math.Max(channel1RpmBeforeSync, (int)(channel0RpmBeforeSync * BaolongdaFanCurveSyncRatio));
 			}
-			// ⭐⭐ 抬升后**仍要按各通道满转夹紧** ✅（40 系 6000 / 30 系 3500；非宝龙达/读不到则退回协议上限）
-			int fullRpm = FanRpmMaxForPercent;
-			if (fullRpm <= 0)
-			{
-				fullRpm = FanCurveEngine.ProtocolMaxRpm;
-			}
+			// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙放宽 + 加 RPM 斜坡）：
+			//   ① 目标档上限不再按"百分比分母"夹（30 系 3500 只是 100% 的分母），而是按**协议档位上限**
+			//      （68 = 6800 RPM；⭐ 实际能用多少**以功能号 13 回读为准**）✅
+			//   ② 真正下发的值按**斜坡**向目标靠拢：涨 ≤800 RPM/s、降 ≤150 RPM/s（1 档 = 100 RPM）⇒
+			//      3 s tick ⇒ 最多涨 24 档、最多降 4 档（取整**保守**）✅
+			//   ③ 强冷**不走斜坡**（用户要立刻狂转，见 `TrySetFanBoostViaBackend`）✅
+			//   ⭐ 参考自 **JiaolongControl (MIT)** 的 `MaxRampUp/DownRpmPerSec` 思路，⛔ 未复制代码 ✅
+			int fullRpm = BaolongdaProfile.FanManualMaxUnits100Rpm * 100;
 			channel0Rpm = Math.Clamp(channel0Rpm, 0, fullRpm);
 			channel1Rpm = Math.Clamp(channel1Rpm, 0, fullRpm);
 			int channel0Units = FanCurveEngine.ToUnits100Rpm(channel0Rpm);
 			int channel1Units = FanCurveEngine.ToUnits100Rpm(channel1Rpm);
+			// ⭐ 按本 tick 间隔换算斜坡档位增量（⭐ 向下取整 = 保守；⛔ 至少 0）✅
+			int rampIntervalMs = (settings.IntervalMs > 0) ? settings.IntervalMs : LegacyRefreshIntervalMs;
+			int maxUpUnits = Math.Max(0, (int)((long)BaolongdaProfile.FanCurveRampUpRpmPerSec * rampIntervalMs / 1000L / 100L));
+			int maxDownUnits = Math.Max(0, (int)((long)BaolongdaProfile.FanCurveRampDownRpmPerSec * rampIntervalMs / 1000L / 100L));
+			int sentUnits0 = RampFanUnitsToward(ref _fanCurveRampCh0Units, channel0Units, maxUpUnits, maxDownUnits);
+			int sentUnits1 = RampFanUnitsToward(ref _fanCurveRampCh1Units, channel1Units, maxUpUnits, maxDownUnits);
+			// ⭐ 日志（⭐ 仅当斜坡**限制了**本 tick 的下发值时记一行；`WriteLineIfChanged` 去重 ⛔ 不刷屏）✅
+			if (sentUnits0 != channel0Units || sentUnits1 != channel1Units)
+			{
+				Logger.WriteLineIfChanged("baolongda-fancurve-ramp",
+					$"[fan] 曲线：目标 cpu={channel1Rpm} gpu={channel0Rpm} RPM → 下发 cpu={sentUnits1 * 100} gpu={sentUnits0 * 100} RPM"
+					+ $"（斜坡 +{BaolongdaProfile.FanCurveRampUpRpmPerSec}/s · -{BaolongdaProfile.FanCurveRampDownRpmPerSec}/s 限制）");
+			}
+			// ⚠️ 决策器没给新目标、也没到 30 s 重申、且斜坡已到位 ⇒ ⭐ 本轮**一个字节都不写**（原防抖行为）✅
+			bool rampPending = (sentUnits0 != channel0Units) || (sentUnits1 != channel1Units);
+			if (!decided0.HasValue && !decided1.HasValue && !reassertDue && !rampPending)
+			{
+				return false;
+			}
 			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致 ✅
 			//    ⭐ ch0 = `FanType 0`（GPU）· ⭐ ch1 = `FanType 1`（CPU）✅
-			// ⭐⭐ 2026-10-19（机主要求：减少写入次数）：⭐ **差异比较** —— 目标档位与上次已写相同、
+			// ⭐⭐ 2026-10-19（机主要求：减少写入次数）：⭐ **差异比较** —— 下发档位与上次已写相同、
 			//   且手动开关仍为「开」⇒ ⭐ 本轮**不写**（只读一次功能号 20 确认状态，然后 return）✅
 			//   ⚠️ 每 30 秒**强制重写一次**（防固件静默丢状态）；⚠️ 强冷/开关变化会清空缓存 ⇒ 下一轮必写 ✅
-			bool sameAsLast = _fanCurveLastCh0 == channel0Units && _fanCurveLastCh1 == channel1Units;
+			bool sameAsLast = _fanCurveLastCh0 == sentUnits0 && _fanCurveLastCh1 == sentUnits1;
 			long curveTick = Environment.TickCount64;
 			bool forceRewrite = curveTick - _fanCurveLastWriteTick >= FanCurveForceRewriteMs;
 			if (sameAsLast && !forceRewrite)
@@ -4948,7 +5010,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				if (manualReadOk && stillCh0On && stillCh1On)
 				{
 					Logger.WriteLineIfChanged("baolongda-fancurve-skip-same",
-						$"[fan] 曲线：目标未变（cpu={channel1Units} gpu={channel0Units} x100RPM）且 20 回读=1/1 ⇒ ⛔ 本轮不写");
+						$"[fan] 曲线：下发值未变（cpu={sentUnits1} gpu={sentUnits0} x100RPM）且 20 回读=1/1 ⇒ ⛔ 本轮不写");
 					return true;
 				}
 				string lost = manualReadOk
@@ -4957,11 +5019,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteLineIfChanged("baolongda-fancurve-manual-lost",
 					$"[fan] 曲线：⚠️ {lost} ⇒ 手动接管丢了（固件重置/外部改动？）⇒ 本轮强制重写");
 			}
-			bool handled = TrySetFanManualViaBackend(enable: true, channel0Units, channel1Units, out bool confirmed);
+			bool handled = TrySetFanManualViaBackend(enable: true, sentUnits0, sentUnits1, out bool confirmed);
 			if (handled)
 			{
-				_fanCurveLastCh0 = channel0Units;
-				_fanCurveLastCh1 = channel1Units;
+				_fanCurveLastCh0 = sentUnits0;
+				_fanCurveLastCh1 = sentUnits1;
 				_fanCurveLastWriteTick = Environment.TickCount64;
 			}
 			// ⭐ 2026-10-18（日志自证）：⭐ 写完读一次 13（实际转速，⭐ 有机械延迟）⇒ ⭐ 一眼看出"写了到底转没转" ✅
@@ -4980,8 +5042,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				$"[fan] 曲线：cpu={cpuTemp}℃/gpu={gpuTemp}℃（平滑 cpu={cpuTempSmooth}/gpu={gpuTempSmooth}）"
 				+ $" → rpm cpu={channel1RpmBeforeSync} gpu={channel0RpmBeforeSync}"
 				+ $"（联动后 cpu={channel1Rpm} gpu={channel0Rpm}）"
-				+ $" → 写 20=1 + 21=(0,{channel0Units})/(1,{channel1Units}) ok={confirmed}"
-				+ $" · 档位 cpu={channel1Units} gpu={channel0Units}"
+				+ $" → 写 20=1 + 21=(0,{sentUnits0})/(1,{sentUnits1}) ok={confirmed}"
+				+ $" · 档位 cpu={sentUnits1} gpu={sentUnits0}"
+				+ (rampPending ? $"（斜坡中，目标 cpu={channel1Units} gpu={channel0Units}）" : "")
 				+ $" · 13={(rpmReadOk ? nowFirstRpm + "/" + nowSecondRpm : "读不到")} RPM（有延迟）"
 				+ (settings.SyncEnabled ? "" : " · 联动=关")
 				+ (reassertDue && !decided0.HasValue && !decided1.HasValue ? " · 仅重申" : ""));
