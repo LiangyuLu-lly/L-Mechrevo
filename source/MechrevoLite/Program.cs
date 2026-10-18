@@ -329,6 +329,24 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-19（30 系「FN 调亮度」· EC 取证工具）：
+		//   用法：L-Mechrevo.exe --kbd-ec-probe [秒数，默认 60]
+		//   ⭐ **只读**扫描 EC RAM（0x8300–0x84FF / 0x1000–0x10FF / 0x07B0–0x07FF），
+		//     每 200~300ms 一轮、只记录**变化的地址** ⇒ 请机主按 Fn 调亮/调暗各 3~5 次；
+		//   ⛔ 0 写入（仅 EcPortIo.TryReadBytes；不碰 WMI 写）；平台闸：仅宝龙达 30/40 系 ✅
+		case "--kbd-ec-probe":
+		{
+			int ecProbeSeconds = 60;
+			if (args.Length > 1 && int.TryParse(args[1], out int parsedEcSeconds))
+			{
+				ecProbeSeconds = Math.Clamp(parsedEcSeconds, 10, 300);
+			}
+			string ecProbeLog = KeyboardEcProbe.Run(ecProbeSeconds);
+			Console.WriteLine(ecProbeLog);
+			Logger.WriteLine("[kbd-ec-probe] " + ecProbeLog);
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-19（宝龙达 · GPU 核心/显存偏移）：NVAPI P-States 20 真机探针。
 		//   用法：L-Mechrevo.exe --gpu-oc-probe
 		//   读 P0 基线 → 核心/显存各 +50 → 回读 → 各 +100 → 回读 → 归零 → 回读；
