@@ -2471,6 +2471,7 @@ begin
   if Result = '' then Result := '(读不到)';
 end;
 function ShouldInstallPawnIo(): Boolean; forward;
+function IsBaolongdaMold(): Boolean; forward;
 
 procedure CurPageChanged(CurPageID: Integer);
 // 2026-10-18（机主：每次装 LM 都会看到 PawnIO 勾选）：已安装 PawnIO 时，任务页里自动取消并改写该项，
