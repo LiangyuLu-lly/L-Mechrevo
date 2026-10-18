@@ -102,57 +102,34 @@ internal static class FanEcTest
 				bool ec81Ok = RunEc81Experiment(L);
 				return ec81Ok ? 0 : 1;
 			}
-			if (!lpcIdentity && !acpiIdentity)
+			// ⭐⭐ 2026-10-18（机主双报告 · OpenRevo 强锁实测）：⭐ 默认流程直接按 OpenRevo 顺序：
+			//   ACPI 写 0xC83C/0xC83D → 读 0xB20 → 写 0xB20|0x02|0x08 → 2 s → ACPI 稳定读验证；
+			//   ⚠️ `0x1060` 解锁改为 **best-effort**（OpenRevo 强锁时 0x1060=0x00 也生效，失败不中止）；
+			//   ⚠️ LPC 通道**只作对照**（不参与判定/写入；报告 1 里 LPC 读可能陈旧）。
+			if (!acpiIdentity)
 			{
-				L("结论：⛔ 不可用 —— 两条通道身份均未通过");
+				L("结论：⛔ 不可用 —— ACPI 身份未通过（LPC 仅对照，不参与判定）");
 				L("⛔ 本命令**未写任何 EC 字节**");
 				return 1;
 			}
 			if (forceAcpi)
 			{
-				L("⭐ `--acpi`：跳过 LPC 写测试，只测 ACPI EC 写");
+				L("⭐ `--acpi`：ACPI 已是默认写通道（本参数保留兼容，无额外作用）");
 			}
-
-			// ── ② LPC 写测试（身份通过且未强制 ACPI）──
-			if (lpcIdentity && !forceAcpi)
+			L("══ OpenRevo 顺序写验证（ACPI EC · LPC 仅对照）══");
+			bool openRevoOk = RunOpenRevoTest(L);
+			L("");
+			if (openRevoOk)
 			{
-				L("══ A. LPC/SuperIO 写测试（原通道）══");
-				bool lpcAvailable = RunLpcWriteTest(L);
-				L("");
-				if (lpcAvailable)
-				{
-					L("结论：✅ **LPC 写通路可用**");
-					exitCode = 0;
-				}
-				else
-				{
-					L("⚠️ LPC 写通路失败（ioctl 成功但 EC 不认 / 或解锁失败）⇒ **自动改试 ACPI EC 写**");
-					L("");
-				}
+				L("结论：✅ **ACPI EC 写通路可用**（0xB20 出现 bit1+bit3 且转速上升 ≥200 RPM）");
+				L("⭐ 下一步：机主回传本报告 ⇒ 接产品闭环（闸门验证入口 --fan-smu-ec-test）✅");
+				exitCode = 0;
 			}
-
-			// ── ③ ACPI 写测试（LPC 失败 / 被 --acpi 强制 / LPC 身份未通过）──
-			if (exitCode != 0)
+			else
 			{
-				if (!acpiIdentity)
-				{
-					L("结论：⛔ 不可用 —— ACPI 身份未通过，不写任何 EC 字节");
-					return 1;
-				}
-				L("══ B. ACPI EC 写测试（0x93 mailbox）══");
-				bool acpiAvailable = RunAcpiWriteTest(L);
-				L("");
-				if (acpiAvailable)
-				{
-					L("结论：✅ **ACPI EC 写通路可用**（LPC 写被 EC 拒绝，但 ACPI EC 接受）");
-					L("⭐ 下一步：机主回传本报告 ⇒ 再验 Fan2（0xC83D + bit3），然后接产品闭环 ✅");
-					exitCode = 0;
-				}
-				else
-				{
-					L("结论：⛔ **两条写通道都被拒** ⇒ 判定「本机 EC RAM 写被 BIOS 锁死」");
-					L("⇒ 按机主指示：**放弃风扇曲线/强冷**（保持 UI 隐藏），并写入交接说明 ⚠️");
-				}
+				L("结论：⛔ **写被拒/未生效** —— 见上面的两次写前后回读（0xC83C/0xC83D/0xB20）");
+				L("⚠️ 若 `0xB20` 两次回读完全相同 ⇒ EC 不接受 ACPI 0x93 写；");
+				L("   ⭐ 保留闸门关闭（UI 隐藏），把报告发回再定（不再尝试其它写花色）");
 			}
 		}
 		catch (Exception ex)
@@ -161,6 +138,162 @@ internal static class FanEcTest
 			L(ex.StackTrace ?? "");
 		}
 		return exitCode;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主双报告 · OpenRevo 顺序）：ACPI EC 写 `0xC83C/0xC83D` → 读 `0xB20` →
+	/// 写 `0xB20 | 0x02|0x08` → 等 2 s → **只用 ACPI 稳定读**验证 `0xC834/0xC835/0xB20`；
+	/// `0x1060` 解锁 **best-effort**（失败继续）；finally 恢复；LPC 仅对照 ✅。
+	/// </summary>
+	private static bool RunOpenRevoTest(Action<string> L)
+	{
+		bool wroteTargets = false;
+		bool wroteMask = false;
+		int unlockOriginal = -1;
+		bool unlockAttempted = false;
+		bool available = false;
+		try
+		{
+			// ① 基线（ACPI 稳定读；LPC 仅对照）
+			L("── ① 基线（ACPI 稳定读；LPC 仅对照，不参与判定）──");
+			if (!EcPortIo.TryReadByteStable(0xC83C, out int origFan1, out string n1))
+			{
+				L("⛔ 读 0xC83C 失败：" + n1);
+				return false;
+			}
+			if (!EcPortIo.TryReadByteStable(0xC83D, out int origFan2, out string n2))
+			{
+				L("⛔ 读 0xC83D 失败：" + n2);
+				return false;
+			}
+			if (!EcPortIo.TryReadByteStable(0xB20, out int origMask, out string nm))
+			{
+				L("⛔ 读 0xB20 失败：" + nm);
+				return false;
+			}
+			L("ACPI 0xC83C=0x" + origFan1.ToString("X2") + "（" + n1 + "）· 0xC83D=0x" + origFan2.ToString("X2")
+				+ "（" + n2 + "）· 0xB20=0x" + origMask.ToString("X2") + "（" + nm + "）");
+			bool lpc1ok = EcLpcIo.TryReadByteStable(0xC83C, out int lpc1, out _);
+			bool lpc2ok = EcLpcIo.TryReadByteStable(0xC83D, out int lpc2, out _);
+			bool lpcMok = EcLpcIo.TryReadByteStable(0xB20, out int lpcM, out _);
+			L("LPC 对照：0xC83C=" + (lpc1ok ? "0x" + lpc1.ToString("X2") : "读不到")
+				+ " · 0xC83D=" + (lpc2ok ? "0x" + lpc2.ToString("X2") : "读不到")
+				+ " · 0xB20=" + (lpcMok ? "0x" + lpcM.ToString("X2") : "读不到") + "（⚠️ 不参与判定）");
+			bool ecRpmOk = ReadEcRpmBytes(L, "ACPI 基线", acpi: true, out int ecRpmBefore);
+			int wmiBefore = ReadWmiRpm(out string wmiNote);
+			int baselineRpm = (wmiBefore >= 0) ? wmiBefore : (ecRpmOk ? ecRpmBefore : -1);
+			if (baselineRpm < 0)
+			{
+				L("⛔ 无法读基线转速（ACPI/WMI 都读不到）⇒ 不写");
+				return false;
+			}
+			int rpmUnits = Math.Clamp(baselineRpm / 100, 0, 68);
+			// ⭐ OpenRevo 顺序写“原值+5”；原值为 0（固件自动控制）时用“当前转速档+5”，避免写到更低档 ✅
+			int target = Math.Clamp(Math.Max(Math.Max(origFan1, rpmUnits) + 5, 1), 1, 68);
+			L("基线转速=" + baselineRpm + " RPM（来源=" + (wmiBefore >= 0 ? "WMI13" : "ACPI×100") + "）⇒ 目标档=" + target
+				+ "（" + (target * 100) + " RPM）");
+			L("");
+
+			// ② best-effort 解锁
+			L("── ② 解锁 0x1060（best-effort：失败不中止）──");
+			if (EcPortIo.TryReadByteStable(0x1060, out unlockOriginal, out string lockNote))
+			{
+				L("0x1060 原值=0x" + unlockOriginal.ToString("X2") + "（" + lockNote + "）");
+				if ((unlockOriginal & 0x80) == 0)
+				{
+					unlockAttempted = true;
+					bool unlocked = EcPortIo.TryUnlockEcRamAcpi(out _, out int after, out string unlockNote);
+					L("解锁尝试：" + unlockNote);
+					L(unlocked
+						? "解锁后 0x1060=0x" + after.ToString("X2")
+						: "⚠️ 解锁失败 ⇒ **继续**（实测 OpenRevo 强锁时 0x1060=0x00 也生效；解锁不是必要条件）");
+				}
+				else
+				{
+					L("已解锁（bit7=1）");
+				}
+			}
+			else
+			{
+				L("⚠️ 读 0x1060 失败（" + lockNote + "）⇒ 继续（解锁非必需）");
+			}
+			L("");
+
+			// ③ OpenRevo 顺序写
+			L("── ③ OpenRevo 顺序写（ACPI）──");
+			wroteTargets = true;
+			bool w1 = EcPortIo.TryWriteAcpiFanTarget(0xC83C, target, out int rb1);
+			L("写 0xC83C=" + target + " ⇒ ok=" + w1 + " · 回读=" + (rb1 < 0 ? "读不到" : rb1.ToString()));
+			L("  " + EcPortIo.LastAcpiWriteTrace);
+			bool w2 = EcPortIo.TryWriteAcpiFanTarget(0xC83D, target, out int rb2);
+			L("写 0xC83D=" + target + " ⇒ ok=" + w2 + " · 回读=" + (rb2 < 0 ? "读不到" : rb2.ToString()));
+			L("  " + EcPortIo.LastAcpiWriteTrace);
+			if (!EcPortIo.TryReadByteStable(0xB20, out int maskBefore, out string maskBeforeNote))
+			{
+				L("⛔ 写掩码前读 0xB20 失败：" + maskBeforeNote);
+				return false;
+			}
+			int maskWanted = (maskBefore & ~0x0A) | 0x0A;
+			wroteMask = true;
+			bool w3 = EcPortIo.TryWriteAcpiFanManualMask(true, true, out int rbMask, out string maskWriteNote);
+			L("写 0xB20：0x" + maskBefore.ToString("X2") + " → 0x" + maskWanted.ToString("X2")
+				+ "（|=0x02|=0x08，保留其它位）⇒ ok=" + w3 + " · " + maskWriteNote);
+			L("  " + EcPortIo.LastAcpiWriteTrace);
+			L("");
+
+			// ④ 等 2 s，只用 ACPI 稳定读验证
+			L("── ④ 等 2 s 后只用 ACPI 稳定读验证 ──");
+			Thread.Sleep(2000);
+			bool afterRpmOk = ReadEcRpmBytes(L, "ACPI 写后", acpi: true, out int ecRpmAfter);
+			int wmiAfter = ReadWmiRpm(out string wmiAfterNote);
+			L("WMI 13 写后：" + (wmiAfter >= 0 ? wmiAfter + " RPM（" + wmiAfterNote + "）" : "读不到（" + wmiAfterNote + "）"));
+			int afterRpm = (wmiAfter >= 0) ? wmiAfter : (afterRpmOk ? ecRpmAfter : -1);
+			int delta = (afterRpm >= 0) ? afterRpm - baselineRpm : int.MinValue;
+			bool maskAfterOk = EcPortIo.TryReadByteStable(0xB20, out int maskAfter, out string maskAfterNote);
+			L("0xB20 写后稳定读=" + (maskAfterOk ? "0x" + maskAfter.ToString("X2") : "读不到") + "（" + maskAfterNote + "）");
+			bool maskBits = maskAfterOk && (maskAfter & 0x02) != 0 && (maskAfter & 0x08) != 0;
+			L("0xB20 bit1+bit3 = " + (maskBits ? "都已置位 ✅" : "未同时置位 ⚠️"));
+			L("转速变化 = " + (delta == int.MinValue ? "无法读取" : delta + " RPM") + "（判据 ≥+200）");
+			available = w1 && w2 && w3 && maskBits && afterRpm >= 0 && delta >= 200;
+			L("判定：目标写=" + (w1 && w2) + " · 掩码写=" + w3 + " · 掩码位=" + maskBits
+				+ " · RPM+200=" + (delta >= 200) + " ⇒ " + available);
+			if (!w3 || !maskBits)
+			{
+				L("⚠️ 0xB20 两次写的前后回读（供定位）：");
+				L("   写前=0x" + maskBefore.ToString("X2") + " · 写出=0x" + maskWanted.ToString("X2")
+					+ " · 立即回读=" + (rbMask < 0 ? "读不到" : "0x" + rbMask.ToString("X2"))
+					+ " · 写后稳定读=" + (maskAfterOk ? "0x" + maskAfter.ToString("X2") : "读不到"));
+			}
+			return available;
+		}
+		finally
+		{
+			L("");
+			L("── ⑤ finally 恢复（ACPI：0xC83C=0 · 0xC83D=0 · 0xB20 清 0x02|0x08 · 0x1060 原值）──");
+			if (wroteTargets)
+			{
+				bool r1 = EcPortIo.TryWriteAcpiFanTarget(0xC83C, 0, out int rb1);
+				bool r2 = EcPortIo.TryWriteAcpiFanTarget(0xC83D, 0, out int rb2);
+				L("目标 0：0xC83C ok=" + r1 + "（回读=" + (rb1 < 0 ? "读不到" : rb1.ToString())
+					+ "）· 0xC83D ok=" + r2 + "（回读=" + (rb2 < 0 ? "读不到" : rb2.ToString()) + "）");
+			}
+			if (wroteMask)
+			{
+				bool rm = EcPortIo.TryWriteAcpiFanManualMask(false, false, out int rbMask, out string maskNote);
+				L("清掩码位：ok=" + rm + " · " + maskNote);
+			}
+			EcPortIo.TryReadByteStable(0xB20, out int finalMask, out string finalMaskNote);
+			L("恢复后 0xB20=0x" + finalMask.ToString("X2") + "（" + finalMaskNote + "）");
+			EcPortIo.TryReadByteStable(0xC83C, out int f1, out _);
+			EcPortIo.TryReadByteStable(0xC83D, out int f2, out _);
+			L("恢复后 0xC83C=" + f1 + " · 0xC83D=" + f2);
+			if (unlockAttempted && unlockOriginal >= 0)
+			{
+				bool ur = EcPortIo.TryRestoreEcUnlockRegisterAcpi(unlockOriginal, out int rb);
+				L("0x1060 恢复原值 0x" + unlockOriginal.ToString("X2") + " ⇒ ok=" + ur
+					+ " · 回读=" + (rb < 0 ? "读不到" : "0x" + rb.ToString("X2")));
+			}
+		}
 	}
 
 	/// <summary>⭐ LPC 通道写测试（Fan1 + 0xB20 bit1 + 解锁），内部 try/finally 恢复 ✅。</summary>
