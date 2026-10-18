@@ -4388,12 +4388,6 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 强冷前的曲线快照（关闭时原样恢复）✅</summary>
 	private static BaolongdaFanCurveSettings _fanBoostSavedCurve;
 
-	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 强冷**实测到的本机风扇上限**（RPM；0 = 还没测过）。
-	/// <para>⭐ 下次强冷按它取基准（⭐ 比代际基准更准；⭐ 固件把 21 夹回时以实测为准 ✅）。</para>
-	/// </summary>
-	private static int _baolongdaFanMeasuredMaxRpm;
-
 	/// <summary>⭐ 曲线闭环的"上次已写档位"（x100RPM）—— 用于差异比较，避免同值反复写 ✅</summary>
 	private static int _fanCurveLastCh0 = -1;
 
@@ -4494,151 +4488,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		if (on)
 		{
-			// ⭐⭐ 2026-10-18（机主最高优先级 · §9.14）：⭐ 未通过只读验证 ⇒ 强冷**不开放、不写** ✅
-			if (!FanCurveVerified)
-			{
-				Logger.WriteLine("[fan] 强冷：⛔ 本机风扇接管尚未通过只读验证 ⇒ 不执行（UI 已隐藏入口）");
-				return false;
-			}
-			_fanBoostSavedCurve = LoadBaolongdaFanCurve();
-			_fanBoostActive = true;
-			// ⭐ 强冷 = 直接满转 ⇒ 平滑状态清零（⭐ 恢复闭环时从真实温度重新收敛）
-			ResetBaolongdaFanCurveSmoothing();
-			// ① 暂停闭环（先存快照再关）
-			if (_fanBoostSavedCurve != null && _fanBoostSavedCurve.Enabled)
-			{
-				SaveBaolongdaFanCurve(CloneCurve(_fanBoostSavedCurve, enabled: false));
-			}
-			// ② ⭐⭐ 2026-10-18（机主新决定 · 30 系风扇基准）：⭐ 强冷要跑到**真正的满转** ——
-			//   ⭐ 机主实测：30 系 3500 RPM 压不住；原厂上限约 140%（≈4900 RPM）⇒ ⭐ **4900 才是 30 系的真实满转**；
-			//     40 系 100% = 6000 RPM ✅
-			//   ⚠️ 旧实现按曲线存档 `MaxRpm` 换算（30 系旧默认 3500）⇒ 只到「假 100%」❌
-			//   ⭐ 现在：代际真实基准（30 系 49 = 4900 / 40 系 60 = 6000）与曲线存档取**较大者**，
-			//     再夹到协议档位上限 **68**（⭐ 6800 RPM；⛔ 永不写 >68，⛔ 永不超 byte 范围）✅
-			int maxRpm = 4200;
-			try
-			{
-				BaolongdaFanCurveSettings curve = _fanBoostSavedCurve ?? LoadBaolongdaFanCurve();
-				if (curve != null && curve.MaxRpm > 0)
-				{
-					maxRpm = curve.MaxRpm;
-				}
-			}
-			catch
-			{
-			}
-			int trueMaxUnits = (DgpuGeneration == DgpuGenerationKind.Gen30)
-				? BaolongdaProfile.FanTrueMaxUnits30Series
-				: BaolongdaProfile.FanTrueMaxUnits40Series;
-			int curveUnits = Math.Clamp(maxRpm / 100, 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
-			int targetUnits = Math.Clamp(Math.Max(trueMaxUnits, curveUnits), 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
-			// ⭐ 上次实测到的本机上限更准 ⇒ 下次直接用（⭐ 进程内记忆）✅
-			if (_baolongdaFanMeasuredMaxRpm > 0)
-			{
-				targetUnits = Math.Clamp(Math.Max(targetUnits, _baolongdaFanMeasuredMaxRpm / 100), 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
-			}
-			int baselineRpm = 0;
-			if (TryReadFanSpeedsViaBackend(out int preFirst, out int preSecond))
-			{
-				baselineRpm = Math.Max(preFirst, preSecond);
-			}
-			// ⭐⭐ 30 系逐档验证（机主要求）：⭐ 先写 40 档 → 读 13 → 再写 49 档（⭐ 40 系直接写目标档）✅
-			bool wrote = true;
-			int achievedFirst = 0;
-			int achievedSecond = 0;
-			if (DgpuGeneration == DgpuGenerationKind.Gen30 && targetUnits > 40)
-			{
-				wrote = WriteBoostStep(40, out int stepFirst, out int stepSecond, out bool stepAccepted) && wrote;
-				if (!stepAccepted)
-				{
-					confirmed = false;
-					return RollbackBoostOnManualRejected();
-				}
-				achievedFirst = stepFirst;
-				achievedSecond = stepSecond;
-			}
-			wrote = WriteBoostStep(targetUnits, out achievedFirst, out achievedSecond, out bool finalAccepted) && wrote;
-			if (!finalAccepted)
-			{
-				confirmed = false;
-				return RollbackBoostOnManualRejected();
-			}
-			int achievedRpm = Math.Max(achievedFirst, achievedSecond);
-			bool readOk = achievedRpm > 0;
-			// ⭐ 判据（机主要求）：⭐ ≥ 对应档位 ×90%（跑到了）⭐ 或 ⭐ ≥ 原转速 ×1.1（明显提速）⇒ 均算确认 ✅
-			bool reachedTarget = achievedRpm >= targetUnits * 100 * 9 / 10;
-			bool spedUp = baselineRpm <= 0 || achievedRpm >= baselineRpm * 11 / 10;
-			confirmed = wrote && readOk && achievedRpm >= 1500 && (reachedTarget || spedUp);
-			if (readOk)
-			{
-				// ⭐ 记录本机实际上限（⭐ 固件夹回时这里就是真实值 ⇒ 下次强冷基准）✅
-				_baolongdaFanMeasuredMaxRpm = Math.Max(_baolongdaFanMeasuredMaxRpm, achievedRpm);
-			}
-			string clampNote = (readOk && !reachedTarget)
-				? $" · ⚠️ 固件把值夹回 ⇒ 本机实际上限 ≈ {achievedRpm} RPM（已记为下次基准）"
-				: "";
-			Logger.WriteLine($"[fan] 强冷：目标档 {targetUnits}（{targetUnits * 100} RPM · 代际基准 {trueMaxUnits} · 原转速 {baselineRpm}）"
-				+ $" ⇒ 写后 13={achievedFirst}/{achievedSecond} ⇒ 确认={confirmed}{clampNote}");
-			return wrote;
-
-			// ⭐⭐ 2026-10-18（高优先级）：⭐ 20 回读为假 ⇒ 固件不接受手动接管：
-			//   立即恢复原状（20=0、21=0）并返回 false；⛔ 之后不再写（同时触发软件闭环熔断）✅
-			bool RollbackBoostOnManualRejected()
-			{
-				BaolongdaWmi wmi = _baolongda?.Wmi;
-				try
-				{
-					// ⭐ 恢复顺序：先关两通道手动开关，再把 21 归零（⭐ 与「交回固件」一致 ✅）
-					if (wmi != null)
-					{
-						wmi.TrySetFanManualSwitch(0, false);
-						wmi.TrySetFanManualSwitch(1, false);
-						wmi.TrySetMaxFanSpeed(0, 0);
-						wmi.TrySetMaxFanSpeed(1, 0);
-					}
-				}
-				catch
-				{
-				}
-				_fanBoostActive = false;
-				_fanCurveUnsupported = true;
-				ResetBaolongdaFanCurveSmoothing();
-				// ⭐ 快照只回写**存档**（⛔ 不触发闭环下发，避免再多一次无效写）✅
-				BaolongdaFanCurveSettings savedCurve = _fanBoostSavedCurve;
-				_fanBoostSavedCurve = null;
-				if (savedCurve != null)
-				{
-					try
-					{
-						BaolongdaFanCurveStore.Save(savedCurve);
-					}
-					catch
-					{
-					}
-				}
-				Logger.WriteError("[fan] ⚠️ 强冷：手动接管未生效 ⇒ 已回滚（不再写）");
-				return false;
-			}
-
-			// ⭐ 强冷一步：⭐ 先开该通道手动接管（20=1）再写目标（21）→ ⭐ 等起转 → ⭐ 回读 13（⭐ 每次写入/回读都进日志）✅
-			bool WriteBoostStep(int units100Rpm, out int firstRpm, out int secondRpm, out bool stepManualAccepted)
-			{
-				bool ok = TrySetFanManualViaBackend(enable: true, units100Rpm, units100Rpm, out bool stepConfirmed, out stepManualAccepted);
-				firstRpm = 0;
-				secondRpm = 0;
-				if (!stepManualAccepted)
-				{
-					// ⭐ 手动接管未生效 ⇒ ⛔ 不再回读 13、⛔ 不再写 21（由调用方回滚）✅
-					Logger.WriteLine($"[fan] 强冷：目标档 {units100Rpm}（{units100Rpm * 100} RPM）⇒ ⚠️ 手动接管未生效（回读={stepConfirmed}）");
-					return ok;
-				}
-				// ⭐ 6000 RPM 的机械加速要 1~2 s ⇒ 给 1.2 s 再读（⭐ 旧实现只等 300 ms 会误判"没起来"）✅
-				Thread.Sleep(1200);
-				bool stepReadOk = TryReadFanSpeedsViaBackend(out firstRpm, out secondRpm);
-				Logger.WriteLine($"[fan] 强冷：目标档 {units100Rpm}（{units100Rpm * 100} RPM）"
-					+ $" ⇒ 写后 13={(stepReadOk ? firstRpm + "/" + secondRpm : "读不到")} ⇒ 开关回读={stepConfirmed}");
-				return ok;
-			}
+			// ⭐⭐ 2026-10-18（机主批准 · 最高优先级）：⛔ **WMI 写风扇已禁用** ——
+			//   ⚠️ 真机写 `20=1` 会**卡死**（连 try/finally 都跑不完）⇒ 强冷**暂不执行**，
+			//   ⭐ 等 EC 写通路（`--fan-ec-test` 验证通过后，第 2 步接 EC 实现）✅
+			Logger.WriteLineIfChanged("baolongda-fanboost-wmi-disabled",
+				"[fan] 强冷：⛔ WMI 写风扇已禁用（20=1 真机卡死）⇒ 暂不执行；⭐ 等 EC 写通路验证通过后接入");
+			return false;
 		}
 		// 关闭：恢复快照（含 Enabled 状态）
 		TrySetFanManualViaBackend(enable: false, 0, 0, out _, out _);
@@ -4691,69 +4546,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			// ⭐⭐ 2026-10-18（机主两条反馈的根因 · 协议核对）：
-			//   ⚠️ 旧实现把功能号 20 当成"官方控制台手动开关"，⭐ 只写**一个字节**，
-			//      ⭐ 而真机协议是 **两字节 [fanType, 0/1]**（⭐ 三份开源实现一致）⚠️
-			//      ⇒ ⭐ 旧写入实际是 (fanType=1, enable=0) ⇒ ⭐ **手动接管从未开启** ⇒ ⭐ 功能号 21 的目标被固件忽略 ❌
-			//   ⭐ 另外旧顺序是「写完 21 才开开关」⇒ ⭐ 即使开关正确，也应**先开开关再写目标**（⭐ 参考实现顺序 ✅）
-			if (!enable)
-			{
-				// ⭐ 交回固件：⭐ ① 先关两通道手动开关（20 = [fanType,0]）② 回读确认 ③ 确认关了才把 21 目标清零
-				//   ⚠️ 顺序反过来（先写 21=0）在手动仍开时会**真的把风扇写到 0** ⇒ 危险 ⚠️（旧代码就是反的）
-				bool offA = wmi.TrySetFanManualSwitch(0, false);
-				bool offB = wmi.TrySetFanManualSwitch(1, false);
-				bool readOk = wmi.TryReadFanManualSwitches(out bool ch0On, out bool ch1On);
-				confirmed = readOk && !ch0On && !ch1On;
-				bool zeroA = false;
-				bool zeroB = false;
-				if (confirmed)
-				{
-					zeroA = wmi.TrySetMaxFanSpeed(0, 0);
-					zeroB = wmi.TrySetMaxFanSpeed(1, 0);
-				}
-				if (!readOk)
-				{
-					Logger.WriteLine("宝龙达 风扇：⚠️ 已下发「交回固件」，⭐ 但**回读不到手动开关状态** ⇒ ⭐ 如实报告未确认 ⚠️");
-				}
-				else if (!confirmed)
-				{
-					Logger.WriteLine($"宝龙达 风扇：⚠️ 已下发「交回固件」，⭐ 但**回读显示手动开关仍开着**（⭐ 通道0={ch0On} · 通道1={ch1On}）⇒ ⭐ 如实报告未确认 ⚠️");
-				}
-				else
-				{
-					Logger.WriteLine($"宝龙达 风扇：⭐ 已交回固件并回读确认（⭐ 写 20=(0,0)/(1,0) ⇒ 回读 {ch0On}/{ch1On} · 21 归零={zeroA && zeroB} ✅）");
-				}
-				return true;
-			}
-			int a = Math.Clamp(firstChannelUnits100Rpm, 0, BaolongdaProfile.FanManualMaxUnits100Rpm);
-			int b = Math.Clamp(secondChannelUnits100Rpm, 0, BaolongdaProfile.FanManualMaxUnits100Rpm);
-			// ⭐⭐ 2026-10-18（高优先级 · 防卡死）：⭐ 顺序改成「先写 20 ⇒ **按通道回读确认** ⇒ 才写 21」——
-			//   ⚠️ 真机实测：20 写入后回读恒 False（固件不接受）⚠️
-			//   ⇒ ⭐ 这种情况下 **⛔ 绝不写 21**（20 没接管时写 21 无意义，⭐ 且每次都是无效 EC/WMI 写入 ⇒ 卡死风险 ⚠️）
-			//   ⇒ ⭐ `manualAccepted` 交给调用方做"连续 3 次 ⇒ 熔断"判断 ✅
-			bool sw0 = wmi.TrySetFanManualSwitch(0, true);
-			bool sw1 = wmi.TrySetFanManualSwitch(1, true);
-			// ⭐ 回读校验：⭐ 按通道回读功能号 20 ⇒ 两路都为「开」才算接管成功 ✅
-			bool readBackOk = wmi.TryReadFanManualSwitches(out bool nowCh0On, out bool nowCh1On);
-			manualAccepted = readBackOk && nowCh0On && nowCh1On;
-			if (!manualAccepted)
-			{
-				confirmed = false;
-				string readback = readBackOk
-					? (nowCh0On ? "1" : "0") + "/" + (nowCh1On ? "1" : "0")
-					: "读不到";
-				Logger.WriteLine($"[fan] 写 20=(0,1)/(1,1)（ok={sw0}/{sw1}）⇒ 开关回读={readback} · 接管={manualAccepted}"
-					+ " ⇒ ⛔ 跳过写 21（手动接管未生效）");
-				return true;
-			}
-			bool sp0 = wmi.TrySetMaxFanSpeed(0, (byte)a);
-			bool sp1 = wmi.TrySetMaxFanSpeed(1, (byte)b);
-			bool writeOk = sw0 && sw1 && sp0 && sp1;
-			confirmed = writeOk && manualAccepted;
-			Logger.WriteLine($"[fan] 写 20=(0,1)/(1,1) ⇒ 回读 20=1/1 · 写 21=(0,{a})/(1,{b}) ⇒ {a * 100}/{b * 100} RPM ⇒ 确认={confirmed}"
-				+ (writeOk ? "" : " ⚠️ 部分写入失败")
-				+ (manualAccepted ? "" : " ⚠️ 手动接管未生效"));
-			return true;
+			// ⭐⭐ 2026-10-18（机主批准 · 最高优先级）：⛔ **不再写功能号 20/21** ——
+			//   ⚠️ 真机写 `20=1` 会**卡死**（连 try/finally 都跑不完）⇒ 风扇接管改走 EC；
+			//   ⭐ EC 写通路接入前，本方法**一个字节都不写**（只读 API 仍保留给调用方）✅
+			Logger.WriteLineIfChanged("baolongda-fanwmi-write-disabled",
+				"[fan] WMI 写风扇已禁用（功能号 20=1 在真机会卡死）⇒ 本次不写 20/21（⭐ 风扇接管将改走 EC，见 --fan-ec-test）");
+			return false;
 		}
 		catch (Exception ex)
 		{
@@ -5383,8 +5181,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 			}
 		}
-		// ── 判据：30/40 系都**只认 EC 只读**（⚠️ 卡死那台 WMI 20 读得到、写入却回读 False ⇒ WMI 可读 ≠ 接管可用）──
-		bool verified = ecOk;
+		// ── 判据（⭐ 2026-10-18 收紧）：⭐ 只读通过也**不开放** —— 必须等 **EC 写通路**验证
+		//   （`--fan-ec-test`：白名单写 + 13 转速变化）通过、并在第 2 步接入产品后，才允许置 true ✅
+		//   ⚠️ WMI 可读 ≠ 接管可用（卡死那台 WMI 20 读得到、写入却回读 False）✅
+		bool verified = false;
 		if (is30)
 		{
 			_fanCurveVerifiedGen30 = verified;
@@ -5394,16 +5194,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			_fanCurveVerifiedGen40 = verified;
 		}
 		_fanCurveVerifyTick = Environment.TickCount64;
-		conclusion = verified
-			? $"可用（{genName} · EC 只读验证通过）"
+		conclusion = ecOk
+			? $"EC 只读可用（{genName}）· ⚠️ 写通路待 --fan-ec-test 验证 ⇒ 暂不开放"
 			: $"不可用（{genName} · EC 三地址未全部读到合理值）";
 		_fanCurveVerifyNote = conclusion;
 		Logger.WriteLine($"[fan] 风扇接管只读验证（{genName}）：{ecDetail} · {wmiDetail} ⇒ {conclusion}");
 		if (!verified)
 		{
-			Logger.WriteLine($"[fan] 未验证 ⇒ 隐藏风扇曲线/强冷入口（本机={genName}）· 详情请跑 --fan-probe");
+			Logger.WriteLine($"[fan] 未验证 ⇒ 隐藏风扇曲线/强冷入口（本机={genName}）· 详情请跑 --fan-probe / --fan-ec-test");
 		}
-		return verified;
+		return ecOk;
 	}
 
 	/// <summary>

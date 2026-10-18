@@ -280,6 +280,154 @@ internal static class EcLpcIo
 	}
 
 	// ══════════════════════════════════════════════════════════════════
+	//  ⭐⭐ 2026-10-18（机主批准 · **EC 白名单写**）：
+	//    ⭐ 背景：WMI 功能号 20=1 在真机上会**卡死**（连 try/finally 都跑不完）
+	//      ⇒ 风扇接管彻底改走 EC（与开源蛟龙 `Blding64` 同一套寄存器语义，⛔ 未复制代码）✅
+	//    ⭐ 白名单**只有 3 个地址**：0xC83C（Fan1/CPU 目标）· 0xC83D（Fan2/GPU 目标）· 0xB20（接管掩码）
+	//    ⭐ 值域：目标 0..68（x100RPM）· 0xB20 只改 bit1/bit3（0x02/0x08，⭐ 读-改-写，保留其它位）✅
+	//    ⭐ 每次写完**立刻回读同一地址并比对**；失败/超时沿用本类中毒策略 ✅
+	//    ⚠️ 其它地址一律**拒绝并中毒**（⛔ 不给误写其它 EC 寄存器留口子）✅
+	// ══════════════════════════════════════════════════════════════════
+
+	/// <summary>⭐ Fan1（CPU）目标档地址（开源蛟龙 `Fan1_RPM_SET`）✅</summary>
+	internal const int Fan1TargetAddress = 0xC83C;
+
+	/// <summary>⭐ Fan2（GPU）目标档地址（开源蛟龙 `Fan2_RPM_SET`）✅</summary>
+	internal const int Fan2TargetAddress = 0xC83D;
+
+	/// <summary>⭐ 手动接管掩码地址（开源蛟龙 `0xB20`：bit1 = Fan1 手动 · bit3 = Fan2 手动）✅</summary>
+	internal const int FanManualMaskAddress = 0xB20;
+
+	/// <summary>⭐ 目标档上限（x100RPM）= 68（⭐ 与 <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> 同源）✅</summary>
+	internal const int FanTargetMaxUnits100Rpm = BaolongdaProfile.FanManualMaxUnits100Rpm;
+
+	private const int ManualMaskBits = 0x0A;
+
+	private const int ManualMaskBitFan1 = 0x02;
+
+	private const int ManualMaskBitFan2 = 0x08;
+
+	/// <summary>⭐ EC 写白名单（⭐ 只有风扇 3 个地址）✅</summary>
+	internal static bool IsFanWriteAddress(int address)
+	{
+		return address == Fan1TargetAddress || address == Fan2TargetAddress || address == FanManualMaskAddress;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主批准）：⭐ **白名单写一个 EC 字节**（仅 0xC83C/0xC83D/0xB20）+ **立刻回读比对** ✅。
+	/// <para>⚠️ 任何失败/超时按本类既有策略处理；⛔ 不抛出；⛔ 非白名单地址直接拒绝并中毒 ✅</para>
+	/// </summary>
+	internal static bool TryWriteByte(int address, byte value, out int readBack)
+	{
+		readBack = -1;
+		if (!IsFanWriteAddress(address))
+		{
+			Poison("EC 写被拒：地址 0x" + address.ToString("X4") + " 不在风扇白名单（只允许 0xC83C/0xC83D/0xB20）");
+			_lastReadFailure = "写地址不在白名单";
+			return false;
+		}
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				_lastReadFailure = "通道已中毒：" + _poisonReason;
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				_lastReadFailure = "模块未装载：" + _loadFailure;
+				return false;
+			}
+			if (!TryEnterMutex(out Mutex mutex, out bool held))
+			{
+				Poison("无法获取 " + MutexName + " 互斥体");
+				return false;
+			}
+			try
+			{
+				bool wrote = WriteByteCore(DefaultSlot, address, value);
+				int check = -1;
+				bool readOk = wrote && ReadByteCore(DefaultSlot, address, out check);
+				readBack = check;
+				bool ok = wrote && readOk && check == value;
+				if (!ok)
+				{
+					ReportSoftFailure("EC 写 0x" + address.ToString("X4") + "=" + value
+						+ " 回读=" + (readOk ? check.ToString() : "读不到") + "（比对不一致）");
+				}
+				NoteReadOutcome(ok);
+				return ok;
+			}
+			catch (Exception ex)
+			{
+				Poison("写 LPC EC 0x" + address.ToString("X4") + " 抛异常：" + ex.GetType().Name);
+				return false;
+			}
+			finally
+			{
+				ReleaseMutex(mutex, held);
+			}
+		}
+	}
+
+	/// <summary>⭐ 写风扇目标档（**仅** 0xC83C/0xC83D · 值域 0..68）+ 回读比对 ✅。</summary>
+	internal static bool TryWriteFanTarget(int address, int units100Rpm, out int readBack)
+	{
+		readBack = -1;
+		if (address != Fan1TargetAddress && address != Fan2TargetAddress)
+		{
+			return false;
+		}
+		if (units100Rpm < 0 || units100Rpm > FanTargetMaxUnits100Rpm)
+		{
+			return false;
+		}
+		return TryWriteByte(address, (byte)units100Rpm, out readBack);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18：⭐ **读-改-写** 0xB20 —— 只改 bit1/bit3（0x02/0x08），⭐ 保留其它位 ✅。
+	/// <para>⭐ 允许的掩码位组合：0x00 / 0x02 / 0x08 / 0x0A（⭐ 与机主批准的值域一致）✅</para>
+	/// </summary>
+	internal static bool TryWriteFanManualMask(bool fan1Manual, bool fan2Manual, out int readBack)
+	{
+		readBack = -1;
+		if (!TryReadByte(FanManualMaskAddress, out int current))
+		{
+			return false;
+		}
+		int wanted = (current & ~ManualMaskBits)
+			| (fan1Manual ? ManualMaskBitFan1 : 0)
+			| (fan2Manual ? ManualMaskBitFan2 : 0);
+		int bits = wanted & ManualMaskBits;
+		if (bits != 0x00 && bits != ManualMaskBitFan1 && bits != ManualMaskBitFan2 && bits != ManualMaskBits)
+		{
+			return false; // ⭐ 理论不可达 —— ⭐ 仍显式挡住 ✅
+		}
+		if (current == wanted)
+		{
+			readBack = current;
+			return true; // 已经是目标值 ⇒ ⛔ 不重复写 ✅
+		}
+		return TryWriteByte(FanManualMaskAddress, (byte)wanted, out readBack);
+	}
+
+	/// <summary>
+	/// ⭐⭐⭐ **交回固件**（EC 版）：⭐ 两个目标写 0 · 再把 0xB20 的 bit1/bit3 清掉（⭐ 保留其它位）✅。
+	/// <para>⚠️ 调用方**必须**在 finally 里调用（⭐ 与开源蛟龙 `RemoveFanSpeed` 同语义）✅</para>
+	/// </summary>
+	internal static bool TryRestoreFanFirmware(out string detail)
+	{
+		bool fan1 = TryWriteFanTarget(Fan1TargetAddress, 0, out int rb1);
+		bool fan2 = TryWriteFanTarget(Fan2TargetAddress, 0, out int rb2);
+		bool mask = TryWriteFanManualMask(fan1Manual: false, fan2Manual: false, out int rbMask);
+		detail = "0xC83C=" + (rb1 < 0 ? "读不到" : rb1.ToString())
+			+ " · 0xC83D=" + (rb2 < 0 ? "读不到" : rb2.ToString())
+			+ " · 0xB20=0x" + (rbMask < 0 ? "读不到" : rbMask.ToString("X2"));
+		return fan1 && fan2 && mask;
+	}
+
+	// ══════════════════════════════════════════════════════════════════
 	//  LPC/SuperIO 时序（调用方必须已持锁 + 已确保模块 + 已取互斥体）
 	//
 	//  读一个 EC 字节：
@@ -318,6 +466,29 @@ internal static class EcLpcIo
 		}
 		value = data;
 		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主批准）：⭐ **EC 数据写**（调用方已持锁/模块/互斥体）——
+	/// ⭐ 时序与开源蛟龙 `Blding64.EC_RAM_WRITE` 同构：选槽位 → 写地址高/低（窗口寻址）→ 写数据子寄存器 0x12 ✅。
+	/// <para>⚠️ 数据子寄存器 0x12 是**唯一**写 EC 数据的入口（⭐ 白名单由 <see cref="TryWriteByte" /> 把守）✅</para>
+	/// </summary>
+	private static bool WriteByteCore(ulong slot, int address, byte value)
+	{
+		if (!SelectSlot(slot))
+		{
+			return false;
+		}
+		if (!SuperIoOutb(SubRegAddressHigh, (byte)((address >> 8) & 0xFF), "地址高字节"))
+		{
+			return false;
+		}
+		if (!SuperIoOutb(SubRegAddressLow, (byte)(address & 0xFF), "地址低字节"))
+		{
+			return false;
+		}
+		// ⭐ 数据写：子寄存器 0x12（⭐ SuperIoOutb 内部走白名单 0x10/0x11/0x12）✅
+		return SuperIoOutb(SubRegData, value, "EC 数据（风扇白名单写）");
 	}
 
 	/// <summary>

@@ -324,18 +324,27 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-18（宝龙达 · 风扇曲线/强冷「不可用」）：风扇协议真机探针 `--fan-probe`。
-		//   只读 13（两路 RPM）/ 20（[4]=fanType）/ 21（[4]=fanType）⇒ 再**单次写 + 每步回读**：
-		//     a. 20=0 → 回读 20/13 ｜ b. 21=当前档位 → 回读 13 ｜ c. 21=档位+5 → 回读 13
-		//     d. 20=1 → 回读 20/13（看是否满转）｜ e. try/finally 恢复 20=0 + 21=0 并回读确认
-		//   ⛔ 目标 ≤ 本机满转（30 系 4900 / 40 系 6000 RPM）；⛔ 绝不把风扇留在满转；
-		//   ⛔ 非宝龙达机型只写"没有接口"，一个字节都不写。
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇接管接口）：**只读**探针 `--fan-probe`。
+		//   ⚠️ 2026-10-18 收紧：写 WMI 20=1 真机会卡死 ⇒ ⛔ 本探针**不再写任何字节**！
+		//   ⭐ 内容：EC 0xC83C/0xC83D/0xB20 只读验证 + WMI 13/20/21 原始 hex 只读对照 + 结论。
+		//   ⭐ EC 写通路验证请用 `--fan-ec-test`（白名单写 + finally 恢复）。
 		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-probe-*.txt。
 		case "--fan-probe":
 		{
 			string probeLog = FanProbe.Run();
 			Console.WriteLine(probeLog);
 			Logger.WriteLine("[fan-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇 EC 写通路）：**最小验证** `--fan-ec-test`。
+		//   ⭐ 白名单写：只碰 0xC83C / 0xC83D / 0xB20；Fan1 单通道：写目标+5 → 置 bit1 → 读 13；
+		//   ⭐ 转速 ≥ +200 RPM ⇒ 可用；⛔ 任何情况 finally 恢复（目标 0、清 0x02|0x08）。
+		//   ⚠️ 需要管理员（PawnIO 驱动访问）；⛔ 不写 WMI 20/21。
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-ec-test-*.txt。
+		case "--fan-ec-test":
+		{
+			Environment.ExitCode = FanEcTest.Run();
 			Logger.Close();
 			return;
 		}
