@@ -295,8 +295,9 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			_syncing = false;
 		}
-		// ⭐ 机主要求：纯文字、无对勾、无括号；生效=绿色 Success，未启用=灰/Muted ✅
-		SetStatus(active ? "限制充电已生效" : "未限制充电", active ? 3 : 0);
+		// ⭐ 机主要求：纯文字、无对勾；生效=绿色 Success，未启用=灰/Muted；
+		//   ⭐ 同时显示**实际生效值**（enable 时可能按 SOC 提升 high ⇒ 这里回显 EC 读回值）✅
+		SetStatus(active ? "限制充电已生效 · 当前生效 " + high + "%" : "未限制充电", active ? 3 : 0);
 		UpdateSocLine(active);
 	}
 
