@@ -1056,21 +1056,43 @@ public class CustomModeForm : RForm
 		//   ⭐ 判据 = 同一能力位 `hw.WujieSmuApu`（⛔ 不按机型名硬编码）⇒ **隐藏/不显示** GCU 专属行：
 		//      fPPT(PL4) / 风扇转换灵敏度 / 换挡延迟 / 风扇增强 / GPU 超频（开关+核心偏移+显存偏移）✅
 		//   ⚠️ 宝龙达 / GCU / 同方不变（WujieSmuApu 恒 false）✅
-		if (hw?.WujieSmuApu ?? false)
+		// ⭐⭐ 2026-10-19（机主：0.292.1 仍显示 GCU 专属行；SetRowVisible 无效）：
+		//   ⭐ 判据 = 同一能力位 `hw.WujieSmuApu` ⇒ 把这些行**从父表移除**（不加入父容器 ⇒ 不会显示、不占行）✅
+		//   ⭐ 控件对象保留为"不在树上的占位" ⇒ 其它方法（ApplyRange/Refresh*/Apply*）访问不会 NRE ✅
+		//   ⚠️ 宝龙达 / GCU / 同方（WujieSmuApu=false）走不到这里，行为逐位不变 ✅
+		if (Program.hw?.WujieSmuApu ?? false)
 		{
-			SetRowVisible(_pl4, false);
-			SetRowVisible(_fanSwitchSpeedChk, false);
-			SetRowVisible(_fanSwitchSpeed, false);
-			SetRowVisible(_fanBoostRow, false);
-			SetRowVisible(_ocChk, false);
-			SetRowVisible(_coreOc, false);
-			SetRowVisible(_memOc, false);
-			if (Logger.TryMarkChanged("wujie-custom-ui-hide-gcu", "[custom-ui] 无界 APU 本机模式：隐藏 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）"))
+			void DetachRow(Control control)
 			{
-				Logger.WriteError("[custom-ui] 无界 APU 本机模式：隐藏 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）");
+				if (control == null)
+				{
+					return;
+				}
+				Control row = control.Tag as Control;
+				if (row != null && row.Parent != null)
+				{
+					row.Parent.Controls.Remove(row);
+				}
+				else if (control.Parent != null)
+				{
+					control.Parent.Controls.Remove(control);
+				}
 			}
-		}
-		_refreshCombo = new RComboBox
+			DetachRow(_pl4);
+			DetachRow(_fanSwitchSpeedChk);
+			DetachRow(_fanSwitchSpeed);
+			DetachRow(_fanBoostRow);
+			DetachRow(_ocChk);
+			DetachRow(_coreOc);
+			DetachRow(_memOc);
+			DetachRow(_gpuOcAdminRow);
+			DetachRow(_coreOcRiskRow);
+			DetachRow(_memOcRiskRow);
+			if (Logger.TryMarkChanged("wujie-custom-ui-skip-gcu-rows", "[custom-ui] 无界 APU 本机模式：跳过创建/加入 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）"))
+			{
+				Logger.WriteError("[custom-ui] 无界 APU 本机模式：跳过创建/加入 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）");
+			}
+		}		_refreshCombo = new RComboBox
 		{
 			Name = "refreshCombo",
 			DropDownStyle = ComboBoxStyle.DropDownList
