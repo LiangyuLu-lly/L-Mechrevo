@@ -43,7 +43,11 @@ internal static class BatteryLimitProbe
 	// ⭐ 可选旁证地址（参考日志/实现里出现，仅记录原始值）
 	private static readonly int[] EvidenceAddresses = { 0x8370, 0x8394, 0x83A0, 0x8410, 0x8411, 0x8460 };
 
-	private const string ReferenceBoard = "MRID6";
+	// ⭐ 参考机型：2023 款（40 系 · 模具 MRID6/BM5235 · 23 款 = MRID6-23）
+	private const string ReferenceModel = "蛟龙16 Pro 2023（宝龙达 · ITE IT5570 · 40 系 · 模具 MRID6/BM5235 · 23 款 = MRID6-23）";
+
+	// ⭐ “与参考机型同款”的板号前缀（裸 MRID6 与 MRID6-23 都算同款：作者只是没写后缀）
+	private const string ReferenceBoardPrefix = "MRID6";
 
 	internal static int Run()
 	{
@@ -72,27 +76,15 @@ internal static class BatteryLimitProbe
 			L("");
 
 			string board = ReadBaseBoardProduct();
-			// ⭐ 板号代际判据与 `MechrevoHw.IsBaolongda30Series` 同源：裸 MRID6 = 30 系；MRID6-* = 40 系 ✅
-			bool is30Series = string.Equals(board, "MRID6", StringComparison.OrdinalIgnoreCase);
-			bool is40Series = board.StartsWith("MRID6-", StringComparison.OrdinalIgnoreCase);
-			L("── ⓪ 机型对照 ──");
-			L("  参考机型 = " + ReferenceBoard + "（蛟龙16 Pro 2023 · 30 系 · BM5235）");
+			// ⭐⭐ 2026-10-18（机主澄清）：参考机型就是 2023 款（40 系 · 模具 MRID6/BM5235 · 23 款 = MRID6-23）；
+			//   作者写的 `MRID6` 只是没写后缀。⭐ 是否支持仍只看「EC 是否含该布局」，⛔ 不看 30/40 标签 ✅
+			bool sameModel = board.StartsWith(ReferenceBoardPrefix, StringComparison.OrdinalIgnoreCase);
+			L("── ⓪ 参考机型对照 ──");
+			L("  参考机型 = " + ReferenceModel);
 			L("  本机板号 = " + (board.Length == 0 ? "（读不到）" : board));
-			L("  本机代际（板号判据） = " + (is30Series ? "30 系" : (is40Series ? "40 系" : "未知 / 非宝龙达"))
-				+ "（IsBaolongda30Series=" + is30Series + "）");
-			L("  ⚠️ 参考实现只在 **MRID6（30 系）** 实测过；本机若是 `MRID6-23`（40 系）⇒ 地址/语义**可能不同**，结论不能直接沿用 ✅");
-			if (is30Series)
-			{
-				L("  ✅ 板号 = MRID6（与参考机型一致，可沿用参考语义）");
-			}
-			else if (is40Series)
-			{
-				L("  ⚠️ 板号 = MRID6-*（40 系不同机型）⇒ 先验证 0x83A1/0x83A2 是否也是 1–100 的合理值");
-			}
-			else
-			{
-				L("  ⚠️ 板号不是 MRID6/MRID6-* ⇒ 下列地址/语义仅供对照，⛔ 不据此开放功能");
-			}
+			L("  本机与参考机型是否同款（板号以 " + ReferenceBoardPrefix + " 开头） = " + sameModel);
+			L("  ⚠️ 参考作者写的 `MRID6/BM5235` = 2023 款（40 系 · 23 款 = `MRID6-23`）；裸 `MRID6` 只是同款未写后缀 ✅");
+			L("  ⭐ 是否支持**只看 EC 是否含该布局**（0x83A1/0x83A2 是否为合理阈值），⛔ 不按 30/40 系标签判断 ✅");
 			L("");
 
 			L("── ① 主地址（⭐ 只读；来源=ACPI-EC / LPC）──");
@@ -111,6 +103,18 @@ internal static class BatteryLimitProbe
 			{
 				ReadEc(address, "0x" + address.ToString("X4") + " 旁证", L);
 			}
+			L("");
+
+			L("── ①c 参考 EC 版本对照（参考日志 [0,33,0,0]；十进制 33 = 0x21）──");
+			int version0 = ReadEc(0x8410, "0x8410 EC 版本字节 0", L);
+			int version1 = ReadEc(0x8411, "0x8411 EC 版本字节 1", L);
+			int version2 = ReadEc(0x8412, "0x8412 EC 版本字节 2", L);
+			int version3 = ReadEc(0x8413, "0x8413 EC 版本字节 3", L);
+			bool versionNear = version0 == 0x00 && version1 == 0x21;
+			L("  参考 EC 版本 = [0,33,0,0] · 本机前两字节匹配 = " + versionNear
+				+ "（本机 = " + DescribeHex(version0) + "," + DescribeHex(version1) + ","
+				+ DescribeHex(version2) + "," + DescribeHex(version3) + "）");
+			L("  ⚠️ 版本仅作旁证：⛔ 不用它判断是否支持（支持与否只看 0x83A1/0x83A2 布局）✅");
 			L("");
 
 			L("── ② 语义对照（按 MRID6 实测日志）──");
@@ -145,7 +149,7 @@ internal static class BatteryLimitProbe
 			}
 			L("");
 
-			L("── ④ 阶段 1 结论（⭐ 按板号/代际分别判定）──");
+			L("── ④ 阶段 1 结论（⭐ 按「EC 是否含该布局」判断；⛔ 不按 30/40 系）──");
 			bool highLooksPercent = high >= 1 && high <= 100;
 			bool lowLooksPercent = low >= 1 && low <= 100;
 			bool highGreaterThanLow = high > 0 && low > 0 && high > low;
@@ -153,35 +157,21 @@ internal static class BatteryLimitProbe
 			bool commandKnown = command == 0x0D || command == 0x0E || command == 0x0F;
 			bool triggerIdle = trigger == 0x00;
 			bool resultOk = result == 0x55;
+			bool layoutPlausible = highLooksPercent && lowLooksPercent && highGreaterThanLow;
 			L("  阈值高像 1–100 = " + highLooksPercent + " · 阈值低像 1–100 = " + lowLooksPercent
-				+ " · 高>低 = " + highGreaterThanLow);
+				+ " · 高>低 = " + highGreaterThanLow + " ⇒ 布局合理 = " + layoutPlausible);
 			L("  模式值已知 = " + modeKnown + " · 命令字已知 = " + commandKnown
 				+ " · 触发=0（空闲）= " + triggerIdle + " · 结果=0x55 = " + resultOk + "（仅参考）");
-			bool addressLooksRight = highLooksPercent && lowLooksPercent && highGreaterThanLow && modeKnown && commandKnown && triggerIdle;
-			if (is30Series)
+			L(layoutPlausible
+				? "  ⇒ ✅ 本机 EC **含该布局**（0x83A1=" + DescribeHex(high) + " · 0x83A2=" + DescribeHex(low)
+					+ "）⇒ 可进入阶段 2（白名单写测试，需机主批准）"
+				: "  ⇒ ⛔ 本机 EC **不含该布局**（0x83A1=" + DescribeHex(high) + " · 0x83A2=" + DescribeHex(low)
+					+ "，不是合理的 1–100 停充/起充值）⇒ ⛔ 不做阶段 2、⛔ 不显示 UI");
+			if (layoutPlausible && !resultOk)
 			{
-				L(addressLooksRight
-					? "  ⇒ ✅ 30 系（MRID6）：地址语义看起来正确 ⇒ 可进入阶段 2（白名单写测试，需机主批准）"
-					: "  ⇒ ⚠️ 30 系（MRID6）：地址语义未能确认（读不到/值不合理）⇒ ⛔ 不进入阶段 2，先把报告发回");
-				if (addressLooksRight && !resultOk)
-				{
-					L("  ⚠️ 结果寄存器不是 0x55：可能本机 EC 尚未执行过限充事务（不代表地址错误），阶段 2 首次写后再复核。");
-				}
+				L("  ⚠️ 结果寄存器不是 0x55：可能本机尚未执行过限充事务（不代表布局错误），阶段 2 首次写后再复核。");
 			}
-			else if (is40Series)
-			{
-				bool plausible = highLooksPercent && lowLooksPercent && highGreaterThanLow;
-				L("  40 系判据：只要 0x83A1/0x83A2 读出 1–100 且高>低 ⇒ 说明同一布局存在，可继续；否则判本机不可用。");
-				L(plausible
-					? "  ⇒ ✅ 40 系：0x83A1/0x83A2 也读出合理百分比（高=0x" + (high < 0 ? "??" : high.ToString("X2"))
-						+ " / 低=0x" + (low < 0 ? "??" : low.ToString("X2")) + "）⇒ 同一布局可能存在 ⇒ 可继续（需机主确认后再做阶段 2）"
-					: "  ⇒ ⛔ 40 系：**该功能本机不可用**（0x83A1=" + DescribeHex(high) + " · 0x83A2=" + DescribeHex(low)
-						+ "，不是可用的 1–100 停充/起充值；官方控制台也没有该功能）⇒ ⛔ 不做阶段 2、⛔ 不显示 UI");
-			}
-			else
-			{
-				L("  ⇒ ⚠️ 非 MRID6/MRID6-* 机型：⛔ 不据此进入阶段 2、不开放任何 UI。");
-			}
+			L("  旁证（仅参考，⛔ 不作支持判据）：与参考机型同款=" + sameModel + " · EC 版本接近=" + versionNear);
 			L("  ⛔ 本命令未写任何 EC 字节、未发 WMI 写");
 			exitCode = 0;
 		}
