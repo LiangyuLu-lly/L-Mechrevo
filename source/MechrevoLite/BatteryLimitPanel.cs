@@ -1,23 +1,25 @@
 // 2026-10-18（宝龙达 · 充电阈值 · 产品接线）：⭐⭐ **电池页 · 充电阈值区域** ⭐⭐
 //
-// ⭐ 能力判据（机主定）：`UsesBaolongda` + 板号以 `MRID6` 开头 + EC 可读 ⇒ 才显示本区域；
-//    ⛔ 非宝龙达 / 其它板号 / EC 读不到 ⇒ 不构建（SettingsForm 调用前先 IsAvailable）。
+// ⭐ 能力判据：`UsesBaolongda` + 板号命中宝龙达白名单（MRID6/MRID6-*）⇒ 构建；
+//    EC 状态可读与否只影响本区域内容（读不到时显示“状态读不到”），⛔ 非宝龙达不构建。
 //
-// ⭐ 交互：
-//    · 起充 %（低）· 停充 %（高）两个数值框，约束 0 < low < high <= 100，默认 60/80；
-//    · 开关「启用限制充电」：勾上 = 启用（写 EC）；取消 = 恢复默认充电（关闭）；
-//    · 「保存阈值」：在已启用状态下改阈值（内部先关闭再启用，严格时序）；
-//    · 状态行显示：生效中/未启用 + 当前阈值（来源 EC 0x83A1/0x83A2/0x83C0）；
-//    · 所有 EC 读写放后台线程；失败如实显示，⛔ 不假装成功。
+// ⭐ UI 布局（机主 2026-10-18 定稿，自上而下）：
+//    电量 92%                              ← 只保留电量，状态摘要统一在标题行右侧
+//    起充（%） [70]      停充（%） [95]    ← 两列等宽、输入右对齐、标签不换行
+//    ☑ 启用限制充电（接电源时限制充电上限）
+//    [保存阈值]
+//    ✅ 限制充电已生效（停充 95% / 起充 70%）   ← 无“当前:”前缀、无 EC 原始值
+//    ⚠️ SOC ≥ 停充阈值时的红色可操作提示
 //
+// ⭐ EC 原始值（0x83A1/0x83A2/0x83C0…）只写 `[battery]` 日志/诊断包，⛔ 不上 UI ✅
 // ⚠️ 写入只走 `BatteryLimitWriter`（白名单 4 地址 + 严格时序 + 失败不重试）✅
 
 using System;
 using System.Drawing;
-using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MechrevoLite.Hardware;
+using MechrevoLite.UI;
 using Microsoft.Win32;
 
 namespace MechrevoLite;
@@ -25,6 +27,8 @@ namespace MechrevoLite;
 /// <summary>⭐⭐ 电池页的宝龙达充电阈值区域（仅同款机型构建）✅。</summary>
 internal sealed class BatteryLimitPanel : Panel
 {
+	private readonly Label _socLabel;
+
 	private readonly NumericUpDown _lowBox;
 
 	private readonly NumericUpDown _highBox;
@@ -35,16 +39,26 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private readonly Label _statusLabel;
 
-	private readonly Label _basicsLabel;
-
 	private readonly Label _hintLabel;
 
 	private bool _busy;
 
 	private bool _syncing;
 
-	// ⭐ 当前是否“限充生效中”（来自 EC）；用于 SOC 安全提示（未启用时才提示 SOC≥high）✅
 	private bool _active;
+
+	// ⭐ 统一行距常量（逻辑像素；只用这一套，⛔ 不混用半行高）✅
+	private const int RowSoc = 24;
+
+	private const int RowInput = 30;
+
+	private const int RowCheck = 28;
+
+	private const int RowButton = 30;
+
+	private const int RowStatus = 24;
+
+	private const int RowHint = 26;
 
 	public BatteryLimitPanel()
 	{
@@ -53,93 +67,81 @@ internal sealed class BatteryLimitPanel : Panel
 		AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		Dock = DockStyle.Fill;
 
-		TableLayoutPanel grid = new TableLayoutPanel
-		{
-			Dock = DockStyle.Top,
-			AutoSize = true,
-			AutoSizeMode = AutoSizeMode.GrowAndShrink,
-			ColumnCount = 4,
-			RowCount = 0,
-			Margin = new Padding(0, 6, 0, 0)
-		};
-		grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92f));
-		grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92f));
-		grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92f));
-		grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92f));
+		_socLabel = MakeFixedLabel("电量读取中…", D(240));
+		_socLabel.Font = UiVisualStyle.Font(9f);
 
-		Label lowLabel = MakeLabel("起充 %（低）");
+		Label lowLabel = MakeFixedLabel("起充（%）", D(88));
 		_lowBox = MakeNumeric(1, 99, 60);
-		Label highLabel = MakeLabel("停充 %（高）");
+		Label highLabel = MakeFixedLabel("停充（%）", D(88));
 		_highBox = MakeNumeric(2, 100, 80);
-		// ⭐ 机主要求：SOC ≥ high 时给**红色可操作提示**（开关/按钮仍可用，不是静默失败）✅
 		_lowBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 		_highBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
-
-		// ⭐⭐ 2026-10-18（机主：电池行内容为空）：⭐ 面板顶部固定显示**电量百分比 + 电池状态** ✅
-		_basicsLabel = new Label
-		{
-			AutoSize = true,
-			MaximumSize = new Size(560, 0),
-			Margin = new Padding(0, 0, 0, 4),
-			Text = "电量读取中…"
-		};
-
-		grid.RowCount = 5;
-		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		grid.Controls.Add(_basicsLabel, 0, 0);
-		grid.SetColumnSpan(_basicsLabel, 4);
-		grid.Controls.Add(lowLabel, 0, 1);
-		grid.Controls.Add(_lowBox, 1, 1);
-		grid.Controls.Add(highLabel, 2, 1);
-		grid.Controls.Add(_highBox, 3, 1);
 
 		_enableBox = new CheckBox
 		{
 			AutoSize = true,
 			Text = "启用限制充电（接电源时限制充电上限）",
-			Margin = new Padding(0, 8, 0, 0)
+			Margin = new Padding(0, D(6), 0, 0)
 		};
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
-		grid.Controls.Add(_enableBox, 0, 2);
-		grid.SetColumnSpan(_enableBox, 4);
 
 		_applyButton = new Button
 		{
 			AutoSize = true,
 			Text = "保存阈值",
-			Margin = new Padding(0, 8, 0, 0)
+			Margin = new Padding(0, D(5), 0, 0)
 		};
 		_applyButton.Click += ApplyButton_Click;
+
+		_statusLabel = MakeFixedLabel("状态读取中…", D(360));
+		_statusLabel.Margin = new Padding(0, D(4), 0, 0);
+
+		_hintLabel = MakeFixedLabel("开启后接电源时会限制充电上限；建议保持接电源使用。", D(420));
+		_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
+		_hintLabel.Margin = new Padding(0, D(4), 0, 0);
+
+		TableLayoutPanel grid = new TableLayoutPanel
+		{
+			Dock = DockStyle.Top,
+			AutoSize = false,
+			ColumnCount = 4,
+			RowCount = 6,
+			Margin = Padding.Empty,
+			Padding = Padding.Empty,
+			BackColor = Color.Transparent
+		};
+		for (int c = 0; c < 4; c++)
+		{
+			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+		}
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowCheck)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowButton)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowHint)));
+		grid.Height = D(RowSoc + RowInput + RowCheck + RowButton + RowStatus + RowHint);
+
+		grid.Controls.Add(_socLabel, 0, 0);
+		grid.SetColumnSpan(_socLabel, 4);
+		grid.Controls.Add(lowLabel, 0, 1);
+		grid.Controls.Add(_lowBox, 1, 1);
+		grid.Controls.Add(highLabel, 2, 1);
+		grid.Controls.Add(_highBox, 3, 1);
+		grid.Controls.Add(_enableBox, 0, 2);
+		grid.SetColumnSpan(_enableBox, 4);
 		grid.Controls.Add(_applyButton, 0, 3);
 		grid.SetColumnSpan(_applyButton, 2);
-
-		_statusLabel = new Label
-		{
-			AutoSize = true,
-			MaximumSize = new Size(520, 0),
-			Margin = new Padding(0, 8, 0, 0),
-			Text = "状态读取中…"
-		};
 		grid.Controls.Add(_statusLabel, 0, 4);
 		grid.SetColumnSpan(_statusLabel, 4);
+		grid.Controls.Add(_hintLabel, 0, 5);
+		grid.SetColumnSpan(_hintLabel, 4);
 
-		_hintLabel = new Label
-		{
-			AutoSize = true,
-			MaximumSize = new Size(560, 0),
-			ForeColor = Color.FromArgb(120, 120, 120),
-			Margin = new Padding(0, 6, 0, 0),
-			Text = "开启后接电源时会限制充电上限；建议保持接电源使用。"
-		};
-
-		Controls.Add(_hintLabel);
 		Controls.Add(grid);
-		_hintLabel.BringToFront();
-		grid.BringToFront();
+		// ⭐ 代码级 UI 自检（无法启动 GUI 时作为可验证替代）：标签宽度是否足够 ⇒ 不换行 ✅
+		LogLabelWidthCheck("起充标签", lowLabel, D(88));
+		LogLabelWidthCheck("停充标签", highLabel, D(88));
+		LogLabelWidthCheck("状态行", _statusLabel, D(360));
 		RefreshFromEc();
 		UpdateSocSafetyHint();
 	}
@@ -156,7 +158,6 @@ internal sealed class BatteryLimitPanel : Panel
 			{
 				return false;
 			}
-			// ⭐ 机主要求“板号以 MRID6 开头”；这里用同一份白名单纯函数（更严：排除 MRID60 之类假板号）✅
 			return BoardWhitelist.Matches(ReadBaseBoardProduct());
 		}
 		catch
@@ -196,11 +197,14 @@ internal sealed class BatteryLimitPanel : Panel
 		if (!BatteryLimitWriter.TryReadState(out int high, out int low, out int mode, out string detail))
 		{
 			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "状态读不到：" + detail + "（可稍后点「保存阈值」重试）";
-			UpdateBasicsText(active: false);
+			_statusLabel.Text = "状态读不到（详见日志）";
+			Logger.WriteLine("[battery] 充电阈值状态（UI 刷新）：" + detail);
+			UpdateSocLine(active: false);
 			UpdateSocSafetyHint();
 			return;
 		}
+		// ⭐ EC 原始值只进日志/诊断包，⛔ 不上 UI ✅
+		Logger.WriteLine("[battery] 充电阈值状态（UI 刷新）：" + detail);
 		bool active = mode == BatteryLimitWriter.ModeActive;
 		_active = active;
 		_syncing = true;
@@ -217,56 +221,33 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			_syncing = false;
 		}
-		_statusLabel.ForeColor = SystemColors.ControlText;
-		_statusLabel.Text = (active
-			? "当前：✅ 限制充电生效中（停充 " + high + "% · 起充 " + low + "%）"
-			: "当前：未启用（正常充电）")
-			+ " · 来源 EC " + detail;
-		UpdateBasicsText(active);
+		_statusLabel.ForeColor = Color.FromArgb(40, 160, 80);
+		// ⭐ 无“当前:”前缀；无 EC 原始值 ✅
+		_statusLabel.Text = active
+			? "✅ 限制充电已生效（停充 " + high + "% / 起充 " + low + "%）"
+			: "未启用限制充电";
+		UpdateSocLine(active);
 		UpdateSocSafetyHint();
 	}
 
-	/// <summary>⭐ 面板顶部「电量百分比 + 电池状态」；⛔ 读不到就如实写，不猜 ✅。</summary>
-	private void UpdateBasicsText(bool active)
+	/// <summary>⭐ 第二行只显示电量（状态摘要唯一位置=标题行右侧）✅。</summary>
+	private void UpdateSocLine(bool active)
 	{
 		try
 		{
-			PowerStatus power = SystemInformation.PowerStatus;
-			bool ac = power.PowerLineStatus == PowerLineStatus.Online;
-			int soc = (int)Math.Round(power.BatteryLifePercent * 100.0);
-			bool charging = power.BatteryChargeStatus.HasFlag(BatteryChargeStatus.Charging);
-			string state;
-			if (!ac)
-			{
-				state = "电池供电 · 放电中";
-			}
-			else if (charging)
-			{
-				state = "外接电源 · 充电中";
-			}
-			else if (active && soc >= 0 && soc >= (int)_highBox.Value)
-			{
-				state = "外接电源 · 已到停充阈值（限充中）";
-			}
-			else if (active)
-			{
-				state = "外接电源 · 未在充电（限充生效中）";
-			}
-			else
-			{
-				state = "外接电源 · 未在充电";
-			}
-			_basicsLabel.Text = "电量 " + (soc >= 0 ? soc + "%" : "读不到") + " · " + state;
+			int soc = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
+			_socLabel.Text = "电量 " + (soc >= 0 ? soc + "%" : "读不到");
+			Logger.WriteLineIfChanged("battery-ui-soc", "[battery-ui] 电量行：电量=" + soc + "% · active=" + active);
 		}
 		catch
 		{
-			_basicsLabel.Text = "电量/电池状态读不到";
+			_socLabel.Text = "电量读不到";
 		}
 	}
 
 	/// <summary>
 	/// ⭐⭐ 机主要求（UX）：未启用且 `SOC ≥ high` 时，给出**红色、可操作**提示；
-	/// ⛔ 不静默失败、⛔ 不移除 SOC&lt;high 安全前置（启用仍会被 writer 拒绝，但用户知道下一步怎么做）✅
+	/// ⛔ 不移除 SOC&lt;high 安全前置（启用仍会被 writer 拒绝，但用户知道下一步怎么做）✅
 	/// </summary>
 	private void UpdateSocSafetyHint()
 	{
@@ -321,18 +302,18 @@ internal sealed class BatteryLimitPanel : Panel
 				bool disabled = BatteryLimitWriter.TryDisable(out string disableDetail);
 				return (disabled, disableDetail);
 			});
-			Logger.WriteLine("[battery] 充电限制" + (want ? "启用" : "关闭") + "（UI）：ok=" + ok + " · " + detail);
+			Logger.WriteLine("[battery] 充电限制" + (want ? "启用" : "关闭") + "（UI）：ok=" + ok + "\n" + detail);
 			if (!ok)
 			{
 				_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-				_statusLabel.Text = "⛔ " + (want ? "启用失败（未重试）：" : "关闭失败（未重试）：") + Tail(detail);
+				_statusLabel.Text = want ? "⛔ 启用失败（详见日志）" : "⛔ 关闭失败（详见日志）";
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
 			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "⛔ 操作异常：" + ex.GetType().Name + " " + ex.Message;
+			_statusLabel.Text = "⛔ 操作异常（详见日志）";
 			Logger.WriteLine("[battery] 充电限制 UI 异常：" + ex.GetType().Name + " " + ex.Message);
 		}
 		finally
@@ -352,7 +333,7 @@ internal sealed class BatteryLimitPanel : Panel
 		if (!(low >= 1 && low < high && high <= 100))
 		{
 			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "⛔ 参数非法：要求 0 < 起充 < 停充 <= 100（当前 " + low + "/" + high + "）";
+			_statusLabel.Text = "⛔ 参数非法：要求 0 < 起充 < 停充 ≤ 100";
 			return;
 		}
 		SetBusy(true);
@@ -363,18 +344,19 @@ internal sealed class BatteryLimitPanel : Panel
 				bool result = BatteryLimitWriter.TryEnable(low, high, out string enableDetail);
 				return (result, enableDetail);
 			});
-			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + " · " + detail);
+			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + "\n" + detail);
 			if (!ok)
 			{
 				_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-				_statusLabel.Text = "⛔ 保存失败（未重试）：" + Tail(detail);
+				_statusLabel.Text = "⛔ 保存失败（详见日志）";
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
 			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "⛔ 操作异常：" + ex.GetType().Name + " " + ex.Message;
+			_statusLabel.Text = "⛔ 操作异常（详见日志）";
+			Logger.WriteLine("[battery] 充电阈值保存 UI 异常：" + ex.GetType().Name + " " + ex.Message);
 		}
 		finally
 		{
@@ -391,42 +373,56 @@ internal sealed class BatteryLimitPanel : Panel
 		_highBox.Enabled = !busy;
 	}
 
-	private static Label MakeLabel(string text)
+	private int D(int logical)
+	{
+		return ResponsiveLayout.LogicalToDevice(this, logical);
+	}
+
+	private Label MakeFixedLabel(string text, int width)
 	{
 		return new Label
 		{
-			AutoSize = true,
+			AutoSize = false,
 			Text = text,
-			Margin = new Padding(0, 4, 0, 0)
+			Width = width,
+			Height = D(22),
+			TextAlign = ContentAlignment.MiddleLeft,
+			Margin = new Padding(0, D(2), 0, 0),
+			BackColor = Color.Transparent
 		};
 	}
 
-	private static NumericUpDown MakeNumeric(int min, int max, int value)
+	private NumericUpDown MakeNumeric(int min, int max, int value)
 	{
 		return new NumericUpDown
 		{
 			Minimum = min,
 			Maximum = max,
 			Value = value,
-			Width = 72,
-			Margin = new Padding(0, 4, 8, 0)
+			Dock = DockStyle.Fill,
+			TextAlign = HorizontalAlignment.Right,
+			Margin = new Padding(D(2), D(3), D(10), D(3))
 		};
 	}
 
-	private static string Tail(string text)
+	/// <summary>
+	/// ⭐⭐ 机主要求：代码级 UI 自检 —— 用 `TextRenderer.MeasureText` 比较“文本宽 vs 可用列宽”，
+	/// 证明 16 字以内的标签不会换行（截图里的「起充 %（低）」换行问题）✅
+	/// </summary>
+	private void LogLabelWidthCheck(string rowName, Label label, int columnWidth)
 	{
-		if (string.IsNullOrEmpty(text))
+		try
 		{
-			return "（无详情）";
+			Size measured = TextRenderer.MeasureText(label.Text, label.Font);
+			bool wraps = !label.AutoSize && measured.Width > columnWidth;
+			string message = "[battery-ui] 行=" + rowName + " · 文本=\"" + label.Text + "\" · 文本宽="
+				+ measured.Width + "px · 列宽=" + columnWidth + "px ⇒ 会换行=" + wraps;
+			Logger.WriteLine(message);
+			Logger.WriteLineIfChanged("battery-ui-width-" + rowName, message);
 		}
-		string[] lines = text.Replace("\r", "").Split('\n');
-		for (int i = lines.Length - 1; i >= 0; i--)
+		catch (Exception ex)
 		{
-			if (!string.IsNullOrWhiteSpace(lines[i]))
-			{
-				return lines[i].Trim();
-			}
+			Logger.WriteLine("[battery-ui] 宽度自检失败（" + rowName + "）：" + ex.GetType().Name + " " + ex.Message);
 		}
-		return text.Trim();
 	}
 }

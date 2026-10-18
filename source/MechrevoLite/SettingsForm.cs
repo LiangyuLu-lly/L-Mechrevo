@@ -13823,6 +13823,15 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 
 	private static int _bdHeldAtLimitHigh = -1;
 
+	// ⭐⭐ 2026-10-18（机主定稿）：⭐ 标题行状态摘要缓存（5s，避免电池刷新频繁读 EC）✅
+	private static long _bdTitleLimitTick;
+
+	private static int _bdTitleLimitHigh = -1;
+
+	private static int _bdTitleLimitLow = -1;
+
+	private static int _bdTitleLimitMode = -1;
+
 	/// <summary>
 	/// ⭐⭐ 2026-10-18：⭐ 判断“宝龙达限充生效且 SOC ≥ 停充阈值”✅。
 	/// <para>判据：`0x83C0 == 0x48` + `0x83A1`（停充阈值）+ 当前 SOC；⛔ 读不到 EC 状态 ⇒ false
@@ -13904,8 +13913,50 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		return Strings.BatteryStateIdle;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主定稿）：⭐ 标题行右侧的唯一状态摘要 —— 读 `0x83C0/0x83A1/0x83A2`（5s 缓存）；
+	/// ⛔ 读不到 ⇒ 显示「未限制充电」，⛔ 不显示“限充中” ✅
+	/// </summary>
+	private static bool TryReadBaolongdaLimitForTitle(out int high, out int low, out int mode)
+	{
+		high = -1;
+		low = -1;
+		mode = -1;
+		MechrevoHw hw = Program.hw;
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return false;
+		}
+		long now = Environment.TickCount64;
+		if (now - _bdTitleLimitTick < 5000)
+		{
+			high = _bdTitleLimitHigh;
+			low = _bdTitleLimitLow;
+			mode = _bdTitleLimitMode;
+			return mode >= 0;
+		}
+		bool ok = BatteryLimitWriter.TryReadState(out high, out low, out mode, out _);
+		_bdTitleLimitTick = now;
+		_bdTitleLimitHigh = ok ? high : -1;
+		_bdTitleLimitLow = ok ? low : -1;
+		_bdTitleLimitMode = ok ? mode : -1;
+		return ok;
+	}
+
 	internal static string BatteryHeadlineText(in BatteryDisplayInput input)
 	{
+		// ⭐⭐ 2026-10-18（机主定稿布局）：⭐ 宝龙达电池页的**状态摘要唯一位置 = 标题行右侧**：
+		//   「限制充电中（停充 X% / 起充 Y%）」/「未限制充电」；⛔ 不再显示“外接电源·未充电”那串 ✅
+		if (Program.hw?.UsesBaolongda == true && BatteryLimitPanel.IsSupportedBoard(Program.hw))
+		{
+			if (TryReadBaolongdaLimitForTitle(out int titleHigh, out int titleLow, out int titleMode))
+			{
+				return titleMode == BatteryLimitWriter.ModeActive
+					? "限制充电中（停充 " + titleHigh + "% / 起充 " + titleLow + "%）"
+					: "未限制充电";
+			}
+			return "未限制充电";
+		}
 		PowerInputKind kind = PowerInputDecoder.Reconcile(input.Power, input.AcOnline);
 		List<string> list = new List<string>(4) { PowerSourceHeadline(kind, input.Power?.AdapterWatts) };
 		string text = BatteryStateText(in input);
