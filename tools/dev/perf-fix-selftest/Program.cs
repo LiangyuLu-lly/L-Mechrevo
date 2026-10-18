@@ -16,6 +16,11 @@ internal static class Program
 		CheckPl4NotLoweredWhenAlreadyAbove();
 		CheckNoChangeWhenValid();
 		CheckUnknownIgnored();
+		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：
+		//   C1 = 显示/下发**同一判据**：宝龙达 && 30 系 && SMU 可用；
+		//   C2 = 规划器只在判据为真时生成 `SmuStapmTimeSeconds`（未设置/不可用 ⇒ 不生成，旧行为）。
+		CheckSmuPowerRoutePredicate();
+		CheckPlannerEmitsStapmTimeWindowOnlyWhenSmuUsable();
 		CheckPlannerEmitsGpuOverclockOnFirmwareSlotForBaolongda();
 		CheckPlannerKeepsGcuStepsUnchanged();
 		Console.WriteLine(_fail == 0 ? "ALL OK" : $"{_fail} FAILED");
@@ -104,6 +109,65 @@ internal static class Program
 		Expect("A7 PL1", p1 == 120, p1);
 		Expect("A7 PL2 unknown", p2 == null, p2);
 		Expect("A7 no changes", changes.Count == 0);
+	}
+
+	private static void CheckSmuPowerRoutePredicate()
+	{
+		// ⭐⭐ 2026-10-19（机主：显示条件 =「当前自定义档实际走 SMU 下发」，不是"机型是 Gen30"）：
+		//   唯一下发/显示判据 = `PerfModeCapabilities.UsesSmuForCustomPower`。
+		//   C1a：宝龙达 + 30 系 + SMU 可用 ⇒ true（UI 建「功耗时间窗（STAPM，秒）」、下发走 SMU）。
+		bool ready = PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: true, isBaolongda30Series: true, smuReady: true);
+		Expect("C1a SMU route enabled (baolongda+30+smu ok)", ready);
+		//   C1b：PawnIO 未装 / RyzenSMU 初始化失败（smuReady=false）⇒ false（不建行、不生成步骤）。
+		bool notReady = PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: true, isBaolongda30Series: true, smuReady: false);
+		Expect("C1b SMU route disabled when smu unavailable", !notReady);
+		//   C1c：非 30 系（40 系有 WMI 23）⇒ 不走 SMU。
+		bool gen40 = PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: true, isBaolongda30Series: false, smuReady: true);
+		Expect("C1c SMU route disabled for non-30-series", !gen40);
+	}
+
+	private static void CheckPlannerEmitsStapmTimeWindowOnlyWhenSmuUsable()
+	{
+		// ⭐⭐ 2026-10-19（机主：「功耗持续（时间）实际能不能放进去」）：
+		//   判据为真 + 已设置 StapmTimeSeconds ⇒ 生成 `SmuStapmTimeSeconds`（MP1 0x18）这一步；
+		//   判据为假 ⇒ **不生成**（旧行为：步骤列表不变、不写时间窗）。
+		PerfModeSettings settings = new PerfModeSettings
+		{
+			Pl1 = 65,
+			Pl2 = 100,
+			StapmTimeSeconds = 30
+		};
+		PerfModeDefinition mode = new PerfModeDefinition("custom1", PerfModeKind.Custom, null, settings);
+		FirmwareSlotPlan slotPlan = new FirmwareSlotPlan(0, NeedsParameterWrite: true, "test");
+		PerfModeCapabilities smuCaps = new PerfModeCapabilities
+		{
+			SupportsFirmwareSlot = false,
+			SupportsWmiPowerFields = true,
+			SupportsSmuPowerControls = true
+		};
+		IReadOnlyList<PerfApplyStep> smuSteps = PerfModeApplyPlanner.Build(mode, slotPlan, smuCaps, includeSwitch: false);
+		PerfApplyStep? timeStep = smuSteps.FirstOrDefault((PerfApplyStep s) => s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "SmuStapmTimeSeconds");
+		Expect("C2a stapm-time step exists when SMU usable", (object?)timeStep != null);
+		if ((object?)timeStep != null)
+		{
+			Expect("C2a stapm-time value", timeStep.Value == "30", timeStep.Value);
+		}
+		// 不可用 ⇒ 不生成（同一份 settings）
+		PerfModeCapabilities noSmuCaps = new PerfModeCapabilities
+		{
+			SupportsFirmwareSlot = false,
+			SupportsWmiPowerFields = true,
+			SupportsSmuPowerControls = false
+		};
+		IReadOnlyList<PerfApplyStep> noSmuSteps = PerfModeApplyPlanner.Build(mode, slotPlan, noSmuCaps, includeSwitch: false);
+		Expect("C2b no stapm-time step when SMU unavailable",
+			noSmuSteps.All((PerfApplyStep s) => !(s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "SmuStapmTimeSeconds")));
+		// 未设置 StapmTimeSeconds（旧配置缺省 = null）⇒ 即使 SMU 可用也不生成（不写、旧行为）
+		PerfModeSettings unset = settings with { StapmTimeSeconds = null };
+		IReadOnlyList<PerfApplyStep> unsetSteps = PerfModeApplyPlanner.Build(mode.With(unset), slotPlan, smuCaps, includeSwitch: false);
+		Expect("C2c no stapm-time step when unset (old behaviour)",
+			unsetSteps.All((PerfApplyStep s) => !(s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "SmuStapmTimeSeconds")));
+		Console.WriteLine("  C2 steps: " + string.Join("  ", smuSteps.Select((PerfApplyStep s) => s.ToString())));
 	}
 
 	private static void CheckPlannerEmitsGpuOverclockOnFirmwareSlotForBaolongda()

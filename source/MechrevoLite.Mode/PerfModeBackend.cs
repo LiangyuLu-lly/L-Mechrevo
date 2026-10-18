@@ -23,6 +23,9 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 	public static PerfModeCapabilities CapabilitiesFrom(MechrevoHw hw)
 	{
 		ArgumentNullException.ThrowIfNull(hw, "hw");
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制）：先按**静态判据短路**，再问 SMU 通路是否可用 ——
+		//   `SmuAvailability.IsReady` 会做一次 PawnIO 探测（进程内缓存）；⛔ 不能让 GCU/40 系机器也白跑一次。
+		bool smuReady = hw.IsBaolongda30Series && SmuAvailability.IsReady;
 		return new PerfModeCapabilities
 		{
 			UsesAmdPowerFields = hw.UsesAmdPowerFields,
@@ -58,10 +61,13 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//   ⇒ ⭐ 所以单独申报：⭐ 宝龙达 ⇒ true ⇒ ⭐ 规划器额外生成那三步 ✅
 			//   ⚠️ 非宝龙达 ⇒ false ⇒ ⭐ 那三步仍留在原固件字段块里 ⇒ ⭐ 步骤列表【一个字节都不变】✅
 			SupportsWmiPowerFields = hw.UsesBaolongda,
-			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：⭐ 只有「宝龙达 30 系」才生成
-			//   `SmuStapmTimeSeconds` 这一步（30 系没有 WMI 23、PL/温度墙/时间窗走 SMU ✅）
-			//   ⚠️ 40 系 / GCU / 老接口 ⇒ false ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsSmuPowerTimeWindow = hw.IsBaolongda30Series,
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制 · 机主「持续功耗 STAPM 能不能放进去」）：
+			//   ⭐ 本后端自定义档的功耗**到底走不走 SMU** —— 唯一判据 `PerfModeCapabilities.UsesSmuForCustomPower`
+			//      （宝龙达 + 30 系 + SMU 通路真的可用；`SmuAvailability.IsReady` 进程内只探测一次）✅
+			//   ⭐ 规划器据此生成 `StapmLimitW` / `SmuStapmTimeSeconds` 两步；UI 也只用同一个函数决定建不建行
+			//      （⛔ 不再只按"机型是 Gen30"这种静态判据）✅
+			//   ⚠️ 40 系 / GCU / 老接口 / SMU 不可用 ⇒ false ⇒ ⭐ 步骤列表【一个字节都不变】✅
+			SupportsSmuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, smuReady),
 			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 宝龙达没有 GCU ⇒ GPU 偏移只能走本机 NVAPI P0
 			//   （⭐ `PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支）。
 			//   ⚠️ 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** ✅（GCU 机型那条 `WriteFirmwareField` 路径照旧）。

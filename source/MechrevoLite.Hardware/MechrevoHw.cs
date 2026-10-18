@@ -4594,8 +4594,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：当前 **STAPM 时间窗（秒）**；<c>0</c> = 读不到
-	/// （⇒ UI **不建**「功耗时间窗（STAPM，秒）」那一行 —— 铁律：读不到就不显示，⛔ 不编默认值）。
+	/// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：当前 **STAPM 时间窗（秒）**；
+	/// <c>0</c> = 读不到 / 读数不稳定。
+	/// <para>⭐ UI 语义（2026-10-19 机主定）：只要「自定义档真的走 SMU」（判据
+	/// <c>PerfModeCapabilities.UsesSmuForCustomPower</c>）这一行就**照建**；本值为 0 时标题显示
+	/// 「（未设置）」—— ⛔ 不再因为读不到就隐藏整行（那看起来像"没这个功能"）。</para>
 	/// <para>⚠️ 只在 <see cref="IsBaolongda30Series" /> 且 <see cref="RefreshBaolongda30SeriesSmuPower" />
 	/// 成功过之后才有值。</para>
 	/// </summary>
@@ -4612,7 +4615,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <para>⚠️ 39 系/40 系/非宝龙达：本方法**直接返回 false**，一个寄存器不读、一个属性不动。</para>
 	/// <para>⚠️ 只读：只走 PM 表 resolve/transfer/read，⛔ 不发任何 SMU 写命令。</para>
 	/// <para>⚠️ 失败方向：PawnIO 不可用 / 非 AMD / 读表失败 ⇒ 返回 false + 日志；调用方必须如实处理
-	/// （UI = 不建时间窗行；下发 = 如实报失败，⛔ 不假装成功）。</para>
+	/// （UI = STAPM 时间窗行**照建**、值显示「未设置」；下发 = 如实报失败/未确认，⛔ 不假装成功）。</para>
 	/// </summary>
 	internal bool RefreshBaolongda30SeriesSmuPower(bool force = false, bool requireStableStapmTime = false)
 	{
@@ -4643,7 +4646,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// ⭐⭐ STAPM 时间窗：**只有读数稳定才认**（真机教训：本机 Phoenix / PM 表 0x4C0009 的
 			//   0x918 字段连续两次读数会在 25~67 之间跳 ⇒ 不是"用户可设置的当前值"）。
 			//   * UI 打开时传 `requireStableStapmTime: true` ⇒ 再读一次，两次差 >1 就按"读不到"处理
-			//     ⇒ ⛔ 不建「功耗时间窗（STAPM，秒）」那一行（不显示不可信的值）；
+			//     ⇒ UI 行**照建**、显示「（未设置）」（机主 2026-10-19：⛔ 不再因为读不到就隐藏整行）；
 			//   * 下发基线/回读确认不需要它时传 false（省一次 ~0.4 s 的 PM 表读）。
 			int stapmTimeSeconds = snapshot.StapmTimeSeconds ?? 0;
 			if (requireStableStapmTime && stapmTimeSeconds > 0)
@@ -4652,8 +4655,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				int secondTime = (second != null) ? (second.StapmTimeSeconds ?? 0) : 0;
 				if (secondTime <= 0 || Math.Abs(secondTime - stapmTimeSeconds) > 1)
 				{
-					Logger.WriteError($"[smu-30] STAPM 时间窗读数不稳定（{stapmTimeSeconds}s → {secondTime}s）"
-						+ " ⇒ 视为**读不到**：UI 不建该行、也不拿它做写入回读确认（⛔ 不显示不可信的值）");
+					Logger.WriteError($"[smu] STAPM 时间窗读数不稳定（{stapmTimeSeconds}s → {secondTime}s）"
+						+ " ⇒ 视为「未设置」：UI 行照建、值显示「未设置」；也不拿它做写入回读确认（⛔ 不显示不可信的值）");
 					stapmTimeSeconds = 0;
 				}
 			}

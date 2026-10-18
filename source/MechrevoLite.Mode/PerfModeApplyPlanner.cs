@@ -170,10 +170,11 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
-			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：⭐ 第 4 个键，只有「宝龙达 30 系」生成
-			//   （`SupportsSmuPowerTimeWindow` 默认 false ⇒ GCU/老接口/40 系步骤列表逐位不变 ✅）。
-			//   ⚠️ 单位 = **秒**；它是 STAPM 的平均时间窗，不是"PL2 生效时间"（见 PerfModeSettings 注释）。
-			if (caps.SupportsSmuPowerTimeWindow && settings.StapmTimeSeconds.HasValue)
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗 · 机主「持续功耗时间能不能放进去」）：
+			//   ⭐ 只有「SMU 功耗控制真的可用」时生成（`SupportsSmuPowerControls` = 宝龙达 && 30 系 && SMU 通路可用；
+			//      默认 false ⇒ GCU/老接口/40 系/PawnIO 不可用时步骤列表逐位不变 ✅）。
+			//   ⚠️ 单位 = **秒**（MP1 0x18 `stapm_time`）；未设置（null）⇒ 不生成、不写（旧行为）✅
+			if (caps.SupportsSmuPowerControls && settings.StapmTimeSeconds.HasValue)
 			{
 				list.Add(Field("SmuStapmTimeSeconds", settings.StapmTimeSeconds.Value));
 			}

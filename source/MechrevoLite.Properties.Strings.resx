@@ -687,7 +687,7 @@
     <value>Power time window (STAPM, s)</value>
   </data>
 <data name="CpuStapmTimeWindowHint" xml:space="preserve">
-    <value>Averaging window for skin-temperature-aware sustained power, in seconds. Larger values smooth power changes out.</value>
+    <value>STAPM time window (s): the averaging window over which sustained power is constrained by skin temperature. Larger values smooth power changes out.</value>
   </data>
 <data name="CpuTempWallHint" xml:space="preserve">
     <value>Processor temperature limit in °C. The CPU throttles when it reaches this temperature.</value>

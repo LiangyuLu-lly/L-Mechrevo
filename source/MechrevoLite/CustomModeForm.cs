@@ -191,11 +191,14 @@ public class CustomModeForm : RForm
 
 	private RSlider _tcc;
 
-	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：只有「宝龙达 30 系 + 当前值读得到」才创建；
-	//   条件不满足 ⇒ 字段保持 null（= 本机/本档**没有**这一行；铁律：读不到就不显示）。
+	// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：只要「本档真的走 SMU」就**建行**
+	//   （判据 = `PerfModeCapabilities.UsesSmuForCustomPower`，与真实下发分支同源；见 ctor 注释）。
+	//   ⚠️ 值读不到/不稳定 ⇒ 标题显示「（未设置）」；⛔ 不再因为读不到就隐藏整行。
 	private RSlider _stapmTime;
 
 	private RNumericUpDown _stapmTimeVal;
+
+	private Label _stapmTimeLabel;
 
 	private RSlider _tgp;
 
@@ -739,17 +742,27 @@ public class CustomModeForm : RForm
 			}
 		};
 		AddComboRow(Strings.BoostMode, _boostCombo);
-		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：⭐ 本机是不是「宝龙达 30 系」（蛟龙16 / 裸板号 MRID6 / 6800H）？
-		//   ⭐ 是 ⇒ PL1/PL2/温度墙走 **SMU**（30 系原厂 WMI 方法表只到 18、没有功能号 23），
-		//      且**只有**这种情况下才允许出现「功耗时间窗（STAPM，秒）」这一行 ✅
-		//   ⚠️ 40 系 / GCU / 老同方 ⇒ 判据为假 ⇒ 下面一行都不建、tooltip 也不挂 ⇒ 行为逐位不变 ✅
-		bool baolongda30Series = hw != null && hw.IsBaolongda30Series;
-		if (baolongda30Series)
+		// ⭐⭐ 2026-10-19（机主：显示条件 =「当前自定义档**实际走 SMU 下发**」，不是"机型是 Gen30"）：
+		//   ⭐ 单一判据 = `PerfModeCapabilities.UsesSmuForCustomPower(宝龙达, 30 系, SMU 可用)` +
+		//      `SmuAvailability.IsReady`（PawnIO 已装 + RyzenSMU 初始化成功；**进程内只探测一次**，⛔ 不每次开窗读 SMU）。
+		//   ⭐ 与 `MechrevoService.ApplyPowerLimitViaSmu` 实际会走的分支**同源** ⇒ 不会出现"界面显示了、
+		//      实际却走 WMI 23（30 系根本没有）"的错位（守 §9.14）。
+		//   ⚠️ 40 系 / GCU / 老同方 / PawnIO 不可用 ⇒ 判据为假 ⇒ 下面这行都不建、tooltip 也不挂 ⇒ 行为逐位不变 ✅
+		bool smuPowerControls = false;
+		if (hw != null && hw.IsBaolongda30Series)
+		{
+			smuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady);
+			if (!smuPowerControls)
+			{
+				Logger.WriteLine("[smu] 不可用 ⇒ 隐藏 STAPM 时间窗行（原因：" + SmuAvailability.Reason + "）");
+			}
+		}
+		if (smuPowerControls)
 		{
 			// ⭐ 只读：先从 SMU PM 表读一次当前 PL1/PL2/温度墙/时间窗（顺便把本地记忆填成**真实当前值**，
 			//   这样标题不再显示「（未设置）」、下发基线也是真值）。读失败也继续：下面按"未设置"如实显示。
 			//   ⚠️ `requireStableStapmTime: true` ⇒ STAPM 时间窗必须**连续两次读数一致**才算"读得到"
-			//      （真机教训：部分 PM 表版本上这个字段是动态量、会跳）⇒ 不稳定就不建那一行。
+			//      （真机教训：部分 PM 表版本上这个字段是动态量、会跳）⇒ 不稳定按「未设置」显示（行照建）。
 			hw.RefreshBaolongda30SeriesSmuPower(force: true, requireStableStapmTime: true);
 		}
 		(int, int, int, bool) tuple2 = DeviceRange(hw?.Pl1Minimum ?? (-1), hw?.Pl1Maximum ?? (-1), hw?.Pl1 ?? 0);
@@ -770,26 +783,29 @@ public class CustomModeForm : RForm
 		_pl2Val = tuple4.Item2;
 		_pl2Label = RowLabelOf(_pl2);
 		AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
-		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：**读得到当前值才建这一行**。
-		//   ⚠️ SMU 的两个时间窗里，只有 STAPM 时间窗对用户可解释（fast/PL2 是瞬时限值、没有时间参数；
-		//      slow 时间常数这次不暴露）。单位 = **秒**（不是毫秒）。
-		//   ⛔ 读不到当前值 ⇒ 不建行、不显示任何默认值（铁律）。
-		if (baolongda30Series)
+		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：只要「本档真的走 SMU」就**建行** ——
+		//   ⭐ 值读得到/稳定 ⇒ 显示当前值；读不到/不稳定 ⇒ 标题「（未设置）」+ 滑块停在最小档，
+		//      ⛔ 不再因为读不到就隐藏整行（那看起来像"没这个功能"）。
+		//   ⚠️ 单位 = **秒**（MP1 0x18 `stapm_time`；不是毫秒，也不是"PL2 生效时间"）。
+		if (smuPowerControls)
 		{
 			int currentStapmTime = hw.BaolongdaStapmTimeSeconds;
-			if (currentStapmTime >= BaolongdaProfile.StapmTimeMinSeconds && currentStapmTime <= BaolongdaProfile.StapmTimeMaxSeconds)
+			bool stapmTimeUnset = currentStapmTime < BaolongdaProfile.StapmTimeMinSeconds
+				|| currentStapmTime > BaolongdaProfile.StapmTimeMaxSeconds;
+			int stapmTimeStart = stapmTimeUnset ? BaolongdaProfile.StapmTimeMinSeconds : currentStapmTime;
+			tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuStapmTimeWindow, stapmTimeUnset),
+				BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, stapmTimeStart, (int v) =>
 			{
-				tuple4 = AddSliderRow(Strings.CpuStapmTimeWindow, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, currentStapmTime, (int v) =>
-				{
-					Queue("SmuStapmTimeSeconds", v.ToString());
-				});
-				_stapmTime = tuple4.Item1;
-				_stapmTimeVal = tuple4.Item2;
-				AttachPowerWallHint(_stapmTime, _stapmTimeVal, RowLabelOf(_stapmTime), Strings.CpuStapmTimeWindowHint);
-			}
-			else
+				Queue("SmuStapmTimeSeconds", v.ToString());
+			});
+			_stapmTime = tuple4.Item1;
+			_stapmTimeVal = tuple4.Item2;
+			_stapmTimeLabel = RowLabelOf(_stapmTime);
+			// tooltip 正面解释（⛔ 不写"不是 PL2 生效时间"这类否定/对比句）
+			AttachPowerWallHint(_stapmTime, _stapmTimeVal, _stapmTimeLabel, Strings.CpuStapmTimeWindowHint);
+			if (stapmTimeUnset)
 			{
-				Logger.WriteLine("[smu-30] UI 不建「功耗时间窗（STAPM，秒）」行：当前值读不到（PM 表无该字段/读表失败）");
+				Logger.WriteLine("[smu] STAPM 时间窗当前值读不到/不稳定 ⇒ 行照建、显示「（未设置）」（不隐藏）");
 			}
 		}
 		(int, int, int, bool) tuple5 = DeviceRange(hw?.Pl4Minimum ?? (-1), hw?.Pl4Maximum ?? (-1), hw?.Pl4 ?? 0);
@@ -812,11 +828,11 @@ public class CustomModeForm : RForm
 		_tccLabel = RowLabelOf(_tcc);
 		AttachPowerWallUnsetHint(_tcc, _tccVal, _tccLabel);
 		_tccChk.Enabled = tuple6.Item4;
-		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：⭐ 30 系这三行改走 SMU，鼠标悬停显示"这一项在 SMU 里是什么"
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：⭐ 本档走 SMU 时这三行显示"这一项在 SMU 里是什么"
 		//   （PL1 = slow limit / PL2 = fast limit / 温度墙 = Tctl 上限）。⚠️ 只在**读到了当前值**时替换掉
 		//   「未设置」提示；读不到时保留原来的只读/未设置说明（更贴近用户看到的现象）。
-		//   ⚠️ 非 30 系 / 40 系 / GCU ⇒ 一行都不挂 ⇒ 行为逐位不变 ✅
-		if (baolongda30Series)
+		//   ⚠️ 非 30 系 / 40 系 / GCU / SMU 不可用 ⇒ 一行都不挂 ⇒ 行为逐位不变 ✅
+		if (smuPowerControls)
 		{
 			if (!(hw?.BaolongdaPl1Unset ?? true))
 			{
@@ -4311,9 +4327,10 @@ public class CustomModeForm : RForm
 			{
 				ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1);
 				ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2);
-				// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：行存在时按"当前值"刷新
+				// ⭐⭐ 2026-10-19（机主：「是持续功耗时间」）：行存在时按"当前值"刷新
 				//   （写成功后 `NoteBaolongdaSmuStapmTimeApplied` 会把它更新成刚下发的值；
-				//     否则是最近一次 PM 表只读采样的值）。⚠️ 行不存在 ⇒ 一个控件都不碰（不存在的东西不刷新）。
+				//     否则是最近一次 PM 表只读采样的值）。读不到/不稳定（0）⇒ 保持「（未设置）」不动。
+				//   ⚠️ 行不存在 ⇒ 一个控件都不碰（不存在的东西不刷新）。
 				if (_stapmTime != null)
 				{
 					int stapmTimeNow = hw.BaolongdaStapmTimeSeconds;
@@ -4321,6 +4338,8 @@ public class CustomModeForm : RForm
 					{
 						ApplyRange(_stapmTime, _stapmTimeVal, BaolongdaProfile.StapmTimeMinSeconds,
 							BaolongdaProfile.StapmTimeMaxSeconds, stapmTimeNow);
+						// 「（未设置）」只减不增（列宽是建窗时算好的）
+						SyncUnsetMark(_stapmTimeLabel, unset: false);
 					}
 				}
 				// ⭐⭐ 2026-10-16（"未设置"）：⭐ 值一旦下发过 ⇒ ⭐ 把标题里的「（未设置）」**去掉** ✅

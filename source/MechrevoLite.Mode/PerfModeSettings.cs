@@ -34,11 +34,14 @@ public sealed record PerfModeSettings
 	public int? TccTarget { get; init; }
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：STAPM（按机壳温度的持续功耗）的**平均时间窗**，单位**秒**。
-	/// <para>⚠️ 只在「宝龙达 30 系」上由 UI 写入（30 系没有 WMI 功能号 23 ⇒ 自定义模式的 PL/温度墙走 SMU；
-	/// 40 系不建这一行、本字段保持 null）。</para>
-	/// <para>⚠️ 它不是 "PL2 生效时间"：PL2（fast limit）是瞬时限值、没有时间参数；
-	/// SMU 侧只有 <c>stapm_time</c>（本字段）与 <c>slow_time</c>（平均功耗时间常数）两个时间窗。</para>
+	/// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：STAPM（按机壳温度约束的持续功耗）的
+	/// **平均时间窗**，单位**秒**，对应 SMU MP1 **0x18 `stapm_time`**。
+	/// <para>⭐ 显示/下发条件 = **本自定义档真的走 SMU**（`PerfModeCapabilities.UsesSmuForCustomPower`：
+	/// 宝龙达 && 30 系 && SMU 通路可用）；40 系（有 WMI 23）/ GCU / PawnIO 不可用 ⇒ 字段保持 null、不写。</para>
+	/// <para>⚠️ <c>null</c> = **未设置**（旧配置缺省）⇒ 不生成这一步、不写任何东西（旧行为）。
+	/// UI 在值读不到/不稳定时显示「（未设置）」但仍建行（不隐藏）。</para>
+	/// <para>⚠️ 与 <c>slow_time</c>（slow limit 的时间常数，本仓库暂未暴露）是两个不同的时间窗；
+	/// 也⛔ 不是"PL2 生效时间"（PL2/fast 是瞬时限值、没有时间参数）。</para>
 	/// </summary>
 	public int? StapmTimeSeconds { get; init; }
 

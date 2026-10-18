@@ -59,14 +59,38 @@ public sealed record PerfModeCapabilities
 	public bool SupportsWmiPowerFields { get; init; }
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：⭐ <b>本后端能不能把「功耗时间窗（STAPM，秒）」下发到 SMU</b> ✅。
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制）：⭐ <b>本后端的自定义档功耗到底走不走 SMU</b> ✅。
 	/// <para>⭐ 为什么单独一个能力位：30 系（宝龙达 <c>MRID6</c> / 6800H）没有 WMI 功能号 23，
-	/// PL1/PL2/温度墙走 SMU（<see cref="MechrevoService.SetCustomDetail" /> 开头的
-	/// <c>TryApplyPowerLimitViaBackend</c>）；而"时间窗"是**第 4 个键**（<c>SmuStapmTimeSeconds</c>），
-	/// 只有 30 系 UI 会建那一行 ⇒ 只有该后端才生成这一步。</para>
+	/// PL1/PL2/温度墙/STAPM 时间窗都走 SMU；而"本机**真的**走 SMU"不是仅凭机型就能判定的 ——
+	/// PawnIO 没装 / RyzenSMU 初始化失败时，<c>MechrevoService.ApplyPowerLimitViaSmu</c> 会如实失败并返回 false
+	/// （30 系**没有** WMI 23 可退回）⇒ 那时候界面就不该建 SMU 专属行（守 §9.14：能力位||本机实现，
+	/// 且与真实下发分支**同源**）。</para>
+	/// <para>⭐ <b>单一判据</b>：本能力位 = <see cref="UsesSmuForCustomPower" /> 的返回值
+	/// （宝龙达 + 30 系 + SMU 通路可用），供规划器生成 <c>SmuStapmTimeSeconds</c>（MP1 0x18）这一步；
+	/// UI（<c>CustomModeForm</c>）也只用这同一个函数决定建不建「功耗时间窗（STAPM，秒）」那一行 ✅
+	/// （值读不到/不稳定 ⇒ 行**照建**、显示「未设置」，⛔ 不隐藏）。</para>
 	/// <para>⚠️ 默认 <c>false</c> ⇒ ⭐ <see cref="All" /> 与所有既有后端（GCU / 老接口 / 40 系）<b>逐位不变</b> ✅。</para>
 	/// </summary>
-	public bool SupportsSmuPowerTimeWindow { get; init; }
+	public bool SupportsSmuPowerControls { get; init; }
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「它现在接了 SMU 嘛，功耗持续实际能不能放进去」）：
+	/// ⭐ <b>「本机自定义档的功耗是不是真的走 SMU」的唯一纯判据</b>（可单测；不碰硬件）✅。
+	/// <para>三个条件**同时**成立才算走 SMU：</para>
+	/// <list type="number">
+	/// <item><c>usesBaolongda</c>：宝龙达后端（30/40 系蛟龙16Pro 那个模具）；</item>
+	/// <item><c>isBaolongda30Series</c>：30 系（蛟龙16 / 裸 <c>MRID6</c> / 6800H）—— 30 系原厂 WMI 方法表只到 18，
+	/// 没有功能号 23；40 系（<c>MRID6-23</c>）有 23 ⇒ 不走 SMU；</item>
+	/// <item><c>smuReady</c>：SMU 通路**真的可用**（PawnIO 已装 + RyzenSMU 初始化成功；
+	/// 由 <c>SmuAvailability.IsReady</c> 缓存一次轻量探测，⛔ 不每次开窗读 SMU）。</item>
+	/// </list>
+	/// <para>⚠️ 为什么必须是**函数**而不是散在各处的 if：机主明确要求 UI 显示与真实下发**同源**，
+	/// 避免「界面显示 SMU 行、实际却走 WMI 23（30 系根本没有）」的错位（§9.14）。</para>
+	/// </summary>
+	internal static bool UsesSmuForCustomPower(bool usesBaolongda, bool isBaolongda30Series, bool smuReady)
+	{
+		return usesBaolongda && isBaolongda30Series && smuReady;
+	}
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」· 宝龙达无 GCU）：⭐ <b>本后端能不能把 GPU 核心/显存偏移
