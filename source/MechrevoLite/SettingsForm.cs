@@ -8111,7 +8111,10 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			//   只加控件不会自动长高 ⇒ 新行会被裁掉看不见。这里按面板首选高度补一行 **Absolute** 行高，
 			//   ⭐ 并**单独记住该行索引/行高**（所有重算/隐藏路径都跳过它）✅
 			int panelWidth = Math.Max(320, host.Width);
-			int panelHeight = Math.Max(100, panel.GetPreferredSize(new Size(panelWidth, 0)).Height);
+			// 2026-10-18（机主：「底下的『未限制充电』被裁掉一点点」）：
+			//   PreferredSize 是**内容高**，不含面板内边距/字体行高取整 ⇒ 顶部/底部各差几像素就会被裁。
+			//   ⇒ 统一留 8 逻辑像素余量（足够覆盖 96/125/150/175% 缩放的取整误差）。
+			int panelHeight = Math.Max(100, panel.GetPreferredSize(new Size(panelWidth, 0)).Height + ResponsiveLayout.LogicalToDevice(this, 8));
 			// 2026-10-18（机主：电池区域仍然空白 · 诊断包实测 `rowIndex=7 · rows=5`）：
 			//   ⚠️ 根因 = 增量行之前 `RowStyles.Count` 可能**小于** `RowCount`（有行只加了 RowCount 没加样式）
 			//   ⇒ 只 `RowStyles.Add()` 会让"新行"落在 index=5，而控件加到 index=7 ⇒ **那一行没有样式 ⇒ 高度 0 ⇒ 面板看不见**。

@@ -11,7 +11,7 @@ using System.Security.Permissions;
 [assembly: AssemblyCompany("L-Mechrevo")]
 [assembly: AssemblyConfiguration("Release")]
 [assembly: AssemblyFileVersion("0.292.1")]
-[assembly: AssemblyInformationalVersion("0.292.1-beta23")]
+[assembly: AssemblyInformationalVersion("0.292.1-beta23.1")]
 [assembly: AssemblyProduct("L-Mechrevo")]
 [assembly: AssemblyTitle("L-Mechrevo")]
 [assembly: TargetPlatform("Windows10.0.19041.0")]

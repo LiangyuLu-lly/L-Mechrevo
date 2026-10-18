@@ -65,9 +65,11 @@ internal sealed class BatteryLimitPanel : Panel
 	// ⭐ 统一行距常量（逻辑像素；只用这一套，⛔ 不混用半行高）✅
 	private const int RowSoc = 24;
 
-	private const int RowInput = 30;
+	// 2026-10-18（机主：「保存阈值按钮有点被裁」）：输入行 30 -> 34 —— 按钮 Dock=Fill 且上下各有 4 逻辑像素外边距，
+	//   行高 30 时按钮实际只有 22 高，文字/圆角边框会被裁；34 给到 26 高，96/125/150% 缩放下都够。
+	private const int RowInput = 34;
 
-	private const int RowStatus = 24;
+	private const int RowStatus = 26;
 
 
 	public BatteryLimitPanel()
