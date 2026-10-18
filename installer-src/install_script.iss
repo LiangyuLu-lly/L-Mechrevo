@@ -2471,7 +2471,21 @@ begin
   if Result = '' then Result := '(读不到)';
 end;
 function ShouldInstallPawnIo(): Boolean; forward;
+function IsWujieMold(): Boolean;
+// 2026-10-18（机主：无界这类用 SMU 的机型也应默认安装 PawnIO）：
+//   只读 BIOS 注册表 SystemProductName，含 WUJIE 即认定（⛔ 不写任何东西）。
+var
+  Model: String;
+begin
+  Result := False;
+  Model := '';
+  RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'SystemProductName', Model);
+  Result := Pos('WUJIE', Uppercase(Model)) > 0;
+  if Result then Log('LM-PAWNIO-FORCE: 检测到无界机型（SystemProductName=' + Model + '）');
+end;
+
 function IsBaolongdaMold(): Boolean; forward;
+
 
 procedure CurPageChanged(CurPageID: Integer);
 // 2026-10-18（机主：每次装 LM 都会看到 PawnIO 勾选）：已安装 PawnIO 时，任务页里自动取消并改写该项，
@@ -2500,19 +2514,22 @@ begin
       // 2026-10-18（机主：宝龙达应强制要求安装 PawnIO）：
       //   宝龙达的 风扇强冷 / 风扇曲线 / 电池充电阈值 全部依赖 PawnIO（EC 写入）⇒
       //   任务页里强制勾选并改写说明，避免用户取消后 EC 功能全废。
-      if IsBaolongdaMold() then
+      if IsBaolongdaMold() or IsWujieMold() then
       begin
         try
           for I := 0 to WizardForm.TasksList.Items.Count - 1 do
             if Pos('PawnIO', WizardForm.TasksList.Items[I]) > 0 then
             begin
               WizardForm.TasksList.Checked[I] := True;
-              WizardForm.TasksList.ItemCaption[I] := '安装 PawnIO 驱动（宝龙达机型必需：风扇强冷/曲线/电池阈值）';
+              if IsBaolongdaMold() then
+                WizardForm.TasksList.ItemCaption[I] := '安装 PawnIO 驱动（宝龙达机型必需：风扇强冷/曲线/电池阈值）'
+              else
+                WizardForm.TasksList.ItemCaption[I] := '安装 PawnIO 驱动（无界机型必需：SMU 功耗自定义）';
             end;
         except
           Log('LM-PAWNIO-FORCE: 宝龙达机型强制勾选 PawnIO 失败（忽略）');
         end;
-        Log('LM-PAWNIO-FORCE: 宝龙达机型 ⇒ 已强制勾选 PawnIO 安装（EC 功能依赖它）');
+        Log('LM-PAWNIO-FORCE: 宝龙达/无界机型 ⇒ 已强制勾选 PawnIO 安装（EC/SMU 功能依赖它）');
       end;
     end;
   end;

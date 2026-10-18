@@ -5068,7 +5068,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⭐ 本机是否满足「无界 APU」判据（机型名含无界/WUJIE/WJXY · CpuVendor.IsAmd · 无 NVIDIA 独显）✅。
 	/// <para>⚠️ 只读；SMU 是否真的可用另判 `SmuAvailability.IsReady`（与 PerfModeCapabilities 同源）。</para>
 	/// </summary>
-	internal bool WujieSmuApu => WujieSmuGate.IsWujieApu();
+	internal bool WujieSmuApu
+	{
+		get
+		{
+			bool flag = WujieSmuGate.IsWujieApu();
+			// 2026-10-18（机主：无界这类用 SMU 的机型，没装 PawnIO 也要提示）：
+			//   SMU 读写走 PawnIO ⇒ 缺驱动时是「功能静默消失」⇒ 这里显式记一次 error 便于机主看到。
+			if (flag && !PawnIO.RyzenSmuService.IsPawnInstalled() && !_wujiePawnIoWarned)
+			{
+				_wujiePawnIoWarned = true;
+				Logger.WriteError("[smu] ⛔ 无界 APU 机型但 PawnIO 驱动未安装 => SMU 自定义（PL/温度墙）不可用；"
+					+ "请到「设置」或「CPU 调节」页安装 PawnIO 驱动");
+			}
+			return flag;
+		}
+	}
+
+	/// <summary>无界机型 PawnIO 缺失提示只记一次（避免刷屏）。</summary>
+	private static bool _wujiePawnIoWarned;
 	/// <summary>⭐ 最近一次只读验证结论（⭐ UI 说明行/日志用）✅</summary>
 	internal static string FanCurveVerifyNote => _fanCurveVerifyNote;
 
