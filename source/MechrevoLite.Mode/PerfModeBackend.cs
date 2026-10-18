@@ -79,6 +79,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 宝龙达没有 GCU ⇒ GPU 偏移只能走本机 NVAPI P0
 			//   （⭐ `PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支）。
 			//   ⚠️ 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** ✅（GCU 机型那条 `WriteFirmwareField` 路径照旧）。
+			WujieSmuLocalOnly = hw.WujieSmuApu,
 			SupportsDirectGpuOverclock = hw.UsesBaolongda
 		};
 	}

@@ -111,5 +111,12 @@ public sealed record PerfModeCapabilities
 	/// </summary>
 	public bool SupportsDirectGpuOverclock { get; init; }
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：无界 APU 用自定义应用时不要再发 GCU 性能模式命令）：
+	/// ⭐ 本后端是**纯本机 SMU** 自定义（无界 APU）⇒ 规划器**不生成**任何 GCU 模式/固件档/GCU 风扇曲线步骤；
+	/// 只下发本机 SMU 步骤（PL1/PL2/温度墙/STAPM）与后端无关的 Windows 侧步骤 ✅。
+	/// <para>⚠️ 默认 false ⇒ 宝龙达/GCU/同方所有既有后端<b>逐位不变</b> ✅</para>
+	/// </summary>
+	public bool WujieSmuLocalOnly { get; init; }
 	public static readonly PerfModeCapabilities All = new PerfModeCapabilities();
 }

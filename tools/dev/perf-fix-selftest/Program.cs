@@ -22,6 +22,9 @@ internal static class Program
 		CheckSmuPowerRoutePredicate();
 		// ⭐⭐ 2026-10-19（机主拍板：无界 APU 直接开放 SMU 自定义 · 90W）：判据断言。
 		CheckWujieApuSmuPredicate();
+		// ⭐⭐ 2026-10-19（机主：无界 APU 应用自定义时不要再发 GCU 性能模式命令）：
+		//   WJ = 规划器对 Wujie 纯本机路径：不含 GCU 模式/固件档/GCU 风扇曲线步骤，只含本机 SMU(PL) 步骤。
+		CheckWujiePlannerSkipsGcuModeSteps();
 		CheckPlannerEmitsStapmTimeWindowOnlyWhenSmuUsable();
 		// ⭐⭐ 2026-10-19（机主 UI 顺序 + FPPT 结论）：
 		//   C3a = 步骤顺序与 UI 行顺序一致：PL1 → PL2 → SmuStapmTimeSeconds → CpuTccOffset；
@@ -131,6 +134,27 @@ internal static class Program
 		Expect("W3 other machine unchanged", !PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: false, isBaolongda30Series: false, smuReady: true));
 		// D4：宝龙达 30 系原逻辑逐位不变（wujie=false）
 		Expect("W4 baolongda30 unchanged", PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: true, isBaolongda30Series: true, smuReady: true));
+	}
+	private static void CheckWujiePlannerSkipsGcuModeSteps()
+	{
+		PerfModeCapabilities caps = new PerfModeCapabilities
+		{
+			WujieSmuLocalOnly = true,
+			SupportsFirmwareSlot = false,
+			SupportsWmiPowerFields = true,
+			SupportsSmuPowerControls = true
+		};
+		PerfModeSettings settings = new PerfModeSettings
+		{
+			Pl1 = 45,
+			Pl2 = 65,
+			TccTarget = 95
+		};
+		PerfModeDefinition mode = new PerfModeDefinition("custom1", PerfModeKind.Custom, null, settings);
+		IReadOnlyList<PerfApplyStep> steps = PerfModeApplyPlanner.Build(mode, new FirmwareSlotPlan(0, NeedsParameterWrite: true, "test"), caps, includeSwitch: true);
+		Expect("WJ1 no GCU mode switch step", steps.All((PerfApplyStep s) => s.Kind != PerfApplyStepKind.SwitchBuiltIn && s.Kind != PerfApplyStepKind.SwitchFirmwareSlot && s.Kind != PerfApplyStepKind.SwitchTurboSubMode));
+		Expect("WJ2 has PL1/PL2 local SMU steps", steps.Any((PerfApplyStep s) => s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "PL1") && steps.Any((PerfApplyStep s) => s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "PL2"));
+		Expect("WJ3 no GCU fan-curve steps", steps.All((PerfApplyStep s) => s.Kind != PerfApplyStepKind.WriteFanCurve));
 	}
 	private static void CheckSmuPowerRoutePredicate()
 	{

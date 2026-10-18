@@ -719,7 +719,19 @@ internal sealed class PerfModeService
 				};
 			}
 		}
-		IReadOnlyList<PerfApplyStep> readOnlyList = PerfModeApplyPlanner.Build(mode, plan, caps);
+		// ⭐⭐ 2026-10-19（机主：无界 APU 应用自定义时不要再发 GCU 性能模式命令）：
+		//   ⭐ 纯本机 SMU 路径：规划器不生成任何 GCU 模式/固件档步骤；这里落一行去重日志（默认可见）✅
+		//   ⚠️ 其它后端（宝龙达/GCU/同方）`WujieSmuLocalOnly` 恒 false ⇒ 不进入本日志分支，行为逐位不变 ✅
+		if (caps.WujieSmuLocalOnly)
+		{
+			string wujieLog = "[perfmode] 无界 APU：应用自定义 ⇒ 跳过 GCU 性能模式下发（仅本机 SMU：PL1="
+				+ mode.Settings.Pl1.GetValueOrDefault() + "W/PL2=" + mode.Settings.Pl2.GetValueOrDefault()
+				+ "W/tctl=" + mode.Settings.TccTarget.GetValueOrDefault() + "℃）";
+			if (Logger.TryMarkChanged("wujie-smu-local-apply", wujieLog))
+			{
+				Logger.WriteError(wujieLog);
+			}
+		}		IReadOnlyList<PerfApplyStep> readOnlyList = PerfModeApplyPlanner.Build(mode, plan, caps);
 		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
 		//   ⭐ 规划结果（生成/未生成 + 原因）默认级别可见 ✅
 		LogGpuOverclockPlan(mode, plan, caps, readOnlyList);

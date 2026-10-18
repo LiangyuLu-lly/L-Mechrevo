@@ -37,7 +37,7 @@ public static class PerfModeApplyPlanner
 				list.Add(new PerfApplyStep(PerfApplyStepKind.SwitchFirmwareSlot, null, null, slotPlan.SlotIndex, IsCpuCurve: false, null, PerfApplyVerify.ModeReadback));
 			}
 		}
-		else if (includeSwitch)
+		else if (includeSwitch && !caps.WujieSmuLocalOnly)
 		{
 			list.Add(new PerfApplyStep(PerfApplyStepKind.SwitchBuiltIn, null, null, (int)mode.Kind, IsCpuCurve: false, null, PerfApplyVerify.ModeReadback));
 			bool flag = caps.SupportsTurboSubMode;
@@ -187,7 +187,7 @@ public static class PerfModeApplyPlanner
 		//   ⇒ ⭐ 这里单独生成步骤；执行侧（`PerfModeBackend.WriteFanCurveAsync`）在宝龙达下改为
 		//      把"占空比 %"换算成 RPM、存进 `BaolongdaFanCurveStore` 并启用 ✅
 		//   ⚠️ 仅 `SupportsWmiPowerFields`（=宝龙达）且确实要改参数时生成 ⇒ GCU/老接口逐位不变 ✅
-		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite)
+		if (!caps.WujieSmuLocalOnly && caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite)
 		{
 			if (settings.CpuFanDuty != null && settings.CpuFanDuty.Length == 16)
 			{
@@ -200,7 +200,7 @@ public static class PerfModeApplyPlanner
 		}
 		// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：⭐ 只有"能写厂商 WMI 的本机后端"（宝龙达）才生成该步 ✅
 		//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ GCU/老接口逐位不变 ✅
-		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite && settings.GpuPowerLimitW.HasValue)
+		if (!caps.WujieSmuLocalOnly && caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite && settings.GpuPowerLimitW.HasValue)
 		{
 			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyGpuPowerLimit, null, null, settings.GpuPowerLimitW.Value, IsCpuCurve: false, null, PerfApplyVerify.ServiceEcho));
 		}
