@@ -151,6 +151,12 @@ internal static class Program
 
 	private static readonly Dictionary<string, bool> _externalPowerBeforeTemporarySuspend = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
+	/// <summary>⭐ 启动 Logo 恢复判断只记一次（0=未记 · 1=已记）；⛔ 避免恢复重试时刷屏 ✅</summary>
+	private static int _logoRestoreDecisionLogged;
+
+	/// <summary>⭐ Logo powerexplicit 一次性迁移是否已检查（0=未查 · 1=已查）；⛔ 只对宝龙达执行 ✅</summary>
+	private static int _logoExplicitMigrationChecked;
+
 	private static readonly TimeSpan TelemetryStaleAfter = TimeSpan.FromSeconds(45L);
 
 	private static readonly TimeSpan TelemetryRecoveryCooldown = TimeSpan.FromSeconds(60L);
@@ -2294,23 +2300,101 @@ internal static class Program
 		return await service.SetLightEffect(topic, settings.Effect, settings.Light, settings.Speed, "None", KeyboardFirmwareEffects.IsSingleColorEffect(settings.Effect) ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null), save: false).ConfigureAwait(continueOnCapturedContext: false);
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：每次启动仍默认打开 Logo 灯 —— 98a3f70 的 PowerExplicit 闸门没挡住）：
+	/// ⭐ **启动 Logo 恢复判断的唯一日志出口**（默认日志级别可见；只记一次，⛔ 恢复重试不刷屏）✅
+	/// <para>格式：<c>[logo] 启动恢复判断：PowerOn=… · PowerExplicit=… · 决策=点亮/不点亮（原因=…）</c></para>
+	/// </summary>
+	private static void LogLogoRestoreDecision(bool hasSaved, LightChannelSettings settings, bool requested, bool canAct)
+	{
+		if (Interlocked.Exchange(ref _logoRestoreDecisionLogged, 1) != 0)
+		{
+			return;
+		}
+		string powerOnText = hasSaved ? (settings.PowerOn ? "1" : "0") : "(无配置)";
+		string explicitText = hasSaved ? (settings.PowerExplicit ? "1" : "0") : "(无配置)";
+		string reason;
+		if (!canAct)
+		{
+			reason = "无已保存 Logo 配置且无临时快照 ⇒ 跳过（不写硬件、不点亮）";
+		}
+		else if (requested)
+		{
+			reason = "用户显式开过（PowerExplicit=1）⇒ 点亮";
+		}
+		else if (hasSaved)
+		{
+			reason = "用户未显式开过（旧配置/自动置位，已迁移）⇒ 不点亮";
+		}
+		else
+		{
+			reason = "临时快照=关 ⇒ 不点亮";
+		}
+		Logger.WriteError($"[logo] 启动恢复判断：PowerOn={powerOnText} · PowerExplicit={explicitText} · 决策={(requested ? "点亮" : "不点亮")}（原因={reason}）");
+	}
+
 	private static async Task<(bool AllIssued, bool Attempted, string IssuedSummary)> SetExternalLightingPowerAsync(bool on, bool restoreEffect, bool useTemporarySnapshot, int? restoreRequestId = null)
 	{
 		MechrevoHw mechrevoHw = hw;
-		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达"全部接入"第 1 步 · ⭐ 前后端分离模板）：
-		//   ⭐ **先问门面层**："⭐ 这次 LOGO 灯开关归你管吗？" ✅
-		//   ⭐ 宝龙达在管事 ⇒ ⭐ 它写 WMI 功能号 15 并回读确认 ⇒ ⭐ **这里就结束，⛔ 一条 MQTT 都不发** ✅
-		//   ⭐ 不是宝龙达 ⇒ ⭐ 返回 false ⇒ ⭐ **下面那段 GCU 代码原封不动地照走** ✅✅
-		//   ⇒ ⭐ 这样 UI ⭐ **不需要知道后端是谁** ✅，⭐ 而 GCU/同方的行为 ⭐ **逐位不变** ✅
-		if (mechrevoHw != null && mechrevoHw.TrySetLogoLightViaBackend(on, out bool logoConfirmed))
+		// ⭐⭐⭐ 2026-10-18（机主回归：每次启动仍默认打开 Logo 灯 —— 98a3f70 的 PowerExplicit 闸门没挡住）：
+		//   ⚠️ 根因：`savedPowerOn` 判据只写在**下面 GCU 循环**里；而宝龙达在这段开头就
+		//      `TrySetLogoLightViaBackend(on)` **提前 return** ⇒ 闸门**永远不执行** ⇒ 每次启动都点亮 ❌
+		//   ⭐ 修法：把**同一份 savedPowerOn 判据**前置到宝龙达分支（与 GCU 循环逐字同口径）：
+		//      · 有保存配置 ⇒ `PowerOn && (PowerExplicit || 非宝龙达)`（宝龙达下必须 explicit=1 才点亮）✅
+		//      · 无保存配置 ⇒ 只有"空闲熄灯前的临时快照"才算可恢复，否则**跳过、不写硬件** ✅
+		//      · 判为"不点亮"但确有保存配置 ⇒ 下发 off 恢复为关（与 GCU 循环一致）✅
+		//   ⚠️ 非宝龙达（GCU/同方）**逐位不变**：本分支只认 `UsesBaolongda` ✅
+		if (mechrevoHw != null && mechrevoHw.UsesBaolongda)
 		{
-			string logoSummary = $"logo={(on ? "On" : "Off")}{(logoConfirmed ? "" : "(unconfirmed)")}";
-			Logger.WriteLine($"外部灯效电源（⭐ 宝龙达 WMI 路径）：⭐ on={on} · ⭐ 回读确认={logoConfirmed} · ⭐ {logoSummary}");
-			// ⭐⭐ 2026-10-18（「UI 与硬件状态不同步」根因③）：⭐ 真实状态已在 `TrySetLogoLightViaBackend`
-			//   里按功能号 15 的回读值回灌 `hw.QuickSwitches` ⇒ ⭐ **立刻**让界面跟上 ✅
-			//   （启动「灯效恢复（单次下发）」点亮 LOGO 后界面还显示"关"的那个 bug 就死在这里）
-			ScheduleQuickSwitchUiRefresh("宝龙达 WMI 灯效电源");
-			return (AllIssued: logoConfirmed, Attempted: true, IssuedSummary: logoSummary);
+			// ⭐ 一次性迁移：清掉 Logo 通道历史上被"自动路径/早期版本"置上的 powerexplicit=1
+			//   （⛔ 不碰 power 值；⛔ 只对宝龙达执行 —— GCU/同方的恢复判据逐位不变 ✅）
+			//   ⚠️ 必须在下面 TryLoad/判定**之前**跑（只查一次；标记 logo_explicit_migrated 落进 config.json）✅
+			if (Interlocked.Exchange(ref _logoExplicitMigrationChecked, 1) == 0)
+			{
+				LightingSettingsStore.MigrateLogoPowerExplicitOnce();
+			}
+			string logoTopic = MqttTopics.LogoLightCtrl;
+			bool logoHasSaved = LightingSettingsStore.TryLoad(logoTopic, out LightChannelSettings logoSettings);
+			bool? logoSuspendPower = (_externalPowerBeforeTemporarySuspend.TryGetValue(logoTopic, out bool logoSuspendOn)
+				? new bool?(logoSuspendOn)
+				: ((bool?)null));
+			// ⭐ 与 GCU 循环同口径：on=true 时"没有任何可恢复内容"⇒ 跳过（⛔ 不写硬件）
+			bool logoCanAct = !on || logoHasSaved || (useTemporarySnapshot && logoSuspendPower.HasValue);
+			bool logoSavedPowerOn = logoHasSaved
+				? (logoSettings.PowerOn && (logoSettings.PowerExplicit || !mechrevoHw.UsesBaolongda))
+				: (logoSuspendPower == true);
+			bool logoRequested = on && logoSavedPowerOn;
+			if (on)
+			{
+				LogLogoRestoreDecision(logoHasSaved, logoSettings, logoRequested, logoCanAct);
+			}
+			if (logoCanAct && mechrevoHw.TrySetLogoLightViaBackend(logoRequested, out bool logoConfirmed))
+			{
+				string logoSummary = $"logo={(logoRequested ? "On" : "Off")}{(logoConfirmed ? "" : "(unconfirmed)")}";
+				Logger.WriteLine($"外部灯效电源（⭐ 宝龙达 WMI 路径）：⭐ on={logoRequested}（请求 on={on}）· ⭐ 回读确认={logoConfirmed} · ⭐ {logoSummary}");
+				// ⭐⭐ 2026-10-18（「UI 与硬件状态不同步」根因③）：⭐ 真实状态已在 `TrySetLogoLightViaBackend`
+				//   里按功能号 15 的回读值回灌 `hw.QuickSwitches` ⇒ ⭐ **立刻**让界面跟上 ✅
+				ScheduleQuickSwitchUiRefresh("宝龙达 WMI 灯效电源");
+				if (logoConfirmed)
+				{
+					if (on && useTemporarySnapshot)
+					{
+						_externalPowerBeforeTemporarySuspend.Remove(logoTopic);
+					}
+					if (on && restoreRequestId.HasValue)
+					{
+						_lightingExternalRestoreAppliedIds[logoTopic] = restoreRequestId.Value;
+					}
+				}
+				return (AllIssued: logoConfirmed, Attempted: true, IssuedSummary: logoSummary);
+			}
+			if (!logoCanAct)
+			{
+				// ⭐ 启动恢复：有用户意图标记但 Logo 通道没有可恢复内容 ⇒ 视为成功（⛔ 不点亮、⛔ 不写 off）
+				Logger.WriteError("[logo] 启动恢复：跳过 Logo 电源下发（无已保存配置/无临时快照 ⇒ 不写硬件）");
+				return (AllIssued: true, Attempted: true, IssuedSummary: "logo=skip");
+			}
+			Logger.WriteLine("外部灯效电源（宝龙达 WMI 路径）：⚠️ 门面层未接管（异常路径，继续原路）");
 		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：函数体全是 service.Issue*(MQTT) ⇒ 真正需要 GCU。
 		if (mechrevoHw == null || !mechrevoHw.IsGcuConnected || service == null)

@@ -16594,7 +16594,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 							sw2.Enabled = true;
 							if (flag)
 							{
-								LightingSettingsStore.SavePower(topic, requested);
+								// ⭐⭐⭐ 2026-10-18（机主：每次启动仍默认打开 Logo 灯）：
+								//   ⭐ **只有这里（用户亲手点灯光开关）才允许置 powerexplicit=1** ✅
+								//   ⛔ 任何自动路径（启动恢复/亮度/效果/开关幂等回写）都不许调 SavePower
+								LightingSettingsStore.SavePower(topic, requested, "用户点击「灯光」开关");
 								// ⭐⭐ 2026-10-19（机主实测「Logo 灯开→显示关」）：⭐ 这里原来会再调一次
 								//   `ApplyLightChannelEffectAsync` ⇒ 它内部**又**按旧快照的 `PowerOn` 发一次
 								//   `PublishLightPower(..., false)`（诊断包日志：on=True 与 on=False 只隔 0.55 s）❌
