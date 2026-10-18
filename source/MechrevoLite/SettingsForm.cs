@@ -1840,6 +1840,28 @@ public class SettingsForm : RForm
 			{
 				Logger.WriteError("[settings-ui] ⛔ 主题按钮对比度 FAIL：" + message);
 			}
+			// ⭐ 2026-10-19（机主：按钮巨大且被裁）：⭐ 尺寸实测 —— 960/1250/1500% DPI 下验证固定尺寸未叠加缩放 ✅
+			Size daySize = _dayModeButton?.Size ?? Size.Empty;
+			Size nightSize = _nightModeButton?.Size ?? Size.Empty;
+			TableLayoutPanel themeTable = _themeModePanel?.Controls.Count > 0 ? _themeModePanel.Controls[0] as TableLayoutPanel : null;
+			int rowHeight = themeTable != null && themeTable.RowStyles.Count > 0 ? (int)themeTable.RowStyles[0].Height : 0;
+			int rightColumn = themeTable != null && themeTable.ColumnStyles.Count > 2 ? (int)(themeTable.ColumnStyles[1].Width + themeTable.ColumnStyles[2].Width) : 0;
+			int cardWidth = _themeModePanel?.Width ?? 0;
+			int cardHeight = _themeModePanel?.Height ?? 0;
+			int dpiPercent = (int)Math.Round(DeviceDpi / 96.0 * 100.0);
+			bool tooBig = daySize.Height > ResponsiveLayout.LogicalToDevice(this, 40)
+				|| daySize.Width > ResponsiveLayout.LogicalToDevice(this, 200)
+				|| nightSize.Height > ResponsiveLayout.LogicalToDevice(this, 40)
+				|| nightSize.Width > ResponsiveLayout.LogicalToDevice(this, 200);
+			string sizeMessage = "[settings-ui] 尺寸实测：浅色=" + daySize.Width + "x" + daySize.Height
+				+ " · 深色=" + nightSize.Width + "x" + nightSize.Height
+				+ " · 右列=" + rightColumn + "x" + rowHeight + " · 卡片=" + cardWidth + "x" + cardHeight
+				+ " · 行高=" + rowHeight + " · DPI=" + dpiPercent + "%";
+			Logger.WriteLineIfChanged("settings-ui-theme-size", sizeMessage);
+			if (tooBig)
+			{
+				Logger.WriteError("[settings-ui] ⛔ 按钮尺寸过大（疑似双重缩放）：" + sizeMessage);
+			}
 		}
 		catch (Exception ex)
 		{
@@ -7746,7 +7768,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(54),
+				Height = scale(46),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7759,10 +7781,11 @@ public class SettingsForm : RForm
 				Padding = Padding.Empty,
 				BackColor = _themeModePanel.BackColor
 			};
-			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, ThemeColumnPercentages.Title));
-			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, ThemeColumnPercentages.Day));
-			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, ThemeColumnPercentages.Night));
-			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(56)));
+			// ⭐ 2026-10-19（机主：浅/深按钮巨大且被裁）：⭐ 固定尺寸 + 右对齐；右列按两按钮宽 + 间距，⛔ 不再 Percent 拉满 ✅
+			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
+			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
+			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(30)));
 			Label label = new Label
 			{
 				Name = "labelThemeModeTitle",
@@ -7814,8 +7837,13 @@ public class SettingsForm : RForm
 			Button button = new Button();
 			button.Name = (night ? "buttonNightMode" : "buttonDayMode");
 			button.Text = text;
-			button.Dock = DockStyle.Fill;
-			button.Margin = new Padding(scale(4), 0, scale(4), 0);
+			// ⭐ 主题切换按钮 = 固定尺寸（宽 84 / 高 28 逻辑像素），⛔ 不用 AutoSize / Dock 拉满 ✅
+			button.AutoSize = false;
+			button.Dock = DockStyle.None;
+			button.Anchor = AnchorStyles.Right;
+			button.Size = new Size(scale(84), scale(28));
+			button.MinimumSize = Size.Empty;
+			button.Margin = new Padding(scale(4), scale(1), scale(4), scale(1));
 			button.FlatStyle = FlatStyle.Flat;
 			button.Tag = "theme_mode";
 			button.UseVisualStyleBackColor = false;
