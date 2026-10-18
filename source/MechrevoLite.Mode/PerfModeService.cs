@@ -1126,12 +1126,13 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
+		string previousActive = PerfModeStore.ActiveModeId;
 		PerfModeStore.ActiveModeId = mode.Id;
 		PerfModeStore.SetActiveFor(PowerSourceKey(), mode.Id);
 		PerfModeStore.LastCustomId = mode.Id;
-		if (Logger.TryMarkChanged("wujie-local-profile-active", "[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + mode.Id + " · 不发固件档命令）"))
+		if (Logger.TryMarkChanged("wujie-local-profile-active", "[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + previousActive + " → " + mode.Id + "（已落盘 perf_active）· 不发固件档命令）"))
 		{
-			Logger.WriteError("[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + mode.Id + " · 不发固件档命令）");
+			Logger.WriteError("[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + previousActive + " → " + mode.Id + "（已落盘 perf_active）· 不发固件档命令）");
 		}
 		RaiseActiveChanged();
 	}
