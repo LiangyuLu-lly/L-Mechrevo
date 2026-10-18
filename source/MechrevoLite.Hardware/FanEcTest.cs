@@ -102,9 +102,9 @@ internal static class FanEcTest
 				bool ec81Ok = RunEc81Experiment(L);
 				return ec81Ok ? 0 : 1;
 			}
-			// ⭐⭐ 2026-10-18（机主双报告 · OpenRevo 强锁实测）：⭐ 默认流程直接按 OpenRevo 顺序：
+			// ⭐⭐ 2026-10-18（机主双报告 · 参考实现强锁场景实测）：⭐ 默认流程直接按 外部参考实现的写入顺序：
 			//   ACPI 写 0xC83C/0xC83D → 读 0xB20 → 写 0xB20|0x02|0x08 → 2 s → ACPI 稳定读验证；
-			//   ⚠️ `0x1060` 解锁改为 **best-effort**（OpenRevo 强锁时 0x1060=0x00 也生效，失败不中止）；
+			//   ⚠️ `0x1060` 解锁改为 **best-effort**（外部参考实现 强锁时 0x1060=0x00 也生效，失败不中止）；
 			//   ⚠️ LPC 通道**只作对照**（不参与判定/写入；报告 1 里 LPC 读可能陈旧）。
 			if (!acpiIdentity)
 			{
@@ -116,10 +116,10 @@ internal static class FanEcTest
 			{
 				L("⭐ `--acpi`：ACPI 已是默认写通道（本参数保留兼容，无额外作用）");
 			}
-			L("══ OpenRevo 顺序写验证（ACPI EC · LPC 仅对照）══");
-			bool openRevoOk = RunOpenRevoTest(L, is30);
+			L("══ 外部参考实现的写入顺序写验证（ACPI EC · LPC 仅对照）══");
+			bool externalOrderOk = RunExternalOrderTest(L, is30);
 			L("");
-			if (openRevoOk)
+			if (externalOrderOk)
 			{
 				L("结论：✅ **ACPI EC 写通路可用**（0xB20 出现 bit1+bit3 且转速上升 ≥200 RPM）");
 				// ⭐⭐ 2026-10-18（机主：40 系 --fan-ec-test 已成功但 UI 仍无开关）：⭐ 成功时也写验证标记 ✅
@@ -145,11 +145,11 @@ internal static class FanEcTest
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主双报告 · OpenRevo 顺序）：ACPI EC 写 `0xC83C/0xC83D` → 读 `0xB20` →
+	/// ⭐⭐ 2026-10-18（机主双报告 · 外部参考实现的写入顺序）：ACPI EC 写 `0xC83C/0xC83D` → 读 `0xB20` →
 	/// 写 `0xB20 | 0x02|0x08` → 等 2 s → **只用 ACPI 稳定读**验证 `0xC834/0xC835/0xB20`；
 	/// `0x1060` 解锁 **best-effort**（失败继续）；finally 恢复；LPC 仅对照 ✅。
 	/// </summary>
-	private static bool RunOpenRevoTest(Action<string> L, bool is30)
+	private static bool RunExternalOrderTest(Action<string> L, bool is30)
 	{
 		bool wroteTargets = false;
 		bool wroteMask = false;
@@ -192,7 +192,7 @@ internal static class FanEcTest
 				return false;
 			}
 			int rpmUnits = Math.Clamp(baselineRpm / 100, 0, 68);
-			// ⭐ OpenRevo 顺序写“原值+5”；原值为 0（固件自动控制）时用“当前转速档+5”，避免写到更低档 ✅
+			// ⭐ 外部参考实现的写入顺序写“原值+5”；原值为 0（固件自动控制）时用“当前转速档+5”，避免写到更低档 ✅
 			int baseUnits = Math.Max(origFan1, rpmUnits);
 			int maxUnits = is30 ? 49 : 68;
 			// ⭐⭐ 2026-10-18（30 系报告：基线已 4329 RPM，+5 档只差 471 ⇒ 2 s 内看不出）：
@@ -215,7 +215,7 @@ internal static class FanEcTest
 					L("解锁尝试：" + unlockNote);
 					L(unlocked
 						? "解锁后 0x1060=0x" + after.ToString("X2")
-						: "⚠️ 解锁失败 ⇒ **继续**（实测 OpenRevo 强锁时 0x1060=0x00 也生效；解锁不是必要条件）");
+						: "⚠️ 解锁失败 ⇒ **继续**（实测 外部参考实现 强锁时 0x1060=0x00 也生效；解锁不是必要条件）");
 				}
 				else
 				{
@@ -228,8 +228,8 @@ internal static class FanEcTest
 			}
 			L("");
 
-			// ③ OpenRevo 顺序写
-			L("── ③ OpenRevo 顺序写（ACPI）──");
+			// ③ 外部参考实现的写入顺序写
+			L("── ③ 外部参考实现的写入顺序写（ACPI）──");
 			wroteTargets = true;
 			bool w1 = EcPortIo.TryWriteAcpiFanTarget(0xC83C, target, out int rb1);
 			L("写 0xC83C=" + target + " ⇒ ok=" + w1 + " · 回读=" + (rb1 < 0 ? "读不到" : rb1.ToString()));

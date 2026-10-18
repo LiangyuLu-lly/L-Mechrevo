@@ -496,7 +496,7 @@ internal static class EcPortIo
 		{
 			return false;
 		}
-		// ⭐⭐ 2026-10-18（机主双报告 · OpenRevo 强锁实测）：⭐ ACPI 0x93 写路径原来**没有 IBF 等待**；
+		// ⭐⭐ 2026-10-18（机主双报告 · 参考实现强锁场景实测）：⭐ ACPI 0x93 写路径原来**没有 IBF 等待**；
 		//   ⭐ 这里与 LPC 同款：写前轮询 0x66 的 IBF（bit1）清空（最多 ~50ms），只读、失败不阻塞 ✅
 		bool ibfClear = TryWaitAcpiIbfClear(50, out string ibfDetail);
 		string ibfNote = "0x66 IBF 预检：" + (ibfClear ? "已清" : "⚠️ 未清/不可读（继续）") + " · " + ibfDetail;
