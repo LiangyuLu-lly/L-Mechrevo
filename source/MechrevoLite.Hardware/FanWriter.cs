@@ -20,6 +20,7 @@
 
 using System;
 using System.IO;
+using System.Threading;
 
 namespace MechrevoLite.Hardware;
 
@@ -101,10 +102,24 @@ internal static class FanWriter
 		return false;
 	}
 
-	/// <summary>⭐ 交回固件：两路目标 0 + 清 bit1/bit3（按成功过的通道，失败再换通道）✅。</summary>
+	/// <summary>
+	/// ⭐⭐ 交回固件（**安全顺序**）：⭐ 先清 `0xB20` bit1/bit3（交出控制权并回读确认）→ **再**清目标 0 ✅。
+	/// <para>⚠️⚠️ 2026-10-18（机主安全提问）：⛔ 绝不在掩码仍置位时写 0 目标 —— 否则 EC 可能把风扇拉到 0 转 ✅</para>
+	/// <para>⭐ 交回后读 WMI 13 观察 ≤3 s：若 <b>低于怠速 800 RPM</b> ⇒ 记 error 并**立即恢复接管**（回写原掩码/目标）✅</para>
+	/// </summary>
 	internal static bool TryReleaseToFirmware(out string detail)
 	{
 		detail = "";
+		// ⭐ 记录交回前状态（低转速保护用）
+		int preMask = -1;
+		int preFan1 = -1;
+		int preFan2 = -1;
+		if (EcPortIo.TryReadByteStable(0xB20, out int mask, out _))
+		{
+			preMask = mask;
+			EcPortIo.TryReadByteStable(0xC83C, out preFan1, out _);
+			EcPortIo.TryReadByteStable(0xC83D, out preFan2, out _);
+		}
 		foreach (FanWriteChannel channel in Candidates())
 		{
 			bool ok;
@@ -117,15 +132,123 @@ internal static class FanWriter
 			{
 				ok = EcLpcIo.TryRestoreFanFirmware(out channelDetail);
 			}
-			if (ok)
+			if (!ok)
 			{
-				_preferred = channel;
-				detail = "通道=" + ChannelName(channel) + " · " + channelDetail;
-				return true;
+				detail += (detail.Length == 0 ? "" : " | ") + ChannelName(channel) + "失败：" + channelDetail;
+				continue;
 			}
-			detail += (detail.Length == 0 ? "" : " | ") + ChannelName(channel) + "失败：" + channelDetail;
+			_preferred = channel;
+			bool safe = VerifyReleased(channel, out string verifyDetail, out int minRpm, out int maxRpm, out double waitedSeconds);
+			detail = "通道=" + ChannelName(channel) + " · " + channelDetail
+				+ " · 13=" + (minRpm < 0 ? "读不到" : minRpm + "~" + maxRpm + " RPM")
+				+ "（等待 " + waitedSeconds.ToString("0.0") + "s）· " + verifyDetail;
+			Logger.WriteLine("[fan] 交回固件：先清掩码（" + ExtractMaskPart(channelDetail)
+				+ "）· 再清目标（" + ExtractTargetPart(channelDetail) + "）· 13="
+				+ (minRpm < 0 ? "读不到" : minRpm + "~" + maxRpm + " RPM")
+				+ " · 低转速保护=" + (safe ? "未触发 ✅" : "⚠️ 已触发"));
+			if (!safe)
+			{
+				Logger.WriteError("[fan] ⚠️ 交回固件后转速低于怠速或释放未确认（13="
+					+ (minRpm < 0 ? "读不到" : minRpm + " RPM") + "）⇒ 立即恢复接管（回写原 0xB20/目标）");
+				bool recovered = false;
+				try
+				{
+					if (preFan1 >= 0 && preFan2 >= 0)
+					{
+						bool t = TrySetFanTargets(preFan1, preFan2, out _);
+						bool m = TrySetManualMask((preMask & 0x02) != 0, (preMask & 0x08) != 0, out _);
+						recovered = t && m;
+					}
+				}
+				catch
+				{
+				}
+				detail += " · 低转速保护恢复=" + recovered;
+			}
+			return safe;
 		}
 		return false;
+	}
+
+	/// <summary>⭐ 交回后校验：掩码位已清 + 目标 0 + WMI 13 观察 ≤3 s；低于 800 RPM ⇒ 不安全 ✅。</summary>
+	private static bool VerifyReleased(FanWriteChannel channel, out string verifyDetail, out int minRpm, out int maxRpm, out double waitedSeconds)
+	{
+		minRpm = -1;
+		maxRpm = -1;
+		bool maskClear = false;
+		bool targetsZero = false;
+		if (channel == FanWriteChannel.AcpiEc)
+		{
+			maskClear = EcPortIo.TryReadByteStable(0xB20, out int m, out _) && (m & 0x0A) == 0;
+			bool f1 = EcPortIo.TryReadByteStable(0xC83C, out int a, out _);
+			bool f2 = EcPortIo.TryReadByteStable(0xC83D, out int b, out _);
+			targetsZero = f1 && f2 && a == 0 && b == 0;
+		}
+		else
+		{
+			maskClear = EcLpcIo.TryReadByteStable(0xB20, out int m, out _) && (m & 0x0A) == 0;
+			bool f1 = EcLpcIo.TryReadByteStable(0xC83C, out int a, out _);
+			bool f2 = EcLpcIo.TryReadByteStable(0xC83D, out int b, out _);
+			targetsZero = f1 && f2 && a == 0 && b == 0;
+		}
+
+		long start = Environment.TickCount64;
+		bool rpmReadOk = false;
+		while (Environment.TickCount64 - start <= 3000)
+		{
+			int rpm = ReadWmiRpmForRelease();
+			if (rpm >= 0)
+			{
+				rpmReadOk = true;
+				if (minRpm < 0 || rpm < minRpm)
+				{
+					minRpm = rpm;
+				}
+				if (rpm > maxRpm)
+				{
+					maxRpm = rpm;
+				}
+			}
+			Thread.Sleep(500);
+		}
+		waitedSeconds = (Environment.TickCount64 - start) / 1000.0;
+		bool rpmSafe = !rpmReadOk || minRpm >= 800;
+		verifyDetail = "掩码位已清=" + maskClear + " · 目标0=" + targetsZero
+			+ " · 13可读=" + rpmReadOk + " · 转速安全=" + rpmSafe;
+		return maskClear && targetsZero && rpmSafe;
+	}
+
+	private static int ReadWmiRpmForRelease()
+	{
+		try
+		{
+			using BaolongdaWmi wmi = BaolongdaWmi.TryCreate();
+			if (wmi != null && wmi.TryReadFanSpeeds(out BaolongdaWmi.FanSpeeds speeds))
+			{
+				return Math.Max(speeds.First, speeds.Second);
+			}
+		}
+		catch
+		{
+		}
+		return -1;
+	}
+
+	private static string ExtractMaskPart(string channelDetail)
+	{
+		int idx = channelDetail.IndexOf("先清掩码", StringComparison.Ordinal);
+		if (idx < 0)
+		{
+			return channelDetail;
+		}
+		int end = channelDetail.IndexOf("· 再清目标", idx, StringComparison.Ordinal);
+		return end < 0 ? channelDetail.Substring(idx) : channelDetail.Substring(idx, end - idx).TrimEnd(' ');
+	}
+
+	private static string ExtractTargetPart(string channelDetail)
+	{
+		int idx = channelDetail.IndexOf("再清目标", StringComparison.Ordinal);
+		return idx < 0 ? channelDetail : channelDetail.Substring(idx);
 	}
 
 	/// <summary>⭐ 只读：两路转速字节 0xC834/0xC835（≈RPM/100，稳定读；ACPI 优先）✅。</summary>

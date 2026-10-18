@@ -595,24 +595,32 @@ internal static class EcPortIo
 		return TryWriteByteVerified(AcpiEcUnlockAddress, originalValue, out readBack);
 	}
 
-	/// <summary>⭐ ACPI EC：交回固件（目标 0 + 清 0x02|0x08，保留其它位）+ 回读 ✅</summary>
+	/// <summary>
+	/// ⭐⭐ ACPI EC：交回固件 —— ⭐ **先清 `0xB20` 的 bit1/bit3（交出控制权）→ 回读确认 → 再清目标** ✅。
+	/// <para>⚠️⚠️ 2026-10-18（机主安全提问）：⛔ 绝不能在掩码仍置位时写 0 目标（EC 可能把风扇拉到 0 转）✅</para>
+	/// </summary>
 	internal static bool TryRestoreFanFirmwareAcpi(out string detail)
 	{
+		// ① 先交出控制权（清掩码）
+		bool mask = TryWriteAcpiFanManualMask(fan1Manual: false, fan2Manual: false, out int rbMask, out string maskNote);
+		string tMask = LastAcpiWriteTrace;
+		bool maskClear = rbMask >= 0 && (rbMask & 0x0A) == 0;
+		// ② 再清残值
 		bool fan1 = TryWriteAcpiFanTarget(AcpiFan1TargetAddress, 0, out int rb1);
 		string t1 = LastAcpiWriteTrace;
 		bool fan2 = TryWriteAcpiFanTarget(AcpiFan2TargetAddress, 0, out int rb2);
 		string t2 = LastAcpiWriteTrace;
-		bool mask = TryWriteAcpiFanManualMask(fan1Manual: false, fan2Manual: false, out int rbMask, out string maskNote);
-		string t3 = LastAcpiWriteTrace;
-		detail = "0xC83C→" + (rb1 < 0 ? "读不到" : rb1.ToString())
+		bool targetsZero = rb1 == 0 && rb2 == 0;
+		detail = "先清掩码 0xB20→0x" + (rbMask < 0 ? "读不到" : rbMask.ToString("X2"))
+			+ "（bit1/bit3=" + (maskClear ? "已清 ✅" : "⚠️ 未清") + " · " + maskNote + "）"
+			+ " · 再清目标 0xC83C→" + (rb1 < 0 ? "读不到" : rb1.ToString())
 			+ " · 0xC83D→" + (rb2 < 0 ? "读不到" : rb2.ToString())
-			+ " · 0xB20→0x" + (rbMask < 0 ? "读不到" : rbMask.ToString("X2"))
-			+ " · " + maskNote;
+			+ "（" + (targetsZero ? "已归零 ✅" : "⚠️ 未归零") + "）";
 		lock (Gate)
 		{
-			_lastAcpiWriteTrace = t1 + "\n" + t2 + "\n" + t3;
+			_lastAcpiWriteTrace = tMask + "\n" + t1 + "\n" + t2;
 		}
-		return fan1 && fan2 && mask;
+		return mask && maskClear && fan1 && fan2 && targetsZero;
 	}
 
 	/// <summary>
