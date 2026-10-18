@@ -3325,7 +3325,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉 / 亮度不对」第二轮修正）：
-	/// ⭐ 键盘灯下发的**唯一实现** ✅（⭐ 顺序：颜色 17 ⇒ 模式 16 ⇒ 亮度 18 ✅）。
+	/// ⭐ 键盘灯下发的**唯一实现** ✅（⭐ 固定色顺序：模式 16 ⇒ 500ms ⇒ 颜色 17 ⇒ 亮度 18 ✅）。
+	///
+	/// <para>⭐⭐ 2026-10-19（机主「彩虹没效果」，**按第三方 7.3 修正**）：
+	/// ⭐ <b>彩虹（<c>mode == 1</c>）只写功能号 16 = 1</b> —— ⛔ **不写颜色**（17，颜色只属于固定色模式 2）、
+	/// ⭐ 亮度（18）只在变化时写**一次目标值**（⛔ 不做「满 → 0 → 目标」复位序列，7.3 也不做）；
+	/// ⭐ 回读判据只要求 <b>16 回读 == 1</b>（⛔ 不拿颜色/亮度回读凑成功）。
+	/// ⚠️ 旧实现彩虹也写 17/18 ⇒ 40 系固件收到颜色后**视觉回到单色**（而 16 仍读回 1 ⇒ 一直误判成功）❌。
+	/// ⭐ 单色（<c>mode == 2</c>）**保持原行为**（16 → 500ms → 17 → 18 ＋ 复位序列）✅。</para>
 	///
 	/// <para>⭐ <b>本轮两处关键修正</b>：
 	/// <list type="number">
@@ -3354,8 +3361,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <param name="colorArgb">⭐ 单色 ARGB（⭐ 只在 <paramref name="on" /> 为真时用 ✅）。</param>
 	/// <param name="brightness0to3">⭐ 硬件亮度级 <c>0~3</c>（⭐ 0 ＝ 灭 ✅）—— ⚠️ 请用
 	/// <see cref="BaolongdaBrightnessFromUi" /> 从界面口径换算，⛔ 不要自己减 1 ✅。</param>
-	/// <param name="mode">⭐ 功能号 16 的模式值（⭐ 来自 <see cref="TryMapBaolongdaKeyboardMode" /> ✅）。</param>
-	/// <param name="confirmed">⭐ <b>回读一致</b>（⭐ ② 层 ✅）—— ⛔ 不代表灯真的变了（⭐ ③ 层测不到 ⚠️）。</param>
+	/// <param name="mode">⭐ 功能号 16 的模式值（⭐ 来自 <see cref="TryMapBaolongdaKeyboardMode" /> ✅）。
+	/// ⚠️ <c>1</c> = 彩虹/自动循环 ⇒ 只写 16 且只比对 16；<c>2</c> = 固定色 ⇒ 写 16/17/18 ✅。</param>
+	/// <param name="confirmed">⭐ <b>回读一致</b>（⭐ ② 层 ✅）—— ⛔ 不代表灯真的变了（⭐ ③ 层测不到 ⚠️）。
+	/// ⚠️ 彩虹时**只**表示"模式 16 回读 == 1"（亮度是独立操作）✅。</param>
 	internal bool TrySetKeyboardLightingViaBackend(bool on, int colorArgb, int brightness0to3, byte mode, out bool confirmed)
 	{
 		confirmed = false;
@@ -3508,17 +3517,38 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteLine($"[kbd] 亮度复位序列：{maxLevel} → 0 → {level}（7.3 做法）⇒ ok={brightOk}");
 			}
 			// ⭐⭐ 回读：⭐ 逐值比对（⭐ 旧代码只判"非 0 ＝ 开" ⇒ ⭐ 选自动循环/自定义时会误判成功 ❌）
-			bool modeMatch = TryConfirmModeExact(wmi, mode);
+			// ⭐⭐ 2026-10-19（机主：「彩虹没效果」· 按第三方 7.3 修正）：⭐ **彩虹只认 16 回读 == 1** ✅
+			//   ⭐ 依据：7.3 设彩虹 = 只写一个字节 `RGBKeyboardMode = Mode_RGBAutoCyclic(1)`，
+			//     **不写颜色、不复位亮度** ⇒ 回读判据也只要求"模式仍是 1"
+			//     （⛔ 不拿颜色/亮度回读去凑"成功"，⛔ 不假装成功）✅
+			bool modeMatch;
+			if (rainbow)
+			{
+				int modeReadback = ReadKeyboardModeAfterWrite(wmi, 1, attempts: 4, delayMs: 100);
+				modeMatch = (modeReadback == 1);
+				Logger.WriteError($"[kbd] 彩虹：只写 16=1（⛔ 不写颜色）⇒ 回读 16={(modeReadback < 0 ? "读不到" : modeReadback.ToString())}");
+				if (!modeMatch)
+				{
+					Logger.WriteError("[kbd] 彩虹：⚠️ 回读 16≠1 ⇒ 固件**没有保持彩虹模式** ⇒ ⭐ confirmed=false"
+						+ "（⛔ 不假装成功；运行时自校准据此把 Rainbow 判为不可用并隐藏）⚠️");
+				}
+			}
+			else
+			{
+				modeMatch = TryConfirmModeExact(wmi, mode);
+			}
 			bool brightMatch = TryConfirmKeyboardBrightness(wmi, level);
-			confirmed = modeMatch && brightMatch;
+			// ⭐ 彩虹：⭐ 只要求「模式回读==1」（亮度是独立操作，⛔ 不算进彩虹成功）✅
+			// ⭐ 单色：模式 ＋ 亮度都要回读一致（与改动前逐位相同）✅
+			confirmed = rainbow ? modeMatch : (modeMatch && brightMatch);
 			// ⭐⭐ 2026-10-19（机主：「拖到最大没反应/回弹」）：
 			//   ⭐ 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
 			//     UI 必须显示**实际生效值**、并记一条 `[kbd-cal]` 日志（⛔ 不拿用户拖到的值骗人）✅
 			RecordAppliedKeyboardBrightness(wmi, level);
 			Logger.WriteError($"宝龙达 键盘灯：⭐ 下发 rgb=#{r:X2}{g:X2}{b:X2} · 模式={mode}（{(rainbow ? "彩虹/自动循环" : "固定色")}） · 亮度={level}"
 				+ $" · ⭐ 本次**只写变化项**（模式={modeNeedsWrite}{(mode == 1 ? " · 彩虹无条件重写" : "")} · 颜色={(rainbow ? "跳过(彩虹)" : "是")} · 亮度={needBright}）"
-				+ $" ⇒ ⭐ ① 写成功={colorOk && modeOk && brightOk}（色={colorOk} 模式={modeOk} 亮度={brightOk}）"
-				+ $" · ⭐ ② 回读一致={confirmed}（模式={modeMatch} 亮度={brightMatch}）"
+				+ $" ⇒ ⭐ ① 写成功={colorOk && modeOk && brightOk}（色={(rainbow ? "跳过" : (colorOk ? "是" : "否"))} 模式={modeOk} 亮度={brightOk}）"
+				+ $" · ⭐ ② 回读一致={confirmed}（模式={modeMatch} 亮度={(rainbow ? "不参与判据(彩虹)" : brightMatch.ToString())}）"
 				+ " · ⭐ ③ ⚠️ 灯效/亮度是否**真的**变了 —— **我们测不到，需目视确认** ⚠️");
 			LogKeyboardLightingState(wmi, "下发后");
 			return true;
