@@ -2059,7 +2059,11 @@ public class SettingsForm : RForm
 								//   ⭐ 改走统一入口 `SwitchQuick("fanboost", on)`：宝龙达分支会走本机通道
 								//      （暂停曲线闭环 + 功能号 21 满转 + 13 回读）✅
 								//   ⚠️ GCU 机型：`SwitchQuick` 内部对 fanboost 的判据与原来等价（同样发 MQTT）✅
-								await ApplyQuickSwitchAsync(cb, (bool on) => Program.service.SwitchQuick("fanboost", on));
+								// ⭐⭐ 2026-10-19（机主：无界强冷是回归）：SwitchQuick 没有 fanboost 的 MQTT action（会恒 false）⇒
+								//   ⭐ GCU/无界 走原 SwitchFanBoost（Fan/Control 话题）；宝龙达仍走本机 EC 的 SwitchQuick 分支 ✅
+								await ApplyQuickSwitchAsync(cb, (bool on) => (Program.hw?.UsesBaolongda ?? false)
+									? Program.service.SwitchQuick("fanboost", on)
+									: Program.service.SwitchFanBoost(on));
 							}
 						}
 					}

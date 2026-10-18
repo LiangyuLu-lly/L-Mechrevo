@@ -5589,7 +5589,8 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 	{
 		try
 		{
-			if (!_hw.SupportsFanBoost)
+			// ⭐⭐ 无界（GCU 后端）恢复强冷入口：能力位刷新前也允许走 GCU 话题；GCU 未连接则如实失败 ✅
+			if (!_hw.SupportsFanBoost && !_hw.WujieSmuApu)
 			{
 				return false;
 			}

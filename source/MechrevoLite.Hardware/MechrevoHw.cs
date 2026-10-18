@@ -2500,6 +2500,26 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		return currentMode;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：无界之前支持强冷 ⇒ 这是回归）：
+	/// 强冷可见性 = 旧判据（GCU 能力位 / 宝龙达）**或** 无界 APU（GCU 后端；入口恢复，避免能力位刷新前被永久隐藏）✅。
+	/// <para>⚠️ 下发仍走原 `SwitchQuick("fanboost")`：宝龙达=本机 EC；GCU/无界=GCU MQTT 话题（未改）✅</para>
+	/// </summary>
+	internal bool SupportsFanBoostQuickSwitch
+	{
+		get
+		{
+			bool oldPredicate = SupportsFanBoost || UsesBaolongda;
+			bool visible = oldPredicate || WujieSmuApu;
+			string message = "[fan] 强冷可见性：backend=" + ActiveBackend + " · caps.FanBoost=" + Capabilities.FanBoost
+				+ " · 旧判据=" + oldPredicate + " ⇒ visible=" + visible;
+			if (Logger.TryMarkChanged("fan-boost-visible", message))
+			{
+				Logger.WriteError(message);
+			}
+			return visible;
+		}
+	}
 	public bool SupportsQuickSwitch(string key)
 	{
 		return key switch
@@ -2552,7 +2572,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"highperf" => true, 
 			// ⭐ 2026-10-19（风扇强冷 · 无 GCU）：宝龙达用本机通道（EC 目标档/掩码 + 13 回读）✅
 			// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 宝龙达**恒 true**，强冷入口直接出现 ✅
-		"fanboost" => SupportsFanBoost || UsesBaolongda,
+		// ⭐⭐ 2026-10-19（机主：无界强冷是回归，不是该隐藏）：⭐ 无界（GCU 后端）恢复强冷入口 ✅
+		//   ⚠️ 旧判据只看 GCU 能力位；后台初始化分离后，设置窗可能先于 GCU 连接/能力刷新构建 ⇒ caps.FanBoost=false ⇒ 永久隐藏（回归）
+		"fanboost" => SupportsFanBoostQuickSwitch,
 		// ⭐ 2026-10-19（APU 防缩缸）：⭐ 纯 Windows 电源策略 ⇒ 所有机型可用 ✅
 		"apuboost" => true, 
 			"lightbar" => SupportsLightbar, 
