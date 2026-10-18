@@ -65,14 +65,15 @@ internal sealed class BatteryLimitPanel : Panel
 	// 0=正常（Muted）· 1=错误（Danger）· 2=警示（Warn）
 	private int _statusKind;
 
-	// ⭐ 统一行距常量（逻辑像素；只用这一套，⛔ 不混用半行高）✅
-	private const int RowSoc = 24;
+	// ⭐ 2026-10-19（机主：上下空白过多 / 按钮被裁）：⭐ 紧凑行高（22/30/28/22/22）✅
+	private const int RowSoc = 22;
 
-	// 2026-10-18（机主：「保存阈值按钮有点被裁」）：输入行 30 -> 34 —— 按钮 Dock=Fill 且上下各有 4 逻辑像素外边距，
-	//   行高 30 时按钮实际只有 22 高，文字/圆角边框会被裁；34 给到 26 高，96/125/150% 缩放下都够。
-	private const int RowInput = 34;
+	// 开关 + 保存按钮同一行：30 逻辑像素（按钮上下各 2 外边距 ⇒ 26 高）
+	private const int RowSwitch = 30;
 
-	private const int RowStatus = 26;
+	private const int RowInput = 28;
+
+	private const int RowStatus = 22;
 
 
 	public BatteryLimitPanel()
@@ -81,7 +82,8 @@ internal sealed class BatteryLimitPanel : Panel
 		BackColor = Color.Transparent;
 		AutoSize = true;
 		AutoSizeMode = AutoSizeMode.GrowAndShrink;
-		Dock = DockStyle.Fill;
+		// ⭐ 紧凑布局：Dock=Top + AutoSize，⛔ 不用 Fill 拉满（避免上下空白）✅
+		Dock = DockStyle.Top;
 
 		_socLabel = MakeFixedLabel(Strings.BatteryLimitSocReading, D(240));
 		_socLabel.Font = UiVisualStyle.Font(9f);
@@ -96,7 +98,7 @@ internal sealed class BatteryLimitPanel : Panel
 			AutoSize = true,
 			Text = Strings.BatteryLimitEnableCharge,
 			BackColor = Color.Transparent,
-			Margin = new Padding(0, D(4), 0, 0)
+			Margin = Padding.Empty
 		};
 		_toolTip.SetToolTip(_enableBox, Strings.BatteryLimitEnableChargeTip);
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
@@ -108,7 +110,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Text = Strings.BatteryLimitSaveThreshold,
 			// ⭐ 机主要求：**小圆角矩形**（≈4 逻辑像素；默认 8/12 太大）✅
 			BorderRadius = D(4),
-			Margin = new Padding(D(6), D(4), 0, D(4))
+			Margin = new Padding(D(4), D(2), 0, D(2))
 		};
 		_applyButton.Click += ApplyButton_Click;
 
@@ -117,7 +119,7 @@ internal sealed class BatteryLimitPanel : Panel
 			AutoSize = true,
 			Text = Strings.BatteryLimitAllowInitialDischarge,
 			BackColor = Color.Transparent,
-			Margin = new Padding(0, D(2), 0, 0),
+			Margin = Padding.Empty,
 			Checked = BatteryLimitRestore.AllowInitialDischarge
 		};
 		_toolTip.SetToolTip(_allowInitialDischargeBox, Strings.BatteryLimitAllowInitialDischargeTip);
@@ -127,7 +129,7 @@ internal sealed class BatteryLimitPanel : Panel
 		};
 
 		_statusLabel = MakeFixedLabel(Strings.BatteryLimitStatusReading, D(360));
-		_statusLabel.Margin = new Padding(0, D(4), 0, 0);
+		_statusLabel.Margin = Padding.Empty;
 
 		TableLayoutPanel grid = new TableLayoutPanel
 		{
@@ -144,19 +146,35 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
 		}
-		// ① 电量 ② 开关+保存（按钮最右）③ 起充/停充 ④ 允许初次放电（高级）⑤ 状态 ✅
+		// 紧凑：① 电量 22 ② 开关+保存 30 ③ 起充/停充 28 ④ 允许初次放电 22 ⑤ 状态 22 = 124 ✅
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
-		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSwitch)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
-		grid.Height = D(RowSoc + RowInput + RowInput + RowSoc + RowStatus);
+		grid.Height = D(RowSoc + RowSwitch + RowInput + RowSoc + RowStatus);
+
+		// ⭐ 开关 + 保存按钮同一行：内嵌表 2 列（开关占满、按钮固定 120 逻辑像素，⛔ 不再被 25% 列裁字）✅
+		TableLayoutPanel switchRow = new TableLayoutPanel
+		{
+			Dock = DockStyle.Fill,
+			ColumnCount = 2,
+			RowCount = 1,
+			Margin = Padding.Empty,
+			Padding = Padding.Empty,
+			BackColor = Color.Transparent
+		};
+		switchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+		switchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(120)));
+		switchRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+		_enableBox.Dock = DockStyle.Fill;
+		switchRow.Controls.Add(_enableBox, 0, 0);
+		switchRow.Controls.Add(_applyButton, 1, 0);
 
 		grid.Controls.Add(_socLabel, 0, 0);
 		grid.SetColumnSpan(_socLabel, 4);
-		grid.Controls.Add(_enableBox, 0, 1);
-		grid.SetColumnSpan(_enableBox, 3);
-		grid.Controls.Add(_applyButton, 3, 1);
+		grid.Controls.Add(switchRow, 0, 1);
+		grid.SetColumnSpan(switchRow, 4);
 		grid.Controls.Add(_lowLabel, 0, 2);
 		grid.Controls.Add(_lowBox, 1, 2);
 		grid.Controls.Add(_highLabel, 2, 2);
@@ -165,7 +183,6 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.SetColumnSpan(_allowInitialDischargeBox, 4);
 		grid.Controls.Add(_statusLabel, 0, 4);
 		grid.SetColumnSpan(_statusLabel, 4);
-
 		Controls.Add(grid);
 		// ⭐ 代码级 UI 自检（无法启动 GUI 时作为可验证替代）：标签宽度是否足够 ⇒ 不换行 ✅
 		LogLabelWidthCheck("起充标签", _lowLabel, D(88));
@@ -477,12 +494,15 @@ internal sealed class BatteryLimitPanel : Panel
 		try
 		{
 			Size preferred = _applyButton.GetPreferredSize(Size.Empty);
-			int textWidth = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font).Width;
+			Size textSize = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font);
+			int textWidth = textSize.Width;
 			int radius = _applyButton.BorderRadius;
-			bool enough = preferred.Width >= textWidth + radius * 2
-				&& preferred.Height >= TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font).Height + D(6);
+			int availableWidth = D(120);
+			bool enough = textWidth + radius * 2 <= availableWidth
+				&& preferred.Height >= textSize.Height + D(4);
 			string message = "[battery-ui] 保存按钮：圆角半径=" + radius + "px · 尺寸=" + preferred.Width
-				+ "x" + preferred.Height + " · 文本宽=" + textWidth + " ⇒ 不裁切=" + enough;
+				+ "x" + preferred.Height + " · 可用宽=" + availableWidth + "px · 文本宽=" + textWidth
+				+ " ⇒ 不裁切=" + enough;
 			Logger.WriteLine(message);
 			Logger.WriteLineIfChanged("battery-ui-save-button", message);
 		}
@@ -496,14 +516,14 @@ internal sealed class BatteryLimitPanel : Panel
 	{
 		try
 		{
-			int column = D(88);
-			int checkAvailable = column * 3 - D(8);
+			// 新布局：内嵌行 = 开关占满剩余宽 + 按钮固定 120 逻辑像素
+			int buttonAvailable = D(120);
+			int checkAvailable = D(352) - buttonAvailable - D(8);
 			int checkWidth = TextRenderer.MeasureText(_enableBox.Text, _enableBox.Font).Width;
-			Size buttonPreferred = _applyButton.GetPreferredSize(Size.Empty);
-			int buttonAvailable = column - D(8);
-			bool overlap = checkWidth > checkAvailable || buttonPreferred.Width > buttonAvailable;
+			int buttonTextWidth = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font).Width;
+			bool overlap = checkWidth > checkAvailable || buttonTextWidth > buttonAvailable - D(8);
 			string message = "[battery-ui] 开关+按钮行：开关文本宽=" + checkWidth + "px/可用=" + checkAvailable
-				+ "px · 按钮宽=" + buttonPreferred.Width + "px/列宽=" + buttonAvailable
+				+ "px · 按钮文本宽=" + buttonTextWidth + "px/按钮列宽=" + buttonAvailable
 				+ "px ⇒ 重叠=" + overlap;
 			Logger.WriteLine(message);
 			Logger.WriteLineIfChanged("battery-ui-switch-row", message);

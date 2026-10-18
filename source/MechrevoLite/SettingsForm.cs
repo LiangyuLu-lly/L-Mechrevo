@@ -8114,7 +8114,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			// 2026-10-18（机主：「底下的『未限制充电』被裁掉一点点」）：
 			//   PreferredSize 是**内容高**，不含面板内边距/字体行高取整 ⇒ 顶部/底部各差几像素就会被裁。
 			//   ⇒ 统一留 8 逻辑像素余量（足够覆盖 96/125/150/175% 缩放的取整误差）。
-			int panelHeight = Math.Max(100, panel.GetPreferredSize(new Size(panelWidth, 0)).Height + ResponsiveLayout.LogicalToDevice(this, 8));
+			int panelHeight = Math.Max(80, panel.GetPreferredSize(new Size(panelWidth, 0)).Height + ResponsiveLayout.LogicalToDevice(this, 2));
 			// 2026-10-18（机主：电池区域仍然空白 · 诊断包实测 `rowIndex=7 · rows=5`）：
 			//   ⚠️ 根因 = 增量行之前 `RowStyles.Count` 可能**小于** `RowCount`（有行只加了 RowCount 没加样式）
 			//   ⇒ 只 `RowStyles.Add()` 会让"新行"落在 index=5，而控件加到 index=7 ⇒ **那一行没有样式 ⇒ 高度 0 ⇒ 面板看不见**。
@@ -8131,6 +8131,16 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			host.SetColumnSpan(panel, 3);
 			RecalculateBatteryTableHeight();
 			host.PerformLayout();
+			// ⭐ 2026-10-19（机主：紧凑布局）：⭐ PerformLayout 后再量一次内容高度（+2 余量，⛔ 不再 +8）✅
+			panel.PerformLayout();
+			int measuredPanelHeight = Math.Max(80, panel.GetPreferredSize(new Size(panelWidth, 0)).Height + ResponsiveLayout.LogicalToDevice(this, 2));
+			if (measuredPanelHeight != panelHeight)
+			{
+				panelHeight = measuredPanelHeight;
+				host.RowStyles[_bdChargePanelRowIndex] = new RowStyle(SizeType.Absolute, panelHeight);
+				_bdChargePanelRowHeight = panelHeight;
+				RecalculateBatteryTableHeight();
+			}
 			Logger.WriteLine("[battery] 充电阈值面板：rowIndex=" + _bdChargePanelRowIndex + " · rows=" + host.RowStyles.Count
 				+ " · preferredHeight=" + panelHeight + " · host.Width=" + host.Width + " · host.Height=" + host.Height
 				+ " · panel.Height=" + panel.Height + " · panel.Visible=" + panel.Visible);

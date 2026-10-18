@@ -4406,7 +4406,7 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
 <data name="BatteryLimitAllowInitialDischarge" xml:space="preserve">
     
     
-    <value>Allow initial discharge (advanced)</value>
+    <value>Discharge to limit</value>
     
   
   </data>

@@ -4432,7 +4432,7 @@
 <data name="BatteryLimitAllowInitialDischarge" xml:space="preserve">
     
     
-    <value>允许初次放电（高级）</value>
+    <value>放电到限充阈值</value>
     
   
   </data>
