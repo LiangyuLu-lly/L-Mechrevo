@@ -4,23 +4,23 @@
 
 [Setup]
 AppName=L-Mechrevo
-AppVerName=L-Mechrevo 0.291.9.18 beta22.9.18
+AppVerName=L-Mechrevo 0.292.0 beta23
 AppId={{8F4E2C71-9B3A-4D6E-A1C2-7E5B9D0F3A64}
-AppVersion=0.291.9.18
+AppVersion=0.292.0
 AppPublisher=L-Mechrevo contributors
 AppCopyright=Copyright (C) 2026 L-Mechrevo contributors. GPL-3.0-only.
 DefaultDirName={autopf}\L-Mechrevo
 DefaultGroupName=L-Mechrevo
 #ifdef NOGCU
-OutputBaseFilename=LM-0.291.9.18-beta22.9.18-baolongda-test-setup
+OutputBaseFilename=LM-0.292.0-beta23-baolongda-test-setup
 #else
-OutputBaseFilename=LM-0.291.9.18-beta22.9.18-test-setup
+OutputBaseFilename=LM-0.292.0-beta23-test-setup
 #endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
-VersionInfoVersion=0.291.9.18
-VersionInfoProductVersion=0.291.9.18
-UninstallDisplayName=L-Mechrevo 0.291.9.18 beta22.9.18
+VersionInfoVersion=0.292.0
+VersionInfoProductVersion=0.292.0
+UninstallDisplayName=L-Mechrevo 0.292.0 beta23
 Compression=lzma2
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -122,9 +122,9 @@ Source: "files\COPYING.PawnIO.txt"; DestDir: "{app}\LICENSES"; Flags: ignorevers
 Source: "files\Install-PawnIO.ps1"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\更新日志.txt"; DestDir: "{app}\Docs"; Flags: ignoreversion 
 Source: "files\用前必看.txt"; DestDir: "{app}\Docs"; Flags: ignoreversion 
-Source: "files\GCU\Select-GcuPayload.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion 
-Source: "files\GCU\Install-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion 
-Source: "files\GCU\Uninstall-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion
+Source: "files\GCU\Select-GcuPayload.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu 
+Source: "files\GCU\Install-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu 
+Source: "files\GCU\Uninstall-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu
 ; ============================================================================
 ; 2026-10-13（owner 指示：「自带 ACPI 驱动」= 把 UWACPIDriver 变成标准自带）：
 ;   UWACPIDriver 三件此前只随 base payload 树（{app}\GCU\payload\GCU\UWACPIDriver）落盘，
