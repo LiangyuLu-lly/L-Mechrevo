@@ -148,7 +148,8 @@ internal static class LightingSettingsStore
 		LightChannelSettings lightChannelSettings = Load(topic, DefaultEffect(topic));
 		Save(topic, lightChannelSettings with
 		{
-			PowerOn = powerOn
+			PowerOn = powerOn,
+			PowerExplicit = true
 		});
 	}
 
@@ -159,6 +160,7 @@ internal static class LightingSettingsStore
 		int speed = 1;
 		int colorArgb = Color.White.ToArgb();
 		bool powerOn = false;
+		bool explicitPower = false;
 		int[]? manualIndexes = null;
 		int breathingIndex = 1;
 		int monoIndex = 4;
@@ -212,6 +214,14 @@ internal static class LightingSettingsStore
 				}
 				break;
 			}
+			case "powerexplicit":
+			{
+				// ⭐⭐ 2026-10-19（机主：启动自动点亮 Logo 灯）：
+				//   ⭐ 只有用户真的点过开关才有 powerexplicit=1；旧配置没有该键 ⇒ 视为"没设过"
+				//   ⇒ 启动恢复**不点灯**（⛔ 不再因为 power=1 就无条件点亮）✅
+				explicitPower = int.TryParse(text2, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ef) && ef != 0;
+				break;
+			}
 			case "manualindexes":
 			{
 				if (!string.IsNullOrWhiteSpace(text2))
@@ -260,7 +270,7 @@ internal static class LightingSettingsStore
 			}
 		}
 		}
-		return new LightChannelSettings(effect, light, speed, colorArgb, powerOn, manualIndexes, breathingIndex, monoIndex, usePreset);
+		return new LightChannelSettings(effect, light, speed, colorArgb, powerOn && explicitPower, manualIndexes, breathingIndex, monoIndex, usePreset);
 	}
 
 	private static string Serialize(LightChannelSettings settings)
@@ -282,6 +292,7 @@ internal static class LightingSettingsStore
 			"speed=" + settings.Speed.ToString(CultureInfo.InvariantCulture),
 			"color=" + settings.ColorArgb.ToString(CultureInfo.InvariantCulture),
 			"power=" + (settings.PowerOn ? "1" : "0"),
+			"powerexplicit=" + (settings.PowerExplicit ? "1" : "0"),
 			"breathingindex=" + settings.BreathingIndex.ToString(CultureInfo.InvariantCulture),
 			"monoindex=" + settings.MonochromeIndex.ToString(CultureInfo.InvariantCulture),
 			"usepreset=" + (settings.UsePresetColor ? "1" : "0"),

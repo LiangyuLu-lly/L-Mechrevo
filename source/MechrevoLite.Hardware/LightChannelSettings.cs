@@ -1,6 +1,6 @@
 namespace MechrevoLite.Hardware;
 
-internal readonly record struct LightChannelSettings(string Effect, int Light, int Speed, int ColorArgb, bool PowerOn, int[]? ManualIndexes = null, int BreathingIndex = 1, int MonochromeIndex = 4, bool UsePresetColor = false)
+internal readonly record struct LightChannelSettings(string Effect, int Light, int Speed, int ColorArgb, bool PowerOn, int[]? ManualIndexes = null, int BreathingIndex = 1, int MonochromeIndex = 4, bool UsePresetColor = false, bool PowerExplicit = false)
 {
 	internal static readonly int[] DefaultManualIndexes = new int[6] { 1, 5, 9, 13, 21, 25 };
 
