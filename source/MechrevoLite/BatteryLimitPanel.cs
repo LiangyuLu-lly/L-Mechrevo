@@ -272,7 +272,7 @@ internal sealed class BatteryLimitPanel : Panel
 	{
 		if (!BatteryLimitWriter.TryReadState(out int high, out int low, out int mode, out string detail))
 		{
-			SetStatus(Strings.BatteryLimitStatusUnreadable, 1);
+			SetStatus((PawnIO.RyzenSmuService.IsPawnInstalled() ? Strings.BatteryLimitStatusUnreadable : "需要 PawnIO 驱动（设置页可安装）"), 1);
 			Logger.WriteLine("[battery] 充电阈值状态（UI 刷新）：" + detail);
 			UpdateSocLine(active: false);
 				return;

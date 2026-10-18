@@ -7846,7 +7846,9 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		if (!_baolongdaChargePanelProbed)
 		{
-			_baolongdaChargePanelAvailable = BatteryLimitPanel.IsAvailable(hardware);
+			// 2026-10-18（机主：电池区域空白）：EC 读不到（常见原因：PawnIO 未安装）时 IsAvailable 为假 ⇒
+		//   整块面板不构建、卡片空白。改为按「板号支持」判断 ⇒ 卡片仍显示，面板内部给出「状态读不到 / 需要 PawnIO」。
+		_baolongdaChargePanelAvailable = BatteryLimitPanel.IsSupportedBoard(hardware);
 			_baolongdaChargePanelProbed = true;
 		}
 		return _baolongdaChargePanelAvailable;
@@ -8097,10 +8099,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		try
 		{
 			MechrevoHw hardware = Program.hw;
-			if (!BatteryLimitPanel.IsAvailable(hardware))
-			{
-				return;
-			}
+			// 2026-10-18（机主：电池区域空白）：⛔ 不再以「EC 可读」作为构建前置 ——
+			//   PawnIO 没装时 EC 读不到，但面板必须建出来并说明「状态读不到 / 需要 PawnIO」，否则卡片全空。
 			if (!BatteryLimitPanel.IsSupportedBoard(hardware))
 			{
 				return;
