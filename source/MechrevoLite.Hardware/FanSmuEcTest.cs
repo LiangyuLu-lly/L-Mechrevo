@@ -155,10 +155,12 @@ internal static class FanSmuEcTest
 			}
 			else
 			{
-				bool saved = FanEcVerifyStore.Save(is30, verified: true, out string cfgDetail);
 				L("结论：✅ **可用** —— 写入与回读均确认（通道=" + FanWriter.ChannelName(FanWriter.PreferredChannel) + "）");
-				L("闸门配置：" + (saved ? "已写入 · " + cfgDetail : "⚠️ 写入失败 —— " + cfgDetail));
-				L("⭐ 下次启动生效：`FanCurveVerified` 读配置 ⇒ 放开风扇曲线/强冷 UI（本次不热改）");
+				// ⭐⭐ 2026-10-18：⭐ 与 `--fan-ec-test` 共用同一个“写标记”函数（避免两套逻辑）✅
+				bool saved = FanEcVerifyStore.MarkVerifiedFromTest(is30, out string cfgDetail);
+				L(saved
+					? "✅ 已写入验证标记（重启 LM 后放开风扇曲线/强冷 UI）· " + cfgDetail
+					: "⚠️ 验证标记写入失败（UI 仍保持隐藏）· " + cfgDetail);
 				exitCode = 0;
 			}
 		}

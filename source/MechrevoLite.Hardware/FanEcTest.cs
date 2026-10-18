@@ -122,7 +122,11 @@ internal static class FanEcTest
 			if (openRevoOk)
 			{
 				L("结论：✅ **ACPI EC 写通路可用**（0xB20 出现 bit1+bit3 且转速上升 ≥200 RPM）");
-				L("⭐ 下一步：机主回传本报告 ⇒ 接产品闭环（闸门验证入口 --fan-smu-ec-test）✅");
+				// ⭐⭐ 2026-10-18（机主：40 系 --fan-ec-test 已成功但 UI 仍无开关）：⭐ 成功时也写验证标记 ✅
+				bool gateSaved = FanEcVerifyStore.MarkVerifiedFromTest(is30, out string gateDetail);
+				L(gateSaved
+					? "✅ 已写入验证标记（重启 LM 后放开风扇曲线/强冷 UI）· " + gateDetail
+					: "⚠️ 验证标记写入失败（UI 仍保持隐藏）· " + gateDetail);
 				exitCode = 0;
 			}
 			else

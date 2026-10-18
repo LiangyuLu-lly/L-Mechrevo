@@ -304,7 +304,7 @@ internal static class FanEcVerifyStore
 			}
 			string key = is30Series ? "fan_ec_verified_30" : "fan_ec_verified_40";
 			File.WriteAllText(path,
-				"# L-Mechrevo fan EC verification (written by --fan-smu-ec-test only)\n"
+				"# L-Mechrevo fan EC verification (written by a verification command only)\n"
 				+ key + "=" + (verified ? "1" : "0") + "\n");
 			// ⭐ 更新进程内缓存（保存后当前进程立即可见；UI 仍需重启才重新读闸门）✅
 			if (is30Series)
@@ -323,5 +323,42 @@ internal static class FanEcVerifyStore
 			detail = "写配置失败：" + ex.GetType().Name + " " + ex.Message;
 			return false;
 		}
+	}
+
+	/// <summary>⭐ 验证标记文件路径（⭐ `--fan-gate-status` 只读展示用）✅</summary>
+	internal static string GetConfigPath()
+	{
+		return ConfigPath();
+	}
+
+	/// <summary>⭐ 标记文件是否存在（⭐ 只读）✅</summary>
+	internal static bool MarkerExists()
+	{
+		try
+		{
+			return File.Exists(ConfigPath());
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：`--fan-ec-test` 成功也要放行 UI）：⭐ **两个验证命令共用的写标记函数** ✅。
+	/// <para>⛔ 只在验证判定 True 时由命令调用；⛔ 产品运行期不写；⭐ 日志固定一行 ✅</para>
+	/// </summary>
+	internal static bool MarkVerifiedFromTest(bool is30Series, out string detail)
+	{
+		bool ok = Save(is30Series, verified: true, out detail);
+		if (ok)
+		{
+			Logger.WriteLine("[fan] ✅ 已写入验证标记（重启 LM 后放开风扇曲线/强冷 UI）· " + detail);
+		}
+		else
+		{
+			Logger.WriteLine("[fan] ⚠️ 验证标记写入失败（UI 仍保持隐藏）· " + detail);
+		}
+		return ok;
 	}
 }

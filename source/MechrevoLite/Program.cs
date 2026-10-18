@@ -360,6 +360,15 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-18（风扇闸门排查）：`--fan-gate-status`（⭐ 纯只读）。
+		//   ⭐ 打印 FanCurveVerified（读 cfg 的结果）、PreferredChannel、cfg 路径/存在/内容、板号/代际；
+		//   ⛔ 不探测 EC、不写任何文件、不发 WMI；⚠️ 改 cfg 后需重启 LM 才生效。
+		case "--fan-gate-status":
+		{
+			Environment.ExitCode = FanGateStatus.Run();
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-18（SMU-EC 只读核对）：`--smu-ec-probe`。
 		//   ⭐ 核对 7.3 `RyzenAccess.Write_EC_EX/Read_EC_EX` 的真实通道（结论：LPC 端口 I/O，无 SMU 命令）；
 		//   ⭐ 双通道（ACPI/LPC）只读对照；⛔ 不发 SMU 命令、不写任何 EC 字节。
