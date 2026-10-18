@@ -1,3 +1,29 @@
+r74（2026-10-19 · **0.292.1 beta23.1**）★★★ 无界自定义档记忆/强冷/核显功耗 + 宝龙达 30 系键盘走 EC + 滑块崩溃修复
+用户原话：「无界自定义模式不记忆 重启又跳会平衡」「无界开机他自定义不高亮 重启LM变回平衡 无界没有原生自定义需要LM记忆 无界强冷打不开」「重启自动应用应当在GCU各项之后」「在自定义档位哪怕重启也不下发性能档位命令」「30系开关亮度都没有用，用fn键可以调 颜色可以调 彩虹正常」「键盘灯光关闭不行 是不是没接入ec」「40还是WMI」「键盘灯关了这个开关过一会会自己开」「是LHM的 这玩意有源码就是这个仓库的」「核显读取可以参照GCUmonitor」「有概率显示400w核显功耗 不正常」「无界和宝龙达的修复确保不要波及其他机型」「检查一下GCU之类不回归的话先打包吧 追踪之类你看看要不要删」
+① ⭐ 无界模式记忆：`ReconcileAsync` 对 `WujieSmuApu` + 自定义 ActiveModeId 直接 return（不被固件回读覆盖，`a085941`）；`ActivateLocalProfile` 打印写入前后 + `Flush`；
+   启动预热先 `ActivateLocalProfile` 再幂等重放（`ReplayWujieLocalProfileOnStartupAsync`）；高亮改 `ResolveVisualMode`（Wujie ⇒ ActiveModeId 优先，`de35b6e`）。
+② ⭐ 无界本机 SMU 应用：`CapabilitiesFrom` 对 Wujie **主动探测一次** `SmuAvailability.IsReady`；`SetCustomDetail` 本机前置分派扩为 `UsesBaolongda || WujieSmuApu` ⇒ PL1/PL2/温度墙/STAPM 全走本机 SMU（`682d6d9`）；
+   `RunStepsAsync` 对 Wujie `LocalApply=true` ⇒ `ModeSwitched=true` 不再回退；SMU 写序 slow/stapm → fast，fast<slow 自动抬高，三档回读（`71407a9`）。
+③ ⭐ 无界硬门控：`PerfModeBackend.SuppressWujieModeSwitch` ⇒ 自定义档下 `SwitchBuiltIn/SwitchTurboSubMode/SwitchFirmwareSlot` no-op、`WriteDetailFieldAsync` 只放行 4 个本机 SMU 键（`d3685e5`）。
+④ ⭐ 无界 UI：`DetachRow` 把 GCU 专属行（fPPT/风扇灵敏度/换挡延迟/风扇增强/GPU 超频 + 提示行）从父表移除（`e6366b9`）；灰字重复说明去重（`9f24ba8`）。
+⑤ ⭐ 无界强冷回归：`SupportsFanBoostQuickSwitch = SupportsFanBoost || UsesBaolongda || WujieSmuApu`（修 GCU 能力位晚到导致永久隐藏）；`SettingsForm` 恢复分路（宝龙达 ⇒ 本机 EC `SwitchQuick`；GCU/无界 ⇒ `SwitchFanBoost` Fan/Control）；`SwitchFanBoost` 闸门放宽 `!SupportsFanBoost && !WujieSmuApu`（`5bd0509`）。
+⑥ ⭐ 无界启动顺序：`风扇清理 → 摄像头 → 能力刷新 → ReconcileForStartupAsync → 无界重放 → UI 刷新`，串行 await、单步失败继续（`d3685e5`）。
+⑦ ⭐ 核显功耗（Wujie 780M）：LHM 选源从精确名改为「含 GPU 且含 Power」，后完全对齐 GCU Monitor（`tools/gcu-monitor/gcu_monitor_gui.py`）：递归 SubHardware、组合键 `硬件名|传感器名`、功耗=含 `GPU Core`/`GPU SoC` 的 Power **相加**、温度=`VR SoC`、占用=`GPU Core`（`0524a38`、`b1dc8e7`）；
+   额外加合理性过滤（>120W 硬丢、>中位数×5 且 >50W 尖峰丢、连续异常显示「—」）修「偶发 400W」（`af1f364`、`b1dc8e7`）。
+⑧ ⭐ 30 系键盘灯走 EC（宝龙达 Gen30）：WMI 18 实测只读（官方控制台 `SetSP_KeyboardLightBrightness` 是空实现）⇒ 用 EC `0x1807` 写 4 档 PWM `0x00/0x66/0xB3/0xFF`；
+   地址由「WMI18 变化 ↔ EC 变化」±300ms 关联 24/24 命中确认（`--kbd-ec-probe`，`f67c552`/`0200dcb`/`fb5a906`）；写后回读 + WMI18 交叉验证，失败不重试（`8e651e0`）；关灯同走 EC（`6a53fe6`）。
+⑨ ⭐ 30 系开关状态回弹：状态回读改为**只认 EC 0x1807**（0x00=OFF，非 0=ON，读失败保留上次），不再用 WMI16=2 判开（`5fc7097`）；
+   `KbPowerOn` setter 立即 `QueueSaveConfig()` 落盘意图（`aeeddb5`）；恢复判定 `BaolongdaWantsStartupLightWrite()=False ⇒ 只读同步` 去重日志；
+   全链路 `[kbd-trace]`（KeyboardPower 写入来源 + 调用链前 3 帧 / `写 0x1807` 来源）**仅 Gen30+宝龙达**打印（`ffff438`，排查回弹保留）。
+⑩ ⭐ 滑块崩溃：`ArgumentOutOfRangeException`（crash.txt 1653 条，值 36/46/47/48/49）根因=先写 NumericUpDown 再管范围；
+   修法：先扩 min/max 覆盖值 → clamp → 赋值（try/catch）+ `ApplyRange` 先设范围再设值 + `RSlider.ApplyValue` 兜底 + detach 整行容器（`af1f364`）。
+⑪ ⭐ 电池阈值：默认阻断高电量启用（SOC≥停充阈值 ⇒ 0 字节 + 原因），新增高级开关「放电到限充阈值」（配置 `battery_limit_allow_initial_discharge` 默认 0），CLI `--allow-initial-discharge`、`--battery-limit-status` 打印、启动核对同守（`33e7829`、`902cb58`）；
+   电池面板紧凑化（行高 22/28/26/20/20）、保存按钮 AutoSize（不裁切）、面板行样式与 RowCount 对齐（修空白/裁切，`b3968ec`、`7f2f623`、`4846dba`、`c444bb8`）。
+⑫ ⭐ PawnIO：设置页新增驱动行（状态/版本/下载安装/重新安装，复用 `Install-PawnIO.ps1`，3010=需重启）；宝龙达 + 无界（BIOS 型号含 WUJIE）安装器强制勾选并改写说明；`Install-PawnIO.ps1` 运行中跳过/已装先启动/≥2.2.0 跳过（`b6dac10`、`df36eb1`）。
+⑬ ⭐ 快捷开关补齐：`SwitchQuick` 缺 `fanboost` 等映射导致静默 false ⇒ 补 usb/deepsleep/gamewhitelist/cpuadvperf/micmute/lightbar/logolight 下发 + 未映射记 error + `FunctionVerifier.LogQuickSwitchCoverage` 自检（`a6eb574`）。
+⑭ ⭐ 机型隔离：30 系 EC 键盘路径全部加 `UsesBaolongda && Gen30` 门控（`314a2cb`），修「同方 Gen30 误读宝龙达 EC」；启动新增 `[gate]` 自检行打印机型分类与启用分支（`208440e`）。
+⑮ ⭐ 验证：Rebuild 0 错误 / 1459 警告；真机确认 30 系键盘 0/1/2/3 与关灯可用、无界自定义档重启保持、强冷恢复；诊断包归档 `docs/diag-packs/`（35 个）；GCU Monitor 源码入库 `tools/gcu-monitor/`（`487bbc8`）。
+
 r73（2026-10-18 · **0.292.0 beta23**）★★★ 宝龙达全线并入 main + 无界 APU SMU 自定义 + 安装器收口
 用户原话：「合并后打包要带上同方的GCU 版本号升级到0.292.0 beta23 保留宝龙达分支的识别…」「无界机型+AMD APU 8745H 8845H H255 AI 365等」「直接开放就行无界CPU功耗最大给90W」「用自定义的时候别发GCU性能命令」「pawnio会重复安装」「实测无界可以用 打包0.292.0 beta23 不加test字样」
 ① ⭐ 分支：baolongda → main 合并（`2c1bda3`），三处冲突解法：SettingsForm 保留 main 的滑块支持闸门 + baolongda 的统一行高重算；修改日志并集；git 小抄去重。
