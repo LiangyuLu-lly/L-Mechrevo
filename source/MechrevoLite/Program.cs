@@ -369,6 +369,15 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-18（SMU 只读探索 · 阶段 1）：`--smu-reg-probe`。
+		//   ⭐ 只用 `ioctl_read_smu_register` 读少量候选寄存器（间隔 10ms），打印 地址/rc/值/LastError；
+		//   ⭐ 与 ACPI EC 只读值对照，看是否有 EC 映射迹象；⛔ 一个写都不发。
+		case "--smu-reg-probe":
+		{
+			Environment.ExitCode = SmuRegisterProbe.Run();
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-19（30 系 · SMU **保守写 + 回读** 实测，供开发机 HawkPoint 近似验证）：
 		//   用法：L-Mechrevo.exe --smu-write-test          只读（打印当前快照，不写）
 		//         L-Mechrevo.exe --smu-write-test --yes    保守写 + 每次回读 + finally 恢复快照并确认

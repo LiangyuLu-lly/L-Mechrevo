@@ -1426,6 +1426,18 @@ public sealed class RyzenSmuService : IDisposable
 		return false;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（SMU 只读探索 · 阶段 1）：⭐ **只读**一个 SMU 寄存器（`ioctl_read_smu_register`）✅。
+	/// <para>⛔ 只读；⛔ 不发邮箱命令、⛔ 不写任何寄存器；`lastError` 返回 PawnIO 的 Win32 错误码（0=成功）✅</para>
+	/// </summary>
+	internal bool TryReadSmuRegister(uint address, out uint value, out int lastError)
+	{
+		value = 0u;
+		bool ok = ReadReg(address, out value);
+		lastError = _io.LastError;
+		return ok;
+	}
+
 	private bool WriteReg(uint addr, uint value)
 	{
 		return _execute("ioctl_write_smu_register", new ulong[2] { addr, value }, null);
