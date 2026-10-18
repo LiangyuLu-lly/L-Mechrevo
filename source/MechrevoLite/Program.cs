@@ -3505,6 +3505,23 @@ internal static class Program
 					}
 					Logger.WriteError("[init] 后台初始化：摄像头枚举 ok=" + cameraFound + "（耗时 " + (Environment.TickCount64 - camStart) + " ms）");
 				}
+				// ⭐⭐ 2026-10-19（机主：无界 APU 改好功耗后重启不会自动应用）：
+				//   ⭐ 启动空闲预热里**后台**核对并重放当前激活自定义档的本机 SMU 步骤（幂等；⛔ 不发 GCU 命令）
+				if (warmHw.WujieSmuApu)
+				{
+					try
+					{
+						PerfModeService warmPerf = PerfModeService.Instance;
+						if (warmPerf != null)
+						{
+							await warmPerf.ReplayWujieLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
+						}
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteError("[perfmode] 无界 APU 启动恢复异常（已吞掉、不重试）：" + ex.Message);
+					}
+				}
 				SettingsForm form = settingsForm;
 				if (form != null && !form.IsDisposed && form.IsHandleCreated)
 				{

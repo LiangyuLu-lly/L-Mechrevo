@@ -434,6 +434,11 @@ public class CustomModeForm : RForm
 		if (!Program.UiAuditMode)
 		{
 			MechrevoLite.Hardware.WujieSmuGate.LogPredicate();
+		}		// ⭐⭐ 2026-10-19（机主：无界 APU 改好功耗后重启不会自动应用）：
+		//   ⭐ 打开自定义窗口时也**核对一次**（幂等：一致跳过、不一致后台重放本机 SMU；⛔ 不阻塞 UI、⛔ 不发 GCU 命令）✅
+		if (!Program.UiAuditMode && (Program.hw?.WujieSmuApu ?? false))
+		{
+			_ = PerfModeService.Instance?.ReplayWujieLocalProfileOnStartupAsync();
 		}
 		Panel panel = (_scrollHost = new Panel
 		{

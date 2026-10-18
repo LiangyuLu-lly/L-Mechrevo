@@ -688,7 +688,8 @@ internal sealed class PerfModeService
 		}
 		PerfModeSettings expectedSettings = mode.Settings;
 		MechrevoHw hw = _hw;
-		if (hw == null || !hw.IsConnected)
+		// ⭐⭐ 2026-10-19（无界 APU）：无 GCU 也可走本机 SMU 应用/启动恢复 ⇒ 连接判据放宽（其它机型不变）✅
+		if (hw == null || (!hw.IsConnected && !hw.WujieSmuApu))
 		{
 			Logger.WriteLine("PerfModes: activate(" + modeId + ") refused, GCU not connected");
 			// ⭐⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ 失败原因【按后端如实写】✅ ——
@@ -1133,6 +1134,97 @@ internal sealed class PerfModeService
 			Logger.WriteError("[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + mode.Id + " · 不发固件档命令）");
 		}
 		RaiseActiveChanged();
+	}
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：无界 APU 改好功耗后重启不会自动应用）：
+	/// ⭐ **启动/开窗核对并重放当前激活自定义档的本机 SMU 步骤**（PL1/PL2/温度墙/STAPM）——
+	/// 走现有本机应用路径（`WujieSmuLocalOnly`，⛔ 不发任何 GCU 命令）✅。
+	/// <para>⭐ 幂等：先读 SMU 当前值，与配置一致 ⇒ 不写、只记一行 skip 日志 ✅</para>
+	/// <para>⚠️ 只对无界 APU 生效；宝龙达/GCU/同方不进入（调用点判据 + 本方法再判一次）✅</para>
+	/// <para>⚠️ 失败不重试、只记日志、由后台线程调用（⛔ 不阻塞 UI）✅</para>
+	/// </summary>
+	internal async Task ReplayWujieLocalProfileOnStartupAsync()
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null || !hw.WujieSmuApu)
+		{
+			return;
+		}
+		PerfModeDefinition mode = Find(ActiveModeId);
+		if ((object)mode == null || !mode.IsCustom)
+		{
+			return;
+		}
+		PerfModeSettings settings = mode.Settings;
+		if (TryReadWujieSmuCurrent(out int curPl1, out int curPl2, out int curTctl)
+			&& WujieSmuValuesMatch(settings, curPl1, curPl2, curTctl))
+		{
+			string skip = "[perfmode] 无界 APU 启动恢复：当前值与配置一致 ⇒ 跳过（ActiveModeId=" + mode.Id + "）";
+			if (Logger.TryMarkChanged("wujie-startup-skip", skip))
+			{
+				Logger.WriteError(skip);
+			}
+			return;
+		}
+		string replay = "[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机 SMU（PL1="
+			+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）";
+		if (Logger.TryMarkChanged("wujie-startup-replay", replay))
+		{
+			Logger.WriteError(replay);
+		}
+		try
+		{
+			await ActivateAsync(mode.Id, "wujie startup replay", forceParameters: true).ConfigureAwait(continueOnCapturedContext: false);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[perfmode] 无界 APU 启动恢复失败（已吞掉、不重试）：" + ex.Message);
+		}
+	}
+
+	/// <summary>⭐ 只读：SMU 当前 PL1(slow)/PL2(fast)/tctl（读不到返回 false；⛔ 不写任何东西）✅</summary>
+	private static bool TryReadWujieSmuCurrent(out int pl1, out int pl2, out int tctl)
+	{
+		pl1 = (pl2 = (tctl = -1));
+		try
+		{
+			PawnIO.RyzenSmuService smu = ModeControl.SharedSmu;
+			if (smu == null)
+			{
+				return false;
+			}
+			PawnIO.PowerLimits limits = smu.GetPowerLimits();
+			if (limits == null)
+			{
+				return false;
+			}
+			pl1 = (int)Math.Round((double)limits.Slow);
+			pl2 = (int)Math.Round((double)limits.Fast);
+			tctl = (int)Math.Round((double)limits.TctlTemp);
+			return pl1 > 0 && pl2 > 0;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>⭐ 幂等判据：配置里设过的项与当前 SMU 值一致（±2W / ±1℃）⇒ 无需重写 ✅</summary>
+	private static bool WujieSmuValuesMatch(PerfModeSettings settings, int curPl1, int curPl2, int curTctl)
+	{
+		if (settings.Pl1.HasValue && Math.Abs(settings.Pl1.Value - curPl1) > 2)
+		{
+			return false;
+		}
+		if (settings.Pl2.HasValue && Math.Abs(settings.Pl2.Value - curPl2) > 2)
+		{
+			return false;
+		}
+		if (settings.TccTarget.HasValue && Math.Abs(settings.TccTarget.Value - curTctl) > 1)
+		{
+			return false;
+		}
+		return true;
 	}
 	internal void CancelPendingApply()
 	{
