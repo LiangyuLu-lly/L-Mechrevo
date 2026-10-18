@@ -542,6 +542,25 @@ internal sealed class BaolongdaWmi : IDisposable
 	//  通用读 / 写
 	// ══════════════════════════════════════════════════════════════════════
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系只读诊断）：读一次功能号的**完整 OutData**（原始字节；失败返回 <c>false</c>）✅。
+	/// <para>⚠️ 只发 Get（250），⛔ 不写任何字节 —— 供 raw 探针核对"我们取值的偏移是否正确"✅。</para>
+	/// </summary>
+	internal bool TryReadRawOutData(Function function, out byte[] outData)
+	{
+		outData = null;
+		try
+		{
+			outData = Invoke(MethodGet, function);
+			return outData != null && outData.Length > 0;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine($"宝龙达 WMI：raw 读功能号 {(byte)function} 失败：{ex.Message}");
+			return false;
+		}
+	}
+
 	/// <summary>读一个功能号的单字节值（<c>OutData[4]</c>）。</summary>
 	internal bool TryReadByte(Function function, out byte value)
 	{

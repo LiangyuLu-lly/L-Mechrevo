@@ -312,6 +312,23 @@ internal static class Program
 			Logger.WriteLine("[kbd-probe] " + probeLog);
 			return;
 		}
+		// ⭐⭐ 2026-10-19（30 系「亮度只有 FN 能调」只读诊断）：
+		//   ⭐ 用法：L-Mechrevo.exe --kbd-fn-probe [秒数，默认 60]
+		//   ⭐ 期间**只读**采样 16/17/18 的完整 OutData（每 200ms；raw 变化才记一行）
+		//   ⇒ 请机主在这段时间内按 Fn 调亮/调暗各几次 —— 看**哪个字节跟着变** ✅
+		case "--kbd-fn-probe":
+		{
+			int fnProbeSeconds = 60;
+			if (args.Length > 1 && int.TryParse(args[1], out int parsedFnSeconds))
+			{
+				fnProbeSeconds = Math.Clamp(parsedFnSeconds, 5, 300);
+			}
+			string fnProbeLog = KeyboardWmiProbe.RunFnProbe(fnProbeSeconds);
+			Console.WriteLine(fnProbeLog);
+			Logger.WriteLine("[kbd-probe] fn-probe: " + fnProbeLog);
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-19（宝龙达 · GPU 核心/显存偏移）：NVAPI P-States 20 真机探针。
 		//   用法：L-Mechrevo.exe --gpu-oc-probe
 		//   读 P0 基线 → 核心/显存各 +50 → 回读 → 各 +100 → 回读 → 归零 → 回读；

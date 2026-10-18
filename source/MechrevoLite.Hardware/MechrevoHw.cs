@@ -1612,6 +1612,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private readonly object _kbdCapsGate = new object();
 
 	/// <summary>
+	/// ⭐ 2026-10-19（30 系只读诊断）：raw OutData 一次性探测状态（0=未探 / 1=探测中 / 2=完成）。
+	/// <para>⚠️ 全程**只读**（只发 Get），⛔ 不写任何字节；每进程一次 ✅。</para>
+	/// </summary>
+	private static int _kbdRawProbeState;
+
+	/// <summary>
 	/// ⭐ 本机的**键盘灯自校准结果**（只读；<c>null</c> = 还没探测过）。
 	/// <para>⭐ UI 用它决定：亮度滑块上限（<see cref="KeyboardLightingCalibration.BrightnessMax" />）✅。</para>
 	/// </summary>
@@ -3565,6 +3571,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return false;
 		}
+		// ⭐ 2026-10-19（30 系只读诊断）：每进程一次 raw OutData 探测（⛔ 不写任何字节）✅
+		ProbeKeyboardRawOnce(wmi);
 		try
 		{
 			// ⭐⭐ 2026-10-19（自动关灯）：任何**非恢复**的键盘灯写入都视为"用户手动改灯"
@@ -3597,6 +3605,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					LogKeyboardLightingState(wmi, "关灯失败后");
 					return true;
 				}
+				// ⭐ 2026-10-19（只读诊断）：写 18=0 后连续读 5 次 raw（看是否滞后/是否夹回）✅
+				LogKeyboardRawAfterBrightnessWrite(wmi, 0);
 				confirmed = TryConfirmKeyboardBrightness(wmi, 0);
 				// ⭐⭐ 2026-10-19：⭐ 记录**回读到的实际值**（⭐ UI 显示实际生效值，⛔ 不显示用户拖到的值）✅
 				RecordAppliedKeyboardBrightness(wmi, requestedLevel: 0);
@@ -3715,6 +3725,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				brightOk = wmi.TrySetKeyboardBrightness(level);
 				Logger.WriteLine($"[kbd] 亮度复位序列：{maxLevel} → 0 → {level}（7.3 做法）⇒ ok={brightOk}");
 			}
+			// ⭐ 2026-10-19（只读诊断）：真的写了 18 之后连续读 5 次 raw（看滞后/夹回）✅
+			if (needBright)
+			{
+				LogKeyboardRawAfterBrightnessWrite(wmi, level);
+			}
 			// ⭐⭐ 回读：⭐ 逐值比对（⭐ 旧代码只判"非 0 ＝ 开" ⇒ ⭐ 选自动循环/自定义时会误判成功 ❌）
 			bool modeMatch = TryConfirmModeExact(wmi, mode);
 			bool brightMatch = TryConfirmKeyboardBrightness(wmi, level);
@@ -3811,6 +3826,82 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// ⭐ UI 订阅方自己的异常⛔ 不允许影响硬件写入链路（⭐ 已写完，这里只是通知）✅
 			Logger.WriteLine("[kbd-cal] 亮度实际值通知 UI 时异常（已吞掉）：" + ex.Message);
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系只读诊断）：⭐ **每进程一次**，连续 5 次读 16/17/18 的**完整 OutData**，
+	/// 用来核对"我们读 17/18 的偏移是否正确"（颜色明明变了但回读 0 ⇒ 很可能读错字节）✅。
+	/// <para>⚠️ 全程只发 Get；⛔ 不写任何字节、⛔ 不改任何状态（仅 30 系跑）✅。</para>
+	/// </summary>
+	private void ProbeKeyboardRawOnce(BaolongdaWmi wmi)
+	{
+		if (DgpuGeneration != DgpuGenerationKind.Gen30)
+		{
+			return;
+		}
+		if (Interlocked.CompareExchange(ref _kbdRawProbeState, 1, 0) != 0)
+		{
+			return;
+		}
+		try
+		{
+			for (int round = 1; round <= 5; round++)
+			{
+				Logger.WriteError($"[kbd-probe] 第 {round} 次 16={FormatKeyboardRaw(wmi, BaolongdaWmi.Function.RgbKeyboardMode)}"
+					+ $" · 17={FormatKeyboardRaw(wmi, BaolongdaWmi.Function.RgbKeyboardColor)}"
+					+ $" · 18={FormatKeyboardRaw(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness)}");
+				if (round < 5)
+				{
+					Thread.Sleep(60);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[kbd-probe] raw 探测异常（已吞掉）：" + ex.Message);
+		}
+		finally
+		{
+			Volatile.Write(ref _kbdRawProbeState, 2);
+		}
+	}
+
+	/// <summary>⭐ 只读：读一个功能号的完整 OutData 摘要（下标 2..8，含长度）✅。</summary>
+	private static string FormatKeyboardRaw(BaolongdaWmi wmi, BaolongdaWmi.Function function)
+	{
+		if (!wmi.TryReadRawOutData(function, out byte[] data) || data == null)
+		{
+			return "fail";
+		}
+		int end = Math.Min(data.Length - 1, 8);
+		string text = "";
+		for (int i = 2; i <= end; i++)
+		{
+			text += (i == 2 ? "" : "-") + data[i].ToString("X2");
+		}
+		return "raw(OutData[2.." + end + "])=" + text + " (len=" + data.Length + ")";
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-19（30 系只读诊断）：写 18=N 后**连续读 5 次** raw，看固件是否"滞后"
+	/// （写完立刻读是旧值、稍后读才对）✅。⚠️ 只读；⛔ 不改写入顺序/不重试写入 ✅。
+	/// </summary>
+	private void LogKeyboardRawAfterBrightnessWrite(BaolongdaWmi wmi, int requestedLevel)
+	{
+		if (DgpuGeneration != DgpuGenerationKind.Gen30)
+		{
+			return;
+		}
+		string text = "";
+		for (int round = 1; round <= 5; round++)
+		{
+			if (round > 1)
+			{
+				Thread.Sleep(60);
+			}
+			text += (round == 1 ? "" : " · ") + $"[{round}]" + FormatKeyboardRaw(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness);
+		}
+		Logger.WriteError($"[kbd-probe] 写 18={requestedLevel} 后连续读 5 次 raw：{text}");
 	}
 
 	/// <summary>
