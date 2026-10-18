@@ -329,19 +329,28 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-19（30 系「FN 调亮度」· EC 取证工具）：
-		//   用法：L-Mechrevo.exe --kbd-ec-probe [秒数，默认 60]
-		//   ⭐ **只读**扫描 EC RAM（0x8300–0x84FF / 0x1000–0x10FF / 0x07B0–0x07FF），
-		//     每 200~300ms 一轮、只记录**变化的地址** ⇒ 请机主按 Fn 调亮/调暗各 3~5 次；
-		//   ⛔ 0 写入（仅 EcPortIo.TryReadBytes；不碰 WMI 写）；平台闸：仅宝龙达 30/40 系 ✅
+		// ⭐⭐ 2026-10-19（30 系「FN 调亮度」· EC 取证工具 v3：ACPI/LPC 双通道）：
+		//   用法：L-Mechrevo.exe --kbd-ec-probe [秒数，默认 60] [--lpc]
+		//   ⭐ **只读**扫描 EC RAM（0x0790–0x07FF / 0x1800–0x18FF / 0x8300–0x83BF），
+		//     默认 ACPI（0x92）；`--lpc` 走 LPC（EcLpcIo · 0x4E/0x4F），打开失败自动回退 ACPI；
+		//   ⭐ 先测速（32 次采样）；LPC >5ms/B ⇒ 提示“LPC 也跟不上”并提前结束；
+		//   ⭐ 发现变化 ⇒ 专注模式（50ms 盯变化地址）；⛔ 0 写入、⛔ 不碰 WMI 写；仅宝龙达 30/40 系 ✅
 		case "--kbd-ec-probe":
 		{
 			int ecProbeSeconds = 60;
-			if (args.Length > 1 && int.TryParse(args[1], out int parsedEcSeconds))
+			bool ecProbeUseLpc = false;
+			for (int i = 1; i < args.Length; i++)
 			{
-				ecProbeSeconds = Math.Clamp(parsedEcSeconds, 10, 300);
+				if (string.Equals(args[i], "--lpc", StringComparison.OrdinalIgnoreCase))
+				{
+					ecProbeUseLpc = true;
+				}
+				else if (int.TryParse(args[i], out int parsedEcSeconds))
+				{
+					ecProbeSeconds = Math.Clamp(parsedEcSeconds, 10, 300);
+				}
 			}
-			string ecProbeLog = KeyboardEcProbe.Run(ecProbeSeconds);
+			string ecProbeLog = KeyboardEcProbe.Run(ecProbeSeconds, ecProbeUseLpc);
 			Console.WriteLine(ecProbeLog);
 			Logger.WriteLine("[kbd-ec-probe] " + ecProbeLog);
 			Logger.Close();
