@@ -4598,16 +4598,24 @@ public class SettingsForm : RForm
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达下 `webcam` 写的是 **Windows 摄像头隐私授权**
-	/// （`ConsentStore\webcam`），⛔ 不是 EC/固件级断电 ⇒ 文案必须如实写「**摄像头隐私**」，
-	/// 别让用户以为按了就等于把摄像头断电了。
+	/// ⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
+	/// ⭐ 宝龙达下 `webcam` 现在是**真正禁用/启用摄像头设备**（SetupAPI PnP，见 `CameraPnpControl`）
+	/// ⇒ 文案恢复成「摄像头」✅；
+	/// ⚠️ 只有本机枚举不到可控制摄像头设备、退回旧隐私键兜底时，才必须如实写「**摄像头隐私**」
+	/// （两者语义不同：一个是设备级禁用，一个只是系统隐私授权 ⚠️）。
 	/// <para>⚠️ 非宝龙达仍用 <see cref="Strings.QuickCamera" />（GCU 的 `WEBCAM_ON/OFF` 是厂商级）⇒ 逐位不变 ✅</para>
 	/// <para>⚠️ 用字面量而不是改 `Strings*.resx`：那个文件是**混合行尾**（CRLF 14 / 裸 LF 5343），
 	/// 用编辑器改会整篇改行尾；本表里 `("wifi", "WiFi")` 就是既有先例 ✅</para>
 	/// </summary>
 	private static string QuickCameraLabel(string fallback)
 	{
-		return (Program.hw?.UsesBaolongda ?? false) ? Strings.QuickCameraPrivacy : fallback;
+		if (!(Program.hw?.UsesBaolongda ?? false))
+		{
+			return fallback;
+		}
+		// ⭐ 有可控制的摄像头设备 ⇒ 走 PnP 设备级禁用/启用 ⇒ 文案「摄像头」；
+		//   ⛔ 没有（例如只有 Windows Hello 红外相机被我们排除）⇒ 退回隐私键 ⇒ 文案「摄像头隐私」
+		return CameraPnpControl.HasCamera ? fallback : Strings.QuickCameraPrivacy;
 	}
 
 	/// <summary>「更多开关」里该 key 的文案（提级后的 <see cref="QuickSwitchLabels" />，与那一组完全同源）。</summary>
@@ -5472,6 +5480,15 @@ public class SettingsForm : RForm
 					return new bool?(hw.FanBoost);
 				}
 				return hw.UsesBaolongda ? new bool?(MechrevoHw.FanBoostActive) : ((bool?)null);
+			}
+			// ⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
+			//   ⭐ 宝龙达下 `webcam` 的**权威状态是设备状态**（`CameraPnpControl`：SetupAPI 枚举 +
+			//      `CM_Get_DevNode_Status` / ConfigFlags）✅ —— ⛔ 不再拿"隐私授权"或 3 s 周期镜像冒充真值 ⚠️；
+			//   ⚠️ 读不到（本机没有可控制摄像头设备）⇒ **回落到下面的通用分支**（⛔ 不编造状态）；
+			//   ⛔ 非宝龙达不进本分支 ⇒ GCU / 老同方行为逐位不变 ✅
+			if (key == "webcam" && hw.UsesBaolongda && CameraPnpControl.TryGetEnabled(out bool camEnabled, out string _))
+			{
+				return new bool?(camEnabled);
 			}
 			// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」）：`logolight` 的**权威状态是硬件
 			//  功能号 15 的实时回读** ✅ —— ⛔ 不再只信 3 s 周期的 `QuickSwitches` 镜像 ⚠️

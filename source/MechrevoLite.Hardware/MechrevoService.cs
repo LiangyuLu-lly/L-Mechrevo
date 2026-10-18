@@ -3065,18 +3065,48 @@ public class MechrevoService
 					return bdConfirmed;
 				}
 			}
-			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达没有 GCU ⇒ 写 Windows 的摄像头隐私授权 ✅
-			//   ⚠️ 语义：`on=true`（摄像头可用）= ConsentStore Allow；`on=false` = Deny
-			//   ⚠️ 与 GCU 的 WEBCAM_ON/OFF 不同（那是厂商 EC 级）⇒ UI 文案要写成「摄像头隐私」
+			// ⭐⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
+			//   ⚠️ 宝龙达没有 GCU、也没有摄像头功能号 ⇒ 旧的 `WEBCAM_ON/OFF`（厂商 MQTT）**必然无效**；
+			//      上一版的"摄像头隐私授权"只是系统隐私开关（隐私 Allow ≠ 设备没被禁用 ⚠️）。
+			//   ⭐ 现在：`on=true` ⇒ **启用摄像头设备**；`on=false` ⇒ **禁用摄像头设备**（SetupAPI，通用）✅
+			//   ⭐ 结果/回读都来自**设备状态**（见 `CameraPnpControl`），并回灌 `QuickSwitches["webcam"]` ✅
+			//   ⚠️ 本机枚举不到可控制摄像头设备时才退回旧的隐私键兜底（保功能，⛔ 不假装成 PnP）；
+			//   ⚠️ **GCU / 同方机型不进入本分支** ⇒ 下面 `WEBCAM_ON/OFF` 那条厂商路径**逐位不变** ✅
 			if (_hw.UsesBaolongda && string.Equals(key, "webcam", StringComparison.Ordinal))
 			{
-				if (CameraPrivacy.Available)
+				if (CameraPnpControl.HasCamera)
 				{
-					bool camOk = CameraPrivacy.TrySetDenied(!on, out string camNote);
-					Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ 走**系统摄像头隐私**（ConsentStore）⇒ 确认={camOk}（{camNote}）");
+					// ⭐ PnP 禁用/启用要等设备卸载/启动（数百 ms）⇒ 放**后台线程**，⛔ 不卡 UI（沿用 fanboost 同款做法）
+					(bool camOk, string camDetail) = await Task.Run(() =>
+					{
+						bool ok = CameraPnpControl.TrySetEnabled(on, out bool _, out string detail);
+						return (ok, detail);
+					}).ConfigureAwait(continueOnCapturedContext: false);
+					if (camOk)
+					{
+						// ⭐ 回读确认成立 ⇒ 把真值回灌镜像（界面/磁贴据此即时收敛）✅
+						_hw.SyncCameraPnpQuickSwitch(on, "PnP 写入确认");
+					}
+					else if (CameraPnpControl.TryGetEnabled(out bool camNow, out string _))
+					{
+						// ⚠️ 未确认 ⇒ **按真实设备状态**回灌（⛔ 不拿意图当状态）⇒ 界面按真值回滚 ✅
+						_hw.SyncCameraPnpQuickSwitch(camNow, "PnP 设备状态回读");
+					}
+					Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ 走 **Windows PnP 摄像头设备**（禁用/启用）⇒ 确认={camOk}（{camDetail}）");
 					return camOk;
 				}
-				Logger.WriteLine($"SwitchQuick(webcam,{on})：⚠️ 摄像头隐私键不可用（无权限/不存在）⇒ 不下发");
+				if (CameraPrivacy.Available)
+				{
+					// ⭐ 兜底：本机没有可控制的摄像头设备（例如只有 Windows Hello 红外相机）⇒ 沿用旧隐私键（保功能）
+					bool camOk = CameraPrivacy.TrySetDenied(!on, out string camNote);
+					Logger.WriteLine($"SwitchQuick(webcam,{on}) ⚠️ 走**隐私键兜底**（无 PnP 摄像头设备 · ConsentStore）⇒ 确认={camOk}（{camNote}）");
+					if (camOk)
+					{
+						_hw.SyncCameraPnpQuickSwitch(on, "隐私键写入确认（无 PnP 摄像头设备兜底）");
+					}
+					return camOk;
+				}
+				Logger.WriteLine($"SwitchQuick(webcam,{on})：⚠️ 既没有可控制的摄像头设备、隐私键也不可用 ⇒ 不下发");
 				return false;
 			}
 			// ⭐⭐ 2026-10-16（宝龙达 · OSD 提示）：⭐ 走**本地实现**（⭐ 它连 WMI 都不用 ✅）

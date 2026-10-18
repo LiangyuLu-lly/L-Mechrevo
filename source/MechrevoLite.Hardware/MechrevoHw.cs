@@ -2454,9 +2454,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"touchpad" => true, 
 			"wifi" => WifiSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Wifi)), 
 			"bt" => BluetoothSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Bluetooth)), 
-			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 宝龙达没有 GCU ⇒ 用 Windows 的摄像头隐私授权
-			//   （⭐ 与 GCU 的 WEBCAM_ON/OFF 不同：那是厂商 EC 级，宝龙达给不了 ✅）
-			"webcam" => WebcamSeen || (UsesBaolongda && CameraPrivacy.Available), 
+			// ⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
+			//   ⭐ 宝龙达没有 GCU/摄像头功能号 ⇒ 原来的 `WEBCAM_ON/OFF`（厂商 MQTT）必然无效；
+			//   ⭐ 现改为 **SetupAPI 直接禁用/启用摄像头设备**（通用，见 `CameraPnpControl` ✅）
+			//   ⇒ 能力位 = "本机有可控制的摄像头设备"；⛔ 无摄像头设备时才退回旧隐私键兜底（保功能）
+			//   ⚠️ GCU / 同方机型仍按 `WebcamSeen`（厂商 `WebCamEnable`）判 ⇒ **逐位不变** ✅
+			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCamera || CameraPrivacy.Available)),
 			"winkey" => WinKeySeen, 
 			"fnkey" => FnKeySeen || UsesBaolongda, 
 			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：这两个**不是 WMI 开关** ——
@@ -6286,14 +6289,28 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Logger.WriteLine($"宝龙达状态回读：⭐ apuboost ⇒ {(apuOn ? "开" : "关")}（⭐ 来源：Windows 电源策略）");
 				}
 			}
-			// ⭐⭐ 2026-10-17（摄像头 · 系统隐私开关）：⭐ 状态来自注册表 ConsentStore（桌面应用那一项优先）
-			if (CameraPrivacy.TryGetDenied(out bool camDenied, out string camNote))
+			// ⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
+			//   ⭐ 状态源改成**设备状态**（`CM_Get_DevNode_Status` / `ConfigFlags` —— 见 `CameraPnpControl`），
+			//      ⛔ 不再是隐私授权回显（隐私 Allow ≠ 设备没被禁用 ⚠️）；
+			//   ⭐ 只有"本机枚举不到可控制的摄像头设备"时才退回旧的隐私键兜底（保功能、⛔ 不谎报来源）✅
+			//   ⚠️ 非宝龙达不走本方法 ⇒ GCU 机型仍由 `WebCamEnable` 回包写 `QuickSwitches`（逐位不变 ✅）
+			if (CameraPnpControl.TryGetEnabled(out bool camEnabled, out string camPnpNote))
+			{
+				if (!QuickSwitches.TryGetValue("webcam", out bool camCur) || camCur != camEnabled)
+				{
+					QuickSwitches["webcam"] = camEnabled;
+					Logger.WriteLine($"宝龙达状态回读：⭐ webcam ⇒ {(camEnabled ? "开" : "关")}"
+						+ $"（⭐ 来源：Windows 摄像头设备状态（PnP）· {camPnpNote} ✅）");
+				}
+			}
+			else if (CameraPrivacy.TryGetDenied(out bool camDenied, out string camPrivacyNote))
 			{
 				bool camOn = !camDenied;
-				if (!QuickSwitches.TryGetValue("webcam", out bool camCur) || camCur != camOn)
+				if (!QuickSwitches.TryGetValue("webcam", out bool camCur2) || camCur2 != camOn)
 				{
 					QuickSwitches["webcam"] = camOn;
-					Logger.WriteLine($"宝龙达状态回读：⭐ webcam ⇒ {(camOn ? "开" : "关")}（⭐ 来源：Windows 摄像头隐私 · {camNote} ✅）");
+					Logger.WriteLine($"宝龙达状态回读：⭐ webcam ⇒ {(camOn ? "开" : "关")}"
+						+ $"（⭐ 无 PnP 摄像头设备 ⇒ 兜底来源：Windows 摄像头隐私 · {camPrivacyNote} ⚠️）");
 				}
 			}
 			// ⭐⭐ 2026-10-16（OSD 提示 · 本地方案）：⭐ 这个开关的状态**来自本地配置** ✅
@@ -6350,6 +6367,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				+ "）");
 		}
 	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：⭐ 把**摄像头设备状态**回灌
+	/// <see cref="QuickSwitches" />（⭐ 唯一入口，⛔ 与厂商回显区分开）。
+	/// <para>⚠️ 根因：宝龙达没有 GCU/摄像头功能号 ⇒ 原来的 `WEBCAM_ON/OFF` 发不出去；
+	/// 且 `QuickSwitches["webcam"]` 原来只由"摄像头隐私授权"回读 ⇒ **隐私 Allow ≠ 设备没被禁用** ⚠️
+	/// ⇒ 设备被 PnP 禁用后界面仍显示"开"❌。</para>
+	/// <para>⭐ 只在**值真的变了**时才写＋记日志 ✅；<paramref name="source" /> 必须如实写清来源
+	/// （PnP 写入确认 ／ PnP 设备状态回读），⛔ 不拿意图当状态 ✅。</para>
+	/// </summary>
+	internal void SyncCameraPnpQuickSwitch(bool on, string source)
+	{
+		if (!QuickSwitches.TryGetValue("webcam", out bool current) || current != on)
+		{
+			QuickSwitches["webcam"] = on;
+			Logger.WriteLine($"[camera] 状态同步 ⇒ {(on ? "On" : "Off")}（来源：{source}）");
+		}
+	}
+
 	private void RefreshBaolongdaSensors()
 	{
 		BaolongdaWmi wmi = _baolongda?.Wmi;
