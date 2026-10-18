@@ -15544,10 +15544,11 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			int rpmMaxForPercent = hw.FanRpmMaxForPercent;
 			int rpmNow = isCpu ? hw.CpuFanRpm : hw.GpuFanRpm;
-			// ⭐⭐ 2026-10-18（机主 30 系反馈）：
-			//   ⭐ 原厂 30 系口径 `percent = Item1 / 35f` ⇒ 3500 RPM = 100%，**4900 RPM = 140%** 是官方允许的显示范围 ✅
-			//   ⚠️ 旧实现 `Math.Min(100, …)` ⇒ 30 系超过 100% 的部分永远显示 100%，比官方少一截 ❌
-			//   ⭐ 现在**不夹 100**，只留 140% 的显示安全上限（⭐ 40 系同样处理；⛔ 只改显示，不改任何下发值）✅
+			// ⭐⭐ 2026-10-18（机主新决定 · 30 系风扇基准）：
+			//   ⭐ 30 系 100% = **4900 RPM**（机主实测：3500 压不住；原厂上限约 140% ≈ 4900 ⇒ 以其为 100% 基准）✅
+			//   ⭐ 40 系 100% = 6000 RPM ✅
+			//   ⚠️ 旧实现 `Math.Min(100, …)` ⇒ 超过 100% 的部分永远显示 100%，比官方少一截 ❌
+			//   ⭐ 现在**不夹 100**，只留 140% 的显示安全上限（⛔ 只改显示，不改任何下发值）✅
 			if (rpmMaxForPercent > 0 && rpmNow > 0)
 			{
 				int rawPercent = (int)Math.Round(rpmNow * 100.0 / rpmMaxForPercent);

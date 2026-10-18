@@ -46,12 +46,26 @@ internal static class BaolongdaProfile
 	// ══════════════════════════════════════════════════════════════════
 
 	/// <summary>
-	/// ⭐⭐ 转速**百分比**的分母（RPM ✅）：⭐ 原厂 40 系口径 = **RPM ÷ 60** ⇒ 100% = 6000 ✅。
+	/// ⭐⭐ 转速**百分比**的分母（RPM ✅）：⭐ **40 系**口径 = **RPM ÷ 60** ⇒ 100% = 6000 ✅。
 	/// <para>⚠️ 为什么不是"读功能号 21"：原厂把功能号 21 的**读值**当**手动转速设定值**
 	/// （⛔ 不是最大转速）⇒ 拿它当分母会随"上次手动设过多少"漂移 ❌（详见
 	/// <c>docs\notes\0.291.9.8-风扇曲线修复与开关-20261017.md</c> §七）。</para>
+	/// <para>⭐⭐ 2026-10-18（机主新决定）：⭐ 本常量**只作为 40 系别名保留**（⛔ 避免大面积改动）；
+	/// ⭐ **按代际取值请用 <see cref="FanPercentDenominatorRpmFor" />**（30 系已改为 **4900**）✅</para>
 	/// </summary>
 	internal const int FanPercentDenominatorRpm = 6000;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主新决定 · 30 系风扇基准）：⭐ 百分比**分母按代际** ——
+	/// **30 系 = 4900 RPM · 40 系 = 6000 RPM** ✅。
+	/// <para>⭐ 依据：⭐ <b>机主实测：30 系 3500 RPM 压不住；原厂上限约 140%（4900 RPM）
+	/// ⇒ 以其为 100% 基准</b> ✅（⭐ 3500 只是旧版原厂控制台的 ÷35 显示口径，⛔ 不代表散热需求）。</para>
+	/// <para>⚠️ 本函数是**纯函数**（⛔ 不读硬件）；⭐ 非宝龙达由调用方先判 <c>UsesBaolongda</c> ✅。</para>
+	/// </summary>
+	internal static int FanPercentDenominatorRpmFor(DgpuGenerationKind generation)
+	{
+		return (generation == DgpuGenerationKind.Gen30) ? FanTrueMaxUnits30Series * 100 : FanPercentDenominatorRpm;
+	}
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙口径放宽）：⭐ 手动转速的**档位上限**（⭐ 功能号 21 的入参单位
@@ -82,10 +96,10 @@ internal static class BaolongdaProfile
 	internal const int FanCurveRampDownRpmPerSec = 150;
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 30 系**真实满转档位** = **49**（⭐ 4900 RPM ✅）。
-	/// <para>⭐ 依据：原厂 30 系口径 `percent = Item1 / 35f` ⇒ 3500 RPM = 100%，
-	/// **4900 RPM = 140%** 是官方允许的正常显示范围 ✅（⛔ 不是"超频"，⭐ 也不是写爆）。</para>
-	/// <para>⚠️ 旧强冷按曲线存档 `MaxRpm`（30 系默认 3500）⇒ 只到 100%，比官方少一截 ❌。</para>
+	/// ⭐⭐ 2026-10-18（机主新决定）：⭐ 30 系**真实满转档位** = **49**（⭐ 4900 RPM = 100% ✅）。
+	/// <para>⭐ 依据：⭐ <b>机主实测：30 系 3500 RPM 压不住；原厂上限约 140%（4900 RPM）
+	/// ⇒ 以其为 100% 基准</b> ✅（⛔ 不是"超频"，⭐ 4900 就是这台 30 系该有的满转）。</para>
+	/// <para>⚠️ 旧实现把 30 系满转当 3500（原厂 ÷35 显示口径）⇒ 强冷/曲线都只到 100% ❌。</para>
 	/// </summary>
 	internal const int FanTrueMaxUnits30Series = 49;
 

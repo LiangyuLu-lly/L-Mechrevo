@@ -47,7 +47,8 @@
 //   ⭐ ① ⭐ 默认温度点：⭐ **40~100℃ · 16 点均匀**（每点 +4℃）✅
 //   ⭐ ② ⭐ 默认 RPM：⭐ **按该机型"满转"乘百分比形状**生成 ✅
 //        · 40 系（板号 `MRID6-23`）⭐ 满转 **6000 RPM**（原厂口径 `rpm / 60f`；真机 1965 RPM ⇒ 33% 已验证）✅
-//        · 30 系（板号裸 `MRID6` · 6800H）⭐ 满转 **3500 RPM**（原厂口径 `Item1 / 35f`）✅
+//        · 30 系（板号裸 `MRID6` · 6800H）⭐ 满转 **4900 RPM**（⭐⭐ 2026-10-18 机主新决定：
+//          **机主实测 3500 RPM 压不住；原厂上限约 140%（4900 RPM）⇒ 以其为 100% 基准** ✅）
 //        · 百分比形状锚点：⭐ 40℃≈30% · ⭐ 70℃≈58% · ⭐ 90℃≈73% · ⭐ 100%=100%（线性插值）✅
 //   ⚠️⚠️ **重要定性**：这条默认曲线是【我们软件的默认起点】，⛔ **不是厂商下发的曲线数据** ⚠️
 //        —— 宝龙达协议（功能号 20/21）**根本没有曲线表** ✅（只有"手动开关 ＋ 固定转速"）
@@ -82,7 +83,7 @@ namespace MechrevoLite.Hardware;
 /// ⭐ 在**外面**加一层语义映射 ✅（⭐ ⛔ 不回来改数据模型 ⚠️）。</para>
 /// <para>⭐⭐ <b>默认曲线已按代际校准</b>（⭐ 见 <see cref="DefaultRpms(int)" /> ✅）：
 /// ⭐ 温度 **40~100℃ · 16 点均匀** · ⭐ RPM = **本机满转 × 百分比形状** ✅
-/// （40 系 6000 RPM / 30 系 3500 RPM）。
+/// （40 系 6000 RPM / 30 系 4900 RPM）。
 /// ⚠️ 它是**我们软件的默认起点**，⛔ **不是厂商数据** ⚠️ —— 宝龙达协议没有曲线表，
 /// ⭐ 用户随时可在「风扇曲线」窗口自行调整（⭐ 存档值永远优先）✅。</para>
 /// <para>⭐ 安全性：<see cref="Enabled" /> **默认 false** ✅ ⇒ ⭐ 这条默认曲线**不会被静默应用** ✅。</para>
@@ -109,8 +110,8 @@ internal sealed class BaolongdaFanCurveSettings
 
 	/// <summary>
 	/// ⭐ 默认转速下界（RPM ✅）—— ⭐ 沿用既有口径 **1200 RPM** ✅（⭐ 刻意不从 0 起：长期停转不利于散热）。
-	/// <para>⚠️ 30 系满转只有 3500 ⇒ 默认曲线最前面两点（1050/1181 RPM）会被本下界抬到 1200 ✅
-	/// —— ⭐ 这是**安全下界**，⛔ 不是曲线算错 ✅。</para>
+	/// <para>⭐ 2026-10-18（机主新基准）：⭐ 30 系满转改为 **4900** ⇒ 默认曲线首点 = **1470 RPM**（&gt; 本下界）
+	/// ⇒ ⭐ 不会再被抬升；⭐ 40 系首点 1800 也高于下界 ✅—— ⭐ 这是**安全下界**，⛔ 不是曲线算错 ✅。</para>
 	/// </summary>
 	internal const int DefaultMinRpm = 1200;
 
@@ -128,15 +129,16 @@ internal sealed class BaolongdaFanCurveSettings
 	internal const int FullRpm40Series = 6000;
 
 	/// <summary>
-	/// ⭐ 30 系（板号裸 `MRID6` · 6800H）的**满转** = **3500 RPM** ✅
-	/// <para>⭐ 依据：原厂 30 系控制台把风扇百分比算作 `Item1 / 35f` ⇒ 100% = 3500 RPM ✅</para>
+	/// ⭐⭐ 2026-10-18（机主新决定）：⭐ 30 系（板号裸 `MRID6` · 6800H）的**满转** = **4900 RPM** ✅
+	/// <para>⭐ 依据：⭐ **机主实测：30 系 3500 RPM 压不住；原厂上限约 140%（4900 RPM）
+	/// ⇒ 以其为 100% 基准** ✅（⛔ 不是厂商曲线数据；⭐ 3500 只是旧版原厂 ÷35 显示口径）✅</para>
 	/// </summary>
-	internal const int FullRpm30Series = 3500;
+	internal const int FullRpm30Series = 4900;
 
 	/// <summary>
 	/// ⭐ 没有硬件上下文（自检 / 未接后端）时的默认满转 —— 按 **40 系 6000 RPM** 处理 ✅。
 	/// <para>⚠️ 真正的下发路径**必须**由调用方把本机满转传进来：
-	/// <c>MechrevoHw.LoadBaolongdaFanCurve()</c> 传 <c>FanRpmMaxForPercent</c>（40 系 6000 / 30 系 3500）✅
+	/// <c>MechrevoHw.LoadBaolongdaFanCurve()</c> 传 <c>FanRpmMaxForPercent</c>（40 系 6000 / 30 系 4900）✅
 	/// —— ⭐ 复用与 <c>MechrevoHw.FanRpmMaxForPercent</c> **同一条代际判据** ✅。</para>
 	/// </summary>
 	internal const int DefaultFullRpm = FullRpm40Series;
@@ -212,7 +214,7 @@ internal sealed class BaolongdaFanCurveSettings
 
 	/// <summary>
 	/// ⭐ 默认转速曲线（RPM ✅）—— ⭐ 无硬件上下文时按 <see cref="DefaultFullRpm" />（40 系 6000）生成 ✅。
-	/// <para>⚠️ 带硬件路径请用 <see cref="DefaultRpms(int)" /> 传本机满转（30 系 3500）✅。</para>
+	/// <para>⚠️ 带硬件路径请用 <see cref="DefaultRpms(int)" /> 传本机满转（30 系 4900）✅。</para>
 	/// </summary>
 	internal static int[] DefaultRpms()
 	{
@@ -236,7 +238,7 @@ internal sealed class BaolongdaFanCurveSettings
 		for (int i = 0; i < PointCount; i++)
 		{
 			double percent = DefaultRpmPercent(temperatures[i]);
-			// ⭐ 明确用 AwayFromZero：中点（如 30 系 2082.5）向上取整，⛔ 不用银行家舍入（结果更直观）✅
+			// ⭐ 明确用 AwayFromZero：中点（如 30 系 4900 × 59.5% = 2915.5）向上取整，⛔ 不用银行家舍入（结果更直观）✅
 			int rpm = (int)Math.Round(full * percent / 100.0, MidpointRounding.AwayFromZero);
 			array[i] = Math.Clamp(rpm, 0, full);
 		}
@@ -375,7 +377,7 @@ internal static class BaolongdaFanCurveStore
 
 	/// <summary>
 	/// ⭐ 读一次设置（⭐ 读不到/坏掉 ⇒ ⭐ 返回**默认**（⭐ `Enabled=false` ✅），⭐ 不外抛 ✅）。
-	/// <para>⭐⭐ 参数 <paramref name="fullRpm" /> = ⭐ **本机风扇满转**（40 系 6000 / 30 系 3500）✅
+	/// <para>⭐⭐ 参数 <paramref name="fullRpm" /> = ⭐ **本机风扇满转**（40 系 6000 / 30 系 4900）✅
 	/// —— ⭐ **存档不存在 / 读不懂**时用它生成校准过的默认曲线 ✅。
 	/// ⚠️ 传 ≤0 ⇒ 按 40 系 <see cref="BaolongdaFanCurveSettings.DefaultFullRpm" /> 处理（⭐ 仅供自检/无硬件路径）✅。</para>
 	/// </summary>

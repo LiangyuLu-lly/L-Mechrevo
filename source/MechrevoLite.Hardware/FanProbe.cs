@@ -15,7 +15,7 @@
 //    e. **恢复**：20=0（两通道）→ 回读确认 → 21=0（两通道）→ 回读 13/20 确认
 //
 // ⚠️⚠️ 安全边界（硬性）：
-//    · ⛔ 目标上限 ≤ **本机满转**（30 系 3500 / 40 系 6000 RPM，按板号判定）；
+//    · ⛔ 目标上限 ≤ **本机满转**（30 系 4900 / 40 系 6000 RPM，按板号判定）；
 //    · ⛔ 恢复顺序 = **先关 20 再清 21**（⭐ 顺序反过来：手动仍开时写 21=0 会真的把风扇停掉 ⚠️）；
 //    · ⛔ 全程 `try/finally`：即使中途异常 / 提前返回也一定执行恢复，**绝不把风扇留在满转**；
 //    · ⛔ 本探针**不打包、不碰安装目录、不 kill LM**。
@@ -71,7 +71,7 @@ internal static class FanProbe
 			L("");
 
 			string board = ReadBoardProduct();
-			// ⭐ 满转按板号：裸 `MRID6` = 30 系 3500 RPM；`MRID6-*`（含 MRID6-23）= 40 系 6000 RPM ✅
+			// ⭐ 满转按板号：裸 `MRID6` = 30 系 4900 RPM（机主新基准）；`MRID6-*`（含 MRID6-23）= 40 系 6000 RPM ✅
 			int fullRpm = string.Equals(board, "MRID6", StringComparison.OrdinalIgnoreCase)
 				? BaolongdaFanCurveSettings.FullRpm30Series
 				: BaolongdaFanCurveSettings.FullRpm40Series;
@@ -471,7 +471,7 @@ internal static class FanProbe
 		return sb.ToString();
 	}
 
-	/// <summary>⭐ 只读主板型号（⭐ 只为了算"本机满转"：裸 `MRID6` = 30 系 3500 / `MRID6-*` = 40 系 6000）✅。</summary>
+	/// <summary>⭐ 只读主板型号（⭐ 只为了算"本机满转"：裸 `MRID6` = 30 系 4900 / `MRID6-*` = 40 系 6000）✅。</summary>
 	private static string ReadBoardProduct()
 	{
 		try

@@ -110,8 +110,8 @@ internal static class Program
 		// ⭐ band 反着写（min > max）⇒ ⭐ 内部纠正，⭐ 不抛异常 ✅
 		Eq("band 反写 [4200,1200] 仍夹到 1200", 1200, FanCurveEngine.ResolveRpm(c, 40, 4200, 1200));
 
-		// ⭐ 协议上限 6000：⭐ 就算 band 允许 9999，⭐ 也不能超过 6000 ✅
-		Eq("协议上限把 9000 压到 6000", 6000,
+		// ⭐ 协议上限 6800（2026-10-18 按开源蛟龙放宽到 68 档）：⭐ 就算 band 允许 9999，⭐ 也不能超过 6800 ✅
+		Eq("协议上限把 9000 压到 6800", 6800,
 			FanCurveEngine.ResolveRpm(FanCurveEngine.BuildPoints(new[] { 40, 80 }, new[] { 1000, 9000 }), 80, 0, 9999));
 		// ⭐ 插值结果越界也要被夹（⭐ 曲线中间段高于 band 上界 ✅）
 		Eq("插值结果也受 band 上界约束", 4200,
@@ -168,9 +168,9 @@ internal static class Program
 		Eq("999 RPM ⇒ 档位 9（向下取整）", 9, FanCurveEngine.ToUnits100Rpm(999));
 		Eq("0 RPM ⇒ 档位 0", 0, FanCurveEngine.ToUnits100Rpm(0));
 		Eq("-5 RPM ⇒ 档位 0（负数不当成越界）", 0, FanCurveEngine.ToUnits100Rpm(-5));
-		Eq("6000 RPM ⇒ 档位 60（正好上限）", 60, FanCurveEngine.ToUnits100Rpm(6000));
-		Eq("9999 RPM ⇒ 档位 60（夹到上限）", 60, FanCurveEngine.ToUnits100Rpm(9999));
-		True("协议上限常量自洽（60×100=6000）", FanCurveEngine.ProtocolMaxRpm == 6000);
+		Eq("6800 RPM ⇒ 档位 68（正好上限）", 68, FanCurveEngine.ToUnits100Rpm(6800));
+		Eq("9999 RPM ⇒ 档位 68（夹到上限）", 68, FanCurveEngine.ToUnits100Rpm(9999));
+		True("协议上限常量自洽（68×100=6800）", FanCurveEngine.ProtocolMaxRpm == 6800);
 	}
 
 	private static void TestHysteresis()
@@ -281,11 +281,19 @@ internal static class Program
 		Eq("默认回差 = 3", FanCurveEngine.DefaultHysteresisC, fresh.HysteresisC);
 		Eq("无存档 ⇒ 不该打错误日志", 0, Logger.Errors.Count);
 
-		// ---- 用例 1b：30 系（满转 3500）⇒ 默认曲线按 3500 校准 ----
+		// ---- 用例 1b：30 系（机主新基准：满转 4900）⇒ 默认曲线按 4900 校准 ----
+		Eq("30 系满转常量 = 4900（机主实测：3500 压不住，原厂约 140%≈4900）",
+			4900, BaolongdaFanCurveSettings.FullRpm30Series);
 		BaolongdaFanCurveSettings fresh30 = BaolongdaFanCurveStore.Load(BaolongdaFanCurveSettings.FullRpm30Series);
-		Eq("30 系 ⇒ band 上界 3500", BaolongdaFanCurveSettings.FullRpm30Series, fresh30.MaxRpm);
-		Eq("30 系 ⇒ RPM 首点 = 1050（30%）", 1050, fresh30.Channel0Rpms[0]);
-		Eq("30 系 ⇒ RPM 末点 = 3500（100%）", 3500, fresh30.Channel0Rpms[15]);
+		Eq("30 系 ⇒ band 上界 4900", BaolongdaFanCurveSettings.FullRpm30Series, fresh30.MaxRpm);
+		Eq("30 系 ⇒ RPM 首点 = 1470（30% × 4900）", 1470, fresh30.Channel0Rpms[0]);
+		Eq("30 系 ⇒ RPM 第 5 点 = 2202（44.933% × 4900）", 2202, fresh30.Channel0Rpms[4]);
+		Eq("30 系 ⇒ RPM 末点 = 4900（100%）", 4900, fresh30.Channel0Rpms[15]);
+		// ⭐ 全序列回归（⭐ 16 点全部按 4900 × 形状重算，⭐ 防止将来有人只改常量忘了重算）
+		string expectedDefault30 = "1470,1653,1836,2019,2202,2385,2568,2751,2916,3063,3210,3357,3504,3842,4371,4900";
+		string actualDefault30 = string.Join(",", fresh30.Channel0Rpms);
+		True("30 系默认 16 点 RPM 序列 = 按 4900×形状重算",
+			actualDefault30 == expectedDefault30, $"实际 {actualDefault30}");
 
 		// ---- 用例 2：**旧格式**（⭐ 占空比 ＋ ⭐ modeid ＋ ⭐ 没有 format ✅）⇒ ⭐ 不启用 ＋ ⭐ 如实告知 ----
 		//    ⚠️ 注意 `enabled=1`：⭐ 旧存档是**开着**的 ⚠️ ⇒ ⭐ 更要证明它**不会**被启用 ✅

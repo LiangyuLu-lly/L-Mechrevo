@@ -923,7 +923,7 @@ internal static class DiagnosticBaolongdaInfo
 			else
 			{
 				sb.AppendLine("     · 功能号 21 只读到 1 字节或读不到"
-					+ " ⇒ ⚠️ 这只影响\"手动设定值\"的显示；⭐ 百分比分母是常量 6000、与本项无关 ✅");
+					+ " ⇒ ⚠️ 这只影响\"手动设定值\"的显示；⭐ 百分比分母按代际（40 系 6000 / 30 系 4900）、与本项无关 ✅");
 			}
 		}
 		catch (Exception ex21)

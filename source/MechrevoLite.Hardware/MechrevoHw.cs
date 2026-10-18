@@ -4032,16 +4032,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//    （原厂手动转速范围 22~58 ⇒ 2200~5800 RPM）⇒ 60 × 100 = 6000 就是 **40 系百分比**的满刻度 ✅。
 	//    ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙放宽）：⭐ 功能号 21 的**写入档位上限**已从 60 放宽到
 	//    <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> = **68**（6800 RPM，⭐ 参考 JiaolongControl (MIT)
-	//    的 `MAX_FAN_BYTE`，⛔ 未复制代码）—— ⚠️ 但**百分比分母不变**（40 系 6000 / 30 系 3500）✅
+	//    的 `MAX_FAN_BYTE`，⛔ 未复制代码）—— ⚠️ 但**百分比分母不变**（40 系 6000 / 30 系 4900，⭐ 见下）✅
 	//
 	//  ⚠️⚠️ **为什么不再读功能号 21**：原厂把它当**手动转速设定值**用 ——
 	//    读回来的就是"上次写下去的那个值"（用来回显/定位手动滑块），⛔ 从来不是"最大转速"。
 	//    旧实现把读数（真机 = 50）当分母 ⇒ 5000 ⇒ 1996 RPM 显示 **40%**，而官方是 **33%** ❌。
 	//  ⭐ 合规说明：本改动**没有照搬原厂的任何实现**，只采用"分母 60"这一个**协议事实** ✅。
 	//
-	//  ⚠️ 30 系仍待确认：旧版 30 系原厂控制台（v0.2.35）用的是**除以 35**（⇒ 3500 RPM），
-	//    但那是另一套年代／可能不同模具的包 ⇒ ⛔ 暂不套用；30 系真机请对照官方控制台百分比，
-	//    若不一致就把这里按代数拆开（⚠️ 唯一改动点）✅
+	//  ⭐⭐ 2026-10-18（机主新决定 · 30 系风扇基准）：⭐ **30 系分母由 3500 改为 4900 RPM** ✅
+	//    ⭐ 依据：⭐ **机主实测：30 系 3500 RPM 压不住；原厂上限约 140%（4900 RPM）
+	//    ⇒ 以其为 100% 基准** ✅（⭐ 40 系仍是 6000）✅
 	internal const int BaolongdaFanRpmAtFullPercent = BaolongdaProfile.FanPercentDenominatorRpm;
 
 	/// <summary>
@@ -4050,24 +4050,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⛔ 不是"读功能号 21 当 max"（那个读数是**手动转速设定值** ⚠️）。</para>
 	/// <para>⚠️ 非宝龙达 ⇒ 返回 0（⭐ 分母由各机型自己的 duty 口径负责 ✅）。</para>
 	/// </summary>
-	// ⭐⭐ 2026-10-19（30 系官方口径）：⭐ 原厂 30 系控制台把"风扇转速百分比"算作
-	//   `Item1 / 35f`（见 `official-30-v0.2.35` 的 `Init_SettingsAsync`）⇒ ⭐ 分母 = **3500 RPM** 而不是 6000 ✅
-	//   ⚠️ 40 系仍是 6000（原厂 40 系 `rpm / 60f`，真机 1965 RPM ⇒ 33% 已验证）✅
+	// ⭐⭐ 2026-10-18（机主新决定 · 30 系风扇基准）：⭐ 分母**按代际** ——
+	//   ⭐ **30 系 = 4900 RPM**（机主实测：3500 压不住；原厂上限约 140% ≈ 4900 ⇒ 以其为 100% 基准）✅
+	//   ⭐ 40 系 = 6000 RPM（原厂 `rpm / 60f`，真机 1965 RPM ⇒ 33% 已验证）✅
 	//   ⚠️ 非宝龙达恒 0（走原来的 duty 读法，逐位不变）✅
-	//   ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 这个分母**只决定 100% 在哪**，⛔ 不表示 100% 就是上限 ——
-	//   30 系 4900 RPM（= 分母 3500 的 140%）是官方允许的正常转速 ⇒ ⭐ 显示层**不许夹 100**
-	//   （⭐ 见 <see cref="BaolongdaFanPercentDisplayMax" />；⭐ 只影响显示，⛔ 不改任何下发值）✅
 	public int FanRpmMaxForPercent => UsesBaolongda
-		? ((DgpuGeneration == DgpuGenerationKind.Gen30) ? 3500 : BaolongdaFanRpmAtFullPercent)
+		? BaolongdaProfile.FanPercentDenominatorRpmFor(DgpuGeneration)
 		: 0;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 宝龙达风扇百分比的**显示上限** = **140%** ✅
-	/// <para>⭐ 依据：原厂 30 系 `percent = Item1 / 35f` ⇒ 4900 RPM = 140%，**官方允许显示**；
-	/// 40 系同样按 140% 封顶（⛔ 不会真到 140%，只是留出显示余量）✅</para>
+	/// <para>⭐ 依据：机主新基准下 30 系 100% = 4900 RPM；140% 只作为**显示余量**
+	/// （⭐ 实测上限一般就是 100% 附近；⛔ 不会真到 140%）✅</para>
 	/// <para>⚠️ 这是**显示层**的安全上限：⛔ 不影响功能号 20/21 的任何下发值
 	/// （⭐ 下发档位上限见 <see cref="BaolongdaProfile.FanManualMaxUnits100Rpm" /> = **68**，⭐ 6800 RPM ✅）</para>
-	/// <para>⚠️ 旧显示层 `Math.Min(100, …)` ⇒ 30 系 4900 RPM 只显示 100%，比官方少一截 ❌</para>
+	/// <para>⚠️ 旧显示层 `Math.Min(100, …)` ⇒ 会少显示超过 100% 的部分 ❌</para>
 	/// </summary>
 	internal const int BaolongdaFanPercentDisplayMax = 140;
 
@@ -4241,10 +4238,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				SaveBaolongdaFanCurve(CloneCurve(_fanBoostSavedCurve, enabled: false));
 			}
-			// ② ⭐⭐ 2026-10-18（机主 30 系反馈）：⭐ 强冷要跑到**真正的满转** ——
-			//   ⭐ 原厂口径：30 系 `percent = Item1 / 35f` ⇒ 3500 RPM = 100%，**4900 RPM = 140% 是官方允许的**；
+			// ② ⭐⭐ 2026-10-18（机主新决定 · 30 系风扇基准）：⭐ 强冷要跑到**真正的满转** ——
+			//   ⭐ 机主实测：30 系 3500 RPM 压不住；原厂上限约 140%（≈4900 RPM）⇒ ⭐ **4900 才是 30 系的真实满转**；
 			//     40 系 100% = 6000 RPM ✅
-			//   ⚠️ 旧实现按曲线存档 `MaxRpm` 换算（30 系默认 3500）⇒ 强冷只到 100%，比官方少一截 ❌
+			//   ⚠️ 旧实现按曲线存档 `MaxRpm` 换算（30 系旧默认 3500）⇒ 只到「假 100%」❌
 			//   ⭐ 现在：代际真实基准（30 系 49 = 4900 / 40 系 60 = 6000）与曲线存档取**较大者**，
 			//     再夹到协议档位上限 **68**（⭐ 6800 RPM；⛔ 永不写 >68，⛔ 永不超 byte 范围）✅
 			int maxRpm = 4200;
@@ -4937,7 +4934,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>
 	/// ⭐ 宝龙达软件闭环曲线的门面层入口（⭐ 供 UI 读设置 ✅）。数据来源 <see cref="BaolongdaFanCurveStore" /> ✅。
 	/// <para>⭐⭐ 这里把**本机满转**传进存储层 ⇒ 存档不存在时生成的默认曲线按代际校准 ✅
-	/// （40 系 6000 / 30 系 3500 —— 复用 <see cref="FanRpmMaxForPercent" /> **同一条判据** ✅）。</para>
+	/// （40 系 6000 / 30 系 4900 —— 复用 <see cref="FanRpmMaxForPercent" /> **同一条代际判据** ✅）。</para>
 	/// </summary>
 	internal BaolongdaFanCurveSettings LoadBaolongdaFanCurve()
 	{
@@ -5006,7 +5003,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			// ⭐⭐ 2026-10-19：⭐ 把**本机满转**传进存储层（40 系 6000 / 30 系 3500）⇒ 新装机默认曲线按代际校准 ✅
+			// ⭐⭐ 2026-10-19：⭐ 把**本机满转**传进存储层（40 系 6000 / 30 系 4900）⇒ 新装机默认曲线按代际校准 ✅
 			BaolongdaFanCurveSettings settings = BaolongdaFanCurveStore.Load(FanRpmMaxForPercent);
 			if (!settings.Enabled)
 			{
@@ -5066,7 +5063,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				channel1Rpm = Math.Max(channel1RpmBeforeSync, (int)(channel0RpmBeforeSync * BaolongdaFanCurveSyncRatio));
 			}
 			// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙放宽 + 加 RPM 斜坡）：
-			//   ① 目标档上限不再按"百分比分母"夹（30 系 3500 只是 100% 的分母），而是按**协议档位上限**
+			//   ① 目标档上限不再按"百分比分母"夹（分母只决定 100% 在哪：40 系 6000 / 30 系 4900），而是按**协议档位上限**
 			//      （68 = 6800 RPM；⭐ 实际能用多少**以功能号 13 回读为准**）✅
 			//   ② 真正下发的值按**斜坡**向目标靠拢：涨 ≤800 RPM/s、降 ≤150 RPM/s（1 档 = 100 RPM）⇒
 			//      3 s tick ⇒ 最多涨 24 档、最多降 4 档（取整**保守**）✅
@@ -5666,7 +5663,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⭐⭐ 2026-10-17（平台声明式 · 第 1 步）：⭐ 把"声明的事实"打一行 ✅
 		//   ⚠️ 纯日志：⛔ 不改变任何行为；⭐ 以后诊断包里能直接看到"这台机器按什么口径算"✅
 		Logger.WriteLine("宝龙达平台事实表（声明）："
-			+ $"转速百分比分母={BaolongdaProfile.FanPercentDenominatorRpm} RPM · "
+			+ $"转速百分比分母={FanRpmMaxForPercent} RPM · "
 			+ $"手动转速上限={BaolongdaProfile.FanManualMaxUnits100Rpm}（x100RPM） · "
 			+ $"功耗墙范围 PL1=[{BaolongdaProfile.PlMinWatts},{BaolongdaProfile.Pl1MaxWatts}]W "
 			+ $"PL2=[{BaolongdaProfile.PlMinWatts},{BaolongdaProfile.Pl2MaxWatts}]W "

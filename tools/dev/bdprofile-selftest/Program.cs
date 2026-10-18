@@ -22,15 +22,25 @@ internal static class Program
 
 		Console.WriteLine();
 		Console.WriteLine("-- 1. 风扇事实（百分比分母 / 手动上限 / 通道）--");
-		Eq("百分比分母 = 6000 RPM（原厂 40 系 ÷60 口径）", 6000, BaolongdaProfile.FanPercentDenominatorRpm);
+		// 2026-10-18（机主新决定）：30 系基准 4900（机主实测 3500 压不住；原厂约 140%≈4900）
+		Eq("40 系百分比分母 = 6000 RPM（旧常量保留为 40 系别名）", 6000, BaolongdaProfile.FanPercentDenominatorRpm);
+		Eq("30 系百分比分母 = 4900 RPM（机主实测基准）", 4900,
+			BaolongdaProfile.FanPercentDenominatorRpmFor(DgpuGenerationKind.Gen30));
+		Eq("40 系百分比分母（按代际函数）= 6000 RPM", 6000,
+			BaolongdaProfile.FanPercentDenominatorRpmFor(DgpuGenerationKind.Gen40));
+		Eq("Unknown 代际按 40 系 = 6000 RPM", 6000,
+			BaolongdaProfile.FanPercentDenominatorRpmFor(DgpuGenerationKind.Unknown));
 		// 2026-10-18：上限按开源蛟龙 MAX_FAN_BYTE=68 放宽（提交 e23da98）⇒ 断言同步为 68
 		Eq("手动转速协议上限 = 68（x100RPM · 参考 JiaolongControl MAX_FAN_BYTE）", 68, BaolongdaProfile.FanManualMaxUnits100Rpm);
 		Eq("FanType 0 = 大扇/GPU", 0, BaolongdaProfile.FanTypeLarge);
 		Eq("FanType 1 = 小扇/CPU", 1, BaolongdaProfile.FanTypeSmall);
 		// 2026-10-18：上限按 JiaolongControl MAX_FAN_BYTE 放宽到 68（e23da98）
 		//  ⇒ 不再"等于"100% 分母，改为断言"上限 >= 分母"（允许超速档）
-		True("手动上限不低于 100% 分母（68×100=6800 >= 6000）",
+		True("手动上限不低于 40 系 100% 分母（68×100=6800 >= 6000）",
 			BaolongdaProfile.FanManualMaxUnits100Rpm * 100 >= BaolongdaProfile.FanPercentDenominatorRpm);
+		True("手动上限不低于 30 系 100% 分母（68×100=6800 >= 4900）",
+			BaolongdaProfile.FanManualMaxUnits100Rpm * 100
+				>= BaolongdaProfile.FanPercentDenominatorRpmFor(DgpuGenerationKind.Gen30));
 
 		Console.WriteLine();
 		Console.WriteLine("-- 2. 功耗墙 / 温度墙范围 --");
