@@ -6008,6 +6008,8 @@ public class SettingsForm : RForm
 		else
 		{
 			BuildChargeLimitControls(tableLayoutPanel);
+			// ⭐⭐ 2026-10-18（机主定：宝龙达同款机型 · 充电阈值放电池页）：⭐ 起充/停充 + 启用开关 ✅
+			BuildBaolongdaChargeLimitSection(tableLayoutPanel);
 		}
 		MechrevoHw? hwForBattery = Program.hw;
 		if (hwForBattery != null)
@@ -7866,6 +7868,32 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			valueLabel.Visible = _chargeSliderEnabled;
 			host.Controls.Add(valueLabel, 2, row);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主定 · 充电阈值产品接线）：⭐ 在电池页追加「起充/停充 + 启用开关」区域 ✅。
+	/// <para>⭐ 能力判据：`UsesBaolongda` + 板号以 `MRID6` 开头 + EC 可读 ⇒ 才构建；
+	/// ⛔ 非宝龙达 / 其它板号 / EC 读不到 ⇒ **不构建**（非宝龙达逐位不变）✅</para>
+	/// </summary>
+	private void BuildBaolongdaChargeLimitSection(TableLayoutPanel host)
+	{
+		try
+		{
+			MechrevoHw hardware = Program.hw;
+			if (!BatteryLimitPanel.IsAvailable(hardware))
+			{
+				return;
+			}
+			BatteryLimitPanel panel = new BatteryLimitPanel();
+			host.RowCount += 1;
+			host.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			host.Controls.Add(panel, 0, host.RowCount - 1);
+			host.SetColumnSpan(panel, 3);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery] 构建充电阈值区域失败（已忽略，不影响电池页其它控件）：" + ex.GetType().Name + " " + ex.Message);
 		}
 	}
 
