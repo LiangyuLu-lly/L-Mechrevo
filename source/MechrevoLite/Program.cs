@@ -3401,12 +3401,13 @@ internal static class Program
 
 	private static int _backendWarmupScheduled;
 
+	private static readonly CancellationTokenSource _backendWarmupCts = new CancellationTokenSource();
+
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：后端初始化不是设置窗口的功能）：
-	/// ⭐ **启动后空闲低优先级后台预热**（单个任务、串行、可取消）—— ⛔ 不阻塞 UI、⛔ 不在设置窗打开线程 ✅。
-	/// <para>顺序：风扇闸门只读验证 + 启动风扇清理 → 摄像头 PnP 枚举（缓存）→ 回 UI 线程刷新能力位/快捷开关行。</para>
-	/// <para>日志：`[init] 后台初始化：风扇闸门 ok=…（耗时 … ms，来源=启动后空闲）` /
-	/// `[init] 后台初始化：摄像头 PnP 枚举 ok=…（… ms，来源=启动后空闲）` ✅</para>
+	/// ⭐⭐ 2026-10-19（机主定稿：后端初始化留在「启动后空闲预热」，设置窗只管设置）✅。
+	/// ⭐ 主窗显示后 **Application.Idle + 2.5s** 起**单个**后台任务（串行、可取消）：
+	/// ⭐ ① 风扇闸门只读验证 + 启动风扇清理；② 摄像头 PnP 枚举；完成后回 UI 线程刷新对应行。
+	/// <para>⛔ 不在 UI 线程同步执行、⛔ 不挂在设置窗打开路径；每步独立 try/catch，失败只记日志并**标记失败、不重试** ✅</para>
 	/// </summary>
 	internal static void ScheduleIdleBackendWarmup()
 	{
@@ -3416,10 +3417,11 @@ internal static class Program
 		}
 		_ = Task.Run(async () =>
 		{
+			long warmStart = Environment.TickCount64;
 			try
 			{
-				// 启动后 2.5s 再动（让首帧/首屏先完成；窗口显示后再做）
-				await Task.Delay(2500).ConfigureAwait(continueOnCapturedContext: false);
+				Logger.WriteError("[init] 启动空闲预热开始（后台，不阻塞 UI）");
+				await Task.Delay(2500, _backendWarmupCts.Token).ConfigureAwait(continueOnCapturedContext: false);
 				MechrevoHw warmHw = hw;
 				if (warmHw == null)
 				{
@@ -3432,46 +3434,62 @@ internal static class Program
 				}
 				catch (Exception ex)
 				{
-					Logger.WriteLine("[init] 后台初始化：风扇闸门/清理失败（已吞掉）：" + ex.Message);
+					Logger.WriteLine("[init] 后台初始化：风扇闸门/清理失败（已吞掉，标记失败不重试）：" + ex.Message);
 				}
-				Logger.WriteError("[init] 后台初始化：风扇闸门 ok=" + warmHw.FanCurveVerified
-					+ "（耗时 " + (Environment.TickCount64 - fanStart) + " ms，来源=启动后空闲）");
-				// 摄像头 PnP 枚举：只在宝龙达有意义（GCU 走 WebcamSeen 能力位）✅
-				if (warmHw.UsesBaolongda)
-				{
-					long camStart = Environment.TickCount64;
-					bool cameraFound = MechrevoLite.Hardware.CameraPnpControl.ProbeHasCamera();
-					Logger.WriteError("[init] 后台初始化：摄像头 PnP 枚举 ok=" + cameraFound
-						+ "（耗时 " + (Environment.TickCount64 - camStart) + " ms，来源=启动后空闲）");
-				}
-				// 完成后回 UI 线程刷新对应行（能力位/快捷开关；⛔ 不阻塞、⛔ 不重建窗口）
-				SettingsForm form = settingsForm;
-				if (form == null || form.IsDisposed || !form.IsHandleCreated)
+				Logger.WriteError("[init] 后台初始化：风扇闸门 ok=" + warmHw.FanCurveVerified + "（耗时 " + (Environment.TickCount64 - fanStart) + " ms）");
+				if (_backendWarmupCts.IsCancellationRequested)
 				{
 					return;
 				}
-				try
+				if (warmHw.UsesBaolongda)
 				{
-					form.BeginInvoke((Action)(() =>
+					long camStart = Environment.TickCount64;
+					bool cameraFound = false;
+					try
 					{
-						if (!form.IsDisposed)
-						{
-							form.RefreshDeviceCapabilities();
-							form.RefreshQuickSwitchStatesNow();
-						}
-					}));
+						cameraFound = MechrevoLite.Hardware.CameraPnpControl.ProbeHasCamera();
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[init] 后台初始化：摄像头枚举失败（已吞掉，标记失败不重试）：" + ex.Message);
+					}
+					Logger.WriteError("[init] 后台初始化：摄像头枚举 ok=" + cameraFound + "（耗时 " + (Environment.TickCount64 - camStart) + " ms）");
 				}
-				catch (Exception ex)
+				SettingsForm form = settingsForm;
+				if (form != null && !form.IsDisposed && form.IsHandleCreated)
 				{
-					Logger.WriteLine("[init] 后台初始化后刷新界面失败（已吞掉，不影响 UI）：" + ex.Message);
+					try
+					{
+						form.BeginInvoke((Action)(() =>
+						{
+							if (!form.IsDisposed)
+							{
+								form.RefreshDeviceCapabilities();
+								form.RefreshQuickSwitchStatesNow();
+							}
+						}));
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[init] 后台初始化后刷新界面失败（已吞掉，不影响 UI）：" + ex.Message);
+					}
 				}
+			}
+			catch (OperationCanceledException)
+			{
+				Logger.WriteLine("[init] 启动空闲预热已取消（退出中）");
 			}
 			catch (Exception ex)
 			{
-				Logger.WriteLine("[init] 后台初始化失败（已吞掉，不影响 UI）：" + ex);
+				Logger.WriteLine("[init] 后台初始化失败（已吞掉，不重试）：" + ex);
+			}
+			finally
+			{
+				Logger.WriteError("[init] 启动空闲预热完成（总耗时 " + (Environment.TickCount64 - warmStart) + " ms）");
 			}
 		});
 	}
+
 
 	private static void TrayIcon_MouseClick(object? sender, MouseEventArgs e)
 	{
@@ -3519,6 +3537,14 @@ internal static class Program
 	{
 		if (Interlocked.Exchange(ref _exitStarted, 1) == 0)
 		{
+			// ⭐⭐ 2026-10-19（机主定稿 · 启动空闲预热可取消）：退出时取消仍在排队的预热（幂等）✅
+			try
+			{
+				_backendWarmupCts.Cancel();
+			}
+			catch (ObjectDisposedException)
+			{
+			}
 			TryRestoreScreenAfterFailure();
 			_telemetryRecoveryTimer?.Dispose();
 			_telemetryRecoveryTimer = null;

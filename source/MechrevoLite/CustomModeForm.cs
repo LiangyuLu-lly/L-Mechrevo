@@ -77,6 +77,9 @@ public class CustomModeForm : RForm
 
 	private readonly SemaphoreSlim _saveLock = new SemaphoreSlim(1, 1);
 
+	// ⭐⭐ 2026-10-19（机主：初始化纯按需、⛔ 不要启动预热）：风扇闸门/清理的"按需触发一次"闸门 ✅
+	private static int _deferredFanInitScheduled;
+
 	private readonly List<string> _rowLabels = new List<string>();
 
 	private readonly ToolTip _tips = new ToolTip();
@@ -2875,13 +2878,58 @@ public class CustomModeForm : RForm
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：初始化必须纯按需、⛔ 不要启动预热）：
+	/// ⭐ 打开风扇曲线窗口时**后台**触发一次风扇闸门只读验证 + 启动清理（进程内缓存一次；⛔ 不阻塞 UI）✅。
+	/// <para>完成后回 UI 线程刷新「更多开关/磁贴」等入口（不重建窗口）。</para>
+	/// </summary>
+	private void ScheduleDeferredFanInit(string trigger)
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null || !hw.UsesBaolongda || Interlocked.Exchange(ref _deferredFanInitScheduled, 1) != 0)
+		{
+			return;
+		}
+		_ = Task.Run(() =>
+		{
+			long start = Environment.TickCount64;
+			try
+			{
+				hw.RunDeferredFanStartupCleanup();
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[init] 按需初始化：风扇闸门/清理失败（已吞掉，不影响 UI）：" + ex.Message);
+			}
+			Logger.WriteError("[init] 按需初始化：风扇闸门（触发=" + trigger + " · 耗时 " + (Environment.TickCount64 - start) + " ms）");
+			try
+			{
+				SettingsForm form = Program.settingsForm;
+				if (form != null && !form.IsDisposed && form.IsHandleCreated)
+				{
+					form.BeginInvoke((Action)(() =>
+					{
+						if (!form.IsDisposed)
+						{
+							form.RefreshQuickSwitchStatesNow();
+						}
+					}));
+				}
+			}
+			catch (Exception ex2)
+			{
+				Logger.WriteLine("[init] 按需初始化后刷新 UI 失败（已吞掉）：" + ex2.Message);
+			}
+		});
+	}
+
 	private async Task OpenFanCurveAsync()
 	{
 		PerfModeService perf = PerfModeService.Instance;
 		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-		//   ⭐ 风扇闸门只读验证**推迟到真正要用风扇曲线时**（这里）显式触发一次（进程内缓存）——
-		//      ⛔ 不再由"打开设置/构建行读 FanCurveVerified"提前触发 EC 读 ✅
-		Program.hw?.EnsureFanCurveReady();
+		//   ⭐ 风扇闸门只读验证/启动清理改为**纯按需 + 后台**：打开风扇曲线窗口时才触发（进程内缓存一次）；
+		//      ⛔ 不阻塞 UI（先显示窗口，验证完再回 UI 刷新开关/入口）✅
+		ScheduleDeferredFanInit("打开风扇曲线窗口");
 		// 2026-10-05: in firmware-profile mode go straight to the editor.
 		// FanCurveForm already reads and writes the ACTIVE profile's curve through
 		// GET/SET_FAN_SPEED_CURVE_SETTING, and the active profile IS the config being
