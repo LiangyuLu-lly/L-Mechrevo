@@ -2175,6 +2175,41 @@ internal static class Program
 		return flag;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」根因③：恢复后没有回灌界面）：
+	/// ⭐ 灯效电源经 **宝龙达 WMI（功能号 15）**下发之后，**立刻**让界面按真实状态收敛一次 ✅
+	/// <para>⚠️ 根因（机主诊断包 0.291.9.11-20261018-113538 实证）：启动「灯效恢复（单次下发）」
+	/// 把 LOGO 点亮了，硬件回读也确认了，但**没有任何路径通知界面** ⇒「灯光」里的 LOGO 开关一直显示
+	/// 关闭 ❌（该开关**不在** `_quickSwitches` 里 ⇒ 那个每 3 s 的快速开关刷新根本不碰它 ⚠️）。</para>
+	/// <para>⭐ 本方法只做"切 UI 线程调度"：真正的刷新在
+	/// <c>SettingsForm.RefreshQuickSwitchStatesNow()</c>（灯光行立刻收敛；「更多开关」仍守各自的
+	/// 12 秒宽限 ⇒ ⛔ 不覆盖用户刚点的值 ✅）。⭐ 任何异常都吞掉 —— 界面刷新失败绝不影响灯效恢复本身 ✅。</para>
+	/// </summary>
+	private static void ScheduleQuickSwitchUiRefresh(string reason)
+	{
+		try
+		{
+			SettingsForm form = settingsForm;
+			if (form == null || form.IsDisposed || !form.IsHandleCreated)
+			{
+				return;
+			}
+			if (form.InvokeRequired)
+			{
+				form.BeginInvoke((Action)form.RefreshQuickSwitchStatesNow);
+			}
+			else
+			{
+				form.RefreshQuickSwitchStatesNow();
+			}
+			Logger.WriteLineIfChanged("logo-ui-refresh", $"[logo] 已调度界面按真实状态刷新（触发：{reason}）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[logo] 调度界面刷新失败（已吞掉，不影响灯效）：" + ex.Message);
+		}
+	}
+
 	internal static async Task<bool> ApplyLightChannelEffectAsync(string topic, LightChannelSettings settings, int delayMs = 120, Func<bool>? shouldApply = null)
 	{
 		if (delayMs > 0)
@@ -2206,6 +2241,10 @@ internal static class Program
 		{
 			string logoSummary = $"logo={(on ? "On" : "Off")}{(logoConfirmed ? "" : "(unconfirmed)")}";
 			Logger.WriteLine($"外部灯效电源（⭐ 宝龙达 WMI 路径）：⭐ on={on} · ⭐ 回读确认={logoConfirmed} · ⭐ {logoSummary}");
+			// ⭐⭐ 2026-10-18（「UI 与硬件状态不同步」根因③）：⭐ 真实状态已在 `TrySetLogoLightViaBackend`
+			//   里按功能号 15 的回读值回灌 `hw.QuickSwitches` ⇒ ⭐ **立刻**让界面跟上 ✅
+			//   （启动「灯效恢复（单次下发）」点亮 LOGO 后界面还显示"关"的那个 bug 就死在这里）
+			ScheduleQuickSwitchUiRefresh("宝龙达 WMI 灯效电源");
 			return (AllIssued: logoConfirmed, Attempted: true, IssuedSummary: logoSummary);
 		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：函数体全是 service.Issue*(MQTT) ⇒ 真正需要 GCU。

@@ -4319,6 +4319,39 @@ public class SettingsForm : RForm
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」）：⭐ **立刻**按真实状态刷新一次开关界面 ✅
+	/// <para>⚠️ 根因（机主诊断包 0.291.9.11 实证）：启动「灯效恢复（单次下发）」用 WMI 功能号 15
+	/// 把 LOGO 灯点亮了，但界面那颗 LOGO 开关（<c>_logoPowerSw</c>，属于「灯光」折叠组、
+	/// **不在** `_quickSwitches` 里）只有在 <see cref="RefreshDeviceCapabilities" /> 的能力布局**发生变化**
+	/// 时才会经 <see cref="SyncLightRows" /> 刷新 ⚠️ ⇒ 启动恢复之后**没有任何路径**把它拉回真值
+	/// ⇒ 机主看到「硬件实际是开、界面显示关」❌。</para>
+	/// <para>⭐ 本方法供"状态刚刚被程序自己改掉"的路径（启动灯效恢复 ／ 宝龙达 WMI 电源下发）调用：
+	/// ⭐ 灯光行**立刻**收敛（<see cref="SyncLightRows" />）；⭐「更多开关」仍走
+	/// <see cref="UpdateQuickSwitches" /> 自己的 12 秒宽限（⛔ 不覆盖用户刚点的值 ✅）。</para>
+	/// </summary>
+	internal void RefreshQuickSwitchStatesNow()
+	{
+		if (IsDisposed || Disposing)
+		{
+			return;
+		}
+		try
+		{
+			// ⭐ 灯光行（键盘 ／ 灯带 ／ LOGO ／ 铰链 ／ 同步）—— 原来没有周期/事件消费 ⚠️
+			SyncLightRows();
+			// ⭐ 「更多开关」—— 自带 12 秒宽限（用户刚点过就跳过）⇒ 宽限期逻辑对刚下发的键仍然生效 ✅
+			UpdateQuickSwitches();
+			RefreshQuickGroupSummary();
+			RefreshQuickTiles();
+		}
+		catch (Exception ex)
+		{
+			// 恢复路径是**非 UI 线程**调过来的，这里吞掉异常，⛔ 不让一次刷新失败影响灯效恢复本身 ✅
+			Logger.WriteLine("[logo] 立即刷新开关界面失败（已吞掉，不影响别处）：" + ex.Message);
+		}
+	}
+
+	/// <summary>
 	/// 把一颗快捷开关的勾选态**程序化**拨回去，且不触发它自己的下发回调。
 	/// 2026-10-11：从构造函数里的局部函数**提级**为实例方法（判据/语义一字未改）——
 	/// 因为「深度睡眠」的动作体被抽成了 <see cref="ApplyDeepSleepSwitchAsync" />（磁贴与 CheckBox 共用），
@@ -5386,6 +5419,16 @@ public class SettingsForm : RForm
 					return new bool?(hw.FanBoost);
 				}
 				return hw.UsesBaolongda ? new bool?(MechrevoHw.FanBoostActive) : ((bool?)null);
+			}
+			// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」）：`logolight` 的**权威状态是硬件
+			//  功能号 15 的实时回读** ✅ —— ⛔ 不再只信 3 s 周期的 `QuickSwitches` 镜像 ⚠️
+			//  （镜像已由 `MechrevoHw.SyncLogoLightQuickSwitch` 在每次写后按真值回灌；这里再直读一次，
+			//   让"读状态"这条路径任何时刻都拿到硬件真值 ✅）。
+			//  ⚠️ 读不到 ⇒ **回落到下面的通用分支**（⛔ 读失败不编造状态 ✅）；
+			//  ⛔ 非宝龙达不进本分支 ⇒ GCU / 老同方行为逐位不变 ✅
+			if (key == "logolight" && hw.UsesBaolongda && hw.TryReadLogoLightViaBackend(out bool logoOn))
+			{
+				return new bool?(logoOn);
 			}
 			bool value;
 			return hw.QuickSwitches.TryGetValue(key, out value) ? new bool?(value) : ((bool?)null);
@@ -12757,6 +12800,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			UpdateQuickSwitches();
 			SyncDisplayEffectRow();
 			MechrevoHw hw = Program.hw;
+			// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」根因②：界面没有周期消费）：
+			//   `_quickSwitches` 里**没有** logolight —— LOGO 开关在「灯光」折叠组（`_logoPowerSw`），
+			//   它的状态只由 `SyncLightRows()` 从 `hw.QuickSwitches["logolight"]` 读；而 `SyncLightRows`
+			//   原来**只有** `RefreshDeviceCapabilities` 的能力布局发生变化时才会被调用 ⚠️
+			//   ⇒ 启动「灯效恢复」点亮 LOGO 后，界面**没有任何路径**再把它拉回真值 ⇒ 一直显示"关"❌
+			//   ⇒ ⭐ 这里按与「更多开关」**同一把尺子**（12 秒宽限）周期收敛 ✅：
+			//     用户刚点过（宽限内）就不抢，宽限一过才按真值回拨（与 UpdateQuickSwitches 语义一致 ✅）。
+			//   ⚠️ **只在宝龙达启用**：GCU / 同方的灯光行继续保持"仅能力刷新时同步"的既有行为
+			//      （⛔ 不在本轮顺手改其它机型）✅
+			if ((hw?.UsesBaolongda ?? false) && (DateTime.Now - _lastQuickSwitchUi).TotalSeconds >= 12.0)
+			{
+				SyncLightRows();
+			}
 			if (hw != null && hw.IsConnected)
 			{
 				VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent());

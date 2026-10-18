@@ -2806,6 +2806,24 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	// ══════════════════════════════════════════════════════════════════════════
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」）：⭐ **把功能号 15 的真实状态回灌
+	/// <see cref="QuickSwitches" /> 的唯一入口** ✅
+	/// <para>⚠️ 根因（机主诊断包 0.291.9.11-20261018-113538 实证）：启动「灯效恢复（单次下发）」把 LOGO
+	/// 点亮了，而 <see cref="TrySetLogoLightViaBackend" /> 原来**只回读、不回灌** ⇒
+	/// <c>QuickSwitches["logolight"]</c> 还是旧值（关）⇒ 界面（<c>SettingsForm.SyncLightRows</c>
+	/// 读的就是它）一直显示"关"❌。</para>
+	/// <para>⭐ 纪律：⭐ **只同步真值** —— <paramref name="source" /> 必须如实写清这个值是怎么来的
+	/// （⭐ 功能号 15 回读确认 ／ ⭐ 回读不一致时按实际读到的值），⛔ 绝不把"想让它变成什么"当成状态 ✅
+	/// （与 3 s 周期 <see cref="RefreshBaolongdaSwitchStates" /> 同一口径 ✅）。</para>
+	/// </summary>
+	private void SyncLogoLightQuickSwitch(bool on, string source)
+	{
+		SyncBaolongdaQuickSwitch("logolight", on ? 1 : 0);
+		// ⭐ 用 WriteLineIfChanged 去重：状态没变就不刷屏 ✅（一变就换一行 ⇒ 诊断包能回查"谁改的"）
+		Logger.WriteLineIfChanged("logo-state-sync", $"[logo] 状态同步 ⇒ {(on ? "on" : "off")}（来源：{source}）");
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · LOGO 灯）：⭐ **意向方法** —— "⭐ 把 LOGO 灯开/关" ✅
 	/// <para>⭐ 宝龙达：⭐ 走 ⭐ WMI 功能号 15（⭐ 真机已验证可读、⭐ 协议为 0/1 ✅）
 	/// ⇒ ⭐ 写后**立刻回读确认**（⭐ 真机实测的 `OutData[3]` 回显让这一步很可靠 ✅）。</para>
@@ -2831,15 +2849,35 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				return true; // ⭐ 已"处理"（只是失败）⇒ 调用方仍不该再发 GCU ✅
 			}
 			// ⭐ 回读确认（⭐ 最多 5 次、⭐ 150 ms 间隔 —— ⭐ 与档位那套同款 ✅）
+			bool readbackSeen = false;
+			bool readbackValue = false;
 			for (int attempt = 0; attempt < 5; attempt++)
 			{
-				if (wmi.TryReadLogoLight(out bool current) && current == on)
+				if (wmi.TryReadLogoLight(out bool current))
 				{
-					confirmed = true;
-					Logger.WriteLine($"宝龙达 LOGO 灯：⭐ 已{(on ? "点亮" : "熄灭")}并回读确认 ✅（第 {attempt + 1} 次）");
-					return true;
+					readbackSeen = true;
+					readbackValue = current;
+					if (current == on)
+					{
+						confirmed = true;
+						Logger.WriteLine($"宝龙达 LOGO 灯：⭐ 已{(on ? "点亮" : "熄灭")}并回读确认 ✅（第 {attempt + 1} 次）");
+						// ⭐⭐ 2026-10-18（「UI 与硬件状态不同步」根因：写入后没有同步状态镜像）：
+						//   ⭐ 写成功 + 回读确认后**必须立刻**把功能号 15 的真值回灌 `QuickSwitches` ✅
+						//   ⚠️ 原来这里只回读、不回灌 ⇒ LOGO 灯被"灯效恢复"点亮后：
+						//      ① `QuickSwitches["logolight"]` 要等下一轮 3 s 周期回读才刷新 ⚠️
+						//      ② 界面灯光行（`SettingsForm.SyncLightRows`）原来根本没有周期消费 ⚠️
+						//      ⇒ 机主看到「硬件实际是开、界面显示关」❌（诊断包 0.291.9.11 实证）。
+						//   ⭐ 同步的是**回读确认过的真值**，⛔ 不是"意图"✅。
+						SyncLogoLightQuickSwitch(on, "功能号15 回读确认");
+						return true;
+					}
 				}
 				Thread.Sleep(150);
+			}
+			// ⭐ 回读到了但与目标不一致 ⇒ ⭐ 按**回读真值**同步（⛔ 不拿意图当状态 ✅；读不到才保持原镜像）
+			if (readbackSeen)
+			{
+				SyncLogoLightQuickSwitch(readbackValue, "功能号15 回读（与目标不一致）");
 			}
 			Logger.WriteLine($"宝龙达 LOGO 灯：⚠️ 写入完成但 {(5 * 150)} ms 内**回读不一致** ⇒ 如实报告未确认 ⚠️");
 			return true;
@@ -2883,6 +2921,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				//      ⇒ 失败 ⇒ `SetLightPower` 返回 false ⇒ ⭐ **界面把开关拨回去** ❌
 				//   ⇒ ⭐ 写入并**回读确认后立刻**镜像本地状态 ✅（⭐ 口径与 3 s 周期刷新同源 ✅ ——
 				//      功能号 15 的真实回读值 ✅，⛔ 不是拿"意图"当状态 ⚠️）。
+				//   ⭐ 2026-10-18：`TrySetLogoLightViaBackend` 内部已在回读确认分支调用
+				//      `SyncLogoLightQuickSwitch`（含 `[logo] 状态同步` 日志）⇒ 下面这句现在只是**兜底**
+				//      （值已相同 ⇒ `SyncBaolongdaQuickSwitch` 不会重复刷日志 ✅）。
 				SyncBaolongdaQuickSwitch("logolight", on ? 1 : 0);
 			}
 			return logoHandled;
@@ -3006,7 +3047,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				if (wmi.TryReadLogoLight(out bool logoOn))
 				{
-					SyncBaolongdaQuickSwitch("logolight", logoOn ? 1 : 0);
+					// ⭐ 2026-10-18：统一走 `SyncLogoLightQuickSwitch` —— 读到的真值回灌镜像，
+					//   `[logo] 状态同步` 那条日志与写入路径共用同一个去重键 ⇒ 值没变时不会多刷一行 ✅
+					SyncLogoLightQuickSwitch(logoOn, "功能号15 回读确认");
 					confirmed = logoOn == on;
 					return true;
 				}
@@ -5053,7 +5096,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⚠️ 映射只挑**语义确定**的三个 ✅ —— ⭐ 其余留在快照里（⭐ 诊断包会用 ✅），
 			//      ⛔ 不乱映射（⭐ 例如功能号 10 是"键盘灯状态"，
 			//         ⚠️ **不等于**实体灯带 `lightbar` ⚠️ ⇒ ⭐ 映射过去就是错的 ❌）
-			SyncBaolongdaQuickSwitch("logolight", snap.LogoLight);
+			// ⭐ 2026-10-18：LogoLIGHT 统一走 `SyncLogoLightQuickSwitch` —— 与"写后回灌"共用
+			//   同一个镜像写入 + `[logo] 状态同步` 日志（⛔ 读不到时不动镜像 ✅）。
+			if (snap.LogoLight.HasValue)
+			{
+				SyncLogoLightQuickSwitch(snap.LogoLight.Value != 0, "功能号15 回读确认");
+			}
 			// ⭐⭐ 2026-10-16（⭐ 机主反馈「⭐ 触摸板的开关反了」✅）：⭐ 功能号 12 是「⭐ 锁」语义 ⚠️
 			//   （⭐ TPLock ⇒ 1 = 锁定 = 禁用 ✅），⭐ 而界面 <c>touchpad</c> 的 true 表示「⭐ 可用」✅
 			//   ⇒ ⭐ **取反** ✅ —— ⚠️ 极性来自 <see cref="BaolongdaToggleInverted" />（⭐ 与写入侧**共用** ✅
