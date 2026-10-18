@@ -4214,6 +4214,20 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="BatteryLimitEnableCharge" xml:space="preserve">
+    
+    
+    <value>Charge limit</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableChargeTip" xml:space="preserve">
+    
+    
+    <value>When plugged in, charging is limited to the stop threshold</value>
+    
+  
+  </data>
 <data name="BatteryStateIdle" xml:space="preserve">
     
     

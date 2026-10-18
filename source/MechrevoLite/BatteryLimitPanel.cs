@@ -19,6 +19,7 @@ using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MechrevoLite.Hardware;
+using MechrevoLite.Properties;
 using MechrevoLite.UI;
 using Microsoft.Win32;
 
@@ -40,6 +41,9 @@ internal sealed class BatteryLimitPanel : Panel
 	private readonly Label _statusLabel;
 
 	private readonly Label _hintLabel;
+
+	// ⭐ 开关说明的 Tooltip（机主：说明不放在行内）✅
+	private readonly ToolTip _toolTip = new ToolTip();
 
 	private bool _busy;
 
@@ -77,19 +81,22 @@ internal sealed class BatteryLimitPanel : Panel
 		_lowBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 		_highBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 
+		// ⭐ 机主 2026-10-18：开关文案只保留「启用限制充电」；说明移入 Tooltip（⛔ 不放在行内）✅
 		_enableBox = new CheckBox
 		{
 			AutoSize = true,
-			Text = "启用限制充电（接电源时限制充电上限）",
+			Text = Strings.BatteryLimitEnableCharge,
 			Margin = new Padding(0, D(6), 0, 0)
 		};
+		_toolTip.SetToolTip(_enableBox, Strings.BatteryLimitEnableChargeTip);
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
 
 		_applyButton = new Button
 		{
-			AutoSize = true,
+			AutoSize = false,
+			Dock = DockStyle.Fill,
 			Text = "保存阈值",
-			Margin = new Padding(0, D(5), 0, 0)
+			Margin = new Padding(D(6), D(4), 0, D(4))
 		};
 		_applyButton.Click += ApplyButton_Click;
 
@@ -105,7 +112,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Dock = DockStyle.Top,
 			AutoSize = false,
 			ColumnCount = 4,
-			RowCount = 6,
+			RowCount = 5,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = Color.Transparent
@@ -114,27 +121,29 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
 		}
+		// ⭐ 机主 2026-10-18 定稿：① 开关+保存同一行（按钮最右）② 起充/停充并排 ③ 状态 ④ 提示 ✅
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
-		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowCheck)));
-		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowButton)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowHint)));
-		grid.Height = D(RowSoc + RowInput + RowCheck + RowButton + RowStatus + RowHint);
+		grid.Height = D(RowSoc + RowInput + RowInput + RowStatus + RowHint);
 
 		grid.Controls.Add(_socLabel, 0, 0);
 		grid.SetColumnSpan(_socLabel, 4);
-		grid.Controls.Add(lowLabel, 0, 1);
-		grid.Controls.Add(_lowBox, 1, 1);
-		grid.Controls.Add(highLabel, 2, 1);
-		grid.Controls.Add(_highBox, 3, 1);
-		grid.Controls.Add(_enableBox, 0, 2);
-		grid.SetColumnSpan(_enableBox, 4);
-		grid.Controls.Add(_applyButton, 0, 3);
-		grid.SetColumnSpan(_applyButton, 2);
-		grid.Controls.Add(_statusLabel, 0, 4);
+		// 第 1 行：开关在左（跨 3 列）+ 保存按钮在最右列 ✅
+		grid.Controls.Add(_enableBox, 0, 1);
+		grid.SetColumnSpan(_enableBox, 3);
+		grid.Controls.Add(_applyButton, 3, 1);
+		// 第 2 行：起充/停充并排（等宽、不换行）✅
+		grid.Controls.Add(lowLabel, 0, 2);
+		grid.Controls.Add(_lowBox, 1, 2);
+		grid.Controls.Add(highLabel, 2, 2);
+		grid.Controls.Add(_highBox, 3, 2);
+		// 第 3/4 行：状态 + 红色 SOC 提示 ✅
+		grid.Controls.Add(_statusLabel, 0, 3);
 		grid.SetColumnSpan(_statusLabel, 4);
-		grid.Controls.Add(_hintLabel, 0, 5);
+		grid.Controls.Add(_hintLabel, 0, 4);
 		grid.SetColumnSpan(_hintLabel, 4);
 
 		Controls.Add(grid);
@@ -142,6 +151,7 @@ internal sealed class BatteryLimitPanel : Panel
 		LogLabelWidthCheck("起充标签", lowLabel, D(88));
 		LogLabelWidthCheck("停充标签", highLabel, D(88));
 		LogLabelWidthCheck("状态行", _statusLabel, D(360));
+		LogSwitchRowCheck();
 		RefreshFromEc();
 		UpdateSocSafetyHint();
 	}
@@ -409,6 +419,42 @@ internal sealed class BatteryLimitPanel : Panel
 	/// ⭐⭐ 机主要求：代码级 UI 自检 —— 用 `TextRenderer.MeasureText` 比较“文本宽 vs 可用列宽”，
 	/// 证明 16 字以内的标签不会换行（截图里的「起充 %（低）」换行问题）✅
 	/// </summary>
+	/// <summary>⭐ Tooltip 是组件、不随 Panel 自动释放 ⇒ 手动释放 ✅</summary>
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			_toolTip.Dispose();
+		}
+		base.Dispose(disposing);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 机主要求：代码级 UI 自检 —— 开关 + 保存按钮同行时是否重叠：
+	/// 开关文本宽 vs 跨 3 列可用宽；按钮宽 vs 第 4 列宽 ✅
+	/// </summary>
+	private void LogSwitchRowCheck()
+	{
+		try
+		{
+			int column = D(88);
+			int checkAvailable = column * 3 - D(8);
+			int checkWidth = TextRenderer.MeasureText(_enableBox.Text, _enableBox.Font).Width;
+			Size buttonPreferred = _applyButton.GetPreferredSize(Size.Empty);
+			int buttonAvailable = column - D(8);
+			bool overlap = checkWidth > checkAvailable || buttonPreferred.Width > buttonAvailable;
+			string message = "[battery-ui] 开关+按钮行：开关文本宽=" + checkWidth + "px/可用=" + checkAvailable
+				+ "px · 按钮宽=" + buttonPreferred.Width + "px/列宽=" + buttonAvailable
+				+ "px ⇒ 重叠=" + overlap;
+			Logger.WriteLine(message);
+			Logger.WriteLineIfChanged("battery-ui-switch-row", message);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery-ui] 开关行自检失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
 	private void LogLabelWidthCheck(string rowName, Label label, int columnWidth)
 	{
 		try

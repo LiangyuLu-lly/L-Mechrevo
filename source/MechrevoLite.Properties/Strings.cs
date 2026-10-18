@@ -1461,6 +1461,8 @@ internal class Strings
 	internal static string BatteryStateFull => ResourceManager.GetString("BatteryStateFull", resourceCulture);
 	internal static string BatteryStateHeldAtLimit => ResourceManager.GetString("BatteryStateHeldAtLimit", resourceCulture);
 	internal static string BatteryStateHeldAtBaolongdaLimit => ResourceManager.GetString("BatteryStateHeldAtBaolongdaLimit", resourceCulture);
+	internal static string BatteryLimitEnableCharge => ResourceManager.GetString("BatteryLimitEnableCharge", resourceCulture);
+	internal static string BatteryLimitEnableChargeTip => ResourceManager.GetString("BatteryLimitEnableChargeTip", resourceCulture);
 	internal static string BatteryStateIdle => ResourceManager.GetString("BatteryStateIdle", resourceCulture);
 	internal static string BatteryAbnormalTag => ResourceManager.GetString("BatteryAbnormalTag", resourceCulture);
 	internal static string BatteryCycleCountLine => ResourceManager.GetString("BatteryCycleCountLine", resourceCulture);

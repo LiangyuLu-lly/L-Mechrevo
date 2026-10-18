@@ -4240,6 +4240,20 @@
     
   
   </data>
+<data name="BatteryLimitEnableCharge" xml:space="preserve">
+    
+    
+    <value>限制充电</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableChargeTip" xml:space="preserve">
+    
+    
+    <value>开启后接电源时会把充电限制在停充阈值</value>
+    
+  
+  </data>
 <data name="BatteryStateIdle" xml:space="preserve">
     
     
