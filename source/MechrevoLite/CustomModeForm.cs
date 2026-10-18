@@ -171,6 +171,13 @@ public class CustomModeForm : RForm
 
 	private bool _refreshingHardwareState;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1，低了要联动调 PL1）：
+	/// ⭐ 联动**正在进行**的标志 —— 程序化改被联动滑块的值时，它自己的 onChanged 只 `Queue`、⛔ 不再发起第二次联动
+	/// （⭐ 避免递归/重复日志；⭐ 值本身仍会正常登记、正常下发）✅。
+	/// </summary>
+	private bool _plLinking;
+
 	private Panel _scrollHost;
 
 	private int _laidOutContentHeight;
@@ -750,7 +757,7 @@ public class CustomModeForm : RForm
 		(int, int, int, bool) tuple3 = DeviceRange(hw?.Pl2Minimum ?? (-1), hw?.Pl2Maximum ?? (-1), hw?.Pl2 ?? 0);
 		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl1, hw?.BaolongdaPl1Unset ?? false), tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
 		{
-			Queue("PL1", v.ToString());
+			QueuePowerLimit("PL1", v);
 		});
 		_pl1 = tuple4.Item1;
 		_pl1Val = tuple4.Item2;
@@ -758,7 +765,7 @@ public class CustomModeForm : RForm
 		AttachPowerWallUnsetHint(_pl1, _pl1Val, _pl1Label);
 		tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
 		{
-			Queue("PL2", v.ToString());
+			QueuePowerLimit("PL2", v);
 		});
 		_pl2 = tuple4.Item1;
 		_pl2Val = tuple4.Item2;
@@ -789,7 +796,7 @@ public class CustomModeForm : RForm
 		(int, int, int, bool) tuple5 = DeviceRange(hw?.Pl4Minimum ?? (-1), hw?.Pl4Maximum ?? (-1), hw?.Pl4 ?? 0);
 		tuple4 = AddSliderRow((hw != null && hw.UsesAmdPowerFields) ? Strings.CpuFppt : Strings.CpuPl4, tuple5.Item1, tuple5.Item2, tuple5.Item3, (int v) =>
 		{
-			Queue("PL4", v.ToString());
+			QueuePowerLimit("PL4", v);
 		});
 		_pl4 = tuple4.Item1;
 		_pl4Val = tuple4.Item2;
@@ -3261,6 +3268,111 @@ public class CustomModeForm : RForm
 	{
 		_pending[field] = value;
 		MarkPanelDirty();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1；低了要联动调 PL1）：
+	/// ⭐ PL 三行的**唯一登记入口** —— 先登记本次改动，再做联动（⭐ 联动改出来的另一项也会走这里登记，
+	/// 但 <see cref="_plLinking" /> 保证⛔ 不会再发起第二次联动）✅。
+	/// </summary>
+	private void QueuePowerLimit(string field, int value)
+	{
+		Queue(field, value.ToString());
+		if (_plLinking)
+		{
+			return;
+		}
+		LinkPowerLimits(field);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1）：⭐ 界面联动 —— 把被联动的那几个滑块**一起改掉** ✅。
+	/// <para>⭐ 规则本体在 <see cref="PowerLimitOrder" />（⭐ 与校验层**同一份口径**，⛔ 不在 UI 里另写一套）✅。</para>
+	/// <para>⚠️ "未知值"不参与联动：⭐ 宝龙达 40 系的 PL 协议**只写不读** ⇒ 本次运行还没下发过时，
+	/// 另一项就是未知（⭐ 不能拿界面钳出来的下限当真值去把用户刚设的值改掉）✅。</para>
+	/// </summary>
+	private void LinkPowerLimits(string changedField)
+	{
+		if (_pl1 == null || _pl2 == null)
+		{
+			return;
+		}
+		MechrevoHw hw = Program.hw;
+		int? pl1 = KnownPowerLimitValue("PL1", _pl1, hw?.Pl1 ?? 0);
+		int? pl2 = KnownPowerLimitValue("PL2", _pl2, hw?.Pl2 ?? 0);
+		// ⭐ 无 PL4 的机型（宝龙达）⇒ `_pl4` 行不可调 ⇒ 这里自然是 null ⇒ 约束自动忽略 PL4 ✅
+		int? pl4 = (_pl4 == null) ? ((int?)null) : KnownPowerLimitValue("PL4", _pl4, hw?.Pl4 ?? 0);
+		PowerLimitOrder.Field? changed = changedField switch
+		{
+			"PL1" => PowerLimitOrder.Field.Pl1,
+			"PL2" => PowerLimitOrder.Field.Pl2,
+			"PL4" => PowerLimitOrder.Field.Pl4,
+			_ => (PowerLimitOrder.Field?)null
+		};
+		PowerLimitOrder.Range range1 = (_pl1.Maximum > _pl1.Minimum)
+			? new PowerLimitOrder.Range(_pl1.Minimum, _pl1.Maximum)
+			: PowerLimitOrder.Range.Unbounded;
+		PowerLimitOrder.Range range2 = (_pl2.Maximum > _pl2.Minimum)
+			? new PowerLimitOrder.Range(_pl2.Minimum, _pl2.Maximum)
+			: PowerLimitOrder.Range.Unbounded;
+		PowerLimitOrder.Range range4 = ((_pl4 != null && _pl4.Maximum > _pl4.Minimum))
+			? new PowerLimitOrder.Range(_pl4.Minimum, _pl4.Maximum)
+			: PowerLimitOrder.Range.Unbounded;
+		if (!PowerLimitOrder.TryLink(changed, pl1, pl2, pl4, range1, range2, range4,
+			out int? linkedPl1, out int? linkedPl2, out int? linkedPl4,
+			out IReadOnlyList<PowerLimitOrder.Change> changes, out string reason))
+		{
+			// ⭐ 极端情形（⭐ 三行范围互相冲突）⇒ 保持原值、如实说明；⛔ 不生成违规组合 ✅
+			Logger.WriteError("[pl] 联动：⚠️ 当前三行范围无法同时满足 PL1 ≤ PL2 ≤ PL4 ⇒ 本次不联动（保持原值）");
+			return;
+		}
+		if (changes == null || changes.Count == 0)
+		{
+			return;
+		}
+		_plLinking = true;
+		try
+		{
+			// ⭐ 程序化改值仍会走各自的 onChanged ⇒ 会把"被联动后的值"正常登记进 `_pending` ✅
+			//   （⭐ `_plLinking` 只拦住"再发起一次联动"，⛔ 不拦登记）✅
+			if (linkedPl1.HasValue && _pl1.Value != linkedPl1.Value)
+			{
+				_pl1.Value = linkedPl1.Value;
+			}
+			if (linkedPl2.HasValue && _pl2.Value != linkedPl2.Value)
+			{
+				_pl2.Value = linkedPl2.Value;
+			}
+			if (linkedPl4.HasValue && _pl4 != null && _pl4.Value != linkedPl4.Value)
+			{
+				_pl4.Value = linkedPl4.Value;
+			}
+		}
+		finally
+		{
+			_plLinking = false;
+		}
+		// ⭐ 机主要求的那一行日志（⭐ 例：`[pl] 联动：PL1 120→100（因 PL2=100）`）✅
+		//   ⚠️ 界面这一次联动只是"改了待应用的值"；真正下发时还会由校验层/单键兜底再记一条
+		//      **带下发结果**的 `[pl] 联动`（那条用 WriteError ⇒ 默认级别可见）✅
+		Logger.WriteLine(PowerLimitOrder.Describe(changes, reason));
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19：⭐ 界面某一行 PL 的"当前已知值" —— ⭐ 本次已登记（待应用，⭐ 以用户刚改的为准）
+	/// → ⭐ 硬件上报的真实值（&gt;0 才算已知）→ ⭐ 否则 <c>null</c>（⭐ 未知，不参与联动）✅。
+	/// </summary>
+	private int? KnownPowerLimitValue(string field, RSlider bar, int hwValue)
+	{
+		if (bar == null || bar.Maximum <= bar.Minimum)
+		{
+			return null;
+		}
+		if (_pending.TryGetValue(field, out string text) && int.TryParse(text, out int pending))
+		{
+			return pending;
+		}
+		return (hwValue > 0) ? hwValue : (int?)null;
 	}
 
 	internal static bool IsOcCheckboxEnabled(MechrevoHw? hw, bool rangesAdjustable)

@@ -61,7 +61,11 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：⭐ 只有「宝龙达 30 系」才生成
 			//   `SmuStapmTimeSeconds` 这一步（30 系没有 WMI 23、PL/温度墙/时间窗走 SMU ✅）
 			//   ⚠️ 40 系 / GCU / 老接口 ⇒ false ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsSmuPowerTimeWindow = hw.IsBaolongda30Series
+			SupportsSmuPowerTimeWindow = hw.IsBaolongda30Series,
+			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 宝龙达没有 GCU ⇒ GPU 偏移只能走本机 NVAPI P0
+			//   （⭐ `PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支）。
+			//   ⚠️ 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** ✅（GCU 机型那条 `WriteFirmwareField` 路径照旧）。
+			SupportsDirectGpuOverclock = hw.UsesBaolongda
 		};
 	}
 
@@ -177,11 +181,28 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		{
 			int targetCore = (on ? core : 0);
 			int targetMemory = (on ? memory : 0);
+			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 先把**驱动回读后端**准备好 ——
+			//   ① 写后校验（`VerifyAsync` ⇒ `DriverGpuOverclockFieldMatches`）只在
+			//      `DirectGpuOverclockBackendPresent` 时才会去回读；② 自定义模式窗口显示的
+			//      `EffectiveGpuCoreClockOffset` 也走同一条回读。⇒ 不先 Ensure 的话，
+			//      真机日志里会出现"写成功但验证读不到"的假象（⛔ 不是写失败，是回读后端没起）。
+			//   ⚠️ 本方法失败也不影响真正的写：下面是独立的 NVAPI P0 通路；异常都在 Ensure 内部吞掉 ✅
+			bool readbackReady = _hw.EnsureDirectGpuOverclock();
 			bool ok = NvapiPStates.TrySetP0Offsets(targetCore, targetMemory, out int appliedCore, out int appliedMemory);
 			string detail = NvapiPStates.LastError;
-			Logger.WriteLine($"[gpu-oc] 宝龙达 NVAPI P0：请求 core={targetCore} mem={targetMemory} MHz ⇒ ok={ok} · 回读 core={appliedCore} mem={appliedMemory} MHz"
+			// ⭐ 写后回读值**原样进日志**（⭐ 机主需要凭这一行判断"到底写没写进去"）✅
+			Logger.WriteError($"[gpu-oc] 宝龙达 NVAPI P0：请求 core={targetCore} mem={targetMemory} MHz"
+				+ $" ⇒ ⭐ 写成功={ok} · 驱动回读 core={appliedCore} mem={appliedMemory} MHz"
+				+ $" · 回读后端就绪={readbackReady}"
 				+ (string.IsNullOrEmpty(detail) ? "" : " · " + detail));
-			return Task.FromResult(ok);
+			// ⭐ 再单独比一次"配置目标 vs 驱动回读值"：⭐ 一致 = 已生效；不一致 = 如实报失败（⛔ 不假装）✅
+			bool confirmed = ok && appliedCore == targetCore && appliedMemory == targetMemory;
+			if (ok && !confirmed)
+			{
+				Logger.WriteError($"[gpu-oc] ⚠️ 驱动接受了写入，但回读与目标不一致：目标 core={targetCore} mem={targetMemory}"
+					+ $" · 回读 core={appliedCore} mem={appliedMemory} MHz ⇒ 如实按失败处理");
+			}
+			return Task.FromResult(confirmed);
 		}
 		return _service.ApplyGcuGpuOverclock(on, core, memory);
 	}

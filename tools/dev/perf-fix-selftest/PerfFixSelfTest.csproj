@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>PerfFixSelfTest</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace />
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- ⭐ 直接 Link 产品源码本体（⛔ 不是复制一份逻辑），与 tools\dev\kblight-selftest 同一做法。
+         覆盖两件事：
+         ① PL1 ≤ PL2 ≤ PL4 联动（纯函数 PowerLimitOrder）；
+         ② 宝龙达（无 GCU）自定义档是否真的生成 ApplyGpuOverclock 步骤（PerfModeApplyPlanner）。 -->
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PowerLimitOrder.cs" Link="PowerLimitOrder.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeApplyPlanner.cs" Link="PerfModeApplyPlanner.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfApplyStep.cs" Link="PerfApplyStep.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfApplyStepKind.cs" Link="PerfApplyStepKind.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfApplyVerify.cs" Link="PerfApplyVerify.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeCapabilities.cs" Link="PerfModeCapabilities.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeDefinition.cs" Link="PerfModeDefinition.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeKind.cs" Link="PerfModeKind.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeRoute.cs" Link="PerfModeRoute.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeSettings.cs" Link="PerfModeSettings.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\FirmwareSlotPlan.cs" Link="FirmwareSlotPlan.cs" />
+  </ItemGroup>
+</Project>

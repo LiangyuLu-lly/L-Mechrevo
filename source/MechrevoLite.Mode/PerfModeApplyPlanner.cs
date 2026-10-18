@@ -200,6 +200,30 @@ public static class PerfModeApplyPlanner
 		{
 			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyGpuPowerLimit, null, null, settings.GpuPowerLimitW.Value, IsCpuCurve: false, null, PerfApplyVerify.ServiceEcho));
 		}
+		// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」· 根因）：⭐ 宝龙达没有 GCU ⇒ GPU 核心/显存偏移
+		//   ⭐ 走本机 **NVAPI P-States 20（P0）**（`PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支，
+		//     写后**回读确认**）✅ —— 但原来这一步**只在 BuiltIn 路由**生成，而自定义档**永远是 FirmwareSlot**
+		//     ⇒ 自定义模式窗口里的「GPU 超频」开关 + 核心/显存滑块只是存进了 `PerfModeSettings`，
+		//     **一个字节都没走到 NVAPI** ❌（⛔ 这就是"没用"的根因）✅。
+		//   ⭐ 现在：能走本机直写的后端（宝龙达 ⇒ `SupportsDirectGpuOverclock = true`）在 **FirmwareSlot 路由**
+		//     下也生成这一步 ⇒ 与 WMI 功耗墙/风扇曲线那几步同一条自定义档下发链 ✅。
+		//   ⚠️ 默认 false ⇒ GCU / 老接口的步骤列表【逐位不变】✅（它们仍走原来的固件字段/内置档分支）。
+		if (caps.SupportsDirectGpuOverclock && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite
+			&& (settings.GpuOverclockOn.HasValue || settings.GpuCoreOffset.HasValue || settings.GpuMemoryOffset.HasValue))
+		{
+			bool gpuOcOn = settings.GpuOverclockOn ?? true;
+			list.Add(new PerfApplyStep(
+				PerfApplyStepKind.ApplyGpuOverclock,
+				WireKey: null,
+				Value: null,
+				Number: gpuOcOn ? 1 : 0,
+				IsCpuCurve: false,
+				Curve: null,
+				Verify: PerfApplyVerify.GpuClockOffset,
+				GpuOffsets: gpuOcOn
+					? (settings.GpuCoreOffset.GetValueOrDefault(), settings.GpuMemoryOffset.GetValueOrDefault())
+					: (0, 0)));
+		}
 		if (settings.FanBoost.HasValue)
 		{
 			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyFanBoost, null, null, settings.FanBoost.Value ? 1 : 0));

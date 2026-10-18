@@ -68,5 +68,21 @@ public sealed record PerfModeCapabilities
 	/// </summary>
 	public bool SupportsSmuPowerTimeWindow { get; init; }
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」· 宝龙达无 GCU）：⭐ <b>本后端能不能把 GPU 核心/显存偏移
+	/// **直接写进 NVIDIA 驱动**（NVAPI P-States 20 的 P0）</b> ✅。
+	/// <para>⚠️ <b>为什么必须单独一个能力位</b>：宝龙达（`UsesBaolongda`）**没有 GCU** ⇒ 自定义档走
+	/// <see cref="PerfModeRoute.FirmwareSlot" /> 时，本来该发 GPU 偏移的那几步（`WriteFirmwareField:GpuCoreClockOffsetOC`
+	/// ⇒ 厂商 MQTT）**必然失败**；而它其实有另一条可用通路：
+	/// <c>PerfModeBackend.ApplyGpuOverclockAsync</c>（⭐ 宝龙达分支 ⇒ <c>NvapiPStates.TrySetP0Offsets</c>）
+	/// —— ⭐ 但规划器原来**只在 BuiltIn 路由**里生成 <see cref="PerfApplyStepKind.ApplyGpuOverclock" />，
+	/// 而自定义档**永远**是 FirmwareSlot 路由 ⇒ ⭐ 这一步**从来没生成过** ⇒ 界面上的核心/显存滑块
+	/// 只是存进了配置、**一个字节都没下发**（⛔ 这正是"显卡超频没用"的根因）✅。</para>
+	/// <para>⭐ <b>语义</b>：<c>true</c> ⇒ ⭐ 规划器在 **FirmwareSlot 路由**下也生成
+	/// <see cref="PerfApplyStepKind.ApplyGpuOverclock" />（⭐ 后端走本机 NVAPI，写后回读）✅。</para>
+	/// <para>⚠️ 默认 <c>false</c> ⇒ ⭐ <see cref="All" /> 与所有既有后端（GCU / 老接口）<b>逐位不变</b> ✅。</para>
+	/// </summary>
+	public bool SupportsDirectGpuOverclock { get; init; }
+
 	public static readonly PerfModeCapabilities All = new PerfModeCapabilities();
 }

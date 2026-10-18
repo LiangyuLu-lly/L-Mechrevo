@@ -882,6 +882,19 @@ public class MechrevoService
 
 	public async Task<bool> SetCustomDetail(Dictionary<string, string> fields)
 	{
+		// ⭐⭐ 2026-10-19（机主：「PL2 / PL4 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
+		//   ⭐ **校验层兜底** —— 下发前先把这一批里的 PL1/PL2/PL4 规范成 **PL1 ≤ PL2 ≤ PL4**：
+		//     · 用户降 PL2 到低于 PL1 ⇒ 把 PL1 一起降下来；
+		//     · 用户抬 PL1 超过 PL2 ⇒ 把 PL2（以及 PL4）一起抬高；
+		//     · 无 PL4 的机型（宝龙达没有 PL4）自动忽略 PL4；
+		//     · 历史非法存档回放（多字段同批）⇒ 优先往下压（安全方向）。
+		//   ⛔ **绝不允许把违反关系的组合发出去**；⛔ 不改 WMI 功能号 23 的写入协议（子命令 2/3/4 不变）。
+		//   ⚠️ 规则本体在 `PowerLimitOrder`（⭐ 与 CustomModeForm 的界面联动**同一份口径**）✅。
+		if (!NormalizePowerLimitOrder(fields))
+		{
+			Logger.WriteError("SetCustomDetail rejected: PL1 ≤ PL2 ≤ PL4 无法满足（硬件范围互相冲突）⇒ 本批不下发");
+			return false;
+		}
 		// ⭐⭐ 2026-10-19（机主：PL1/PL2 不可调 · 日志 `WriteFirmwareField:PL1=120 -> Failed`）：
 		//   ⭐ 宝龙达没有 GCU ⇒ 这几个键**先**走本机 WMI 功能号 23（`TryApplyPowerLimitViaBackend`），
 		//      剩下的字段才发给 MQTT ✅
@@ -1225,6 +1238,98 @@ public class MechrevoService
 			Interlocked.CompareExchange(ref _customDetailCts, null, requestCts);
 			requestCts.Dispose();
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「PL2 / PL4 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
+	/// ⭐ **PL1 ≤ PL2 ≤ PL4 的校验层兜底** —— 就地规范化 <paramref name="fields" /> 里的 PL 三项。
+	/// <para>⭐ 规则本体在 <see cref="PowerLimitOrder.TryLink" />（⭐ 与界面联动同一份口径）。
+	/// 本方法只负责：① 把"待下发值 + 硬件当前值"凑成三元组；② 把联动结果写回字段表（⭐ 被联动的
+	/// 那一项即使不在本批里也会被**补进去**，⇒ 它会被真正写到硬件上）；③ 打机主要求的那一行日志 ✅。</para>
+	/// <para>⚠️ 非宝龙达的 GCU 机型同样生效（⭐ PL4 也在范围内）⇒ 只在"确实违反关系"时才多写字段，
+	/// 合法组合**一个字段都不改** ✅。</para>
+	/// <para>⚠️ 返回 <c>false</c> = 硬件范围互相冲突、无法同时满足关系 ⇒ 调用方必须**放弃本批**，
+	/// ⛔ 不许把违规组合发出去 ✅。</para>
+	/// </summary>
+	private bool NormalizePowerLimitOrder(Dictionary<string, string> fields)
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null || fields == null || fields.Count == 0)
+		{
+			return true;
+		}
+		bool hasPl1 = fields.ContainsKey("PL1");
+		bool hasPl2 = fields.ContainsKey("PL2");
+		bool hasPl4 = fields.ContainsKey("PL4");
+		if (!hasPl1 && !hasPl2 && !hasPl4)
+		{
+			return true;
+		}
+		int? pl1 = CurrentOrPendingPowerLimit(fields, "PL1", hw.Pl1Adjustable, hw.Pl1);
+		int? pl2 = CurrentOrPendingPowerLimit(fields, "PL2", hw.Pl2Adjustable, hw.Pl2);
+		// ⭐ 无 PL4 的机型（宝龙达 40 系）⇒ `Pl4Adjustable == false` ⇒ 传 null ⇒ 约束自动忽略 PL4 ✅
+		int? pl4 = hw.Pl4Adjustable ? CurrentOrPendingPowerLimit(fields, "PL4", adjustable: true, hw.Pl4) : ((int?)null);
+		int changedCount = (hasPl1 ? 1 : 0) + (hasPl2 ? 1 : 0) + (hasPl4 ? 1 : 0);
+		PowerLimitOrder.Field? changed = changedCount switch
+		{
+			1 when hasPl1 => PowerLimitOrder.Field.Pl1,
+			1 when hasPl2 => PowerLimitOrder.Field.Pl2,
+			1 when hasPl4 => PowerLimitOrder.Field.Pl4,
+			_ => (PowerLimitOrder.Field?)null
+		};
+		PowerLimitOrder.Range range1 = ToPowerLimitRange(hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1Adjustable);
+		PowerLimitOrder.Range range2 = ToPowerLimitRange(hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2Adjustable);
+		PowerLimitOrder.Range range4 = ToPowerLimitRange(hw.Pl4Minimum, hw.Pl4Maximum, hw.Pl4Adjustable);
+		if (!PowerLimitOrder.TryLink(changed, pl1, pl2, pl4, range1, range2, range4,
+			out int? linkedPl1, out int? linkedPl2, out int? linkedPl4,
+			out IReadOnlyList<PowerLimitOrder.Change> changes, out string reason))
+		{
+			return false;
+		}
+		if (changes == null || changes.Count == 0)
+		{
+			return true;
+		}
+		WriteLinkedPowerLimit(fields, "PL1", pl1, linkedPl1);
+		WriteLinkedPowerLimit(fields, "PL2", pl2, linkedPl2);
+		WriteLinkedPowerLimit(fields, "PL4", pl4, linkedPl4);
+		// ⭐ 机主要求的那一行日志（⭐ 例：`[pl] 联动：PL1 120→100（因 PL2=100）`）✅
+		//   ⚠️ 用 WriteError ⇒ 默认「仅错误」级别下也**一定落盘**（⭐ 这是真机取证的主要证据）✅
+		Logger.WriteError(PowerLimitOrder.Describe(changes, reason));
+		return true;
+	}
+
+	/// <summary>⭐ 读"这一批里的值"；本批没带 ⇒ 用硬件上报的当前值（⭐ <c>&gt; 0</c> 才算已知）✅。</summary>
+	private static int? CurrentOrPendingPowerLimit(IReadOnlyDictionary<string, string> fields, string key, bool adjustable, int current)
+	{
+		if (fields.TryGetValue(key, out string text))
+		{
+			// ⚠️ 非法数字不在这里兜底（交给后面的 `ValidateCustomField` 如实拒绝）
+			return int.TryParse(text, out int value) ? value : ((int?)null);
+		}
+		if (!adjustable || current <= 0)
+		{
+			return null;
+		}
+		return current;
+	}
+
+	/// <summary>⭐ 硬件范围 → <see cref="PowerLimitOrder.Range" />（⭐ 读不到 ⇒ 不夹）✅。</summary>
+	private static PowerLimitOrder.Range ToPowerLimitRange(int minimum, int maximum, bool adjustable)
+	{
+		return (adjustable && maximum > minimum)
+			? new PowerLimitOrder.Range(minimum, maximum)
+			: PowerLimitOrder.Range.Unbounded;
+	}
+
+	/// <summary>⭐ 把联动结果写回字段表（⭐ 只在"值真的变了"时才覆盖/补字段）✅。</summary>
+	private static void WriteLinkedPowerLimit(Dictionary<string, string> fields, string key, int? original, int? linked)
+	{
+		if (!linked.HasValue || !original.HasValue || linked.Value == original.Value)
+		{
+			return;
+		}
+		fields[key] = linked.Value.ToString(CultureInfo.InvariantCulture);
 	}
 
 	/// <summary>
@@ -3931,6 +4036,10 @@ public class MechrevoService
 			int max = (hw.TccMaximum > 0) ? hw.TccMaximum : 105;
 			tempWallC = (result <= 0) ? max : Math.Max(60, Math.Min(max, result));
 		}
+		// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1）：⭐ **最后一道兜底** ——
+		//   即使本方法被"单键"调用（⭐ `PerfModeService` 的逐字段下发就是这种）、
+		//   也⛔ 不会写出 PL1 &gt; PL2 的组合 ✅（⭐ 正常路径已在 `SetCustomDetail` 开头按整批规范化过）✅
+		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
 		// ⭐⭐ 2026-10-16（"未设置" · 用户指导「⭐ 开源的都有方案的不是吗」）：
 		//   ⛔ **删掉了原来的"保守默认 45/65/95"** —— ⭐ 那是**我们自己编的**（⭐ 依据：⭐ 开源里
 		//      没有任何一处完整支持那组数；⭐ 蛟龙自己两处还互相矛盾 ⚠️ ⇒ ⭐ 不能编 ✅）
@@ -3946,6 +4055,54 @@ public class MechrevoService
 			+ $" · ⭐ 下发 PL1={ShowPowerValue(pl1)} PL2={ShowPowerValue(pl2)} 温度墙={ShowTempValue(tempWallC)}"
 			+ $" · ⭐ 写成功={confirmed}（⚠️ ⛔ 非「数值已生效」）⇒ ⭐ 该项未发 MQTT ✅");
 		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「PL2 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
+	/// ⭐ **单键写入路径的 PL1/PL2 联动兜底**（⭐ WMI 23 与 SMU 两条路径共用）。
+	/// <para>⭐ 方向：用户抬 PL1 / 非 PL 项触发 ⇒ 把 PL2 抬到 PL1（受 PL2 上限约束，顶不上去就把 PL1 压下来）；
+	/// 用户降 PL2 ⇒ 把 PL1 一起降下来 ✅。</para>
+	/// <para>⚠️ 只改"已知且已违反"的组合（<c>&gt; 0</c>）；未设置（≤0）的项原样不动 ✅。</para>
+	/// </summary>
+	private static void LinkPowerLimitPair(MechrevoHw hw, bool isPl1, bool isPl2, ref int pl1, ref int pl2)
+	{
+		if (pl1 <= 0 || pl2 <= 0 || pl1 <= pl2)
+		{
+			return;
+		}
+		int oldPl1 = pl1;
+		int oldPl2 = pl2;
+		string reason;
+		if (isPl1 && !isPl2)
+		{
+			// ⭐ 用户抬高了 PL1 ⇒ 把 PL2 一起抬（⭐ 受 PL2 上限约束）
+			pl2 = ((hw.Pl2Maximum > 0) ? Math.Min(pl1, hw.Pl2Maximum) : pl1);
+			if (pl2 < pl1)
+			{
+				pl1 = pl2;
+			}
+			reason = "因 PL1=" + pl1.ToString(CultureInfo.InvariantCulture);
+		}
+		else
+		{
+			// ⭐ 用户在降 PL2（⭐ 或来源不明的键）⇒ 把 PL1 一起降（⭐ 安全方向）
+			pl1 = pl2;
+			reason = "因 PL2=" + pl2.ToString(CultureInfo.InvariantCulture);
+		}
+		string detail = string.Empty;
+		if (pl1 != oldPl1)
+		{
+			detail += $"PL1 {oldPl1}→{pl1}";
+		}
+		if (pl2 != oldPl2)
+		{
+			if (detail.Length > 0)
+			{
+				detail += "、";
+			}
+			detail += $"PL2 {oldPl2}→{pl2}";
+		}
+		Logger.WriteError($"[pl] 联动：{detail}（{reason}）");
 	}
 
 	/// <summary>
@@ -3976,6 +4133,9 @@ public class MechrevoService
 		int pl2 = isPl2 ? result : hw.Pl2;
 		int tempWallC = isTempWall ? ((result <= 0) ? 0 : result) : ((hw.TccTarget > 0) ? hw.TccTarget : 0);
 		int stapmTime = isStapmTime ? result : 0;
+		// ⭐⭐ 2026-10-19（机主：PL2 不应低于 PL1）：⭐ SMU 这条路径同样**最后兜底**一次
+		//   （⭐ 正常路径已在 `SetCustomDetail` 开头按整批规范化过）⇒ ⛔ 不写出 PL1 > PL2 的组合 ✅
+		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
 		// ② 取值夹取（与 WMI 路径同一组范围；⛔ 不写 0 = "未设置"）
 		if (pl1 > 0)
 		{
