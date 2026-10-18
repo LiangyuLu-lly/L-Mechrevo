@@ -23,11 +23,14 @@ internal static class Program
 		Console.WriteLine();
 		Console.WriteLine("-- 1. 风扇事实（百分比分母 / 手动上限 / 通道）--");
 		Eq("百分比分母 = 6000 RPM（原厂 40 系 ÷60 口径）", 6000, BaolongdaProfile.FanPercentDenominatorRpm);
-		Eq("手动转速协议上限 = 60（x100RPM）", 60, BaolongdaProfile.FanManualMaxUnits100Rpm);
+		// 2026-10-18：上限按开源蛟龙 MAX_FAN_BYTE=68 放宽（提交 e23da98）⇒ 断言同步为 68
+		Eq("手动转速协议上限 = 68（x100RPM · 参考 JiaolongControl MAX_FAN_BYTE）", 68, BaolongdaProfile.FanManualMaxUnits100Rpm);
 		Eq("FanType 0 = 大扇/GPU", 0, BaolongdaProfile.FanTypeLarge);
 		Eq("FanType 1 = 小扇/CPU", 1, BaolongdaProfile.FanTypeSmall);
-		True("分母与手动上限自洽（60×100=6000）",
-			BaolongdaProfile.FanManualMaxUnits100Rpm * 100 == BaolongdaProfile.FanPercentDenominatorRpm);
+		// 2026-10-18：上限按 JiaolongControl MAX_FAN_BYTE 放宽到 68（e23da98）
+		//  ⇒ 不再"等于"100% 分母，改为断言"上限 >= 分母"（允许超速档）
+		True("手动上限不低于 100% 分母（68×100=6800 >= 6000）",
+			BaolongdaProfile.FanManualMaxUnits100Rpm * 100 >= BaolongdaProfile.FanPercentDenominatorRpm);
 
 		Console.WriteLine();
 		Console.WriteLine("-- 2. 功耗墙 / 温度墙范围 --");
