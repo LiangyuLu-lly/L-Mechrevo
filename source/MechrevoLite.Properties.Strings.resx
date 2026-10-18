@@ -4207,6 +4207,13 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="BatteryStateHeldAtBaolongdaLimit" xml:space="preserve">
+    
+    
+    <value>At charge stop threshold (limit active)</value>
+    
+  
+  </data>
 <data name="BatteryStateIdle" xml:space="preserve">
     
     

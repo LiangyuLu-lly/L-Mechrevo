@@ -35,6 +35,8 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private readonly Label _statusLabel;
 
+	private readonly Label _basicsLabel;
+
 	private readonly Label _hintLabel;
 
 	private bool _busy;
@@ -73,15 +75,27 @@ internal sealed class BatteryLimitPanel : Panel
 		_lowBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 		_highBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 
-		grid.RowCount = 4;
+		// ⭐⭐ 2026-10-18（机主：电池行内容为空）：⭐ 面板顶部固定显示**电量百分比 + 电池状态** ✅
+		_basicsLabel = new Label
+		{
+			AutoSize = true,
+			MaximumSize = new Size(560, 0),
+			Margin = new Padding(0, 0, 0, 4),
+			Text = "电量读取中…"
+		};
+
+		grid.RowCount = 5;
 		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		grid.Controls.Add(lowLabel, 0, 0);
-		grid.Controls.Add(_lowBox, 1, 0);
-		grid.Controls.Add(highLabel, 2, 0);
-		grid.Controls.Add(_highBox, 3, 0);
+		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		grid.Controls.Add(_basicsLabel, 0, 0);
+		grid.SetColumnSpan(_basicsLabel, 4);
+		grid.Controls.Add(lowLabel, 0, 1);
+		grid.Controls.Add(_lowBox, 1, 1);
+		grid.Controls.Add(highLabel, 2, 1);
+		grid.Controls.Add(_highBox, 3, 1);
 
 		_enableBox = new CheckBox
 		{
@@ -90,7 +104,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Margin = new Padding(0, 8, 0, 0)
 		};
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
-		grid.Controls.Add(_enableBox, 0, 1);
+		grid.Controls.Add(_enableBox, 0, 2);
 		grid.SetColumnSpan(_enableBox, 4);
 
 		_applyButton = new Button
@@ -100,7 +114,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Margin = new Padding(0, 8, 0, 0)
 		};
 		_applyButton.Click += ApplyButton_Click;
-		grid.Controls.Add(_applyButton, 0, 2);
+		grid.Controls.Add(_applyButton, 0, 3);
 		grid.SetColumnSpan(_applyButton, 2);
 
 		_statusLabel = new Label
@@ -110,7 +124,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Margin = new Padding(0, 8, 0, 0),
 			Text = "状态读取中…"
 		};
-		grid.Controls.Add(_statusLabel, 0, 3);
+		grid.Controls.Add(_statusLabel, 0, 4);
 		grid.SetColumnSpan(_statusLabel, 4);
 
 		_hintLabel = new Label
@@ -171,6 +185,7 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
 			_statusLabel.Text = "状态读不到：" + detail + "（可稍后点「保存阈值」重试）";
+			UpdateBasicsText(active: false);
 			UpdateSocSafetyHint();
 			return;
 		}
@@ -195,7 +210,46 @@ internal sealed class BatteryLimitPanel : Panel
 			? "当前：✅ 限制充电生效中（停充 " + high + "% · 起充 " + low + "%）"
 			: "当前：未启用（正常充电）")
 			+ " · 来源 EC " + detail;
+		UpdateBasicsText(active);
 		UpdateSocSafetyHint();
+	}
+
+	/// <summary>⭐ 面板顶部「电量百分比 + 电池状态」；⛔ 读不到就如实写，不猜 ✅。</summary>
+	private void UpdateBasicsText(bool active)
+	{
+		try
+		{
+			PowerStatus power = SystemInformation.PowerStatus;
+			bool ac = power.PowerLineStatus == PowerLineStatus.Online;
+			int soc = (int)Math.Round(power.BatteryLifePercent * 100.0);
+			bool charging = power.BatteryChargeStatus.HasFlag(BatteryChargeStatus.Charging);
+			string state;
+			if (!ac)
+			{
+				state = "电池供电 · 放电中";
+			}
+			else if (charging)
+			{
+				state = "外接电源 · 充电中";
+			}
+			else if (active && soc >= 0 && soc >= (int)_highBox.Value)
+			{
+				state = "外接电源 · 已到停充阈值（限充中）";
+			}
+			else if (active)
+			{
+				state = "外接电源 · 未在充电（限充生效中）";
+			}
+			else
+			{
+				state = "外接电源 · 未在充电";
+			}
+			_basicsLabel.Text = "电量 " + (soc >= 0 ? soc + "%" : "读不到") + " · " + state;
+		}
+		catch
+		{
+			_basicsLabel.Text = "电量/电池状态读不到";
+		}
 	}
 
 	/// <summary>

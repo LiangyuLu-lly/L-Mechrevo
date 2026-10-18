@@ -7915,9 +7915,20 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			}
 			BatteryLimitPanel panel = new BatteryLimitPanel();
 			host.RowCount += 1;
-			host.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			// ⭐⭐ 2026-10-18（机主：电池行内容为空）：⭐ 宿主表是**固定高度**的 TableLayoutPanel，
+			//   只加控件不会自动长高 ⇒ 新行会被裁掉看不见。这里按面板首选高度补一行 **Absolute** 行高，
+			//   并把 host.Height / panelBattery.MinimumSize 一起加高（内容可见，⛔ 不依赖 AutoScroll）✅
+			int panelWidth = Math.Max(320, host.Width);
+			int panelHeight = Math.Max(100, panel.GetPreferredSize(new Size(panelWidth, 0)).Height);
+			host.RowStyles.Add(new RowStyle(SizeType.Absolute, panelHeight));
 			host.Controls.Add(panel, 0, host.RowCount - 1);
 			host.SetColumnSpan(panel, 3);
+			host.Height += panelHeight;
+			host.PerformLayout();
+			if (panelBattery != null)
+			{
+				panelBattery.MinimumSize = new Size(0, host.Bottom + panelBattery.Padding.Bottom);
+			}
 		}
 		catch (Exception ex)
 		{
@@ -13740,6 +13751,48 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 	}
 
+	// ⭐⭐ 2026-10-18（机主：限充生效时“未充电”误导）：⭐ 宝龙达限充停在阈值上的状态缓存（5s）✅
+	private static long _bdHeldAtLimitTick;
+
+	private static bool _bdHeldAtLimitCache;
+
+	private static int _bdHeldAtLimitHigh = -1;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18：⭐ 判断“宝龙达限充生效且 SOC ≥ 停充阈值”✅。
+	/// <para>判据：`0x83C0 == 0x48` + `0x83A1`（停充阈值）+ 当前 SOC；⛔ 读不到 EC 状态 ⇒ false
+	/// （回退到普通“未在充电”文案，⛔ 不显示“限充中”）✅</para>
+	/// <para>⚠️ 只有 `UsesBaolongda` 才会读 EC；结果缓存 5 s，避免电池刷新时频繁读 EC ✅</para>
+	/// </summary>
+	private static bool TryBaolongdaHeldAtLimit(int percent, out int high)
+	{
+		high = -1;
+		MechrevoHw hw = Program.hw;
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return false;
+		}
+		long now = Environment.TickCount64;
+		if (now - _bdHeldAtLimitTick < 5000)
+		{
+			high = _bdHeldAtLimitHigh;
+			return _bdHeldAtLimitCache;
+		}
+		if (!BatteryLimitWriter.TryReadState(out int currentHigh, out _, out int mode, out _))
+		{
+			_bdHeldAtLimitTick = now;
+			_bdHeldAtLimitHigh = -1;
+			_bdHeldAtLimitCache = false;
+			return false;
+		}
+		bool held = mode == BatteryLimitWriter.ModeActive && percent >= 0 && currentHigh >= 1 && percent >= currentHigh;
+		_bdHeldAtLimitTick = now;
+		_bdHeldAtLimitHigh = currentHigh;
+		_bdHeldAtLimitCache = held;
+		high = currentHigh;
+		return held;
+	}
+
 	internal static string BatteryStateText(in BatteryDisplayInput input)
 	{
 		if (input.RateWatts > (decimal?)0m)
@@ -13762,6 +13815,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		if (status.IsDischarging || !input.AcOnline)
 		{
 			return Strings.BatteryStateDischargingNoRate;
+		}
+		// ⭐⭐ 2026-10-18（机主：限充生效时“未充电”误导）：⭐ AC + 未充电 + 限充生效且 SOC≥停充阈值
+		//   ⇒ 「已到停充阈值（限充中）」；⛔ EC 读不到 ⇒ 回退到普通“未在充电”✅
+		if (input.AcOnline && input.Percent >= 0 && TryBaolongdaHeldAtLimit(input.Percent, out _))
+		{
+			return Strings.BatteryStateHeldAtBaolongdaLimit;
 		}
 		if (input.Percent >= 0)
 		{
