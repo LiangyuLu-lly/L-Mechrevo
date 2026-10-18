@@ -129,6 +129,11 @@ public static class NvmlHelper
 	[DllImport("nvml.dll")]
 	private static extern int nvmlDeviceGetPowerManagementLimit(nint device, out uint limitMilliWatts);
 
+	// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 显卡功耗上限的**出厂默认值**（NVML 官方导出）。
+	//   ⭐ 用途：⭐ 自定义档恢复出厂时把功耗上限写回**驱动默认值**（⛔ 不拿 max/猜值冒充默认）✅
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetPowerManagementDefaultLimit(nint device, out uint defaultLimitMilliWatts);
+
 	[DllImport("nvml.dll")]
 	private static extern int nvmlDeviceSetPowerManagementLimit(nint device, uint limitMilliWatts);
 
@@ -655,6 +660,38 @@ public static class NvmlHelper
 			maxW = (int)(maxMw / 1000u);
 			currentW = (int)(curMw / 1000u);
 			return maxW > 0 && maxW >= minW;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 读显卡功耗上限的**出厂默认值**（W）✅。
+	/// <para>⭐ 依据：NVML 官方导出 <c>nvmlDeviceGetPowerManagementDefaultLimit</c>（单位毫瓦）——
+	/// 它与"驱动允许区间 max"**不是一回事**（很多机型 max 是出厂默认，但⛔ 不能拿这个假设冒充默认值）✅。</para>
+	/// <para>⚠️ 失败（无 NVML / 读不到）⇒ false + <paramref name="watts" />=0，⛔ 不猜 ✅。</para>
+	/// </summary>
+	internal static bool TryGetDefaultPowerLimitWatts(out int watts)
+	{
+		watts = 0;
+		if (Unavailable)
+		{
+			return false;
+		}
+		try
+		{
+			if (nvmlDeviceGetHandleByIndex_v2(0u, out nint device) != 0 || device == 0)
+			{
+				return false;
+			}
+			if (nvmlDeviceGetPowerManagementDefaultLimit(device, out uint defaultMw) != 0)
+			{
+				return false;
+			}
+			watts = (int)(defaultMw / 1000u);
+			return watts > 0;
 		}
 		catch
 		{

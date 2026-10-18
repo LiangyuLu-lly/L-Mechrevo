@@ -4702,6 +4702,28 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ **清空宝龙达功耗墙的"本地记忆"** ✅。
+	/// <para>⭐ 用途：⭐ 自定义档「恢复出厂」时，40 系已写 <c>功能号 23 = 0</c>（关闭自定义 ⇒ 固件回到默认功耗墙），
+	/// 30 系 SMU 没有"恢复默认"命令 ⇒ 至少把**本地记忆**清成"未设置"，让界面如实显示"本次运行未下发过"、
+	/// 并让后续 reconcile/应用不再拿旧值当基线 ✅。</para>
+	/// <para>⚠️ 只清本地记忆与属性，⛔ **不写任何硬件**（硬件侧动作由调用方决定，见
+	/// <c>MechrevoService.TryApplyCpuPowerLimitViaBackend(enable:false,…)</c>）✅。</para>
+	/// </summary>
+	internal void ClearBaolongdaPowerLimitMemory()
+	{
+		_baolongdaMemPl1 = 0;
+		_baolongdaMemPl2 = 0;
+		_baolongdaMemTempWall = 0;
+		Pl1 = 0;
+		Pl2 = 0;
+		TccTarget = 0;
+		// ⭐ SMU 只读快照也一起作废 ⇒ 下一次 `RefreshBaolongda30SeriesSmuPower` 会重新从 PM 表读
+		//   （⛔ 不拿"上次我们写的值"冒充当前值）✅
+		_baolongdaSmuSnapshot = null;
+		_baolongdaSmuSnapshotAt = DateTime.MinValue;
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：某几项 **SMU 写成功**后更新"本地记忆"与只读快照
 	/// （传 0 的项 = 本次没写，保持原样）。⛔ 只在 SMU 返回 <c>OK</c> 之后由调用方调用。
 	/// </summary>

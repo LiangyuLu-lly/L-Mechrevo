@@ -1551,6 +1551,9 @@ internal class Strings
 
 	internal static string PerfModeHintEmulated => ResourceManager.GetString("PerfModeHintEmulated", resourceCulture);
 
+	/// <summary>⭐ 宝龙达（无 GCU）：设置保存到本机并立即应用（SMU / WMI 23），不写固件自定义档。</summary>
+	internal static string PerfModeHintLocalApply => ResourceManager.GetString("PerfModeHintLocalApply", resourceCulture);
+
 	internal static string PerfModeHintVendor => ResourceManager.GetString("PerfModeHintVendor", resourceCulture);
 
 	internal static string PerfModeKeepOneCustom => ResourceManager.GetString("PerfModeKeepOneCustom", resourceCulture);
@@ -1590,6 +1593,9 @@ internal class Strings
 	internal static string PerfModeRestoreFailed => ResourceManager.GetString("PerfModeRestoreFailed", resourceCulture);
 
 	internal static string PerfModeRestorePrompt => ResourceManager.GetString("PerfModeRestorePrompt", resourceCulture);
+
+	/// <summary>⭐ 30 系：SMU 功耗墙是运行时写入，重启才回固件默认（恢复出厂后的补充说明）。</summary>
+	internal static string PerfModeRestoreSmuVolatileNote => ResourceManager.GetString("PerfModeRestoreSmuVolatileNote", resourceCulture);
 
 	internal static string PerfModeSavedInactive => ResourceManager.GetString("PerfModeSavedInactive", resourceCulture);
 

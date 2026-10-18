@@ -4536,6 +4536,13 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="PerfModeHintLocalApply" xml:space="preserve">
+    
+    
+    <value>Settings are saved locally and applied immediately (SMU / WMI 23); the firmware custom slot is not written.</value>
+    
+  
+  </data>
 <data name="PerfModeKeepOneCustom" xml:space="preserve">
     
     
@@ -4606,6 +4613,13 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
     
     <value>Didn't take effect: {0}</value>
+    
+  
+  </data>
+<data name="PerfModeRestoreSmuVolatileNote" xml:space="preserve">
+    
+    
+    <value> (SMU power limits are runtime writes for this boot; a reboot restores firmware defaults.)</value>
     
   
   </data>

@@ -4555,6 +4555,13 @@
     
   
   </data>
+<data name="PerfModeHintLocalApply" xml:space="preserve">
+    
+    
+    <value>设置保存到本机并立即应用（SMU / WMI 23），不写入固件自定义档。</value>
+    
+  
+  </data>
 <data name="PerfModeKeepOneCustom" xml:space="preserve">
     
     
@@ -4625,6 +4632,13 @@
     
     
     <value>没生效：{0}</value>
+    
+  
+  </data>
+<data name="PerfModeRestoreSmuVolatileNote" xml:space="preserve">
+    
+    
+    <value>（SMU 功耗墙为本次开机内的运行时写入，重启后回到固件默认）</value>
     
   
   </data>

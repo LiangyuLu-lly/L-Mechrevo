@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using MechrevoLite.Gpu;
 using MechrevoLite.Hardware;
 using Microsoft.Win32;
 
@@ -1286,6 +1287,17 @@ internal sealed class PerfModeService
 			MechrevoHw hw = _hw;
 			if (hw != null && hw.IsConnected)
 			{
+				// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30/40 系宝龙达）：
+				//   ⭐ 宝龙达**没有 GCU** ⇒ 下面那条 `RestoreVendorProfileAsync()`（纯 MQTT 的 `RESTORE_*`）
+				//     必然失败；而它在 `catch` 里只写一行日志、返回 false ⇒ 结果：
+				//     ① 界面把「恢复出厂」显示成**失败**；② 硬件侧**一个字节都没动**（PL/温度墙/GPU 超频/NVML 功耗上限）
+				//     ⇒ 机主看到的就是「不重置」❌
+				//   ⭐ 现在：自定义档 + 宝龙达 ⇒ 走**本机后端**的恢复路径（SMU / WMI 23 / NVAPI / NVML）✅
+				//   ⚠️ 非自定义档 / GCU 机型 ⇒ 下面原有分支【逐位不变】✅
+				if (mode.IsCustom && hw.UsesBaolongda)
+				{
+					return ResetBaolongdaCustomLocally(hw);
+				}
 				if (!mode.IsCustom)
 				{
 					PerfApplyOutcome perfApplyOutcome = await ActivateAsync(mode.Id, "reset").ConfigureAwait(continueOnCapturedContext: false);
@@ -1305,6 +1317,72 @@ internal sealed class PerfModeService
 			}
 		}
 		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30/40 系宝龙达）：
+	/// ⭐ **自定义档「恢复出厂」的本机后端实现**（⛔ 不走 GCU 的 MQTT `RESTORE_*`）✅。
+	/// <para>⭐ 顺序：
+	/// ① 本机配置已由 <see cref="ResetAsync" /> 开头 `PerfModeStore.ResetSettings` 清除并落盘（`AppConfig.Flush`）✅；
+	/// ② 40 系：写 <c>功能号 23 = 0</c>（关闭自定义功耗墙）⇒ **固件回到默认 PL1/PL2/温度墙** ✅；
+	///    30 系：原厂 WMI 方法表没有功能号 23、SMU 也没有"恢复默认"命令 ⇒ ⛔ 不编造默认值、一条写命令都不发，
+	///    只清本地记忆并**如实记日志**（SMU 写入是运行时状态，重启后回固件默认）✅；
+	/// ③ 清空功耗墙本地记忆（界面因此显示「未设置」，⛔ 不拿"上次我们写的值"冒充当前值）✅；
+	/// ④ GPU 超频：NVAPI P0 偏移写 <c>0/0</c>（真恢复默认）＋ 清 `gpu_oc` 与直写记录（防下次切档又推回去）✅；
+	/// ⑤ 显卡功耗上限：NVML 写回**出厂默认值**（`nvmlDeviceGetPowerManagementDefaultLimit`，⛔ 不拿 max 冒充默认）✅。
+	/// </para>
+	/// <para>⚠️ 只对**活动档**执行（调用方已判 `active`）⇒ ⛔ 不会把别的档正在用的硬件状态改掉 ✅。</para>
+	/// <para>⚠️ 返回 <c>false</c> 只在"该动硬件却真的失败"时（如 40 系功能号 23 关闭写不进去）——
+	/// 界面据此显示「恢复没有得到确认」，⛔ 不假装成功 ✅。</para>
+	/// </summary>
+	private bool ResetBaolongdaCustomLocally(MechrevoHw hw)
+	{
+		bool is30 = hw.IsBaolongda30Series;
+		bool powerLimitReleased = false;
+		bool powerLimitConfirmed = false;
+		if (!is30)
+		{
+			// 40 系：功能号 23 单字节 0 = 关闭自定义 ⇒ 固件恢复默认功耗墙（协议未改）
+			powerLimitReleased = hw.TryApplyCpuPowerLimitViaBackend(enable: false, 0, 0, 0, out powerLimitConfirmed);
+		}
+		// ⭐ 40 系：**回读确认**关闭成功才算功耗墙恢复（写不进去/固件不认 ⇒ 如实 false）；
+		//   30 系：本机配置清空即算恢复（SMU 侧无恢复命令，日志如实说明）✅
+		bool powerLimitResetOk = is30 || (powerLimitReleased && powerLimitConfirmed);
+		// ⭐ 只有权限恢复成功才清本地记忆；失败则**保留**（界面继续显示硬件真实值，⛔ 不假装"未设置"）✅
+		if (powerLimitResetOk)
+		{
+			hw.ClearBaolongdaPowerLimitMemory();
+		}
+		// ④ GPU 超频：P0 0/0 + 清直写记录 / gpu_oc
+		bool gpuOcExpected = hw.SupportsGpuOverclock;
+		bool gpuOcReset = NvapiPStates.TrySetP0Offsets(0, 0, out int appliedCore, out int appliedMem);
+		// 直写记录（direct_gpu_oc_*）也要清：否则下次切到该自定义档时
+		// `RestoreDirectGpuOverclockProfile` 会把刚才的偏移又推回去（⛔ 重置等于白做）
+		hw.SelectGcuGpuOverclockBackend();
+		AppConfig.Set("gpu_oc", 0);
+		AppConfig.Flush();
+		MechrevoService.GpuOverclockEnabled = false;
+		if (gpuOcExpected && (!gpuOcReset || appliedCore != 0 || appliedMem != 0))
+		{
+			Logger.WriteError($"[reset] ⚠️ GPU 偏移恢复默认**未确认**：写成功={gpuOcReset} · 驱动回读 core={appliedCore} mem={appliedMem} MHz"
+				+ "（如实记录，⛔ 不假装已恢复）");
+		}
+		// ⑤ 显卡功耗上限：写回驱动默认值（读不到默认值 ⇒ 不动，如实记日志）
+		string powerDefaultText = "默认值读不到（未改）";
+		if (NvmlHelper.TryGetDefaultPowerLimitWatts(out int defaultW) && NvmlHelper.TrySetPowerLimitWatts(defaultW, out int appliedW))
+		{
+			powerDefaultText = appliedW + "W";
+		}
+		// ⭐ 后端恢复明细（⭐ 机主要求的那一行 `[reset] 自定义档已恢复默认 ⇒ …` 由 CustomModeForm 统一落盘）
+		Logger.WriteError($"[reset] 后端恢复明细：功耗墙={(powerLimitResetOk
+				? (is30 ? "本机配置已清（SMU 运行时值需重启才回固件默认）" : "WMI 23 已关闭自定义（回读确认）")
+				: "⚠️ 未确认（保留硬件当前值，界面不冒充已重置）")}"
+			+ $" · GPU 超频=关（NVAPI P0 0/0 写成功={gpuOcReset}）"
+			+ $" · 显卡功耗上限={powerDefaultText}"
+			+ (is30
+				? " · ⚠️ 30 系 SMU 无「恢复默认」命令 ⇒ 本次开机内 SMU 功耗墙保持当前值（本机配置已清；重启后回固件默认）"
+				: $" · WMI 23 关闭自定义 写成功={powerLimitReleased} · 回读确认={powerLimitConfirmed}"));
+		return powerLimitResetOk;
 	}
 
 	private async Task<bool> RestoreVendorProfileAsync()

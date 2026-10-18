@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -383,19 +384,17 @@ public class CustomModeForm : RForm
 	internal static string HardwareStateUnavailableText => "本机无 GCU，硬件状态页不可读";
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ <b>本机写不了「固件自定义档」时的如实说明</b> ✅。
-	/// <para>⚠️ <b>背景</b>：⭐ 自定义档走 <see cref="PerfModeRoute.FirmwareSlot" /> ⇒ ⭐ 档位步
-	/// <c>SwitchFirmwareSlot</c>（⇒ <c>MechrevoService.SwitchCustomProfileWithResend</c>）与字段步
-	/// <c>WriteFirmwareField</c>（⇒ <c>SetCustomDetail</c>）⭐ <b>只走 GCU 的 MQTT</b> ❌；
-	/// ⭐ 宝龙达没有 GCU ⇒ ⭐ 恒失败 ⚠️（⭐ 真机日志：⭐ <c>SwitchCustomProfile: GCU 未连接</c> ＋
-	/// <c>SwitchFirmwareSlot:0 -> Failed</c> ✅）。</para>
-	/// <para>⭐ 现在 <c>PerfModeCapabilities.SupportsFirmwareSlot == false</c> ⇒
-	/// <see cref="PerfModeApplyPlanner" /> <b>不再生成</b>那两步 ✅ ⇒ ⭐ 不会再出现「⭐ 切换失败」/「⭐ 这次没写进去」
-	/// 这类"⭐ 像是重试一下就能好"⭐ 的误导 ❌；⭐ 但界面上也<b>不该</b>显示成"⭐ 已切换到 X" ✅
-	/// ⇒ ⭐ 用这条如实说明"⭐ 保存下来的是本机配置、⭐ 固件档位不会切" ✅。</para>
-	/// <para>⚠️ <b>非宝龙达 ⇒ 恒不取用</b> ⇒ ⭐ 原有分支逐字不变 ✅。</para>
+	/// ⭐⭐ 2026-10-19（机主反馈：顶部黄字「本机无 GCU，不支持写入固件自定义档」**误导**）：
+	/// ⭐ <b>宝龙达（30/40 系）自定义档的如实说明</b> —— 设置保存到本机、并**立即应用**
+	/// （30 系 PL/温度墙走 **SMU**；40 系走 **WMI 功能号 23**；GPU 偏移走 NVAPI；显卡功耗上限走 NVML），
+	/// ⛔ 不写固件自定义档 ✅。
+	/// <para>⚠️ 为什么原来的文案是错的：⭐ 宝龙达确实没有 GCU、也写不了「固件自定义档」，
+	/// 但它的**功耗墙/温度墙/GPU 偏移/显卡功耗上限都能真下发**（`52d66da` / `d03da38` 已接）——
+	/// 旧文案用「不支持写入」把"本机后端能写"一起否定了 ❌，而且是否定句「无 GCU 所以不支持」❌。</para>
+	/// <para>⭐ 现在：30/40 系宝龙达显示「设置保存到本机并立即应用（SMU / WMI 23），不写入固件自定义档」✅；
+	/// ⚠️ GCU 机型仍用原来的 <see cref="Strings.PerfModeHintCustom" /> 等 resx 文案，**逐字不变** ✅。</para>
 	/// </summary>
-	internal static string FirmwareSlotUnsupportedText => "本机无 GCU，不支持写入固件自定义档（设置仍保存在本机）";
+	internal static string LocalApplyText => Strings.PerfModeHintLocalApply;
 
 	internal string EditingModeId => _modeId;
 
@@ -1959,6 +1958,20 @@ public class CustomModeForm : RForm
 
 	private void UpdateRouteHint(PerfModeDefinition mode)
 	{
+		// ⭐⭐ 2026-10-19（机主：顶部黄字「本机无 GCU，不支持写入固件自定义档」误导）：
+		//   ⭐ 宝龙达（30/40 系）⇒ 统一显示「设置保存到本机并立即应用（SMU / WMI 23），不写入固件自定义档」✅
+		//   ⚠️ 原来这里会给自定义档显示「由固件自定义档 N 承载」、给未分配档显示「切换到该模式时分配固件自定义档」
+		//      —— 在宝龙达上**两句都不成立**（它根本没有固件自定义档，却**能**真下发本机后端）❌
+		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 下面原有分支【逐字不变】✅
+		if (Program.hw?.UsesBaolongda == true)
+		{
+			string baolongdaHint = LocalApplyText;
+			if (_routeHint.Text != baolongdaHint)
+			{
+				_routeHint.Text = baolongdaHint;
+			}
+			return;
+		}
 		int? num = PerfModeService.Instance?.SlotOf(mode.Id);
 		string text;
 		if (!mode.IsCustom)
@@ -2505,6 +2518,23 @@ public class CustomModeForm : RForm
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30 系与 40 系都不重置）：
+	/// ⭐ 「恢复出厂」= ① 清 `PerfModeStore`（`perf_<档>_*` ＝ 原 `mode_tune_*` 同源键）并**落盘**；
+	/// ② 对宝龙达**真正恢复硬件默认**（详见 <c>PerfModeService.ResetBaolongdaCustomLocally</c>：
+	/// 40 系 WMI 23 关闭自定义 / 30 系如实说明 SMU 无恢复命令 / GPU 偏移 0/0 / NVML 功耗上限默认值）；
+	/// ③ **显式重置界面控件**（PL1/PL2/温度墙/GPU 超频/偏移/显卡功耗上限）✅。
+	/// <para>⭐⭐ <b>原实现为什么"看起来不生效"</b>：
+	/// <list type="number">
+	/// <item>`ResetAsync` 对宝龙达自定义档会走 GCU 的 `RestoreVendorProfileAsync()`（纯 MQTT）⇒ 必然失败；
+	/// 失败只写一行 `Logger.WriteLine`（默认级别不可见）就 `return false` —— 界面显示「恢复未确认」，
+	/// 而<strong>硬件侧一个字节都没动</strong> ❌（`ResetSettings` 其实已清配置，但没人看得到）；</item>
+	/// <item>就算配置清空了，界面这些行的值来自**硬件回读**（宝龙达清不掉/读回旧值）⇒ PL 还是旧值、
+	/// GPU 超频开关还是开、偏移还在 ⇒ 机主看到的就是「不重置」❌。</item>
+	/// </list>
+	/// ⇒ ⭐ 现在：宝龙达走本机后端真恢复 + 重置完**把控件压回"未设置/关"**，并落一行 `[reset]` 日志 ✅。</para>
+	/// <para>⚠️ 异常一律如实上报（状态行红字 + `Logger.WriteError`），⛔ 不再静默吞掉 ✅。</para>
+	/// </summary>
 	private async Task RestoreDefaultsAsync()
 	{
 		PerfModeService instance = PerfModeService.Instance;
@@ -2515,6 +2545,8 @@ public class CustomModeForm : RForm
 		MechrevoHw hw = Program.hw;
 		if (hw == null || !hw.IsConnected)
 		{
+			_status.Text = GcuDisconnectedText;
+			_status.ForeColor = UiVisualStyle.Danger;
 			return;
 		}
 		PerfModeDefinition mode = FindMode(_modeId);
@@ -2523,24 +2555,193 @@ public class CustomModeForm : RForm
 			return;
 		}
 		string name = PerfModeText.Name(mode);
-		if (MessageBox.Show(this, string.Format(Strings.PerfModeRestorePrompt, name), "L-Mechrevo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+		if (MessageBox.Show(this, string.Format(Strings.PerfModeRestorePrompt, name), "L-Mechrevo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 		{
-			// 2026-10-09（面板统一「显式应用」）：恢复出厂是最后的兜底 —— 它只丢掉未应用的临时改动，
-			// 然后走既有的 PerfModeService.ResetAsync（原有的一键恢复路径），不在这里下发自定义字段。
-			DiscardPendingChanges();
-			_gpuOcArmed = false;
-			_status.Text = Strings.Restoring;
-			_status.ForeColor = UiVisualStyle.Muted;
-			bool flag = await instance.ResetAsync(mode.Id);
+			return;
+		}
+		// 2026-10-09（面板统一「显式应用」）：恢复出厂是最后的兜底 —— 它只丢掉未应用的临时改动，
+		// 然后走既有的 PerfModeService.ResetAsync（原有的一键恢复路径），不在这里下发自定义字段。
+		DiscardPendingChanges();
+		_gpuOcArmed = false;
+		_status.Text = Strings.Restoring;
+		_status.ForeColor = UiVisualStyle.Muted;
+		bool flag;
+		try
+		{
+			flag = await instance.ResetAsync(mode.Id);
+		}
+		catch (Exception ex)
+		{
+			// ⭐ 异常原文进日志（⛔ 不吞），状态行如实失败 ✅
+			Logger.WriteError("[reset] 自定义档恢复出厂**异常**（如实上报，未吞掉）：" + ex);
 			if (!IsDisposed)
 			{
-				BindMode(mode.Id);
-				OnCustomChanged();
-				_status.Text = string.Format(flag ? Strings.PerfModeRestoreDone : Strings.PerfModeRestoreFailed, name);
-				_status.ForeColor = (flag ? UiVisualStyle.Ok : UiVisualStyle.Danger);
+				_status.Text = string.Format(Strings.PerfModeRestoreFailed, name);
+				_status.ForeColor = UiVisualStyle.Danger;
+				ResizeToContent();
+			}
+			return;
+		}
+		if (IsDisposed)
+		{
+			return;
+		}
+		try
+		{
+			BindMode(mode.Id);
+			OnCustomChanged();
+			// ⭐⭐ 关键：宝龙达的这些行按"硬件回读"刷新（清不掉/旧值）⇒ 必须**显式压回默认显示** ✅
+			//   ⚠️ 只在**恢复确认成功**（`flag`）时压回：40 系功能号 23 关闭写若未被固件接受，
+			//      界面仍显示硬件真实值（⛔ 不拿"看起来已重置"骗人），状态行红字如实说明 ✅
+			//   ⚠️ 非宝龙达（GCU）⇒ 不调用 ⇒ 行为逐位不变 ✅
+			if (hw.UsesBaolongda && flag)
+			{
+				ApplyBaolongdaResetVisuals(hw);
 			}
 		}
+		catch (Exception ex2)
+		{
+			Logger.WriteError("[reset] 恢复出厂后刷新界面失败（如实上报，未吞掉）：" + ex2);
+		}
+		_status.Text = string.Format(flag ? Strings.PerfModeRestoreDone : Strings.PerfModeRestoreFailed, name);
+		// ⭐⭐ 2026-10-19（30 系 · SMU）：⭐ SMU 功耗墙**没有"恢复默认"命令**、写入是运行时状态 ⇒
+		//   恢复出厂只清本机配置；硬件侧需**重启**才回固件默认 —— 状态行如实补一句（⛔ 不假装已经写回去了）✅
+		if (flag && hw.UsesBaolongda && hw.IsBaolongda30Series)
+		{
+			_status.Text += Strings.PerfModeRestoreSmuVolatileNote;
+		}
+		_status.ForeColor = (flag ? UiVisualStyle.Ok : UiVisualStyle.Danger);
+		ResizeToContent();
+		// ⭐ 机主要求的一行日志（值 = 重置后的实际显示状态；默认日志级别可见）✅
+		LogCustomResetResult(hw);
 	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 恢复出厂后**显式重置界面控件** ✅。
+	/// <para>⚠️ 只对宝龙达调用（GCU 机型的行按硬件回读显示的是"厂商默认"，⛔ 不能覆盖成"未设置"）✅。</para>
+	/// <para>⚠️ 全程 `_syncing = true` ⇒ 程序化改值**不会**触发 `Queue`/`MarkGpuOffsetDirty`（⛔ 不产生"待应用"脏值）✅。</para>
+	/// </summary>
+	private void ApplyBaolongdaResetVisuals(MechrevoHw hw)
+	{
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return;
+		}
+		bool syncing = _syncing;
+		_syncing = true;
+		try
+		{
+			// ① 功耗墙三项 ⇒ 回到「未设置」显示位（标题补回「（未设置）」）
+			ResetPowerWallRowVisual(_pl1, _pl1Val, _pl1Label, Strings.CpuPl1);
+			ResetPowerWallRowVisual(_pl2, _pl2Val, _pl2Label, Strings.CpuPl2);
+			ResetPowerWallRowVisual(_tcc, _tccVal, _tccLabel, Strings.TempWallValue);
+			if (_tccChk != null)
+			{
+				_tccChk.Checked = false;
+			}
+			if (_tcc != null)
+			{
+				_tcc.Enabled = false;
+			}
+			// ② GPU 超频 ⇒ 关；核心/显存偏移 ⇒ 0（重置时已用 NVAPI 写回 0/0）
+			_gpuOcArmed = false;
+			if (_ocChk != null)
+			{
+				_ocChk.Checked = false;
+			}
+			if (_coreOc != null)
+			{
+				ApplyRange(_coreOc, _coreOcVal, _coreOc.Minimum, _coreOc.Maximum, 0, allowNegative: true);
+			}
+			if (_memOc != null)
+			{
+				ApplyRange(_memOc, _memOcVal, _memOc.Minimum, _memOc.Maximum, 0, allowNegative: true);
+			}
+			_gpuOcDirty = false;
+			SyncGpuOverclockDependents();
+			// ③ 显卡功耗上限 ⇒ 按 NVML 回读的当前值显示（重置时已写回驱动默认值）
+			if (_gpuPowerLimit != null && NvmlHelper.TryGetPowerLimitBounds(out int minW, out int maxW, out int curW) && maxW > minW)
+			{
+				ApplyRange(_gpuPowerLimit, _gpuPowerLimitVal, minW, maxW, curW);
+			}
+		}
+		finally
+		{
+			_syncing = syncing;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 把一行功耗墙控件压回「未设置」显示位 ✅。
+	/// <para>⚠️ 只改**显示值/标题/悬浮提示**，⛔ 不发任何硬件命令、⛔ 不 Queue 字段 ✅。</para>
+	/// </summary>
+	private void ResetPowerWallRowVisual(RSlider bar, RNumericUpDown valueInput, Label label, string baseText)
+	{
+		if (bar == null)
+		{
+			return;
+		}
+		ApplyRange(bar, valueInput, bar.Minimum, bar.Maximum, bar.Minimum);
+		// ⭐ 构造期标题按"当时是否未设置"确定；重置后要**补回**标记（只减不增的旧纪律在这里必须破例，
+		//   否则重置后标题还停在"已下发"的短文案，会被误读成"仍然设置着"）—— 标题列宽按最长标题算过 ⇒ 不会裁 ✅
+		if (label != null && !label.Text.EndsWith(UnsetMark, StringComparison.Ordinal))
+		{
+			label.Text = baseText + UnsetMark;
+		}
+		// ⭐ 30 系曾把提示换成"SMU 语义" ⇒ 重置后恢复成「未设置」的完整语义 ✅
+		_tips.SetToolTip(bar, PowerWallUnsetHint);
+		if (valueInput != null)
+		{
+			_tips.SetToolTip(valueInput, PowerWallUnsetHint);
+		}
+		if (label != null)
+		{
+			_tips.SetToolTip(label, PowerWallUnsetHint);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 恢复出厂后落**机主要求的那一行**日志 ✅
+	/// <para>⭐ 例：`[reset] 自定义档已恢复默认 ⇒ PL1=未设置 PL2=未设置 温度墙=未设置 GPU 超频=关`</para>
+	/// <para>⚠️ 值取**重置后的实际显示状态**（宝龙达 = 未设置/关；GCU = 硬件回读到的厂商默认值）✅</para>
+	/// </summary>
+	private void LogCustomResetResult(MechrevoHw hw)
+	{
+		string pl1 = ShowResetPower(hw?.Pl1Adjustable ?? false, hw?.BaolongdaPl1Unset ?? false, hw?.Pl1 ?? 0);
+		string pl2 = ShowResetPower(hw?.Pl2Adjustable ?? false, hw?.BaolongdaPl2Unset ?? false, hw?.Pl2 ?? 0);
+		string tcc = ((hw != null && hw.TccAdjustable && !hw.BaolongdaTempWallUnset && hw.TccTarget > 0)
+			? hw.TccTarget.ToString(CultureInfo.InvariantCulture) + "℃"
+			: "未设置");
+		string gpuOc = ((_ocChk != null && _ocChk.Checked) ? "开" : "关");
+		bool baolongda = hw != null && hw.UsesBaolongda;
+		// ⭐ 机主要求核查的第三点：⭐ 配置是否真的写回 `PerfModeStore`（`perf_<档>_*` ≡ 原 `mode_tune_*`）
+		//   并落盘 —— 这里**直读配置**复核（⛔ 不拿内存里的对象冒充）✅
+		//   ⚠️ 只对宝龙达输出：GCU 机型恢复后 `CaptureSlotAsync` 会按固件回读重填档位参数（既有语义），
+		//      那不是"残留"，⛔ 不该在这里误报 ✅
+		string storeSuffix = string.Empty;
+		if (baolongda)
+		{
+			string storeState;
+			try
+			{
+				PerfModeSettings persisted = PerfModeStore.LoadSettings(_modeId);
+				storeState = persisted.IsUntouched ? "已清空并落盘" : "⚠️ 仍有残留";
+			}
+			catch (Exception ex)
+			{
+				storeState = "⚠️ 回读失败：" + ex.GetType().Name;
+			}
+			storeSuffix = " · 本机配置=" + storeState;
+		}
+		Logger.WriteError($"[reset] 自定义档已恢复默认 ⇒ PL1={pl1} PL2={pl2} 温度墙={tcc} GPU 超频={gpuOc}"
+			+ storeSuffix
+			+ (baolongda ? "（本机后端：SMU / WMI 23；不写固件自定义档）" : ""));
+		static string ShowResetPower(bool adjustable, bool unset, int value)
+		{
+			return (adjustable && !unset && value > 0) ? value.ToString(CultureInfo.InvariantCulture) : "未设置";
+		}
+	}
+
 
 	private async Task OpenFanCurveAsync()
 	{
@@ -2842,20 +3043,22 @@ public class CustomModeForm : RForm
 		//   ⭐ 所以这里如实说明：⭐ 保存下来的是【本机配置】，⭐ 固件档位**不切** ✅。
 		//   ⚠️ ⭐ 不掩盖真实失败：⭐ 有失败项 ⇒ ⭐ 仍走下面 AnyFailed 分支（⭐ 红字 ✅）。
 		//   ⚠️ 非宝龙达 ⇒ `firmwareSlotNotWritable` 恒 false ⇒ ⭐ 下面原有三分支【一字不变】✅。
+		// ⭐⭐ 2026-10-19（机主：顶部黄字误导）：⭐ 宝龙达**能真下发**（SMU / WMI 23 / NVAPI / NVML）⇒
+		//   ⛔ 不再说「本机无 GCU，不支持写入固件自定义档」；改说「设置保存到本机并立即应用…不写入固件自定义档」✅
 		bool firmwareSlotNotWritable = ((object)perfModeDefinition != null)
 			&& perfModeDefinition.Route == PerfModeRoute.FirmwareSlot
 			&& (Program.hw?.UsesBaolongda ?? false);
 		if (firmwareSlotNotWritable && !outcome.AnyFailed)
 		{
-			_status.Text = FirmwareSlotUnsupportedText;
+			_status.Text = LocalApplyText;
 			_status.ForeColor = UiVisualStyle.Warn;
 			_tips.SetToolTip(_status, PerfModeText.Details(outcome, amd));
 			ResizeToContent();
 			// ⭐ 默认「仅错误」级别可见（⭐ WriteError ✅）；⭐ 用状态翻转去重 ⇒ ⭐ 不会随每次
 			//   懒验证/重绘刷屏（⭐ 只有"从别的情形变成这种"时才落一行 ✅）。
-			if (Logger.TryMarkChanged("perf-custom-firmware-slot-unsupported", "PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）写不了固件自定义档 ⇒ 只保存本机配置、不切固件档；已按后端如实提示"))
+			if (Logger.TryMarkChanged("perf-custom-firmware-slot-unsupported", "PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）⇒ 本机配置已应用（SMU / WMI 23），固件自定义档不写；已按后端如实提示"))
 			{
-				Logger.WriteError("PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）写不了固件自定义档 ⇒ 只保存本机配置、不切固件档；已按后端如实提示");
+				Logger.WriteError("PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）⇒ 本机配置已应用（SMU / WMI 23），固件自定义档不写；已按后端如实提示");
 			}
 			return;
 		}
