@@ -562,6 +562,20 @@ public class SettingsForm : RForm
 
 	private ComboBox? _kbEffectCombo;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右）：宝龙达**非键盘灯行**
+	/// （灯带 / Logo / 铰链 / 同步）在隐藏效果下拉和「编辑」按钮后，需要把开关仍放回**标签右侧**、
+	/// 并与键盘行开关**逐像素对齐** ⇒ 这里记下这些行与其开关，供
+	/// <see cref="ApplyBaolongdaCollapsedLightRowWidths" /> 按键盘行的实际像素列宽重算 ✅。
+	/// </summary>
+	private readonly List<(TableLayoutPanel Row, RCheckBox Switch, string Label)> _baolongdaCollapsedLightRows = new List<(TableLayoutPanel, RCheckBox, string)>();
+
+	/// <summary>防止 <see cref="ApplyBaolongdaCollapsedLightRowWidths" /> 在 Layout 事件里递归重入 ✅。</summary>
+	private bool _applyingCollapsedLightRowLayout;
+
+	/// <summary>⭐ 每行布局日志只记一次（对齐失败时仍会按变化记；⛔ 拖动窗口不刷屏）✅。</summary>
+	private readonly HashSet<string> _collapsedLightRowLayoutLogged = new HashSet<string>(StringComparer.Ordinal);
+
 	private ComboBox? _lbEffectCombo;
 
 	private ComboBox? _logoEffectCombo;
@@ -17409,11 +17423,15 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 						child.Visible = false;
 					}
 				}
-				// 列宽：原 22/10/56/12 ⇒ 收掉 56% 与 12% 两列，标签/开关重分 80%/20%（否则留一大块空白）
-				tableLayoutPanel3.ColumnStyles[0] = new ColumnStyle(SizeType.Percent, 80f);
-				tableLayoutPanel3.ColumnStyles[1] = new ColumnStyle(SizeType.Percent, 20f);
-				tableLayoutPanel3.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, 0f);
-				tableLayoutPanel3.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
+				// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右）：⭐ 开关**显式放回第 1 列**（标签右侧）✅
+				//   ⚠️ 旧实现把列宽改成 80%/20%/0/0 ⇒ 开关虽在第 1 列，但第 0 列占 80% ⇒ 视觉上被推到最右 ❌
+				//   ⭐ 新做法见 `ApplyBaolongdaCollapsedLightRowWidths`：按**键盘行的实际像素列宽**
+				//     （col0/col1）复制过来、col2/col3 = 0 ⇒ 开关 x 与键盘行**逐像素相同** ✅
+				if (tableLayoutPanel3.GetColumn(sw2) != 1)
+				{
+					tableLayoutPanel3.SetColumn(sw2, 1);
+				}
+				_baolongdaCollapsedLightRows.Add((tableLayoutPanel3, sw2, LightRowLogName(rowName)));
 			}
 			(string, string)[] array2 = effects;
 			for (int num3 = 0; num3 < array2.Length; num3++)
@@ -17612,6 +17630,131 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			int width = Math.Max(1, lblKeyboardControllerStatus.ClientSize.Width - 8);
 			int height = TextRenderer.MeasureText(lblKeyboardControllerStatus.Text, lblKeyboardControllerStatus.Font, new Size(width, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding).Height;
 			lblKeyboardControllerStatus.Height = height + 4;
+		}
+		// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右）：宝龙达非键盘灯行的列宽**按键盘行的实际像素列宽**重算
+		//   （挂 Layout/SizeChanged ⇒ 窗口缩放、DPI 变化、折叠组展开后都会重算；
+		//    ⚠️ 非宝龙达时 `_baolongdaCollapsedLightRows` 恒空 ⇒ 本回调是 no-op，其它机型逐位不变 ✅）
+		body.Layout += (object _, LayoutEventArgs _) => ApplyBaolongdaCollapsedLightRowWidths(body);
+		body.SizeChanged += (object _, EventArgs _) => ApplyBaolongdaCollapsedLightRowWidths(body);
+		ApplyBaolongdaCollapsedLightRowWidths(body);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右）：⭐ 宝龙达**非键盘灯行**（灯带 / Logo / 铰链 / 同步）
+	/// 在隐藏效果下拉与「编辑」按钮之后，把**开关放回标签右侧、并与键盘行开关逐像素对齐** ✅
+	/// <para>⚠️ 两个已排除的错解法：
+	/// ① 旧实现列宽写成 80%/20%/0/0 —— 开关虽然在第 1 列，但第 0 列占 80% ⇒ 视觉上被推到最右 ❌；
+	/// ② 若把 2/3 列设 0、只留 22%/10% 两个百分比列 —— TableLayoutPanel 会按 22:10 **归一化**
+	///    ⇒ 第 0 列实际变 68.75% ⇒ 开关又被推到最右 ❌。</para>
+	/// <para>⭐ 本方法：把键盘行当前的实际像素列宽 <c>col0</c> / <c>col1</c> **原样复制**到非键盘行，
+	/// col2 / col3 = 0 ⇒ 开关 x = col0 = 键盘行开关 x ⇒ **逐像素相同** ✅
+	/// （键盘行本身仍是 22%/10%/56%/12% 百分比，窗口缩放时本方法重新取像素宽）。</para>
+	/// <para>⭐ 日志（每行只记一次；对齐变 False 时再记）：<c>[light] 行=Logo · switchCol=1 · label=…% ·
+	/// col1=…%（宽 …px）· switchX=… · 键盘行switchX=… ⇒ 对齐=True（x差=…px）</c></para>
+	/// </summary>
+	private void ApplyBaolongdaCollapsedLightRowWidths(TableLayoutPanel body)
+	{
+		if (_applyingCollapsedLightRowLayout || _baolongdaCollapsedLightRows.Count == 0 || body == null || body.IsDisposed)
+		{
+			return;
+		}
+		TableLayoutPanel keyboardRow = null;
+		foreach (Control child in body.Controls)
+		{
+			if (child is TableLayoutPanel row && string.Equals(row.Name, "rowKeyboard", StringComparison.Ordinal))
+			{
+				keyboardRow = row;
+				break;
+			}
+		}
+		if (keyboardRow == null || keyboardRow.ColumnStyles.Count < 2 || keyboardRow.ClientSize.Width <= 0)
+		{
+			return;
+		}
+		keyboardRow.PerformLayout();
+		int[] keyboardColumns = keyboardRow.GetColumnWidths();
+		if (keyboardColumns.Length < 2 || keyboardColumns[0] <= 0)
+		{
+			return;
+		}
+		int col0Width = keyboardColumns[0];
+		int col1Width = keyboardColumns[1];
+		int keyboardSwitchX = _kbPowerSw?.Location.X ?? int.MinValue;
+		_applyingCollapsedLightRowLayout = true;
+		try
+		{
+			foreach (var (row, powerSwitch, rowLabel) in _baolongdaCollapsedLightRows)
+			{
+				if (row.IsDisposed || powerSwitch.IsDisposed)
+				{
+					continue;
+				}
+				bool needApply = row.ColumnStyles.Count < 4
+					|| row.ColumnStyles[0].SizeType != SizeType.Absolute || Math.Abs(row.ColumnStyles[0].Width - col0Width) > 0.5f
+					|| row.ColumnStyles[1].SizeType != SizeType.Absolute || Math.Abs(row.ColumnStyles[1].Width - col1Width) > 0.5f
+					|| row.ColumnStyles[2].SizeType != SizeType.Absolute || row.ColumnStyles[2].Width > 0.5f
+					|| row.ColumnStyles[3].SizeType != SizeType.Absolute || row.ColumnStyles[3].Width > 0.5f;
+				if (needApply)
+				{
+					row.ColumnStyles[0] = new ColumnStyle(SizeType.Absolute, col0Width);
+					row.ColumnStyles[1] = new ColumnStyle(SizeType.Absolute, col1Width);
+					row.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, 0f);
+					row.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
+				}
+				row.PerformLayout();
+				int switchColumn = row.GetColumn(powerSwitch);
+				int switchX = powerSwitch.Location.X;
+				int rowWidth = row.ClientSize.Width;
+				string labelPercent = ((rowWidth > 0) ? (col0Width * 100.0 / rowWidth) : 0.0).ToString("0.#", CultureInfo.InvariantCulture);
+				string switchPercent = ((rowWidth > 0) ? (col1Width * 100.0 / rowWidth) : 0.0).ToString("0.#", CultureInfo.InvariantCulture);
+				string aligned;
+				string diffText;
+				if (keyboardSwitchX == int.MinValue)
+				{
+					aligned = "?";
+					diffText = "?";
+				}
+				else
+				{
+					int diff = switchX - keyboardSwitchX;
+					aligned = (diff == 0) ? "True" : "False";
+					diffText = diff.ToString(CultureInfo.InvariantCulture);
+				}
+				string keyboardSwitchXText = (keyboardSwitchX == int.MinValue) ? "?" : keyboardSwitchX.ToString(CultureInfo.InvariantCulture);
+				string message = $"[light] 行={rowLabel} · switchCol={switchColumn} · label={labelPercent}%"
+					+ $" · col1={switchPercent}%（宽 {col1Width}px）· switchX={switchX}"
+					+ $" · 键盘行switchX={keyboardSwitchXText} ⇒ 对齐={aligned}（x差={diffText}px）";
+				if (!_collapsedLightRowLayoutLogged.Contains(rowLabel) || aligned == "False")
+				{
+					Logger.WriteLineIfChanged("light-row-layout-" + rowLabel, message);
+					if (aligned != "False")
+					{
+						_collapsedLightRowLayoutLogged.Add(rowLabel);
+					}
+				}
+			}
+		}
+		finally
+		{
+			_applyingCollapsedLightRowLayout = false;
+		}
+	}
+
+	/// <summary>⭐ 灯光行日志名（宝龙达非键盘灯行对齐日志用）✅。</summary>
+	private static string LightRowLogName(string rowName)
+	{
+		switch (rowName)
+		{
+		case "rowLightbar":
+			return "灯带";
+		case "rowLogo":
+			return "Logo";
+		case "rowHinge":
+			return "铰链";
+		case "rowSync":
+			return "同步";
+		default:
+			return rowName ?? "";
 		}
 	}
 
