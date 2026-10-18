@@ -10,6 +10,8 @@ public class OSDNativeForm : NativeWindow, IDisposable
 {
 	private bool _disposed;
 
+	private bool _topMost;
+
 	private byte _alpha = 250;
 
 	private Size _size = new Size(350, 50);
@@ -132,6 +134,62 @@ public class OSDNativeForm : NativeWindow, IDisposable
 		}
 	}
 
+	// ⭐⭐ 2026-10-18（机主反馈「悬浮窗没有置顶、会被其他窗口盖住」）：⭐ 显式置顶用的 Win32 常量 ——
+	//   ⚠️ 本类是 `NativeWindow`（⛔ 不是 `Form`）⇒ 没有 `Form.TopMost` 可用 ⚠️，必须自己调 `SetWindowPos` ✅。
+	private static readonly nint HWND_TOPMOST = new IntPtr(-1);
+
+	private static readonly nint HWND_NOTOPMOST = new IntPtr(-2);
+
+	private const uint SWP_NOSIZE = 1u;
+
+	private const uint SWP_NOMOVE = 2u;
+
+	private const uint SWP_NOACTIVATE = 16u;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主反馈「悬浮窗没有置顶、会被其他窗口盖住」）：⭐ <b>窗口是否置顶</b> ✅
+	/// <para>⚠️ <b>为什么必须显式做</b>：⭐ 本窗口是 <see cref="NativeWindow" />（⛔ 不是 <c>Form</c>）⇒
+	/// ⚠️ 没有 <c>Form.TopMost</c> 可用；⭐ 而 <c>CreateParams.ExStyle</c> 里虽然带了 <c>WS_EX_TOPMOST</c> 位，
+	/// ⭐ 那个位**不是可靠的创建入参开关**（⭐ 真正的置顶要由 <c>SetWindowPos(HWND_TOPMOST)</c> 施加 ✅）
+	/// ⇒ ⭐ 以前只在那个位"丢失"时才补 ⚠️ ⇒ ⭐ 它从来没丢过、也就**从来没真正置顶过** ❌（= 机主看到的现象）。</para>
+	/// <para>⭐ 现在的口径：⭐ ① 赋值时立刻 <c>SetWindowPos</c>；② <see cref="Show" />（含从托盘重新打开）后再补一次；
+	/// ③ 悬浮窗每帧还会调 <see cref="AssertTopMost" /> 重申 ✅。</para>
+	/// <para>⚠️ 所有置顶动作都带 <c>SWP_NOACTIVATE</c> ＋ 窗口本身有 <c>WS_EX_NOACTIVATE</c>
+	/// ⇒ ⛔ **不抢焦点**（⭐ 与既有"OSD 不抢焦点"的口径一致 ✅）。</para>
+	/// </summary>
+	public bool TopMost
+	{
+		get
+		{
+			return _topMost;
+		}
+		set
+		{
+			_topMost = value;
+			if (Handle != IntPtr.Zero)
+			{
+				ApplyTopMost();
+			}
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-18：⭐ <b>把窗口重新放回最上层</b> ✅（⭐ 只在 <see cref="TopMost" /> 为真时动作）。
+	/// <para>⚠️ 三个 flag：<c>SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE</c> —— ⭐ 不改大小/位置、⛔ 不抢焦点 ✅。</para>
+	/// </summary>
+	internal void AssertTopMost()
+	{
+		if (_topMost && Handle != IntPtr.Zero)
+		{
+			ApplyTopMost();
+		}
+	}
+
+	private void ApplyTopMost()
+	{
+		User32.SetWindowPos(Handle, _topMost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+	}
+
 	protected virtual void PerformPaint(PaintEventArgs e)
 	{
 	}
@@ -223,6 +281,9 @@ public class OSDNativeForm : NativeWindow, IDisposable
 			CreateWindowOnly();
 		}
 		User32.ShowWindow(Handle, 4);
+		// ⭐ 2026-10-18（机主：悬浮窗没有置顶）：⭐ 从托盘重新打开时（⚠️ `Hide()` 会销毁句柄 ⇒ 这里重建 ✅）
+		//   再补一次置顶 —— ⛔ 仍是 SW_SHOWNOACTIVATE＋SWP_NOACTIVATE，不抢焦点 ✅
+		AssertTopMost();
 	}
 
 	public virtual void Hide()
@@ -267,6 +328,13 @@ public class OSDNativeForm : NativeWindow, IDisposable
 		createParams.Style = (int)style;
 		createParams.ExStyle = 134742184;
 		CreateHandle(createParams);
+		// ⭐ 2026-10-18（机主：悬浮窗没有置顶）：⭐ 窗口一建好就**真正**调 SetWindowPos(HWND_TOPMOST) ✅
+		//   ⚠️ 光靠上面 CreateParams.ExStyle 里的 WS_EX_TOPMOST 位**不可靠** ⚠️（⭐ 那个位创建时就在、
+		//   但 z-order 并不会因此进入置顶带 ⇒ 机主看到"会被其他窗口盖住" ❌）。
+		if (_topMost)
+		{
+			ApplyTopMost();
+		}
 		UpdateLayeredWindow();
 	}
 

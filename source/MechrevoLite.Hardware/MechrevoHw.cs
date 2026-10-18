@@ -2591,6 +2591,29 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：悬浮窗 CPU 温度停在开机时的温度）：⭐ **外部取到 CPU 温度时写回门面层** ✅
+	/// —— ⭐ 与 <see cref="MarkExternalGpuTemp" /> 同款（⭐ **连值带时间戳** ✅）。
+	/// <para>⚠️ <b>为什么需要</b>：⭐ 主界面那行遥测读的是 <b><c>hw.CpuTemp</c></b> ⚠️；而 30 系宝龙达的
+	/// 功能号 22 是**整条关掉**的（<see cref="BaolongdaWmi.VendorTemperatureUnsupported" />），
+	/// 只能靠 LHM / ACPI 兜底 ⇒ ⭐ 不写回门面层的话，⭐ 即使 LHM 取到了温度、⭐ 主界面也**永远看不到**
+	/// （⛔ 恒「—」）❌。⭐ 40 系则用来把刚落到的功能号 22 值同步进门面层 ✅。</para>
+	/// <para>⚠️ <b>调用口径</b>：⭐ 只由 `HardwareControl.RefreshCpuTempFromLocalSources` 在
+	/// <b>非厂商推送来源</b>（func22 / LHM / ACPI）时调用 ✅ ⇒ ⭐ GCU 机型的「厂商值优先」语义
+	/// ⛔ 一字不改（⭐ 厂商推送仍由 `DataChanged` 直接写 ✅）。</para>
+	/// <para>⚠️ 与 <see cref="MarkCpuInfoReceived" /> 的区别：⭐ 本方法**连值一起写**（⭐ 主界面读的是值本身 ⚠️）；
+	/// ⭐ 那个只打时间戳 ✅。⭐ 本方法内部**也会打时间戳** ✅（= 复用 `IsSensorInfoFresh(cpu: true)` 体系 ✅）。</para>
+	/// </summary>
+	internal void MarkExternalCpuTemp(int celsius)
+	{
+		if (celsius <= 0)
+		{
+			return; // ⛔ 无效值不写、⭐ 也不打时间戳（⭐ 免得把「—」变成假的有效 ✅）
+		}
+		CpuTemp = celsius;
+		Interlocked.Exchange(ref _cpuInfoReceivedAt, Environment.TickCount64);
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-16（同上）：⭐ **外部取到风扇转速时打时间戳** ✅（⭐ 与 <see cref="MarkGpuInfoReceived" /> 同款 ✅）
 	/// <para>⚠️ 说明：⭐ 宝龙达那条路已在 `RefreshBaolongdaSensors` 内部直接打了 ⚠️；
 	/// 本方法是给"⭐ 别的来源也算数"⭐ 留的口子（⭐ 目前**没有**调用方，⭐ 保留以免将来重现同类漏打 ✅）。</para>

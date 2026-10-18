@@ -225,6 +225,68 @@ public static class HardwareControl
 
 	public static int cpuTemp;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主反馈「开机很久了，悬浮窗 CPU 温度还停在开机时的温度」）：
+	/// <see cref="cpuTemp"/> **最后一次被有效值真正写入**的时刻（<see cref="Environment.TickCount64"/>；0 = 本次会话还没写过）。
+	/// <para>⚠️ 为什么要单独记：⭐ 界面上「CPU 温度是否新鲜」原来只看 <c>hw.IsSensorInfoFresh(cpu: true)</c> ⚠️ ——
+	/// 而那个时间戳由**另一条路**维护（⭐ 宝龙达 3 s 定时器的功能号 22 / ⭐ GCU 推送 ✅），
+	/// 与 <see cref="cpuTemp"/> 这个**展示字段**是否真的被刷新过**不是同一件事** ⚠️
+	/// （⭐ 真机根因正是：LHM 闸门失败 ⇒ <c>ApplySensorPriority</c> 整段不跑 ⇒ 时间戳在走、值却停住 ❌）。
+	/// ⇒ ⭐ 悬浮窗判「过期」必须看**本字段** ✅（⭐ 超 <see cref="CpuTempFreshAge"/> ⇒ 显示「—」⛔ 不显示陈旧值）。</para>
+	/// </summary>
+	private static long _cpuTempUpdatedTick;
+
+	/// <summary>
+	/// ⭐ 2026-10-18：<see cref="cpuTemp"/> 的新鲜度上限（⭐ 悬浮窗用它判「过期」✅）。
+	/// <para>⚠️ 取值理由：⭐ 正常刷新频率 ≤ 2.5 s（⭐ 常驻泵 / ⭐ 悬浮窗 1 s / ⭐ 自定义页 2 s ✅），
+	/// 10 s 留足 4 倍余量给线程池抖动/系统忙，⛔ 又远短于"开机到现在"那种真正冻结 ✅。</para>
+	/// </summary>
+	internal static readonly TimeSpan CpuTempFreshAge = TimeSpan.FromMilliseconds(10000.0);
+
+	/// <summary>
+	/// ⭐ 2026-10-18：<see cref="_cpuTempUpdatedTick"/> 的只读快照 —— **-1 = 本次会话从未写入过** ✅。
+	/// <para>⭐ 供悬浮窗打 <c>[float] cpu temp stale age=…s</c> 诊断日志 ✅。</para>
+	/// </summary>
+	internal static long CpuTempAgeMs
+	{
+		get
+		{
+			long tick = Interlocked.Read(in _cpuTempUpdatedTick);
+			if (tick == 0L)
+			{
+				return -1L;
+			}
+			return Environment.TickCount64 - tick;
+		}
+	}
+
+	/// <summary>⭐ 2026-10-18：<see cref="cpuTemp"/> 是否在 <paramref name="maximumAge"/> 内被刷新过 ✅（⭐ 0 次写入 ⇒ 一律判「不新鲜」）。</summary>
+	internal static bool CpuTempIsFresh(TimeSpan maximumAge)
+	{
+		long tick = Interlocked.Read(in _cpuTempUpdatedTick);
+		if (tick == 0L)
+		{
+			return false;
+		}
+		return Environment.TickCount64 - tick <= (long)maximumAge.TotalMilliseconds;
+	}
+
+	/// <summary>⭐ 2026-10-18：CPU 温度刷新**最近一次尝试**的时刻（⭐ 多入口限频去重用 ✅）。</summary>
+	private static long _cpuTempLastAttemptTick;
+
+	/// <summary>
+	/// ⭐ 2026-10-18：CPU 温度刷新的**最小间隔**（毫秒 ✅）。
+	/// <para>⚠️ 同一条采样链有多个入口（⭐ 常驻泵 2.5 s · ⭐ 悬浮窗 1 s · ⭐ 自定义页 2 s ✅）
+	/// ⇒ ⭐ 限频 800 ms ⇒ 1 s 的入口每帧都能刷到、⭐ 同一次泵回调里**不会**重复读两遍 WMI ✅。</para>
+	/// </summary>
+	private const int CpuTempLocalReadIntervalMs = 800;
+
+	/// <summary>⭐ 2026-10-18：CPU 温度「三个来源都没值」是否已按状态翻转记过一次 ✅（0=没记 · 1=记过）。</summary>
+	private static int _cpuTempNoneLogged;
+
+	/// <summary>⭐ 2026-10-18：上一次记录过的 CPU 温度来源（"func22" / "LHM" / "ACPI" / "vendor"）—— 来源变化时立即记一行 ✅。</summary>
+	private static string _cpuTempSourceLogged = "";
+
 	public static int? cpuUsage;
 
 	public static int? cpuFan;
@@ -584,6 +646,11 @@ public static class HardwareControl
 			{
 				return; // ⭐ 刚有人采过（⭐ 自定义模式页/悬浮窗/手动入口 ✅）⇒ ⭐ 让位 ✅
 			}
+			// ⭐⭐ 2026-10-18（机主：悬浮窗 CPU 温度停在开机时的温度）：⭐⭐ 泵里原来**没有 CPU 温度这一步**
+			//   ⇒ ⭐ 现在按「CPU 温度 → GPU 温度 → CPU/GPU 功耗」的顺序先刷 CPU 温度 ✅
+			//   ⭐ 来源顺序：⭐ 宝龙达 40 系功能号 22 ⇒ ⭐ LHM ⇒ ⭐ ACPI 热区（⭐ 见 RefreshCpuTempFromLocalSources ✅）
+			//   ⚠️ 三源都没值 ⇒ 保持原值且**不更新时间戳** ⇒ ⭐ 上层（悬浮窗）判「过期」显示「—」⛔ 不显示陈旧值 ✅
+			RefreshCpuTempFromLocalSources();
 			// ⭐⭐ 2026-10-19（机主：「4070 显卡温度读取」才是要修的）：⭐⭐ 之前泵里**只**调了
 			//   `SampleLocalPowerCore` ⇒ ⭐ 只刷功耗、**不刷 GPU 温度时间戳** ⚠️
 			//   ⇒ 温度仍会在 6 s（`FanInfoMaximumAge`）后被显示闸门画成「—」❌
@@ -614,6 +681,155 @@ public static class HardwareControl
 			return false;
 		}
 		return Environment.TickCount64 - tick <= (long)maximumAge.TotalMilliseconds;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主反馈「开机很久了，悬浮窗 CPU 温度还停在开机时的温度」）：⭐ <b>常驻 CPU 温度刷新</b> ✅
+	/// —— 按 <b>厂商功能号 22 ⇒ LHM ⇒ ACPI 热区</b> 的顺序取值，⭐ **成功才写** <see cref="cpuTemp"/>
+	/// ＋ ⭐ **打** <see cref="_cpuTempUpdatedTick"/> 时间戳 ✅。
+	///
+	/// <para>⚠️⚠️ <b>根因</b>：⭐ 常驻采样泵（<see cref="LocalSamplingPumpTick"/> · 2.5 s）原来只刷
+	/// <b>GPU 温度与 CPU/GPU 功耗</b> ⚠️ —— ⭐ 而 CPU 温度**唯一**会被刷的地方
+	/// <c>ApplySensorPriority</c> 排在 LHM 的两道闸门**之后** ⚠️ ⇒ ⭐ LHM 一旦不可用 / 更新失败，
+	/// 那里就**整段不跑** ❌ ⇒ ⭐ <see cref="cpuTemp"/> 永远停在启动时
+	/// （<see cref="AttachMechrevoHw"/> 的 <c>DataChanged</c>）抄进来的那个值 ❌ —— 正是机主看到的现象 ✅。
+	/// ⭐ 修法：⭐ 抽成**独立一步**、⭐ 排在 LHM 闸门**之前**（⭐ 与 GPU 那条 <c>gpu-temp-nvml-early</c> 同款 ✅）
+	/// ⇒ ⭐ 自定义模式页 / ⭐ 悬浮窗 / ⭐ 常驻泵 **任一采样入口**都会把它刷到 ✅。</para>
+	///
+	/// <para>⭐ <b>取值顺序</b>（⭐ 与宝龙达「温度来源顺序」声明同口径 ✅）：
+	/// <list type="number">
+	/// <item>⭐ <b>宝龙达 40 系</b>：⭐ 厂商 WMI <b>功能号 22</b>（<c>wmi.TryReadCpuTemperature</c> ✅）；
+	///   ⚠️ 30 系（裸板号 <c>MRID6</c>）的功能号 22 **恒返回 0** ⇒ 已由
+	///   <see cref="BaolongdaWmi.VendorTemperatureUnsupported"/> 整条关掉 ⇒ ⭐ 直接落到 LHM ✅；</item>
+	/// <item>⭐ <b>LHM</b>（<c>LhmMonitor.CpuTemperature</c> ✅ —— ⭐ 30 系 / ⭐ 22 失败 / ⭐ 非宝龙达没给值 ✅）；</item>
+	/// <item>⭐ <b>ACPI 热区</b>（<see cref="ReadAcpiThermalZoneCelsius"/> ✅ —— ⭐ 免驱动 · ⭐ 封装温度口径 · ⭐ 内部限频 30 s ✅）。</item>
+	/// </list>
+	/// ⚠️ <b>三个来源都没值</b> ⇒ ⭐ **保持原值、⛔ 不更新时间戳** ✅ ⇒ ⭐ 上层（悬浮窗）据此判「过期」并显示「—」
+	/// （⛔ 不再把陈旧值当实时值 ❌）。</para>
+	///
+	/// <para>⚠️ <b>安全边界</b>：⭐ 调用方只在 <c>_localMonitoringEnabled</c> 时调它（⭐ 未启用/正在退出 ⇒ 一次原生调用都不发 ✅）；
+	/// ⭐ 外层带 <c>TryStep(..., countsAsHealthFailure:false)</c> ⇒ 失败只跳过本步、⛔ 不参与 LHM/NVML 健康判定
+	/// （⭐ WMI/ACPI 抖一下不该触发「采样链坏了 ⇒ 重建/降级」⚠️）；⭐ 内部再限频 <see cref="CpuTempLocalReadIntervalMs"/>
+	/// ⇒ ⛔ 不因多入口而重复读 WMI ✅。</para>
+	/// </summary>
+	private static void RefreshCpuTempFromLocalSources()
+	{
+		// ⭐ 多入口限频去重：⛔ 同一次采样里重复读 WMI ✅
+		long now = Environment.TickCount64;
+		long lastAttempt = Interlocked.Read(in _cpuTempLastAttemptTick);
+		if (lastAttempt != 0L && now - lastAttempt < CpuTempLocalReadIntervalMs)
+		{
+			return;
+		}
+		Interlocked.Exchange(ref _cpuTempLastAttemptTick, now);
+		MechrevoHw hw;
+		try
+		{
+			hw = Program.hw;
+		}
+		catch
+		{
+			return;
+		}
+		if (hw == null)
+		{
+			return;
+		}
+		int celsius = 0;
+		string source = "";
+		// ── ① 宝龙达 40 系：厂商功能号 22（⭐ 30 系已被 VendorTemperatureUnsupported 整条关掉）──
+		if (hw.UsesBaolongda)
+		{
+			BaolongdaWmi wmi = hw.BaolongdaWmi;
+			if (wmi != null && !BaolongdaWmi.VendorTemperatureUnsupported)
+			{
+				try
+				{
+					if (wmi.TryReadCpuTemperature(out int vendorCelsius) && vendorCelsius > 0 && vendorCelsius < 120)
+					{
+						celsius = vendorCelsius;
+						source = "func22";
+					}
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLineIfChanged("cpu-temp-vendor-fail", "[cpu-temp] 厂商功能号 22 读取异常（转 LHM）：" + ex.Message);
+				}
+			}
+		}
+		else if (hw.CpuTemp > 0)
+		{
+			// ⭐ 非宝龙达（GCU/同方）：厂商推送值优先（⭐ 与 ApplySensorPriority 同口径；⭐ 只同步时间戳、⛔ 不覆盖）✅
+			celsius = hw.CpuTemp;
+			source = "vendor";
+		}
+		// ── ② LHM 兜底（⭐ 30 系 / ⭐ 22 失败 / ⭐ 非宝龙达没给值 ✅）──
+		if (celsius <= 0)
+		{
+			LhmMonitor lhmMonitor = lhm;
+			if (lhmMonitor != null && !lhmMonitor.IsDisposed)
+			{
+				float? fromLhm = lhmMonitor.CpuTemperature;
+				if (fromLhm.HasValue && fromLhm.Value > 0f && fromLhm.Value < 120f)
+				{
+					celsius = (int)Math.Round(fromLhm.Value);
+					source = "LHM";
+				}
+			}
+		}
+		// ── ③ ACPI 热区（最后兜底；内部限频 30 s）──
+		if (celsius <= 0)
+		{
+			int acpi = ReadAcpiThermalZoneCelsius();
+			if (acpi > 0)
+			{
+				celsius = acpi;
+				source = "ACPI";
+			}
+		}
+		if (celsius <= 0)
+		{
+			// ⭐ 三个来源都没值 ⇒ ⭐ **保持原值**、⛔ **不更新时间戳** ⇒ ⭐ 上层能判「过期」✅
+			if (Interlocked.Exchange(ref _cpuTempNoneLogged, 1) == 0)
+			{
+				Logger.WriteError("[cpu-temp] ⚠️ 三个来源都没值（厂商 func22 / LHM / ACPI 热区）"
+					+ " ⇒ 保持原值且**不更新时间戳** ⇒ 悬浮窗超过 "
+					+ CpuTempFreshAge.TotalSeconds.ToString("F0")
+					+ " s 会显示「—」（⛔ 不再显示陈旧值）；⭐ 本条只在「开始取不到」的那一刻记一次");
+			}
+			return;
+		}
+		cpuTemp = celsius;
+		// ⭐⭐ 2026-10-18：⭐ 同时**写回门面层** ＋ 打 `_cpuInfoReceivedAt`（⭐ 复用既有
+		//   `IsSensorInfoFresh(cpu: true)` 体系 ✅ —— 主界面那行遥测读的就是 `hw.CpuTemp` ⚠️）
+		//   ⚠️ 只在**非厂商推送来源**（func22 / LHM / ACPI）时写 ⇒ ⭐ GCU 机型的「厂商值优先」语义 ⛔ 一字不改 ✅
+		//   ⚠️ 30 系宝龙达的功能号 22 是关掉的 ⇒ ⭐ 这一笔让 LHM/ACPI 兜底值也能进主界面（⛔ 不再恒「—」）✅
+		if (!string.Equals(source, "vendor", StringComparison.Ordinal))
+		{
+			hw.MarkExternalCpuTemp(celsius);
+		}
+		long updated = Environment.TickCount64;
+		long previous = Interlocked.Exchange(ref _cpuTempUpdatedTick, updated);
+		bool recovered = Interlocked.Exchange(ref _cpuTempNoneLogged, 0) == 1;
+		double ageSeconds = ((previous == 0L) ? 0.0 : (updated - previous) / 1000.0);
+		string line = $"[cpu-temp] 来源={source} · 值={celsius}℃ · age={ageSeconds:F1}s";
+		bool sourceChanged = !string.Equals(_cpuTempSourceLogged, source, StringComparison.Ordinal);
+		_cpuTempSourceLogged = source;
+		if (recovered)
+		{
+			// ⭐ 状态翻转（⭐ 之前三源都没值 ⇒ 现在有了 ✅）⇒ ⭐ 默认级别可见地记一行 ✅
+			Logger.WriteError("[cpu-temp] ⭐ 已恢复 ✅ —— " + line);
+		}
+		else if (sourceChanged || previous == 0L)
+		{
+			// ⭐ 来源变化 / ⭐ 首次成功 ⇒ ⭐ 立即记一行（含 age ⇒ 能看出上一帧到现在多久）✅
+			Logger.WriteLine(line);
+		}
+		else
+		{
+			// ⭐ 去重：来源/值都没有状态变化时 60 s 一条心跳（⭐ 含 age ⇒ 能看出刷新间隔 ✅）
+			Logger.WriteLineThrottled("cpu-temp", line, 60000);
+		}
 	}
 
 	/// <summary>
@@ -1526,6 +1742,18 @@ public static class HardwareControl
 				cpuFrequency = perfFreq.Value;
 			}
 		}, "cpu-freq-sample");
+		// ⭐⭐ 2026-10-18（机主：悬浮窗 CPU 温度停在开机时的温度）：⭐ **CPU 温度刷新** ✅
+		//   ⚠️ 必须排在 `lhm == null` / `_localSamplingQuarantined` / LHM 两道闸门**之前** ——
+		//      原因与上面 `cpu-freq-sample`、下面 `gpu-temp-nvml-early` 完全同款：⭐ LHM 一旦不可用/更新失败，
+		//      闸门之后的 `ApplySensorPriority` 就**整段不跑** ⚠️ ⇒ ⭐ CPU 温度会永远停在启动值 ❌（本次机主现象）
+		//   ⚠️ 三个来源（宝龙达功能号 22 / LHM / ACPI）里**没有一个是 LHM/NVML 的必需句柄**（LHM 只读缓存属性 ✅）
+		//      ⇒ ⭐ 放在闸门之前**不削弱**原生层 AV 防护 ✅
+		//   ⚠️ 只在监控已启用时做（⭐ 未启用/正在退出 ⇒ 一次原生调用都不发 ✅）；
+		//      `countsAsHealthFailure:false` ⇒ ⛔ WMI/ACPI 抖一下不触发"采样链坏了 ⇒ 重建/降级"✅
+		if (_localMonitoringEnabled)
+		{
+			TryStep(RefreshCpuTempFromLocalSources, "cpu-temp-local", countsAsHealthFailure: false);
+		}
 		// (d) 未启用/已释放：直接早退。
 		//   ⭐⭐ 2026-10-16（GPU 温度「完全不显示」BUGFIX · p2 实证）：
 		//     ⚠️ 本检查**必须排在 `_localSamplingQuarantined` 之前** —— 因为下面
