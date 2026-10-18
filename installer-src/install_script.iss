@@ -373,7 +373,7 @@ Filename: "{app}\L-Mechrevo.exe"; Description: "{cm:LaunchApp}"; Flags: postinst
 ;   加了这个开关后：目录不存在时脚本只跳过 -LogDir 那份日志（Write-Log 对 $null 已短路，
 ;   见 Uninstall-Gcu.ps1 L111），清理步骤一步不少；目录存在时行为不变、照常写。
 ;   ⚠️ 该开关只影响"写日志"，⛔ 与 -PurgeVendor 的厂商清理范围无关。
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\GCU\Uninstall-Gcu.ps1"" -TargetDir ""{app}\GCU"" -LogDir ""{commonappdata}\L-Mechrevo\logs"" -PurgeVendor -NoLogDir"; RunOnceId: "GcuUninstall";
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\GCU\Uninstall-Gcu.ps1"" -TargetDir ""{app}\GCU"" -LogDir ""{commonappdata}\L-Mechrevo\logs"" -PurgeVendor -NoLogDir"; RunOnceId: "GcuUninstall"; Check: ShouldInstallGcu
 
 [Icons]
 ; 2026-10-13（r25）：快捷方式指回程序本体 —— ⛔ 启动壳已移除；缺 .NET 10 运行时由【安装阶段
