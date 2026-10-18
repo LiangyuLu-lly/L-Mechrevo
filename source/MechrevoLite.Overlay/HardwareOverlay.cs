@@ -612,8 +612,14 @@ public class HardwareOverlay : OSDNativeForm
 		_cpuHistory[_historyHead] = (float)Math.Max(0.0, D(HardwareControl.cpuPower));
 		_gpuHistory[_historyHead] = (flag3 ? ((float)Math.Max(0.0, D(HardwareControl.gpuPower))) : 0f);
 		_historyHead = (_historyHead + 1) % 60;
-		_cpuUsage = HardwareControl.cpuUsage;
-		_gpuUsage = (flag3 ? new int?(HardwareControl.gpuUsage.GetValueOrDefault()) : ((int?)null));
+		// ⭐⭐ 2026-10-18（机主：遥测里 CPU/GPU 占用率显示不对）：
+		//   ⚠️ 旧代码：`_gpuUsage` 用 `GetValueOrDefault()` ⇒ ⭐ **null 被画成 0%** ❌；
+		//      `_cpuUsage` 则没有任何新鲜度判断 ⇒ ⭐ 采样链停了也会一直画旧百分比 ⚠️。
+		//   ⭐ 现在：⭐ 只在**新鲜**（≤ <see cref="HardwareControl.UsageFreshAge"/>）时才显示；
+		//      取不到/过期 ⇒ 画「—」（⛔ 不显示 0% 冒充 ✅；⭐ 与主界面温度「不新鲜 ⇒ —」同口径 ✅）。
+		//   ⚠️ 与旧 `flag3`（GPU 温度有没有值）**解耦**：占用率是独立采样，⛔ 不该被 GPU 温度缺失连带隐藏 ✅。
+		_cpuUsage = HardwareControl.CpuUsageIsFresh(HardwareControl.UsageFreshAge) ? HardwareControl.cpuUsage : ((int?)null);
+		_gpuUsage = HardwareControl.GpuUsageIsFresh(HardwareControl.UsageFreshAge) ? HardwareControl.gpuUsage : ((int?)null);
 		_vramUsage = (flag3 ? new int?(HardwareControl.vramUsage.GetValueOrDefault()) : ((int?)null));
 		_vramUsedMb = (flag3 ? new int?(HardwareControl.vramUsedMb.GetValueOrDefault()) : ((int?)null));
 		_ramUsage = HardwareControl.ramUsage;
@@ -952,11 +958,10 @@ public class HardwareOverlay : OSDNativeForm
 
 	private static void DrawUsagePercent(Graphics g, Font font, int x, int colW, int y, int? usage, SolidBrush brush)
 	{
-		if (usage.HasValue)
-		{
-			string text = usage.Value + "%";
-			g.DrawString(text, font, brush, new PointF((float)(x + colW) - g.MeasureString(text, font).Width, y));
-		}
+		// ⭐⭐ 2026-10-18（机主：占用率显示不对）：⭐ 取不到值画「—」（⛔ 不再什么都不画/画 0% 冒充 ✅；
+		//   ⭐ 与温度/功耗的「不新鲜 ⇒ —」同口径；⚠️ 只是同一格里的文字，⛔ 不改布局/列宽 ✅）
+		string text = (usage.HasValue ? (usage.Value + "%") : "—");
+		g.DrawString(text, font, brush, new PointF((float)(x + colW) - g.MeasureString(text, font).Width, y));
 	}
 
 	private static void DrawMemGb(Graphics g, Font font, int x, int colW, int y, int? usedMb, SolidBrush brush)

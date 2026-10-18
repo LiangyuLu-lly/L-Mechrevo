@@ -43,6 +43,10 @@ internal static class DiagnosticSystemInfo
 		//   ① 厂商功能号 22（30 系 = 可读但值 0）；② LHM **全部** CPU 温度传感器（值 + 上次变化时刻）；
 		//   ③ ACPI 热区现读；④ 当前实际取源 + 「LHM 未刷新」判定。⛔ 不写任何硬件/配置。
 		stringBuilder.Append(DiagnosticCpuTempInfo.Build());
+		// ⭐ 2026-10-18（机主：遥测里 CPU/GPU 后面的占用率显示不对）：⭐ 紧跟「CPU 温度来源明细」之后
+		//   追加「占用率来源明细」一节 —— ⭐ 只读 ✅：CPU 来源 + 值 + 采样间隔 / GPU 来源 + engine + 值 /
+		//   NVML 同快照的显存控制器利用率（⚠️ 仅参考）/ 新鲜度。⛔ 不写任何硬件/配置。
+		stringBuilder.Append(DiagnosticUsageInfo.Build());
 		AppendGpus(stringBuilder);
 		// 2026-10-09（诊断增强）：[GPU] 之后追加「配置与注册表」一节 ——
 		// LM 关键配置 / 档位已保存值 / 注册表（L-Mechrevo·RGBKeyboard·ItemSupport·服务·BIOS）/

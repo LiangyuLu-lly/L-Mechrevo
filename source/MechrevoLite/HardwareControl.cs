@@ -353,6 +353,91 @@ public static class HardwareControl
 
 	public static int? gpuUsage;
 
+	// ⭐⭐ 2026-10-18（机主：遥测里 CPU/GPU 后面的占用率显示不对）：⭐ **占用率的新鲜度/来源体系** ✅
+	//   ⚠️⚠️ 旧链路：`cpuUsage` / `gpuUsage` **只**由 `AttachMechrevoHw` 的 `DataChanged` 从
+	//   GCU/MQTT 字段（`hw.CpuUsage` / `hw.GpuUsage`）抄进来 ⚠️ ⇒ ⭐ 宝龙达（无 GCU）机型**根本没有来源**，
+	//   而悬浮窗又用 `GetValueOrDefault()` 把 `null` 画成 **0%** ❌ ⇒ ⭐ 机主看到"占用率 0 / 不对" ✅。
+	//   ⭐ 现在：⭐ 本地采样（CPU = 性能计数器/GetSystemTimes · GPU = NVML 核心利用率/LHM），
+	//   并把"值真正被写入"的时刻记下来 ⇒ ⭐ 界面只在**新鲜**时才显示，过期显示「—」（⛔ 不显示 0% 冒充）✅
+	/// <summary>⭐ CPU 占用率**真正被写入**的时刻（<see cref="Environment.TickCount64"/>；0 = 还没写过）✅。</summary>
+	private static long _cpuUsageUpdatedTick;
+
+	/// <summary>⭐ GPU 占用率**真正被写入**的时刻（<see cref="Environment.TickCount64"/>；0 = 还没写过）✅。</summary>
+	private static long _gpuUsageUpdatedTick;
+
+	/// <summary>⭐ CPU 占用率来源（⭐ 如实标注：性能计数器 xxx / GetSystemTimes 差值 / GCU 推送 兜底 ✅）。</summary>
+	private static string _cpuUsageSource = "";
+
+	/// <summary>⭐ GPU 占用率来源（⭐ 如实标注：NVML 核心利用率 / LHM 核心负载 / GCU 推送 兜底 ✅）。</summary>
+	private static string _gpuUsageSource = "";
+
+	/// <summary>⭐ GPU 占用率对应的 engine/传感器名（⭐ 如 <c>graphics(core)</c> / <c>D3D 3D</c>）✅。</summary>
+	private static string _gpuUsageEngine = "";
+
+	private static int _cpuUsageIntervalMs;
+
+	private static int _gpuUsageIntervalMs;
+
+	/// <summary>⭐ 占用率的新鲜度上限：⭐ 采样泵 2.5 s / 悬浮窗 1 s ⇒ 正常永远新鲜；10 s 留足余量 ✅。</summary>
+	internal static readonly TimeSpan UsageFreshAge = TimeSpan.FromMilliseconds(10000.0);
+
+	/// <summary>⭐ 当前 CPU 占用率来源（⭐ 诊断包「占用率来源明细」用 ✅）。</summary>
+	internal static string CpuUsageSource => _cpuUsageSource;
+
+	/// <summary>⭐ 当前 GPU 占用率来源（⭐ 诊断用 ✅）。</summary>
+	internal static string GpuUsageSource => _gpuUsageSource;
+
+	/// <summary>⭐ 当前 GPU 占用率的 engine/传感器名（⭐ 诊断用 ✅）。</summary>
+	internal static string GpuUsageEngine => _gpuUsageEngine;
+
+	/// <summary>⭐ CPU 占用率最近两次真实采样的间隔（毫秒；0 = 未知；⭐ 诊断用 ✅）。</summary>
+	internal static int CpuUsageIntervalMs => _cpuUsageIntervalMs;
+
+	/// <summary>⭐ GPU 占用率最近两次真实采样的间隔（毫秒；0 = 未知；⭐ 诊断用 ✅）。</summary>
+	internal static int GpuUsageIntervalMs => _gpuUsageIntervalMs;
+
+	/// <summary>⭐ CPU 占用率数据年龄（毫秒；-1 = 从未写入；⭐ 诊断用 ✅）。</summary>
+	internal static long CpuUsageAgeMs => UsageAgeMs(Interlocked.Read(in _cpuUsageUpdatedTick));
+
+	/// <summary>⭐ GPU 占用率数据年龄（毫秒；-1 = 从未写入；⭐ 诊断用 ✅）。</summary>
+	internal static long GpuUsageAgeMs => UsageAgeMs(Interlocked.Read(in _gpuUsageUpdatedTick));
+
+	/// <summary>⭐ CPU 占用率是否在 <paramref name="maximumAge"/> 内被刷新过 ✅（0 次写入 ⇒ 一律判「不新鲜」）。</summary>
+	internal static bool CpuUsageIsFresh(TimeSpan maximumAge)
+	{
+		return UsageIsFresh(Interlocked.Read(in _cpuUsageUpdatedTick), maximumAge);
+	}
+
+	/// <summary>⭐ GPU 占用率是否在 <paramref name="maximumAge"/> 内被刷新过 ✅。</summary>
+	internal static bool GpuUsageIsFresh(TimeSpan maximumAge)
+	{
+		return UsageIsFresh(Interlocked.Read(in _gpuUsageUpdatedTick), maximumAge);
+	}
+
+	private static long UsageAgeMs(long tick)
+	{
+		return (tick == 0L) ? (-1L) : (Environment.TickCount64 - tick);
+	}
+
+	private static bool UsageIsFresh(long tick, TimeSpan maximumAge)
+	{
+		if (tick == 0L)
+		{
+			return false;
+		}
+		return Environment.TickCount64 - tick <= (long)maximumAge.TotalMilliseconds;
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ CPU 占用率当前是否在用 GetSystemTimes 兜底（⭐ 性能计数器不可用时为真；⭐ 诊断用 ✅）。</summary>
+	internal static bool CpuUsageUsingSystemTimesFallback
+	{
+		get
+		{
+			CpuUsageSampler sampler = Volatile.Read(ref cpuUsageSampler);
+			return sampler != null && sampler.UsingSystemTimesFallback;
+		}
+	}
+
 	public static int? gpuFan;
 
 	public static int gpuFanRPM;
@@ -398,6 +483,9 @@ public static class HardwareControl
 	private static CpuPowerSampler? cpuPowerSampler;
 
 	private static CpuFrequencySampler? cpuFreqSampler;
+
+	/// <summary>⭐ 2026-10-18（机主：CPU 占用率显示不对）：⭐ CPU 占用率本地采样器（⭐ 性能计数器优先、GetSystemTimes 兜底 ✅）。</summary>
+	private static CpuUsageSampler cpuUsageSampler;
 
 	// ================= 2026-10-09（NVML 原生崩溃修复）：本地功耗采样链健康状态机 =================
 	// 事故依据：.NET Runtime 事件 1026 + Application Error 1000 的堆栈为
@@ -618,6 +706,11 @@ public static class HardwareControl
 			{
 				cpuFreqSampler = new CpuFrequencySampler();
 			}
+			// ⭐ 2026-10-18（机主：CPU 占用率显示不对）：⭐ 起动本地 CPU 占用率采样器（⭐ 与 GCU 无关 ✅）
+			if (cpuUsageSampler == null)
+			{
+				cpuUsageSampler = new CpuUsageSampler();
+			}
 			// 重新启用监控时清掉上一次的降级状态。
 			_localSamplingQuarantined = false;
 			_quarantineUntilTicks = 0L;
@@ -650,6 +743,9 @@ public static class HardwareControl
 			cpuPowerSampler = null;
 			cpuFreqSampler?.Dispose();
 			cpuFreqSampler = null;
+			// ⭐ 2026-10-18（机主：CPU 占用率显示不对）：⭐ 停采样器（⭐ 不留后台性能计数器 ✅）
+			cpuUsageSampler?.Dispose();
+			cpuUsageSampler = null;
 			cpuPower = (gpuPower = null);
 			vramUsedMb = (vramUsage = null);
 		}
@@ -2005,6 +2101,181 @@ public static class HardwareControl
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：遥测里 CPU 占用率显示不对）：⭐ <b>CPU 占用率本地采样</b> ✅
+	/// —— ⭐ 来源：性能计数器 <c>Processor Information\_Total\% Processor Utility</c>（⭐ 任务管理器同源）
+	/// ⇒ 不可用时退 <c>% Processor Time</c> ⇒ 再退 <c>GetSystemTimes</c> 差值 ✅。
+	/// <para>⚠️ 旧链路只有 GCU/MQTT 推送（<c>hw.CpuUsage</c>）⇒ ⭐ 宝龙达（无 GCU）机型**根本没有来源** ❌。
+	/// ⭐ 现在本地采；GCU 推送只作**最后兜底**（⭐ 且仅在 GCU 已连接时）✅。</para>
+	/// <para>⚠️ 取不到 ⇒ **不更新时间戳**（⭐ 界面按 <see cref="UsageFreshAge"/> 判过期显示「—」，
+	/// ⛔ 不显示 0% 冒充"占用 0%"）✅。</para>
+	/// </summary>
+	private static void SampleLocalCpuUsage()
+	{
+		int? usage = null;
+		string source = "";
+		int intervalMs = 0;
+		CpuUsageSampler sampler = Volatile.Read(ref cpuUsageSampler);
+		if (sampler != null)
+		{
+			int? sampled = sampler.Sample();
+			if (sampled.HasValue && sampled.Value >= 0 && sampled.Value <= 100)
+			{
+				usage = sampled.Value;
+				source = sampler.Source;
+				intervalMs = sampler.LastIntervalMs;
+			}
+		}
+		if (!usage.HasValue)
+		{
+			// ⭐ 兜底：GCU 推送（⭐ 只在 GCU 已连接时才有意义；⭐ 0% 也是合法值 ✅）
+			MechrevoHw hw = TryGetHw();
+			if (hw != null && hw.IsGcuConnected)
+			{
+				usage = Math.Clamp(hw.CpuUsage, 0, 100);
+				source = "GCU 推送（兜底）";
+				intervalMs = 0;
+			}
+		}
+		if (!usage.HasValue)
+		{
+			return; // ⭐ 保持旧值、⛔ 不更新时间戳 ⇒ 上层判过期显示「—」✅
+		}
+		cpuUsage = usage;
+		_cpuUsageSource = source;
+		_cpuUsageIntervalMs = intervalMs;
+		Interlocked.Exchange(ref _cpuUsageUpdatedTick, Environment.TickCount64);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：遥测里 GPU 占用率显示不对）：⭐ <b>GPU 占用率本地采样</b> ✅
+	/// —— ⭐ 来源优先级：⭐ <b>NVML 核心利用率</b>（<c>nvmlDeviceGetUtilizationRates().gpu</c>，0–100，graphics 口径）
+	/// ⇒ ⭐ <b>LHM GPU 核心负载</b>（⭐ 仅非 NVIDIA 机型；NVIDIA 机型 LHM GPU 那支被关 ⚠️）
+	/// ⇒ ⭐ GCU 推送（⭐ 最后兜底）✅。
+	/// <para>⚠️ **不是显存占用率**：显存占用仍由 <c>vramUsage = used/total</c> 单独提供；⛔ 两者不可混用 ✅。</para>
+	/// <para>⚠️ NVML 是原生调用 ⇒ 调用点必须排在 <c>_localSamplingQuarantined</c> **之后**（⭐ 降级期一次不发 ✅）；
+	/// ⚠️ 取不到 ⇒ **不更新时间戳** ⇒ 界面「—」（⛔ 不显示 0% 冒充）✅。</para>
+	/// </summary>
+	private static void SampleLocalGpuUsage()
+	{
+		int? usage = null;
+		string source = "";
+		string engine = "";
+		int intervalMs = 0;
+		if (!NvmlHelper.Unavailable)
+		{
+			int? nvml = NvmlHelper.GetGpuUtilization();
+			if (nvml.HasValue && nvml.Value >= 0 && nvml.Value <= 100)
+			{
+				usage = nvml.Value;
+				source = "NVML nvmlDeviceGetUtilizationRates";
+				engine = "graphics(core)";
+				// ⭐ 采样间隔 = NVML 快照 TTL（⭐ 同一快照复用，⛔ 不放大原生调用 ✅）
+				intervalMs = NvmlHelper.SnapshotTtlMs;
+			}
+		}
+		if (!usage.HasValue)
+		{
+			LhmMonitor lhmMonitor = lhm;
+			if (lhmMonitor != null && !lhmMonitor.IsDisposed && lhmMonitor.GpuLoadPercent.HasValue)
+			{
+				usage = Math.Clamp(lhmMonitor.GpuLoadPercent.Value, 0, 100);
+				source = "LHM Load 传感器";
+				engine = (lhmMonitor.GpuLoadSensorName ?? "(未知)");
+				intervalMs = 0;
+			}
+		}
+		if (!usage.HasValue)
+		{
+			MechrevoHw hw = TryGetHw();
+			if (hw != null && hw.IsGcuConnected)
+			{
+				usage = Math.Clamp(hw.GpuUsage, 0, 100);
+				source = "GCU 推送（兜底）";
+				engine = "(厂商口径)";
+			}
+		}
+		if (!usage.HasValue)
+		{
+			return;
+		}
+		gpuUsage = usage;
+		_gpuUsageSource = source;
+		_gpuUsageEngine = engine;
+		_gpuUsageIntervalMs = intervalMs;
+		Interlocked.Exchange(ref _gpuUsageUpdatedTick, Environment.TickCount64);
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ 安全取 <see cref="Program.hw"/>（⭐ 启动早期可能为 null / 初始化中可能抛 ✅）。</summary>
+	private static MechrevoHw TryGetHw()
+	{
+		try
+		{
+			return Program.hw;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ 占用率日志去重用的"上次已记录"状态 ✅。</summary>
+	private static int _usageLastLoggedCpu = -1;
+
+	private static int _usageLastLoggedGpu = -1;
+
+	private static string _usageLastLoggedCpuSource = "";
+
+	private static string _usageLastLoggedGpuSource = "";
+
+	/// <summary>⭐ 2026-10-18：⭐ 采样间隔 → 人读文本（⭐ 诊断/日志共用 ✅）。</summary>
+	private static string FormatUsageInterval(int intervalMs)
+	{
+		return (intervalMs <= 0) ? "未知" : (intervalMs + "ms");
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：CPU/GPU 占用率显示不对）：⭐ <b>`[usage]` 诊断日志</b> ✅
+	/// —— ⭐ 格式：<c>[usage] cpu=37%（来源=… · 采样间隔=1000ms）· gpu=12%（来源=… · engine=graphics(core) · 采样间隔=1500ms）</c> ✅
+	/// <para>⭐ 去重：⭐ 值变化 ≥5 个百分点 / 来源变化 / 首次 ⇒ ⭐ 立即一行；否则 60 s 一条心跳（⛔ 不刷屏）✅。</para>
+	/// <para>⚠️ 取不到新鲜值的那一项如实写 <c>—</c>（⭐ ⛔ 不写 0% 冒充 ✅）。</para>
+	/// </summary>
+	private static void LogUsageIfChanged()
+	{
+		bool cpuFresh = CpuUsageIsFresh(UsageFreshAge);
+		bool gpuFresh = GpuUsageIsFresh(UsageFreshAge);
+		int cpuVal = cpuFresh ? cpuUsage.GetValueOrDefault() : -1;
+		int gpuVal = gpuFresh ? gpuUsage.GetValueOrDefault() : -1;
+		string cpuPart = cpuFresh
+			? ($"{cpuVal}%（来源={_cpuUsageSource} · 采样间隔={FormatUsageInterval(_cpuUsageIntervalMs)}）")
+			: "—（没有新鲜值）";
+		string gpuPart = gpuFresh
+			? ($"{gpuVal}%（来源={_gpuUsageSource} · engine={_gpuUsageEngine} · 采样间隔={FormatUsageInterval(_gpuUsageIntervalMs)}）")
+			: "—（没有新鲜值）";
+		string line = $"[usage] cpu={cpuPart} · gpu={gpuPart}";
+		bool significant = false;
+		if (cpuFresh || gpuFresh)
+		{
+			significant = (cpuVal < 0 || gpuVal < 0)
+				|| Math.Abs(cpuVal - _usageLastLoggedCpu) >= 5
+				|| Math.Abs(gpuVal - _usageLastLoggedGpu) >= 5
+				|| !string.Equals(_usageLastLoggedCpuSource, _cpuUsageSource, StringComparison.Ordinal)
+				|| !string.Equals(_usageLastLoggedGpuSource, _gpuUsageSource, StringComparison.Ordinal);
+		}
+		_usageLastLoggedCpu = cpuVal;
+		_usageLastLoggedGpu = gpuVal;
+		_usageLastLoggedCpuSource = _cpuUsageSource;
+		_usageLastLoggedGpuSource = _gpuUsageSource;
+		if (significant)
+		{
+			Logger.WriteLine(line);
+		}
+		else
+		{
+			Logger.WriteLineThrottled("usage", line, 60000);
+		}
+	}
+
+	/// <summary>
 	/// 采样主干（由 <see cref="RefreshLocalMonitoring"/> 在同一次持锁内调用）：
 	/// 每一步各自兜底（LHM 更新 / LHM 读值 / NVML 采样 / 性能计数器回退），任何一步失败只跳过本次采样。
 	/// </summary>
@@ -2021,6 +2292,14 @@ public static class HardwareControl
 				cpuFrequency = perfFreq.Value;
 			}
 		}, "cpu-freq-sample");
+		// ⭐⭐ 2026-10-18（机主：CPU/GPU 占用率显示不对）：⭐ **CPU 占用率本地采样** ✅
+		//   ⚠️ 放在 `_localSamplingQuarantined` / LHM/NVML 闸门**之前**：它只碰性能计数器 / GetSystemTimes
+		//      （⭐ 不是 LHM/NVML 原生句柄 ✅）⇒ ⭐ 采样链降级时也能出值 ✅
+		//   ⚠️ `countsAsHealthFailure:false` ⇒ ⛔ 性能计数器缺失不算"采样链坏了"✅
+		if (_localMonitoringEnabled)
+		{
+			TryStep(SampleLocalCpuUsage, "cpu-usage-local", countsAsHealthFailure: false);
+		}
 		// ⭐⭐ 2026-10-18（机主：悬浮窗 CPU 温度停在开机时的温度）：⭐ **CPU 温度刷新** ✅
 		//   ⚠️ 必须排在 `lhm == null` / `_localSamplingQuarantined` / LHM 两道闸门**之前** ——
 		//      原因与上面 `cpu-freq-sample`、下面 `gpu-temp-nvml-early` 完全同款：⭐ LHM 一旦不可用/更新失败，
@@ -2058,6 +2337,8 @@ public static class HardwareControl
 				{
 					RefreshGpuTempFromNvmlWhenNoVendor();
 				}, "gpu-temp-nvml-early", countsAsHealthFailure: false);
+				// ⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ LHM 重建期间 GPU 占用率也照常刷（NVML，与 LHM 无关）✅
+				TryStep(SampleLocalGpuUsage, "gpu-usage-nvml", countsAsHealthFailure: false);
 			}
 			return;
 		}
@@ -2077,6 +2358,10 @@ public static class HardwareControl
 		{
 			return;
 		}
+		// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ **GPU 占用率采样**（NVML 核心/graphics 利用率）✅
+		//   ⚠️ 排在 `_localSamplingQuarantined` **之后**：NVML 是原生调用，降级期一次都不发 ✅
+		//   ⚠️ `countsAsHealthFailure:false` ⇒ ⛔ NVML 单独查询失败不额外计入健康判定 ✅
+		TryStep(SampleLocalGpuUsage, "gpu-usage-nvml", countsAsHealthFailure: false);
 		// ⭐⭐ 2026-10-17（真机诊断包 `0.291.9.8-180311` 定因 · 修「4070 显卡温度又变回 —」）：
 		//   证据：18:02:13~28 由 NVML 取到 41/42℃ 并写回门面层 ✅；之后 LHM 两道闸门失败 ⇒
 		//     `ApplySensorPriority` 不再执行 ⇒ 门面层不再刷新 ⇒ `KeepAlive`(30 s) 到期 ⇒ 44 s 后界面又「—」❌
@@ -2388,6 +2673,9 @@ public static class HardwareControl
 			//   ⚠️ 与 `_lastPowerRefreshTick` 分工不同：那个在**值真的被写入**之后才打 ✅。
 			Interlocked.Exchange(ref _lastLocalSampleTick, Environment.TickCount64);
 			RefreshLocalMonitoring();
+			// ⭐⭐ 2026-10-18（机主：CPU/GPU 占用率显示不对）：⭐ 占用率诊断日志
+			//   （⭐ 值变化 ≥5 个百分点 / 来源变化 / 首次 ⇒ 立即一行；否则 60 s 心跳 ✅）
+			TryStep(LogUsageIfChanged, "usage-log", countsAsHealthFailure: false);
 			if (includeAuxiliary)
 			{
 				// 供电/电池刷新失败不影响「本地功耗采样链」的健康判定（见 TryStep 的 countsAsHealthFailure）。

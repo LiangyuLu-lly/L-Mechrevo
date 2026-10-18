@@ -317,6 +317,42 @@ public class LhmMonitor : IDisposable
 	public float? GpuClockMhz { get; private set; }
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ <b>GPU 核心负载（0–100 %）</b> ——
+	/// ⭐ 来自 LHM 的 <c>SensorType.Load</c>（⭐ 只在 **非 NVIDIA** 机型才可能命中 ✅：
+	/// 本类检测到 NVIDIA 会把 LHM 的 GPU 那支整体关掉 ⚠️ —— ⭐ 那些机型由 <c>NvmlHelper.GetGpuUtilization</c> 提供 ✅）。
+	/// <para>⚠️ **每轮 <see cref="Update" /> 都会清空重读**（⛔ 不重蹈 CPU 温度"只写一次"的覆辙 ✅；
+	/// 取不到时保持 <c>null</c> ⇒ 界面显示「—」，⛔ 不用 0% 冒充 ✅）。</para>
+	/// <para>⚠️ 与"显存占用"不是一回事：⭐ 这里只取 <c>Load</c> 里**核心/3D** 那一支（⭐ 显存/视频/总线负载一律排除 ✅）。</para>
+	/// </summary>
+	public int? GpuLoadPercent { get; private set; }
+
+	/// <summary>⭐ 实际选中的 GPU 负载传感器名（⭐ 诊断用 ✅）。</summary>
+	public string GpuLoadSensorName { get; private set; }
+
+	/// <summary>
+	/// ⭐ 2026-10-18：⭐ 判断某 <c>Load</c> 传感器是不是"GPU 核心负载"✅。
+	/// <para>⭐ LHM 实测名字：⭐ NVIDIA = <c>GPU Core</c>（⭐ 生产被关）· ⭐ AMD 核显 = <c>D3D 3D</c> ✅。</para>
+	/// <para>⚠️ 刻意排除：⭐ <c>Memory</c> / ⭐ <c>Video</c> / ⭐ <c>Bus</c> / ⭐ <c>Copy</c> —— ⭐ 那些不是核心 3D 占用 ⚠️。</para>
+	/// </summary>
+	internal static bool IsGpuLoadSensorName(string name)
+	{
+		if (string.IsNullOrEmpty(name))
+		{
+			return false;
+		}
+		if (name.IndexOf("Memory", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Video", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Bus", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Copy", StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			return false;
+		}
+		return name.IndexOf("GPU", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Core", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("3D", StringComparison.OrdinalIgnoreCase) >= 0;
+	}
+
+	/// <summary>
 	/// ⭐ 判断某个 GPU 温度传感器名是不是我们要的（⭐ 取"核心"那一个 ✅）。
 	/// <para>⭐ 实测（⭐ `--sensor-dump`）：⭐ NVIDIA = ⭐ <c>GPU Core</c> ✅；
 	/// ⭐ AMD 核显 = ⭐ <c>GPU VR SoC</c> ✅。</para>
@@ -491,6 +527,11 @@ public class LhmMonitor : IDisposable
 				CpuTemperatureSelectedTier = CpuTemperatureTier.None;
 				List<CpuTemperatureSensorReading> cpuTempReadings = new List<CpuTemperatureSensorReading>();
 				int cpuHardwareCount = 0;
+				// ⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ GPU 负载同样**每轮清空重读**（⛔ 不冻结 ✅）
+				GpuLoadPercent = null;
+				GpuLoadSensorName = null;
+				int? gpuLoad = null;
+				string gpuLoadName = "";
 				bool flag = false;
 				bool flag2 = false;
 				float? nvidiaPower = null;
@@ -593,8 +634,24 @@ public class LhmMonitor : IDisposable
 						{
 							GpuMemoryUsedMb = (int)sensor.Value.Value;
 						}
+						// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ GPU 核心负载（⭐ 只在**非 NVIDIA** 机型命中 ✅）
+						//   ⚠️ 关键：⭐ 与本轮温度一样**每轮都收集** ⇒ ⛔ 不会重蹈"只写一次就冻结"的覆辙 ✅
+						//   ⚠️ 只取 <c>Load</c> 里的**核心/3D** 那支（⭐ 显存/视频/总线负载由 `IsGpuLoadSensorName` 排除 ✅）
+						else if (sensor.SensorType == SensorType.Load && IsGpuHardwareType(item.HardwareType)
+							&& IsGpuLoadSensorName(sensor.Name) && sensor.Value.Value >= 0f && sensor.Value.Value <= 100f)
+						{
+							int load = (int)Math.Round(sensor.Value.Value);
+							if (!gpuLoad.HasValue || load > gpuLoad.Value)
+							{
+								gpuLoad = load;
+								gpuLoadName = sensor.Name;
+							}
+						}
 					}
 				}
+				// ⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ 本轮 GPU 负载结果（⭐ 没有就保持 null ⇒ 界面「—」✅）
+				GpuLoadPercent = gpuLoad;
+				GpuLoadSensorName = gpuLoadName;
 				// ⭐⭐ 2026-10-18（机主：CPU 温度 80℃ 不动）：⭐ 本轮 CPU 温度选源（⭐ 在全部传感器里按档位选 ✅）
 				CpuHardwareCount = cpuHardwareCount;
 				SelectCpuTemperature(cpuTempReadings, tickCount);

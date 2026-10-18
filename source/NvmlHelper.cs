@@ -30,6 +30,22 @@ public static class NvmlHelper
 		public ulong used;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：遥测里 GPU 占用率显示不对）：⭐ <c>nvmlUtilization_t</c>
+	/// <para>⭐ 两个字段**都是 0–100 的百分比**（⛔ 不是 0–1、⛔ 不是 0–1000）：
+	/// <list type="bullet">
+	/// <item><c>gpu</c> = ⭐ **GPU 核心（graphics/compute）利用率** —— ⭐ 界面要的就是它 ✅</item>
+	/// <item><c>memory</c> = ⭐ **显存控制器利用率** —— ⚠️ 只是"忙不忙"的百分比，**不是**显存占用率
+	/// （⛔ 绝不能用它冒充核心占用率，也不能用它冒充"显存已用 %"）⚠️</item>
+	/// </list></para>
+	/// </summary>
+	private struct nvmlUtilization_t
+	{
+		public uint gpu;
+
+		public uint memory;
+	}
+
 	internal const string NvmlModuleName = "nvml.dll";
 
 	private const string NvmlDll = "nvml.dll";
@@ -170,6 +186,26 @@ public static class NvmlHelper
 	/// <summary>⭐ `NVML_CLOCK_GRAPHICS`（⭐ NVML 头文件枚举值 = 0 ✅）。</summary>
 	private const int NvmlClockGraphics = 0;
 
+	// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ GPU 核心利用率快照。
+	//   ⚠️ 旧链路里 `HardwareControl.gpuUsage` **只**来自 GCU/MQTT 推送（`hw.GpuUsage`）⚠️
+	//   ⇒ ⭐ 宝龙达（无 GCU）机型永远是 0/空 ⇒ 界面画 0% ❌。
+	//   ⭐ 现在补本地来源：⭐ `nvmlDeviceGetUtilizationRates().gpu`（0–100，⭐ 核心/graphics 口径）✅
+	//   ⭐ 与功耗/温度/频率**同一次快照、同一把句柄、同一 TTL** ⇒ ⛔ 不放大原生调用频率 ✅
+	private static int? _snapshotGpuUtilization;
+
+	/// <summary>⭐ 同一次快照的**显存控制器利用率**（⚠️ 仅供诊断参考，⛔ 不上界面冒充核心占用 ✅）。</summary>
+	private static int? _snapshotGpuMemoryUtilization;
+
+	/// <summary>⭐ `nvmlDeviceGetUtilizationRates` 的专属最后返回码（⭐ -1 = 本进程还没查过 ✅）。</summary>
+	private static int _lastUtilizationError = -1;
+
+	/// <summary>
+	/// ⭐ <c>nvmlDeviceGetUtilizationRates</c>（⭐ NVML 官方导出 ✅）。
+	/// <para>⚠️ 参数是 <c>nvmlDevice_t</c>；返回两个 **0–100** 的百分比（见 <see cref="nvmlUtilization_t" />）。</para>
+	/// </summary>
+	[DllImport("nvml.dll")]
+	private static extern int nvmlDeviceGetUtilizationRates(nint device, out nvmlUtilization_t utilization);
+
 	/// <summary>(c) 已降级：隔离期内或模块已失效，调用方应完全跳过本类（一次原生调用都不要发）。</summary>
 	internal static bool Unavailable
 	{
@@ -253,6 +289,55 @@ public static class NvmlHelper
 				return null;
 			}
 			return _snapshotClockMhz.Value;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ <b>GPU 核心利用率（0–100 %）</b> ✅
+	/// —— ⭐ 取自 <c>nvmlDeviceGetUtilizationRates().gpu</c>（⭐ graphics/compute 口径 ✅）。
+	/// <para>⚠️ 与"显存占用率"**不是一回事**：⭐ 那个是 `used/total`（<see cref="GetMemoryInfo" />），
+	/// ⛔ 不要混用（⛔ 更不能用本值冒充显存占用）✅。</para>
+	/// <para>⚠️ 取不到（NVML 隔离 / 句柄失效 / 低功耗返回异常）⇒ <c>null</c>（⭐ 调用方保留旧值 +
+	/// 不更新时间戳 ⇒ 界面按"过期"显示「—」，⛔ 不显示 0% 冒充 ✅）。</para>
+	/// </summary>
+	internal static int? GetGpuUtilization(uint gpuIndex = 0u)
+	{
+		lock (_lock)
+		{
+			RefreshLocked(gpuIndex);
+			return _snapshotGpuUtilization;
+		}
+	}
+
+	/// <summary>⭐ 同一次快照的**显存控制器利用率**（⚠️ 仅诊断参考，⛔ 上界面会误导 ✅）。</summary>
+	internal static int? GetGpuMemoryUtilizationForDiagnostics(uint gpuIndex = 0u)
+	{
+		lock (_lock)
+		{
+			RefreshLocked(gpuIndex);
+			return _snapshotGpuMemoryUtilization;
+		}
+	}
+
+	/// <summary>⭐ `nvmlDeviceGetUtilizationRates` 的专属最后返回码（⭐ -1 = 还没查过 · 0 = 成功 ✅；诊断用）。</summary>
+	internal static int LastUtilizationError => Volatile.Read(in _lastUtilizationError);
+
+	/// <summary>⭐ 设备句柄是否拿到过（⭐ 诊断用：判"卡在但没值" vs "卡不在" ✅）。</summary>
+	internal static bool DeviceHandleAlive => Volatile.Read(in _deviceHandleAlive);
+
+	/// <summary>⭐ NVML 快照年龄（毫秒；⭐ -1 = 还没有任何快照 ✅；⭐ 诊断用）。</summary>
+	internal static long SnapshotAgeMs
+	{
+		get
+		{
+			lock (_lock)
+			{
+				if (_snapshotTicks < 0L)
+				{
+					return -1L;
+				}
+				return Environment.TickCount64 - _snapshotTicks;
+			}
 		}
 	}
 
@@ -490,6 +575,10 @@ public static class NvmlHelper
 		_snapshotPower = null;
 		_snapshotUsedMb = null;
 		_snapshotTotalMb = null;
+		// ⭐ 2026-10-18：⭐ 占用率**每轮先清空**再查 —— ⚠️ 否则本轮查询失败时会继续返回上一轮的旧值，
+		//   ⭐ 上层会误以为"一直有新鲜值"⇒ ⛔ 违背"取不到就显示「—」"的口径 ✅
+		_snapshotGpuUtilization = null;
+		_snapshotGpuMemoryUtilization = null;
 		if (!_init)
 		{
 			return;
@@ -553,13 +642,29 @@ public static class NvmlHelper
 			{
 				_snapshotClockMhz = clockMhz;
 			}
+			// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ GPU 核心利用率（⭐ 与上面同一把句柄、同一次快照 ✅）
+			//   ⚠️ 合理性：(0, 100] 的百分比 —— ⭐ `0` **是合法值**（待机时真的 0%）⚠️
+			//   ⇒ ⭐ 与温度不同，这里**不能**把 0 当无效（⭐ 否则待机时永远显示「—」/旧值 ❌）
+			//   ⭐ 判据只看返回码 + 上界 ≤100 ✅
+			int num9 = nvmlDeviceGetUtilizationRates(device, out nvmlUtilization_t utilization);
+			bool utilizationValid = num9 == NVML_SUCCESS && utilization.gpu <= 100u;
+			Volatile.Write(ref _lastUtilizationError, utilizationValid ? NVML_SUCCESS : num9);
+			if (utilizationValid)
+			{
+				_snapshotGpuUtilization = (int)utilization.gpu;
+				// ⚠️ 显存控制器利用率只做诊断参考（⭐ 不是显存占用率，⛔ 不上界面冒充）
+				if (utilization.memory <= 100u)
+				{
+					_snapshotGpuMemoryUtilization = (int)utilization.memory;
+				}
+			}
 			// 只要有一个查询成功就说明句柄/上下文是活的（功耗返回 0 是低功耗态，不是失败）。
-			if (num2 == NVML_SUCCESS || num3 == NVML_SUCCESS || num4 == NVML_SUCCESS || num8 == NVML_SUCCESS)
+			if (num2 == NVML_SUCCESS || num3 == NVML_SUCCESS || num4 == NVML_SUCCESS || num8 == NVML_SUCCESS || num9 == NVML_SUCCESS)
 			{
 				NoteSuccessLocked();
 				return;
 			}
-			NoteFailureLocked("nvmlDeviceGetPowerUsage/nvmlDeviceGetMemoryInfo/nvmlDeviceGetTemperature/nvmlDeviceGetClockInfo", num2);
+			NoteFailureLocked("nvmlDeviceGetPowerUsage/nvmlDeviceGetMemoryInfo/nvmlDeviceGetTemperature/nvmlDeviceGetClockInfo/nvmlDeviceGetUtilizationRates", num2);
 		}
 		catch (SEHException ex)
 		{
@@ -620,6 +725,10 @@ public static class NvmlHelper
 		// ⭐ 2026-10-16：⭐ 温度与频率同样要作废（⭐ 否则会拿旧值冒充新读数 ⚠️）
 		_snapshotTempCelsius = null;
 		_snapshotClockMhz = null;
+		// ⭐ 2026-10-18：⭐ 占用率也一并作废（⭐ 免得拿旧快照冒充实时占用 ✅）
+		_snapshotGpuUtilization = null;
+		_snapshotGpuMemoryUtilization = null;
+		Volatile.Write(ref _lastUtilizationError, -1);
 		// ⭐⭐ 2026-10-16（修"待机显示 —"）：⭐ 快照作废 ⇒ ⭐ "⭐ 设备还在不在"与"⭐ 温度为什么没有"
 		//   这两个结论**同时失效** ⚠️ ⇒ ⭐ 一并复位，⭐ 免得拿陈旧结论去判"待机" ✅
 		//   （⭐ 下一次成功采样会重新把 `_deviceHandleAlive` 置真 ✅）
