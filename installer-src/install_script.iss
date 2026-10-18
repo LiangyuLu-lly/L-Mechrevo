@@ -2464,6 +2464,33 @@ begin
   RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardProduct', Result);
   if Result = '' then Result := '(读不到)';
 end;
+function ShouldInstallPawnIo(): Boolean; forward;
+
+procedure CurPageChanged(CurPageID: Integer);
+// 2026-10-18（机主：每次装 LM 都会看到 PawnIO 勾选）：已安装 PawnIO 时，任务页里自动取消并改写该项，
+//   ⛔ 不重复安装；未安装时保持原样（默认勾选，可手动取消）。
+var
+  I: Integer;
+begin
+  if CurPageID = wpSelectTasks then
+  begin
+    if not ShouldInstallPawnIo() then
+    begin
+      try
+        for I := 0 to WizardForm.TasksList.Items.Count - 1 do
+          if Pos('PawnIO', WizardForm.TasksList.Items[I]) > 0 then
+          begin
+            WizardForm.TasksList.Checked[I] := False;
+            WizardForm.TasksList.ItemCaption[I] := 'PawnIO 驱动（已安装，无需再次安装）';
+          end;
+      except
+        Log('LM-PAWNIO-SKIP: 已安装 PawnIO，但任务页勾选改写失败（忽略）');
+      end;
+      Log('LM-PAWNIO-SKIP: 已安装 PawnIO ⇒ 任务页中该项已取消勾选（不再重复安装）');
+    end;
+  end;
+end;
+
 function ShouldInstallPawnIo(): Boolean;
 // 2026-10-18（机主反馈「PawnIO 会重复安装」）：驱动服务键已存在 ⇒ 认为已安装，安装包不再重复跑安装脚本。
 //   ⚠️ 只读注册表，⛔ 不探测设备；驱动坏了仍可从 LM「CPU 调节」里手动重装。
