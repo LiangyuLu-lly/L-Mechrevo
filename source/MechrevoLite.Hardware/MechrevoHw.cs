@@ -4441,6 +4441,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	// ⭐⭐ 2026-10-18（机主：多自定义档各自记录风扇曲线）：⭐ 当前档位 id（默认 "default" 走旧全局存档）✅
 	private static string _fanCurveModeId = "default";
 
+	/// <summary>⭐ 当前风扇曲线档位 id（⭐ 诊断/日志只读用 ✅）</summary>
+	internal static string CurrentFanCurveModeId => _fanCurveModeId;
+
 	private static bool? _fanCurveVerifiedGen30;
 
 	/// <summary>⭐ 40 系只读验证缓存（<c>null</c> = 还没验证过；false = 不可用；true = 可用）✅</summary>

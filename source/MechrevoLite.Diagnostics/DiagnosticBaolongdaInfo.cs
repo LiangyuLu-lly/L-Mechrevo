@@ -62,6 +62,7 @@ internal static class DiagnosticBaolongdaInfo
 			AppendEcLpcIoProbe(sb);
 			AppendFunctionProbe(sb);
 			AppendHidNote(sb);
+			AppendFanEcState(sb);
 		}
 		catch (Exception ex)
 		{
@@ -1105,6 +1106,120 @@ internal static class DiagnosticBaolongdaInfo
 			verdict = "⚠️ 异常：" + ex.Message;
 		}
 		sb.AppendLine("  功能号 " + "21".PadLeft(2) + " · " + "风扇手动转速设定值".PadRight(18) + " · " + verdict);
+	}
+
+	// ── ⑤ 风扇 / EC 实况（⭐ 机主：30 系风扇状态进诊断包 · 全程只读 ✅）──
+	private static void AppendFanEcState(StringBuilder sb)
+	{
+		sb.AppendLine();
+		sb.AppendLine("── ⑤ 风扇 / EC 实况（⭐ 30/40 系都输出 · 全程只读 ⛔ 不写任何字节）──");
+		System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+		try
+		{
+			MechrevoHw hw = Program.hw;
+			if (hw == null)
+			{
+				sb.AppendLine("⚠️ 后端未创建（Program.hw = null）⇒ 平台判据/曲线/强冷状态不可读");
+			}
+			else
+			{
+				sb.AppendLine("平台判据：UsesBaolongda = " + hw.UsesBaolongda
+					+ " · IsBaolongda30Series = " + hw.IsBaolongda30Series
+					+ " · DgpuGeneration = " + hw.DgpuGeneration
+					+ " · 板号 = " + (ReadBaseBoardProduct() is { Length: > 0 } board ? board : "（读不到）"));
+				sb.AppendLine("闸门：FanCurveVerified = " + hw.FanCurveVerified
+					+ " · PreferredChannel = " + FanWriter.ChannelName(FanWriter.PreferredChannel));
+			}
+
+			sb.AppendLine();
+			sb.AppendLine("EC 实读（⭐ 只读 · 8 个地址以内；⭐ 来源=ACPI-EC / LPC；读不到给原因）：");
+			AppendEcValue(sb, 0xC83C, "Fan1 目标档（x100RPM）", interpret: v => v + "（" + (v * 100) + " RPM）");
+			AppendEcValue(sb, 0xC83D, "Fan2 目标档（x100RPM）", interpret: v => v + "（" + (v * 100) + " RPM）");
+			AppendEcValue(sb, 0xB20, "接管掩码", interpret: v =>
+				"0x" + v.ToString("X2") + "（bit1=" + (((v & 0x02) != 0) ? "1" : "0")
+				+ " · bit3=" + (((v & 0x08) != 0) ? "1" : "0") + "）");
+			AppendEcValue(sb, 0xC834, "Fan1 转速字节", interpret: v => "0x" + v.ToString("X2") + "（≈" + (v * 100) + " RPM）");
+			AppendEcValue(sb, 0xC835, "Fan2 转速字节", interpret: v => "0x" + v.ToString("X2") + "（≈" + (v * 100) + " RPM）");
+			AppendEcValue(sb, 0x2000, "芯片 ID（期望 0x55）", interpret: v => "0x" + v.ToString("X2") + (v == 0x55 ? " ✅" : " ⚠️"));
+			AppendEcValue(sb, 0xC411, "EC 版本", interpret: v => "0x" + v.ToString("X2"));
+			AppendEcValue(sb, 0x1060, "解锁位（仅记录）", interpret: v =>
+				"0x" + v.ToString("X2") + "（bit7=" + (((v & 0x80) != 0) ? "1=已解锁" : "0=未解锁") + "，⛔ 诊断不写）");
+
+			sb.AppendLine();
+			if (hw != null && hw.TryReadFanSpeedsViaBackend(out int firstRpm, out int secondRpm))
+			{
+				sb.AppendLine("WMI 功能号 13（只读对照）：First=" + firstRpm + " RPM · Second=" + secondRpm + " RPM（协议通道 First/Second，含义待定）");
+			}
+			else
+			{
+				sb.AppendLine("WMI 功能号 13（只读对照）：读不到（接口不存在 / 后端未连接）");
+			}
+
+			if (hw != null)
+			{
+				try
+				{
+					BaolongdaFanCurveSettings curve = hw.LoadBaolongdaFanCurve();
+					sb.AppendLine("曲线状态：档位=" + MechrevoHw.CurrentFanCurveModeId
+						+ " · Enabled=" + curve.Enabled
+						+ " · SyncEnabled=" + curve.SyncEnabled
+						+ " · 温度点数=" + curve.Channel0Temperatures.Length
+						+ " · RPM 点数=" + curve.Channel0Rpms.Length
+						+ " · MinRpm=" + curve.MinRpm + " · MaxRpm=" + curve.MaxRpm
+						+ " · 存档" + (curve.IsUnreadableArchive ? "⚠️ 读不懂（" + curve.StatusNote + "）" : "可读"));
+				}
+				catch (Exception ex)
+				{
+					sb.AppendLine("曲线状态：读不到（" + ex.GetType().Name + "）");
+				}
+			}
+			sb.AppendLine("强冷状态：FanBoostActive = " + MechrevoHw.FanBoostActive
+				+ "（⚠️ 上次确认结果未持久化 ⇒ 本节只报 Active）");
+
+			sw.Stop();
+			sb.AppendLine("本节耗时 = " + sw.ElapsedMilliseconds + " ms（⭐ 固定 8 个 EC 地址，单次读有通道超时保护）");
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("风扇 / EC 实况异常（已吞掉，不影响其余诊断段）：" + ex.GetType().Name + " · " + ex.Message);
+		}
+	}
+
+	/// <summary>⭐ 诊断用只读 EC：先 ACPI-EC、再 LPC；⭐ 失败如实给原因（⛔ 不写任何字节）✅</summary>
+	private static void AppendEcValue(StringBuilder sb, int address, string label, Func<int, string> interpret)
+	{
+		bool ok = TryReadEcForDiag(address, out int value, out string source);
+		sb.AppendLine("  0x" + address.ToString("X4") + " " + label + " = "
+			+ (ok ? interpret(value) + " · 来源=" + source : source));
+	}
+
+	private static bool TryReadEcForDiag(int address, out int value, out string source)
+	{
+		value = -1;
+		source = "";
+		try
+		{
+			if (EcPortIo.TryReadByte(address, out int acpiValue))
+			{
+				value = acpiValue;
+				source = "ACPI-EC";
+				return true;
+			}
+			string acpiReason = EcPortIo.LastReadFailure;
+			if (EcLpcIo.TryReadByte(address, out int lpcValue))
+			{
+				value = lpcValue;
+				source = "LPC";
+				return true;
+			}
+			source = "读不到（ACPI-EC: " + acpiReason + " · LPC: " + EcLpcIo.LastReadFailure + "）";
+			return false;
+		}
+		catch (Exception ex)
+		{
+			source = "读不到（异常：" + ex.GetType().Name + "）";
+			return false;
+		}
 	}
 
 	// ── ⑤ HID 事件如实说明（⭐ 我们没有实现 ✅ ⛔ 不假装 ✅）──
