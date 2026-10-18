@@ -49,8 +49,6 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private readonly Label _statusLabel;
 
-	private readonly Label _hintLabel;
-
 	private TableLayoutPanel _grid;
 
 	private readonly ToolTip _toolTip = new ToolTip();
@@ -71,7 +69,6 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private const int RowStatus = 24;
 
-	private const int RowHint = 26;
 
 	public BatteryLimitPanel()
 	{
@@ -88,8 +85,6 @@ internal sealed class BatteryLimitPanel : Panel
 		_lowBox = MakeNumeric(1, 99, 60);
 		_highLabel = MakeFixedLabel("停充（%）", D(88));
 		_highBox = MakeNumeric(2, 100, 80);
-		_lowBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
-		_highBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 
 		_enableBox = new RCheckBox
 		{
@@ -115,16 +110,12 @@ internal sealed class BatteryLimitPanel : Panel
 		_statusLabel = MakeFixedLabel("状态读取中…", D(360));
 		_statusLabel.Margin = new Padding(0, D(4), 0, 0);
 
-		_hintLabel = MakeFixedLabel("", D(420));
-		_hintLabel.Margin = new Padding(0, D(4), 0, 0);
-		_hintLabel.Visible = false;
-
 		TableLayoutPanel grid = new TableLayoutPanel
 		{
 			Dock = DockStyle.Top,
 			AutoSize = false,
 			ColumnCount = 4,
-			RowCount = 5,
+			RowCount = 4,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = Color.Transparent
@@ -139,8 +130,7 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
-		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowHint)));
-		grid.Height = D(RowSoc + RowInput + RowInput + RowStatus + RowHint);
+		grid.Height = D(RowSoc + RowInput + RowInput + RowStatus);
 
 		grid.Controls.Add(_socLabel, 0, 0);
 		grid.SetColumnSpan(_socLabel, 4);
@@ -153,8 +143,6 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.Controls.Add(_highBox, 3, 2);
 		grid.Controls.Add(_statusLabel, 0, 3);
 		grid.SetColumnSpan(_statusLabel, 4);
-		grid.Controls.Add(_hintLabel, 0, 4);
-		grid.SetColumnSpan(_hintLabel, 4);
 
 		Controls.Add(grid);
 		// ⭐ 代码级 UI 自检（无法启动 GUI 时作为可验证替代）：标签宽度是否足够 ⇒ 不换行 ✅
@@ -164,7 +152,6 @@ internal sealed class BatteryLimitPanel : Panel
 		LogSwitchRowCheck();
 		LogSaveButtonCheck();
 		RefreshFromEc();
-		UpdateSocSafetyHint();
 		ApplyTheme();
 	}
 
@@ -196,7 +183,6 @@ internal sealed class BatteryLimitPanel : Panel
 		_applyButton.BackColor = UiVisualStyle.ButtonFace;
 		_applyButton.BorderColor = UiVisualStyle.Border;
 		ApplyStatusColor();
-		UpdateSocSafetyHint();
 		Logger.WriteLineIfChanged("battery-ui-theme",
 			"[battery-ui] 主题=" + (UiVisualStyle.IsNightMode ? "Dark" : "Light")
 			+ " ⇒ 文本色=" + ToHex(text) + " · 背景=" + ToHex(BackColor)
@@ -289,8 +275,7 @@ internal sealed class BatteryLimitPanel : Panel
 			SetStatus("状态读不到（详见日志）", 1);
 			Logger.WriteLine("[battery] 充电阈值状态（UI 刷新）：" + detail);
 			UpdateSocLine(active: false);
-			UpdateSocSafetyHint();
-			return;
+				return;
 		}
 		// ⭐ EC 原始值只进日志/诊断包，⛔ 不上 UI ✅
 		Logger.WriteLine("[battery] 充电阈值状态（UI 刷新）：" + detail);
@@ -313,7 +298,6 @@ internal sealed class BatteryLimitPanel : Panel
 		// ⭐ 机主要求：纯文字、无对勾、无括号；生效=绿色 Success，未启用=灰/Muted ✅
 		SetStatus(active ? "限制充电已生效" : "未限制充电", active ? 3 : 0);
 		UpdateSocLine(active);
-		UpdateSocSafetyHint();
 	}
 
 	/// <summary>⭐ 第二行只显示电量（状态摘要唯一位置=标题行右侧）✅。</summary>
@@ -329,63 +313,6 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			_socLabel.Text = "电量读不到";
 		}
-	}
-
-	/// <summary>
-	/// ⭐⭐ 机主要求（UX）：未启用且 `SOC ≥ high` 时，给出**可操作**提示（Warn 色）；
-	/// ⛔ 不移除 SOC&lt;high 安全前置（启用仍会被 writer 拒绝，但用户知道下一步怎么做）✅
-	/// </summary>
-	private void UpdateSocSafetyHint()
-	{
-		try
-		{
-			if (_active)
-			{
-				HideHint();
-				return;
-			}
-			int soc = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
-			int high = (int)_highBox.Value;
-			if (soc >= 0 && soc >= high)
-			{
-				_hintLabel.ForeColor = UiVisualStyle.Warn;
-				_hintLabel.Text = "⚠️ 当前电量 " + soc + "% ≥ 停充阈值 " + high
-					+ "% ⇒ 不会发送启用命令。请二选一：① 先把电量放到低于阈值；② 把停充阈值设到当前电量以上（例如 "
-					+ Math.Min(100, soc + 1) + "%）。";
-				ShowHintRow(true);
-			}
-			else
-			{
-				HideHint();
-			}
-		}
-		catch
-		{
-			HideHint();
-		}
-	}
-
-	/// <summary>⭐ 机主要求：普通说明行已删除 ⇒ 无警示时整行高 0（⛔ 不留空行）✅</summary>
-	private void HideHint()
-	{
-		_hintLabel.Text = "";
-		ShowHintRow(false);
-	}
-
-	private void ShowHintRow(bool show)
-	{
-		_hintLabel.Visible = show;
-		if (_grid == null || _grid.RowStyles.Count <= 4)
-		{
-			return;
-		}
-		_grid.RowStyles[4] = new RowStyle(SizeType.Absolute, show ? D(RowHint) : 0);
-		float total = 0f;
-		foreach (RowStyle rowStyle in _grid.RowStyles)
-		{
-			total += Math.Max(0f, rowStyle.Height);
-		}
-		_grid.Height = (int)Math.Round(total);
 	}
 
 	private static string EnableChargeText()

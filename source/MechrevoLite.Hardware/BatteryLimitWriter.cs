@@ -5,7 +5,7 @@
 //    · mailbox：0x8153 = 高参数 · 0x8154 = 低参数 · 0x8151 = 命令（0x0D 启用/0x0F 关闭）
 //                · 0x8150 = 触发（写 0x10）· 0x8152 = 结果（0x55 成功）
 //
-// ⭐ 启用顺序（严格）：身份 OK → 0x8150==0 → AC 在线 → 0<low<high<=100 → SOC<high
+// ⭐ 启用顺序（严格）：身份 OK → 0x8150==0 → AC 在线 → 0<low<high<=100（SOC≥high 允许，参考 initial_discharge_allowed=true）
 //    → 写 0x8153=high → 0x8154=low（回读）→ 0x8151=0x0D → 0x8150=0x10
 //    → 轮询 0x8150 回 0（≤3 s）→ 校验 0x8152==0x55 && 0x83C0==0x48（+ 0x83A1/0x83A2）
 // ⭐ 关闭顺序：0x8151=0x0F → 0x8150=0x10 → 轮询 → 校验 0x8152==0x55 && 0x83C0==0x00
@@ -46,17 +46,12 @@ internal static class BatteryLimitWriter
 		return h && l && m;
 	}
 
-	/// <summary>⭐ 启用限充（high=停充、low=起充；默认遵守 SOC&lt;high，失败不重试）✅。</summary>
-	internal static bool TryEnable(int low, int high, out string detail)
-	{
-		return TryEnable(low, high, allowAboveSoc: false, out detail);
-	}
-
 	/// <summary>
-	/// ⭐ 启用限充。<paramref name="allowAboveSoc" /> = true 时**仅测试**允许 SOC ≥ high（会打印警告）；
-	/// ⛔ 默认 false（参考实现要求 SOC&lt;high，否则可能触发固件放电辅助）✅。
+	/// ⭐ 启用限充。<para>⚠️ 2026-10-18（机主按参考实现纠正）：⭐ SOC ≥ high **默认允许**启用
+	/// （等价参考实现 `initial_discharge_allowed=true`，可能触发一次短暂放电把电量降到阈值）——
+	/// 只写一行日志，⛔ 不再拦截；其它安全前置（AC/参数/身份/触发空闲）保持不变 ✅</para>
 	/// </summary>
-	internal static bool TryEnable(int low, int high, bool allowAboveSoc, out string detail)
+	internal static bool TryEnable(int low, int high, out string detail)
 	{
 		StringBuilder log = new StringBuilder();
 		try
@@ -115,16 +110,11 @@ internal static class BatteryLimitWriter
 			log.AppendLine("电池 SOC = " + batteryPercent + "%");
 			if (batteryPercent >= high)
 			{
-				string suggestion = "请二选一：① 先把电量放到低于阈值；② 把停充阈值设到当前电量以上（例如 "
-					+ Math.Min(100, batteryPercent + 1) + "%）。";
-				if (!allowAboveSoc)
-				{
-					detail = log + "当前电量 " + batteryPercent + "% ≥ 停充阈值 " + high + "% ⇒ 不会发送启用命令。"
-						+ suggestion;
-					return false;
-				}
-				log.AppendLine("⚠️ --allow-above-soc（仅测试）：当前电量 " + batteryPercent + "% ≥ 停充阈值 " + high
-					+ "% ⇒ 用户已显式允许继续；⚠️ 参考实现警告：可能触发固件放电辅助");
+				// ⭐ 机主要求：只记一行日志，⛔ 不弹 UI、⛔ 不拦截 ✅
+				string note = "[battery] 启用时 SOC(" + batteryPercent + "%) ≥ 停充阈值(" + high
+					+ "%) ⇒ 按参考实现允许（initial_discharge_allowed=true），可能触发一次短暂放电";
+				log.AppendLine(note);
+				Logger.WriteLine(note);
 			}
 
 			log.AppendLine("① 写参数：0x8153=high(" + high + ") → 0x8154=low(" + low + ")");

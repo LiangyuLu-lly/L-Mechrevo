@@ -1,7 +1,7 @@
 // 2026-10-18（宝龙达 · 充电阈值）：⭐⭐ **限充启用/关闭测试** `--battery-limit-test` ⭐⭐
 //
 // ⭐ 阶段 2（白名单写）：严格按参考实现在 BM5235/2023 款上的协议事实（⛔ 未复制代码）：
-//    启用：身份 OK → 0x8150==0 → AC 在线 → 0<low<high<=100 → SOC<high
+//    启用：身份 OK → 0x8150==0 → AC 在线 → 0<low<high<=100（SOC≥high 允许，可能短暂放电）
 //          → 0x8153=high → 0x8154=low → 0x8151=0x0D → 0x8150=0x10 → 轮询回 0
 //          → 校验 0x8152==0x55 且 0x83C0==0x48
 //    关闭：0x8151=0x0F → 0x8150=0x10 → 轮询回 0 → 校验 0x8152==0x55 且 0x83C0==0x00
@@ -34,7 +34,6 @@ internal static class BatteryLimitTest
 		int low = 60;
 		int high = 80;
 		bool disable = false;
-		bool allowAboveSoc = false;
 		if (args != null)
 		{
 			for (int i = 0; i < args.Length; i++)
@@ -43,10 +42,6 @@ internal static class BatteryLimitTest
 				if (string.Equals(arg, "--disable", StringComparison.OrdinalIgnoreCase))
 				{
 					disable = true;
-				}
-				else if (string.Equals(arg, "--allow-above-soc", StringComparison.OrdinalIgnoreCase))
-				{
-					allowAboveSoc = true;
 				}
 				else if (string.Equals(arg, "--low", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
 				{
@@ -91,13 +86,9 @@ internal static class BatteryLimitTest
 			else
 			{
 				L("模式：启用限充（high=" + high + "% · low=" + low + "%）");
-				if (allowAboveSoc)
-				{
-					L("⚠️ --allow-above-soc 已启用：仅测试用途；允许 SOC ≥ 停充阈值时仍发送启用命令（可能触发固件放电辅助）");
-				}
 				bool stateOk = BatteryLimitWriter.TryReadState(out int curHigh, out int curLow, out int curMode, out string state);
 				L("当前状态：" + state + (stateOk ? "" : "（⚠️ 读取不完整）"));
-				bool ok = BatteryLimitWriter.TryEnable(low, high, allowAboveSoc, out string detail);
+				bool ok = BatteryLimitWriter.TryEnable(low, high, out string detail);
 				L(detail);
 				BatteryLimitWriter.TryReadState(out int afterHigh, out int afterLow, out int afterMode, out string after);
 				L("写后状态：" + after);
