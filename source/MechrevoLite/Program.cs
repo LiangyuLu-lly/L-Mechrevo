@@ -3513,6 +3513,25 @@ internal static class Program
 				{
 					return;
 				}
+				// ⭐⭐ 2026-10-19（门控审计）：启动自检一行，明确本机启用了哪些机型相关分支 ✅
+				try
+				{
+					bool gen30 = warmHw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
+					bool amd = MechrevoLite.Hardware.CpuVendor.IsAmd;
+					bool noDgpu = warmHw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu;
+					bool nvidia = !noDgpu && warmHw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.Unknown;
+					bool igpuPower = amd && noDgpu;
+					Logger.WriteError("[gate] 机型分类：baolongda=" + warmHw.UsesBaolongda + " gen=" + warmHw.DgpuGeneration
+						+ " wujieApu=" + warmHw.WujieSmuApu + " amd=" + amd + " nvidia=" + nvidia
+						+ " | 启用分支：kbdEc=" + (warmHw.UsesBaolongda && gen30)
+						+ " wujieSmu=" + warmHw.WujieSmuApu
+						+ " igpuPower=" + igpuPower
+						+ " quickExtra=" + warmHw.WujieSmuApu);
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[gate] 机型分类自检失败（已吞掉）：" + ex.Message);
+				}
 				long fanStart = Environment.TickCount64;
 				try
 				{

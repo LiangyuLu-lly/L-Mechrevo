@@ -609,7 +609,9 @@ public class LhmMonitor : IDisposable
 							else if (IsGpuHardwareType(item.HardwareType))
 							{
 								gpuPowerSensors.Add((item.HardwareType, item.Name, sensor.Name, sensor.Value.Value));
-								if (IsGpuPowerSensorName(sensor.Name))
+								// ⭐⭐ 2026-10-19（门控审计：NVIDIA 路径逐位不变）：NVIDIA 仍用**原窄判据**；
+								//   AMD 才用放宽后的 GPU*Power（APU 核显必需）✅
+								if (item.HardwareType == HardwareType.GpuNvidia ? IsGpuPowerSensorNameLegacy(sensor.Name) : IsGpuPowerSensorName(sensor.Name))
 								{
 									switch (item.HardwareType)
 									{
@@ -690,13 +692,17 @@ public class LhmMonitor : IDisposable
 					amdPower = amdIgpuPower;
 				}
 				float? gpuPowerSelected = SelectGpuPower(flag, nvidiaPower, flag2, amdPower, integratedPower);
-				LogGpuPowerDiagnostics(gpuPowerSensors, gpuTemps, flag, flag2, amdIgpuSource, amdIgpuPower);
 				GpuPower = ApplyGpuPowerFreezeGuard(gpuPowerSelected, flag2 && !flag, gpuLoad, GpuTemperature);
-				LogGpuPowerTick(gpuPowerSensors, gpuTemps, amdIgpuSource, GpuPower, gpuLoad, GpuTemperature);
-				if (!_dumpedSensors)
+				// ⭐ 门控审计：诊断/tick/启用日志只对 **AMD 核显** 打印（NVIDIA 日志/行为逐位不变）✅
+				if (flag2 && !flag)
 				{
-					Logger.WriteError("[gpu-power] LHM 启用检查：IsGpuEnabled=" + _computer.IsGpuEnabled + " · nvidiaSkipped=" + _nvidiaGpuSkipped
-						+ " · GPU 硬件数=" + _computer.Hardware.Count((IHardware h) => IsGpuHardwareType(h.HardwareType)));
+					LogGpuPowerDiagnostics(gpuPowerSensors, gpuTemps, flag, flag2, amdIgpuSource, amdIgpuPower);
+					LogGpuPowerTick(gpuPowerSensors, gpuTemps, amdIgpuSource, GpuPower, gpuLoad, GpuTemperature);
+					if (!_dumpedSensors)
+					{
+						Logger.WriteError("[gpu-power] LHM 启用检查：IsGpuEnabled=" + _computer.IsGpuEnabled + " · nvidiaSkipped=" + _nvidiaGpuSkipped
+							+ " · GPU 硬件数=" + _computer.Hardware.Count((IHardware h) => IsGpuHardwareType(h.HardwareType)));
+					}
 				}
 				if (!_updateHadFailure && Interlocked.Exchange(ref _consecutiveFailures, 0) != 0)
 				{
@@ -1042,6 +1048,25 @@ public class LhmMonitor : IDisposable
 			|| text.Equals("Board Power", StringComparison.OrdinalIgnoreCase);
 	}
 
+	/// <summary>⭐ 原窄判据（NVIDIA 专用，保持改动前口径逐位不变）✅</summary>
+	private static bool IsGpuPowerSensorNameLegacy(string? name)
+	{
+		if (string.IsNullOrWhiteSpace(name))
+		{
+			return false;
+		}
+		string text = name.Trim();
+		if (text.Contains("limit", StringComparison.OrdinalIgnoreCase) || text.Contains("capacity", StringComparison.OrdinalIgnoreCase)
+			|| text.Contains("maximum", StringComparison.OrdinalIgnoreCase) || text.Contains("minimum", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+		return text.Equals("GPU Package", StringComparison.OrdinalIgnoreCase)
+			|| text.Equals("GPU Package Power", StringComparison.OrdinalIgnoreCase)
+			|| text.Equals("GPU Power", StringComparison.OrdinalIgnoreCase)
+			|| text.Equals("Total Board Power", StringComparison.OrdinalIgnoreCase)
+			|| text.Equals("Board Power", StringComparison.OrdinalIgnoreCase);
+	}
 	private static bool IsGpuMemoryTotalSensorName(string? name)
 	{
 		if (name != null)
