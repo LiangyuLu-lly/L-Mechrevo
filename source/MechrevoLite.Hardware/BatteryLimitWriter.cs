@@ -92,22 +92,17 @@ internal static class BatteryLimitWriter
 				return false;
 			}
 
-			// ⭐⭐ 2026-10-18（机主：启用时不要触发那一次放电）：⭐ 若 SOC > 配置 high ⇒
-			//   `effectiveHigh = max(high, SOC)`（上限 100）再发启用 ⇒ SOC ≤ effectiveHigh ⇒ **不触发固件放电**；
-			//   ⛔ 不改用户配置（下次保存时按新 SOC 重新判断）；📝 这是一次**本次生效值**的提升 ✅
-			//   ⚠️ 放在“已是目标配置”提前返回**之前**：用户重新保存旧 high 时也要按当前 SOC 重新判断 ✅
+			// ⭐⭐ 2026-10-18（机主按 0.291.9.18 诊断包纠正）：⭐ **恢复参考实现的放电语义**：
+			//   SOC > high 时**直接写用户配置的 high/low**（⛔ 不做 effectiveHigh 提升、⛔ 不改配置、⛔ 不回填 SOC），
+			//   固件会放电到 high；只记一行说明 ✅
 			int batteryPercent = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
 			log.AppendLine("电池 SOC = " + batteryPercent + "%");
-			int configuredHigh = high;
 			if (batteryPercent >= 0 && batteryPercent > high)
 			{
-				int effectiveHigh = Math.Min(100, Math.Max(high, batteryPercent));
-				string note = "[battery] 启用：配置停充阈值=" + configuredHigh + "% 但当前 SOC=" + batteryPercent
-					+ "% ⇒ 本次按 SOC 提升为 " + effectiveHigh
-					+ "%（避免触发固件放电）；可在电量下降后重新保存为 " + configuredHigh + "%";
+				string note = "[battery] 启用：SOC(" + batteryPercent + "%) > 停充阈值(" + high
+					+ "%) ⇒ 按参考实现允许（initial_discharge_allowed=true），固件会放电到 " + high + "%";
 				log.AppendLine(note);
 				Logger.WriteLine(note);
-				high = effectiveHigh;
 			}
 
 			if (curMode == ModeActive && curHigh == high && curLow == low)

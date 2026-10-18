@@ -7973,6 +7973,18 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			Logger.WriteLine("[battery] 充电阈值面板：rowIndex=" + _bdChargePanelRowIndex + " · rows=" + host.RowStyles.Count
 				+ " · preferredHeight=" + panelHeight + " · host.Width=" + host.Width + " · host.Height=" + host.Height
 				+ " · panel.Height=" + panel.Height + " · panel.Visible=" + panel.Visible);
+			// ⭐⭐ 2026-10-18（机主：打开电池页也核对一次）：⭐ 后台跑、幂等；⛔ 不阻塞 UI ✅
+			_ = Task.Run(delegate
+			{
+				try
+				{
+					BatteryLimitRestore.RunOnce("打开电池页");
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[battery] 打开电池页核对失败（已吞掉，不重试）：" + ex.Message);
+				}
+			});
 		}
 		catch (Exception ex)
 		{

@@ -414,6 +414,14 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值）：`--battery-limit-status`（⭐ 纯只读）。
+		//   ⭐ 打印 EC 常驻值 + 本地配置 + 是否一致；⛔ 不写、不触发恢复；平台闸拒绝非宝龙达（0 读 0 写）。
+		case "--battery-limit-status":
+		{
+			Environment.ExitCode = BatteryLimitStatus.Run();
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-18（SMU-EC 只读核对）：`--smu-ec-probe`。
 		//   ⭐ 核对 7.3 `RyzenAccess.Write_EC_EX/Read_EC_EX` 的真实通道（结论：LPC 端口 I/O，无 SMU 命令）；
 		//   ⭐ 双通道（ACPI/LPC）只读对照；⛔ 不发 SMU 命令、不写任何 EC 字节。
@@ -3470,6 +3478,15 @@ internal static class Program
 					Logger.WriteLine("[init] 后台初始化：风扇闸门/清理失败（已吞掉，标记失败不重试）：" + ex.Message);
 				}
 				Logger.WriteError("[init] 后台初始化：风扇闸门 ok=" + warmHw.FanCurveVerified + "（耗时 " + (Environment.TickCount64 - fanStart) + " ms）");
+				// ⭐⭐ 2026-10-18（机主：关机后阈值还在不在）：⭐ 启动空闲预热里核对并恢复宝龙达限充配置 ✅
+				try
+				{
+					MechrevoLite.Hardware.BatteryLimitRestore.RunOnce("启动空闲预热");
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[init] 后台初始化：电池阈值核对失败（已吞掉，不重试）：" + ex.Message);
+				}
 				if (_backendWarmupCts.IsCancellationRequested)
 				{
 					return;

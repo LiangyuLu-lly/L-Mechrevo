@@ -341,6 +341,11 @@ internal sealed class BatteryLimitPanel : Panel
 			{
 				SetStatus(want ? Strings.BatteryLimitEnableFailed : Strings.BatteryLimitDisableFailed, 1);
 			}
+			else
+			{
+				// ⭐ 成功 ⇒ 落本地配置（启动核对/恢复用；⛔ 失败不写，避免把错误状态当配置）✅
+				BatteryLimitRestore.SaveConfig(want, (int)_lowBox.Value, (int)_highBox.Value);
+			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
@@ -379,6 +384,10 @@ internal sealed class BatteryLimitPanel : Panel
 			if (!ok)
 			{
 				SetStatus(Strings.BatteryLimitSaveFailed, 1);
+			}
+			else
+			{
+				BatteryLimitRestore.SaveConfig(enabled: true, low, high);
 			}
 			RefreshFromEc();
 		}
