@@ -17,6 +17,9 @@ public class LhmMonitor : IDisposable
 
 	private long _lastUpdateTicks;
 
+	/// <summary>⭐ 2026-10-18：⭐ 被 1 s 限频 / 并发更新跳过（未真正 Update）的次数（⭐ 诊断用，见 <see cref="UpdateSkips" />）✅。</summary>
+	private int _updateSkips;
+
 	private long _lastOpenAttemptTicks;
 
 	private bool _dumpedSensors;
@@ -65,6 +68,235 @@ public class LhmMonitor : IDisposable
 
 	/// <summary>⭐ 实际选中的 CPU 温度传感器名（⭐ 诊断用：⭐ 让我们知道到底读到的是哪一个 ✅）。</summary>
 	public string CpuTemperatureSensorName { get; private set; }
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：30 系 CPU 温度 80℃ 不动 · 诊断包 <c>lm-…-161007</c>）：
+	/// ⭐ <b>CPU 温度来源档位</b>（⭐ 数值越小越优先 ✅）。
+	/// <para>⭐ 优先级（⭐ 用户/官方口径）：<c>Tctl/Tdie</c>（AMD 真实结温）＞
+	/// <c>CPU Package</c> / <c>Core Average</c> / <c>Core Max</c>（Intel 封装）＞ 其余（<c>Core #N</c> 等）✅。</para>
+	/// <para>⚠️ 「ACPI 热区」不在本枚举里 —— ⭐ 它由 <c>HardwareControl</c> 插在 <see cref="Package" />
+	/// 与 <see cref="Other" /> 之间参与取源 ✅。</para>
+	/// </summary>
+	internal enum CpuTemperatureTier
+	{
+		/// <summary>⭐ 本轮没读到任何 CPU 温度 ✅。</summary>
+		None = 0,
+		/// <summary>⭐⭐ 最优先：⭐ AMD 的 <c>Core (Tctl/Tdie)</c> / <c>CCD (Tdie)</c> —— **真实结温**（官方控制台口径）✅。</summary>
+		TctlTdie = 1,
+		/// <summary>⭐ 次优先：⭐ Intel 口径的 <c>CPU Package</c> / <c>Core Average</c> / <c>Core Max</c> ✅。</summary>
+		Package = 2,
+		/// <summary>⭐ 最后：⭐ 其余温度名（⭐ <c>Core #1</c> 等单核/其他口径 ⚠️ —— 通常比封装/结温低）。</summary>
+		Other = 3,
+		/// <summary>⛔ 不参与选源：⭐ <c>Distance to TjMax</c> 之类语义相反/无关的温度名 ⚠️。</summary>
+		Excluded = 4
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-18：⭐ <b>一个 CPU 温度传感器的快照</b>（⭐ 名称 / 值 / 档位 / 上次值变化时刻 ✅）。
+	/// <para>⭐ 用途：⭐ ① 诊断包「CPU 温度来源明细」逐行列出（⭐ 值 + 更新时间 ✅）；
+	/// ⭐ ② 「疑似异常」提示判据（⭐ 这个值多久没变过 ⚠️）。</para>
+	/// </summary>
+	internal sealed class CpuTemperatureSensorReading
+	{
+		internal string Name { get; init; } = "";
+
+		internal float? Value { get; init; }
+
+		internal CpuTemperatureTier Tier { get; init; }
+
+		/// <summary>⭐ 这个传感器的值**上一次真正变化**的时刻（<see cref="Environment.TickCount64" />；0 = 未知）✅。</summary>
+		internal long LastChangeTicks { get; init; }
+
+		/// <summary>⭐ 距上次变化的毫秒数（⭐ -1 = 未知 / 还没变过 ✅）。</summary>
+		internal long UnchangedMs
+		{
+			get
+			{
+				long tick = LastChangeTicks;
+				if (tick == 0L)
+				{
+					return -1L;
+				}
+				return Environment.TickCount64 - tick;
+			}
+		}
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ 跨轮保存每个 CPU 温度传感器的「上次值 / 上次变化时刻」（⭐ 卡死与诊断判据用 ✅）。</summary>
+	private sealed class CpuTemperatureSensorState
+	{
+		internal float Value;
+
+		internal long LastChangeTicks;
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ 本轮所有 CPU 温度传感器快照（⭐ 每轮 <see cref="Update" /> 重建、整数组替换 ✅）。</summary>
+	private CpuTemperatureSensorReading[] _cpuTemperatureSensors = Array.Empty<CpuTemperatureSensorReading>();
+
+	/// <summary>⭐ 2026-10-18：⭐ 每个 CPU 温度传感器的跨轮状态（⭐ 判"上次变化时刻"✅）。</summary>
+	private readonly Dictionary<string, CpuTemperatureSensorState> _cpuTemperatureState = new Dictionary<string, CpuTemperatureSensorState>(StringComparer.Ordinal);
+
+	/// <summary>⭐ 2026-10-18：⭐ 上一次选中的 CPU 温度值 / 它开始保持不变的时刻（⭐ 只用于诊断"多久没变" ✅）。</summary>
+	private float? _cpuTemperatureLastValue;
+
+	private long _cpuTemperatureLastChangeTicks;
+
+	/// <summary>⭐ 2026-10-18：⭐ 当前选中 CPU 温度传感器所属档位（⭐ 选源/诊断用 ✅）。</summary>
+	internal CpuTemperatureTier CpuTemperatureSelectedTier { get; private set; }
+
+	/// <summary>
+	/// ⭐ 2026-10-18：⭐ <b>本机 LHM 暴露的全部 CPU 温度传感器快照</b> ✅
+	/// （⭐ 诊断包「CPU 温度来源明细」逐行列出：⭐ 名称 / 值 / 档位 / 上次变化时刻 ✅）。
+	/// <para>⚠️ 只读快照、整数组替换 ⇒ ⭐ 诊断线程读取时**不需要加锁**（⭐ 最差读到上一轮 ✅）。</para>
+	/// </summary>
+	internal IReadOnlyList<CpuTemperatureSensorReading> CpuTemperatureSensors => _cpuTemperatureSensors;
+
+	/// <summary>⭐ 2026-10-18：⭐ 当前选中的 CPU 温度值**已经多久没变过**（毫秒；⭐ -1 = 还没选到 ✅）。</summary>
+	internal long CpuTemperatureUnchangedMs
+	{
+		get
+		{
+			long tick = _cpuTemperatureLastChangeTicks;
+			if (tick == 0L)
+			{
+				return -1L;
+			}
+			return Environment.TickCount64 - tick;
+		}
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ LHM 枚举到的 CPU 硬件对象数（⭐ 0 ⇒ 温度必然读不到；⭐ 诊断用 ✅）。</summary>
+	internal int CpuHardwareCount { get; private set; }
+
+	/// <summary>⭐ 2026-10-18：⭐ LHM 最近一次 <see cref="Update" /> 距今多久（毫秒；⭐ -1 = 还没更新过；⭐ 诊断用 ✅）。</summary>
+	internal long LastUpdateAgeMs
+	{
+		get
+		{
+			long tick = Interlocked.Read(in _lastUpdateTicks);
+			if (tick == 0L)
+			{
+				return -1L;
+			}
+			return Environment.TickCount64 - tick;
+		}
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ LHM 最近一次 <see cref="Update" /> 的时刻（<see cref="Environment.TickCount64" />；⭐ 0 = 还没更新过 ✅）。</summary>
+	internal long LastUpdateTicks => Interlocked.Read(in _lastUpdateTicks);
+
+	/// <summary>
+	/// ⭐ 2026-10-18（机主：CPU 温度显示不跟随真实温度）：⭐ <b>被 1 s 限频/并发跳过的 Update 次数</b>（⭐ 诊断用）✅
+	/// <para>⭐ 用途：⭐ 区分「本 tick 真的 Update 了」与「在 1 s 限频内、读到的是上一次的缓存」⚠️
+	/// —— ⭐ `[cpu-temp]` 日志里会标成 <c>LHM=Update</c> / <c>LHM=缓存(ns前)</c> ✅。</para>
+	/// </summary>
+	internal int UpdateSkips => Volatile.Read(in _updateSkips);
+
+	/// <summary>
+	/// ⭐ 2026-10-18：⭐ 把一个 CPU 温度传感器名**分档**（⭐ 选源用）✅。
+	/// <list type="bullet">
+	/// <item><c>Tctl</c> / <c>Tdie</c> ⇒ <see cref="CpuTemperatureTier.TctlTdie" />（⭐ AMD 真实结温，官方口径）✅</item>
+	/// <item><c>CPU Package</c> / <c>Core Average</c> / <c>Core Max</c> ⇒ <see cref="CpuTemperatureTier.Package" />（⭐ Intel 封装）✅</item>
+	/// <item><c>Distance to TjMax</c> 之类 ⇒ <see cref="CpuTemperatureTier.Excluded" />（⭐ 语义相反，⛔ 不参与）⚠️</item>
+	/// <item>其余（<c>Core #N</c> 等）⇒ <see cref="CpuTemperatureTier.Other" /> ✅</item>
+	/// </list>
+	/// </summary>
+	internal static CpuTemperatureTier ClassifyCpuTemperatureSensorName(string name)
+	{
+		if (string.IsNullOrEmpty(name))
+		{
+			return CpuTemperatureTier.Excluded;
+		}
+		if (name.IndexOf("Distance", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("TjMax", StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			return CpuTemperatureTier.Excluded;
+		}
+		if (name.IndexOf("Tctl", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Tdie", StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			return CpuTemperatureTier.TctlTdie;
+		}
+		if (name.IndexOf("CPU Package", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Core Average", StringComparison.OrdinalIgnoreCase) >= 0
+			|| name.IndexOf("Core Max", StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			return CpuTemperatureTier.Package;
+		}
+		return CpuTemperatureTier.Other;
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-18：⭐ 收集本轮一个 CPU 温度传感器（⭐ 值 + 档位 + 上次变化时刻）✅。
+	/// <para>⚠️ 变化判据按 **0.05℃** 容差 ⇒ ⭐ 浮点抖动不算"变化"（⛔ 免得把"不变"误判成"在变" ⚠️）。</para>
+	/// </summary>
+	private void CollectCpuTemperatureSensor(string name, float value, long nowTicks, List<CpuTemperatureSensorReading> readings)
+	{
+		if (!_cpuTemperatureState.TryGetValue(name, out CpuTemperatureSensorState state))
+		{
+			state = new CpuTemperatureSensorState
+			{
+				Value = value,
+				LastChangeTicks = nowTicks
+			};
+			_cpuTemperatureState[name] = state;
+		}
+		else if (Math.Abs(state.Value - value) > 0.05f)
+		{
+			state.Value = value;
+			state.LastChangeTicks = nowTicks;
+		}
+		readings.Add(new CpuTemperatureSensorReading
+		{
+			Name = name,
+			Value = value,
+			Tier = ClassifyCpuTemperatureSensorName(name),
+			LastChangeTicks = state.LastChangeTicks
+		});
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-18（机主：CPU 温度 80℃ 不动）：⭐ <b>本轮选源</b> ✅ ——
+	/// ⭐ 在**本轮全部** CPU 温度传感器里按 <c>Tctl/Tdie &gt; CPU Package &gt; Core Max/其余</c> 选一个 ✅；
+	/// ⭐ 同档多个（⭐ 如 CCD1/CCD2 两个 Tdie）⇒ ⭐ **取最高值**（⭐ 最接近"整颗 CPU 最热处" ✅）。
+	/// <para>⚠️⚠️ 这条**必须在每轮 <see cref="Update" /> 里重新执行** —— 以前用
+	/// <c>!CpuTemperature.HasValue</c> 做闸门 ⇒ ⭐ 一个实例只在第一次读到值后**再也不更新** ❌
+	/// （⭐ 真机证据：同一个实例连续 20 分钟恒 90℃、重启后新实例恒 80℃ ⚠️）。</para>
+	/// </summary>
+	private void SelectCpuTemperature(List<CpuTemperatureSensorReading> readings, long nowTicks)
+	{
+		_cpuTemperatureSensors = readings.ToArray();
+		CpuTemperatureSensorReading best = null;
+		foreach (CpuTemperatureSensorReading reading in readings)
+		{
+			if (reading.Tier == CpuTemperatureTier.Excluded || !reading.Value.HasValue)
+			{
+				continue;
+			}
+			if (best == null || reading.Tier < best.Tier
+				|| (reading.Tier == best.Tier && reading.Value.Value > best.Value.Value))
+			{
+				best = reading;
+			}
+		}
+		if (best == null)
+		{
+			CpuTemperature = null;
+			CpuTemperatureSensorName = null;
+			CpuTemperatureSelectedTier = CpuTemperatureTier.None;
+			_cpuTemperatureLastValue = null;
+			_cpuTemperatureLastChangeTicks = 0L;
+			return;
+		}
+		CpuTemperature = best.Value;
+		CpuTemperatureSensorName = best.Name;
+		CpuTemperatureSelectedTier = best.Tier;
+		if (!_cpuTemperatureLastValue.HasValue || Math.Abs(_cpuTemperatureLastValue.Value - best.Value.Value) > 0.05f)
+		{
+			_cpuTemperatureLastValue = best.Value;
+			_cpuTemperatureLastChangeTicks = nowTicks;
+		}
+	}
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（"接传感器"）：⭐ **GPU 温度（摄氏度）** —— 同样来自 LM 自带的 LHM ✅。
@@ -225,6 +457,8 @@ public class LhmMonitor : IDisposable
 		long tickCount = Environment.TickCount64;
 		if (tickCount - Interlocked.Read(in _lastUpdateTicks) < 1000)
 		{
+			// ⭐ 2026-10-18：⭐ 1 s 限频内 ⇒ 本次**没有真正 Update**（⭐ 记数供诊断区分"Update / 缓存" ✅）
+			Interlocked.Increment(ref _updateSkips);
 			return;
 		}
 		lock (_updateLock)
@@ -232,6 +466,10 @@ public class LhmMonitor : IDisposable
 			tickCount = Environment.TickCount64;
 			if (_disposed || tickCount - _lastUpdateTicks < 1000)
 			{
+				if (!_disposed)
+				{
+					Interlocked.Increment(ref _updateSkips);
+				}
 				return;
 			}
 			_lastUpdateTicks = tickCount;
@@ -243,6 +481,16 @@ public class LhmMonitor : IDisposable
 				GpuPower = null;
 				GpuMemoryTotalMb = 0;
 				GpuMemoryUsedMb = 0;
+				// ⭐⭐ 2026-10-18（机主：30 系 CPU 温度 80℃ 不动 · 诊断包 lm-…-161007）：
+				//   ⚠️⚠️ **根因**：⭐ 这里原来**没有**把 CPU 温度清成 null，而采集分支又带
+				//   `!CpuTemperature.HasValue` 闸门 ⚠️ ⇒ ⭐ 一个 <see cref="LhmMonitor" /> 实例
+				//   **只在第一次读到值之后就不再更新** ❌（⭐ 真机证据：[cpu-temp] 在同一实例里
+				//   连续 20 分钟恒 90℃、重启后新实例恒 80℃ ⚠️）⇒ ⭐ 每轮必须清空、重新选 ✅。
+				CpuTemperature = null;
+				CpuTemperatureSensorName = null;
+				CpuTemperatureSelectedTier = CpuTemperatureTier.None;
+				List<CpuTemperatureSensorReading> cpuTempReadings = new List<CpuTemperatureSensorReading>();
+				int cpuHardwareCount = 0;
 				bool flag = false;
 				bool flag2 = false;
 				float? nvidiaPower = null;
@@ -256,6 +504,10 @@ public class LhmMonitor : IDisposable
 				{
 					flag |= item.HardwareType == HardwareType.GpuNvidia;
 					flag2 |= item.HardwareType == HardwareType.GpuAmd;
+					if (item.HardwareType == HardwareType.Cpu)
+					{
+						cpuHardwareCount++;
+					}
 					if (item.HardwareType == HardwareType.GpuNvidia)
 					{
 						// (b) NVIDIA 原生路径守卫：nvml.dll/nvapi64.dll 被卸载或换址后，LHM 缓存的句柄/函数地址已失效，
@@ -310,21 +562,16 @@ public class LhmMonitor : IDisposable
 							float num5 = sensor.Value.Value;
 							CpuClockMhz = num5 * ((num5 < 1000f) ? 1000f : 1f);
 						}
-						// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配 · "接传感器"）：⭐ **新增温度采集** ✅
-						//   ⭐ 起因（⭐ 用户原话）：「⭐ 接 传感器如果 LM 自带的那个 dll 能读温度
-						//      **优先用 LM 的传感器**，⭐ 不能的再接」✅
-						//   ⭐ 实测（⭐ `--sensor-dump` · ⭐ 本机 翼龙15Pro）：⭐ LHM 能读 **5 个温度** ✅
-						//      （⭐ GPU Core 78 / ⭐ Hot Spot 91 / ⭐ 显存 80 / ⭐ iGPU 72 / ⭐ CPU Tctl/Tdie ✅）
-						//   ⚠️ 但生产里 `_nvidiaGpuSkipped` 会**关掉 GPU 那支**（⭐ 见构造函数注释：
-						//      ⭐ NVML 原生崩溃修复 ⚠️）⇒ ⭐ 生产上 **GPU 温度不来自 LHM** ⚠️，
-						//      ⭐ 能稳定拿到的是 ⭐ **CPU 温度** ✅
-						//   ⇒ ⭐ 所以这里**只补 CPU 温度**（⭐ 优先取到一个就固定用那个传感器的名字 ✅）；
-						//      ⭐ GPU 温度另有来源（⭐ NVML / ⭐ 宝龙达侧后续 ✅）
-						else if (sensor.SensorType == SensorType.Temperature && item.HardwareType == HardwareType.Cpu
-							&& !CpuTemperature.HasValue && IsCpuTemperatureSensorName(sensor.Name))
+						// ⭐⭐ 2026-10-18（机主：30 系 CPU 温度 80℃ 不动 · 诊断包 lm-…-161007）：
+						//   ⚠️ 原来这里用 `!CpuTemperature.HasValue` 做闸门（⭐ 一旦有值就再也不进）
+						//   ⇒ ⭐ 温度**冻结在实例的第一个读数上** ❌（⭐ 真机证据：同一实例 20 分钟恒 90℃、
+						//   重启后新实例恒 80℃；⭐ 官方控制台同期也在变 ⚠️）。
+						//   ⭐ 现在：⭐ **收集本轮全部 CPU 温度传感器**（⭐ 名称/值/档位/上次变化时刻 ✅），
+						//   循环结束后由 `SelectCpuTemperature` 统一按「Tctl/Tdie ＞ CPU Package ＞ 其余」选源 ✅。
+						//   ⭐ 官方口径：⭐ AMD 的 `Core (Tctl/Tdie)` = 真实结温（官方控制台读数）；⭐ Intel 为 `CPU Package` ✅
+						else if (sensor.SensorType == SensorType.Temperature && item.HardwareType == HardwareType.Cpu)
 						{
-							CpuTemperature = sensor.Value;
-							CpuTemperatureSensorName = sensor.Name;
+							CollectCpuTemperatureSensor(sensor.Name, sensor.Value.Value, tickCount, cpuTempReadings);
 						}
 						// ⭐⭐ 2026-10-16：⭐ GPU 温度（⭐ 只在 LHM 的 GPU 那支启用时才可能命中 ✅）
 						else if (sensor.SensorType == SensorType.Temperature && IsGpuHardwareType(item.HardwareType)
@@ -348,6 +595,9 @@ public class LhmMonitor : IDisposable
 						}
 					}
 				}
+				// ⭐⭐ 2026-10-18（机主：CPU 温度 80℃ 不动）：⭐ 本轮 CPU 温度选源（⭐ 在全部传感器里按档位选 ✅）
+				CpuHardwareCount = cpuHardwareCount;
+				SelectCpuTemperature(cpuTempReadings, tickCount);
 				GpuPower = SelectGpuPower(flag, nvidiaPower, flag2, amdPower, integratedPower);
 				if (!_updateHadFailure && Interlocked.Exchange(ref _consecutiveFailures, 0) != 0)
 				{

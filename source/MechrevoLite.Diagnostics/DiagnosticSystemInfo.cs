@@ -38,6 +38,11 @@ internal static class DiagnosticSystemInfo
 		// ⛔ 不写注册表/EC/ACPI/NVRAM；⛔ 序列号字段从不读取；WMI 失败写 unavailable，不抛。
 		stringBuilder.Append(MachineCodeProbe.BuildSection());
 		AppendCpu(stringBuilder);
+		// ⭐ 2026-10-18（机主：30 系 CPU 温度显示卡在 80℃ 不动、调节电后真实温度变了显示没变）：
+		//   ⭐ 紧跟 [CPU] 之后追加「CPU 温度来源明细」一节 —— ⭐ 只读 ✅：
+		//   ① 厂商功能号 22（30 系 = 可读但值 0）；② LHM **全部** CPU 温度传感器（值 + 上次变化时刻）；
+		//   ③ ACPI 热区现读；④ 当前实际取源 + 「LHM 未刷新」判定。⛔ 不写任何硬件/配置。
+		stringBuilder.Append(DiagnosticCpuTempInfo.Build());
 		AppendGpus(stringBuilder);
 		// 2026-10-09（诊断增强）：[GPU] 之后追加「配置与注册表」一节 ——
 		// LM 关键配置 / 档位已保存值 / 注册表（L-Mechrevo·RGBKeyboard·ItemSupport·服务·BIOS）/

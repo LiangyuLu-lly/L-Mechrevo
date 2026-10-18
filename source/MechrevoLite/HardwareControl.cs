@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -33,10 +34,10 @@ public static class HardwareControl
 	/// 本项目 `DiagnosticBaolongdaInfo.cs:22` 记过：那个口径查不到会**假否定** ⚠️）。</para>
 	/// <para>⚠️ 限频 30 秒（WMI 查询不轻）；任何异常都吞掉返回 0（⛔ 不影响别的传感器）。</para>
 	/// </summary>
-	private static int ReadAcpiThermalZoneCelsius()
+	private static int ReadAcpiThermalZoneCelsius(bool force = false)
 	{
 		long now = Environment.TickCount64;
-		if (now - Interlocked.Read(in _acpiTempLastTicks) < 30000)
+		if (!force && now - Interlocked.Read(in _acpiTempLastTicks) < 30000)
 		{
 			return _acpiTempCached;
 		}
@@ -69,6 +70,16 @@ public static class HardwareControl
 		}
 		Volatile.Write(ref _acpiTempCached, best);
 		return best;
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-18（机主：CPU 温度显示不跟随真实温度）：⭐ <b>诊断包专用</b> —— 强制现读一次 ACPI 热区 ✅。
+	/// <para>⚠️ 与采样路径共用同一份实现，只**跳过 30 s 限频缓存**（⭐ 导出诊断包是低频手动动作 ⇒ ⭐ 一次现读可接受 ✅）；
+	/// ⛔ 纯只读（⭐ 只查 <c>root\WMI:MSAcpi_ThermalZoneTemperature</c>）✅。</para>
+	/// </summary>
+	internal static int ReadAcpiThermalZoneCelsiusForDiagnostics()
+	{
+		return ReadAcpiThermalZoneCelsius(force: true);
 	}
 
 	/// <summary>
@@ -286,6 +297,51 @@ public static class HardwareControl
 
 	/// <summary>⭐ 2026-10-18：上一次记录过的 CPU 温度来源（"func22" / "LHM" / "ACPI" / "vendor"）—— 来源变化时立即记一行 ✅。</summary>
 	private static string _cpuTempSourceLogged = "";
+
+	/// <summary>⭐ 2026-10-18（机主验证：调「节电」后温度必须下降）：⭐ 上一次**记过日志**的 CPU 温度值 —— 值一变就必打一行 ✅。</summary>
+	private static int _cpuTempLastLoggedValue = -1;
+
+	/// <summary>⭐ 2026-10-18：⭐ 上一次读到的厂商功能号 22 原始值（⭐ -1 = 没试/不适用 · ⭐ 0 = 可读但无效 · ⭐ &gt;0 = 有效 ✅；⭐ 诊断用）。</summary>
+	private static int _cpuTempLastFunc22Celsius = -1;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主实测：调「节电」后**真实温度降了、显示没变**）：⭐ **LHM 是否在刷新**的判定状态 ✅
+	/// <para>⚠️ 判据（⭐ 必须**先用日志证明**才能换源）：⭐ ① LHM 值连续 ≥ <see cref="CpuTempLhmWatchMinUnchangedMs" />
+	/// （3 分钟）完全不变；⭐ ② ⭐ 同一窗口内 **ACPI 热区变了 ≥ <see cref="CpuTempLhmWatchAcpiDeltaCelsius" />℃**
+	/// （= 环境/负载真的在变，而 ACPI 能反映 ⇒ ⭐ 这才有资格说"LHM 没刷新" ✅）。
+	/// ⇒ ⭐ 满足才改以 ACPI 热区为主源；⭐ LHM 值一变就自动恢复 ✅。</para>
+	/// <para>⛔ 绝不单凭"值不变"判异常 —— ⭐ 80℃ 恒定可能只是这台机的正常待机温度 ⚠️。</para>
+	/// </summary>
+	private static int _cpuTempLhmWatchValue = -1;
+
+	private static long _cpuTempLhmWatchSinceTick;
+
+	private static int _cpuTempLhmWatchAcpi = -1;
+
+	private static int _cpuTempLhmSuspect;
+
+	/// <summary>⭐ 2026-10-18：⭐ 交叉校验用的上一帧 ACPI / LHM 值（⭐ 判断"ACPI 变了而 LHM 没变"✅）。</summary>
+	private static int _cpuTempCrossPrevAcpi = -1;
+
+	private static int _cpuTempCrossPrevLhm = -1;
+
+	/// <summary>⭐ 2026-10-18：⭐ `[cpu-temp] LHM 原始` 日志的去重键（⭐ 传感器集合/值/上次变化时刻不变 ⇒ 不重复打 ✅）。</summary>
+	private static string _cpuTempLhmRawKey = "";
+
+	/// <summary>⭐ 2026-10-18：⭐ LHM「未刷新」判定窗口（毫秒；⭐ 3 分钟 ✅）。</summary>
+	internal const long CpuTempLhmWatchMinUnchangedMs = 180000L;
+
+	/// <summary>⭐ 2026-10-18：⭐ 同一窗口内 ACPI 至少变化这么多℃ 才允许判「LHM 未刷新」（⭐ 2℃ ✅）。</summary>
+	internal const int CpuTempLhmWatchAcpiDeltaCelsius = 2;
+
+	/// <summary>⭐ 2026-10-18：⭐ 当前 CPU 温度来源标签（⭐ 诊断包「CPU 温度来源明细」用 ✅）。</summary>
+	internal static string CpuTempSourceName => _cpuTempSourceLogged;
+
+	/// <summary>⭐ 2026-10-18：⭐ 当前是否已判定「LHM 未刷新 ⇒ 改以 ACPI 主源」（⭐ 诊断用 ✅）。</summary>
+	internal static bool CpuTempLhmSuspect => Volatile.Read(ref _cpuTempLhmSuspect) == 1;
+
+	/// <summary>⭐ 2026-10-18：⭐ 上一次厂商功能号 22 原始值（⭐ -1=没试/不适用 · ⭐ 0=可读但无效 · ⭐ &gt;0=有效；⭐ 诊断用 ✅）。</summary>
+	internal static int CpuTempLastFunc22Celsius => Volatile.Read(ref _cpuTempLastFunc22Celsius);
 
 	public static int? cpuUsage;
 
@@ -735,57 +791,126 @@ public static class HardwareControl
 		{
 			return;
 		}
-		int celsius = 0;
-		string source = "";
-		// ── ① 宝龙达 40 系：厂商功能号 22（⭐ 30 系已被 VendorTemperatureUnsupported 整条关掉）──
+		// ── ① LHM：⭐⭐ 先**主动 Update()**、再读值（⭐ 机主实测：调「节电」后真实温度降了、我们的显示没变 ⚠️）──
+		//   ⚠️⚠️ 本方法以前只读 `lhmMonitor.CpuTemperature` 的**缓存值**，而 LHM 的 `Update()` 排在采样链**后面**
+		//      ⇒ ⭐ 悬浮窗 1 s / 自定义页 2 s 这些入口读到的是**上一轮**（甚至更旧）的值 ⚠️；
+		//      再加上 `LhmMonitor` 里 `CpuTemperature` 原来**每轮不清空**（已修）⇒ ⭐ 值会冻结 ❌。
+		//   ⭐ 现在：⭐ 本步自己先 `Update()` 一次（⭐ LHM 内部自带 1 s 限频 ⇒ ⛔ 不会加倍原生调用 ✅），
+		//      并如实标注 `来源=Update`（本轮真更新了）/ `来源=缓存(ns前)`（⭐ 1 s 限频内，读的是上一次的 ✅）。
+		LhmMonitor lhmMonitor = lhm;
+		LhmMonitor.CpuTemperatureTier lhmTier = LhmMonitor.CpuTemperatureTier.None;
+		int lhmCelsius = 0;
+		string lhmSensor = "";
+		string lhmUpdateKind = "无";
+		if (lhmMonitor != null && !lhmMonitor.IsDisposed)
+		{
+			long beforeUpdateTicks = lhmMonitor.LastUpdateTicks;
+			if (_localMonitoringEnabled && !_localSamplingQuarantined)
+			{
+				// ⚠️ 只在**未降级**时调原生 Update（⭐ 降级期一次原生调用都不发 ✅）；
+				//    `countsAsHealthFailure:false` ⇒ ⛔ 不把这里的失败重复计入 LHM 健康判定 ✅
+				TryStep(lhmMonitor.Update, "lhm-update-cpu-temp", countsAsHealthFailure: false);
+			}
+			bool updatedThisCall = lhmMonitor.LastUpdateTicks != beforeUpdateTicks;
+			lhmUpdateKind = (updatedThisCall ? "Update" : ("缓存(" + FormatAgeSeconds(lhmMonitor.LastUpdateAgeMs) + "前)"));
+			float? fromLhm = lhmMonitor.CpuTemperature;
+			if (fromLhm.HasValue && fromLhm.Value > 0f && fromLhm.Value < 120f)
+			{
+				lhmCelsius = (int)Math.Round(fromLhm.Value);
+				lhmTier = lhmMonitor.CpuTemperatureSelectedTier;
+				lhmSensor = lhmMonitor.CpuTemperatureSensorName;
+			}
+			// ⭐ 原始诊断日志：⭐ 列出**本机 LHM 全部 CPU 温度传感器**（名称/值/上次变化时刻/档位）
+			//   ⭐ 值一变必打一行（⭐ 机主调节电后应能看到 80→7x）✅
+			LogLhmCpuTemperatureRaw(lhmMonitor, lhmUpdateKind, lhmCelsius, lhmSensor);
+		}
+		// ── ② 宝龙达 40 系：厂商功能号 22（⭐ 30 系已被 VendorTemperatureUnsupported 整条关掉）/ 非宝龙达：GCU 推送 ──
+		int vendorCelsius = 0;
+		int func22Raw = -1;
+		string func22Text;
 		if (hw.UsesBaolongda)
 		{
-			BaolongdaWmi wmi = hw.BaolongdaWmi;
-			if (wmi != null && !BaolongdaWmi.VendorTemperatureUnsupported)
+			if (BaolongdaWmi.VendorTemperatureUnsupported)
 			{
-				try
+				func22Raw = 0;
+				func22Text = "22=不可用(30系已知)";
+			}
+			else
+			{
+				BaolongdaWmi wmi = hw.BaolongdaWmi;
+				if (wmi != null)
 				{
-					if (wmi.TryReadCpuTemperature(out int vendorCelsius) && vendorCelsius > 0 && vendorCelsius < 120)
+					try
 					{
-						celsius = vendorCelsius;
-						source = "func22";
+						if (wmi.TryReadCpuTemperature(out int vendor) && vendor > 0 && vendor < 120)
+						{
+							vendorCelsius = vendor;
+							func22Raw = vendor;
+							func22Text = $"22={vendor}℃";
+						}
+						else
+						{
+							func22Raw = 0;
+							func22Text = "22=读不到/无效";
+						}
+					}
+					catch (Exception ex)
+					{
+						func22Text = "22=异常";
+						Logger.WriteLineIfChanged("cpu-temp-vendor-fail", "[cpu-temp] 厂商功能号 22 读取异常（转 LHM/ACPI）：" + ex.Message);
 					}
 				}
-				catch (Exception ex)
+				else
 				{
-					Logger.WriteLineIfChanged("cpu-temp-vendor-fail", "[cpu-temp] 厂商功能号 22 读取异常（转 LHM）：" + ex.Message);
+					func22Text = "22=无WMI对象";
 				}
 			}
 		}
-		else if (hw.CpuTemp > 0)
+		else
 		{
-			// ⭐ 非宝龙达（GCU/同方）：厂商推送值优先（⭐ 与 ApplySensorPriority 同口径；⭐ 只同步时间戳、⛔ 不覆盖）✅
-			celsius = hw.CpuTemp;
-			source = "vendor";
+			func22Text = "22=不适用(非宝龙达)";
+			vendorCelsius = (hw.CpuTemp > 0) ? hw.CpuTemp : 0;
 		}
-		// ── ② LHM 兜底（⭐ 30 系 / ⭐ 22 失败 / ⭐ 非宝龙达没给值 ✅）──
-		if (celsius <= 0)
+		Interlocked.Exchange(ref _cpuTempLastFunc22Celsius, func22Raw);
+		// ── ③ ACPI 热区（⭐ 交叉校验 + 兜底；⭐ 内部限频 30 s，但**每轮都读**以做"同一 tick"对照 ✅）──
+		int acpi = ReadAcpiThermalZoneCelsius();
+		// ── ④ 交叉校验 + 「LHM 是否在刷新」判定（⭐ 机主方向：先用日志证明、再决定换不换源 ⚠️）──
+		NoteCpuTempCrossCheck(lhmCelsius, acpi);
+		bool lhmSuspect = NoteCpuTempLhmRefreshWatch(lhmCelsius, acpi, lhmSensor);
+		// ── ⑤ 取源优先级：厂商(func22/GCU) ＞ LHM Tctl/Tdie ＞ LHM Package ＞ ACPI ＞ LHM 其余 ──
+		//   ⚠️ LHM 被判「未刷新」时：⭐ 改用 ACPI 主源、LHM 次源（⭐ 依据 = 上面已经用日志证明"ACPI 在变" ✅）
+		//   ⛔ 整个选择过程**不修改任何数值**（不做偏移/补偿）✅
+		int celsius = 0;
+		string source = "";
+		if (vendorCelsius > 0)
 		{
-			LhmMonitor lhmMonitor = lhm;
-			if (lhmMonitor != null && !lhmMonitor.IsDisposed)
-			{
-				float? fromLhm = lhmMonitor.CpuTemperature;
-				if (fromLhm.HasValue && fromLhm.Value > 0f && fromLhm.Value < 120f)
-				{
-					celsius = (int)Math.Round(fromLhm.Value);
-					source = "LHM";
-				}
-			}
+			celsius = vendorCelsius;
+			source = (hw.UsesBaolongda ? "func22" : "vendor");
 		}
-		// ── ③ ACPI 热区（最后兜底；内部限频 30 s）──
-		if (celsius <= 0)
+		else if (lhmSuspect && acpi > 0)
 		{
-			int acpi = ReadAcpiThermalZoneCelsius();
-			if (acpi > 0)
-			{
-				celsius = acpi;
-				source = "ACPI";
-			}
+			celsius = acpi;
+			source = "ACPI(主源·LHM未刷新)";
+		}
+		else if (lhmCelsius > 0 && lhmTier == LhmMonitor.CpuTemperatureTier.TctlTdie)
+		{
+			celsius = lhmCelsius;
+			source = "LHM/TctlTdie";
+		}
+		else if (lhmCelsius > 0 && lhmTier == LhmMonitor.CpuTemperatureTier.Package)
+		{
+			celsius = lhmCelsius;
+			source = "LHM/Package";
+		}
+		else if (acpi > 0)
+		{
+			celsius = acpi;
+			source = "ACPI";
+		}
+		else if (lhmCelsius > 0)
+		{
+			celsius = lhmCelsius;
+			source = "LHM/Other";
 		}
 		if (celsius <= 0)
 		{
@@ -793,6 +918,8 @@ public static class HardwareControl
 			if (Interlocked.Exchange(ref _cpuTempNoneLogged, 1) == 0)
 			{
 				Logger.WriteError("[cpu-temp] ⚠️ 三个来源都没值（厂商 func22 / LHM / ACPI 热区）"
+					+ $"（⭐ LHM={lhmUpdateKind} · LHM传感器值={(lhmCelsius > 0 ? lhmCelsius + "℃" : "无")} · "
+					+ $"{func22Text} · ACPI={(acpi > 0 ? acpi + "℃" : "读不到")}）"
 					+ " ⇒ 保持原值且**不更新时间戳** ⇒ 悬浮窗超过 "
 					+ CpuTempFreshAge.TotalSeconds.ToString("F0")
 					+ " s 会显示「—」（⛔ 不再显示陈旧值）；⭐ 本条只在「开始取不到」的那一刻记一次");
@@ -812,17 +939,22 @@ public static class HardwareControl
 		long previous = Interlocked.Exchange(ref _cpuTempUpdatedTick, updated);
 		bool recovered = Interlocked.Exchange(ref _cpuTempNoneLogged, 0) == 1;
 		double ageSeconds = ((previous == 0L) ? 0.0 : (updated - previous) / 1000.0);
-		string line = $"[cpu-temp] 来源={source} · 值={celsius}℃ · age={ageSeconds:F1}s";
+		string sensorTag = ((lhmSensor.Length > 0 && source.StartsWith("LHM", StringComparison.Ordinal)) ? ("(" + lhmSensor + ")") : "");
+		// ⭐ 2026-10-18（机主验证方式：调「节电」后温度应下降、日志应有值变化行）：
+		//   ⭐ 这一行**含 ACPI 与功能号 22 的同一 tick 读数** ⇒ ⭐ 下次诊断包可直接交叉校验"谁在变、谁没变" ✅
+		string line = $"[cpu-temp] 来源={source}{sensorTag} · 值={celsius}℃ · ACPI={acpi}℃ · {func22Text} · LHM={lhmUpdateKind} · age={ageSeconds:F1}s";
 		bool sourceChanged = !string.Equals(_cpuTempSourceLogged, source, StringComparison.Ordinal);
 		_cpuTempSourceLogged = source;
+		bool valueChanged = _cpuTempLastLoggedValue != celsius;
+		_cpuTempLastLoggedValue = celsius;
 		if (recovered)
 		{
 			// ⭐ 状态翻转（⭐ 之前三源都没值 ⇒ 现在有了 ✅）⇒ ⭐ 默认级别可见地记一行 ✅
 			Logger.WriteError("[cpu-temp] ⭐ 已恢复 ✅ —— " + line);
 		}
-		else if (sourceChanged || previous == 0L)
+		else if (sourceChanged || valueChanged || previous == 0L)
 		{
-			// ⭐ 来源变化 / ⭐ 首次成功 ⇒ ⭐ 立即记一行（含 age ⇒ 能看出上一帧到现在多久）✅
+			// ⭐ 来源变化 / ⭐ **值变化（机主复现点：调节电后必须看到这一行 ✅）** / ⭐ 首次成功 ⇒ ⭐ 立即记一行 ✅
 			Logger.WriteLine(line);
 		}
 		else
@@ -830,6 +962,153 @@ public static class HardwareControl
 			// ⭐ 去重：来源/值都没有状态变化时 60 s 一条心跳（⭐ 含 age ⇒ 能看出刷新间隔 ✅）
 			Logger.WriteLineThrottled("cpu-temp", line, 60000);
 		}
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ 毫秒 → 人读"距离现在多久"（⭐ -1 ⇒ "从未"；⭐ 诊断/日志共用 ✅）。</summary>
+	private static string FormatAgeSeconds(long ageMs)
+	{
+		return (ageMs < 0L) ? "从未" : ((ageMs / 1000.0).ToString("F1") + "s");
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-18：⭐ <see cref="Environment.TickCount64" /> → 本地时钟 <c>HH:mm:ss</c>（⭐ 诊断里"上次变化时刻"用**绝对时刻**
+	/// ⇒ ⭐ 内容稳定、日志才能去重 ✅；⭐ 与 <see cref="DateTime.Now" /> 的误差只来自调用瞬间，诊断足够 ✅）。
+	/// </summary>
+	private static string FormatTickAsClock(long tick)
+	{
+		if (tick <= 0L)
+		{
+			return "未知";
+		}
+		return DateTime.Now.AddMilliseconds(-(Environment.TickCount64 - tick)).ToString("HH:mm:ss");
+	}
+
+	/// <summary>⭐ 2026-10-18：⭐ LHM CPU 温度档位 → 人读标签（⭐ 诊断行用 ✅）。</summary>
+	private static string CpuTempTierLabel(LhmMonitor.CpuTemperatureTier tier)
+	{
+		switch (tier)
+		{
+		case LhmMonitor.CpuTemperatureTier.TctlTdie:
+			return "Tctl/Tdie";
+		case LhmMonitor.CpuTemperatureTier.Package:
+			return "Package";
+		case LhmMonitor.CpuTemperatureTier.Other:
+			return "其余";
+		case LhmMonitor.CpuTemperatureTier.Excluded:
+			return "不参与选源";
+		default:
+			return "无";
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：CPU 温度 80℃ 不动 · 调节电后真实温度变了显示没变）：
+	/// ⭐ <b>`[cpu-temp] LHM 原始` 诊断日志</b> ✅ —— ⭐ 列出**本机 LHM 全部 CPU 温度传感器**
+	/// （⭐ 名称 / 值 / 上次变化时刻 / 档位），⭐ 并标出"本轮是 Update 还是缓存" ✅。
+	/// <para>⭐ 去重口径：⭐ 传感器集合 / 值 / 上次变化时刻（绝对时刻）都不变 ⇒ ⭐ 不重复打（⭐ 30 s 心跳例外）；
+	/// ⭐ **任何一个值一变 ⇒ 立即打一行**（⭐ 机主调节电后应能看到 80→7x 的变化行 ✅）。</para>
+	/// </summary>
+	private static void LogLhmCpuTemperatureRaw(LhmMonitor monitor, string updateKind, int selectedCelsius, string selectedSensor)
+	{
+		IReadOnlyList<LhmMonitor.CpuTemperatureSensorReading> sensors = monitor.CpuTemperatureSensors;
+		string all = "";
+		long selectedLastChange = 0L;
+		foreach (LhmMonitor.CpuTemperatureSensorReading sensor in sensors)
+		{
+			if (all.Length > 0)
+			{
+				all += " · ";
+			}
+			all += $"{sensor.Name}={sensor.Value:F1}℃(updatedAt={FormatTickAsClock(sensor.LastChangeTicks)}, {CpuTempTierLabel(sensor.Tier)})";
+			if (selectedSensor.Length > 0 && string.Equals(sensor.Name, selectedSensor, StringComparison.Ordinal))
+			{
+				selectedLastChange = sensor.LastChangeTicks;
+			}
+		}
+		if (all.Length == 0)
+		{
+			all = "（LHM 没给出 CPU 温度传感器）";
+		}
+		string selectedText = (selectedCelsius > 0)
+			? ($"sensor={selectedSensor} value={selectedCelsius}℃ updatedAt={FormatTickAsClock(selectedLastChange)}")
+			: "sensor=（无有效值）";
+		string line = $"[cpu-temp] LHM 原始：{selectedText} · 来源={updateKind} · CPU硬件={monitor.CpuHardwareCount}"
+			+ $" · LHM更新={FormatAgeSeconds(monitor.LastUpdateAgeMs)}前 · 全部=[{all}]";
+		string dedupKey = selectedText + "|" + monitor.CpuHardwareCount + "|[" + all + "]";
+		if (!string.Equals(_cpuTempLhmRawKey, dedupKey, StringComparison.Ordinal))
+		{
+			_cpuTempLhmRawKey = dedupKey;
+			Logger.WriteLine(line);
+		}
+		else
+		{
+			// ⭐ 完全没变化 ⇒ ⭐ 30 s 一条心跳（⛔ 不刷屏）✅
+			Logger.WriteLineThrottled("cpu-temp-lhm-raw", line, 30000);
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-18（机主方向 ③：同一 tick 交叉校验）：⭐ 若 **ACPI 变了而 LHM 没变** ⇒ ⭐ 明确记一行
+	/// "本轮 LHM 缓存没更新"（⭐ 限流 30 s ⇒ ⛔ 不刷屏）；⭐ 这是"要不要换主源"的**直接证据** ✅。
+	/// </summary>
+	private static void NoteCpuTempCrossCheck(int lhmCelsius, int acpi)
+	{
+		if (_cpuTempCrossPrevAcpi > 0 && acpi > 0 && acpi != _cpuTempCrossPrevAcpi
+			&& _cpuTempCrossPrevLhm > 0 && lhmCelsius > 0 && lhmCelsius == _cpuTempCrossPrevLhm)
+		{
+			Logger.WriteLineThrottled("cpu-temp-cross",
+				$"[cpu-temp] ⚠️ 交叉校验：ACPI {_cpuTempCrossPrevAcpi}℃ → {acpi}℃ 变了，而 LHM 仍 {lhmCelsius}℃"
+				+ " ⇒ ⭐ 本轮 LHM 缓存没更新（⭐ 若持续出现，会按「LHM 未刷新」判据自动改以 ACPI 为主源 ✅）", 30000);
+		}
+		if (acpi > 0)
+		{
+			_cpuTempCrossPrevAcpi = acpi;
+		}
+		if (lhmCelsius > 0)
+		{
+			_cpuTempCrossPrevLhm = lhmCelsius;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：调节电后真实温度降了、显示没变）：⭐ <b>「LHM 未刷新」判定</b> ✅
+	/// —— ⭐ 只有**两条同时成立**才判：⭐ ① LHM 值连续 ≥3 分钟完全不变；⭐ ② 同一窗口内 ACPI 变化 ≥2℃
+	/// （⭐ 证明环境/负载确实在变、而 ACPI 能反映 ✅）。⭐ 判为真后：⭐ 取源改以 ACPI 为主源；
+	/// ⭐ LHM 值一变 ⇒ 立即解除、恢复 LHM 主源 ✅。
+	/// <para>⛔ 不单凭"值不变"下结论（⭐ 80℃ 恒定可能只是正常待机温度 ⚠️）；⛔ 不修改任何数值 ✅。</para>
+	/// </summary>
+	/// <returns>⭐ 当前是否处于「LHM 未刷新」状态 ✅。</returns>
+	private static bool NoteCpuTempLhmRefreshWatch(int lhmCelsius, int acpi, string sensorName)
+	{
+		long now = Environment.TickCount64;
+		if (lhmCelsius <= 0)
+		{
+			_cpuTempLhmWatchValue = -1;
+			return Volatile.Read(ref _cpuTempLhmSuspect) == 1;
+		}
+		if (lhmCelsius != _cpuTempLhmWatchValue)
+		{
+			_cpuTempLhmWatchValue = lhmCelsius;
+			_cpuTempLhmWatchSinceTick = now;
+			_cpuTempLhmWatchAcpi = acpi;
+			if (Interlocked.Exchange(ref _cpuTempLhmSuspect, 0) == 1)
+			{
+				Logger.WriteError($"[cpu-temp] ⭐ LHM 值已恢复变化（={lhmCelsius}℃）⇒ 解除「LHM 未刷新」判定，恢复 **LHM 主源** ✅");
+			}
+			return false;
+		}
+		long unchangedMs = now - _cpuTempLhmWatchSinceTick;
+		if (unchangedMs >= CpuTempLhmWatchMinUnchangedMs
+			&& acpi > 0 && _cpuTempLhmWatchAcpi > 0
+			&& Math.Abs(acpi - _cpuTempLhmWatchAcpi) >= CpuTempLhmWatchAcpiDeltaCelsius
+			&& Interlocked.Exchange(ref _cpuTempLhmSuspect, 1) == 0)
+		{
+			Logger.WriteError($"[cpu-temp] ⚠️ 判定 **LHM 未刷新**：sensor={sensorName} · 值={lhmCelsius}℃ 已 "
+				+ $"{unchangedMs / 60000.0:F1} 分钟完全不变，而同一窗口 ACPI 热区 {_cpuTempLhmWatchAcpi}℃ → {acpi}℃ 在变化"
+				+ " ⇒ ⭐ 本机改以 **ACPI 热区**为主源（LHM 次源）；⭐ 一旦 LHM 值再次变化就自动恢复 ✅"
+				+ "（⭐ 依据：先由日志证明 ACPI 会随负载/节电变化；⛔ 未改任何数值、⛔ 未做偏移补偿）");
+		}
+		return Volatile.Read(ref _cpuTempLhmSuspect) == 1;
 	}
 
 	/// <summary>
