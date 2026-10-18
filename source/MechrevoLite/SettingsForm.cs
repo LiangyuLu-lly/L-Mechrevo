@@ -1775,6 +1775,101 @@ public class SettingsForm : RForm
 	/// 2026-10-10（修用户反馈「禁用Windows更新开关打不开」）：快捷开关动作的返回值从 bool 换成
 	/// 带明细的结果 —— 只有 winupdate 需要区分「必需项失败」与「可选项跳过」，其余开关沿用 bool 语义。
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：浅色/深色按钮渲染错乱）：⭐ 主题切换控件**专用**样式，⛔ 不与其它卡片按钮混用：
+	/// 未选中 = 卡片底 + 1px 描边 + 次要文字；选中 = Accent 填充 + AccentText（浅/深色均同一套语义）✅
+	/// </summary>
+	private static void SetThemeModeButtonState(Button button, bool night, bool selected)
+	{
+		if (button == null)
+		{
+			return;
+		}
+		// ⭐ 未选中用**固定预览色**（浅色按钮=浅底深字 / 深色按钮=深底浅字），⛔ 不用当前主题 Surface 去画“浅色”✅
+		Color previewLightBg = Color.FromArgb(246, 246, 246);
+		Color previewLightFg = Color.FromArgb(32, 32, 32);
+		Color previewDarkBg = Color.FromArgb(32, 34, 38);
+		Color previewDarkFg = Color.FromArgb(240, 240, 240);
+		Color background = selected ? UiVisualStyle.Accent : (night ? previewDarkBg : previewLightBg);
+		Color foreground = selected ? UiVisualStyle.AccentText : (night ? previewDarkFg : previewLightFg);
+		Color border = selected ? UiVisualStyle.Accent : UiVisualStyle.ButtonEdge;
+		button.BackColor = background;
+		button.ForeColor = foreground;
+		button.FlatStyle = FlatStyle.Flat;
+		button.UseVisualStyleBackColor = false;
+		button.FlatAppearance.BorderColor = border;
+		button.FlatAppearance.BorderSize = selected ? 2 : 1;
+		button.AccessibleDescription = selected ? "Selected" : null;
+		if (button is RButton rButton)
+		{
+			// 防御：若将来换成 RButton，也保证按本专用样式渲染（不跟随当前主题的按钮面）
+			rButton.Activated = selected;
+			rButton.ActivatedOutline = true;
+			rButton.SelectionUsesAssignedAccent = true;
+			rButton.SelectionUsesModeFill = true;
+			rButton.ActivatedColor = UiVisualStyle.Accent;
+			rButton.ActivatedTextColor = UiVisualStyle.AccentText;
+			rButton.BorderColor = border;
+			rButton.Invalidate();
+		}
+		button.Invalidate();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：配色必须可验证）：⭐ 主题按钮自检 —— 打印实际 bg/fg、选中态与对比度；
+	/// 对比度低或前景=背景 ⇒ `Logger.WriteError` FAIL ✅
+	/// </summary>
+	private void LogThemeButtonStyles(bool isNightMode)
+	{
+		try
+		{
+			Color dayBg = _dayModeButton?.BackColor ?? Color.Empty;
+			Color dayFg = _dayModeButton?.ForeColor ?? Color.Empty;
+			Color nightBg = _nightModeButton?.BackColor ?? Color.Empty;
+			Color nightFg = _nightModeButton?.ForeColor ?? Color.Empty;
+			double dayContrast = ContrastRatio(dayBg, dayFg);
+			double nightContrast = ContrastRatio(nightBg, nightFg);
+			bool ok = dayContrast >= 4.5 && nightContrast >= 4.5
+				&& dayBg != dayFg && nightBg != nightFg;
+			string message = "[settings-ui] 主题按钮：浅色=(bg=" + ToHex(dayBg) + ",fg=" + ToHex(dayFg)
+				+ ") · 深色=(bg=" + ToHex(nightBg) + ",fg=" + ToHex(nightFg)
+				+ ") · 选中=" + (isNightMode ? "深色" : "浅色")
+				+ " · 对比度校验=" + (ok ? "OK" : "FAIL(" + dayContrast.ToString("0.00") + "/" + nightContrast.ToString("0.00") + ")");
+			Logger.WriteLineIfChanged("settings-ui-theme-buttons", message);
+			if (!ok)
+			{
+				Logger.WriteError("[settings-ui] ⛔ 主题按钮对比度 FAIL：" + message);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[settings-ui] 主题按钮自检失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
+	private static string ToHex(Color color)
+	{
+		return "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2");
+	}
+
+	private static double ContrastRatio(Color a, Color b)
+	{
+		double la = RelativeLuminance(a);
+		double lb = RelativeLuminance(b);
+		double lighter = Math.Max(la, lb);
+		double darker = Math.Min(la, lb);
+		return (lighter + 0.05) / (darker + 0.05);
+	}
+
+	private static double RelativeLuminance(Color color)
+	{
+		double Channel(int value)
+		{
+			double c = value / 255.0;
+			return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+		}
+		return 0.2126 * Channel(color.R) + 0.7152 * Channel(color.G) + 0.0722 * Channel(color.B);
+	}
 	private sealed class SwitchOutcome
 	{
 		public bool Ok { get; init; }
@@ -6375,6 +6470,11 @@ public class SettingsForm : RForm
 			if (_themeModePanel != null)
 			{
 				_themeModePanel.BackColor = UiVisualStyle.Surface;
+			}
+			if (_themeFollowBox != null)
+			{
+				_themeFollowBox.ForeColor = UiVisualStyle.Text;
+				_themeFollowBox.BackColor = Color.Transparent;
 			}
 			if (_officialConsolePanel != null)
 			{
