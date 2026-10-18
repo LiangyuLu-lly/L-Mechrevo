@@ -4449,7 +4449,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 上次只读验证的时刻（TickCount64）—— ⭐ 未通过时最多每 30 s 重试一次（⛔ 不刷屏/不反复碰 EC）✅</summary>
 	private static long _fanCurveVerifyTick;
 
-	/// <summary>⭐ 本机（按代际）风扇软件闭环是否**已通过只读验证**（⭐ 未验证 = false ⇒ UI 不开放）✅</summary>
+	/// <summary>⭐ 本机（按代际）风扇软件闭环是否**已验证可用**（⭐ 未验证 = false ⇒ UI 不开放）✅</summary>
+	/// <para>⭐⭐ 2026-10-18（机主：默认不开）：⭐ 默认 **false**；只有 `--fan-smu-ec-test` 验证通过并写入
+	/// `%APPDATA%\MechrevoLite\fan_ec_verified.cfg`（`fan_ec_verified_30=1` / `_40=1`）后，**下次启动**才放开 ✅</para>
 	internal bool FanCurveVerified
 	{
 		get
@@ -4458,9 +4460,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return false;
 			}
-			return (DgpuGeneration == DgpuGenerationKind.Gen30)
-				? (_fanCurveVerifiedGen30 ?? false)
-				: (_fanCurveVerifiedGen40 ?? false);
+			if (DgpuGeneration == DgpuGenerationKind.Gen30)
+			{
+				return _fanCurveVerifiedGen30 ?? FanEcVerifyStore.Load(is30Series: true);
+			}
+			return _fanCurveVerifiedGen40 ?? FanEcVerifyStore.Load(is30Series: false);
 		}
 	}
 
@@ -4488,15 +4492,56 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		if (on)
 		{
-			// ⭐⭐ 2026-10-18（机主批准 · 最高优先级）：⛔ **WMI 写风扇已禁用** ——
-			//   ⚠️ 真机写 `20=1` 会**卡死**（连 try/finally 都跑不完）⇒ 强冷**暂不执行**，
-			//   ⭐ 等 EC 写通路（`--fan-ec-test` 验证通过后，第 2 步接 EC 实现）✅
-			Logger.WriteLineIfChanged("baolongda-fanboost-wmi-disabled",
-				"[fan] 强冷：⛔ WMI 写风扇已禁用（20=1 真机卡死）⇒ 暂不执行；⭐ 等 EC 写通路验证通过后接入");
-			return false;
+			// ⭐⭐ 2026-10-18（机主批准 · 统一门面）：⭐ 强冷改走 `FanWriter`（ACPI EC → LPC/SMU-EC），
+			//   ⛔ 不再写 WMI 20/21（20=1 真机卡死）；⭐ 未验证 ⇒ 不执行（UI 也隐藏）✅
+			if (!FanCurveVerified)
+			{
+				Logger.WriteLineIfChanged("baolongda-fanboost-unverified",
+					"[fan] 强冷：⛔ 本机风扇写入尚未验证 ⇒ 不执行（UI 已隐藏；跑 --fan-smu-ec-test 验证）");
+				return false;
+			}
+			_fanBoostSavedCurve = LoadBaolongdaFanCurve();
+			_fanBoostActive = true;
+			ResetBaolongdaFanCurveSmoothing();
+			if (_fanBoostSavedCurve != null && _fanBoostSavedCurve.Enabled)
+			{
+				SaveBaolongdaFanCurve(CloneCurve(_fanBoostSavedCurve, enabled: false));
+			}
+			int baselineRpm = 0;
+			if (TryReadFanSpeedsViaBackend(out int preFirst, out int preSecond))
+			{
+				baselineRpm = Math.Max(preFirst, preSecond);
+			}
+			int units = (DgpuGeneration == DgpuGenerationKind.Gen30)
+				? BaolongdaProfile.FanTrueMaxUnits30Series
+				: BaolongdaProfile.FanTrueMaxUnits40Series;
+			units = Math.Clamp(units, 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
+			bool targetsOk = FanWriter.TrySetFanTargets(units, units, out string targetDetail);
+			string maskDetail = "未写（目标写入失败）";
+			bool maskOk = false;
+			if (targetsOk)
+			{
+				maskOk = FanWriter.TrySetManualMask(true, true, out maskDetail);
+			}
+			Thread.Sleep(1200);
+			bool readOk = TryReadFanSpeedsViaBackend(out int nowFirst, out int nowSecond);
+			int achievedRpm = readOk ? Math.Max(nowFirst, nowSecond) : 0;
+			bool reached = targetsOk && maskOk && readOk && achievedRpm >= units * 100 * 9 / 10;
+			confirmed = reached;
+			Logger.WriteLine($"[fan] 强冷：开 ⇒ 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}"
+				+ $" · 目标={units * 100} RPM（两路）· 写={targetsOk}/{maskOk} · 13={baselineRpm}→{achievedRpm} RPM"
+				+ $" ⇒ 确认={confirmed} · {targetDetail} · {maskDetail}");
+			if (!targetsOk || !maskOk)
+			{
+				FanWriter.TryReleaseToFirmware(out string releaseDetail);
+				_fanBoostActive = false;
+				confirmed = false;
+				Logger.WriteError("[fan] ⚠️ 强冷：EC 写入失败 ⇒ 已回滚（交回固件）· " + releaseDetail);
+			}
+			return true;
 		}
 		// 关闭：恢复快照（含 Enabled 状态）
-		TrySetFanManualViaBackend(enable: false, 0, 0, out _, out _);
+		FanWriter.TryReleaseToFirmware(out string releaseOnOff);
 		_fanBoostActive = false;
 		// ⭐ 强冷结束 ⇒ 平滑状态清零（⭐ 让恢复后的闭环从真实温度重新收敛，⛔ 不沿用强冷前的旧平滑值）
 		ResetBaolongdaFanCurveSmoothing();
@@ -4505,12 +4550,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		if (saved != null)
 		{
 			bool restored = SaveBaolongdaFanCurve(saved);
-			Logger.WriteLine($"[fan] 强冷：关 ⇒ 写 20=0（两通道）+ 21=0 ⇒ 已恢复强冷前曲线（enabled={saved.Enabled} · 联动={saved.SyncEnabled}）ok={restored}");
+			Logger.WriteLine($"[fan] 强冷：关 ⇒ 交回固件（{releaseOnOff}）⇒ 已恢复强冷前曲线（enabled={saved.Enabled} · 联动={saved.SyncEnabled}）ok={restored}");
 			confirmed = restored;
 		}
 		else
 		{
-			Logger.WriteLine("[fan] 强冷：关 ⇒ 写 20=0（两通道）+ 21=0 ⇒ 没有快照可恢复（保持手动模式关闭）");
+			Logger.WriteLine("[fan] 强冷：关 ⇒ 交回固件（" + releaseOnOff + "）⇒ 没有快照可恢复（保持手动模式关闭）");
 			confirmed = true;
 		}
 		return true;
@@ -5186,10 +5231,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 			}
 		}
-		// ── 判据（⭐ 2026-10-18 收紧）：⭐ 只读通过也**不开放** —— 必须等 **EC 写通路**验证
-		//   （`--fan-ec-test`：白名单写 + 13 转速变化）通过、并在第 2 步接入产品后，才允许置 true ✅
+		// ── 判据（⭐ 2026-10-18 最终版）：⭐ 只读通过不开放；⭐ 只有 `--fan-smu-ec-test`
+		//   验证通过并写入 `fan_ec_verified.cfg`（或显式 `fan_ec_verified=1`）后才放开 ✅
 		//   ⚠️ WMI 可读 ≠ 接管可用（卡死那台 WMI 20 读得到、写入却回读 False）✅
-		bool verified = false;
+		bool verified = FanEcVerifyStore.Load(is30);
 		if (is30)
 		{
 			_fanCurveVerifiedGen30 = verified;
@@ -5199,14 +5244,20 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			_fanCurveVerifiedGen40 = verified;
 		}
 		_fanCurveVerifyTick = Environment.TickCount64;
-		conclusion = ecOk
-			? $"EC 只读可用（{genName}）· ⚠️ 写通路待 --fan-ec-test 验证 ⇒ 暂不开放"
-			: $"不可用（{genName} · EC 三地址未全部读到合理值）";
+		conclusion = verified
+			? $"✅ 已验证（{genName} · 配置文件标记 fan_ec_verified）"
+			: (ecOk
+				? $"EC 只读可用（{genName}）· ⚠️ 写通路未验证 ⇒ 暂不开放（跑 --fan-smu-ec-test）"
+				: $"不可用（{genName} · EC 三地址未全部读到合理值）");
 		_fanCurveVerifyNote = conclusion;
 		Logger.WriteLine($"[fan] 风扇接管只读验证（{genName}）：{ecDetail} · {wmiDetail} ⇒ {conclusion}");
 		if (!verified)
 		{
-			Logger.WriteLine($"[fan] 未验证 ⇒ 隐藏风扇曲线/强冷入口（本机={genName}）· 详情请跑 --fan-probe / --fan-ec-test");
+			Logger.WriteLine($"[fan] 未验证 ⇒ 隐藏风扇曲线/强冷入口（本机={genName}）· 详情请跑 --fan-probe / --fan-smu-ec-test");
+		}
+		else
+		{
+			Logger.WriteLine($"[fan] ✅ 已验证 ⇒ 放开风扇曲线/强冷入口（本机={genName} · 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}）");
 		}
 		return ecOk;
 	}
@@ -5398,24 +5449,37 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				return false;
 			}
 			_fanCurveLastAttemptTick = attemptTick;
-			bool handled = TrySetFanManualViaBackend(enable: true, sentUnits0, sentUnits1, out bool confirmed, out bool manualAccepted);
-			// ⭐⭐ 2026-10-18（高优先级 · 失败熔断）：⭐ "写 20 后回读仍为关"连续 3 次 ⇒ 判定本机不可用，
-			//   停用闭环（⛔ 不再写 20/21），防止反复无效写入导致卡死 ✅
-			if (handled && manualAccepted)
+			// ⭐⭐ 2026-10-18（机主批准 · 统一门面）：⭐ 曲线写入改走 `FanWriter`（ACPI EC → LPC/SMU-EC），
+			//   ⛔ 不再走 WMI 20/21（20=1 真机卡死）；⭐ 每次写后回读校验 ✅
+			//   ⭐ 通道约定：`sentUnits0` = fanType 0 = GPU = 0xC83D；`sentUnits1` = fanType 1 = CPU = 0xC83C ✅
+			bool targetsOk = FanWriter.TrySetFanTargets(sentUnits1, sentUnits0, out string targetDetail);
+			string maskDetail = "未写（目标写入失败）";
+			bool maskOk = false;
+			if (targetsOk)
+			{
+				maskOk = FanWriter.TrySetManualMask(true, true, out maskDetail);
+			}
+			bool handled = targetsOk && maskOk;
+			bool confirmed = handled;
+			bool manualAccepted = maskOk;
+			string fanWriteDetail = (targetDetail.Length > 0 ? targetDetail : "目标未写") + " · " + maskDetail;
+			// ⭐⭐ 2026-10-18（高优先级 · 失败熔断）：⭐ 写/回读不确认连续 3 次 ⇒ 判定本机不可用，
+			//   停用闭环（⛔ 不再写 EC 风扇寄存器），防止反复无效写入导致卡死 ✅
+			if (manualAccepted)
 			{
 				_fanCurveManualRejectStreak = 0;
 			}
-			else if (handled && !manualAccepted)
+			else
 			{
 				_fanCurveManualRejectStreak++;
 				if (_fanCurveManualRejectStreak >= FanCurveRejectLimit)
 				{
 					_fanCurveUnsupported = true;
-					Logger.WriteError("[fan] ⚠️ 手动接管开关写入未生效（连续3次）⇒ 已自动停用软件闭环"
-						+ "（防止反复无效写入导致卡死）；请检查 --fan-probe 报告");
+					Logger.WriteError("[fan] ⚠️ 风扇写入/回读未确认（连续3次）⇒ 已自动停用软件闭环"
+						+ "（防止反复无效写入导致卡死）；请检查 --fan-probe / --fan-smu-ec-test 报告");
 				}
 			}
-			if (handled && manualAccepted)
+			if (handled)
 			{
 				_fanCurveLastCh0 = sentUnits0;
 				_fanCurveLastCh1 = sentUnits1;
@@ -5437,7 +5501,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				$"[fan] 曲线：cpu={cpuTemp}℃/gpu={gpuTemp}℃（平滑 cpu={cpuTempSmooth}/gpu={gpuTempSmooth}）"
 				+ $" → rpm cpu={channel1RpmBeforeSync} gpu={channel0RpmBeforeSync}"
 				+ $"（联动后 cpu={channel1Rpm} gpu={channel0Rpm}）"
-				+ $" → 写 20=1 + 21=(0,{sentUnits0})/(1,{sentUnits1}) ok={confirmed}"
+				+ $" → 写 EC cpu={sentUnits1} gpu={sentUnits0}（{FanWriter.ChannelName(FanWriter.PreferredChannel)}）ok={confirmed}"
+				+ $" · {fanWriteDetail}"
 				+ $" · 档位 cpu={sentUnits1} gpu={sentUnits0}"
 				+ (rampPending ? $"（斜坡中，目标 cpu={channel1Units} gpu={channel0Units}）" : "")
 				+ $" · 13={(rpmReadOk ? nowFirstRpm + "/" + nowSecondRpm : "读不到")} RPM（有延迟）"
@@ -5533,10 +5598,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				: "20 回读=读不到";
 			Logger.WriteLine($"宝龙达风扇曲线：⚠️ 启动自检 ⇒ {detail} · 曲线启用={curveEnabled}"
 				+ "（⭐ 可能是上次被强杀留下的 ⚠️）⇒ ⭐ 现在交回固件控制 ✅");
-			if (TrySetFanManualViaBackend(enable: false, 0, 0, out bool confirmed, out bool _))
+			// ⭐⭐ 2026-10-18（统一门面）：⭐ 交回固件改走 `FanWriter`（ACPI EC → LPC/SMU-EC）；
+			//   ⛔ 不再写 WMI 20/21（20=1 真机卡死；写 0 也统一走 EC）✅
+			bool released = FanWriter.TryReleaseToFirmware(out string releaseDetail);
+			if (released)
 			{
 				_baolongdaFanCurveApplied = false;
-				Logger.WriteLine($"宝龙达风扇曲线：⭐ 已交回固件控制（⭐ 写 20=(0,0)/(1,0) ＋ 21 归零 · ⭐ 确认={confirmed} ✅）");
+				Logger.WriteLine($"宝龙达风扇曲线：⭐ 已交回固件控制（{releaseDetail} ✅）");
+			}
+			else
+			{
+				_baolongdaFanCurveApplied = false;
+				Logger.WriteLine("宝龙达风扇曲线：⚠️ 交回固件未确认（通道均失败）⇒ 已记录、⛔ 不假装成功：" + releaseDetail);
 			}
 		}
 		catch (Exception ex)

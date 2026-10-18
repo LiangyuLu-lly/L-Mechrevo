@@ -349,6 +349,26 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇写入门面验证/放行）：`--fan-smu-ec-test`。
+		//   ⭐ 只读对照（ACPI EC vs LPC vs SmuEcAccess）→ 最小写 0xB20（置 bit1）→ 回读确认；
+		//   ⭐ 全部确认 ⇒ 写 `%APPDATA%\MechrevoLite\fan_ec_verified.cfg`（下次启动放开 UI 曲线/强冷）；
+		//   ⛔ 不确认 ⇒ 不写配置、UI 保持隐藏；⛔ 不写 0x1060 / WMI 20/21。
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-smu-ec-test-*.txt。
+		case "--fan-smu-ec-test":
+		{
+			Environment.ExitCode = FanSmuEcTest.Run();
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（SMU-EC 只读核对）：`--smu-ec-probe`。
+		//   ⭐ 核对 7.3 `RyzenAccess.Write_EC_EX/Read_EC_EX` 的真实通道（结论：LPC 端口 I/O，无 SMU 命令）；
+		//   ⭐ 双通道（ACPI/LPC）只读对照；⛔ 不发 SMU 命令、不写任何 EC 字节。
+		case "--smu-ec-probe":
+		{
+			Environment.ExitCode = SmuEcProbe.Run();
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-19（30 系 · SMU **保守写 + 回读** 实测，供开发机 HawkPoint 近似验证）：
 		//   用法：L-Mechrevo.exe --smu-write-test          只读（打印当前快照，不写）
 		//         L-Mechrevo.exe --smu-write-test --yes    保守写 + 每次回读 + finally 恢复快照并确认
