@@ -876,18 +876,27 @@ public class CustomModeForm : RForm
 		});
 		_tgp = tuple4.Item1;
 		_tgpVal = tuple4.Item2;
-		// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：⭐ 只有**能读到有效约束**（max>min）才建这一行
-		//   ⛔ 读不到就不显示（宁可不给，也不给一个写不进去的滑块）✅
-		if (NvmlHelper.TryGetPowerLimitBounds(out int plMinW, out int plMaxW, out int plCurW) && plMaxW > plMinW)
+		// ⭐⭐ 2026-10-19（机主实测：GCU 机型上「GPU 功耗限制 (W)」无效）：⭐ **只在宝龙达（本机 NVML 可写）构建这一行** ✅
+		//   · GCU / 老接口：NVML 不是它的下发通道（写了也不生效）⇒ **连控件都不建**（⛔ 不是建后隐藏）；
+		//   · GCU 若支持厂商 TGP，走上面的 `Strings.GpuTgp` 厂商口径行（现有字段语义，⛔ 不混用）✅；
+		//   · 宝龙达：NVML 实测可写 ⇒ 保持现状 ✅
+		if (hw?.UsesBaolongda ?? false)
 		{
-			int plStart = ((plCurW >= plMinW && plCurW <= plMaxW) ? plCurW : plMaxW);
-			var plRow = AddSliderRow(Strings.GpuPowerLimit, plMinW, plMaxW, plStart, (int v) =>
+			if (NvmlHelper.TryGetPowerLimitBounds(out int plMinW, out int plMaxW, out int plCurW) && plMaxW > plMinW)
 			{
-				Queue("GpuPowerLimitW", v.ToString());
-			});
-			_gpuPowerLimit = plRow.Item1;
-			_gpuPowerLimitVal = plRow.Item2;
-			Logger.WriteLine($"[gpu-power] UI 显示功耗上限滑块：{plMinW}~{plMaxW} W（当前 {plCurW} W）");
+				int plStart = ((plCurW >= plMinW && plCurW <= plMaxW) ? plCurW : plMaxW);
+				var plRow = AddSliderRow(Strings.GpuPowerLimit, plMinW, plMaxW, plStart, (int v) =>
+				{
+					Queue("GpuPowerLimitW", v.ToString());
+				});
+				_gpuPowerLimit = plRow.Item1;
+				_gpuPowerLimitVal = plRow.Item2;
+				Logger.WriteLine($"[gpu-power] UI 显示功耗上限滑块：{plMinW}~{plMaxW} W（当前 {plCurW} W）");
+			}
+		}
+		else if (Logger.TryMarkChanged("gpu-power-non-baolongda-row-skip", "[gpu-power] 非宝龙达（GCU/老接口）⇒ 不构建 NVML 功耗上限行（该机型以厂商 TGP 行为准）"))
+		{
+			Logger.WriteLine("[gpu-power] 非宝龙达（GCU/老接口）⇒ 不构建 NVML 功耗上限行（该机型以厂商 TGP 行为准）");
 		}
 		_dbChk = AddCheckRow(Strings.GpuDynamicBoost, hw?.GpuDbSwitch ?? false, (bool on) =>
 		{
