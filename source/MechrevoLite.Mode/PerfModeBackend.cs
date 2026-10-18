@@ -31,7 +31,8 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		//      （`CustomModeForm` 里显式 `SmuAvailability.IsReady`）或真正需要 STAPM 时 ✅
 		//   ⚠️ 未探测前 `SupportsSmuPowerControls=false` ⇒ 规划器不生成 SMU 步骤；
 		//      自定义模式窗口打开后会重新算能力位，语义不变 ✅
-		bool smuReady = hw.IsBaolongda30Series && SmuAvailability.IsReadyCached;
+		bool wujieApu = hw.WujieSmuApu;
+		bool smuReady = (hw.IsBaolongda30Series || wujieApu) && SmuAvailability.IsReadyCached;
 		return new PerfModeCapabilities
 		{
 			UsesAmdPowerFields = hw.UsesAmdPowerFields,
@@ -59,21 +60,22 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//   ⇒ ⭐ 所以按后端【如实申报】：⭐ 宝龙达 ⇒ false ⇒ ⭐ 规划器不生成那两步 ✅
 			//      ⇒ ⭐ 不再出现"注定失败"的档位步（⭐ 它会让 Runner 提前 break、把后面所有步骤一起废掉 ❌）✅
 			//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda == false` ⇒ true ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsFirmwareSlot = !hw.UsesBaolongda,
+			SupportsFirmwareSlot = !hw.UsesBaolongda && !hw.WujieSmuApu,
 			// ⭐⭐ 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）：⭐ 功耗墙三项（PL1 / PL2 / 温度墙）
 			//   ⭐ 在宝龙达上【不走固件槽】、而是走 WMI 功能号 23 ✅
 			//      （⭐ 通路：⭐ `PerfModeBackend.WriteDetailFieldAsync` ⇒ `MechrevoService.SetCustomDetail`
 			//        ⇒ 它开头那个 `TryApplyPowerLimitViaBackend` ⇒ `TryApplyCpuPowerLimitViaBackend` ✅）
 			//   ⇒ ⭐ 所以单独申报：⭐ 宝龙达 ⇒ true ⇒ ⭐ 规划器额外生成那三步 ✅
 			//   ⚠️ 非宝龙达 ⇒ false ⇒ ⭐ 那三步仍留在原固件字段块里 ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsWmiPowerFields = hw.UsesBaolongda,
+			// ⭐⭐ 2026-10-19（无界 APU）：功耗墙走本机 SMU ⇒ 与宝龙达同样单独生成 PL/温度墙步骤 ✅
+			SupportsWmiPowerFields = hw.UsesBaolongda || hw.WujieSmuApu,
 			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制 · 机主「持续功耗 STAPM 能不能放进去」）：
 			//   ⭐ 本后端自定义档的功耗**到底走不走 SMU** —— 唯一判据 `PerfModeCapabilities.UsesSmuForCustomPower`
 			//      （宝龙达 + 30 系 + SMU 通路真的可用；`SmuAvailability.IsReady` 进程内只探测一次）✅
 			//   ⭐ 规划器据此生成 `StapmLimitW` / `SmuStapmTimeSeconds` 两步；UI 也只用同一个函数决定建不建行
 			//      （⛔ 不再只按"机型是 Gen30"这种静态判据）✅
 			//   ⚠️ 40 系 / GCU / 老接口 / SMU 不可用 ⇒ false ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsSmuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, smuReady),
+			SupportsSmuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, smuReady, wujieApu),
 			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 宝龙达没有 GCU ⇒ GPU 偏移只能走本机 NVAPI P0
 			//   （⭐ `PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支）。
 			//   ⚠️ 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** ✅（GCU 机型那条 `WriteFirmwareField` 路径照旧）。

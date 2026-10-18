@@ -1175,7 +1175,7 @@ internal sealed class PerfModeService
 			//      做**本机全量下发**（PL1/PL2/温度墙 → WMI 23；GPU 超频 → NVAPI P0；曲线 → 20/21）✅
 			//   ⚠️ 非宝龙达（GCU / 老接口）⇒ `PerfApplyGate` 恒等价旧口径 ⇒ 条件**逐位不变** ✅
 			bool isActiveMode = string.Equals(ActiveModeId, mode.Id, StringComparison.Ordinal);
-			bool localCustomApply = PerfApplyGate.ShouldApplyLocalCustom(_hw != null && _hw.UsesBaolongda, mode.IsCustom, isActiveMode);
+			bool localCustomApply = PerfApplyGate.ShouldApplyLocalCustom(_hw != null && _hw.UsesBaolongda, mode.IsCustom, isActiveMode, _hw != null && _hw.WujieSmuApu);
 			if (localCustomApply)
 			{
 				MechrevoHw hw = _hw;

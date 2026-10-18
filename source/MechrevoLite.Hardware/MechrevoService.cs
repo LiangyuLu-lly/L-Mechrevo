@@ -4016,9 +4016,9 @@ public class MechrevoService
 	private bool TryApplyPowerLimitViaBackend(string key, string rawValue)
 	{
 		MechrevoHw hw = _hw;
-		if (hw == null || !hw.UsesBaolongda)
+		if (hw == null || (!hw.UsesBaolongda && !hw.WujieSmuApu))
 		{
-			return false; // ⭐ 不是宝龙达在管事 ⇒ ⭐ 原样交给 GCU ✅
+			return false; // ⭐ 不是宝龙达/无界 APU 在管事 ⇒ ⭐ 原样交给 GCU ✅
 		}
 		bool isPl1 = string.Equals(key, "PL1", StringComparison.Ordinal);
 		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
@@ -4038,12 +4038,12 @@ public class MechrevoService
 		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：30 系**没有** WMI 功能号 23（原厂方法表只到 18）
 		//   ⇒ ⭐ PL1 / PL2 / 温度墙 / STAPM 时间窗**只能走 SMU** ✅
 		//   ⚠️ 40 系（宝龙达 `MRID6-23`）有功能号 23 ⇒ ⭐ 继续走下面的原 WMI 路径，**行为不变** ✅
-		if (hw.IsBaolongda30Series)
+		if (hw.IsBaolongda30Series || hw.WujieSmuApu)
 		{
 			// ⭐⭐ 2026-10-19（机主 · 与 UI 同源）：只有「本机自定义档的功耗**真的**走 SMU」时才走 SMU。
 			//   判据 = `PerfModeCapabilities.UsesSmuForCustomPower`（宝龙达 && 30 系 && SMU 通路可用；缓存）。
 			//   ⚠️ 不可用 ⇒ 如实 false + 日志（30 系**没有** WMI 23 可退回，⛔ 不假装成功）。
-			if (!PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady))
+			if (!PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady, hw.WujieSmuApu))
 			{
 				Logger.WriteError("[smu] 不可用 ⇒ 30 系功耗墙**未下发**（原因：" + SmuAvailability.Reason + "）⇒ 如实失败");
 				return false;
@@ -4225,13 +4225,17 @@ public class MechrevoService
 		//   （⭐ 正常路径已在 `SetCustomDetail` 开头按整批规范化过）⇒ ⛔ 不写出 PL1 > PL2 的组合 ✅
 		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
 		// ② 取值夹取（与 WMI 路径同一组范围；⛔ 不写 0 = "未设置"）
+		// ⭐⭐ 无界 APU（机主口径）：PL1/PL2 上限 = 90W（下限沿用现有 SMU 常量 15W）；宝龙达 30 系保持原范围 ✅
+		int plMin = (hw.WujieSmuApu ? WujieSmuGate.PlMinWatts : BaolongdaProfile.PlMinWatts);
+		int pl1Max = (hw.WujieSmuApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl1MaxWatts);
+		int pl2Max = (hw.WujieSmuApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl2MaxWatts);
 		if (pl1 > 0)
 		{
-			pl1 = Math.Clamp(pl1, BaolongdaProfile.PlMinWatts, BaolongdaProfile.Pl1MaxWatts);
+			pl1 = Math.Clamp(pl1, plMin, pl1Max);
 		}
 		if (pl2 > 0)
 		{
-			pl2 = Math.Clamp(pl2, BaolongdaProfile.PlMinWatts, BaolongdaProfile.Pl2MaxWatts);
+			pl2 = Math.Clamp(pl2, plMin, pl2Max);
 		}
 		if (tempWallC > 0)
 		{
@@ -4336,7 +4340,30 @@ public class MechrevoService
 			verified = VerifyBaolongdaSmuPower(hw, wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0,
 				wroteWall ? tempWallC : 0, out verifyDetail);
 		}
-		Logger.WriteError($"[smu-30] 30 系功耗墙（SMU 路径 · 无 WMI 23）：基线刷新={refreshed} "
+		// ⭐⭐ 2026-10-19（机主口径 · 无界 APU）：写后回读日志（成功/失败都如实、⛔ 不重试）✅
+		if (hw.WujieSmuApu)
+		{
+			int rbPl1 = -1;
+			int rbPl2 = -1;
+			try
+			{
+				PawnIO.SmuPowerSnapshot snap = smu.GetPowerSnapshot();
+				if (snap != null)
+				{
+					rbPl1 = (int)Math.Round((double)snap.Slow);
+					rbPl2 = (int)Math.Round((double)snap.Fast);
+				}
+			}
+			catch
+			{
+			}
+			Logger.WriteError(wrotePl1
+				? "[smu] 写 PL1=" + pl1 + "W → 回读=" + rbPl1 + "W（ok=" + (verified && rbPl1 == pl1) + "）"
+				: "[smu] ⛔ 写 PL1 失败（原始值=" + pl1 + " / 回读=" + rbPl1 + "）⇒ 不重试");
+			Logger.WriteError(wrotePl2
+				? "[smu] 写 PL2=" + pl2 + "W → 回读=" + rbPl2 + "W（ok=" + (verified && rbPl2 == pl2) + "）"
+				: "[smu] ⛔ 写 PL2 失败（原始值=" + pl2 + " / 回读=" + rbPl2 + "）⇒ 不重试");
+		}		Logger.WriteError($"[smu-30] 30 系功耗墙（SMU 路径 · 无 WMI 23）：基线刷新={refreshed} "
 			+ $"⇒ PL1(slow)={ShowPowerValue(pl1)} [{pl1Status}] · PL2(fast)={ShowPowerValue(pl2)} [{pl2Status}] "
 			+ $"· 温度墙(tctl)={ShowTempValue(tempWallC)} [{wallStatus}] "
 			+ $"⇒ 下发全部 OK={ok} · 回读确认={verified}（{verifyDetail}）"

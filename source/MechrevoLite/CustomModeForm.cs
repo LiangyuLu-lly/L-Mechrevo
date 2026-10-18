@@ -741,10 +741,18 @@ public class CustomModeForm : RForm
 		//   ⭐ 与 `MechrevoService.ApplyPowerLimitViaSmu` 实际会走的分支**同源** ⇒ 不会出现"界面显示了、
 		//      实际却走 WMI 23（30 系根本没有）"的错位（守 §9.14）。
 		//   ⚠️ 40 系 / GCU / 老同方 / PawnIO 不可用 ⇒ 判据为假 ⇒ 下面这行都不建、tooltip 也不挂 ⇒ 行为逐位不变 ✅
+		// ⭐⭐ 2026-10-19（机主拍板：无界 APU 直接开放 SMU 自定义）：判据增加「无界 APU」分支 ——
+		//   model 含无界/WUJIE/WJXY && CpuVendor.IsAmd && 无 NVIDIA 独显 && SmuAvailability.IsReady ✅
+		//   ⚠️ 宝龙达 30 系原判据逐位不变；GCU/同方其它机型默认 false ⇒ 行为不变 ✅
+		bool wujieApu = hw?.WujieSmuApu ?? false;
 		bool smuPowerControls = false;
-		if (hw != null && hw.IsBaolongda30Series)
+		if (hw != null && (hw.IsBaolongda30Series || wujieApu))
 		{
-			smuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady);
+			smuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady, wujieApu);
+			if (smuPowerControls && wujieApu)
+			{
+				MechrevoLite.Hardware.WujieSmuGate.LogAllowed();
+			}
 			if (!smuPowerControls)
 			{
 				Logger.WriteLine("[smu] 不可用 ⇒ 隐藏 STAPM 时间窗行（原因：" + SmuAvailability.Reason + "）");
@@ -760,6 +768,14 @@ public class CustomModeForm : RForm
 		}
 		(int, int, int, bool) tuple2 = DeviceRange(hw?.Pl1Minimum ?? (-1), hw?.Pl1Maximum ?? (-1), hw?.Pl1 ?? 0);
 		(int, int, int, bool) tuple3 = DeviceRange(hw?.Pl2Minimum ?? (-1), hw?.Pl2Maximum ?? (-1), hw?.Pl2 ?? 0);
+		if (wujieApu && smuPowerControls)
+		{
+			// ⭐⭐ 无界 APU（机主口径）：PL1/PL2 上限统一 90W、下限沿用 15W ⇒ 行可调、写入范围同一口径 ✅
+			int wjPl1 = Math.Clamp((hw.Pl1 > 0) ? hw.Pl1 : MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts);
+			int wjPl2 = Math.Clamp((hw.Pl2 > 0) ? hw.Pl2 : MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts);
+			tuple2 = (MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts, wjPl1, true);
+			tuple3 = (MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts, wjPl2, true);
+		}
 		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl1, hw?.BaolongdaPl1Unset ?? false), tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
 		{
 			QueuePowerLimit("PL1", v);
@@ -833,6 +849,12 @@ public class CustomModeForm : RForm
 			_tcc.Enabled = on;
 		});
 		(int, int, int, bool) tuple6 = DeviceRange(hw?.TccMinimum ?? (-1), hw?.TccMaximum ?? (-1), hw?.TccTarget ?? 0);
+		if (wujieApu && smuPowerControls)
+		{
+			// ⭐ 无界 APU：温度墙沿用 60–105℃（与 SMU tctl 命令同一口径）✅
+			int wjTcc = Math.Clamp((hw.TccTarget > 0) ? hw.TccTarget : MechrevoLite.Hardware.WujieSmuGate.TccMinCelsius, MechrevoLite.Hardware.WujieSmuGate.TccMinCelsius, MechrevoLite.Hardware.WujieSmuGate.TccMaxCelsius);
+			tuple6 = (MechrevoLite.Hardware.WujieSmuGate.TccMinCelsius, MechrevoLite.Hardware.WujieSmuGate.TccMaxCelsius, wjTcc, true);
+		}
 		(_tcc, _tccVal) = AddSliderRow(PowerWallRowLabel(Strings.TempWallValue, hw?.BaolongdaTempWallUnset ?? false), tuple6.Item1, tuple6.Item2, tuple6.Item3, (int v) =>
 		{
 			Queue("CpuTccOffset", v.ToString());

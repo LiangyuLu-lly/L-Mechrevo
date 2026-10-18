@@ -20,6 +20,8 @@ internal static class Program
 		//   C1 = 显示/下发**同一判据**：宝龙达 && 30 系 && SMU 可用；
 		//   C2 = 规划器只在判据为真时生成 `SmuStapmTimeSeconds`（未设置/不可用 ⇒ 不生成，旧行为）。
 		CheckSmuPowerRoutePredicate();
+		// ⭐⭐ 2026-10-19（机主拍板：无界 APU 直接开放 SMU 自定义 · 90W）：判据断言。
+		CheckWujieApuSmuPredicate();
 		CheckPlannerEmitsStapmTimeWindowOnlyWhenSmuUsable();
 		// ⭐⭐ 2026-10-19（机主 UI 顺序 + FPPT 结论）：
 		//   C3a = 步骤顺序与 UI 行顺序一致：PL1 → PL2 → SmuStapmTimeSeconds → CpuTccOffset；
@@ -119,6 +121,17 @@ internal static class Program
 		Expect("A7 no changes", changes.Count == 0);
 	}
 
+	private static void CheckWujieApuSmuPredicate()
+	{
+		// D1：无界 APU + SMU 可用 ⇒ 允许 SMU 自定义（新分支）
+		Expect("W1 wujie apu + smu => smu custom", PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: false, isBaolongda30Series: false, smuReady: true, wujieApu: true));
+		// D2：无界 APU 但 SMU 不可用 ⇒ 不开放
+		Expect("W2 wujie apu + smu unavailable => false", !PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: false, isBaolongda30Series: false, smuReady: false, wujieApu: true));
+		// D3：非无界、非宝龙达 30 系 ⇒ 行为与旧口径一致（默认参数 false）
+		Expect("W3 other machine unchanged", !PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: false, isBaolongda30Series: false, smuReady: true));
+		// D4：宝龙达 30 系原逻辑逐位不变（wujie=false）
+		Expect("W4 baolongda30 unchanged", PerfModeCapabilities.UsesSmuForCustomPower(usesBaolongda: true, isBaolongda30Series: true, smuReady: true));
+	}
 	private static void CheckSmuPowerRoutePredicate()
 	{
 		// ⭐⭐ 2026-10-19（机主：显示条件 =「当前自定义档实际走 SMU 下发」，不是"机型是 Gen30"）：

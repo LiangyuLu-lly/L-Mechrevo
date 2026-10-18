@@ -17,8 +17,9 @@ internal static class PerfApplyGate
 	/// <summary>
 	/// ⭐ 是否应执行本机硬件下发：`isActive`（原口径）**或** 宝龙达 + 自定义档（本机配置始终可下发）✅。
 	/// </summary>
-	internal static bool ShouldApplyLocalCustom(bool usesBaolongda, bool isCustom, bool isActive)
+	internal static bool ShouldApplyLocalCustom(bool usesBaolongda, bool isCustom, bool isActive, bool wujieApu = false)
 	{
-		return (usesBaolongda && isCustom) || isActive;
+		// ⭐⭐ 2026-10-19（无界 APU）：与宝龙达同为"本机配置"⇒ 非激活档也要下发（SMU 功耗墙/曲线）✅
+		return ((usesBaolongda || wujieApu) && isCustom) || isActive;
 	}
 }

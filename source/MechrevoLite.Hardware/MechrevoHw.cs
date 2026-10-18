@@ -5063,6 +5063,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		Logger.WriteLine("[init] 首次打开设置 ⇒ 初始化风扇闸门/清理（耗时 " + (Environment.TickCount64 - start) + " ms，已缓存）");
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主拍板：无界系列 + AMD APU 直接开放 SMU 自定义）：
+	/// ⭐ 本机是否满足「无界 APU」判据（机型名含无界/WUJIE/WJXY · CpuVendor.IsAmd · 无 NVIDIA 独显）✅。
+	/// <para>⚠️ 只读；SMU 是否真的可用另判 `SmuAvailability.IsReady`（与 PerfModeCapabilities 同源）。</para>
+	/// </summary>
+	internal bool WujieSmuApu => WujieSmuGate.IsWujieApu();
 	/// <summary>⭐ 最近一次只读验证结论（⭐ UI 说明行/日志用）✅</summary>
 	internal static string FanCurveVerifyNote => _fanCurveVerifyNote;
 

@@ -66,6 +66,61 @@ internal static class WujieSmuGate
 	/// <summary>机型名关键字（⛔ 不含模具号；大小写不敏感）。</summary>
 	private static readonly string[] WujieModelKeywords = new string[3] { "无界", "WUJIE", "WJXY" };
 
+	// ⭐⭐ 2026-10-19（机主拍板：无界 APU 直接开放 SMU 自定义，CPU 功耗最大 90W）：
+	//   ⭐ 范围常量（UI/写入**同一口径**）：PL1/PL2 = [15, 90]W；温度墙沿用 60–105℃。
+	internal const int PlMinWatts = 15;
+
+	internal const int PlMaxWatts = 90;
+
+	internal const int TccMinCelsius = 60;
+
+	internal const int TccMaxCelsius = 105;
+
+	/// <summary>
+	/// ⭐ **无界 APU 判据**（不含 SMU 可用性）：机型名含无界/WUJIE/WJXY && CpuVendor.IsAmd && 无 NVIDIA 独显 ✅。
+	/// <para>⚠️ 只读；SMU 是否可用由调用方另加 `SmuAvailability.IsReady`（与 `<see cref="PerfModeCapabilities.UsesSmuForCustomPower" />` 同源）。</para>
+	/// </summary>
+	internal static bool IsWujieApu()
+	{
+		WujieSmuVerdict verdict = Evaluate();
+		return verdict.IsWujie && verdict.ApuOk;
+	}
+
+	/// <summary>⭐ 无界 APU **且** SMU 通路可用 ⇒ 允许 SMU 自定义（会触发一次 SMU 探测，已缓存）。</summary>
+	internal static bool IsWujieSmuAllowed()
+	{
+		return IsWujieApu() && SmuAvailability.IsReady;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 机主要求的默认可见日志（去重）：
+	/// `[smu-ui] 无界 APU：SMU自定义=True（model=… · code=… · smuVer=…）· PL上限=90W` ✅
+	/// </summary>
+	internal static void LogAllowed()
+	{
+		try
+		{
+			WujieSmuVerdict verdict = Evaluate();
+			if (!verdict.IsWujie || !verdict.ApuOk)
+			{
+				return;
+			}
+			PawnIO.RyzenSmuService smu = null;
+			try { smu = MechrevoLite.Mode.ModeControl.SharedSmu; } catch { }
+			string code = (smu != null) ? smu.CpuCodeName.ToString() : "读不到";
+			string version = (smu != null) ? ("0x" + smu.SmuVersion.ToString("X")) : "读不到";
+			string message = "[smu-ui] 无界 APU：SMU自定义=" + (SmuAvailability.IsReady ? "True" : "False")
+				+ "（model=" + verdict.Model + " · code=" + code + " · smuVer=" + version + "）· PL上限=" + PlMaxWatts + "W";
+			if (Logger.TryMarkChanged("wujie-smu-allowed", message))
+			{
+				Logger.WriteError(message);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[smu-ui] 无界 APU 允许日志异常（已吞掉）：" + ex.Message);
+		}
+	}
 	/// <summary>⭐ 机型名判据：SystemProductName 含「无界」/ WUJIE / WJXY（大小写不敏感）。</summary>
 	internal static bool IsWujieModel(string model)
 	{

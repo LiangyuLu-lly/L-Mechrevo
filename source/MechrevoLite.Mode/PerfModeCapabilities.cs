@@ -87,9 +87,12 @@ public sealed record PerfModeCapabilities
 	/// <para>⚠️ 为什么必须是**函数**而不是散在各处的 if：机主明确要求 UI 显示与真实下发**同源**，
 	/// 避免「界面显示 SMU 行、实际却走 WMI 23（30 系根本没有）」的错位（§9.14）。</para>
 	/// </summary>
-	internal static bool UsesSmuForCustomPower(bool usesBaolongda, bool isBaolongda30Series, bool smuReady)
+	internal static bool UsesSmuForCustomPower(bool usesBaolongda, bool isBaolongda30Series, bool smuReady, bool wujieApu = false)
 	{
-		return usesBaolongda && isBaolongda30Series && smuReady;
+		// ⭐⭐ 2026-10-19（机主拍板：无界 APU 直接开放 SMU 自定义）：新增「无界 APU」分支 ——
+		//   model 含 无界/WUJIE/WJXY && CpuVendor.IsAmd && 无 NVIDIA 独显 && SMU 通路可用 ⇒ 允许 SMU 自定义 ✅
+		//   ⚠️ 宝龙达 30 系原条件**逐位不变**；其它机型（GCU/同方）默认参数 false ⇒ 行为不变 ✅
+		return (usesBaolongda && isBaolongda30Series && smuReady) || (wujieApu && smuReady);
 	}
 
 	/// <summary>
