@@ -78,6 +78,9 @@ internal class Strings
 
 	internal static string Brightness => ResourceManager.GetString("Brightness", resourceCulture);
 
+	/// <summary>⭐ 本机不支持软件调亮度（读不到系统亮度时滑块置灰后的标注）。</summary>
+	internal static string BrightnessUnsupported => ResourceManager.GetString("BrightnessUnsupported", resourceCulture);
+
 	internal static string BrightnessDown => ResourceManager.GetString("BrightnessDown", resourceCulture);
 
 	internal static string BrightnessUp => ResourceManager.GetString("BrightnessUp", resourceCulture);

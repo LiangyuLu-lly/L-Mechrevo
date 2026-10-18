@@ -34,6 +34,9 @@
 <data name="Brightness" xml:space="preserve">
     <value>Brightness</value>
   </data>
+<data name="BrightnessUnsupported" xml:space="preserve">
+    <value>Software brightness control is not supported on this device</value>
+  </data>
 <data name="Battery" xml:space="preserve">
     <value>Battery</value>
   </data>

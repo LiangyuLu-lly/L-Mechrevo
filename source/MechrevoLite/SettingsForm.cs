@@ -814,6 +814,24 @@ public class SettingsForm : RForm
 
 	private bool _syncingDisplay;
 
+	// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
+	//   构造期这两个控件是**局部变量**（定时器靠闭包访问）⇒ 现在提到字段，供「只读同步」复用。
+	//   · `_brightnessSlider` / `_brightnessValueLabel`：滑块与百分比标签；
+	//   · `_lastBrightnessSystemSyncTick`：低频只读轮询节流（5 s，且只在设置页可见时跑）；
+	//   · `_brightnessUnsupportedShown`：读不到系统亮度 ⇒ 滑块置灰 + 标注（只改 UI，⛔ 不写硬件）；
+	//   · `_brightnessRowVisible`：亮度行当前是否被既有能力闸门放行（恢复显隐时保持闸门语义）。
+	private const int BrightnessSystemPollMs = 5000;
+
+	private RSlider _brightnessSlider;
+
+	private Label _brightnessValueLabel;
+
+	private long _lastBrightnessSystemSyncTick;
+
+	private bool _brightnessUnsupportedShown;
+
+	private bool _brightnessRowVisible;
+
 	private RCheckBox _displayEffectSwitch = null!;
 
 	private ComboBox _displayEffectCombo = null!;
@@ -2406,6 +2424,9 @@ public class SettingsForm : RForm
 			Margin = Padding.Empty,
 			BackColor = bufferedPanel.BackColor
 		};
+		// ⭐⭐ 2026-10-19（机主：启动时亮度滑块没读系统真值）：提到字段，供「只读同步」复用 ✅
+		_brightnessSlider = brightSlider;
+		_brightnessValueLabel = brightPercent;
 		brightSlider.ValueChanged += (object? _, EventArgs _) =>
 		{
 			int value = brightSlider.Value;
@@ -3563,20 +3584,13 @@ public class SettingsForm : RForm
 			try
 			{
 				MechrevoHw hw = Program.hw;
-				if (hw != null && hw.ScreenBrightness >= 0 && !_brightnessCommitQueue.HasPendingOrRunning && (DateTime.UtcNow - _lastBrightnessUi).TotalSeconds >= 3.0)
-				{
-					int screenBrightness = Program.hw.ScreenBrightness;
-					// 2026-10-12（bug ① 同一处夹取）：回读同步的下限也从 10 放到 0 —— 否则硬件报 0 时
-					// 滑块会停在旧值、数值标签也不更新（"量程对了但显示不对"）。
-					if (screenBrightness >= 0 && screenBrightness <= 100)
-					{
-						if (brightSlider.Value != screenBrightness)
-						{
-							brightSlider.Value = screenBrightness;
-						}
-						brightPercent.Text = screenBrightness + "%";
-					}
-				}
+				// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
+				//   ⭐ 旧实现这里只读 **GCU 上报**的 `hw.ScreenBrightness` —— 无 GCU 机型（宝龙达）恒为 -1
+				//      ⇒ 周期回读**从来不跑**，滑块一直停在构造默认值 ❌
+				//   ⭐ 现在统一走 `SyncBrightnessFromSystemReadOnly`：WMI `WmiMonitorBrightness`（首选）
+				//      → dxva2 `GetMonitorBrightness`（备选）→ GCU 字段（旧路径兼容）；
+				//      ⭐ 只更新滑块/数值，⛔ 不写硬件；低频（5 s）且只在设置页可见时跑 ✅
+				SyncBrightnessFromSystemReadOnly(force: false);
 				// ⚠️⚠️ 2026-10-15（用户反馈「刷新率的回读有问题 走 Windows API 的，我点了 60 切过去还是显示 180
 				// 或者说状态刷新不及时」）：`SyncHzButtons()` 原来被包在**上面那个「亮度可读」条件里** ——
 				// 而无 GCU 时 `hw.ScreenBrightness` 恒为 -1（那是 **GCU 上报**字段）⇒ 周期回读**根本不跑**，
@@ -3683,6 +3697,16 @@ public class SettingsForm : RForm
 		{
 			_displayStatusTimer.Start();
 		}
+		// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
+		//   ⭐ 首次打开设置页 ⇒ **只读同步一次**系统亮度（WMI 优先 / dxva2 备选），
+		//      ⛔ 不写硬件（不调 `ScreenBrightness.Set`）、⛔ 不动 `_lastBrightnessUi`（那是用户拖动的时间戳）✅
+		Shown += (object? _, EventArgs _) =>
+		{
+			if (!Program.UiAuditMode)
+			{
+				SyncBrightnessFromSystemReadOnly(force: true);
+			}
+		};
 		void AddCustomLightItem(string text2, string profile)
 		{
 			lcLightMenu.AddItem(text2, async () =>
@@ -8681,6 +8705,13 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			SetScreenRowVisible(4, hw?.DisplayEffectOn.HasValue ?? false, new string[1] { "rowDisplayEffect" });
 		}
 		SetScreenRowVisible(2, flag10, new string[3] { "labelScreenBrightness", "sliderScreenBrightness", "labelScreenBrightnessValue" });
+		// ⭐⭐ 2026-10-19（机主：读不到系统亮度时滑块置灰/隐藏并标注）：
+		//   ⭐ 记录**既有能力闸门**对亮度行的放行结果；随后按"是否读得到系统亮度"补一次 UI 状态：
+		//      · 读得到 ⇒ 滑块恢复可用、数值 = 真实百分比；
+		//      · 读不到 ⇒ 滑块置灰，数值位显示「本机不支持软件调亮度」（⛔ 不显示假值）；
+		//      ⛔ 这里只改 UI，不写硬件、也不改闸门判据（闸门说隐藏就仍然隐藏）✅
+		_brightnessRowVisible = flag10;
+		ApplyBrightnessVisualState();
 		if (_hzSegTable != null)
 		{
 			SetScreenRowControls(1, _hzButtons.Count > 0, _hzSegTable);
@@ -10295,6 +10326,178 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
+	/// ⭐ **只读**同步系统亮度到滑块/数值标签 —— ⛔ 不写硬件（绝不调 <c>ScreenBrightness.Set</c>）✅。
+	/// <para>⭐ 触发时机：
+	/// ① 启动 / 首次打开设置页（`Shown`）；② 页面重新打开（`VisibleChanged` → Visible）；
+	/// ③ 显示器变化（`OnDisplaySettingsChanged`）；④ 设置页可见时每 <see cref="BrightnessSystemPollMs" /> 毫秒一次低频校验。</para>
+	/// <para>⭐ 读取来源：WMI <c>root\wmi:WmiMonitorBrightness.CurrentBrightness</c>（首选）
+	/// → Win32 <c>dxva2.GetMonitorBrightness</c>（备选）→ GCU 上报字段（旧路径兼容）。</para>
+	/// <para>⚠️ 用户正在拖滑块 / 刚拖过 3 秒内 / 有写入在飞 ⇒ **跳过**本次回读（⛔ 不覆盖用户刚设的值）；
+	/// 读不到 ⇒ 滑块置灰 + 数值位标注「本机不支持软件调亮度」（⛔ 不显示假值）✅。</para>
+	/// <para>⚠️ 日志去重：同一值/同一失败原因只落一行（`Logger.TryMarkChanged`），⛔ 不刷屏 ✅。</para>
+	/// </summary>
+	/// <param name="force">⭐ true = 打开/显示变化等事件触发（忽略 5 s 节流，但仍避开用户拖动窗口）。</param>
+	private void SyncBrightnessFromSystemReadOnly(bool force)
+	{
+		if (Program.UiAuditMode || IsDisposed || _brightnessSlider == null || _brightnessValueLabel == null)
+		{
+			return;
+		}
+		// 用户正在拖 / 刚拖过 3 s 内、或写入在飞 ⇒ 不拿回读值覆盖（与旧回读口径一致）
+		if (_brightnessCommitQueue.HasPendingOrRunning || (DateTime.UtcNow - _lastBrightnessUi).TotalSeconds < 3.0)
+		{
+			return;
+		}
+		long now = Environment.TickCount64;
+		bool firstSync = _lastBrightnessSystemSyncTick == 0;
+		if (!force)
+		{
+			if (!Visible)
+			{
+				return;
+			}
+			if (now - _lastBrightnessSystemSyncTick < BrightnessSystemPollMs)
+			{
+				return;
+			}
+		}
+		_lastBrightnessSystemSyncTick = now;
+		bool ok = TryReadSystemBrightness(out int value, out string source, out string reason);
+		if (!ok)
+		{
+			_brightnessUnsupportedShown = true;
+			ApplyBrightnessVisualState();
+			string failMsg = "[brightness] ⚠️ 读不到系统亮度（原因=" + reason + "）";
+			if (Logger.TryMarkChanged("brightness-read-fail", failMsg))
+			{
+				Logger.WriteError(failMsg);
+			}
+			return;
+		}
+		bool wasUnsupported = _brightnessUnsupportedShown || !_brightnessSlider.Enabled;
+		_brightnessUnsupportedShown = false;
+		ApplyBrightnessVisualState();
+		bool changed = false;
+		bool prevSyncing = _syncingDisplay;
+		_syncingDisplay = true;
+		try
+		{
+			if (_brightnessSlider.Value != value)
+			{
+				_brightnessSlider.Value = value;
+				changed = true;
+			}
+			string text = value + "%";
+			if (_brightnessValueLabel.Text != text)
+			{
+				_brightnessValueLabel.Text = text;
+				changed = true;
+			}
+		}
+		finally
+		{
+			_syncingDisplay = prevSyncing;
+		}
+		if (changed || wasUnsupported || firstSync)
+		{
+			string okMsg = "[brightness] 只读同步 ⇒ 系统值=" + value + "%（来源=" + source + "）· UI 已更新（未写硬件）";
+			if (Logger.TryMarkChanged("brightness-read-sync", okMsg))
+			{
+				Logger.WriteError(okMsg);
+			}
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
+	/// ⭐ **读取系统亮度**（只读）—— 返回 false 时 <paramref name="reason" /> 给出可读原因 ✅。
+	/// <para>顺序：① WMI <c>WmiMonitorBrightness</c>（首选）→ ② dxva2 <c>GetMonitorBrightness</c>（备选）
+	/// → ③ GCU 上报字段（仅 ≥0 的旧路径兼容；无 GCU 机型恒 -1 ⇒ 不会走到）✅</para>
+	/// </summary>
+	private static bool TryReadSystemBrightness(out int percent, out string source, out string reason)
+	{
+		percent = -1;
+		source = string.Empty;
+		reason = string.Empty;
+		// ① WMI WmiMonitorBrightness（笔记本内屏通用）
+		try
+		{
+			if (ScreenBrightness.TryGet(out int wmi) && wmi >= 0 && wmi <= 100)
+			{
+				percent = wmi;
+				source = "WMI WmiMonitorBrightness";
+				return true;
+			}
+			reason = "WMI WmiMonitorBrightness 无有效实例";
+		}
+		catch (Exception ex)
+		{
+			reason = "WMI 异常：" + ex.GetType().Name + " " + ex.Message;
+		}
+		// ② Win32 dxva2 GetMonitorBrightness（只读备选）
+		if (MonitorBrightness.TryGet(out int dxPercent, out string dxReason))
+		{
+			percent = dxPercent;
+			source = "Win32 dxva2 GetMonitorBrightness";
+			return true;
+		}
+		reason = (reason.Length == 0) ? dxReason : (reason + "；" + dxReason);
+		// ③ 旧路径兼容：GCU 上报字段（无 GCU 机型恒 -1）
+		MechrevoHw hw = Program.hw;
+		if (hw != null && hw.ScreenBrightness >= 0 && hw.ScreenBrightness <= 100)
+		{
+			percent = hw.ScreenBrightness;
+			source = "GCU 上报 ScreenBrightness";
+			return true;
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：读不到系统亮度时滑块置灰/隐藏并标注）：
+	/// ⭐ 按 <see cref="_brightnessUnsupportedShown" /> 切换亮度行 UI —— ⛔ 只改控件显示，不写硬件、不改闸门判据 ✅。
+	/// <para>⚠️ 标注「本机不支持软件调亮度」比数值列宽 ⇒ 只在**闸门放行（行可见）**时隐藏滑块、
+	/// 让标注跨「滑块 + 数值」两列；闸门说隐藏时保持原样 ✅。</para>
+	/// </summary>
+	private void ApplyBrightnessVisualState()
+	{
+		if (_brightnessSlider == null || _brightnessValueLabel == null)
+		{
+			return;
+		}
+		if (_brightnessUnsupportedShown)
+		{
+			_brightnessSlider.Enabled = false;
+			if (_brightnessValueLabel.Text != Strings.BrightnessUnsupported)
+			{
+				_brightnessValueLabel.Text = Strings.BrightnessUnsupported;
+			}
+			_brightnessValueLabel.TextAlign = ContentAlignment.MiddleLeft;
+			if (_brightnessRowVisible && _screenRowsLayout != null)
+			{
+				_brightnessSlider.Visible = false;
+				// ⚠️ 顺序：先移到第 1 列，再设跨 2 列 —— 反过来的话 (2,2)+span2 会越界（3 列表格）。
+				_screenRowsLayout.SetCellPosition(_brightnessValueLabel, new TableLayoutPanelCellPosition(1, 2));
+				_screenRowsLayout.SetColumnSpan(_brightnessValueLabel, 2);
+			}
+			return;
+		}
+		// 可读：恢复默认布局（滑块 (1,2) · 数值 (2,2)）
+		if (_screenRowsLayout != null)
+		{
+			_screenRowsLayout.SetColumnSpan(_brightnessValueLabel, 1);
+			_screenRowsLayout.SetCellPosition(_brightnessValueLabel, new TableLayoutPanelCellPosition(2, 2));
+		}
+		_brightnessValueLabel.TextAlign = ContentAlignment.MiddleRight;
+		_brightnessSlider.Enabled = true;
+		if (_brightnessRowVisible)
+		{
+			_brightnessSlider.Visible = true;
+		}
+	}
+
 	private void SettingsForm_VisibleChanged(object? sender, EventArgs e)
 	{
 		if (!Program.UiAuditMode)
@@ -10306,6 +10509,10 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			}
 			if (Visible)
 			{
+				// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
+				//   ⭐ **重新打开设置页**（ShowAll → Visible=true）⇒ 立刻只读同步一次系统亮度；
+				//      ⛔ 不写硬件；值没变时只更新 UI 不刷日志（去重在同步方法内）✅
+				SyncBrightnessFromSystemReadOnly(force: true);
 				if (_themeModePanel != null)
 				{
 					UiVisualStyle.ApplyWindow(this);
@@ -13314,6 +13521,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				// screen_max / max_frequency / frequency 是否被别的屏污染；只在能确定 eDP 内屏时才纠正。
 				MechrevoLite.Display.ScreenControl.ReconcileScreenMetrics("DisplaySettingsChanged");
 				SyncHzButtons();
+				// ⭐⭐ 2026-10-19（机主：显示器变化后亮度也要刷新）：
+				//   ⭐ 显示配置变化（内屏/外接屏接入、MUX/分辨率切换）后**只读**重读一次系统亮度；
+				//      ⛔ 不写硬件、不影响刷新率那条逻辑 ✅
+				SyncBrightnessFromSystemReadOnly(force: true);
 			}));
 		}
 		catch (Exception ex)

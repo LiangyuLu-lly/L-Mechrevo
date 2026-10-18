@@ -82,6 +82,9 @@
 <data name="Brightness" xml:space="preserve">
     <value>亮度</value>
   </data>
+<data name="BrightnessUnsupported" xml:space="preserve">
+    <value>本机不支持软件调亮度</value>
+  </data>
 <data name="Battery" xml:space="preserve">
     <value>电池</value>
   </data>
