@@ -42,7 +42,7 @@ internal static class KeyboardEcBrightness
 	/// <param name="wmi">宝龙达 WMI（可为 null；仅用于交叉验证）✅。</param>
 	/// <param name="readback">最终回读的 0x1807 值（失败为 -1 或最后一次回读）✅。</param>
 	/// <param name="wmi18">写后读到的 WMI 功能号 18（读不到为 -1）✅。</param>
-	internal static bool TrySetLevel(int level, BaolongdaWmi wmi, out int readback, out int wmi18)
+	internal static bool TrySetLevel(int level, BaolongdaWmi wmi, out int readback, out int wmi18, string source = "未标注")
 	{
 		readback = -1;
 		wmi18 = ReadWmi18(wmi);
@@ -68,6 +68,7 @@ internal static class KeyboardEcBrightness
 
 		// ⭐ ① ACPI 0x93 写 + 回读 ✅
 		string via = "ACPI";
+		TraceEcWrite(level, target, source, via);
 		bool wrote = EcPortIo.TryWriteByte(RegisterAddress, target);
 		int rb = -1;
 		bool rbOk = EcPortIo.TryReadByte(RegisterAddress, out rb);
@@ -77,6 +78,7 @@ internal static class KeyboardEcBrightness
 		if (!ok)
 		{
 			via = "LPC";
+			TraceEcWrite(level, target, source, via);
 			bool lpcWrote = EcLpcIo.TryWriteByte(RegisterAddress, target, out int lpcBack);
 			bool lpcRead = EcLpcIo.TryReadByte(RegisterAddress, out int lpcCheck);
 			if (lpcWrote && lpcRead && lpcCheck == target)
@@ -128,6 +130,42 @@ internal static class KeyboardEcBrightness
 	private static string FormatWmi18(int wmi18)
 	{
 		return (wmi18 >= 0) ? wmi18.ToString() : "读不到";
+	}
+
+	/// <summary>⭐ 2026-10-19（追踪「谁在写 0x1807」）：每次真实 EC 写前打来源 + 前 3 帧调用链（⛔ 不打整栈）✅。</summary>
+	private static void TraceEcWrite(int level, byte target, string source, string channel)
+	{
+		Logger.WriteError($"[kbd-trace] 写 0x1807=0x{target:X2} ← 来源={source} · 档位={level}"
+			+ $" · 通道={channel} · 调用链={DescribeEcCallChain(3)}");
+	}
+
+	/// <summary>⭐ 截前 N 帧调用链（类型.方法 ← …），⛔ 不打完整栈 ✅。</summary>
+	private static string DescribeEcCallChain(int maxFrames)
+	{
+		try
+		{
+			System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace(2, fNeedFileInfo: false);
+			string text = "";
+			int count = Math.Min(Math.Max(0, maxFrames), stackTrace.FrameCount);
+			for (int i = 0; i < count; i++)
+			{
+				var method = stackTrace.GetFrame(i)?.GetMethod();
+				if (method == null)
+				{
+					continue;
+				}
+				if (text.Length > 0)
+				{
+					text += " ← ";
+				}
+				text += method.DeclaringType?.Name + "." + method.Name;
+			}
+			return (text.Length > 0) ? text : "n/a";
+		}
+		catch
+		{
+			return "n/a";
+		}
 	}
 
 	/// <summary>⭐ “默认可见 + 去重”日志（错误级别 ⇒ 默认日志可见；同 key+同内容只记一次）✅。</summary>

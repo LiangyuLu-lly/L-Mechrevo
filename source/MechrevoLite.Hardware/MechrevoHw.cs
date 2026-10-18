@@ -3184,6 +3184,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				{
 					if (TryReadKeyboardPowerFromEc(out bool ecOff, out int ecOffValue))
 					{
+						TraceKeyboardPowerWrite(ecOff, "关灯后-EC回读");
 						KeyboardPower = ecOff;
 						confirmed = !ecOff;
 						Logger.WriteError($"[kbd] 30 系关灯后开关状态：EC 0x1807=0x{ecOffValue:X2} ⇒ {(ecOff ? "ON" : "OFF")}"
@@ -3240,6 +3241,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
 				{
+					TraceKeyboardPowerWrite(ecOn, "开灯后-EC回读");
 					KeyboardPower = ecOn;
 					confirmed = ecOn == on;
 					Logger.WriteError($"[kbd] 30 系开关确认：EC 0x1807=0x{ecValue:X2} ⇒ {(ecOn ? "ON" : "OFF")}"
@@ -3255,6 +3257,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
 				{
 					bool actual = mode != 0;
+					TraceKeyboardPowerWrite(actual, "开关确认-WMI16回读(non30)");
 					KeyboardPower = actual; // ⭐ 如实回写本地镜像 ✅（⭐ 修「关了又开」的关键一步 ⚠️）
 					confirmed = actual == on;
 					Logger.WriteError($"宝龙达 灯光：⭐ 键盘灯电源已{(on ? "开" : "关")}并回读确认"
@@ -3308,6 +3311,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				{
 					if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
 					{
+						TraceKeyboardPowerWrite(ecOn, "TryConfirm-topic-EC回读");
 						KeyboardPower = ecOn;
 						confirmed = ecOn == on;
 						Logger.WriteError($"[kbd] 30 系开关确认（topic）：EC 0x1807=0x{ecValue:X2} ⇒ {(ecOn ? "ON" : "OFF")}"
@@ -3322,6 +3326,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte mode) && mode != 255)
 				{
 					bool actual = mode != 0;
+					TraceKeyboardPowerWrite(actual, "TryConfirm-topic-WMI16回读");
 					KeyboardPower = actual; // ⭐ 如实回写镜像 ✅
 					confirmed = actual == on;
 					return true;
@@ -3612,6 +3617,44 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「30 系关灯后开关又跳回开」）：⭐ **追踪 KeyboardPower 的每个写入点** ✅。
+	/// <para>日志格式：`[kbd-trace] KeyboardPower=True ← 来源=… · 调用链=类型.方法 ← …`（⛔ 只截前 3 帧，不打整栈）✅。</para>
+	/// </summary>
+	private void TraceKeyboardPowerWrite(bool value, string source)
+	{
+		Logger.WriteError($"[kbd-trace] KeyboardPower={value} ← 来源={source} · 调用链={DescribeCallChain(3)}");
+	}
+
+	/// <summary>⭐ 2026-10-19：截前 N 帧调用链（类型.方法 ← …），⛔ 不打完整栈 ✅。</summary>
+	private static string DescribeCallChain(int maxFrames)
+	{
+		try
+		{
+			System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace(2, fNeedFileInfo: false);
+			StringBuilder text = new StringBuilder();
+			int count = Math.Min(Math.Max(0, maxFrames), stackTrace.FrameCount);
+			for (int i = 0; i < count; i++)
+			{
+				var method = stackTrace.GetFrame(i)?.GetMethod();
+				if (method == null)
+				{
+					continue;
+				}
+				if (text.Length > 0)
+				{
+					text.Append(" ← ");
+				}
+				text.Append(method.DeclaringType?.Name).Append('.').Append(method.Name);
+			}
+			return (text.Length > 0) ? text.ToString() : "n/a";
+		}
+		catch
+		{
+			return "n/a";
+		}
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-19（30 系「关灯后开关自己跳回开」）：⭐ **开关状态以 EC 0x1807 为准** ✅。
 	/// <para>0x00 ⇒ OFF；!=0 ⇒ ON；读失败返回 <c>false</c>（调用方保留上一次状态；⛔ 不凭 WMI16/18 恢复 ON）✅。</para>
 	/// <para>⚠️ 仅 Gen30；其它机型返回 false（继续走原 WMI 判据）✅。</para>
@@ -3649,6 +3692,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return;
 		}
+		TraceKeyboardPowerWrite(on, "SyncKeyboardPowerFromHardware(" + source + ")");
 		KeyboardPower = on;
 		Logger.WriteLine($"[light] 键盘灯电源镜像同步 ⇒ {(on ? "On" : "Off")}（来源：{source}；⛔ 未写硬件）");
 	}
@@ -3732,6 +3776,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// ⭐ 2026-10-19（30 系只读诊断）：每进程一次 raw OutData 探测（⛔ 不写任何字节）✅
 		ProbeKeyboardRawOnce(wmi);
+		// ⭐ 2026-10-19（追踪「谁把开关/亮度改回开」）：每次下发都记来源 + 前 3 帧调用链 ✅
+		Logger.WriteError($"[kbd-trace] TrySetKeyboardLightingViaBackend(on={on} · level={brightness0to3} · mode={mode})"
+			+ $" ← 调用链={DescribeCallChain(3)}");
 		try
 		{
 			// ⭐⭐ 2026-10-19（自动关灯）：任何**非恢复**的键盘灯写入都视为"用户手动改灯"
@@ -3762,7 +3809,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				if (DgpuGeneration == DgpuGenerationKind.Gen30)
 				{
 					LogKeyboardLightingState(wmi, "关灯前");
-					bool ecOffOk = KeyboardEcBrightness.TrySetLevel(0, wmi, out int ecOffReadback, out int ecOffWmi18);
+					bool ecOffOk = KeyboardEcBrightness.TrySetLevel(0, wmi, out int ecOffReadback, out int ecOffWmi18,
+						"关灯写(EC) · TrySetKeyboardLightingViaBackend(on=false)");
 					confirmed = ecOffOk;
 					if (ecOffOk)
 					{
@@ -3900,7 +3948,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				//   ⚠️ 关灯（档位 0）仍走上面 !on 分支的原有 `18=0` 路径，**未改**；
 				//   ⚠️ 40 系/其它机型不进这里（继续原 WMI 18 写法）✅
 				ecBrightnessUsed = true;
-				ecBrightnessOk = KeyboardEcBrightness.TrySetLevel(level, wmi, out ecBrightnessReadback, out ecBrightnessWmi18);
+				ecBrightnessOk = KeyboardEcBrightness.TrySetLevel(level, wmi, out ecBrightnessReadback, out ecBrightnessWmi18,
+					"亮度下发(固定色) · TrySetKeyboardLightingViaBackend(on=true)");
 				brightOk = ecBrightnessOk;
 				Logger.WriteError($"[kbd] 30 系亮度走 EC 0x1807：档位={level} ⇒ 回读="
 					+ $"{(ecBrightnessReadback >= 0 ? "0x" + ecBrightnessReadback.ToString("X2") : "读不到")}"
@@ -8750,7 +8799,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text6 = o["powerStatus"]?.ToString();
 		if (text6 != null)
 		{
-			KeyboardPower = text6 == "On";
+			bool gcuKeyboardOn = text6 == "On";
+			TraceKeyboardPowerWrite(gcuKeyboardOn, "GCU payload 解析(powerStatus)");
+			KeyboardPower = gcuKeyboardOn;
 		}
 		string text7 = o["solution"]?.ToString();
 		if (text7 != null)
