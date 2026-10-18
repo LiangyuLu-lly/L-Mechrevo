@@ -78,36 +78,36 @@ internal sealed class BatteryLimitPanel : Panel
 		AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		Dock = DockStyle.Fill;
 
-		_socLabel = MakeFixedLabel("电量读取中…", D(240));
+		_socLabel = MakeFixedLabel(Strings.BatteryLimitSocReading, D(240));
 		_socLabel.Font = UiVisualStyle.Font(9f);
 
-		_lowLabel = MakeFixedLabel("起充（%）", D(88));
+		_lowLabel = MakeFixedLabel(Strings.BatteryLimitStartPercent, D(88));
 		_lowBox = MakeNumeric(1, 99, 60);
-		_highLabel = MakeFixedLabel("停充（%）", D(88));
+		_highLabel = MakeFixedLabel(Strings.BatteryLimitStopPercent, D(88));
 		_highBox = MakeNumeric(2, 100, 80);
 
 		_enableBox = new RCheckBox
 		{
 			AutoSize = true,
-			Text = EnableChargeText(),
+			Text = Strings.BatteryLimitEnableCharge,
 			BackColor = Color.Transparent,
 			Margin = new Padding(0, D(4), 0, 0)
 		};
-		_toolTip.SetToolTip(_enableBox, EnableChargeTipText());
+		_toolTip.SetToolTip(_enableBox, Strings.BatteryLimitEnableChargeTip);
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
 
 		_applyButton = new RButton
 		{
 			AutoSize = false,
 			Dock = DockStyle.Fill,
-			Text = "保存阈值",
+			Text = Strings.BatteryLimitSaveThreshold,
 			// ⭐ 机主要求：**小圆角矩形**（≈4 逻辑像素；默认 8/12 太大）✅
 			BorderRadius = D(4),
 			Margin = new Padding(D(6), D(4), 0, D(4))
 		};
 		_applyButton.Click += ApplyButton_Click;
 
-		_statusLabel = MakeFixedLabel("状态读取中…", D(360));
+		_statusLabel = MakeFixedLabel(Strings.BatteryLimitStatusReading, D(360));
 		_statusLabel.Margin = new Padding(0, D(4), 0, 0);
 
 		TableLayoutPanel grid = new TableLayoutPanel
@@ -272,7 +272,7 @@ internal sealed class BatteryLimitPanel : Panel
 	{
 		if (!BatteryLimitWriter.TryReadState(out int high, out int low, out int mode, out string detail))
 		{
-			SetStatus("状态读不到（详见日志）", 1);
+			SetStatus(Strings.BatteryLimitStatusUnreadable, 1);
 			Logger.WriteLine("[battery] 充电阈值状态（UI 刷新）：" + detail);
 			UpdateSocLine(active: false);
 				return;
@@ -297,7 +297,7 @@ internal sealed class BatteryLimitPanel : Panel
 		}
 		// ⭐ 机主要求：纯文字、无对勾；生效=绿色 Success，未启用=灰/Muted；
 		//   ⭐ 同时显示**实际生效值**（enable 时可能按 SOC 提升 high ⇒ 这里回显 EC 读回值）✅
-		SetStatus(active ? "限制充电已生效 · 当前生效 " + high + "%" : "未限制充电", active ? 3 : 0);
+		SetStatus(active ? string.Format(Strings.BatteryLimitStatusActiveFormat, high) : Strings.BatteryLimitStatusInactive, active ? 3 : 0);
 		UpdateSocLine(active);
 	}
 
@@ -307,47 +307,15 @@ internal sealed class BatteryLimitPanel : Panel
 		try
 		{
 			int soc = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
-			_socLabel.Text = "电量 " + (soc >= 0 ? soc + "%" : "读不到");
+			_socLabel.Text = soc >= 0 ? string.Format(Strings.BatteryLimitSocFormat, soc) : Strings.BatteryLimitSocUnreadable;
 			Logger.WriteLineIfChanged("battery-ui-soc", "[battery-ui] 电量行：电量=" + soc + "% · active=" + active);
 		}
 		catch
 		{
-			_socLabel.Text = "电量读不到";
+			_socLabel.Text = Strings.BatteryLimitSocUnreadable;
 		}
 	}
 
-	private static string EnableChargeText()
-	{
-		string text = Strings.BatteryLimitEnableCharge;
-		// ⭐ 中文系统上若资源回退成英文（satellite 未命中）⇒ 保底显示中文，⛔ 不让 UI 出现英文 ✅
-		if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh" && !ContainsChinese(text))
-		{
-			return "限制充电";
-		}
-		return text;
-	}
-
-	private static string EnableChargeTipText()
-	{
-		string text = Strings.BatteryLimitEnableChargeTip;
-		if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh" && !ContainsChinese(text))
-		{
-			return "开启后接电源时会把充电限制在停充阈值";
-		}
-		return text;
-	}
-
-	private static bool ContainsChinese(string text)
-	{
-		foreach (char c in text ?? string.Empty)
-		{
-			if (c >= '\u4e00' && c <= '\u9fff')
-			{
-				return true;
-			}
-		}
-		return false;
-	}
 	private async void EnableBox_CheckedChanged(object sender, EventArgs e)
 	{
 		if (_busy || _syncing)
@@ -371,13 +339,13 @@ internal sealed class BatteryLimitPanel : Panel
 			Logger.WriteLine("[battery] 充电限制" + (want ? "启用" : "关闭") + "（UI）：ok=" + ok + "\n" + detail);
 			if (!ok)
 			{
-				SetStatus(want ? "⛔ 启用失败（详见日志）" : "⛔ 关闭失败（详见日志）", 1);
+				SetStatus(want ? Strings.BatteryLimitEnableFailed : Strings.BatteryLimitDisableFailed, 1);
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
-			SetStatus("⛔ 操作异常（详见日志）", 1);
+			SetStatus(Strings.BatteryLimitOperationFailed, 1);
 			Logger.WriteLine("[battery] 充电限制 UI 异常：" + ex.GetType().Name + " " + ex.Message);
 		}
 		finally
@@ -396,7 +364,7 @@ internal sealed class BatteryLimitPanel : Panel
 		int high = (int)_highBox.Value;
 		if (!(low >= 1 && low < high && high <= 100))
 		{
-			SetStatus("⛔ 参数非法：要求 0 < 起充 < 停充 ≤ 100", 1);
+			SetStatus(Strings.BatteryLimitInvalidParams, 1);
 			return;
 		}
 		SetBusy(true);
@@ -410,13 +378,13 @@ internal sealed class BatteryLimitPanel : Panel
 			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + "\n" + detail);
 			if (!ok)
 			{
-				SetStatus("⛔ 保存失败（详见日志）", 1);
+				SetStatus(Strings.BatteryLimitSaveFailed, 1);
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
-			SetStatus("⛔ 操作异常（详见日志）", 1);
+			SetStatus(Strings.BatteryLimitOperationFailed, 1);
 			Logger.WriteLine("[battery] 充电阈值保存 UI 异常：" + ex.GetType().Name + " " + ex.Message);
 		}
 		finally

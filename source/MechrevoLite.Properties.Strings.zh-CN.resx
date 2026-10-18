@@ -4254,6 +4254,125 @@
     
   
   </data>
+<data name="BatteryLimitStartPercent" xml:space="preserve">
+    
+    
+    <value>起充（%）</value>
+    
+  
+  </data>
+<data name="BatteryLimitStopPercent" xml:space="preserve">
+    
+    
+    <value>停充（%）</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveThreshold" xml:space="preserve">
+    
+    
+    <value>保存阈值</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocReading" xml:space="preserve">
+    
+    
+    <value>电量读取中…</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocFormat" xml:space="preserve">
+    
+    
+    <value>电量 {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocUnreadable" xml:space="preserve">
+    
+    
+    <value>电量读不到</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusReading" xml:space="preserve">
+    
+    
+    <value>状态读取中…</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusUnreadable" xml:space="preserve">
+    
+    
+    <value>状态读不到（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusActiveFormat" xml:space="preserve">
+    
+    
+    <value>限制充电已生效 · 当前生效 {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusInactive" xml:space="preserve">
+    
+    
+    <value>未限制充电</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleActiveFormat" xml:space="preserve">
+    
+    
+    <value>限制充电中（停充 {0}% / 起充 {1}%）</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleInactive" xml:space="preserve">
+    
+    
+    <value>未限制充电</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 启用失败（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitDisableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 关闭失败（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitOperationFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 操作异常（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 保存失败（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitInvalidParams" xml:space="preserve">
+    
+    
+    <value>⛔ 参数非法：要求 0 &lt; 起充 &lt; 停充 ≤ 100</value>
+    
+  
+  </data>
 <data name="BatteryStateIdle" xml:space="preserve">
     
     

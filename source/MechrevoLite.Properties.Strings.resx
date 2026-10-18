@@ -4228,6 +4228,125 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="BatteryLimitStartPercent" xml:space="preserve">
+    
+    
+    <value>Start (%)</value>
+    
+  
+  </data>
+<data name="BatteryLimitStopPercent" xml:space="preserve">
+    
+    
+    <value>Stop (%)</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveThreshold" xml:space="preserve">
+    
+    
+    <value>Save thresholds</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocReading" xml:space="preserve">
+    
+    
+    <value>Reading battery…</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocFormat" xml:space="preserve">
+    
+    
+    <value>Battery {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocUnreadable" xml:space="preserve">
+    
+    
+    <value>Battery level unreadable</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusReading" xml:space="preserve">
+    
+    
+    <value>Reading status…</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusUnreadable" xml:space="preserve">
+    
+    
+    <value>Status unreadable (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusActiveFormat" xml:space="preserve">
+    
+    
+    <value>Charge limit active · effective {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusInactive" xml:space="preserve">
+    
+    
+    <value>Charge limit off</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleActiveFormat" xml:space="preserve">
+    
+    
+    <value>Charge limit active (stop {0}% / start {1}%)</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleInactive" xml:space="preserve">
+    
+    
+    <value>Charge limit off</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Enable failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitDisableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Disable failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitOperationFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Operation failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Save failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitInvalidParams" xml:space="preserve">
+    
+    
+    <value>⛔ Invalid values: require 0 &lt; start &lt; stop ≤ 100</value>
+    
+  
+  </data>
 <data name="BatteryStateIdle" xml:space="preserve">
     
     

@@ -13961,10 +13961,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			if (TryReadBaolongdaLimitForTitle(out int titleHigh, out int titleLow, out int titleMode))
 			{
 				return titleMode == BatteryLimitWriter.ModeActive
-					? "限制充电中（停充 " + titleHigh + "% / 起充 " + titleLow + "%）"
-					: "未限制充电";
+					? string.Format(Strings.BatteryLimitTitleActiveFormat, titleHigh, titleLow)
+					: Strings.BatteryLimitTitleInactive;
 			}
-			return "未限制充电";
+			return Strings.BatteryLimitTitleInactive;
 		}
 		PowerInputKind kind = PowerInputDecoder.Reconcile(input.Power, input.AcOnline);
 		List<string> list = new List<string>(4) { PowerSourceHeadline(kind, input.Power?.AdapterWatts) };
