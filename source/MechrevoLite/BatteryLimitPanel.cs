@@ -4,15 +4,16 @@
 //    EC 状态可读与否只影响本区域内容（读不到时显示“状态读不到”），⛔ 非宝龙达不构建。
 //
 // ⭐ UI 布局（机主 2026-10-18 定稿，自上而下）：
-//    电量 92%                              ← 只保留电量，状态摘要统一在标题行右侧
-//    起充（%） [70]      停充（%） [95]    ← 两列等宽、输入右对齐、标签不换行
-//    ☑ 启用限制充电（接电源时限制充电上限）
-//    [保存阈值]
-//    ✅ 限制充电已生效（停充 95% / 起充 70%）   ← 无“当前:”前缀、无 EC 原始值
-//    ⚠️ SOC ≥ 停充阈值时的红色可操作提示
+//    电量 92%
+//    [开关] 限制充电                       [保存阈值]   ← 仓库现有 RCheckBox 开关样式 + 最右按钮
+//    起充（%） [70]      停充（%） [95]                 ← 两列等宽、输入右对齐、标签不换行
+//    ✅ 限制充电已生效（停充 95% / 起充 70%）            ← 无“当前:”前缀、无 EC 原始值
+//    ⚠️ SOC ≥ 停充阈值时的可操作提示
 //
-// ⭐ EC 原始值（0x83A1/0x83A2/0x83C0…）只写 `[battery]` 日志/诊断包，⛔ 不上 UI ✅
-// ⚠️ 写入只走 `BatteryLimitWriter`（白名单 4 地址 + 严格时序 + 失败不重试）✅
+// ⭐ 颜色全部走 `UiVisualStyle`（浅/深色主题；`ApplyTheme()` 由 SettingsForm.ApplyThemeMode 调用）✅
+//    · 文本 = Text · 次要/正常状态 = Muted · 错误 = Danger · 警示 = Warn
+//    · 输入框底 = Input · 按钮面 = ButtonFace · 边框 = Border
+// ⭐ EC 原始值只写 `[battery]` 日志/诊断包，⛔ 不上 UI ✅
 
 using System;
 using System.Drawing;
@@ -28,13 +29,20 @@ namespace MechrevoLite;
 /// <summary>⭐⭐ 电池页的宝龙达充电阈值区域（仅同款机型构建）✅。</summary>
 internal sealed class BatteryLimitPanel : Panel
 {
+	internal const string PanelControlName = "batteryLimitPanel";
+
 	private readonly Label _socLabel;
+
+	private readonly Label _lowLabel;
+
+	private readonly Label _highLabel;
 
 	private readonly NumericUpDown _lowBox;
 
 	private readonly NumericUpDown _highBox;
 
-	private readonly CheckBox _enableBox;
+	// ⭐ 机主要求：用仓库现有开关控件（RCheckBox 的拨动开关样式），⛔ 不用普通 CheckBox 对勾 ✅
+	private readonly RCheckBox _enableBox;
 
 	private readonly Button _applyButton;
 
@@ -42,7 +50,6 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private readonly Label _hintLabel;
 
-	// ⭐ 开关说明的 Tooltip（机主：说明不放在行内）✅
 	private readonly ToolTip _toolTip = new ToolTip();
 
 	private bool _busy;
@@ -51,14 +58,13 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private bool _active;
 
+	// 0=正常（Muted）· 1=错误（Danger）· 2=警示（Warn）
+	private int _statusKind;
+
 	// ⭐ 统一行距常量（逻辑像素；只用这一套，⛔ 不混用半行高）✅
 	private const int RowSoc = 24;
 
 	private const int RowInput = 30;
-
-	private const int RowCheck = 28;
-
-	private const int RowButton = 30;
 
 	private const int RowStatus = 24;
 
@@ -66,6 +72,7 @@ internal sealed class BatteryLimitPanel : Panel
 
 	public BatteryLimitPanel()
 	{
+		Name = PanelControlName;
 		BackColor = Color.Transparent;
 		AutoSize = true;
 		AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -74,19 +81,19 @@ internal sealed class BatteryLimitPanel : Panel
 		_socLabel = MakeFixedLabel("电量读取中…", D(240));
 		_socLabel.Font = UiVisualStyle.Font(9f);
 
-		Label lowLabel = MakeFixedLabel("起充（%）", D(88));
+		_lowLabel = MakeFixedLabel("起充（%）", D(88));
 		_lowBox = MakeNumeric(1, 99, 60);
-		Label highLabel = MakeFixedLabel("停充（%）", D(88));
+		_highLabel = MakeFixedLabel("停充（%）", D(88));
 		_highBox = MakeNumeric(2, 100, 80);
 		_lowBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 		_highBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 
-		// ⭐ 机主 2026-10-18：开关文案只保留「启用限制充电」；说明移入 Tooltip（⛔ 不放在行内）✅
-		_enableBox = new CheckBox
+		_enableBox = new RCheckBox
 		{
 			AutoSize = true,
 			Text = Strings.BatteryLimitEnableCharge,
-			Margin = new Padding(0, D(6), 0, 0)
+			BackColor = Color.Transparent,
+			Margin = new Padding(0, D(4), 0, 0)
 		};
 		_toolTip.SetToolTip(_enableBox, Strings.BatteryLimitEnableChargeTip);
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
@@ -95,6 +102,7 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			AutoSize = false,
 			Dock = DockStyle.Fill,
+			FlatStyle = FlatStyle.Flat,
 			Text = "保存阈值",
 			Margin = new Padding(D(6), D(4), 0, D(4))
 		};
@@ -104,7 +112,6 @@ internal sealed class BatteryLimitPanel : Panel
 		_statusLabel.Margin = new Padding(0, D(4), 0, 0);
 
 		_hintLabel = MakeFixedLabel("开启后接电源时会限制充电上限；建议保持接电源使用。", D(420));
-		_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
 		_hintLabel.Margin = new Padding(0, D(4), 0, 0);
 
 		TableLayoutPanel grid = new TableLayoutPanel
@@ -121,7 +128,7 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
 		}
-		// ⭐ 机主 2026-10-18 定稿：① 开关+保存同一行（按钮最右）② 起充/停充并排 ③ 状态 ④ 提示 ✅
+		// ① 电量 ② 开关+保存（按钮最右）③ 起充/停充 ④ 状态 ⑤ 提示 ✅
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
@@ -131,16 +138,13 @@ internal sealed class BatteryLimitPanel : Panel
 
 		grid.Controls.Add(_socLabel, 0, 0);
 		grid.SetColumnSpan(_socLabel, 4);
-		// 第 1 行：开关在左（跨 3 列）+ 保存按钮在最右列 ✅
 		grid.Controls.Add(_enableBox, 0, 1);
 		grid.SetColumnSpan(_enableBox, 3);
 		grid.Controls.Add(_applyButton, 3, 1);
-		// 第 2 行：起充/停充并排（等宽、不换行）✅
-		grid.Controls.Add(lowLabel, 0, 2);
+		grid.Controls.Add(_lowLabel, 0, 2);
 		grid.Controls.Add(_lowBox, 1, 2);
-		grid.Controls.Add(highLabel, 2, 2);
+		grid.Controls.Add(_highLabel, 2, 2);
 		grid.Controls.Add(_highBox, 3, 2);
-		// 第 3/4 行：状态 + 红色 SOC 提示 ✅
 		grid.Controls.Add(_statusLabel, 0, 3);
 		grid.SetColumnSpan(_statusLabel, 4);
 		grid.Controls.Add(_hintLabel, 0, 4);
@@ -148,12 +152,66 @@ internal sealed class BatteryLimitPanel : Panel
 
 		Controls.Add(grid);
 		// ⭐ 代码级 UI 自检（无法启动 GUI 时作为可验证替代）：标签宽度是否足够 ⇒ 不换行 ✅
-		LogLabelWidthCheck("起充标签", lowLabel, D(88));
-		LogLabelWidthCheck("停充标签", highLabel, D(88));
+		LogLabelWidthCheck("起充标签", _lowLabel, D(88));
+		LogLabelWidthCheck("停充标签", _highLabel, D(88));
 		LogLabelWidthCheck("状态行", _statusLabel, D(360));
 		LogSwitchRowCheck();
 		RefreshFromEc();
 		UpdateSocSafetyHint();
+		ApplyTheme();
+	}
+
+	/// <summary>⭐ Tooltip 是组件、不随 Panel 自动释放 ⇒ 手动释放 ✅</summary>
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			_toolTip.Dispose();
+		}
+		base.Dispose(disposing);
+	}
+
+	/// <summary>⭐⭐ 主题适配：颜色全部走 UiVisualStyle（浅/深色同一套语义），⛔ 不硬编码 ✅。</summary>
+	internal void ApplyTheme()
+	{
+		Color text = UiVisualStyle.Text;
+		BackColor = Color.Transparent;
+		_socLabel.ForeColor = text;
+		_lowLabel.ForeColor = text;
+		_highLabel.ForeColor = text;
+		_enableBox.ForeColor = text;
+		_enableBox.BackColor = Color.Transparent;
+		_lowBox.ForeColor = text;
+		_lowBox.BackColor = UiVisualStyle.Input;
+		_highBox.ForeColor = text;
+		_highBox.BackColor = UiVisualStyle.Input;
+		_applyButton.ForeColor = text;
+		_applyButton.BackColor = UiVisualStyle.ButtonFace;
+		_applyButton.FlatAppearance.BorderColor = UiVisualStyle.Border;
+		ApplyStatusColor();
+		UpdateSocSafetyHint();
+		Logger.WriteLineIfChanged("battery-ui-theme",
+			"[battery-ui] 主题=" + (UiVisualStyle.IsNightMode ? "Dark" : "Light")
+			+ " ⇒ 文本色=" + ToHex(text) + " · 背景=" + ToHex(BackColor)
+			+ " · 状态行=" + ToHex(_statusLabel.ForeColor));
+	}
+
+	private static string ToHex(Color color)
+	{
+		return "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2");
+	}
+
+	private void SetStatus(string text, int kind)
+	{
+		_statusLabel.Text = text;
+		_statusKind = kind;
+		ApplyStatusColor();
+	}
+
+	private void ApplyStatusColor()
+	{
+		_statusLabel.ForeColor = _statusKind == 1 ? UiVisualStyle.Danger
+			: (_statusKind == 2 ? UiVisualStyle.Warn : UiVisualStyle.Muted);
 	}
 
 	/// <summary>
@@ -206,8 +264,7 @@ internal sealed class BatteryLimitPanel : Panel
 	{
 		if (!BatteryLimitWriter.TryReadState(out int high, out int low, out int mode, out string detail))
 		{
-			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "状态读不到（详见日志）";
+			SetStatus("状态读不到（详见日志）", 1);
 			Logger.WriteLine("[battery] 充电阈值状态（UI 刷新）：" + detail);
 			UpdateSocLine(active: false);
 			UpdateSocSafetyHint();
@@ -231,11 +288,10 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			_syncing = false;
 		}
-		_statusLabel.ForeColor = Color.FromArgb(40, 160, 80);
 		// ⭐ 无“当前:”前缀；无 EC 原始值 ✅
-		_statusLabel.Text = active
+		SetStatus(active
 			? "✅ 限制充电已生效（停充 " + high + "% / 起充 " + low + "%）"
-			: "未启用限制充电";
+			: "未启用限制充电", 0);
 		UpdateSocLine(active);
 		UpdateSocSafetyHint();
 	}
@@ -256,7 +312,7 @@ internal sealed class BatteryLimitPanel : Panel
 	}
 
 	/// <summary>
-	/// ⭐⭐ 机主要求（UX）：未启用且 `SOC ≥ high` 时，给出**红色、可操作**提示；
+	/// ⭐⭐ 机主要求（UX）：未启用且 `SOC ≥ high` 时，给出**可操作**提示（Warn 色）；
 	/// ⛔ 不移除 SOC&lt;high 安全前置（启用仍会被 writer 拒绝，但用户知道下一步怎么做）✅
 	/// </summary>
 	private void UpdateSocSafetyHint()
@@ -266,7 +322,7 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			if (_active)
 			{
-				_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
+				_hintLabel.ForeColor = UiVisualStyle.Muted;
 				_hintLabel.Text = NormalHint;
 				return;
 			}
@@ -274,20 +330,20 @@ internal sealed class BatteryLimitPanel : Panel
 			int high = (int)_highBox.Value;
 			if (soc >= 0 && soc >= high)
 			{
-				_hintLabel.ForeColor = Color.FromArgb(200, 40, 40);
+				_hintLabel.ForeColor = UiVisualStyle.Warn;
 				_hintLabel.Text = "⚠️ 当前电量 " + soc + "% ≥ 停充阈值 " + high
 					+ "% ⇒ 不会发送启用命令。请二选一：① 先把电量放到低于阈值；② 把停充阈值设到当前电量以上（例如 "
 					+ Math.Min(100, soc + 1) + "%）。";
 			}
 			else
 			{
-				_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
+				_hintLabel.ForeColor = UiVisualStyle.Muted;
 				_hintLabel.Text = NormalHint;
 			}
 		}
 		catch
 		{
-			_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
+			_hintLabel.ForeColor = UiVisualStyle.Muted;
 			_hintLabel.Text = NormalHint;
 		}
 	}
@@ -315,15 +371,13 @@ internal sealed class BatteryLimitPanel : Panel
 			Logger.WriteLine("[battery] 充电限制" + (want ? "启用" : "关闭") + "（UI）：ok=" + ok + "\n" + detail);
 			if (!ok)
 			{
-				_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-				_statusLabel.Text = want ? "⛔ 启用失败（详见日志）" : "⛔ 关闭失败（详见日志）";
+				SetStatus(want ? "⛔ 启用失败（详见日志）" : "⛔ 关闭失败（详见日志）", 1);
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
-			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "⛔ 操作异常（详见日志）";
+			SetStatus("⛔ 操作异常（详见日志）", 1);
 			Logger.WriteLine("[battery] 充电限制 UI 异常：" + ex.GetType().Name + " " + ex.Message);
 		}
 		finally
@@ -342,8 +396,7 @@ internal sealed class BatteryLimitPanel : Panel
 		int high = (int)_highBox.Value;
 		if (!(low >= 1 && low < high && high <= 100))
 		{
-			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "⛔ 参数非法：要求 0 < 起充 < 停充 ≤ 100";
+			SetStatus("⛔ 参数非法：要求 0 < 起充 < 停充 ≤ 100", 1);
 			return;
 		}
 		SetBusy(true);
@@ -357,15 +410,13 @@ internal sealed class BatteryLimitPanel : Panel
 			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + "\n" + detail);
 			if (!ok)
 			{
-				_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-				_statusLabel.Text = "⛔ 保存失败（详见日志）";
+				SetStatus("⛔ 保存失败（详见日志）", 1);
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
-			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
-			_statusLabel.Text = "⛔ 操作异常（详见日志）";
+			SetStatus("⛔ 操作异常（详见日志）", 1);
 			Logger.WriteLine("[battery] 充电阈值保存 UI 异常：" + ex.GetType().Name + " " + ex.Message);
 		}
 		finally
@@ -416,20 +467,6 @@ internal sealed class BatteryLimitPanel : Panel
 	}
 
 	/// <summary>
-	/// ⭐⭐ 机主要求：代码级 UI 自检 —— 用 `TextRenderer.MeasureText` 比较“文本宽 vs 可用列宽”，
-	/// 证明 16 字以内的标签不会换行（截图里的「起充 %（低）」换行问题）✅
-	/// </summary>
-	/// <summary>⭐ Tooltip 是组件、不随 Panel 自动释放 ⇒ 手动释放 ✅</summary>
-	protected override void Dispose(bool disposing)
-	{
-		if (disposing)
-		{
-			_toolTip.Dispose();
-		}
-		base.Dispose(disposing);
-	}
-
-	/// <summary>
 	/// ⭐⭐ 机主要求：代码级 UI 自检 —— 开关 + 保存按钮同行时是否重叠：
 	/// 开关文本宽 vs 跨 3 列可用宽；按钮宽 vs 第 4 列宽 ✅
 	/// </summary>
@@ -455,6 +492,10 @@ internal sealed class BatteryLimitPanel : Panel
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 机主要求：代码级 UI 自检 —— 用 `TextRenderer.MeasureText` 比较“文本宽 vs 可用列宽”，
+	/// 证明 16 字以内的标签不会换行（截图里的「起充 %（低）」换行问题）✅
+	/// </summary>
 	private void LogLabelWidthCheck(string rowName, Label label, int columnWidth)
 	{
 		try

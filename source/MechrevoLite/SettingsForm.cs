@@ -1601,6 +1601,15 @@ public class SettingsForm : RForm
 			_quickGroup.BackColor = UiVisualStyle.Window;
 		}
 		UiVisualStyle.ApplyWindow(this);
+		// ⭐⭐ 2026-10-18（机主：主题适配）：⭐ 电池页充电阈值面板自绘/自取色，ApplyWindow 不会替它刷色
+		//   ⇒ 主题切换后显式重刷（浅/深色都走 UiVisualStyle 同一套语义）✅
+		foreach (Control themedControl in Controls.Find(BatteryLimitPanel.PanelControlName, searchAllChildren: true))
+		{
+			if (themedControl is BatteryLimitPanel batteryLimitPanel)
+			{
+				batteryLimitPanel.ApplyTheme();
+			}
+		}
 		(string, UiGlyph.Kind)[] array = new (string, UiGlyph.Kind)[2]
 		{
 			("labelThemeModeTitle", UiGlyph.Kind.Contrast),
