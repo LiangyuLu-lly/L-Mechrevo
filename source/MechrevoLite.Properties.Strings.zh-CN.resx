@@ -5417,7 +5417,13 @@
     <data name="AboutLicensesIntro" xml:space="preserve">
       <value>L-Mechrevo 是自由软件，以 GNU 通用公共许可证第 3 版（GPL-3.0-only）分发。本程序包含派生自下列项目的代码，并内嵌了一个第三方二进制模块。完整许可文本位于程序目录下的 LICENSES 文件夹里（LICENSE / THIRD_PARTY_NOTICES.txt 也在其中）。</value>
     </data>
-    <data name="AboutLicensesUseBatteryThreshold" xml:space="preserve">
+    <data name="AboutLicensesUseJiaolongControl" xml:space="preserve">
+    <value>2026-10 宝龙达协议事实来源（WMI `MiInterface` 调用方式、功能号 8~23、EC 通道）。内部笔记曾直接引用其代码片段（MIT，已随包附 MIT 许可全文）；产品代码未复制其实实现，按事实重写。</value>
+  </data>
+  <data name="AboutLicensesUseDouzhanzhe" xml:space="preserve">
+    <value>2026-10 工程做法与 NVAPI/EC 事实的交叉印证（仅取事实与做法，未复制代码）。</value>
+  </data>
+  <data name="AboutLicensesUseBatteryThreshold" xml:space="preserve">
     <value>2026-10-18 充电阈值：EC 寄存器语义与命令时序参考（0x83A1/0x83A2/0x83C0、0x8150~0x8154），仅取协议事实，未复制代码。该仓库未附 LICENSE 文件，故仅作事实参考。</value>
   </data>
   <data name="AboutThanksHeading" xml:space="preserve">

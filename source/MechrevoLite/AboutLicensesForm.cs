@@ -70,7 +70,9 @@ public class AboutLicensesForm : RForm
 	// 2026-10-11（息屏改造 · 用户要求 UI 层鸣谢）：息屏（不睡眠）的虚拟显示器方案参考实现，MIT，放本组末尾。
 	new Entry("IYATT-yx/NullSignal", "MIT", "https://github.com/IYATT-yx/NullSignal", Strings.AboutLicensesUseNullSignal),
 		// 2026-10-18 本次改动新增的协议参考（未复制代码）
-		new Entry("Zcodeoooo/JiaoLong16Pro-Battery-threshold", "无 LICENSE（协议事实参考）", "https://github.com/Zcodeoooo/JiaoLong16Pro-Battery-threshold", Strings.AboutLicensesUseBatteryThreshold)
+		new Entry("Zcodeoooo/JiaoLong16Pro-Battery-threshold", "无 LICENSE（协议事实参考）", "https://github.com/Zcodeoooo/JiaoLong16Pro-Battery-threshold", Strings.AboutLicensesUseBatteryThreshold),
+		new Entry("GaoXanSheng/JiaolongControl", "MIT (Copyright (C) 2025 GaoXanSheng)", "https://github.com/GaoXanSheng/JiaolongControl/tree/windows/X86-64", Strings.AboutLicensesUseJiaolongControl),
+		new Entry("KanzakiK/DOUZHANZHE-Control", "GPL-3.0 (GitHub)", "https://github.com/KanzakiK/DOUZHANZHE-Control", Strings.AboutLicensesUseDouzhanzhe)
 	};
 
 	public AboutLicensesForm()

@@ -10,6 +10,7 @@ derives from or conveys in binary form. See `THIRD-PARTY-NOTICES.md` (in the sou
 |---|---|---|---|---|
 | `GPL-3.0.txt` | G-Helper, irusanov/ZenStates-Core, irusanov/SMUDebugTool, kitsunyan/intel-undervolt, JamesCJ60/Universal-x86-Tuning-Utility, tomups/watercooler-manager — **and L-Mechrevo itself** | 35149 B | `3972DC9744F6499F0F9B2DBF76696F2AE7AD8AF9B23DDE66D6AF86C9DFB36986` | copied byte-for-byte from `..\installer-src\files\LICENSE,1.txt`, which is byte-identical to `seerge/g-helper@main:LICENSE` (git blob SHA-1 `f288702d2fa16d3cdf0035b15a9fcbc552cd88e7`) |
 | `LGPL-2.1.txt` | namazso/PawnIO.Modules — the `RyzenSMU.bin` module embedded in `L-Mechrevo.dll` | 26530 B | `DC626520DCD53A22F727AF3EE42C770E56C97A64FE3ADB063799D8AB032FE551` | copied byte-for-byte from `..\_upstream\0.290.6\extract\{app}\COPYING.PawnIO.txt`, which is byte-identical to `namazso/PawnIO.Modules@main:COPYING` (git blob SHA-1 `4362b49151d7b34ef83b3067a8f9c9f877d72a0e`) |
+| `MIT-JiaolongControl.txt` | GaoXanSheng/JiaolongControl (`windows/X86-64`) — internal notes quote code fragments; the Baolongda protocol facts were read from it | 1078 B | `89FA9E1553B3FF96B9B51F18FCE7E5A74580FAC3029BF44902F87996D6696C17` | written for this repo from the upstream MIT text, **Copyright (C) 2025 GaoXanSheng**; MIT requires this notice to ship with the binary |
 
 `LGPL-2.1.txt` is also the file referred to, under its upstream name, as `COPYING.PawnIO.txt` by the
 previous release's installer (`_upstream\0.290.6\extract\install_script.iss:32`). When restoring that

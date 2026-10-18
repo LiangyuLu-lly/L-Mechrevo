@@ -96,6 +96,8 @@ Source: "..\LICENSE"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\LICENSES\GPL-3.0.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\LICENSES\LGPL-2.1.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\LICENSES\README.md"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
+; 2026-10-18 合规（MIT 归属）：内部笔记引用过 JiaolongControl 的代码片段 ⇒ 随包分发 MIT 全文（Copyright (C) 2025 GaoXanSheng）。
+Source: "..\LICENSES\MIT-JiaolongControl.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 ; 2026-10-10 (repack9)：随包的两份文档都指向它（根 LICENSE 的横幅与
 ;   LICENSES\README.md 的 "..\THIRD-PARTY-NOTICES.md"）——不纳入则目标机上这两处引用悬空；
 ;   它也是包内内嵌模块 IntelMSR.bin 的权威清单（§1.2 B4）。ATTRIBUTION-PATCH-PLAN.md 属内部文档，不纳入。
