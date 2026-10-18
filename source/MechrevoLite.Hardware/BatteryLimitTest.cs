@@ -25,6 +25,12 @@ internal static class BatteryLimitTest
 {
 	internal static int Run(string[] args)
 	{
+		// ⭐⭐ 机主强调：开发机（同方 GM5HG0A）不是宝龙达 ⇒ 入口第一行平台校验，非宝龙达 0 读 0 写 ✅
+		if (!BatteryLimitPlatform.IsBaolongdaMachine())
+		{
+			BatteryLimitPlatform.LogRejected("battery-limit-test");
+			return 0;
+		}
 		int low = 60;
 		int high = 80;
 		bool disable = false;

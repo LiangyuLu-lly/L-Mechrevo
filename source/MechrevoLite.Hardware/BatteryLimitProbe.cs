@@ -51,6 +51,12 @@ internal static class BatteryLimitProbe
 
 	internal static int Run()
 	{
+		// ⭐⭐ 机主强调：开发机（同方 GM5HG0A）不是宝龙达 ⇒ 入口第一行平台校验，非宝龙达 0 读 0 写 ✅
+		if (!BatteryLimitPlatform.IsBaolongdaMachine())
+		{
+			BatteryLimitPlatform.LogRejected("battery-limit-probe");
+			return 0;
+		}
 		string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
 			"lm-battery-probe-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt");
 		try

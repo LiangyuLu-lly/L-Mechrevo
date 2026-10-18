@@ -123,7 +123,7 @@ internal sealed class BatteryLimitPanel : Panel
 		RefreshFromEc();
 	}
 
-	/// <summary>⭐ 能力判据：宝龙达 + 板号以 MRID6 开头 + EC 可读 ✅。</summary>
+	/// <summary>⭐ 能力判据：`UsesBaolongda` + 板号命中宝龙达白名单（MRID6/MRID6-*）+ EC 可读 ✅。</summary>
 	internal static bool IsAvailable(MechrevoHw hw)
 	{
 		try
@@ -132,7 +132,8 @@ internal sealed class BatteryLimitPanel : Panel
 			{
 				return false;
 			}
-			if (!ReadBaseBoardProduct().StartsWith("MRID6", StringComparison.OrdinalIgnoreCase))
+			// ⭐ 机主要求“板号以 MRID6 开头”；这里用同一份白名单纯函数（更严：排除 MRID60 之类假板号）✅
+			if (!BoardWhitelist.Matches(ReadBaseBoardProduct()))
 			{
 				return false;
 			}
