@@ -1481,6 +1481,16 @@ internal class Strings
 	internal static string BatteryLimitSaveFailed => ResourceManager.GetString("BatteryLimitSaveFailed", resourceCulture);
 	internal static string BatteryLimitInvalidParams => ResourceManager.GetString("BatteryLimitInvalidParams", resourceCulture);
 	internal static string ChargeSliderOffResetFailed => ResourceManager.GetString("ChargeSliderOffResetFailed", resourceCulture);
+	internal static string PawnIODriver => ResourceManager.GetString("PawnIODriver", resourceCulture);
+	internal static string PawnIODriverInstalledFormat => ResourceManager.GetString("PawnIODriverInstalledFormat", resourceCulture);
+	internal static string PawnIODriverInstalled => ResourceManager.GetString("PawnIODriverInstalled", resourceCulture);
+	internal static string PawnIODriverNotInstalled => ResourceManager.GetString("PawnIODriverNotInstalled", resourceCulture);
+	internal static string PawnIODownloadInstall => ResourceManager.GetString("PawnIODownloadInstall", resourceCulture);
+	internal static string PawnIOReinstall => ResourceManager.GetString("PawnIOReinstall", resourceCulture);
+	internal static string PawnIOInstalling => ResourceManager.GetString("PawnIOInstalling", resourceCulture);
+	internal static string PawnIOInstallFailed => ResourceManager.GetString("PawnIOInstallFailed", resourceCulture);
+	internal static string PawnIODriverRestart => ResourceManager.GetString("PawnIODriverRestart", resourceCulture);
+	internal static string PawnIOBaolongdaDependency => ResourceManager.GetString("PawnIOBaolongdaDependency", resourceCulture);
 	internal static string BatteryStateIdle => ResourceManager.GetString("BatteryStateIdle", resourceCulture);
 	internal static string BatteryAbnormalTag => ResourceManager.GetString("BatteryAbnormalTag", resourceCulture);
 	internal static string BatteryCycleCountLine => ResourceManager.GetString("BatteryCycleCountLine", resourceCulture);

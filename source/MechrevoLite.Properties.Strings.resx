@@ -4340,6 +4340,76 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="PawnIODriver" xml:space="preserve">
+    
+    
+    <value>PawnIO driver</value>
+    
+  
+  </data>
+<data name="PawnIODriverInstalledFormat" xml:space="preserve">
+    
+    
+    <value>Installed ({0})</value>
+    
+  
+  </data>
+<data name="PawnIODriverInstalled" xml:space="preserve">
+    
+    
+    <value>Installed</value>
+    
+  
+  </data>
+<data name="PawnIODriverNotInstalled" xml:space="preserve">
+    
+    
+    <value>Not installed</value>
+    
+  
+  </data>
+<data name="PawnIODownloadInstall" xml:space="preserve">
+    
+    
+    <value>Download and install</value>
+    
+  
+  </data>
+<data name="PawnIOReinstall" xml:space="preserve">
+    
+    
+    <value>Reinstall</value>
+    
+  
+  </data>
+<data name="PawnIOInstalling" xml:space="preserve">
+    
+    
+    <value>Downloading and installing…</value>
+    
+  
+  </data>
+<data name="PawnIOInstallFailed" xml:space="preserve">
+    
+    
+    <value>PawnIO installation failed</value>
+    
+  
+  </data>
+<data name="PawnIODriverRestart" xml:space="preserve">
+    
+    
+    <value>Restart required to take effect</value>
+    
+  
+  </data>
+<data name="PawnIOBaolongdaDependency" xml:space="preserve">
+    
+    
+    <value>Baolongda fan boost, curves and battery threshold depend on PawnIO</value>
+    
+  
+  </data>
 <data name="ChargeSliderOffResetFailed" xml:space="preserve">
     
     

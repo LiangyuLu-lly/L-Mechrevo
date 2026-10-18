@@ -734,6 +734,14 @@ public class SettingsForm : RForm
 
 	private RButton? _officialConsoleButton;
 
+	// ⭐⭐ 2026-10-18（机主：设置页加 PawnIO 安装入口）✅
+	private Label _pawnioStatus;
+
+	private RButton _pawnioButton;
+
+	private Label _pawnioWarning;
+
+	private bool _pawnioBusy;
 	private readonly System.Windows.Forms.Timer _officialConsoleStatusTimer = new System.Windows.Forms.Timer
 	{
 		Interval = 3000
@@ -6157,7 +6165,7 @@ public class SettingsForm : RForm
 		{
 			Name = "panelOfficialConsole",
 			CardStyle = true,
-			Height = D(56),
+			Height = D(112),
 			Padding = new Padding(D(12), D(8), D(12), D(8)),
 			BackColor = UiVisualStyle.Surface
 		};
@@ -6165,7 +6173,7 @@ public class SettingsForm : RForm
 		{
 			Dock = DockStyle.Fill,
 			ColumnCount = 3,
-			RowCount = 1,
+			RowCount = 3,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = _officialConsolePanel.BackColor
@@ -6173,7 +6181,9 @@ public class SettingsForm : RForm
 		tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(110)));
 		tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 		tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(140)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, D(56)));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, D(56)));
 		Label label = new Label
 		{
 			Name = "labelOfficialConsoleTitle",
@@ -6204,6 +6214,44 @@ public class SettingsForm : RForm
 		tableLayoutPanel.Controls.Add(label, 0, 0);
 		tableLayoutPanel.Controls.Add(_officialConsoleStatus, 1, 0);
 		tableLayoutPanel.Controls.Add(_officialConsoleButton, 2, 0);
+		// ⭐⭐ 2026-10-18（机主：PawnIO 安装入口）：⭐ 官方控制台下一行（宝龙达未安装时前面加醒目提示）✅
+		_pawnioWarning = new Label
+		{
+			Dock = DockStyle.Fill,
+			TextAlign = ContentAlignment.MiddleLeft,
+			ForeColor = UiVisualStyle.Danger,
+			AutoEllipsis = true,
+			Visible = false
+		};
+		tableLayoutPanel.Controls.Add(_pawnioWarning, 0, 1);
+		tableLayoutPanel.SetColumnSpan(_pawnioWarning, 3);
+		Label pawnioTitle = new Label
+		{
+			Name = "labelPawnIODriverTitle",
+			Text = Strings.PawnIODriver,
+			Dock = DockStyle.Fill,
+			TextAlign = ContentAlignment.MiddleLeft
+		};
+		_pawnioStatus = new Label
+		{
+			Text = Strings.Detecting,
+			Dock = DockStyle.Fill,
+			TextAlign = ContentAlignment.MiddleRight,
+			AutoEllipsis = true
+		};
+		_pawnioButton = new RButton
+		{
+			Dock = DockStyle.Fill,
+			Margin = new Padding(D(8), 0, 0, 0),
+			BackColor = UiVisualStyle.ButtonFace,
+			ForeColor = UiVisualStyle.Text,
+			Cursor = Cursors.Hand,
+			Text = Strings.PawnIODownloadInstall
+		};
+		_pawnioButton.Click += PawnIOButton_Click;
+		tableLayoutPanel.Controls.Add(pawnioTitle, 0, 2);
+		tableLayoutPanel.Controls.Add(_pawnioStatus, 1, 2);
+		tableLayoutPanel.Controls.Add(_pawnioButton, 2, 2);
 		_officialConsolePanel.Controls.Add(tableLayoutPanel);
 		UiVisualStyle.ApplyTitle(label);
 		UiVisualStyle.ApplyMuted(_officialConsoleStatus);
@@ -6218,6 +6266,7 @@ public class SettingsForm : RForm
 		Shown += (object? _, EventArgs _) =>
 		{
 			RefreshOfficialConsolePanel();
+			RefreshPawnIOPanel();
 			if (!Program.UiAuditMode)
 			{
 				_officialConsoleStatusTimer.Start();
@@ -6626,6 +6675,106 @@ public class SettingsForm : RForm
 		SetContextMenu();
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主）：⭐ 设置页 PawnIO 行 —— 状态/按钮/宝龙达提醒刷新（幂等）✅
+	/// </summary>
+	private void RefreshPawnIOPanel()
+	{
+		if (_pawnioStatus == null || _pawnioButton == null || _pawnioWarning == null)
+		{
+			return;
+		}
+		if (_pawnioBusy)
+		{
+			return;
+		}
+		PawnIOInstaller.Status status = PawnIOInstaller.GetStatus();
+		bool baolongda = Program.hw?.UsesBaolongda == true;
+		_pawnioStatus.Text = status.Installed
+			? (status.Version.Length > 0
+				? string.Format(Strings.PawnIODriverInstalledFormat, status.Version)
+				: Strings.PawnIODriverInstalled)
+			: Strings.PawnIODriverNotInstalled;
+		_pawnioButton.Text = status.Installed ? Strings.PawnIOReinstall : Strings.PawnIODownloadInstall;
+		_pawnioButton.Enabled = !Program.UiAuditMode;
+		bool showWarning = baolongda && !status.Installed;
+		_pawnioWarning.Text = showWarning ? Strings.PawnIOBaolongdaDependency : "";
+		_pawnioWarning.Visible = showWarning;
+		// 警告行高度：显示时 24 逻辑像素，否则 0（不占空行）
+		if (_officialConsolePanel?.Controls.Count > 0 && _officialConsolePanel.Controls[0] is TableLayoutPanel table
+			&& table.RowStyles.Count > 1)
+		{
+			int warningHeight = showWarning ? ResponsiveLayout.LogicalToDevice(this, 24) : 0;
+			table.RowStyles[1] = new RowStyle(SizeType.Absolute, warningHeight);
+			_officialConsolePanel.Height = ResponsiveLayout.LogicalToDevice(this, 112 + (showWarning ? 24 : 0));
+		}
+		Logger.WriteLineIfChanged("pawnio-settings-status",
+			"[pawnio] 设置页：状态=" + (status.Installed ? "已安装" + (status.Version.Length > 0 ? " " + status.Version : "") : "未安装")
+			+ " · 宝龙达=" + baolongda + " · 按钮=" + _pawnioButton.Text);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主）：⭐ 复用现有 `Install-PawnIO.ps1`（与 CpuTuningForm 同一入口），
+	/// 管理员启动；运行中按钮禁用并显示“正在下载并安装…”；结束刷新状态 ✅
+	/// </summary>
+	private async void PawnIOButton_Click(object sender, EventArgs e)
+	{
+		if (_pawnioBusy || _pawnioButton == null || Program.UiAuditMode)
+		{
+			return;
+		}
+		_pawnioBusy = true;
+		_pawnioButton.Enabled = false;
+		string previousText = _pawnioButton.Text;
+		_pawnioButton.Text = Strings.PawnIOInstalling;
+		if (_pawnioStatus != null)
+		{
+			_pawnioStatus.Text = Strings.PawnIOInstalling;
+		}
+		PawnIOInstaller.Status before = PawnIOInstaller.GetStatus();
+		try
+		{
+			int exitCode = await PawnIOInstaller.RunInstallerAsync();
+			PawnIOInstaller.Status after = PawnIOInstaller.GetStatus();
+			Logger.WriteLine("[pawnio] 设置页：状态=" + (before.Installed ? "已安装" : "未安装")
+				+ " · 点击安装 ⇒ 结果=" + (exitCode == 0 ? "成功" : (exitCode == 3010 ? "需要重启" : "失败"))
+				+ "（退出码=" + exitCode + "）· 安装后=" + (after.Installed ? "已安装" : "未安装"));
+			if (exitCode == 3010)
+			{
+				if (_pawnioStatus != null)
+				{
+					_pawnioStatus.Text = Strings.PawnIODriverRestart;
+				}
+			}
+			else if (exitCode != 0)
+			{
+				if (_pawnioStatus != null)
+				{
+					_pawnioStatus.Text = Strings.PawnIOInstallFailed + "（" + exitCode + "）";
+				}
+				ToastForm.ShowFailure(Strings.PawnIOInstallFailed);
+			}
+		}
+		catch (Exception ex)
+		{
+			if (_pawnioStatus != null)
+			{
+				_pawnioStatus.Text = Strings.PawnIOInstallFailed;
+			}
+			ToastForm.ShowFailure(Strings.PawnIOInstallFailed);
+			Logger.WriteLine("[pawnio] 设置页安装异常：" + ex.GetType().Name + " " + ex.Message);
+		}
+		finally
+		{
+			_pawnioBusy = false;
+			if (_pawnioButton != null)
+			{
+				_pawnioButton.Enabled = true;
+				_pawnioButton.Text = previousText;
+			}
+			RefreshPawnIOPanel();
+		}
+	}
 	private async void OfficialConsoleButton_Click(object? sender, EventArgs e)
 	{
 		if (_officialConsoleButton == null || Program.UiAuditMode)
@@ -7329,7 +7478,7 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, ThemeColumnPercentages.Title));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, ThemeColumnPercentages.Day));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, ThemeColumnPercentages.Night));
-			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(56)));
 			Label label = new Label
 			{
 				Name = "labelThemeModeTitle",

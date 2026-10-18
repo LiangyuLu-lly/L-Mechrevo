@@ -4366,6 +4366,76 @@
     
   
   </data>
+<data name="PawnIODriver" xml:space="preserve">
+    
+    
+    <value>PawnIO 驱动</value>
+    
+  
+  </data>
+<data name="PawnIODriverInstalledFormat" xml:space="preserve">
+    
+    
+    <value>已安装（{0}）</value>
+    
+  
+  </data>
+<data name="PawnIODriverInstalled" xml:space="preserve">
+    
+    
+    <value>已安装</value>
+    
+  
+  </data>
+<data name="PawnIODriverNotInstalled" xml:space="preserve">
+    
+    
+    <value>未安装</value>
+    
+  
+  </data>
+<data name="PawnIODownloadInstall" xml:space="preserve">
+    
+    
+    <value>下载并安装</value>
+    
+  
+  </data>
+<data name="PawnIOReinstall" xml:space="preserve">
+    
+    
+    <value>重新安装</value>
+    
+  
+  </data>
+<data name="PawnIOInstalling" xml:space="preserve">
+    
+    
+    <value>正在下载并安装…</value>
+    
+  
+  </data>
+<data name="PawnIOInstallFailed" xml:space="preserve">
+    
+    
+    <value>PawnIO 安装失败</value>
+    
+  
+  </data>
+<data name="PawnIODriverRestart" xml:space="preserve">
+    
+    
+    <value>需要重启后生效</value>
+    
+  
+  </data>
+<data name="PawnIOBaolongdaDependency" xml:space="preserve">
+    
+    
+    <value>宝龙达的风扇强冷/曲线/电池阈值依赖 PawnIO</value>
+    
+  
+  </data>
 <data name="ChargeSliderOffResetFailed" xml:space="preserve">
     
     
