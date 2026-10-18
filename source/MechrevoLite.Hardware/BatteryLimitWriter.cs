@@ -15,6 +15,7 @@ using System;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using MechrevoLite.Properties;
 
 namespace MechrevoLite.Hardware;
 
@@ -47,11 +48,19 @@ internal static class BatteryLimitWriter
 	}
 
 	/// <summary>
-	/// ⭐ 启用限充。<para>⚠️ 2026-10-18（机主按参考实现纠正）：⭐ SOC ≥ high **默认允许**启用
-	/// （等价参考实现 `initial_discharge_allowed=true`，可能触发一次短暂放电把电量降到阈值）——
-	/// 只写一行日志，⛔ 不再拦截；其它安全前置（AC/参数/身份/触发空闲）保持不变 ✅</para>
+	/// ⭐ 启用限充。<para>⚠️ 2026-10-19（机主批准 · 恢复开源默认）：⭐ `SOC >= high` 时**默认阻断**（0 字节、给可操作原因）；
+	/// 只有显式「允许初次放电」才允许（固件会先放电到起充值附近，可能掉电）✅</para>
 	/// </summary>
 	internal static bool TryEnable(int low, int high, out string detail)
+	{
+		return TryEnable(low, high, allowInitialDischarge: false, out detail);
+	}
+
+	/// <summary>
+	/// ⭐ 启用限充；<paramref name="allowInitialDischarge" /> = true 时允许 SOC ≥ high（参考 `initial_discharge_allowed=true`）。
+	/// <para>其它安全前置不变：身份 / 0x8150 空闲 / AC / 0&lt;low&lt;high≤100 / 白名单 / 失败不重试 ✅</para>
+	/// </summary>
+	internal static bool TryEnable(int low, int high, bool allowInitialDischarge, out string detail)
 	{
 		StringBuilder log = new StringBuilder();
 		try
@@ -97,10 +106,19 @@ internal static class BatteryLimitWriter
 			//   固件会放电到 high；只记一行说明 ✅
 			int batteryPercent = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
 			log.AppendLine("电池 SOC = " + batteryPercent + "%");
-			if (batteryPercent >= 0 && batteryPercent > high)
+			if (batteryPercent >= 0 && batteryPercent >= high)
 			{
-				string note = "[battery] 启用：SOC(" + batteryPercent + "%) > 停充阈值(" + high
-					+ "%) ⇒ 按参考实现允许（initial_discharge_allowed=true），固件会放电到 " + high + "%";
+				if (!allowInitialDischarge)
+				{
+					// ⭐ 机主批准（对齐参考 guard_start）：默认阻断，0 字节，给可操作原因 ✅
+					string blocked = string.Format(Strings.BatteryLimitAboveSocBlockedFormat, batteryPercent, high);
+					log.AppendLine(blocked);
+					Logger.WriteLine(blocked);
+					detail = log.ToString();
+					return false;
+				}
+				string note = "[battery] 启用：SOC(" + batteryPercent + "%) ≥ 停充阈值(" + high
+					+ "%) 且「允许初次放电」已开 ⇒ 固件会放电到起充值附近，可能掉电";
 				log.AppendLine(note);
 				Logger.WriteLine(note);
 			}

@@ -28,6 +28,8 @@ internal static class BatteryLimitStatus
 			return 0;
 		}
 		Console.WriteLine("  EC：" + stateDetail);
+		// ⭐ 机主要求：无论配置是否存在，都多打印一行（便于机主验证“允许初次放电”状态）✅
+		Console.WriteLine("  允许初次放电=" + BatteryLimitRestore.AllowInitialDischarge);
 		if (!hasConfig)
 		{
 			Console.WriteLine("  本地配置 = 不存在（enabled/start/stop 未设置）⇒ 不参与恢复");

@@ -1491,6 +1491,9 @@ internal class Strings
 	internal static string PawnIOInstallFailed => ResourceManager.GetString("PawnIOInstallFailed", resourceCulture);
 	internal static string PawnIODriverRestart => ResourceManager.GetString("PawnIODriverRestart", resourceCulture);
 	internal static string PawnIOBaolongdaDependency => ResourceManager.GetString("PawnIOBaolongdaDependency", resourceCulture);
+	internal static string BatteryLimitAllowInitialDischarge => ResourceManager.GetString("BatteryLimitAllowInitialDischarge", resourceCulture);
+	internal static string BatteryLimitAllowInitialDischargeTip => ResourceManager.GetString("BatteryLimitAllowInitialDischargeTip", resourceCulture);
+	internal static string BatteryLimitAboveSocBlockedFormat => ResourceManager.GetString("BatteryLimitAboveSocBlockedFormat", resourceCulture);
 	internal static string BatteryStateIdle => ResourceManager.GetString("BatteryStateIdle", resourceCulture);
 	internal static string BatteryAbnormalTag => ResourceManager.GetString("BatteryAbnormalTag", resourceCulture);
 	internal static string BatteryCycleCountLine => ResourceManager.GetString("BatteryCycleCountLine", resourceCulture);

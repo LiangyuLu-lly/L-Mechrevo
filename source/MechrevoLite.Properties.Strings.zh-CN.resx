@@ -4429,6 +4429,27 @@
     
   
   </data>
+<data name="BatteryLimitAllowInitialDischarge" xml:space="preserve">
+    
+    
+    <value>允许初次放电（高级）</value>
+    
+  
+  </data>
+<data name="BatteryLimitAllowInitialDischargeTip" xml:space="preserve">
+    
+    
+    <value>开启后，电量高于停充阈值时也能启用限充；固件会先放电到阈值附近，可能掉电，请保持接电源</value>
+    
+  
+  </data>
+<data name="BatteryLimitAboveSocBlockedFormat" xml:space="preserve">
+    
+    
+    <value>电量 {0}% ≥ 停充阈值 {1}% ⇒ 未启用（开源项目默认行为：避免初始放电）。请先放电到 &lt;{1}%，或在电池页打开「允许初次放电（高级）」后重试。</value>
+    
+  
+  </data>
 <data name="PawnIOBaolongdaDependency" xml:space="preserve">
     
     

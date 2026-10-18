@@ -44,6 +44,9 @@ internal sealed class BatteryLimitPanel : Panel
 	// ⭐ 机主要求：用仓库现有开关控件（RCheckBox 的拨动开关样式），⛔ 不用普通 CheckBox 对勾 ✅
 	private readonly RCheckBox _enableBox;
 
+	// ⭐ 机主批准：高级开关（默认关；允许 SOC ≥ 停充阈值时启用，固件会先放电）✅
+	private readonly RCheckBox _allowInitialDischargeBox;
+
 	// ⭐ 机主要求：用仓库现有圆角按钮控件 RButton；半径**面板局部**调小（⛔ 不全局改）✅
 	private readonly RButton _applyButton;
 
@@ -109,6 +112,20 @@ internal sealed class BatteryLimitPanel : Panel
 		};
 		_applyButton.Click += ApplyButton_Click;
 
+		_allowInitialDischargeBox = new RCheckBox
+		{
+			AutoSize = true,
+			Text = Strings.BatteryLimitAllowInitialDischarge,
+			BackColor = Color.Transparent,
+			Margin = new Padding(0, D(2), 0, 0),
+			Checked = BatteryLimitRestore.AllowInitialDischarge
+		};
+		_toolTip.SetToolTip(_allowInitialDischargeBox, Strings.BatteryLimitAllowInitialDischargeTip);
+		_allowInitialDischargeBox.CheckedChanged += delegate
+		{
+			BatteryLimitRestore.SetAllowInitialDischarge(_allowInitialDischargeBox.Checked);
+		};
+
 		_statusLabel = MakeFixedLabel(Strings.BatteryLimitStatusReading, D(360));
 		_statusLabel.Margin = new Padding(0, D(4), 0, 0);
 
@@ -117,7 +134,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Dock = DockStyle.Top,
 			AutoSize = false,
 			ColumnCount = 4,
-			RowCount = 4,
+			RowCount = 5,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = Color.Transparent
@@ -127,12 +144,13 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
 		}
-		// ① 电量 ② 开关+保存（按钮最右）③ 起充/停充 ④ 状态 ⑤ 提示 ✅
+		// ① 电量 ② 开关+保存（按钮最右）③ 起充/停充 ④ 允许初次放电（高级）⑤ 状态 ✅
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
-		grid.Height = D(RowSoc + RowInput + RowInput + RowStatus);
+		grid.Height = D(RowSoc + RowInput + RowInput + RowSoc + RowStatus);
 
 		grid.Controls.Add(_socLabel, 0, 0);
 		grid.SetColumnSpan(_socLabel, 4);
@@ -143,7 +161,9 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.Controls.Add(_lowBox, 1, 2);
 		grid.Controls.Add(_highLabel, 2, 2);
 		grid.Controls.Add(_highBox, 3, 2);
-		grid.Controls.Add(_statusLabel, 0, 3);
+		grid.Controls.Add(_allowInitialDischargeBox, 0, 3);
+		grid.SetColumnSpan(_allowInitialDischargeBox, 4);
+		grid.Controls.Add(_statusLabel, 0, 4);
 		grid.SetColumnSpan(_statusLabel, 4);
 
 		Controls.Add(grid);
@@ -332,7 +352,7 @@ internal sealed class BatteryLimitPanel : Panel
 			{
 				if (want)
 				{
-					bool enabled = BatteryLimitWriter.TryEnable((int)_lowBox.Value, (int)_highBox.Value, out string enableDetail);
+					bool enabled = BatteryLimitWriter.TryEnable((int)_lowBox.Value, (int)_highBox.Value, BatteryLimitRestore.AllowInitialDischarge, out string enableDetail);
 					return (enabled, enableDetail);
 				}
 				bool disabled = BatteryLimitWriter.TryDisable(out string disableDetail);
@@ -379,7 +399,7 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			(bool ok, string detail) = await Task.Run(delegate
 			{
-				bool result = BatteryLimitWriter.TryEnable(low, high, out string enableDetail);
+				bool result = BatteryLimitWriter.TryEnable(low, high, BatteryLimitRestore.AllowInitialDischarge, out string enableDetail);
 				return (result, enableDetail);
 			});
 			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + "\n" + detail);

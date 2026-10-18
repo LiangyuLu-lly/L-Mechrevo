@@ -4403,6 +4403,27 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="BatteryLimitAllowInitialDischarge" xml:space="preserve">
+    
+    
+    <value>Allow initial discharge (advanced)</value>
+    
+  
+  </data>
+<data name="BatteryLimitAllowInitialDischargeTip" xml:space="preserve">
+    
+    
+    <value>When enabled, the charge limit can be enabled even when the battery is above the stop threshold; the firmware will first discharge to near the threshold (power may drop), keep it plugged in</value>
+    
+  
+  </data>
+<data name="BatteryLimitAboveSocBlockedFormat" xml:space="preserve">
+    
+    
+    <value>Battery {0}% ≥ stop threshold {1}% ⇒ not enabled (upstream default: avoid initial discharge). Discharge below &lt;{1}% first, or turn on "Allow initial discharge (advanced)" on the battery page and retry.</value>
+    
+  
+  </data>
 <data name="PawnIOBaolongdaDependency" xml:space="preserve">
     
     

@@ -34,6 +34,7 @@ internal static class BatteryLimitTest
 		int low = 60;
 		int high = 80;
 		bool disable = false;
+		bool allowInitialDischarge = false;
 		if (args != null)
 		{
 			for (int i = 0; i < args.Length; i++)
@@ -42,6 +43,10 @@ internal static class BatteryLimitTest
 				if (string.Equals(arg, "--disable", StringComparison.OrdinalIgnoreCase))
 				{
 					disable = true;
+				}
+				else if (string.Equals(arg, "--allow-initial-discharge", StringComparison.OrdinalIgnoreCase))
+				{
+					allowInitialDischarge = true;
 				}
 				else if (string.Equals(arg, "--low", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
 				{
@@ -85,10 +90,10 @@ internal static class BatteryLimitTest
 			}
 			else
 			{
-				L("模式：启用限充（high=" + high + "% · low=" + low + "%）");
+				L("模式：启用限充（high=" + high + "% · low=" + low + "% · 允许初次放电=" + allowInitialDischarge + "）");
 				bool stateOk = BatteryLimitWriter.TryReadState(out int curHigh, out int curLow, out int curMode, out string state);
 				L("当前状态：" + state + (stateOk ? "" : "（⚠️ 读取不完整）"));
-				bool ok = BatteryLimitWriter.TryEnable(low, high, out string detail);
+				bool ok = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge, out string detail);
 				L(detail);
 				BatteryLimitWriter.TryReadState(out int afterHigh, out int afterLow, out int afterMode, out string after);
 				L("写后状态：" + after);

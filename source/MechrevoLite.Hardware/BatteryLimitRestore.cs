@@ -22,6 +22,18 @@ internal static class BatteryLimitRestore
 
 	internal const string StopKey = "battery_limit_stop";
 
+	internal const string AllowInitialDischargeKey = "battery_limit_allow_initial_discharge";
+
+	/// <summary>⭐ 高级开关：允许 SOC ≥ 停充阈值时启用（默认 0；⛔ 不默认开）✅。</summary>
+	internal static bool AllowInitialDischarge => AppConfig.Get(AllowInitialDischargeKey, 0) == 1;
+
+	internal static void SetAllowInitialDischarge(bool allow)
+	{
+		AppConfig.Set(AllowInitialDischargeKey, allow ? 1 : 0);
+		AppConfig.Flush();
+		Logger.WriteLine("[battery] 允许初次放电=" + (allow ? "开" : "关"));
+	}
+
 	private static int _running;
 
 	/// <summary>⭐ 本地是否存过配置（没存过 ⇒ ⛔ 不恢复，避免把参考工具单独设置的值关掉）✅。</summary>
@@ -97,7 +109,15 @@ internal static class BatteryLimitRestore
 			}
 			if (enabled)
 			{
-				bool ok = BatteryLimitWriter.TryEnable(low, high, out string enableDetail);
+				// ⭐ 机主批准：启动恢复也要守「默认禁止高电量启用」（避免开机掉电）✅
+				int soc = (int)Math.Round(System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
+				if (soc >= 0 && soc >= high && !AllowInitialDischarge)
+				{
+					Logger.WriteLine("[battery] 启动核对：SOC(" + soc + "%) ≥ 配置停充阈值(" + high
+						+ "%) 且未允许初次放电 ⇒ 跳过恢复（避免开机掉电）");
+					return;
+				}
+				bool ok = BatteryLimitWriter.TryEnable(low, high, AllowInitialDischarge, out string enableDetail);
 				if (BatteryLimitWriter.TryReadState(out int highAfter, out int lowAfter, out int modeAfter, out _) && ok)
 				{
 					Logger.WriteLine("[battery] 启动恢复：已写回 high=" + highAfter + "/low=" + lowAfter
