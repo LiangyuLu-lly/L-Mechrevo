@@ -43,10 +43,13 @@ internal static class Program
 			&& BaolongdaProfile.TccMinCelsius < BaolongdaProfile.TccMaxCelsius);
 
 		Console.WriteLine();
-		Console.WriteLine("-- 3. 键盘灯亮度上限（按代数，唯一分叉点）--");
-		Eq("Gen30 ⇒ 3（30 系只确认到 0~3）", 3, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.Gen30));
-		Eq("Gen40 ⇒ 4（原厂 Level_4）", 4, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.Gen40));
-		Eq("Gen50 ⇒ 4", 4, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.Gen50));
+		// ⭐⭐ 2026-10-19（机主实测纠正）：40 系键盘亮度**只有 0/1/2/3**（最大 3），
+		//   原"Gen40/50 = 4"会让 UI 拖到固件不支持的档位 ⇒ 「最大亮度不能用」❌
+		//   ⇒ 现在全系统一 3（若将来某机型实测有第 5 档，由运行时自校准覆盖本常量）
+		Console.WriteLine("-- 3. 键盘灯亮度上限（全系统一 3；40 系实测也只有 0~3）--");
+		Eq("Gen30 ⇒ 3", 3, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.Gen30));
+		Eq("Gen40 ⇒ 3（机主实测 0~3，不再是 4）", 3, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.Gen40));
+		Eq("Gen50 ⇒ 3", 3, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.Gen50));
 		Eq("Unknown ⇒ 3（保守方向）", 3, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.Unknown));
 		Eq("NoDgpu ⇒ 3", 3, BaolongdaProfile.BrightnessMax(DgpuGenerationKind.NoDgpu));
 

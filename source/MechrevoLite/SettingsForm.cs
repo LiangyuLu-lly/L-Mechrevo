@@ -568,6 +568,13 @@ public class SettingsForm : RForm
 	private bool _syncingEffectCombos;
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-19（运行时自校准）：键盘灯能力探测是否已在**本界面**排过队（0/1）。
+	/// <para>⚠️ 只防重复排队；真正的"只跑一次"由 <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c>
+	/// 的缓存保证 ✅。</para>
+	/// </summary>
+	private int _kbdCalibrationQueued;
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯效表）：
 	/// ⭐ 宝龙达键盘灯的**可写模式表 ＝ 三项** ✅（⭐ 下拉、⭐ 索引→Id 映射、
 	/// ⭐ 点进 LightForm 那扇窗、⭐ 以及下发时的 Id→模式映射 ⭐ **四处共用** ✅）。
@@ -597,12 +604,35 @@ public class SettingsForm : RForm
 	};
 
 	/// <summary>
-	/// ⭐ 宝龙达时把任意「声明的效果表」收敛成**本机真能做到的三项** ✅；
+	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：宝龙达键盘灯**当前可用**的效果表 ✅。
+	/// <para>⭐ 探测确认彩虹不可用（或探测失败 ⇒ 保守隐藏）⇒ **动态去掉 Rainbow**
+	/// （⛔ 不长期给无效项、⛔ 不假装支持）；尚未探测 ⇒ 先按完整表展示（探测完成后界面随即收敛）✅。</para>
+	/// <para>⚠️ 与下面键盘行的「索引 → 效果 Id」映射**必须**用同一个方法 ⇒ 否则下拉项与下发值错位 ❌。</para>
+	/// </summary>
+	private static (string Effect, string Name)[] CurrentBaolongdaLightEffects()
+	{
+		if (!MechrevoHw.IsKeyboardRainbowKnownUnavailable())
+		{
+			return BaolongdaLightEffects;
+		}
+		List<(string Effect, string Name)> filtered = new List<(string, string)>(BaolongdaLightEffects.Length);
+		foreach ((string Effect, string Name) item in BaolongdaLightEffects)
+		{
+			if (!string.Equals(item.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase))
+			{
+				filtered.Add(item);
+			}
+		}
+		return (filtered.Count > 0) ? filtered.ToArray() : new (string, string)[1] { ("Single", Strings.EffectSingle) };
+	}
+
+	/// <summary>
+	/// ⭐ 宝龙达时把任意「声明的效果表」收敛成**本机真能做到的项** ✅；
 	/// ⭐ 其他机型（⭐ GCU ／ 老同方 ／ 非宝龙达 ✅）**原样返回** ⇒ ⭐ 逐位不变 ✅。
 	/// </summary>
 	private static (string Effect, string Name)[] EffectsForCurrentBackend((string Effect, string Name)[] declared)
 	{
-		return (Program.hw?.UsesBaolongda == true) ? BaolongdaLightEffects : declared;
+		return (Program.hw?.UsesBaolongda == true) ? CurrentBaolongdaLightEffects() : declared;
 	}
 
 	private RCheckBox? _lightOffOnBatteryChk;
@@ -1717,6 +1747,9 @@ public class SettingsForm : RForm
 
 	private void OpenRgbForm()
 	{
+		// ⭐⭐ 2026-10-19（运行时自校准）：机主打开**键盘灯设置窗口** ⇒ 排队一次能力探测 ✅
+		//   （后台线程、结果缓存；完成后重填本界面的键盘效果下拉 ⇒ 彩虹不可用就动态去掉）
+		EnsureBaolongdaKeyboardCalibrationQueued();
 		if (rgbForm == null || rgbForm.IsDisposed)
 		{
 			rgbForm = new RgbForm(Program.rgb);
@@ -15791,6 +15824,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		_kbPowerSw = sw;
 		_kbEffectCombo = effectCombo;
 		FillKeyboardEffectCombo(effectCombo);
+		// ⭐⭐ 2026-10-19（运行时自校准）：机主**打开键盘灯效果下拉**（= 打开键盘灯设置）时排队一次能力探测 ✅
+		//   ⚠️ 后台线程 + 结果缓存；完成后重填本下拉 ⇒ 彩虹不可用就**动态去掉**（⛔ 不长期给无效项）
+		effectCombo.DropDown += delegate
+		{
+			EnsureBaolongdaKeyboardCalibrationQueued();
+		};
 		effectCombo.SelectedIndexChanged += async (object? _, EventArgs _) =>
 		{
 			if (!_syncingEffectCombos && !Program.UiAuditMode)
@@ -15804,7 +15843,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 					if (ShouldUseGcuKeyboardFallback(Program.rgb) || Program.hw?.UsesBaolongda == true)
 					{
 						(string, string)[] array2 = (Program.hw?.UsesBaolongda == true)
-							? BaolongdaLightEffects
+							? CurrentBaolongdaLightEffects()
 							: KeyboardFirmwareEffects.Visible(CurrentKeyboardType());
 						if (selectedIndex < array2.Length)
 						{
@@ -16639,6 +16678,90 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		return Program.hw?.Capabilities.KeyboardType ?? 0;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：打开/刷新键盘灯设置时**排队一次**能力探测 ✅。
+	/// <para>⭐ 探测本体（写 WMI 16/18 + 回读 + try/finally 恢复）在
+	/// <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 里**只跑一次并缓存**；
+	/// 本方法只负责"后台线程触发 + 完成后回 UI 重填效果下拉（过滤彩虹）"✅。</para>
+	/// <para>⚠️ 必须后台线程：探测含多次 WMI 往返（约 &lt; 1s），⛔ 不阻塞设置界面 ✅。</para>
+	/// </summary>
+	private void EnsureBaolongdaKeyboardCalibrationQueued()
+	{
+		if (Program.hw?.UsesBaolongda != true)
+		{
+			return;
+		}
+		MechrevoHw hw = Program.hw;
+		if (hw == null || hw.KeyboardLightingCaps != null)
+		{
+			return;
+		}
+		if (Interlocked.Exchange(ref _kbdCalibrationQueued, 1) != 0)
+		{
+			return;
+		}
+		Task.Run(delegate
+		{
+			try
+			{
+				hw.EnsureKeyboardLightingCalibration();
+				if (IsDisposed || Disposing || !IsHandleCreated)
+				{
+					return;
+				}
+				BeginInvoke(new Action(delegate
+				{
+					if (IsDisposed || Disposing)
+					{
+						return;
+					}
+					// ⭐ 探测结果可能把 Rainbow 从效果表里去掉 ⇒ 重填下拉（展开中会等收起再填）✅
+					RefreshKeyboardEffectComboAfterCalibration();
+				}));
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteError("[kbd-cal] 键盘灯自校准（设置界面触发）异常（已吞掉）：" + ex.Message);
+			}
+		});
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19：自校准完成后刷新键盘灯效果下拉（彩虹不可用 ⇒ 动态去掉）—— 供 <c>RgbForm</c> 回调 ✅。
+	/// <para>⚠️ 必须在 UI 线程调用；内部只重填下拉（没变化时 <see cref="FillKeyboardEffectCombo" /> 自己会 return）✅。</para>
+	/// </summary>
+	internal void RefreshKeyboardEffectComboAfterCalibration()
+	{
+		if (IsDisposed || Disposing)
+		{
+			return;
+		}
+		if (_kbEffectCombo == null || _kbEffectCombo.IsDisposed)
+		{
+			return;
+		}
+		// ⚠️ 下拉正展开时**不要**清空 Items（会闪、且焦点/命中会乱）⇒ 等它收起后再重填 ✅
+		if (_kbEffectCombo.DroppedDown)
+		{
+			EventHandler refillAfterClose = null;
+			refillAfterClose = delegate
+			{
+				_kbEffectCombo.DropDownClosed -= refillAfterClose;
+				RefreshKeyboardEffectComboAfterCalibration();
+			};
+			_kbEffectCombo.DropDownClosed += refillAfterClose;
+			return;
+		}
+		try
+		{
+			FillKeyboardEffectCombo(_kbEffectCombo);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[kbd-cal] 校准后刷新键盘灯效果下拉失败（已吞掉）：" + ex.Message);
+		}
+	}
+
 	private void FillKeyboardEffectCombo(ComboBox combo)
 	{
 		bool flag = ShouldUseGcuKeyboardFallback(Program.rgb);
@@ -16651,7 +16774,9 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		if (Program.hw?.UsesBaolongda == true)
 		{
 			flag = true;
-			array = BaolongdaLightEffects;
+			// ⭐⭐ 2026-10-19（运行时自校准）：彩虹被探测确认不可用 ⇒ 这里**动态过滤**掉
+			//   （与 SelectedIndexChanged 的索引→Id 映射用同一方法 ⇒ 不会错位）✅
+			array = CurrentBaolongdaLightEffects();
 		}
 		(int, string)[] array2 = RgbForm.VisibleHidEffects(keyboardType);
 		string[] array3 = (flag ? array.Select(((string Id, string Label) e) => e.Label).ToArray() : array2.Select(((int Mode, string Name) e) => e.Name).ToArray());

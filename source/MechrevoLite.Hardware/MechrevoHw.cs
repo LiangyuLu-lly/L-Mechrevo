@@ -1598,6 +1598,44 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	public long KeyboardStatusVersion => Interlocked.Read(in _keyboardStatusVersion);
 
+	// ══════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-19（宝龙达键盘灯「最大亮度不能用 / 彩虹没效果」）：
+	//    ⭐ **运行时自校准** —— ⛔ 不再猜"40 系 = 4 档 / 彩虹一定可用"这类常量
+	//    ⭐ 探测一次、结果缓存；UI 只读 `KeyboardLightingCaps` 决定滑块范围与效果表 ✅
+	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>⭐ 自校准结果的**单次缓存**（<c>null</c> = 还没探测过）。⚠️ 只由 <see cref="EnsureKeyboardLightingCalibration" /> 写。</summary>
+	private KeyboardLightingCalibration _kbdCaps;
+
+	/// <summary>⭐ 保证"同一时刻只有一个线程在探测"（WMI 写 + 回读必须串行）。</summary>
+	private readonly object _kbdCapsGate = new object();
+
+	/// <summary>
+	/// ⭐ 本机的**键盘灯自校准结果**（只读；<c>null</c> = 还没探测过）。
+	/// <para>⭐ UI 用它决定：亮度滑块上限（<see cref="KeyboardLightingCalibration.BrightnessMax" />）
+	/// 与「彩虹」是否露出（<see cref="KeyboardLightingCalibration.RainbowSupported" />）✅。</para>
+	/// </summary>
+	internal KeyboardLightingCalibration KeyboardLightingCaps => Volatile.Read(ref _kbdCaps);
+
+	/// <summary>
+	/// ⭐ 最近一次键盘灯亮度写入的**请求值**（硬件级；-1 = 还没写过）。
+	/// <para>⚠️ 它可能已被 <see cref="MechrevoHw.BaolongdaBrightnessFromUi" /> 夹过；⛔ 不代表用户拖到的界面值。</para>
+	/// </summary>
+	internal int LastKeyboardBrightnessRequested { get; private set; } = -1;
+
+	/// <summary>
+	/// ⭐ 最近一次键盘灯亮度写入后**回读到的实际值**（硬件级；-1 = 读不到）。
+	/// <para>⚠️ 用途（机主「拖到最大没反应/回弹」）：UI 显示**实际生效值**，⛔ 不显示用户拖到的值 ✅。</para>
+	/// </summary>
+	internal int LastKeyboardBrightnessApplied { get; private set; } = -1;
+
+	/// <summary>
+	/// ⭐ 键盘灯亮度**写入并回读后**触发（参数 = 硬件实际值；-1 = 读不到）。
+	/// <para>⚠️ 可能在**后台线程**触发 ⇒ UI 订阅方必须自己 <c>BeginInvoke</c> 回 UI 线程 ✅。</para>
+	/// <para>⛔ 只在真的写了亮度时触发（"只写变化项"路径里亮度没变就不写、也就不会触发）✅。</para>
+	/// </summary>
+	internal event Action<int> KeyboardBrightnessApplied;
+
 	public int ScreenBrightness { get; private set; } = -1;
 
 	public IReadOnlyList<int> HzList => _hzList;
@@ -2957,9 +2995,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				//   ⚠️ 原来硬编码白色 0xFFFFFFFF ⇒ ⭐ 每次点亮都把用户颜色冲成白 ❌
 				LightChannelSettings stored = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
 				int defaultArgb = stored.EffectiveColorArgb();
-				int defaultBrightness = Math.Clamp(Math.Max(1, stored.Light), 1, BaolongdaProfile.BrightnessMax(DgpuGeneration));
+				int defaultBrightness = Math.Clamp(Math.Max(1, stored.Light), 1, EffectiveKeyboardBrightnessMax());
 				Logger.WriteError($"宝龙达 灯光：⭐ 本入口只带开关（topic={topic}）⇒ 点亮**沿用已保存颜色**"
-					+ $"（#{(defaultArgb & 0xFFFFFF):X6} · 界面亮度 {stored.Light} ⇒ 硬件 {defaultBrightness}/{BaolongdaProfile.BrightnessMax(DgpuGeneration)}）✅"
+					+ $"（#{(defaultArgb & 0xFFFFFF):X6} · 界面亮度 {stored.Light} ⇒ 硬件 {defaultBrightness}/{EffectiveKeyboardBrightnessMax()}）✅"
 					+ " —— ⭐ 界面若另有配色/亮度入口，那条会各自下发 ✅");
 				if (!TrySetKeyboardLightingViaBackend(true, defaultArgb, defaultBrightness, out confirmed))
 				{
@@ -3348,6 +3386,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					return true;
 				}
 				confirmed = TryConfirmKeyboardBrightness(wmi, 0);
+				// ⭐⭐ 2026-10-19：⭐ 记录**回读到的实际值**（⭐ UI 显示实际生效值，⛔ 不显示用户拖到的值）✅
+				RecordAppliedKeyboardBrightness(wmi, requestedLevel: 0);
 				if (confirmed)
 				{
 					Logger.WriteError("宝龙达 键盘灯：⭐ 关灯已写「亮度 0」（功能号 18）"
@@ -3403,8 +3443,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			int b = colorArgb & 0xFF;
 			bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
 			// ⭐ ④ 亮度（功能号 18）—— **只在变化时写**（改颜色时不再重写亮度 ✅）
-			//   ⚠️ 上限按代数：Gen40/50 = 4（原厂 Level_4）· 其余 = 3 —— 与 `BaolongdaProfile` 同一事实 ✅
-			byte level = (byte)Math.Clamp(brightness0to3, 0, BaolongdaProfile.BrightnessMax(kbGen));
+			//   ⭐⭐ 2026-10-19（机主实测纠正 + 自校准）：⭐ 本机上限 = **探测值**
+			//     （探测失败才退回声明值）；⛔ 不再按 GPU 代数猜 4/3 ——
+			//     40 系实测只有 0~3，界面拖到 4 会被固件夹回/变成灭灯 ❌
+			byte level = (byte)Math.Clamp(brightness0to3, 0, EffectiveKeyboardBrightnessMax());
 			// ⭐⭐ 2026-10-18（机主：「键盘灯打开得手动调一下亮度才能开」）：
 			//   ⚠️ 亮了但亮度=0 ⇒ 看起来就是"没开"；用户必须再拖一下亮度才有光 ❌
 			//   ⭐ 规则：**开灯状态下亮度不允许是 0**（0 等于关），最低给 1 ✅
@@ -3428,7 +3470,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				//   ⭐ 第三方 7.3 设亮度用的是**复位序列**：先写满(4) → 再写 0 → 最后写目标值 ✅
 				//   ⭐ 我们原来"只写变化项、直接写目标" ⇒ 固件可能不认（真机上亮度/灯效常不生效）⚠️
 				//   ⚠️ 中间那次 0 会让灯瞬灭 ~120ms（7.3 同样如此）✅
-				byte maxLevel = (byte)BaolongdaProfile.BrightnessMax(kbGen);
+				//   ⭐⭐ 2026-10-19：⭐ 复位序列的"写满"也取**本机探测上限**（⛔ 不写超过上限的值）✅
+				byte maxLevel = (byte)EffectiveKeyboardBrightnessMax();
 				wmi.TrySetKeyboardBrightness(maxLevel);
 				Thread.Sleep(120);
 				wmi.TrySetKeyboardBrightness(0);
@@ -3440,6 +3483,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			bool modeMatch = TryConfirmModeExact(wmi, mode);
 			bool brightMatch = TryConfirmKeyboardBrightness(wmi, level);
 			confirmed = modeMatch && brightMatch;
+			// ⭐⭐ 2026-10-19（机主：「拖到最大没反应/回弹」）：
+			//   ⭐ 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
+			//     UI 必须显示**实际生效值**、并记一条 `[kbd-cal]` 日志（⛔ 不拿用户拖到的值骗人）✅
+			RecordAppliedKeyboardBrightness(wmi, level);
 			Logger.WriteError($"宝龙达 键盘灯：⭐ 下发 rgb=#{r:X2}{g:X2}{b:X2} · 模式={mode} · 亮度={level}"
 				+ $" · ⭐ 本次**只写变化项**（模式={needMode} · 颜色=是 · 亮度={needBright}）"
 				+ $" ⇒ ⭐ ① 写成功={colorOk && modeOk && brightOk}（色={colorOk} 模式={modeOk} 亮度={brightOk}）"
@@ -3486,6 +3533,48 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			Thread.Sleep(100);
 		}
 		return false;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「最大亮度不能用 / 拖到最大会回弹」）：
+	/// ⭐ 亮度写入后**立刻回读**，把【请求值 / 实际值】都记下来，并在被固件夹回时记一条 `[kbd-cal]` 日志 ✅。
+	/// <para>⚠️ 诚实边界：⭐ 回读只是**寄存器口径**（② 层），⛔ 不代表灯真的变亮了（③ 层测不到）⚠️。</para>
+	/// <para>⭐ 触发 <see cref="KeyboardBrightnessApplied" />：UI 据此把滑块显示成**实际生效值** ✅。</para>
+	/// </summary>
+	private void RecordAppliedKeyboardBrightness(BaolongdaWmi wmi, int requestedLevel)
+	{
+		LastKeyboardBrightnessRequested = requestedLevel;
+		int actual = -1;
+		if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte readback))
+		{
+			actual = readback;
+		}
+		LastKeyboardBrightnessApplied = actual;
+		if (actual >= 0 && actual != requestedLevel)
+		{
+			Logger.WriteError($"[kbd-cal] ⚠️ 亮度写入被夹回：请求={requestedLevel} · 回读实际={actual}"
+				+ $" ⇒ ⭐ UI 显示**实际生效值 {actual}**（⛔ 不显示用户拖到的 {requestedLevel}）"
+				+ " —— ⭐ 本机固件只接受 0~" + EffectiveKeyboardBrightnessMax() + " 档 ⚠️");
+		}
+		else if (actual < 0)
+		{
+			Logger.WriteError($"[kbd-cal] ⚠️ 亮度写入后**回读不到**：请求={requestedLevel}"
+				+ " ⇒ ⭐ UI 无法显示实际值（⛔ 不拿请求值冒充实际值）⚠️");
+		}
+		Action<int> handler = KeyboardBrightnessApplied;
+		if (handler == null)
+		{
+			return;
+		}
+		try
+		{
+			handler(actual);
+		}
+		catch (Exception ex)
+		{
+			// ⭐ UI 订阅方自己的异常⛔ 不允许影响硬件写入链路（⭐ 已写完，这里只是通知）✅
+			Logger.WriteLine("[kbd-cal] 亮度实际值通知 UI 时异常（已吞掉）：" + ex.Message);
+		}
 	}
 
 	/// <summary>
@@ -3544,14 +3633,286 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return 0;
 		}
-		// ⭐⭐ 2026-10-17（依据：第三方 JiaoLong7.3 的 `WMIRGBKeyboardBrightnessLevel`）：
-		//   ⭐ 它明确枚举了 `Level_0..Level_4`（**0~4 共 5 档**）⚠️
-		//   ⭐ 而官方 40 系（v0.3.15）与第三方 7.3（40 系改）**都有**这一档
-		//   ⇒ ⭐ **40 系（Gen40/50）按 0~4 透传** ✅
-		//   ⚠️ 30 系目前**只确认到 0~3**（30 系官方包里没找到完整枚举）⇒ ⭐ 保守夹到 3
-		//   ⚠️ 原来无条件 `Clamp(1,3)` ⇒ ⭐ 40 系的第 4 档被吞掉（用户会觉得"亮度调不上去"）❌
-		DgpuGenerationKind gen = Program.hw?.DgpuGeneration ?? DgpuGenerationKind.Unknown;
-		return (byte)Math.Clamp(ui0to4, 1, BaolongdaProfile.BrightnessMax(gen));
+		// ⭐⭐ 2026-10-19（机主实测纠正）：⭐ 上限不再按 GPU 代数猜 ——
+		//   40 系实测 **只有 0/1/2/3 四档**（最大 3），旧常量给 Gen40 返回 4
+		//   ⇒ 界面能拖到「4」但固件不支持 ⇒ 表现为「最大亮度不能用」❌
+		//   ⭐ 现在上限 = **运行时自校准值**（探测失败才退回声明常量，当前声明值也是 3）✅
+		return (byte)Math.Clamp(ui0to4, 1, EffectiveKeyboardBrightnessMax());
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19：⭐ 本机键盘灯亮度**上限**（硬件级）—— UI 滑块与所有下发夹取**共用这一个来源** ✅。
+	/// <para>⭐ 顺序：⭐ ① 已自校准且亮度探测成功 ⇒ 用探测值 ✅；
+	/// ② 否则 ⇒ 用声明值 <see cref="BaolongdaProfile.BrightnessMax" />（现在是全系 3）。</para>
+	/// <para>⚠️ 非宝龙达也返回声明值（3），但**只有宝龙达路径会用它**；非宝龙达 UI 的 0~4 逐位不变 ✅。</para>
+	/// </summary>
+	internal static int EffectiveKeyboardBrightnessMax()
+	{
+		MechrevoHw hw = Program.hw;
+		KeyboardLightingCalibration caps = hw?.KeyboardLightingCaps;
+		if (caps != null && caps.BrightnessProbed)
+		{
+			return Math.Max(1, caps.BrightnessMax);
+		}
+		return Math.Max(1, BaolongdaProfile.BrightnessMax(hw?.DgpuGeneration ?? DgpuGenerationKind.Unknown));
+	}
+
+	/// <summary>
+	/// ⭐ 本机彩虹（模式 16 = 1）是否**已知不可用**（探测确认不可用，或探测失败 ⇒ 保守隐藏）✅。
+	/// <para>⚠️ 还没探测过（<c>null</c>）⇒ 返回 <c>false</c>（先按可用展示，探测完再收敛）✅。</para>
+	/// </summary>
+	internal static bool IsKeyboardRainbowKnownUnavailable()
+	{
+		KeyboardLightingCalibration caps = Program.hw?.KeyboardLightingCaps;
+		return caps != null && !caps.RainbowSupported;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19：⭐ 宝龙达键盘效果 Id 的**运行时收敛**（在 <see cref="BaolongdaProfile.NormalizeKeyboardEffect" />
+	/// 之上再加一层"本机彩虹能力"）✅：
+	/// <para>⭐ 旧配置里存着 <c>Rainbow</c>、但本机探测确认彩虹不可用 ⇒ ⭐ 收敛到 <c>Single</c>
+	/// （模式 2 ＋ 用户颜色），⛔ 不把用户丢进"选了没反应"的无效项 ✅。</para>
+	/// </summary>
+	internal static string NormalizeKeyboardLightingEffect(string effect)
+	{
+		string normalized = BaolongdaProfile.NormalizeKeyboardEffect(effect);
+		if (string.Equals(normalized, "Rainbow", StringComparison.OrdinalIgnoreCase) && IsKeyboardRainbowKnownUnavailable())
+		{
+			return "Single";
+		}
+		return normalized;
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：
+	//    键盘灯**能力探测** —— 打开键盘灯设置时调用一次，结果缓存。
+	//    · 亮度上限：记录原值 → 依次写 k = 1..声明上限 → 回读，能写进去的最大 k 即上限
+	//    · 彩虹：写模式 16=1 → 回读，能保持 1 ⇒ 可用
+	//    ⚠️ 探测**必须** try/finally 恢复原始亮度/模式（失败也要恢复）——
+	//       ⛔ 绝不允许把键盘留在探测状态 ✅
+	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>
+	/// ⭐ 探测入口：**只跑一次**，结果缓存（并发调用会串行化并复用同一份结果）✅。
+	/// <para>⚠️ 会写 WMI（亮度 / 模式），带 try/finally 恢复；⛔ 调用方应在**后台线程**调它，
+	/// 探测耗时约 &lt; 1s（3 档亮度 × 回读重试），⛔ 不要阻塞 UI ✅。</para>
+	/// </summary>
+	internal KeyboardLightingCalibration EnsureKeyboardLightingCalibration()
+	{
+		KeyboardLightingCalibration cached = Volatile.Read(ref _kbdCaps);
+		if (cached != null)
+		{
+			return cached;
+		}
+		lock (_kbdCapsGate)
+		{
+			cached = _kbdCaps;
+			if (cached != null)
+			{
+				return cached;
+			}
+			KeyboardLightingCalibration probed = ProbeKeyboardLightingCapabilities();
+			Volatile.Write(ref _kbdCaps, probed);
+			return probed;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 宝龙达键盘灯**能力探测本体**（只在本机固件上做有限次写；全程 try/finally 恢复）✅。
+	/// <para>⚠️ 判据（与机主真机口径一致）：
+	/// <list type="number">
+	/// <item>亮度：探测范围 <b>1..声明上限（当前 3）</b> —— ⛔ 不试 4/5/6，
+	/// 避免"写超范围被夹回"反而误判（也避免把键盘写到不支持的值上）；</item>
+	/// <item>彩虹：写 16=1 → 回读；回读 == 1 ⇒ 可用，否则不可用 ✅。</item>
+	/// </list></para>
+	/// <para>⭐ 失败保守：亮度上限保持**声明值**、Rainbow **隐藏**（⛔ 不给无效项）✅。</para>
+	/// </summary>
+	private KeyboardLightingCalibration ProbeKeyboardLightingCapabilities()
+	{
+		DgpuGenerationKind gen = DgpuGeneration;
+		int declaredMax = Math.Max(1, BaolongdaProfile.BrightnessMax(gen));
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			string reason = "非宝龙达后端 / 实例不可用";
+			Logger.WriteError("[kbd-cal] 跳过探测（" + reason + "）⇒ 保守：亮度上限=" + declaredMax + "（声明值）· Rainbow 隐藏");
+			return KeyboardLightingCalibration.Conservative(declaredMax, reason);
+		}
+		// ── ⭐ ① 记录原始状态（读不到的那一项**不写**，否则无法恢复）──
+		bool brightnessKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte originalBrightness);
+		bool modeKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte originalMode);
+		Logger.WriteError($"[kbd-cal] 开始探测键盘灯能力：当前亮度={(brightnessKnown ? originalBrightness.ToString() : "读不到")}"
+			+ $" · 当前模式={(modeKnown ? originalMode.ToString() : "读不到")}"
+			+ $" · 声明上限={declaredMax}（探测后**恢复原值**）");
+		LogKeyboardLightingState(wmi, "探测前");
+		int probedMax = 0;
+		string clampNote = string.Empty;
+		bool rainbowProbed = false;
+		bool rainbowSupported = false;
+		try
+		{
+			// ── ⭐ ② 亮度上限：写 k → 回读，能写进去的最大 k ──
+			if (!brightnessKnown)
+			{
+				Logger.WriteError("[kbd-cal] ⚠️ 原始亮度读不到 ⇒ **跳过亮度写入探测**"
+					+ "（无法恢复 ⇒ 宁可不测，⛔ 不把键盘留在探测状态）");
+			}
+			else
+			{
+				for (int k = 1; k <= declaredMax; k++)
+				{
+					bool writeOk = wmi.TrySetKeyboardBrightness((byte)k);
+					int readback = writeOk ? ReadKeyboardBrightnessAfterWrite(wmi, k, attempts: 3, delayMs: 80) : -1;
+					string readText = (readback < 0) ? "读不到" : readback.ToString();
+					Logger.WriteError($"[kbd-cal] 亮度探测：写 {k} ⇒ 回读 {readText}");
+					if (readback == k)
+					{
+						probedMax = k;
+						continue;
+					}
+					clampNote = (readback >= 0)
+						? $"写到 {k} 回读为 {readback} 被夹回"
+						: $"写 {k} 后回读不到";
+					break;
+				}
+			}
+			// ── ⭐ ③ Rainbow：写模式 16=1 → 回读 ──
+			if (!modeKnown)
+			{
+				Logger.WriteError("[kbd-cal] ⚠️ 原始模式读不到 ⇒ **跳过 Rainbow 探测**"
+					+ "（无法恢复 ⇒ 宁可不测，⛔ 不把键盘留在探测状态）");
+			}
+			else
+			{
+				bool writeModeOk = wmi.TrySetKeyboardMode(1);
+				int readback = writeModeOk ? ReadKeyboardModeAfterWrite(wmi, 1, attempts: 3, delayMs: 100) : -1;
+				rainbowProbed = readback >= 0;
+				rainbowSupported = readback == 1;
+				Logger.WriteError($"[kbd-cal] Rainbow 探测：写 模式16=1 ⇒ 回读={(readback < 0 ? "读不到" : readback.ToString())}"
+					+ $" ⇒ ⭐ Rainbow={(rainbowSupported ? "可用" : "不可用")}");
+			}
+		}
+		finally
+		{
+			// ── ⭐ ④ 无论成功/失败/异常 ⇒ 恢复原始模式 + 原始亮度 ──
+			RestoreKeyboardLightingAfterCalibration(wmi, brightnessKnown, originalBrightness, modeKnown, originalMode);
+		}
+		// ── ⭐ ⑤ 汇总 + 缓存 ──
+		bool brightnessProbed = probedMax >= 1;
+		int brightnessMax = brightnessProbed ? Math.Clamp(probedMax, 1, declaredMax) : declaredMax;
+		string brightnessPart;
+		if (brightnessProbed)
+		{
+			brightnessPart = (brightnessMax >= declaredMax)
+				? $"亮度上限={brightnessMax}（与机主口径一致）"
+				: $"亮度上限={brightnessMax}（{clampNote}；声明上限={declaredMax}）";
+		}
+		else
+		{
+			brightnessPart = (clampNote.Length > 0)
+				? $"亮度上限={brightnessMax}（声明值 · 探测失败：{clampNote}）"
+				: $"亮度上限={brightnessMax}（声明值 · 探测失败）";
+		}
+		string rainbowPart = rainbowProbed
+			? (rainbowSupported ? "Rainbow=可用" : "Rainbow=不可用（写模式 1 回读不是 1）")
+			: "Rainbow=不可用（模式回读不到 ⇒ 保守隐藏）";
+		string detail = brightnessPart + " · " + rainbowPart;
+		Logger.WriteError("[kbd-cal] " + detail);
+		return KeyboardLightingCalibration.FromProbe(declaredMax, probedMax, rainbowProbed, rainbowSupported, detail);
+	}
+
+	/// <summary>⭐ 写亮度后**带重试**回读（等待固件生效；⛔ 一次读不到就下结论）✅。</summary>
+	private static int ReadKeyboardBrightnessAfterWrite(BaolongdaWmi wmi, int expected, int attempts, int delayMs)
+	{
+		int last = -1;
+		for (int attempt = 0; attempt < attempts; attempt++)
+		{
+			Thread.Sleep(delayMs);
+			if (!wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte value))
+			{
+				continue;
+			}
+			last = value;
+			if (value == expected)
+			{
+				return value;
+			}
+		}
+		return last;
+	}
+
+	/// <summary>⭐ 写模式后**带重试**回读（同上）✅。</summary>
+	private static int ReadKeyboardModeAfterWrite(BaolongdaWmi wmi, int expected, int attempts, int delayMs)
+	{
+		int last = -1;
+		for (int attempt = 0; attempt < attempts; attempt++)
+		{
+			Thread.Sleep(delayMs);
+			if (!wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte value))
+			{
+				continue;
+			}
+			last = value;
+			if (value == expected)
+			{
+				return value;
+			}
+		}
+		return last;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 探测收尾：把键盘灯**恢复成探测前的状态**（模式先恢复、亮度最后恢复）✅。
+	/// <para>⚠️ 每一项最多重试 3 次写 + 回读；**恢复不一致也如实记日志**（⛔ 不假装恢复成功）⚠️。</para>
+	/// <para>⚠️ 原值读不到的那一项**不写**（⭐ 探测时也没写它 ⇒ 它本来就该在原始状态）✅。</para>
+	/// </summary>
+	private static void RestoreKeyboardLightingAfterCalibration(BaolongdaWmi wmi, bool brightnessKnown, byte originalBrightness, bool modeKnown, byte originalMode)
+	{
+		// ⭐ 顺序：先模式、后亮度 —— 防"写模式把亮度重置"⇒ 亮度最后写才能落在统计值上 ✅
+		int restoredMode = -1;
+		if (modeKnown)
+		{
+			for (int attempt = 0; attempt < 3; attempt++)
+			{
+				wmi.TrySetKeyboardMode(originalMode);
+				restoredMode = ReadKeyboardModeAfterWrite(wmi, originalMode, attempts: 2, delayMs: 60);
+				if (restoredMode == originalMode)
+				{
+					break;
+				}
+			}
+			Logger.WriteError($"[kbd-cal] 恢复模式：写 {originalMode} ⇒ 回读 {(restoredMode < 0 ? "读不到" : restoredMode.ToString())}"
+				+ (restoredMode == originalMode ? " ✅" : " ⚠️ 恢复不一致（如实记录）"));
+		}
+		if (brightnessKnown)
+		{
+			int restoredBrightness = -1;
+			for (int attempt = 0; attempt < 3; attempt++)
+			{
+				wmi.TrySetKeyboardBrightness(originalBrightness);
+				restoredBrightness = ReadKeyboardBrightnessAfterWrite(wmi, originalBrightness, attempts: 2, delayMs: 60);
+				if (restoredBrightness == originalBrightness)
+				{
+					break;
+				}
+			}
+			Logger.WriteError($"[kbd-cal] 恢复亮度：写 {originalBrightness} ⇒ 回读 {(restoredBrightness < 0 ? "读不到" : restoredBrightness.ToString())}"
+				+ (restoredBrightness == originalBrightness ? " ✅" : " ⚠️ 恢复不一致（如实记录）"));
+		}
+		// ⭐⭐ 最后的安全闸（⛔ 绝不允许把键盘留在探测状态）：
+		//   ⭐ 原状态是「关灯」（模式 0），而固件**不接受模式 0**（历史真机实证：写 0 回读仍是原值）
+		//   ⇒ 用「亮度 0」兜底关灯 ✅
+		//   ⚠️ 这会覆盖"原亮度"寄存器值，但**可见状态与原状态一致（都是灭）**；
+		//      反之若不管，固件停在模式 1（彩虹）＋原亮度就会**亮着** ❌
+		if (modeKnown && originalMode == 0 && restoredMode != 0)
+		{
+			wmi.TrySetKeyboardBrightness(0);
+			int offReadback = ReadKeyboardBrightnessAfterWrite(wmi, 0, attempts: 2, delayMs: 60);
+			Logger.WriteError($"[kbd-cal] ⚠️ 原模式 0（关灯）固件不接受（回读 {(restoredMode < 0 ? "读不到" : restoredMode.ToString())}）"
+				+ $" ⇒ ⭐ 用「亮度 0」兜底关灯 ⇒ 回读 {(offReadback < 0 ? "读不到" : offReadback.ToString())}"
+				+ "（⛔ 绝不把键盘留在探测时的亮灯状态 ⚠️）");
+		}
+		LogKeyboardLightingState(wmi, "探测后（已恢复）");
 	}
 
 	/// <summary>

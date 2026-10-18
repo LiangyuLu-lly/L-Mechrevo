@@ -58,6 +58,26 @@ public class RgbForm : RForm
 
 	private RSlider _brightSlider;
 
+	/// <summary>⭐ 2026-10-19（亮度显示**实际生效值**）：滑块右侧的「值/上限」标签（重建面板时一起换）。</summary>
+	private Label _brightValueLabel;
+
+	/// <summary>⭐ 2026-10-19：亮度滑块下限/上限（宝龙达 = 1..探测上限；非宝龙达 = 0..4 逐位不变）。</summary>
+	private int _brightMinimum;
+
+	private int _brightMaximum = 4;
+
+	/// <summary>⭐ 程序化回写滑块（显示实际生效值）时置位 ⇒ ⛔ 不再触发一次下发（防回环）。</summary>
+	private bool _syncingBrightnessUi;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（运行时自校准）：本窗是否已排过键盘灯能力探测（0/1）。
+	/// <para>⚠️ 只防重复排队；"只跑一次"由 <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 缓存保证 ✅。</para>
+	/// </summary>
+	private int _kbdCalibrationQueued;
+
+	/// <summary>⭐ 2026-10-19：亮度实际值事件来源（关闭时退订，防泄漏）。</summary>
+	private MechrevoHw _brightnessSource;
+
 	private System.Windows.Forms.Timer? _modeSyncTimer;
 
 	private int _activeHidMode = 1;
@@ -223,6 +243,16 @@ public class RgbForm : RForm
 			_modeSyncTimer.Start();
 		}
 		_rgb.DeviceLost += OnRgbDeviceLost;
+		// ⭐⭐ 2026-10-19（机主：「拖到最大没反应/回弹」）：订阅亮度**回读实际值**事件 ⇒
+		//   写入被固件夹回时，本窗滑块显示实际生效值（⛔ 不显示用户拖到的值）✅
+		_brightnessSource = Program.hw;
+		if (_brightnessSource != null)
+		{
+			_brightnessSource.KeyboardBrightnessApplied += OnKeyboardBrightnessApplied;
+		}
+		// ⭐⭐ 2026-10-19（运行时自校准）：打开键盘灯设置 ⇒ **排队一次**能力探测
+		//   （后台线程；完成后重建面板 ⇒ 亮度滑块范围 1..实测上限、彩虹按能力位显隐）✅
+		KickKeyboardCalibration();
 		FormClosing += (object? _, FormClosingEventArgs e) =>
 		{
 			if (e.CloseReason == CloseReason.UserClosing)
@@ -239,6 +269,12 @@ public class RgbForm : RForm
 				_modeSyncTimer?.Stop();
 				_modeSyncTimer?.Dispose();
 				_rgb.DeviceLost -= OnRgbDeviceLost;
+				// ⭐ 2026-10-19：退订亮度实际值事件（静态 hw 活得比本窗久 ⇒ 必须退订防泄漏）
+				if (_brightnessSource != null)
+				{
+					_brightnessSource.KeyboardBrightnessApplied -= OnKeyboardBrightnessApplied;
+					_brightnessSource = null;
+				}
 				Interlocked.Increment(ref _gcuBrightGen);
 				if (_gcuBrightLock.Wait(1000))
 				{
@@ -319,6 +355,105 @@ public class RgbForm : RForm
 		_hidPanel.Enabled = enabled;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：
+	/// 打开键盘灯设置（本窗）时**排队一次**宝龙达键盘灯能力探测 ✅。
+	/// <para>⭐ 探测本体（写 WMI 16/18 + 回读 + try/finally 恢复）在
+	/// <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 里**只跑一次并缓存**；
+	/// 本方法只负责"后台线程触发 + 完成后回 UI 重建面板"（滑块范围 / 彩虹显隐随之收敛）✅。</para>
+	/// <para>⚠️ 必须后台线程：探测含多次 WMI 往返（约 &lt; 1s），⛔ 不阻塞窗口 ✅。</para>
+	/// </summary>
+	private void KickKeyboardCalibration()
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null || !hw.UsesBaolongda || hw.KeyboardLightingCaps != null)
+		{
+			return;
+		}
+		if (Interlocked.Exchange(ref _kbdCalibrationQueued, 1) != 0)
+		{
+			return;
+		}
+		Task.Run(delegate
+		{
+			try
+			{
+				hw.EnsureKeyboardLightingCalibration();
+				if (IsDisposed || Disposing || !IsHandleCreated)
+				{
+					return;
+				}
+				BeginInvoke(new Action(delegate
+				{
+					if (IsDisposed || Disposing)
+					{
+						return;
+					}
+					// ⭐ 探测可能改变亮度上限（也可能把 Rainbow 从效果表去掉）⇒ 重建参数面板 ✅
+					if (IsGcuKeyboardFallback())
+					{
+						BuildGcuFirmwareParams();
+					}
+					// ⭐ 设置界面的键盘效果下拉也要按新能力位收敛（彩虹不可用 ⇒ 动态去掉）✅
+					Program.settingsForm?.RefreshKeyboardEffectComboAfterCalibration();
+				}));
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteError("[kbd-cal] 键盘灯自校准（RGB 窗口触发）异常（已吞掉）：" + ex.Message);
+			}
+		});
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「亮度拖到最大没反应/回弹」）：硬件**回读到的实际亮度**到达 ✅。
+	/// <para>⚠️ 事件可能来自后台线程 ⇒ 必须 <c>BeginInvoke</c> 回 UI 线程再动控件 ✅。</para>
+	/// </summary>
+	private void OnKeyboardBrightnessApplied(int actualLevel)
+	{
+		if (IsDisposed || Disposing || !IsHandleCreated)
+		{
+			return;
+		}
+		BeginInvoke(new Action(delegate
+		{
+			ApplyActualKeyboardBrightness(actualLevel);
+		}));
+	}
+
+	/// <summary>
+	/// ⭐ 把滑块/标签**改成实际生效值**（⭐ 这是机主要的"如实显示"，⛔ 不是用户拖到的值）✅。
+	/// <para>⚠️ 实际值 &lt; 滑块下限（= 关灯，0）⇒ **不动滑块**：那是开关的语义，
+	/// ⛔ 不把"关"硬画成"1 档"误导用户 ✅。</para>
+	/// </summary>
+	private void ApplyActualKeyboardBrightness(int actualLevel)
+	{
+		RSlider slider = _brightSlider;
+		Label label = _brightValueLabel;
+		if (slider == null || slider.IsDisposed || label == null || label.IsDisposed)
+		{
+			return;
+		}
+		if (actualLevel < slider.Minimum)
+		{
+			return;
+		}
+		int shown = Math.Clamp(actualLevel, slider.Minimum, slider.Maximum);
+		if (slider.Value != shown)
+		{
+			_syncingBrightnessUi = true;
+			try
+			{
+				slider.Value = shown;
+			}
+			finally
+			{
+				_syncingBrightnessUi = false;
+			}
+		}
+		label.Text = shown + "/" + _brightMaximum;
+	}
+
 	private bool IsGcuKeyboardFallback()
 	{
 		// ⭐⭐ 2026-10-17（真机反馈「30 键盘灯光菜单里没有颜色选项」）：
@@ -353,7 +488,7 @@ public class RgbForm : RForm
 		//      ⛔ 不再把不存在的模式 3 当选项显示/下发 ✅；⚠️ 非宝龙达原样返回 ⇒ 逐位不变 ✅
 		if (Program.hw?.UsesBaolongda == true)
 		{
-			settings = settings with { Effect = BaolongdaProfile.NormalizeKeyboardEffect(settings.Effect) };
+			settings = settings with { Effect = MechrevoHw.NormalizeKeyboardLightingEffect(settings.Effect) };
 		}
 		return settings;
 	}
@@ -379,7 +514,7 @@ public class RgbForm : RForm
 		}
 		// ⭐ 2026-10-17（宝龙达 · Manual 已撤掉）：⭐ 亮度/颜色操作会把这个效果 Id 写回配置，
 		//   ⛔ 不要因为它来自 stats/GCU 就绕过收敛 ⇒ ⭐ 宝龙达下一律回到可写三项 ✅
-		return (Program.hw?.UsesBaolongda == true) ? BaolongdaProfile.NormalizeKeyboardEffect(effect) : effect;
+		return (Program.hw?.UsesBaolongda == true) ? MechrevoHw.NormalizeKeyboardLightingEffect(effect) : effect;
 	}
 
 	private void PersistGcuLightAndPublishBrightness(int light0to4)
@@ -509,25 +644,31 @@ public class RgbForm : RForm
 		table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, (_paramLabelCol > 0) ? _paramLabelCol : D(96)));
 		table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 		int row = 0;
-		// 2026-10-17 (真机: 4070 键盘灯亮度调不了): 宝龙达硬件亮度只有 0~3
-		// (BaolongdaBrightnessFromUi 把 >3 夹到 3), 而滑块原来是 0~4 => 第4档和第3档完全相同
-		// => 宝龙达下上限收到 3; 非宝龙达仍是 0~4 (逐位不变)
-		// 40/50 系：亮度 0~4 五档（第三方 JiaoLong7.3 WMIRGBKeyboardBrightnessLevel.Level_4 可证）；
-		// 30 系：目前只确认到 0~3；非宝龙达（GCU）仍 0~4 => 逐位不变
-		bool bd40 = Program.hw?.UsesBaolongda == true
-			&& (Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40 || Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen50);
-		int brightMax = !(Program.hw?.UsesBaolongda ?? false) ? 4 : (bd40 ? 4 : 3);
+		// ⭐⭐ 2026-10-19（机主要求「运行时自校准」+ 机主实测纠正）：
+		//   ⭐ 宝龙达键盘亮度**只有 0/1/2/3 四档**（最大 3）；旧代码按 Gen40 给到 4
+		//     ⇒ 滑块能拖到第 5 档、但固件不支持 ⇒ 表现为「最大亮度不能用」❌
+		//   ⭐ 现在范围 = **1..本机探测上限**（探测失败退回声明值 3；⛔ 不再写死 3/4）——
+		//     下限取 1：硬件 0 = 灭（开/关由设置界面的开关负责），⛔ 不让"调暗"变成"关灯"。
+		//   ⚠️ 非宝龙达（GCU）仍是 0~4 ⇒ 逐位不变 ✅
+		bool baolongda = Program.hw?.UsesBaolongda ?? false;
+		int brightMin = baolongda ? 1 : 0;
+		int brightMax = baolongda
+			? Math.Max(brightMin, MechrevoHw.EffectiveKeyboardBrightnessMax())
+			: 4;
+		_brightMinimum = brightMin;
+		_brightMaximum = brightMax;
+		int initialBrightLevel = Math.Clamp(lightChannelSettings.Light, brightMin, brightMax);
 		_brightSlider = new RSlider
 		{
-			Minimum = 0,
+			Minimum = brightMin,
 			Maximum = brightMax,
-			Value = Math.Clamp(lightChannelSettings.Light, 0, brightMax),
+			Value = initialBrightLevel,
 			MinimumSize = new Size(D(104), D(20)),
 			Height = D(24)
 		};
-		Label brightValueLabel = new Label
+		_brightValueLabel = new Label
 		{
-			Text = Math.Clamp(lightChannelSettings.Light, 0, brightMax) + "/" + brightMax,
+			Text = initialBrightLevel + "/" + brightMax,
 			AutoSize = true,
 			ForeColor = UiVisualStyle.Muted,
 			Margin = new Padding(D(6), 0, 0, 0)
@@ -540,12 +681,17 @@ public class RgbForm : RForm
 			AutoSizeMode = AutoSizeMode.GrowAndShrink
 		};
 		brightPanel.Controls.Add(_brightSlider);
-		brightPanel.Controls.Add(brightValueLabel);
+		brightPanel.Controls.Add(_brightValueLabel);
 		_brightSlider.ValueChanged += (object? _, EventArgs _) =>
 		{
-			int brightLevel = Math.Clamp(_brightSlider.Value, 0, brightMax);
+			// ⭐ 程序化回写（显示实际生效值）时⛔ 不再触发一次下发，防回环 ✅
+			if (_syncingBrightnessUi)
+			{
+				return;
+			}
+			int brightLevel = Math.Clamp(_brightSlider.Value, _brightMinimum, _brightMaximum);
 			PersistGcuLightAndPublishBrightness(brightLevel);
-			brightValueLabel.Text = brightLevel + "/" + brightMax;
+			_brightValueLabel.Text = brightLevel + "/" + _brightMaximum;
 		};
 		AddRow(Strings.Brightness, brightPanel);
 		if (string.Equals(lightChannelSettings.Effect, "Manual", StringComparison.Ordinal))
