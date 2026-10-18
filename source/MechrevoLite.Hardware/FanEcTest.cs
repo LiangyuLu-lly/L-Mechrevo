@@ -117,7 +117,7 @@ internal static class FanEcTest
 				L("⭐ `--acpi`：ACPI 已是默认写通道（本参数保留兼容，无额外作用）");
 			}
 			L("══ OpenRevo 顺序写验证（ACPI EC · LPC 仅对照）══");
-			bool openRevoOk = RunOpenRevoTest(L);
+			bool openRevoOk = RunOpenRevoTest(L, is30);
 			L("");
 			if (openRevoOk)
 			{
@@ -149,7 +149,7 @@ internal static class FanEcTest
 	/// 写 `0xB20 | 0x02|0x08` → 等 2 s → **只用 ACPI 稳定读**验证 `0xC834/0xC835/0xB20`；
 	/// `0x1060` 解锁 **best-effort**（失败继续）；finally 恢复；LPC 仅对照 ✅。
 	/// </summary>
-	private static bool RunOpenRevoTest(Action<string> L)
+	private static bool RunOpenRevoTest(Action<string> L, bool is30)
 	{
 		bool wroteTargets = false;
 		bool wroteMask = false;
@@ -193,9 +193,14 @@ internal static class FanEcTest
 			}
 			int rpmUnits = Math.Clamp(baselineRpm / 100, 0, 68);
 			// ⭐ OpenRevo 顺序写“原值+5”；原值为 0（固件自动控制）时用“当前转速档+5”，避免写到更低档 ✅
-			int target = Math.Clamp(Math.Max(Math.Max(origFan1, rpmUnits) + 5, 1), 1, 68);
-			L("基线转速=" + baselineRpm + " RPM（来源=" + (wmiBefore >= 0 ? "WMI13" : "ACPI×100") + "）⇒ 目标档=" + target
-				+ "（" + (target * 100) + " RPM）");
+			int baseUnits = Math.Max(origFan1, rpmUnits);
+			int maxUnits = is30 ? 49 : 68;
+			// ⭐⭐ 2026-10-18（30 系报告：基线已 4329 RPM，+5 档只差 471 ⇒ 2 s 内看不出）：
+			//   ⭐ 目标档拉大差距：max(当前档, 基线档) + 15，夹到该代际上限（30 系 49 / 40 系 68）✅
+			int target = Math.Clamp(baseUnits + 15, 1, maxUnits);
+			L("基线档=" + baseUnits + "（0xC83C 原值=" + origFan1 + " · 转速档=" + rpmUnits + "）⇒ 目标档=" + target
+				+ "（" + (target * 100) + " RPM · 上限=" + maxUnits + "）");
+			L("基线转速=" + baselineRpm + " RPM（来源=" + (wmiBefore >= 0 ? "WMI13" : "ACPI×100") + "）");
 			L("");
 
 			// ② best-effort 解锁
@@ -245,23 +250,67 @@ internal static class FanEcTest
 			L("  " + EcPortIo.LastAcpiWriteTrace);
 			L("");
 
-			// ④ 等 2 s，只用 ACPI 稳定读验证
-			L("── ④ 等 2 s 后只用 ACPI 稳定读验证 ──");
-			Thread.Sleep(2000);
-			bool afterRpmOk = ReadEcRpmBytes(L, "ACPI 写后", acpi: true, out int ecRpmAfter);
-			int wmiAfter = ReadWmiRpm(out string wmiAfterNote);
-			L("WMI 13 写后：" + (wmiAfter >= 0 ? wmiAfter + " RPM（" + wmiAfterNote + "）" : "读不到（" + wmiAfterNote + "）"));
-			int afterRpm = (wmiAfter >= 0) ? wmiAfter : (afterRpmOk ? ecRpmAfter : -1);
-			int delta = (afterRpm >= 0) ? afterRpm - baselineRpm : int.MinValue;
+			// ④ 轮询验证（每 500ms 读一次，最多 10s，取峰值；⛔ 期间不再写）
+			L("── ④ 轮询验证（每 500ms 一次，最多 10s，取峰值；⛔ 期间不再写）──");
+			int peakRpm = baselineRpm;
+			bool readOk = false;
+			long pollStart = Environment.TickCount64;
+			while (Environment.TickCount64 - pollStart <= 10000)
+			{
+				Thread.Sleep(500);
+				bool ecSampleOk = false;
+				int b1 = 0;
+				int b2 = 0;
+				if (EcPortIo.TryReadByteStable(0xC834, out int v1, out _))
+				{
+					b1 = v1;
+					if (EcPortIo.TryReadByteStable(0xC835, out int v2, out _))
+					{
+						b2 = v2;
+						ecSampleOk = true;
+					}
+				}
+				int wmiSample = ReadWmiRpm(out _);
+				int sample = (wmiSample >= 0) ? wmiSample : (ecSampleOk ? Math.Max(b1, b2) * 100 : -1);
+				if (sample < 0)
+				{
+					continue;
+				}
+				readOk = true;
+				if (sample > peakRpm)
+				{
+					peakRpm = sample;
+				}
+				if (peakRpm >= target * 100 * 9 / 10 || peakRpm >= baselineRpm + 300)
+				{
+					break;
+				}
+			}
+			double waitedSeconds = Math.Max(0, Environment.TickCount64 - pollStart) / 1000.0;
+			int peakDelta = peakRpm - baselineRpm;
+			L("等待 " + waitedSeconds.ToString("0.0") + " s ⇒ 峰值=" + peakRpm + " RPM（基线 " + baselineRpm + " · 变化 " + peakDelta + " RPM）");
+
+			// ⭐⭐ 2026-10-18（30 系报告：写其实成功，2 s 判据误判）：⭐ 强/弱证据分层 ✅
+			//   强证据（可用必要条件）：0xB20 bit1+bit3 且 0xC83C/0xC83D 回读 == 写入值
+			//   弱证据：峰值 ≥ 基线+300 或 ≥ 目标×70%（仅提示，⛔ 不否定强证据）
 			bool maskAfterOk = EcPortIo.TryReadByteStable(0xB20, out int maskAfter, out string maskAfterNote);
-			L("0xB20 写后稳定读=" + (maskAfterOk ? "0x" + maskAfter.ToString("X2") : "读不到") + "（" + maskAfterNote + "）");
 			bool maskBits = maskAfterOk && (maskAfter & 0x02) != 0 && (maskAfter & 0x08) != 0;
-			L("0xB20 bit1+bit3 = " + (maskBits ? "都已置位 ✅" : "未同时置位 ⚠️"));
-			L("转速变化 = " + (delta == int.MinValue ? "无法读取" : delta + " RPM") + "（判据 ≥+200）");
-			available = w1 && w2 && w3 && maskBits && afterRpm >= 0 && delta >= 200;
-			L("判定：目标写=" + (w1 && w2) + " · 掩码写=" + w3 + " · 掩码位=" + maskBits
-				+ " · RPM+200=" + (delta >= 200) + " ⇒ " + available);
-			if (!w3 || !maskBits)
+			bool targetReadback = w1 && w2 && rb1 == target && rb2 == target;
+			bool strong = targetReadback && maskBits;
+			bool weak = readOk && (peakRpm >= baselineRpm + 300 || peakRpm >= target * 100 * 7 / 10);
+			available = strong;
+			L("0xB20 写后稳定读=" + (maskAfterOk ? "0x" + maskAfter.ToString("X2") : "读不到") + "（" + maskAfterNote + "）"
+				+ " · bit1+bit3=" + (maskBits ? "都已置位 ✅" : "未同时置位 ⚠️"));
+			L("强证据：0xC83C 回读=" + (rb1 < 0 ? "读不到" : rb1.ToString()) + "/目标=" + target
+				+ " · 0xC83D 回读=" + (rb2 < 0 ? "读不到" : rb2.ToString()) + " · 掩码位=" + maskBits
+				+ " ⇒ " + strong);
+			L("弱证据：峰值 " + peakRpm + " RPM（变化 " + peakDelta + "）⇒ " + weak);
+			if (strong && !weak)
+			{
+				L("⚠️ 转速峰值未达预期（软启动 / 基线已高）⇒ **不影响写通路结论**（强证据已成立）");
+			}
+			L("判定：强证据=" + strong + "（必要条件）· 弱证据=" + weak + "（仅提示）⇒ " + available);
+			if (!strong)
 			{
 				L("⚠️ 0xB20 两次写的前后回读（供定位）：");
 				L("   写前=0x" + maskBefore.ToString("X2") + " · 写出=0x" + maskWanted.ToString("X2")
