@@ -12006,6 +12006,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			MessageBox.Show(Strings.GpuModeUnsupported, "L-Mechrevo", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			return;
 		}
+		// ⭐⭐ 2026-10-19（机主：切走再切回同一模式仍显示黄色高亮）：
+		//   ⭐ 判据 = **选择 == 当前生效模式**（取源与原逻辑一致：`ResolveHighlightedGpuMode(-1)`
+		//      = 能力位/厂商回显；宝龙达没有 GCU 时按当前实际路由判定）⇒ **蓝色（无待应用）** ✅
+		//   ⭐ 切走再切回（等于原模式）⇒ 清掉 pending ⇒ 恢复蓝色，⛔ 不再误显示黄色待重启 ✅
+		//   ⚠️ 仅宝龙达分支（GCU/同方路径逐位不变）✅
+		int currentEffective = ResolveHighlightedGpuMode(-1);
+		if (currentEffective == targetMode)
+		{
+			ClearGpuRestartPending();
+			VisualiseGPUMode();
+			LogGpuModeHighlight(targetMode, currentEffective, pending: false);
+			return;
+		}
 		int backendMode = ((targetMode == 2) ? BaolongdaWmi.GpuModeDiscrete : BaolongdaWmi.GpuModeHybrid);
 		bool ok = hw.TrySetGpuModeViaBackend(backendMode, out bool confirmed);
 		Logger.WriteLine($"宝龙达 显卡模式切换：⭐ 界面={targetMode}（{modeName}）⇒ ⭐ 后端功能号 9={backendMode}"
@@ -12042,6 +12055,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//   ⭐ 语义：⭐ 宝龙达的「应用」＝ ⭐ **它自己的固件下次开机读功能号 9** ✅
 		//      ⇒ ⭐ ⛔ 不需要 GCU 的重启路由 ✅
 		MarkGpuRestartPending(targetMode);
+		LogGpuModeHighlight(targetMode, currentEffective, pending: true);
 		Logger.WriteLine("宝龙达 显卡模式切换：⭐ 已写入功能号 9 ⇒ ⭐ 记为「待重启生效」"
 			+ "（⭐ 宝龙达不走 GCU 重启路由 ⇒ ⭐ 请用户在方便时手动重启 ✅）");
 		// ⭐⭐ 2026-10-16（0.291.9.3 · 机主真机反馈「⭐ 显卡模式切换后没有重启提示，⭐ 我也不知道切换成功没」⚠️）：
@@ -12109,6 +12123,22 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	private static bool HasPendingGpuRestart()
 	{
 		return GpuRestartVerifier.HasPendingThisBoot();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：切走再切回同一模式仍显示黄色高亮）：⭐ GPU 模式高亮的**判据日志**（去重）✅。
+	/// <para>判据：`选中 == 当前生效` ⇒ **蓝色**（无待应用）；不等 ⇒ 黄色（待应用/待重启）。</para>
+	/// </summary>
+	private static void LogGpuModeHighlight(int selectedMode, int currentMode, bool pending)
+	{
+		string selectedName = ((selectedMode >= 0) ? GpuRestartVerifier.ModeName(selectedMode) : "未知");
+		string currentName = ((currentMode >= 0) ? GpuRestartVerifier.ModeName(currentMode) : "未知");
+		string message = "[igpu] GPU 模式高亮：选择=" + selectedName + " · 当前=" + currentName
+			+ " ⇒ " + (pending ? "黄色（待应用）" : "蓝色（无待应用）");
+		if (Logger.TryMarkChanged("gpu-mode-highlight", message))
+		{
+			Logger.WriteError(message);
+		}
 	}
 
 	private static void ClearGpuRestartPending()
@@ -12746,7 +12776,21 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			int pendingTarget = GpuRestartVerifier.PendingTarget;
 			if (pendingTarget >= 0)
 			{
-				num = pendingTarget;
+				// ⭐⭐ 2026-10-19（机主：切走再切回同一模式仍显示黄色高亮）：
+				//   ⭐ 若"待生效目标" == **当前生效模式**（取源同上，⛔ 不受 hint 影响）⇒ 等于没变化 ⇒
+				//      清掉 pending、**恢复蓝色**（⛔ 不再误显示黄色待重启）✅
+				//   ⚠️ 只对宝龙达生效（GCU/同方待重启语义逐位不变）✅
+				int currentEffectiveMode = ResolveHighlightedGpuMode(-1);
+				if ((Program.hw?.UsesBaolongda ?? false) && pendingTarget == currentEffectiveMode)
+				{
+					ClearGpuRestartPending();
+					restartPending = false;
+					LogGpuModeHighlight(pendingTarget, currentEffectiveMode, pending: false);
+				}
+				else
+				{
+					num = pendingTarget;
+				}
 			}
 		}
 		ButtonEnabled(buttonEco, flag2);
