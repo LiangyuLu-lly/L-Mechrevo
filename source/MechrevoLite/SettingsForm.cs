@@ -814,6 +814,16 @@ public class SettingsForm : RForm
 
 	private bool _syncingDisplay;
 
+	// ⭐⭐ 2026-10-19（机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）：
+	//   设置窗**构建分段计时**（只打一次；默认级别可见）—— 先量再改 ✅
+	//   · `_uiBuildPerfMs` / `_uiBuildLightMs` 由 BuildDashboardLayout 内部累加（性能组 / 灯光组）；
+	//   · `_uiBuildLogOnce` 保证同一进程只落一行（多实例/重入不刷屏）。
+	private long _uiBuildPerfMs;
+
+	private long _uiBuildLightMs;
+
+	private static int _uiBuildLogOnce;
+
 	// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
 	//   构造期这两个控件是**局部变量**（定时器靠闭包访问）⇒ 现在提到字段，供「只读同步」复用。
 	//   · `_brightnessSlider` / `_brightnessValueLabel`：滑块与百分比标签；
@@ -5588,8 +5598,16 @@ public class SettingsForm : RForm
 
 	public SettingsForm()
 	{
+		// ⭐⭐ 2026-10-19（机主：设置窗加载太多）：构建分段计时（先量再改；只打一次）✅
+		Stopwatch uiBuildTotal = Stopwatch.StartNew();
+		long uiBuildInitMs = 0L;
+		long uiBuildDisplayMs = 0L;
+		long uiBuildOtherMs = 0L;
+		Stopwatch uiBuildPhase = Stopwatch.StartNew();
 		BackColor = UiVisualStyle.Window;
 		InitializeComponent();
+		uiBuildInitMs = uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：写入改成**节流合并**（拖动期 ~120ms 一次 + 松手补最终值）；
 		//   写后回读在后台线程执行 ⇒ ⛔ 不阻塞 UI。日志：`[brightness] 写（节流合并 n 次）请求=… ⇒ 实际=…`
 		_brightnessCommitQueue = new BrightnessCommitQueue(WriteBrightnessValueAsync, TimeSpan.FromMilliseconds(120L), (Exception ex) =>
@@ -6031,11 +6049,17 @@ public class SettingsForm : RForm
 		donateControl.Init();
 		labelBacklight.ForeColor = RForm.colorStandard;
 		labelBacklight.Click += LabelBacklight_Click;
+		uiBuildPhase.Restart();
 		BuildOfficialConsolePanel();
 		BuildIgpuOnlyUiPanel();
+		uiBuildDisplayMs += uiBuildPhase.ElapsedMilliseconds;
 		// 2026-10-09（lightsplit）：设置对话框里的**两个**按行三选行（灯带行 / Logo 灯行；灯光组本身恢复原样，只有行 + 通道汇总）。
+		uiBuildPhase.Restart();
 		BuildLightRowUiPanels();
+		uiBuildOtherMs += uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		BuildDashboardLayout();
+		uiBuildOtherMs += uiBuildPhase.ElapsedMilliseconds;
 		// 2026-10-09（UI 打磨③，用户原话「这种长条的能不能拆成和Ghelper一样独立的呢」）：
 		// BuildDashboardLayout 里的 MakeCompactModeButton 会把性能/显卡两行按钮的 Margin 清成 Empty
 		// （那是"拼成一条长条"时代的写法），会把上面下发过的拆条 Margin 抹掉；而运行时那两次
@@ -6056,7 +6080,23 @@ public class SettingsForm : RForm
 		// 与 Program.hw != null（软重载、能力位变化回调、任何已有硬件的重入）都照旧全量刷新。
 		if (Program.UiAuditMode || Program.hw != null)
 		{
+			uiBuildPhase.Restart();
 			RefreshDeviceCapabilities();
+			uiBuildDisplayMs += uiBuildPhase.ElapsedMilliseconds;
+		}
+		// ⭐⭐ 2026-10-19（机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）：
+		//   ⭐ 分段耗时日志（**只打一次**、默认级别可见）—— 先拿证据再改，⛔ 不猜 ✅
+		//   · 基础 = 总计 − 灯光组 − 性能 − 显示/核显；外设电量在构建阶段**不执行**（后台刷新）。
+		uiBuildTotal.Stop();
+		long uiBuildTotalMs = uiBuildTotal.ElapsedMilliseconds;
+		long uiBuildLightMs = _uiBuildLightMs;
+		long uiBuildPerfMs = _uiBuildPerfMs;
+		long uiBuildBaseMs = Math.Max(0L, uiBuildTotalMs - uiBuildLightMs - uiBuildPerfMs - uiBuildDisplayMs);
+		if (Interlocked.Exchange(ref _uiBuildLogOnce, 1) == 0)
+		{
+			Logger.WriteError($"[ui-build] 分段耗时：基础={uiBuildBaseMs} ms · 灯光组={uiBuildLightMs} ms · 性能={uiBuildPerfMs} ms"
+				+ $" · 外设电量=0 ms（构建阶段不执行，已改后台） · 显示/核显={uiBuildDisplayMs} ms · 总计={uiBuildTotalMs} ms"
+				+ $"（InitializeComponent={uiBuildInitMs} ms · 其它构建={uiBuildOtherMs} ms · 来源=设置窗构造）");
 		}
 	}
 
@@ -6751,7 +6791,10 @@ public class SettingsForm : RForm
 		// 2026-10-08（下拉改矮）：行高常量收到 D(26)，这里同步 +D(26)。
 		_perfHeightWithConfig = D(66) + D(26);
 		// 2026-10-04：30 系「模式 × 配置」—— 性能按钮下方横排三个配置下拉
+		// ⭐ 分段计时：性能组（配置行）
+		Stopwatch uiPerfPhase = Stopwatch.StartNew();
 		BuildPerfConfigRow(D);
+		_uiBuildPerfMs += uiPerfPhase.ElapsedMilliseconds;
 		tableGPU.AutoSize = false;
 		tableGPU.RowStyles.Clear();
 		tableGPU.RowCount = 1;
@@ -6912,7 +6955,9 @@ public class SettingsForm : RForm
 		}
 		_officialConsolePanel.Height = D(48);
 		BuildThemeModePanel(D);
+		uiPerfPhase.Restart();
 		BuildTelemetryRow();
+		_uiBuildPerfMs += uiPerfPhase.ElapsedMilliseconds;
 		control.Dock = DockStyle.Top;
 		_liquidGroup = new RCollapseGroup(Strings.LiquidCoolingShort, UiGlyph.Kind.Droplet, "group_lc_open", defaultExpanded: false, showDivider: true);
 		_liquidGroup.SetContent(control);
@@ -6950,7 +6995,10 @@ public class SettingsForm : RForm
 			UpdateDashboardWindowHeight();
 			UpdateDashboardScroll();
 		};
+		// ⭐ 分段计时：灯光组（键盘/灯带/Logo/铰链/同步行）
+		Stopwatch uiLightPhase = Stopwatch.StartNew();
 		BuildLightRowsPanel();
+		_uiBuildLightMs += uiLightPhase.ElapsedMilliseconds;
 		BuildGcuStatusStrip(D);
 		_unsupportedModelBanner = new BufferedPanel
 		{
