@@ -3596,6 +3596,31 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// ⭐⭐ 2026-10-19（软件彩虹生命周期）：⭐ 关灯 ⇒ **先停掉后台刷色** ✅
 				//   （否则刷色循环会在关灯后继续写 17，表现为"关不掉/自己又亮" ❌）
 				StopKeyboardRainbow();
+				// ⭐⭐ 2026-10-19（机主：30 系「关灯不行」）：关灯也走 **EC 0x1807=0x00**
+				//   ⚠️ 之前保留 WMI `18=0` 是因为"关灯曾经成功过"，但实测证明它不稳定/固件忽略
+				//   ⇒ 30 系统一走 EC（与档位 1/2/3 同一套：读→写→回读→失败再试 LPC→不重试）✅
+				//   ⚠️ 40 系/其它机型仍走下面的原 WMI `18=0` 路径，⛔ 不进 EC 分支 ✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen30)
+				{
+					LogKeyboardLightingState(wmi, "关灯前");
+					bool ecOffOk = KeyboardEcBrightness.TrySetLevel(0, wmi, out int ecOffReadback, out int ecOffWmi18);
+					confirmed = ecOffOk;
+					if (ecOffOk)
+					{
+						RecordKeyboardBrightnessApplied(0);
+					}
+					else
+					{
+						RecordAppliedKeyboardBrightness(wmi, requestedLevel: 0);
+					}
+					Logger.WriteError("宝龙达 键盘灯：⭐ 30 系关灯走 EC 0x1807："
+						+ (ecOffOk ? "成功" : "失败（不重试）")
+						+ $" · 回读={(ecOffReadback >= 0 ? "0x" + ecOffReadback.ToString("X2") : "读不到")}"
+						+ $" · WMI18={(ecOffWmi18 >= 0 ? ecOffWmi18.ToString() : "读不到")}"
+						+ " · ③ ⚠️ 灯是否真的灭了 —— **我们测不到，需目视确认** ⚠️");
+					LogKeyboardLightingState(wmi, "关灯后");
+					return true;
+				}
 				// ── ⭐ 关灯：⭐ 写亮度 0（⭐ 功能号 18）✅ —— ⚠️ 不再尝试模式 0（⭐ 已被真机否定 ❌）──
 				LogKeyboardLightingState(wmi, "关灯前");
 				if (!wmi.TrySetKeyboardBrightness(0))
