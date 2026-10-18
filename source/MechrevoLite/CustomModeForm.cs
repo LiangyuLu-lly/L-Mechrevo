@@ -3045,6 +3045,20 @@ public class CustomModeForm : RForm
 					_status.ForeColor = UiVisualStyle.Muted;
 				}
 			}
+			// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性③）：
+			//   ⭐ 把 **UI 控件值 → 待下发字段** 的真实映射落一行（默认级别可见）✅
+			//   ⚠️ 只在这一批确实带 GPU 超频字段时打 ⇒ 平时改 PL/温度墙不刷屏 ✅
+			if ((Program.hw?.UsesBaolongda ?? false)
+				&& (fields.ContainsKey("OverClockingSwitch") || fields.ContainsKey("GpuCoreClockOffsetOC") || fields.ContainsKey("GpuMemoryClockOffsetOC")))
+			{
+				string ocOnText = fields.TryGetValue("OverClockingSwitch", out string ocOnValue) ? ocOnValue : "(未改)";
+				string coreFieldText = fields.TryGetValue("GpuCoreClockOffsetOC", out string coreFieldValue) ? coreFieldValue : "(未改)";
+				string memFieldText = fields.TryGetValue("GpuMemoryClockOffsetOC", out string memFieldValue) ? memFieldValue : "(未改)";
+				Logger.WriteError("[gpu-oc] 应用请求（UI→字段）：开关=" + ocOnText + " · core=" + coreFieldText + " · mem=" + memFieldText
+					+ " · 滑块 core=" + _coreOc.Value + " mem=" + _memOc.Value
+					+ " · 偏移可调 core=" + _gpuOcCoreAdjustable + " mem=" + _gpuOcMemoryAdjustable
+					+ " · 偏移脏=" + offsetsPending);
+			}
 			PerfApplyOutcome? outcome = null;
 			bool confirmed = true;
 			bool applied = false;

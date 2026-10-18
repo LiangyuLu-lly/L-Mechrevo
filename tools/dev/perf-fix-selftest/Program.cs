@@ -27,6 +27,10 @@ internal static class Program
 		CheckSmuPowerRowOrderAndNoIndependentFppt();
 		CheckPlannerEmitsGpuOverclockOnFirmwareSlotForBaolongda();
 		CheckPlannerKeepsGcuStepsUnchanged();
+		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 根因②）：
+		//   D = "应用"是否走硬件下发的纯判据：宝龙达自定义档**不是当前激活档也要下发**；
+		//       非宝龙达保持旧口径（只有当前激活档才下发）⇒ GCU 行为逐位不变。
+		CheckLocalApplyGateForBaolongdaCustom();
 		Console.WriteLine(_fail == 0 ? "ALL OK" : $"{_fail} FAILED");
 		return (_fail == 0) ? 0 : 1;
 	}
@@ -220,6 +224,17 @@ internal static class Program
 			}
 		}
 		return -1;
+	}
+
+	private static void CheckLocalApplyGateForBaolongdaCustom()
+	{
+		// D：宝龙达自定义档即使不是"当前激活档"也允许本机下发（GPU 超频/PL/曲线才能真正执行）；
+		//    非宝龙达（GCU/老接口）保持旧口径：只有当前激活档才下发 ⇒ 逐位不变。
+		Expect("D1 baolongda custom inactive => apply", PerfApplyGate.ShouldApplyLocalCustom(usesBaolongda: true, isCustom: true, isActive: false));
+		Expect("D2 baolongda custom active => apply", PerfApplyGate.ShouldApplyLocalCustom(usesBaolongda: true, isCustom: true, isActive: true));
+		Expect("D3 non-baolongda inactive => no apply (old gate)", !PerfApplyGate.ShouldApplyLocalCustom(usesBaolongda: false, isCustom: true, isActive: false));
+		Expect("D4 non-baolongda active => apply (old gate)", PerfApplyGate.ShouldApplyLocalCustom(usesBaolongda: false, isCustom: true, isActive: true));
+		Expect("D5 baolongda builtin inactive => no apply (custom only)", !PerfApplyGate.ShouldApplyLocalCustom(usesBaolongda: true, isCustom: false, isActive: false));
 	}
 
 	private static void CheckPlannerEmitsGpuOverclockOnFirmwareSlotForBaolongda()

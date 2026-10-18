@@ -720,6 +720,9 @@ internal sealed class PerfModeService
 			}
 		}
 		IReadOnlyList<PerfApplyStep> readOnlyList = PerfModeApplyPlanner.Build(mode, plan, caps);
+		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
+		//   ⭐ 规划结果（生成/未生成 + 原因）默认级别可见 ✅
+		LogGpuOverclockPlan(mode, plan, caps, readOnlyList);
 		Logger.WriteLine($"PerfModes: activate {mode.Id} ({reason}) route={mode.Route} slot={plan?.SlotIndex.ToString() ?? "-"} write={plan?.NeedsParameterWrite.ToString() ?? "-"} steps={readOnlyList.Count}");
 		Stopwatch elapsed = Stopwatch.StartNew();
 		PerfApplyOutcome outcome;
@@ -969,6 +972,56 @@ internal sealed class PerfModeService
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
+	/// ⭐ **规划结果一行日志**（默认级别可见、去重）：`[gpu-oc] 规划：supports=… · enabled=… · core=… mem=… ⇒ 生成步骤=是/否（原因=…）` ✅
+	/// <para>⚠️ 只在"宝龙达本机直写可用"或"该档确实设了 GPU 超频字段"时打 ⇒ GCU 机型不刷屏 ✅</para>
+	/// </summary>
+	private static void LogGpuOverclockPlan(PerfModeDefinition mode, FirmwareSlotPlan plan, PerfModeCapabilities caps, IReadOnlyList<PerfApplyStep> steps)
+	{
+		PerfModeSettings settings = mode.Settings;
+		if (!caps.SupportsDirectGpuOverclock && !settings.GpuOverclockOn.HasValue && !settings.GpuCoreOffset.HasValue && !settings.GpuMemoryOffset.HasValue)
+		{
+			return;
+		}
+		bool generated = steps.Any((PerfApplyStep s) => s.Kind == PerfApplyStepKind.ApplyGpuOverclock);
+		string reason;
+		if (generated)
+		{
+			reason = "生成";
+		}
+		else if (!caps.SupportsDirectGpuOverclock)
+		{
+			reason = "后端不支持本机直写（旧 GCU 固件字段路径）";
+		}
+		else if (mode.Route != PerfModeRoute.FirmwareSlot)
+		{
+			reason = "路由不是 FirmwareSlot（route=" + mode.Route + "）";
+		}
+		else if (plan == null)
+		{
+			reason = "无槽位计划（slotPlan=null）";
+		}
+		else if (!plan.NeedsParameterWrite)
+		{
+			reason = "本次不需要写参数（NeedsParameterWrite=false）";
+		}
+		else
+		{
+			reason = "该档没有 GPU 超频字段（开关/偏移都未设置）";
+		}
+		string enabledText = settings.GpuOverclockOn.HasValue ? (settings.GpuOverclockOn.Value ? "true" : "false") : "-";
+		string coreText = settings.GpuCoreOffset.HasValue ? settings.GpuCoreOffset.Value.ToString(CultureInfo.InvariantCulture) : "-";
+		string memText = settings.GpuMemoryOffset.HasValue ? settings.GpuMemoryOffset.Value.ToString(CultureInfo.InvariantCulture) : "-";
+		string writeText = (plan == null) ? "-" : plan.NeedsParameterWrite.ToString();
+		string message = "[gpu-oc] 规划：supports=" + caps.SupportsDirectGpuOverclock + " · enabled=" + enabledText + " · core=" + coreText + " · mem=" + memText
+			+ " ⇒ 生成步骤=" + (generated ? "是" : "否") + "（原因=" + reason + " · mode=" + mode.Id + " · route=" + mode.Route + " · write=" + writeText + "）";
+		if (Logger.TryMarkChanged("gpu-oc-plan", message))
+		{
+			Logger.WriteError(message);
+		}
+	}
+
 	private static PerfApplyStep SwitchStepFor(PerfModeDefinition mode, int slot)
 	{
 		if (mode.Route != PerfModeRoute.FirmwareSlot)
@@ -1110,7 +1163,20 @@ internal sealed class PerfModeService
 				}
 				_editCts = editCts;
 			}
-			if (string.Equals(ActiveModeId, mode.Id, StringComparison.Ordinal))
+			// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 根因②）：
+			//   ⭐ 宝龙达**没有固件自定义档** ⇒ 自定义档**永远成不了 `ActiveModeId`**
+			//      （编辑器里选「自定义 N」只切换"正在编辑哪份本机配置"，不切档 ——
+			//       见 CustomModeForm.SelectModeAsync 的宝龙达分支 ⚠️）
+			//   ⭐ 而这里原来只在 `ActiveModeId == mode.Id` 时才走硬件下发 ⇒
+			//      用户点【应用】只把配置存进 `mode_tune_*`、**GPU 超频/PL 等步骤一步都没执行** ❌
+			//      （诊断包实证：日志只有「模式下拉切到 custom1」，grep `gpu-oc` 零命中）
+			//   ⭐ 现在：宝龙达 + 自定义档 ⇒ 即使不是"当前激活档"，`applyHardware=true` 也走下去：
+			//      下面的 `route/flag` 判据会返回 `NeedsActivation=true` ⇒ `UpdateAsync` 转 `ActivateAsync`
+			//      做**本机全量下发**（PL1/PL2/温度墙 → WMI 23；GPU 超频 → NVAPI P0；曲线 → 20/21）✅
+			//   ⚠️ 非宝龙达（GCU / 老接口）⇒ `PerfApplyGate` 恒等价旧口径 ⇒ 条件**逐位不变** ✅
+			bool isActiveMode = string.Equals(ActiveModeId, mode.Id, StringComparison.Ordinal);
+			bool localCustomApply = PerfApplyGate.ShouldApplyLocalCustom(_hw != null && _hw.UsesBaolongda, mode.IsCustom, isActiveMode);
+			if (localCustomApply)
 			{
 				MechrevoHw hw = _hw;
 				if (hw != null && hw.IsConnected)
@@ -1140,6 +1206,11 @@ internal sealed class PerfModeService
 					{
 						Settings = settings2
 					}, plan, Capabilities(), includeSwitch: false, perfModeDefinition.Route);
+					// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：编辑路径同样落规划结果 ✅
+					LogGpuOverclockPlan(perfModeDefinition with
+					{
+						Settings = settings2
+					}, plan, Capabilities(), steps);
 					PerfApplyOutcome perfApplyOutcome;
 					try
 					{

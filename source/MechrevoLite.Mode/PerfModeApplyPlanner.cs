@@ -212,6 +212,10 @@ public static class PerfModeApplyPlanner
 		//   ⭐ 现在：能走本机直写的后端（宝龙达 ⇒ `SupportsDirectGpuOverclock = true`）在 **FirmwareSlot 路由**
 		//     下也生成这一步 ⇒ 与 WMI 功耗墙/风扇曲线那几步同一条自定义档下发链 ✅。
 		//   ⚠️ 默认 false ⇒ GCU / 老接口的步骤列表【逐位不变】✅（它们仍走原来的固件字段/内置档分支）。
+		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
+		//   ⭐ 规划结果（生成/未生成 + 原因）由 **PerfModeService**（唯一有 route/slotPlan/日志上下文的地方）
+		//      在 Build 之后统一落一行默认可见日志 —— 见 `LogGpuOverclockPlan` ✅
+		//   ⚠️ 规划器本身保持**纯函数**（不引日志依赖）⇒ `perf-fix-selftest` 可直接 Link 本文件 ✅
 		if (caps.SupportsDirectGpuOverclock && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite
 			&& (settings.GpuOverclockOn.HasValue || settings.GpuCoreOffset.HasValue || settings.GpuMemoryOffset.HasValue))
 		{

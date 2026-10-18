@@ -189,6 +189,10 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		{
 			int targetCore = (on ? core : 0);
 			int targetMemory = (on ? memory : 0);
+			// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性②）：
+			//   ⭐ **执行入口**先落一行（默认级别可见）：请求值 = 规划步骤真正传下来的值 ✅
+			Logger.WriteError("[gpu-oc] 应用入口（宝龙达 ⇒ NVAPI P0）：on=" + on + " · 请求 core=" + core + " mem=" + memory + "MHz"
+				+ " ⇒ 目标 core=" + targetCore + " mem=" + targetMemory + "MHz");
 			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 先把**驱动回读后端**准备好 ——
 			//   ① 写后校验（`VerifyAsync` ⇒ `DriverGpuOverclockFieldMatches`）只在
 			//      `DirectGpuOverclockBackendPresent` 时才会去回读；② 自定义模式窗口显示的
@@ -196,6 +200,12 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//      真机日志里会出现"写成功但验证读不到"的假象（⛔ 不是写失败，是回读后端没起）。
 			//   ⚠️ 本方法失败也不影响真正的写：下面是独立的 NVAPI P0 通路；异常都在 Ensure 内部吞掉 ✅
 			bool readbackReady = _hw.EnsureDirectGpuOverclock();
+			if (!readbackReady)
+			{
+				// ⭐ 失败要可见（原来 Ensure 只写 info 级日志 ⇒ 默认「仅错误」看不到）✅
+				Logger.WriteError("[gpu-oc] ⚠️ EnsureDirectGpuOverclock=false ⇒ 驱动回读后端未就绪"
+					+ "（NVAPI P0 写入通路不依赖它，下面照写；`VerifyAsync` 的回读校验会按\"读不到\"处理）");
+			}
 			bool ok = NvapiPStates.TrySetP0Offsets(targetCore, targetMemory, out int appliedCore, out int appliedMemory);
 			string detail = NvapiPStates.LastError;
 			// ⭐ 写后回读值**原样进日志**（⭐ 机主需要凭这一行判断"到底写没写进去"）✅

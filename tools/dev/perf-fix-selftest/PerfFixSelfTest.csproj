@@ -25,5 +25,8 @@
     <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeRoute.cs" Link="PerfModeRoute.cs" />
     <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfModeSettings.cs" Link="PerfModeSettings.cs" />
     <Compile Include="..\..\..\source\MechrevoLite.Mode\FirmwareSlotPlan.cs" Link="FirmwareSlotPlan.cs" />
+    <!-- ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」）：D = "应用是否走硬件下发"的纯判据
+         （宝龙达自定义档非激活也要下发；非宝龙达保持旧口径）。纯函数、⛔ 不依赖硬件。 -->
+    <Compile Include="..\..\..\source\MechrevoLite.Mode\PerfApplyGate.cs" Link="PerfApplyGate.cs" />
   </ItemGroup>
 </Project>
