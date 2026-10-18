@@ -5291,7 +5291,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//   * 板号/代际缓存 = 静态判据只读一次注册表。
 	private PawnIO.SmuPowerSnapshot _baolongdaSmuSnapshot;
 	private DateTime _baolongdaSmuSnapshotAt = DateTime.MinValue;
-	private int _baolongda30SeriesCache = -1;
+	// ⭐⭐ 2026-10-18（机主：MRID6 是模具号）：⭐ 板号只读一次缓存（判代际的兜底依据）✅
+	private static string _boardProductForGeneration = string.Empty;
+	private static bool _boardProductForGenerationLoaded;
 
 	/// <summary>
 	/// ⭐ 把**我们自己的**功耗墙范围与本地记忆值填进那些"原本等 GCU 上报"的属性里 ✅
@@ -5335,10 +5337,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>
 	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：本机是不是「**宝龙达 30 系**」—— 蛟龙16 / 裸板号 <c>MRID6</c> /
 	/// 6800H（Rembrandt）。
-	/// <para>⭐ <b>判据（两条并集，任一为真即算）</b>：
-	/// ① 显卡代际 <see cref="DgpuGenerationKind.Gen30" />（3070Ti 等 30 系独显；宝龙达 30 系真机就是这一形态）；
-	/// ② 主板型号 <c>BaseBoardProduct</c> **精确等于** <c>MRID6</c>（⚠️ <c>MRID6-23</c> = 40 系，**不算**；
-	///    <c>MRID6-*</c> 变体也**不算** 30 系 ⇒ 交给 ① 的独显代际判据）。</para>
+	/// <para>⭐ <b>判据（2026-10-18 机主更正：`MRID6` 是模具号，30/40 系共用）</b>：
+	/// ① <b>以 GPU 代际为主</b>：<see cref="DgpuGenerationKind.Gen30" /> ⇒ 30 系；
+	///    <see cref="DgpuGenerationKind.Gen40" /> / <see cref="DgpuGenerationKind.Gen50" /> ⇒ **明确不是 30 系**
+	///    （⭐ 即使板号是 `MRID6` —— 模具号不能当代际）；
+	/// ② **只有代际未知**时才用板号兜底：裸 `MRID6` ⇒ 30 系，其它（含 `MRID6-23`）⇒ 不是。</para>
 	/// <para>⚠️ 为什么必须先要求 <see cref="UsesBaolongda" />：同方 30 系（<c>GM5*</c> 等）**有 GCU**、
 	/// 功耗墙走固件槽，⛔ 不走 SMU —— 它们一个字节都不该受影响。</para>
 	/// <para>⚠️ 为什么 30 系要单独判：30 系原厂 WMI 方法表**只到 18**、没有功能号 23
@@ -5352,32 +5355,38 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return false;
 			}
-			if (DgpuGeneration == DgpuGenerationKind.Gen30)
-			{
-				return true;
-			}
-			int cached = Volatile.Read(ref _baolongda30SeriesCache);
-			if (cached >= 0)
-			{
-				return cached == 1;
-			}
-			bool match = false;
-			try
-			{
-				using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine
-					.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
-				string board = ((key?.GetValue("BaseBoardProduct") as string) ?? string.Empty).Trim();
-				// 裸 `MRID6` = 30 系（2026-10-17 真机：蛟龙16 · 6800H＋3070Ti）；
-				// `MRID6-23` = 40 系 ⇒ 下面这条**故意**用精确比较，不匹配 `MRID6-` 前缀。
-				match = string.Equals(board, "MRID6", StringComparison.OrdinalIgnoreCase);
-			}
-			catch (Exception ex)
-			{
-				Logger.WriteLine("IsBaolongda30Series: 读主板型号失败（按非 30 系处理，安全方向）：" + ex.Message);
-			}
-			Volatile.Write(ref _baolongda30SeriesCache, match ? 1 : 0);
-			return match;
+			DgpuGenerationKind generation = DgpuGeneration;
+			string board = ReadBoardProductForGeneration();
+			bool is30 = BaolongdaProfile.Is30Series(generation, board);
+			// ⭐ 机主要求的去重日志（判代际依据：Gen / 板号兜底）✅
+			Logger.WriteLineIfChanged("board-gen-30series",
+				"[board] 判代际：board=" + (board.Length == 0 ? "(读不到)" : board)
+				+ " · gen=" + generation + " ⇒ 30系=" + is30
+				+ "（依据=" + BaolongdaProfile.Describe30SeriesBasis(generation) + "）");
+			return is30;
 		}
+	}
+
+	/// <summary>⭐ 判代际用的板号（⭐ 只读一次注册表并缓存）✅</summary>
+	private static string ReadBoardProductForGeneration()
+	{
+		if (_boardProductForGenerationLoaded)
+		{
+			return _boardProductForGeneration;
+		}
+		try
+		{
+			using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine
+				.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
+			_boardProductForGeneration = ((key?.GetValue("BaseBoardProduct") as string) ?? string.Empty).Trim();
+		}
+		catch (Exception ex)
+		{
+			_boardProductForGeneration = string.Empty;
+			Logger.WriteLine("判代际：读主板型号失败（按未知板号处理，交给 Gen 判据）：" + ex.Message);
+		}
+		_boardProductForGenerationLoaded = true;
+		return _boardProductForGeneration;
 	}
 
 	/// <summary>

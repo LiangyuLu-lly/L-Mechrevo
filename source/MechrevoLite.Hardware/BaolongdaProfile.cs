@@ -68,6 +68,39 @@ internal static class BaolongdaProfile
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：`MRID6` 是模具号，30/40 系共用）：⭐ **30 系判据以 GPU 代际为主，板号仅兜底** ✅。
+	/// <para>⭐ 规则：`Gen30 ⇒ true`；`Gen40/Gen50 ⇒ false`（即使板号是 `MRID6`）；**只有代际未知**时才看板号：
+	/// 裸 `MRID6` ⇒ true，其它（含 `MRID6-23`）⇒ false ✅</para>
+	/// <para>⚠️ 为什么不能只看板号：参考项目 README 写明 `MRID6/BM5235`，但那是**模具号**；
+	/// 若 40 系机器板号也为 `MRID6`，旧判据会把 40 系误判成 30 系 ⇒ 风扇分母 4900（应为 6000）、
+	/// 强冷档位 49（应为 60）、STAPM 判据也会错 ✅</para>
+	/// <para>⭐ 纯函数（⛔ 不读硬件）⇒ 自检可直接断言 ✅</para>
+	/// </summary>
+	internal static bool Is30Series(DgpuGenerationKind generation, string baseBoardProduct)
+	{
+		if (generation == DgpuGenerationKind.Gen30)
+		{
+			return true;
+		}
+		if (generation == DgpuGenerationKind.Gen40 || generation == DgpuGenerationKind.Gen50)
+		{
+			return false;
+		}
+		// 代际未知 ⇒ 才用板号兜底（且只把裸 MRID6 当 30 系；MRID6-* 是 40 系实测值 ✅）
+		return string.Equals((baseBoardProduct ?? string.Empty).Trim(), "MRID6", StringComparison.OrdinalIgnoreCase);
+	}
+
+	/// <summary>⭐ 30 系判据的“依据”文字（日志/诊断用）✅</summary>
+	internal static string Describe30SeriesBasis(DgpuGenerationKind generation)
+	{
+		if (generation == DgpuGenerationKind.Gen30 || generation == DgpuGenerationKind.Gen40 || generation == DgpuGenerationKind.Gen50)
+		{
+			return "Gen";
+		}
+		return "板号兜底";
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主 30 系 · 按开源蛟龙口径放宽）：⭐ 手动转速的**档位上限**（⭐ 功能号 21 的入参单位
 	/// = `x100 RPM`）⇒ **68 × 100 = 6800 RPM** ✅。
 	/// <para>⭐ 依据：参考自 **JiaolongControl (MIT)** 的 `MAX_FAN_BYTE = 68`（68 × 100 = 6800 RPM），
