@@ -1174,6 +1174,9 @@ internal static class Program
 				hardwareOverlay?.StartOverlay();
 			}
 			GpuRestartVerifier.RunAfterBootAsync(TimeSpan.FromSeconds(8L));
+			// ⭐⭐ 2026-10-19（机主：后端初始化不是设置窗口的功能）：
+			//   ⭐ 启动后空闲再跑（单个后台任务、串行、⛔ 不阻塞 UI、⛔ 不挂在设置窗打开路径）✅
+			ScheduleIdleBackendWarmup();
 		};
 		Application.Idle += deferredInitialization;
 		switch (text)
@@ -3372,17 +3375,18 @@ internal static class Program
 		}
 		Screen screen = Screen.FromRectangle(settingsForm.Bounds);
 		settingsForm.WindowState = FormWindowState.Normal;
-		// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 首次真正打开设置时才做风扇闸门只读验证/启动清理（懒加载、进程内缓存一次）✅
-		try
-		{
-			hw?.RunDeferredFanStartupCleanup();
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("[init] 首次打开设置的风扇懒加载失败（已吞掉，不影响界面）：" + ex.Message);
-		}
+		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+		//   ⭐ `RunDeferredFanStartupCleanup`（风扇闸门只读验证 + 启动风扇清理）**已移出**本方法 ⇒
+		//      改为启动后空闲的后台预热（见 `ScheduleIdleBackendWarmup` / `deferredInitialization`）✅
+		//   ⭐ 打开设置只做与界面直接相关的事：构建行、读亮度、按能力位显隐 ✅
+		long openStartTick = Environment.TickCount64;
 		settingsForm.VisualiseGPUMode();
 		settingsForm.ShowAll(screen.WorkingArea);
+		long openMs = Environment.TickCount64 - openStartTick;
+		if (Logger.TryMarkChanged("settings-open-timing", "[init] 设置窗打开耗时=" + openMs + " ms（只含 UI 构建，后端初始化未在此执行）"))
+		{
+			Logger.WriteError("[init] 设置窗打开耗时=" + openMs + " ms（只含 UI 构建，后端初始化未在此执行）");
+		}
 		if (_showGuideOnFirstRestore)
 		{
 			_showGuideOnFirstRestore = false;
@@ -3393,6 +3397,80 @@ internal static class Program
 			// 2026-10-05「核显模式显示策略」⑤：同上，升级用户单独问一次
 			settingsForm.BeginInvoke(settingsForm.ShowIgpuOnlyGuideIfNeeded);
 		}
+	}
+
+	private static int _backendWarmupScheduled;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：后端初始化不是设置窗口的功能）：
+	/// ⭐ **启动后空闲低优先级后台预热**（单个任务、串行、可取消）—— ⛔ 不阻塞 UI、⛔ 不在设置窗打开线程 ✅。
+	/// <para>顺序：风扇闸门只读验证 + 启动风扇清理 → 摄像头 PnP 枚举（缓存）→ 回 UI 线程刷新能力位/快捷开关行。</para>
+	/// <para>日志：`[init] 后台初始化：风扇闸门 ok=…（耗时 … ms，来源=启动后空闲）` /
+	/// `[init] 后台初始化：摄像头 PnP 枚举 ok=…（… ms，来源=启动后空闲）` ✅</para>
+	/// </summary>
+	internal static void ScheduleIdleBackendWarmup()
+	{
+		if (Interlocked.Exchange(ref _backendWarmupScheduled, 1) != 0)
+		{
+			return;
+		}
+		_ = Task.Run(async () =>
+		{
+			try
+			{
+				// 启动后 2.5s 再动（让首帧/首屏先完成；窗口显示后再做）
+				await Task.Delay(2500).ConfigureAwait(continueOnCapturedContext: false);
+				MechrevoHw warmHw = hw;
+				if (warmHw == null)
+				{
+					return;
+				}
+				long fanStart = Environment.TickCount64;
+				try
+				{
+					warmHw.RunDeferredFanStartupCleanup();
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[init] 后台初始化：风扇闸门/清理失败（已吞掉）：" + ex.Message);
+				}
+				Logger.WriteError("[init] 后台初始化：风扇闸门 ok=" + warmHw.FanCurveVerified
+					+ "（耗时 " + (Environment.TickCount64 - fanStart) + " ms，来源=启动后空闲）");
+				// 摄像头 PnP 枚举：只在宝龙达有意义（GCU 走 WebcamSeen 能力位）✅
+				if (warmHw.UsesBaolongda)
+				{
+					long camStart = Environment.TickCount64;
+					bool cameraFound = MechrevoLite.Hardware.CameraPnpControl.ProbeHasCamera();
+					Logger.WriteError("[init] 后台初始化：摄像头 PnP 枚举 ok=" + cameraFound
+						+ "（耗时 " + (Environment.TickCount64 - camStart) + " ms，来源=启动后空闲）");
+				}
+				// 完成后回 UI 线程刷新对应行（能力位/快捷开关；⛔ 不阻塞、⛔ 不重建窗口）
+				SettingsForm form = settingsForm;
+				if (form == null || form.IsDisposed || !form.IsHandleCreated)
+				{
+					return;
+				}
+				try
+				{
+					form.BeginInvoke((Action)(() =>
+					{
+						if (!form.IsDisposed)
+						{
+							form.RefreshDeviceCapabilities();
+							form.RefreshQuickSwitchStatesNow();
+						}
+					}));
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[init] 后台初始化后刷新界面失败（已吞掉，不影响 UI）：" + ex.Message);
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[init] 后台初始化失败（已吞掉，不影响 UI）：" + ex);
+			}
+		});
 	}
 
 	private static void TrayIcon_MouseClick(object? sender, MouseEventArgs e)

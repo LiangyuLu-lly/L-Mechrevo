@@ -25,7 +25,13 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		ArgumentNullException.ThrowIfNull(hw, "hw");
 		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制）：先按**静态判据短路**，再问 SMU 通路是否可用 ——
 		//   `SmuAvailability.IsReady` 会做一次 PawnIO 探测（进程内缓存）；⛔ 不能让 GCU/40 系机器也白跑一次。
-		bool smuReady = hw.IsBaolongda30Series && SmuAvailability.IsReady;
+		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+		//   ⭐ 这里改成 **只读缓存值** `IsReadyCached`（⛔ 不触发探测）——
+		//      能力位/规划器可能在"打开设置/构建行"时被调用，SMU 探测必须留到真正打开自定义模式窗口
+		//      （`CustomModeForm` 里显式 `SmuAvailability.IsReady`）或真正需要 STAPM 时 ✅
+		//   ⚠️ 未探测前 `SupportsSmuPowerControls=false` ⇒ 规划器不生成 SMU 步骤；
+		//      自定义模式窗口打开后会重新算能力位，语义不变 ✅
+		bool smuReady = hw.IsBaolongda30Series && SmuAvailability.IsReadyCached;
 		return new PerfModeCapabilities
 		{
 			UsesAmdPowerFields = hw.UsesAmdPowerFields,

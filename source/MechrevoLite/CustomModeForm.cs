@@ -2878,6 +2878,10 @@ public class CustomModeForm : RForm
 	private async Task OpenFanCurveAsync()
 	{
 		PerfModeService perf = PerfModeService.Instance;
+		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+		//   ⭐ 风扇闸门只读验证**推迟到真正要用风扇曲线时**（这里）显式触发一次（进程内缓存）——
+		//      ⛔ 不再由"打开设置/构建行读 FanCurveVerified"提前触发 EC 读 ✅
+		Program.hw?.EnsureFanCurveReady();
 		// 2026-10-05: in firmware-profile mode go straight to the editor.
 		// FanCurveForm already reads and writes the ACTIVE profile's curve through
 		// GET/SET_FAN_SPEED_CURVE_SETTING, and the active profile IS the config being

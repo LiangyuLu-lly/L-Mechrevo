@@ -6051,12 +6051,9 @@ public class SettingsForm : RForm
 		labelBacklight.Click += LabelBacklight_Click;
 		uiBuildPhase.Restart();
 		BuildOfficialConsolePanel();
-		BuildIgpuOnlyUiPanel();
 		uiBuildDisplayMs += uiBuildPhase.ElapsedMilliseconds;
-		// 2026-10-09（lightsplit）：设置对话框里的**两个**按行三选行（灯带行 / Logo 灯行；灯光组本身恢复原样，只有行 + 通道汇总）。
-		uiBuildPhase.Restart();
-		BuildLightRowUiPanels();
-		uiBuildOtherMs += uiBuildPhase.ElapsedMilliseconds;
+		// ⭐⭐ 2026-10-19（机主：判据为假连控件都不建）：核显模式三选行 / 灯光额外两行延后到
+		//   `EnsureSettingsDialogBuilt()`（此时 Program.hw 已就绪 ⇒ 判据可判、且不构建不存在的行）✅
 		uiBuildPhase.Restart();
 		BuildDashboardLayout();
 		uiBuildOtherMs += uiBuildPhase.ElapsedMilliseconds;
@@ -10776,7 +10773,24 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 					RefreshThemeButtons();
 					RefreshBatteryModeButtons();
 				}
-				Task.Run((Action)RefreshPeripheralsBattery);
+				// ⭐⭐ 2026-10-19（机主：外设电量不是打开设置窗的功能）：
+				//   ⭐ 原来窗口一显示就 `Task.Run(RefreshPeripheralsBattery)`（HID/外设电量查询）；
+				//      现在改为**显示后延迟后台**做：⛔ 不阻塞打开、⛔ 不在构建路径 ✅
+				_ = Task.Run(async () =>
+				{
+					try
+					{
+						await Task.Delay(2500).ConfigureAwait(continueOnCapturedContext: false);
+						if (!IsDisposed && Visible)
+						{
+							RefreshPeripheralsBattery();
+						}
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("Peripherals battery refresh failed: " + ex.Message);
+					}
+				});
 				updateControl.CheckForUpdates();
 			}
 		}
@@ -18162,7 +18176,21 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			// 把后门永久关掉。
 			// 2026-10-09（settingswarm）：本段从 OpenSettingsDialog 内联搬到本方法（内容一字未改），
 			// 好让预热与点击走**同一段**构建代码 —— 预热没做完/失败时，点击自己会再走一遍。
-			_settingsDialog = new SettingsDialog(_themeModePanel, _officialConsolePanel, _overdriveChk, _overdriveAvailable, _themeFollowBox, checkStartup, IgpuOnlyUiRowAvailable() ? _igpuOnlyUiPanel : null, _lightStripUiPanel, _lightLogoUiPanel);
+			// ⭐⭐ 2026-10-19（机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）：
+			//   ⭐ **判据为假 ⇒ 连控件都不创建**（⛔ 不再"先 new 再 Visible=false"）：
+			//      · 核显模式三选行：只有 `IgpuOnlyUiRowAvailable()` 为真才构建（宝龙达/30 系/无独显 ⇒ 不建）；
+			//      · 灯光额外两行（灯带行/Logo 行显示）：承载"判据判错时的后路"，语义不变（LightExtraRowAvailable 恒 true）⇒ 构建；
+			//      · 构建时机 = 打开设置对话框时（此时 Program.hw 已就绪），⛔ 不在主窗构造函数里白建 ✅
+			bool igpuRow = IgpuOnlyUiRowAvailable();
+			if (igpuRow && _igpuOnlyUiPanel == null)
+			{
+				BuildIgpuOnlyUiPanel();
+			}
+			if (_lightStripUiPanel == null || _lightLogoUiPanel == null)
+			{
+				BuildLightRowUiPanels();
+			}
+			_settingsDialog = new SettingsDialog(_themeModePanel, _officialConsolePanel, _overdriveChk, _overdriveAvailable, _themeFollowBox, checkStartup, igpuRow ? _igpuOnlyUiPanel : null, _lightStripUiPanel, _lightLogoUiPanel);
 			_settingsDialog.SetLightExtraRowAvailable(LightExtraRowAvailable());
 			AddOwnedForm(_settingsDialog);
 		}

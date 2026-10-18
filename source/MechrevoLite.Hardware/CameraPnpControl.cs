@@ -122,17 +122,49 @@ internal static class CameraPnpControl
 	{
 		get
 		{
-			try
-			{
-				return TryReadDevices(forceRefresh: false, out IReadOnlyList<CameraDeviceInfo> devices, out string _)
-					&& devices.Count > 0;
-			}
-			catch
-			{
-				return false;
-			}
+			// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：首次调用才探测（并缓存），之后只读缓存 ✅
+			return (Volatile.Read(ref _hasCameraProbed) == 1) ? _hasCameraCached : ProbeHasCamera();
 		}
 	}
+
+	private static int _hasCameraProbed;
+
+	private static bool _hasCameraCached;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+	/// ⭐ **只读缓存**（未探测过 = false，⛔ **不做 SetupAPI 枚举**）—— 给"打开设置/构建行/算能力位"用 ✅
+	/// </summary>
+	internal static bool HasCameraCached
+	{
+		get
+		{
+			return Volatile.Read(ref _hasCameraProbed) == 1 && _hasCameraCached;
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 明确探测一次摄像头设备并写缓存（启动后空闲后台预热 / 真正需要判断时调用；⛔ 不在设置窗构建路径）✅
+	/// </summary>
+	internal static bool ProbeHasCamera()
+	{
+		try
+		{
+			bool has = TryReadDevices(forceRefresh: true, out IReadOnlyList<CameraDeviceInfo> devices, out string _) && devices.Count > 0;
+			_hasCameraCached = has;
+			return has;
+		}
+		catch (Exception)
+		{
+			_hasCameraCached = false;
+			return false;
+		}
+		finally
+		{
+			Volatile.Write(ref _hasCameraProbed, 1);
+		}
+	}
+
 
 	/// <summary>
 	/// ⭐ 读摄像头开关状态：<paramref name="enabled" /> = 「至少有一台摄像头处于启用状态」。

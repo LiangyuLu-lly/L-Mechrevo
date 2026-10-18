@@ -33,6 +33,20 @@ internal static class SmuAvailability
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+	/// ⭐ **只读缓存值**（未探测过 = false，⛔ **不触发探测**）—— 给"开设置窗/构建行/算能力位"这类
+	/// 不该做 SMU 探测的路径用 ✅。真正需要 SMU 的入口（打开自定义模式窗口、STAPM 行、下发）仍用
+	/// <see cref="IsReady" />（首次访问才探测一次，已缓存）✅。
+	/// </summary>
+	internal static bool IsReadyCached
+	{
+		get
+		{
+			return Volatile.Read(ref _readyCache) == 1;
+		}
+	}
+
 	/// <summary>不可用时的原因（给日志/报告用；可用时是"SMU 可用（代号/家族/版本）"）。</summary>
 	internal static string Reason
 	{
