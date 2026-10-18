@@ -6057,6 +6057,7 @@ public class SettingsForm : RForm
 		labelBacklight.ForeColor = RForm.colorStandard;
 		labelBacklight.Click += LabelBacklight_Click;
 		// ⭐ 布局批处理（性能优化）：整段构建只触发一次最终布局（⛔ 不在每个 Add 后级联重排）
+		// ⚠️ 通用路径（⛔ 不按平台分支）：宝龙达 / GCU / 同方都走这同一段 ⇒ 布局优化对所有机型生效 ✅
 		SuspendLayout();
 		uiBuildPhase.Restart();
 		BuildOfficialConsolePanel();
@@ -6102,6 +6103,7 @@ public class SettingsForm : RForm
 		long uiBuildLightMs = _uiBuildLightMs;
 		long uiBuildPerfMs = _uiBuildPerfMs;
 		long uiBuildBaseMs = Math.Max(0L, uiBuildTotalMs - uiBuildLightMs - uiBuildPerfMs - uiBuildDisplayMs);
+		// ⚠️ 通用路径（⛔ 不分平台）：分段计时对所有机型一致，便于 GCU/同方/宝龙达横向对比 ✅
 		if (Interlocked.Exchange(ref _uiBuildLogOnce, 1) == 0)
 		{
 			int uiBuildControlCount = CountAllControls(this);
