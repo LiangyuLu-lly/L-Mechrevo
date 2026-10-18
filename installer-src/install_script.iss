@@ -18,8 +18,8 @@ OutputBaseFilename=LM-0.292.1.1-beta23.1.1-setup
 #endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
-VersionInfoVersion=0.292.1
-VersionInfoProductVersion=0.292.1
+VersionInfoVersion=0.292.1.1
+VersionInfoProductVersion=0.292.1.1
 UninstallDisplayName=L-Mechrevo 0.292.1.1 beta23.1.1
 Compression=lzma2
 ArchitecturesAllowed=x64compatible
