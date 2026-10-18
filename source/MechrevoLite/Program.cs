@@ -382,7 +382,9 @@ internal static class Program
 			return;
 		}
 		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值 · 阶段 1）：`--battery-limit-probe`（⭐ 纯只读）。
-		//   ⭐ 只读参考实现给出的 6 个 XRAM 地址（0x8150~0x8154 / 0x83C0）+ 当前电池状态；
+		//   ⭐ 读 MRID6 实测地址：常驻阈值 0x83A1/0x83A2 · 模式 0x83C0 · 命令 0x8151 · 触发 0x8150 ·
+		//      结果 0x8152 · mailbox 参数 0x8153/0x8154（+ 旁证地址）+ 当前电池状态；
+		//   ⭐ **按板号区分结论**：MRID6（30 系）沿用参考语义；MRID6-*（40 系）先验证阈值地址是否合理；
 		//   ⛔ 不写任何 EC 字节、⛔ 不发 WMI 写；结果写桌面 lm-battery-probe-*.txt。
 		case "--battery-limit-probe":
 		{
