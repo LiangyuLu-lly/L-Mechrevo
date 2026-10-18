@@ -112,10 +112,10 @@ internal sealed class BaolongdaWmi : IDisposable
 		/// <summary>交流/电池类型（只读）。</summary>
 		SystemAcType = 19,
 
-		/// <summary>⭐ 风扇手动上限 开关（写 <c>[4]=FanType</c> · <c>[5]=0/1</c>）。</summary>
+		/// <summary>⭐ 风扇**按通道手动接管**开关（写 <c>[4]=FanType</c> · <c>[5]=0/1</c>；读 <c>[4]=FanType</c> ⇒ <c>OutData[5]=0/1</c>）。</summary>
 		MaxFanSpeedSwitch = 20,
 
-		/// <summary>⭐ 风扇手动上限 转速（写 <c>[4]=FanType</c> · <c>[5]=x100 RPM</c>）。</summary>
+		/// <summary>⭐ 风扇**按通道手动目标转速**（写 <c>[4]=FanType</c> · <c>[5]=x100 RPM</c>）。</summary>
 		MaxFanSpeed = 21,
 
 		/// <summary>⭐ CPU 温度（读 <c>OutData[4]</c> 摄氏度）。</summary>
@@ -878,56 +878,157 @@ internal sealed class BaolongdaWmi : IDisposable
 	}
 
 	/// <summary>
-	/// ⭐ 风扇手动上限 开/关（功能号 20）。
-	/// <para>⚠️⚠️ **重要**：⭐ 参考实现明确注明「写风扇前**先关掉** <c>MaxFanSpeedSwitch</c>，
-	/// 是为**避免与官方控制台冲突**」⇒ ⭐ 我们接管前**也应先关它**（⭐ 见 <see cref="PrepareFanManualControl" />）✅</para>
+	/// ⭐⭐ 2026-10-18（协议核对 · **按通道**）：⭐ 风扇**手动接管开关**（功能号 20）。
+	/// <para>⭐⭐ <b>协议事实</b>（⭐ 三份开源实现逐字一致 · ⭐ 见
+	/// <c>docs\notes\宝龙达接口-从开源实现读出的事实.md</c> §1.1 / §1.2 / §6b）：
+	/// ⭐ **写两字节** <c>InData[4] = fanType</c>（0 = 大扇通道 / 1 = 小扇通道）·
+	/// <c>InData[5] = 0/1</c>（关/开）✅</para>
+	/// <para>⚠️⚠️ <b>历史 bug（⭐ 机主两条反馈的根因）</b>：⭐ 本方法原来写成
+	/// <c>TryWriteByte(20, on ? 1 : 0)</c> ⇒ 只写 <c>InData[4]</c> ⇒ ⭐ 实际下发的是
+	/// <c>(fanType=1, enable=0)</c> ⇒ **永远只是把小扇的手动开关关掉**，
+	/// ⛔ 从来没有真正开启过手动接管 ⇒ ⭐ 功能号 21 写的转速目标被固件忽略
+	/// ⇒ ⭐ 「风扇曲线不跟随温度」「风扇强冷不狂转」✅</para>
+	/// <para>⭐ 正确顺序（⭐ 参考实现 BellatorFanControl 与官方控制台逆向一致）：
+	/// ⭐ **先开该通道的手动开关（20=[fanType,1]）→ 再写目标转速（21=[fanType,x100RPM]）** ✅</para>
 	/// </summary>
-	internal bool TrySetMaxFanSpeedSwitch(bool on)
+	internal bool TrySetFanManualSwitch(byte fanType, bool on)
 	{
-		return TryWriteByte(Function.MaxFanSpeedSwitch, on ? (byte)1 : (byte)0);
-	}
-
-	/// <summary>读 风扇手动上限 开关状态。</summary>
-	internal bool TryReadMaxFanSpeedSwitch(out bool on)
-	{
-		on = false;
-		if (!TryReadByte(Function.MaxFanSpeedSwitch, out byte raw))
+		if (fanType > 1)
 		{
 			return false;
 		}
-		on = raw == 1;
-		return true;
+		return TryWriteTwo(Function.MaxFanSpeedSwitch, fanType, on ? (byte)1 : (byte)0);
 	}
 
 	/// <summary>
-	/// ⭐ 设风扇手动上限转速（功能号 21）。
+	/// ⭐ 读**某个通道**的手动接管开关（功能号 20）。
+	/// <para>⭐ 协议（⭐ 参考实现 DOUZHANZHE 的 `GetFanManualEnabled` 同款）：
+	/// 请求 <c>InData[4] = fanType</c> ⇒ 响应 <c>OutData[5] = 0/1</c> ✅</para>
+	/// <para>⚠️ 若固件把状态放在 <c>OutData[4]</c>（⭐ 旧代码的假设），这里取不到 [5] 时**回落到 [4]**；
+	/// ⭐ 两种布局的**原始字节**都写进 <c>--fan-probe</c> 报告，⛔ 不靠猜 ✅。</para>
+	/// </summary>
+	internal bool TryReadFanManualSwitch(byte fanType, out bool on)
+	{
+		on = false;
+		if (fanType > 1)
+		{
+			return false;
+		}
+		try
+		{
+			byte[] outData = Invoke(MethodGet, Function.MaxFanSpeedSwitch, new byte[1] { fanType });
+			if (outData == null || outData.Length <= 4)
+			{
+				return false;
+			}
+			if (outData[3] != (byte)Function.MaxFanSpeedSwitch)
+			{
+				Logger.WriteLineIfChanged("baolongda-fanswitch-echo",
+					$"宝龙达 WMI：⚠️ 读功能号 20 回显不符（OutData[3]={outData[3]}）⇒ 本次读数作废（⛔ 不当有效值）");
+				return false;
+			}
+			byte raw = (outData.Length > 5) ? outData[5] : outData[4];
+			if (raw != 0 && raw != 1)
+			{
+				string extra = (outData.Length > 5) ? outData[5].ToString() : "无";
+				Logger.WriteLineIfChanged("baolongda-fanswitch-unknown",
+					$"宝龙达 WMI：⚠️ 功能号 20 读到未知取值 {raw}（OutData[4]={outData[4]} · OutData[5]={extra}）⇒ 当作读不到 ✅");
+				return false;
+			}
+			on = raw == 1;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineIfChanged("baolongda-fanswitch-read", "宝龙达 WMI：读功能号 20 失败：" + ex.Message);
+			return false;
+		}
+	}
+
+	/// <summary>⭐ 按通道读两路手动接管开关（功能号 20）。</summary>
+	internal bool TryReadFanManualSwitches(out bool firstChannelOn, out bool secondChannelOn)
+	{
+		firstChannelOn = false;
+		secondChannelOn = false;
+		bool readFirst = TryReadFanManualSwitch(0, out firstChannelOn);
+		bool readSecond = TryReadFanManualSwitch(1, out secondChannelOn);
+		return readFirst && readSecond;
+	}
+
+	/// <summary>
+	/// ⭐ 设风扇手动目标转速（功能号 21）。
+	/// <para>⭐ 协议：<c>InData[4] = fanType</c> · <c>InData[5] = x100 RPM</c> ✅</para>
 	/// <para>⭐ <paramref name="fanType" />：<c>0 = 大扇（蛟龙=GPU / 联想=大扇1）</c> · <c>1 = 小扇</c>。</para>
 	/// <para>⭐ <paramref name="speedUnits100Rpm" /> 单位是 ⭐ **x100 RPM**（⭐ 例：35 ⇒ 3500 RPM ✅）。</para>
+	/// <para>⚠️ 只有该通道的手动开关（功能号 20 = <c>[fanType,1]</c>）是开的，这个目标才会被执行 ✅</para>
 	/// </summary>
 	internal bool TrySetMaxFanSpeed(byte fanType, byte speedUnits100Rpm)
 	{
+		if (fanType > 1)
+		{
+			return false;
+		}
 		return TryWriteTwo(Function.MaxFanSpeed, fanType, speedUnits100Rpm);
 	}
 
-	/// <summary>
-	/// ⭐ 进入"我们来管风扇"之前的**准备动作**：⭐ 若官方控制台的手动开关是开的，⭐ 先关掉它。
-	/// <para>⭐ 依据：参考实现原话「此处为兼容性设置，**为避免官方控制台冲突设计**」✅</para>
-	/// <para>⛔ 只读 + 一次可能的写；⭐ 失败不影响调用方继续 ✅</para>
-	/// </summary>
-	internal bool PrepareFanManualControl()
+	/// <summary>⭐ 读某个通道的手动目标转速（功能号 21：请求 <c>InData[4]=fanType</c> ⇒ <c>OutData[5]=x100RPM</c>）。</summary>
+	internal bool TryReadMaxFanSpeed(byte fanType, out byte speedUnits100Rpm)
 	{
-		if (!TryReadMaxFanSpeedSwitch(out bool on))
+		speedUnits100Rpm = 0;
+		if (fanType > 1)
 		{
-			// 读不到 ⇒ 保守：仍然尝试下发一次"关"
-			Logger.WriteLine("宝龙达 WMI：读不到风扇手动开关状态 ⇒ 仍先下发一次「关」（⭐ 避免与官方控制台冲突）");
-			return TrySetMaxFanSpeedSwitch(false);
+			return false;
 		}
-		if (!on)
+		try
 		{
-			return true; // 本来就是关的 ✅
+			byte[] outData = Invoke(MethodGet, Function.MaxFanSpeed, new byte[1] { fanType });
+			if (outData == null || outData.Length <= 5)
+			{
+				return false;
+			}
+			speedUnits100Rpm = outData[5];
+			return true;
 		}
-		Logger.WriteLine("宝龙达 WMI：官方控制台的手动风扇开关是**开**的 ⇒ 先关掉它（⭐ 避免两边打架）");
-		return TrySetMaxFanSpeedSwitch(false);
+		catch (Exception ex)
+		{
+			Logger.WriteLineIfChanged("baolongda-fanspeed-read", "宝龙达 WMI：读功能号 21 失败：" + ex.Message);
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（<c>--fan-probe</c> 专用）：⭐ 发一次**原始 Get**，返回完整 <c>OutData</c>。
+	/// <para>⛔ 只读 · ⭐ 不改任何状态 · ⭐ 调用方可传 <paramref name="payload" />（⭐ 从 <c>InData[4]</c> 起）✅</para>
+	/// </summary>
+	internal bool TryInvokeRawGet(Function function, byte[] payload, out byte[] outData)
+	{
+		outData = null;
+		try
+		{
+			outData = Invoke(MethodGet, function, payload);
+			return outData != null;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 WMI：原始 Get 失败：" + ex.Message);
+			return false;
+		}
+	}
+
+	/// <summary>⭐⭐ 2026-10-18（<c>--fan-probe</c> 专用）：⭐ 发一次**原始 Set**，返回完整 <c>OutData</c>（⭐ 探针每步回读用）。</summary>
+	internal bool TryInvokeRawSet(Function function, byte[] payload, out byte[] outData)
+	{
+		outData = null;
+		try
+		{
+			outData = Invoke(MethodSet, function, payload);
+			return outData != null;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("宝龙达 WMI：原始 Set 失败：" + ex.Message);
+			return false;
+		}
 	}
 
 	// ══════════════════════════════════════════════════════════════════════

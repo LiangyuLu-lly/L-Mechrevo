@@ -75,8 +75,11 @@ internal sealed class BaolongdaStateSnapshot
 	/// <summary>⭐ 功能号 19（⭐ 交流类型 ⚠️ 未真机验证 ✅：⭐ 一般 1 = 接电源 · ⭐ 0 = 电池 ⚠️）。</summary>
 	internal int? SystemAcType { get; private set; }
 
-	/// <summary>⭐ 功能号 20（⭐ 风扇手动开关 ✅：⭐ 1 = 手动接管中 ✅）。</summary>
+	/// <summary>⭐ 功能号 20（⭐ 通道 0 手动接管开关 ✅：⭐ 1 = 手动接管中 ✅）。</summary>
 	internal int? FanManualSwitch { get; private set; }
+
+	/// <summary>⭐ 功能号 20（⭐ 通道 1 手动接管开关 ✅：⭐ 1 = 手动接管中 ✅）。</summary>
+	internal int? FanManualSwitchSecond { get; private set; }
 
 	/// <summary>⭐ 功能号 22（⭐ CPU 温度 ℃ ✅）。</summary>
 	internal int? CpuTemperature { get; private set; }
@@ -107,7 +110,19 @@ internal sealed class BaolongdaStateSnapshot
 		snap.KeyboardMode = ReadByteSafe(wmi, BaolongdaWmi.Function.RgbKeyboardMode);
 		snap.KeyboardBrightness = ReadByteSafe(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness);
 		snap.SystemAcType = ReadByteSafe(wmi, BaolongdaWmi.Function.SystemAcType);
-		snap.FanManualSwitch = ReadByteSafe(wmi, BaolongdaWmi.Function.MaxFanSpeedSwitch);
+		// ⭐ 2026-10-18：⭐ 功能号 20 是**按通道**的手动接管开关（⭐ [fanType,0/1]）⇒ ⭐ 两路分别读 ✅
+		//   ⚠️ 旧代码只发一次无参 Get 并取 OutData[4] ⇒ ⭐ 语义不对（⭐ 0 恒为"关"）⚠️
+		try
+		{
+			if (wmi.TryReadFanManualSwitches(out bool ch0Manual, out bool ch1Manual))
+			{
+				snap.FanManualSwitch = ch0Manual ? 1 : 0;
+				snap.FanManualSwitchSecond = ch1Manual ? 1 : 0;
+			}
+		}
+		catch
+		{
+		}
 		// ⭐ 30 系：功能号 22 恒 0 ⇒ 快照里留 **null**（⛔ 不要把 0 当温度）
 		snap.CpuTemperature = BaolongdaWmi.VendorTemperatureUnsupported
 			? null
@@ -183,7 +198,7 @@ internal sealed class BaolongdaStateSnapshot
 		sb.Append("键盘色=").Append(DescribeColor()).Append(' ');
 		sb.Append("键盘亮度=").Append(Show(KeyboardBrightness)).Append(' ');
 		sb.Append("交流=").Append(Show(SystemAcType)).Append(' ');
-		sb.Append("风扇手动=").Append(Show(FanManualSwitch)).Append(' ');
+		sb.Append("风扇手动=").Append(DescribeFanManualSwitches()).Append(' ');
 		sb.Append("CPU=").Append(Show(CpuTemperature)).Append(' ');
 		sb.Append("功耗墙自定义=").Append(Show(CpuCustomEnabled)).Append(' ');
 		sb.Append("风扇RPM=").Append(Show(FanFirstRpm)).Append('/').Append(Show(FanSecondRpm));
@@ -206,7 +221,8 @@ internal sealed class BaolongdaStateSnapshot
 		Add(list, 17, "键盘灯颜色", KeyboardColorRgb == null ? ((int?)null) : 1);
 		Add(list, 18, "键盘灯亮度", KeyboardBrightness);
 		Add(list, 19, "交流类型", SystemAcType);
-		Add(list, 20, "风扇手动开关", FanManualSwitch);
+		Add(list, 20, "风扇手动开关（通道0）", FanManualSwitch);
+		Add(list, 20, "风扇手动开关（通道1）", FanManualSwitchSecond);
 		Add(list, 22, "CPU 温度", CpuTemperature);
 		Add(list, 23, "功耗墙自定义开关", CpuCustomEnabled);
 		return list;
@@ -243,5 +259,15 @@ internal sealed class BaolongdaStateSnapshot
 	private static string DescribeColor()
 	{
 		return "见诊断明细";
+	}
+
+	/// <summary>⭐ 功能号 20 的**两通道**摘要（⭐ 读不到的那一路显示 `—` ✅）。</summary>
+	private string DescribeFanManualSwitches()
+	{
+		if (!FanManualSwitch.HasValue && !FanManualSwitchSecond.HasValue)
+		{
+			return "—";
+		}
+		return Show(FanManualSwitch) + "/" + Show(FanManualSwitchSecond);
 	}
 }

@@ -4078,15 +4078,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达 · 风扇手动）：⭐ **意向方法** —— "⭐ 接管风扇并设两个通道的转速" ✅
-	/// <para>⭐ 宝龙达协议：⭐ 功能号 20 = 手动开关（⭐ 写 `[FanType, 0/1]` ✅）·
-	/// ⭐ 功能号 21 = 转速（⭐ 写 `[FanType, x100RPM]` ✅）。</para>
+	/// <para>⭐ 宝龙达协议（⭐ 2026-10-18 校正 · 三份开源实现一致）：⭐ 功能号 20 = **按通道手动接管开关**
+	/// （⭐ **写两字节** `[FanType, 0/1]` ✅）· ⭐ 功能号 21 = 该通道目标转速（⭐ 写 `[FanType, x100RPM]` ✅）。</para>
 	/// <para>⚠️⚠️ <b>本方法是全部功能里【风险最高】的一个</b>：⭐ 它会**真正改动机器的散热行为** ⚠️
-	/// ⇒ ⭐ 因此额外加了三道保险：
-	/// ⭐ ① ⭐ 先调 ⭐ <see cref="BaolongdaWmi.PrepareFanManualControl" />（⭐ 参考实现明确要求：
-	/// ⭐ 写风扇前先把官方控制台的手动开关**关掉**，⭐ "为避免与官方控制台冲突" ✅）；
+	/// ⇒ ⭐ 因此额外保险：
+	/// ⭐ ① ⭐ **按参考实现的顺序**：⭐ **先开该通道手动开关（20=[fanType,1]）→ 再写目标（21）** ✅
+	/// （⭐ 旧代码先写 21 再写 20，且 20 只写了一个字节 ⇒ 手动接管从未开启 ⚠️）；
 	/// ⭐ ② ⭐ 转数夹在 ⭐ `[0, 60]`（⭐ 即 **0~6000 RPM** ✅）—— ⭐ 保守上限，⛔ 不让人手滑写爆 ✅；
-	/// ⭐ ③ ⭐ `enable=false` 时 ⭐ **两个通道都写 0**（⭐ 交回固件自动控制 ✅）。</para>
-	/// <para>⚠️ <b>通道归属尚未确认</b>：⭐ 按参考实现（蛟龙16Pro）⭐ `FanType=0` = ⭐ **大扇/GPU** ·
+	/// ⭐ ③ ⭐ `enable=false` 时 ⭐ **先关两通道手动开关并回读确认，再把 21 归零**（⭐ 交回固件自动控制 ✅，
+	/// ⛔ 顺序反过来会在手动仍开时把风扇写到 0 ⚠️）。</para>
+	/// <para>⚠️ <b>通道归属</b>：⭐ 按参考实现（蛟龙16Pro）⭐ `FanType=0` = ⭐ **大扇/GPU** ·
 	/// ⭐ `FanType=1` = ⭐ **小扇/CPU** ⚠️ —— ⭐ 真机两组读数太接近，⭐ **还没交叉验证** ⚠️
 	/// ⇒ ⭐ 所以本方法**要求调用方显式传两个通道**（⭐ 而不是替它猜 ✅），⭐ 且日志把两个通道都记全 ✅。</para>
 	/// </summary>
@@ -4111,8 +4112,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达无 GCU）：⭐ 用**本机通道**实现"强冷"——
-	/// ① 暂停软件曲线闭环（避免两个逻辑抢写）② 两路手动写**最大转速**（功能号 21）
-	/// ③ 读功能号 13 **回读确认转速真的上去了** ④ 关闭时恢复强冷前的曲线并重启闭环 ✅
+	/// ① 暂停软件曲线闭环（避免两个逻辑抢写）
+	/// ② ⭐ **按通道先开手动接管（功能号 20 = [fanType,1]）再写满转目标（功能号 21 = [fanType,x100RPM]）**
+	/// ③ 读功能号 13 **回读确认转速真的上去了**（⭐ 给风扇起转时间，多次采样）④ 关闭时恢复强冷前的曲线并重启闭环 ✅
+	/// <para>⚠️⚠️ 2026-10-18 修正：⭐ 之前功能号 20 只写了一个字节（⭐ 见 <c>BaolongdaWmi.TrySetFanManualSwitch</c> 的历史 bug），
+	/// ⇒ ⭐ 手动接管**从来没有真正开启** ⇒ ⭐ 写下去的 21 满转被固件忽略 ⇒ 机主反馈「强冷了不狂转」✅</para>
 	/// <para>⚠️ 非宝龙达恒 false（走原来的 `FanBoost` MQTT 路径，逐位不变）✅</para>
 	/// <para>⛔ 不假装成功：写成功但转速没上去 ⇒ `confirmed=false`，界面按未确认处理 ✅</para>
 	/// </summary>
@@ -4153,11 +4157,28 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			int units = Math.Clamp(maxRpm / 100, 1, BaolongdaProfile.FanManualMaxUnits100Rpm);
 			bool wrote = TrySetFanManualViaBackend(enable: true, units, units, out bool writeConfirmed);
-			// ③ 回读校验：转速确实高于怠速才算成功
-			Thread.Sleep(300);
-			bool readOk = TryReadFanSpeedsViaBackend(out int firstRpm, out int secondRpm);
+			// ③ 回读校验：⭐ 6000 RPM 的机械加速要 1~2 s ⇒ 旧实现只等 300 ms **太短**（⭐ 会误判"没起来"）
+			//    ⇒ ⭐ 现在最多采 4 次（约 1.8 s），任一次达到 1500 RPM 即算确认 ✅
+			bool readOk = false;
+			int firstRpm = 0;
+			int secondRpm = 0;
+			for (int i = 0; i < 4; i++)
+			{
+				Thread.Sleep((i == 0) ? 600 : 400);
+				if (TryReadFanSpeedsViaBackend(out int nowFirst, out int nowSecond))
+				{
+					readOk = true;
+					firstRpm = nowFirst;
+					secondRpm = nowSecond;
+					if (firstRpm >= 1500 || secondRpm >= 1500)
+					{
+						break;
+					}
+				}
+			}
 			confirmed = wrote && readOk && (firstRpm >= 1500 || secondRpm >= 1500);
-			Logger.WriteLine($"[fan] 强冷：开 ⇒ 写={wrote}（目标 {maxRpm} RPM = 档位 {units}）回读 first={firstRpm} second={secondRpm} 确认={confirmed}"
+			Logger.WriteLine($"[fan] 强冷：写 20=1（两通道）⇒ 21={units}（{units * 100} RPM · 目标 {maxRpm} RPM）"
+				+ $" ⇒ 13={firstRpm}/{secondRpm} ⇒ 确认={confirmed}"
 				+ $"（手动开关回读={writeConfirmed}）");
 			return wrote;
 		}
@@ -4171,12 +4192,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		if (saved != null)
 		{
 			bool restored = SaveBaolongdaFanCurve(saved);
-			Logger.WriteLine($"[fan] 强冷：关 ⇒ 已恢复强冷前曲线（enabled={saved.Enabled} · 联动={saved.SyncEnabled}）ok={restored}");
+			Logger.WriteLine($"[fan] 强冷：关 ⇒ 写 20=0（两通道）+ 21=0 ⇒ 已恢复强冷前曲线（enabled={saved.Enabled} · 联动={saved.SyncEnabled}）ok={restored}");
 			confirmed = restored;
 		}
 		else
 		{
-			Logger.WriteLine("[fan] 强冷：关 ⇒ 没有快照可恢复（保持手动模式关闭）");
+			Logger.WriteLine("[fan] 强冷：关 ⇒ 写 20=0（两通道）+ 21=0 ⇒ 没有快照可恢复（保持手动模式关闭）");
 			confirmed = true;
 		}
 		return true;
@@ -4211,64 +4232,64 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			// ⭐⭐ 2026-10-16（审查修复 B2）：⭐ 本方法原先 `confirmed` **只看写入调用是否没抛异常** ⚠️
-			//    ⇒ ⭐ 会**高报成功** ❌ —— ⭐ 与另外三个 `Try…` 方法（⭐ 都有回读 ✅）**不一致** ✅
-			//    ⇒ ⭐ 现在补上**回读校验** ✅：
-			//       ⭐ ① ⭐ 写完后 ⭐ **回读功能号 20**（⭐ 手动开关状态 ✅）⇒ ⭐ 与期望一致才算 confirmed ✅
-			//       ⭐ ② ⭐ 回读**读不到** ⇒ ⭐ `confirmed=false`（⭐ ⛔ 不谎报 ✅），⭐ 日志如实写明 ⚠️
-			//    ⚠️ **诚实的边界**（⭐ 必须记下）：⭐ 转速**数值本身读不回来** ⚠️
-			//       —— ⭐ 功能号 13 给的是 ⭐ **实际转速**（⭐ 会延迟、⭐ 且受负载影响 ⚠️），
-			//       ⭐ ⛔ 不是"⭐ 我们刚设的目标值" ⇒ ⭐ 所以这里**只能确认开关** ✅，⭐ 数值只能靠写入成功 ✅
+			// ⭐⭐ 2026-10-18（机主两条反馈的根因 · 协议核对）：
+			//   ⚠️ 旧实现把功能号 20 当成"官方控制台手动开关"，⭐ 只写**一个字节**，
+			//      ⭐ 而真机协议是 **两字节 [fanType, 0/1]**（⭐ 三份开源实现一致）⚠️
+			//      ⇒ ⭐ 旧写入实际是 (fanType=1, enable=0) ⇒ ⭐ **手动接管从未开启** ⇒ ⭐ 功能号 21 的目标被固件忽略 ❌
+			//   ⭐ 另外旧顺序是「写完 21 才开开关」⇒ ⭐ 即使开关正确，也应**先开开关再写目标**（⭐ 参考实现顺序 ✅）
 			if (!enable)
 			{
-				// ⭐ 交回固件：⭐ 两个通道都写 0 ⇒ ⭐ 再关手动开关 ✅（⭐ 顺序与参考实现的"恢复"一致 ✅）
-				wmi.TrySetMaxFanSpeed(0, 0);
-				wmi.TrySetMaxFanSpeed(1, 0);
-				wmi.TrySetMaxFanSpeedSwitch(false);
-				// ⭐ 回读校验：⭐ 期望"关" ✅
-				bool readOk = wmi.TryReadMaxFanSpeedSwitch(out bool nowOn);
-				confirmed = readOk && !nowOn;
+				// ⭐ 交回固件：⭐ ① 先关两通道手动开关（20 = [fanType,0]）② 回读确认 ③ 确认关了才把 21 目标清零
+				//   ⚠️ 顺序反过来（先写 21=0）在手动仍开时会**真的把风扇写到 0** ⇒ 危险 ⚠️（旧代码就是反的）
+				bool offA = wmi.TrySetFanManualSwitch(0, false);
+				bool offB = wmi.TrySetFanManualSwitch(1, false);
+				bool readOk = wmi.TryReadFanManualSwitches(out bool ch0On, out bool ch1On);
+				confirmed = readOk && !ch0On && !ch1On;
+				bool zeroA = false;
+				bool zeroB = false;
+				if (confirmed)
+				{
+					zeroA = wmi.TrySetMaxFanSpeed(0, 0);
+					zeroB = wmi.TrySetMaxFanSpeed(1, 0);
+				}
 				if (!readOk)
 				{
 					Logger.WriteLine("宝龙达 风扇：⚠️ 已下发「交回固件」，⭐ 但**回读不到手动开关状态** ⇒ ⭐ 如实报告未确认 ⚠️");
 				}
 				else if (!confirmed)
 				{
-					Logger.WriteLine("宝龙达 风扇：⚠️ 已下发「交回固件」，⭐ 但**回读显示手动开关仍是开的** ⇒ ⭐ 如实报告未确认 ⚠️");
+					Logger.WriteLine($"宝龙达 风扇：⚠️ 已下发「交回固件」，⭐ 但**回读显示手动开关仍开着**（⭐ 通道0={ch0On} · 通道1={ch1On}）⇒ ⭐ 如实报告未确认 ⚠️");
 				}
 				else
 				{
-					Logger.WriteLine("宝龙达 风扇：⭐ 已交回固件自动控制并回读确认（⭐ 两通道归零 ＋ ⭐ 手动开关=关 ✅）");
+					Logger.WriteLine($"宝龙达 风扇：⭐ 已交回固件并回读确认（⭐ 写 20=(0,0)/(1,0) ⇒ 回读 {ch0On}/{ch1On} · 21 归零={zeroA && zeroB} ✅）");
 				}
 				return true;
 			}
-			// ⭐ 保险 ①：⭐ 先关官方控制台的手动开关（⭐ 参考实现的要求 ✅）
-			//   ⚠️ 审查补记：⭐ 这一步的返回值原先被丢弃 ⚠️ ⇒ ⭐ 现在记进日志（⭐ 它失败不致命，⭐ 但要看得到 ✅）
-			bool prepared = wmi.PrepareFanManualControl();
-			int a = Math.Max(0, Math.Min(60, firstChannelUnits100Rpm));
-			int b = Math.Max(0, Math.Min(60, secondChannelUnits100Rpm));
-			// ⚠️ 通道归属未确认 ⇒ 日志把"我们按什么理解"写全，⭐ 便于真机对照 ✅
-			bool okA = wmi.TrySetMaxFanSpeed(0, (byte)a);
-			bool okB = wmi.TrySetMaxFanSpeed(1, (byte)b);
-			bool okSw = wmi.TrySetMaxFanSpeedSwitch(true);
-			bool writeOk = okA && okB && okSw;
-			// ⭐ 回读校验：⭐ 期望"开" ✅
-			bool readBackOk = wmi.TryReadMaxFanSpeedSwitch(out bool isOn);
-			confirmed = readBackOk && isOn;
+			int a = Math.Clamp(firstChannelUnits100Rpm, 0, BaolongdaProfile.FanManualMaxUnits100Rpm);
+			int b = Math.Clamp(secondChannelUnits100Rpm, 0, BaolongdaProfile.FanManualMaxUnits100Rpm);
+			// ⭐ 开：**按通道先开手动接管（20）再写目标（21）** —— 参考实现（官方控制台逆向）的顺序 ✅
+			//    ⚠️ 通道归属：0 = 大扇/GPU · 1 = 小扇/CPU（⭐ 按参考实现理解，⚠️ 真机交叉验证记在 --fan-watch/--fan-probe 报告里）
+			bool sw0 = wmi.TrySetFanManualSwitch(0, true);
+			bool sp0 = wmi.TrySetMaxFanSpeed(0, (byte)a);
+			bool sw1 = wmi.TrySetFanManualSwitch(1, true);
+			bool sp1 = wmi.TrySetMaxFanSpeed(1, (byte)b);
+			bool writeOk = sw0 && sp0 && sw1 && sp1;
+			// ⭐ 回读校验：⭐ 按通道回读功能号 20 ⇒ 两路都为「开」才算 confirmed ✅
+			bool readBackOk = wmi.TryReadFanManualSwitches(out bool nowCh0On, out bool nowCh1On);
+			confirmed = writeOk && readBackOk && nowCh0On && nowCh1On;
 			if (writeOk && confirmed)
 			{
-				Logger.WriteLine($"宝龙达 风扇：⭐ 已接管并回读确认（⭐ 通道0={a * 100} RPM · ⭐ 通道1={b * 100} RPM · ⭐ 手动开关=开 ✅"
-					+ $" · ⭐ 预先关官方开关={prepared} · ⚠️ 通道归属按参考实现理解：0=大扇/GPU · 1=小扇/CPU ⚠️ 尚未真机交叉验证 ⚠️"
-					+ " · ⚠️ 转速**数值**读不回来，⭐ 只能确认开关 ⚠️）");
+				Logger.WriteLine($"[fan] 写 20=(0,1)/(1,1) ⇒ 回读 20={nowCh0On}/{nowCh1On} · 写 21=(0,{a})/(1,{b}) ⇒ {a * 100}/{b * 100} RPM ⇒ 确认={confirmed}");
 			}
 			else if (writeOk && !readBackOk)
 			{
-				Logger.WriteLine($"宝龙达 风扇：⚠️ 写入完成但**回读不到手动开关状态** ⇒ ⭐ 如实报告未确认 ⚠️"
-					+ $"（⭐ 通道0={a * 100} RPM · ⭐ 通道1={b * 100} RPM · ⭐ 预先关官方开关={prepared}）");
+				Logger.WriteLine($"[fan] 写 20=(0,1)/(1,1) ⇒ 回读 20=读不到 · 写 21=(0,{a})/(1,{b}) ⇒ ⚠️ 如实报告未确认（⛔ 不谎报成功）");
 			}
 			else
 			{
-				Logger.WriteLine($"宝龙达 风扇：⚠️ 写入不完整或回读不一致（⭐ 通道0={okA} · ⭐ 通道1={okB} · ⭐ 开关写={okSw} · ⭐ 开关回读={(readBackOk ? isOn.ToString() : "读不到")}）⇒ 如实报告 ⚠️");
+				Logger.WriteLine($"[fan] 写 20/21 不完整 ⇒ ok20={sw0}/{sw1} · ok21={sp0}/{sp1}"
+					+ $" · 回读 20={(readBackOk ? (nowCh0On ? "开" : "关") + "/" + (nowCh1On ? "开" : "关") : "读不到")} ⇒ 如实报告未确认 ⚠️");
 			}
 			return true;
 		}
@@ -4869,16 +4890,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			bool forceRewrite = curveTick - _fanCurveLastWriteTick >= FanCurveForceRewriteMs;
 			if (sameAsLast && !forceRewrite)
 			{
-				bool manualOn = false;
-				bool manualReadOk = wmi != null && wmi.TryReadMaxFanSpeedSwitch(out manualOn);
-				if (manualReadOk && manualOn)
+				// ⭐ 2026-10-18：⭐ 必须**两路都还在手动接管**才敢跳过（⭐ 任一路被固件重置 ⇒ 强制重写）✅
+				bool stillCh0On = false;
+				bool stillCh1On = false;
+				bool manualReadOk = wmi != null && wmi.TryReadFanManualSwitches(out stillCh0On, out stillCh1On);
+				if (manualReadOk && stillCh0On && stillCh1On)
 				{
 					Logger.WriteLineIfChanged("baolongda-fancurve-skip-same",
-						$"[fan] 曲线：目标未变（cpu={channel1Units} gpu={channel0Units} x100RPM）且手动开关仍开 ⇒ ⛔ 本轮不写");
+						$"[fan] 曲线：目标未变（cpu={channel1Units} gpu={channel0Units} x100RPM）且 20 回读=1/1 ⇒ ⛔ 本轮不写");
 					return true;
 				}
+				string lost = manualReadOk
+					? $"20 回读={(stillCh0On ? "1" : "0")}/{(stillCh1On ? "1" : "0")}"
+					: "20 回读=读不到";
 				Logger.WriteLineIfChanged("baolongda-fancurve-manual-lost",
-					"[fan] 曲线：⚠️ 手动开关被关掉了（外部改动？）⇒ 本轮强制重写");
+					$"[fan] 曲线：⚠️ {lost} ⇒ 手动接管丢了（固件重置/外部改动？）⇒ 本轮强制重写");
 			}
 			bool handled = TrySetFanManualViaBackend(enable: true, channel0Units, channel1Units, out bool confirmed);
 			if (handled)
@@ -4887,6 +4913,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				_fanCurveLastCh1 = channel1Units;
 				_fanCurveLastWriteTick = Environment.TickCount64;
 			}
+			// ⭐ 2026-10-18（日志自证）：⭐ 写完读一次 13（实际转速，⭐ 有机械延迟）⇒ ⭐ 一眼看出"写了到底转没转" ✅
+			bool rpmReadOk = false;
+			int nowFirstRpm = 0;
+			int nowSecondRpm = 0;
+			if (handled)
+			{
+				Thread.Sleep(300);
+				rpmReadOk = TryReadFanSpeedsViaBackend(out nowFirstRpm, out nowSecondRpm);
+			}
 			// ⭐⭐ 2026-10-19（机主要求 · 日志格式 + 如实回读）：
 			//   `[fan] 曲线：cpu=..℃/gpu=..℃ → rpm cpu=.. gpu=..（联动后..）→ 写 ok=..`
 			//   ⚠️ `ok=` 用的是 `TrySetFanManualViaBackend` 的**回读确认**（⛔ 不是"调用没抛异常"）✅
@@ -4894,8 +4929,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				$"[fan] 曲线：cpu={cpuTemp}℃/gpu={gpuTemp}℃（平滑 cpu={cpuTempSmooth}/gpu={gpuTempSmooth}）"
 				+ $" → rpm cpu={channel1RpmBeforeSync} gpu={channel0RpmBeforeSync}"
 				+ $"（联动后 cpu={channel1Rpm} gpu={channel0Rpm}）"
-				+ $" → 写 ok={confirmed}"
+				+ $" → 写 20=1 + 21=(0,{channel0Units})/(1,{channel1Units}) ok={confirmed}"
 				+ $" · 档位 cpu={channel1Units} gpu={channel0Units}"
+				+ $" · 13={(rpmReadOk ? nowFirstRpm + "/" + nowSecondRpm : "读不到")} RPM（有延迟）"
 				+ (settings.SyncEnabled ? "" : " · 联动=关")
 				+ (reassertDue && !decided0.HasValue && !decided1.HasValue ? " · 仅重申" : ""));
 			if (!handled)
@@ -4921,7 +4957,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
-	/// ⭐⭐ 把风扇**交回固件**控制（⭐ 两通道归零 ＋ ⭐ 关手动开关 ✅）。
+	/// ⭐⭐ 把风扇**交回固件**控制（⭐ 关手动开关 ＝ ⭐ 两通道 20=[fanType,0]，⭐ 确认后再把 21 归零 ✅）。
 	/// <para>⭐⭐ <b>必须在这些时机调用</b>（⭐ 否则风扇会**停在我们上次写的转速上** ⚠️）：
 	/// ⭐ ① ⭐ 用户关掉软件曲线 ✅ · ⭐ ② ⭐ 程序退出 ✅ · ⭐ ③ ⭐ **程序启动时**（⭐ 清理上次残留 ✅）。</para>
 	/// ⚠️ 进程被强杀时来不及调用 ⚠️ ⇒ ⭐ 所以 ③ 很重要 ✅。</para>
@@ -4941,31 +4977,46 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_baolongdaCurveLastWriteTick = 0;
 		try
 		{
-			// ⭐⭐ 先**读一次**手动开关 ⚠️ ⇒ ⭐ **只有它真的是"开"⭐ 才写** ✅
+			// ⭐⭐ 先**按通道读一次**手动开关 ⚠️ ⇒ ⭐ **只有任一路真的是"开"⭐ 才写** ✅
 			//    ⭐ 理由：⭐ 这是每次启动都会走的路 ⇒ ⭐ 常见情况（⭐ 手动本就关着）⛔ **一个字节都不该写** ✅
-			bool alreadyManual = false;
+			bool switchesReadOk = false;
+			bool ch0Manual = false;
+			bool ch1Manual = false;
 			try
 			{
-				if (wmi.TryReadMaxFanSpeedSwitch(out bool on))
-				{
-					alreadyManual = on;
-				}
+				switchesReadOk = wmi.TryReadFanManualSwitches(out ch0Manual, out ch1Manual);
 			}
 			catch
 			{
 			}
-			if (!alreadyManual)
+			// ⭐⭐ 2026-10-18（安全优先）：⭐ 只有「**两路都读到关** ＋ ⭐ 曲线本来就是关的」才跳过。
+			//   ⚠️ 曲线启用过 ⇒ ⭐ 上次可能被强杀留在手动接管/满转 ⇒ ⭐ **必须**走一次交回固件
+			//   （⭐ 2 次幂等的 20=0 写入，代价可忽略；⛔ 绝不赌"读到的关一定是真关"）✅
+			bool curveEnabled = false;
+			try
+			{
+				BaolongdaFanCurveSettings savedCurve = LoadBaolongdaFanCurve();
+				curveEnabled = savedCurve != null && savedCurve.Enabled;
+			}
+			catch
+			{
+			}
+			if (switchesReadOk && !ch0Manual && !ch1Manual && !curveEnabled)
 			{
 				_baolongdaFanCurveApplied = false;
 				Logger.WriteLineIfChanged("baolongda-fanrestore-skip",
-					"宝龙达风扇曲线：⭐ 启动自检 ⇒ ⭐ 手动风扇开关**本来就是关的** ⇒ ⛔ 不写任何东西（⭐ 交回固件已成立 ✅）");
+					"宝龙达风扇曲线：⭐ 启动自检 ⇒ ⭐ 两通道手动接管开关**本来就是关的**（20 回读=0/0）且曲线未启用 ⇒ ⛔ 不写任何东西（⭐ 交回固件已成立 ✅）");
 				return;
 			}
-			Logger.WriteLine("宝龙达风扇曲线：⚠️ 启动自检发现**手动风扇开关是开的**（⭐ 可能是上次被强杀留下的 ⚠️）⇒ ⭐ 现在交回固件控制 ✅");
+			string detail = switchesReadOk
+				? $"20 回读={(ch0Manual ? "1" : "0")}/{(ch1Manual ? "1" : "0")}"
+				: "20 回读=读不到";
+			Logger.WriteLine($"宝龙达风扇曲线：⚠️ 启动自检 ⇒ {detail} · 曲线启用={curveEnabled}"
+				+ "（⭐ 可能是上次被强杀留下的 ⚠️）⇒ ⭐ 现在交回固件控制 ✅");
 			if (TrySetFanManualViaBackend(enable: false, 0, 0, out bool confirmed))
 			{
 				_baolongdaFanCurveApplied = false;
-				Logger.WriteLine($"宝龙达风扇曲线：⭐ 已交回固件控制（⭐ 两通道归零 ＋ ⭐ 关手动开关 · ⭐ 确认={confirmed} ✅）");
+				Logger.WriteLine($"宝龙达风扇曲线：⭐ 已交回固件控制（⭐ 写 20=(0,0)/(1,0) ＋ 21 归零 · ⭐ 确认={confirmed} ✅）");
 			}
 		}
 		catch (Exception ex)

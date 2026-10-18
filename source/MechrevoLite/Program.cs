@@ -324,6 +324,21 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇曲线/强冷「不可用」）：风扇协议真机探针 `--fan-probe`。
+		//   只读 13（两路 RPM）/ 20（[4]=fanType）/ 21（[4]=fanType）⇒ 再**单次写 + 每步回读**：
+		//     a. 20=0 → 回读 20/13 ｜ b. 21=当前档位 → 回读 13 ｜ c. 21=档位+5 → 回读 13
+		//     d. 20=1 → 回读 20/13（看是否满转）｜ e. try/finally 恢复 20=0 + 21=0 并回读确认
+		//   ⛔ 目标 ≤ 本机满转（30 系 3500 / 40 系 6000 RPM）；⛔ 绝不把风扇留在满转；
+		//   ⛔ 非宝龙达机型只写"没有接口"，一个字节都不写。
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-probe-*.txt。
+		case "--fan-probe":
+		{
+			string probeLog = FanProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[fan-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-19（30 系 · SMU **保守写 + 回读** 实测，供开发机 HawkPoint 近似验证）：
 		//   用法：L-Mechrevo.exe --smu-write-test          只读（打印当前快照，不写）
 		//         L-Mechrevo.exe --smu-write-test --yes    保守写 + 每次回读 + finally 恢复快照并确认

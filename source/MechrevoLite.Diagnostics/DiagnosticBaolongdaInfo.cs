@@ -903,13 +903,13 @@ internal static class DiagnosticBaolongdaInfo
 		AppendColor(sb, wmi);
 		AppendOne(sb, wmi, BaolongdaWmi.Function.RgbKeyboardBrightness, "18", "键盘灯亮度");
 		AppendOne(sb, wmi, BaolongdaWmi.Function.SystemAcType, "19", "交流类型");
-		AppendOne(sb, wmi, BaolongdaWmi.Function.MaxFanSpeedSwitch, "20", "风扇手动开关");
+		AppendFanManualSwitch(sb, wmi);
 		// ⭐⭐ 2026-10-17（接手）：⭐ 功能号 21 的**读语义已由原厂包确认** ——
 		//   ⛔ **不是"最大转速"**，⭐ 而是**手动转速设定值**：原厂读回它只用于回显/定位手动转速滑块，
 		//   值就是上次写下去的 `x100 RPM` ✅（⭐ 只取事实，⛔ 不贴其代码 —— 法律风险）。
 		//   ⇒ ⭐ 我们**不再**拿它当百分比分母（真机读到 50 ⇒ 曾被当成 5000 RPM，导致 40% vs 官方 33% ❌）。
 		//   下面仍把原始字节打出来，⭐ 供核对"手动设定值到底是多少" ✅。
-		AppendOne(sb, wmi, BaolongdaWmi.Function.MaxFanSpeed, "21", "风扇手动转速设定值（⚠️ 读=上次设的转速，不是最大转速）");
+		AppendFanManualSpeedSetpoint(sb, wmi);
 		try
 		{
 			if (wmi.TryReadBytesChecked(BaolongdaWmi.Function.MaxFanSpeed, 4, out byte[] mfsRaw)
@@ -1050,6 +1050,61 @@ internal static class DiagnosticBaolongdaInfo
 			verdict = "⚠️ 异常：" + ex.Message;
 		}
 		sb.AppendLine("  功能号 " + "13".PadLeft(2) + " · " + "风扇转速".PadRight(18) + " · " + verdict);
+	}
+
+	/// <summary>
+	/// ⭐ 功能号 20（⭐ 2026-10-18 校正：**按通道**的手动接管开关）。
+	/// <para>⭐ 协议：写两字节 <c>[fanType, 0/1]</c> · 读 <c>[fanType]</c> ⇒ <c>OutData[5] = 0/1</c> ✅</para>
+	/// </summary>
+	private static void AppendFanManualSwitch(StringBuilder sb, BaolongdaWmi wmi)
+	{
+		string verdict;
+		try
+		{
+			bool ok0 = wmi.TryReadFanManualSwitch(0, out bool ch0On);
+			bool ok1 = wmi.TryReadFanManualSwitch(1, out bool ch1On);
+			if (ok0 || ok1)
+			{
+				verdict = "✅ 按通道可读：通道0=" + (ok0 ? (ch0On ? "1（开）" : "0（关）") : "读不到")
+					+ " · 通道1=" + (ok1 ? (ch1On ? "1（开）" : "0（关）") : "读不到")
+					+ "（⚠️ 写是两字节 [fanType,0/1] —— ⭐ 旧版只写一字节 ⇒ 手动接管从未真正开启）";
+			}
+			else
+			{
+				verdict = "⚠️ 读不到（⭐ 或回显不符 ⇒ 已作废 ✅）";
+			}
+		}
+		catch (Exception ex)
+		{
+			verdict = "⚠️ 异常：" + ex.Message;
+		}
+		sb.AppendLine("  功能号 " + "20".PadLeft(2) + " · " + "风扇手动开关(按通道)".PadRight(18) + " · " + verdict);
+	}
+
+	/// <summary>⭐ 功能号 21（⭐ 按通道的手动目标转速：读 <c>[fanType]</c> ⇒ <c>OutData[5] = x100 RPM</c>）。</summary>
+	private static void AppendFanManualSpeedSetpoint(StringBuilder sb, BaolongdaWmi wmi)
+	{
+		string verdict;
+		try
+		{
+			bool ok0 = wmi.TryReadMaxFanSpeed(0, out byte units0);
+			bool ok1 = wmi.TryReadMaxFanSpeed(1, out byte units1);
+			if (ok0 || ok1)
+			{
+				verdict = "✅ 按通道可读（⭐ 值 = 上次写入的手动目标）：通道0="
+					+ (ok0 ? (units0 + "（" + (units0 * 100) + " RPM）") : "读不到")
+					+ " · 通道1=" + (ok1 ? (units1 + "（" + (units1 * 100) + " RPM）") : "读不到");
+			}
+			else
+			{
+				verdict = "⚠️ 读不到";
+			}
+		}
+		catch (Exception ex)
+		{
+			verdict = "⚠️ 异常：" + ex.Message;
+		}
+		sb.AppendLine("  功能号 " + "21".PadLeft(2) + " · " + "风扇手动转速设定值".PadRight(18) + " · " + verdict);
 	}
 
 	// ── ⑤ HID 事件如实说明（⭐ 我们没有实现 ✅ ⛔ 不假装 ✅）──

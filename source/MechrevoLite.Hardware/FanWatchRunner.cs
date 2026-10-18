@@ -95,7 +95,7 @@ internal static class FanWatchRunner
 			W("⚠️ LHM 打开失败（⭐ 温度列会空着，⭐ 不影响风扇读数）：" + ex2.Message);
 		}
 
-		W("  时间      | ⭐通道0(大/GPU?) | ⭐通道1(小/CPU?) | ⭐CPU温度 | ⭐GPU温度 | ⭐LHM-CPU | ⭐LHM-GPU | ⭐手动态");
+		W("  时间      | ⭐通道0(大/GPU?) | ⭐通道1(小/CPU?) | ⭐CPU温度 | ⭐GPU温度 | ⭐LHM-CPU | ⭐LHM-GPU | ⭐20(0/1)");
 		W("  ----------|-----------------|-----------------|----------|----------|----------|----------|--------");
 		try
 		{
@@ -121,16 +121,17 @@ internal static class FanWatchRunner
 					W("  ⚠️ 读风扇失败：" + ex3.Message);
 				}
 				int cpuTemp = -1;
-				bool manual = false;
+				// ⭐ 2026-10-18：⭐ 功能号 20 是**按通道**的手动接管开关（⭐ 写/读都是 [fanType, 0/1]）
+				string manualText = "—";
 				try
 				{
 					if (wmi.TryReadCpuTemperature(out int c))
 					{
 						cpuTemp = c;
 					}
-					if (wmi.TryReadMaxFanSpeedSwitch(out bool on))
+					if (wmi.TryReadFanManualSwitches(out bool ch0Manual, out bool ch1Manual))
 					{
-						manual = on;
+						manualText = (ch0Manual ? "1" : "0") + "/" + (ch1Manual ? "1" : "0");
 					}
 				}
 				catch
@@ -170,7 +171,7 @@ internal static class FanWatchRunner
 					{
 					}
 				}
-				W(string.Format("  {0:HH:mm:ss}  | {1,15} | {2,15} | {3,8} | {4,8} | {5,8} | {6,8} | {7,6}",
+				W(string.Format("  {0:HH:mm:ss}  | {1,15} | {2,15} | {3,8} | {4,8} | {5,8} | {6,8} | {7,8}",
 					DateTime.Now,
 					fanOk ? (ch0 + " RPM") : "读不到",
 					fanOk ? (ch1 + " RPM") : "读不到",
@@ -178,7 +179,7 @@ internal static class FanWatchRunner
 					"—",
 					double.IsNaN(lhmCpu) ? "—" : lhmCpu.ToString("F0") + "℃",
 					double.IsNaN(lhmGpu) ? "—" : lhmGpu.ToString("F0") + "℃",
-					manual ? "开" : "关"));
+					manualText));
 				Thread.Sleep(1000);
 				_ = tick;
 			}
