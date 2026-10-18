@@ -4455,6 +4455,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 上次只读验证的时刻（TickCount64）—— ⭐ 未通过时最多每 30 s 重试一次（⛔ 不刷屏/不反复碰 EC）✅</summary>
 	private static long _fanCurveVerifyTick;
 
+	// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 风扇闸门只读验证改为**首次需要时懒加载一次**（进程内缓存）✅
+	private static int _fanCurveLazyInitState; // 0=未开始 · 1=进行中 · 2=已完成
+
+	private static readonly object _fanCurveLazyInitLock = new object();
+
+	private static bool _fanCurveDeferredCleanupDone;
+
 	/// <summary>⭐ 本机（按代际）风扇软件闭环是否**已验证可用**（⭐ 未验证 = false ⇒ UI 不开放）✅</summary>
 	/// <para>⭐⭐ 2026-10-18（机主：默认不开）：⭐ 默认 **false**；只有 `--fan-smu-ec-test` 验证通过并写入
 	/// `%APPDATA%\MechrevoLite\fan_ec_verified.cfg`（`fan_ec_verified_30=1` / `_40=1`）后，**下次启动**才放开 ✅</para>
@@ -4466,12 +4473,67 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return false;
 			}
+			// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 第一次**真的需要**闸门时才做只读验证（⛔ 启动不读 EC）✅
+			EnsureFanCurveLazyInit();
 			if (DgpuGeneration == DgpuGenerationKind.Gen30)
 			{
 				return _fanCurveVerifiedGen30 ?? FanEcVerifyStore.Load(is30Series: true);
 			}
 			return _fanCurveVerifiedGen40 ?? FanEcVerifyStore.Load(is30Series: false);
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 首次需要风扇闸门时才做**只读验证**；结果进程内缓存一次 ✅。
+	/// <para>⛔ 不写 EC、不发 WMI 写；⭐ 失败也只缓存一次，不反复探测 ✅</para>
+	/// </summary>
+	private void EnsureFanCurveLazyInit()
+	{
+		if (!UsesBaolongda || Volatile.Read(ref _fanCurveLazyInitState) == 2)
+		{
+			return;
+		}
+		lock (_fanCurveLazyInitLock)
+		{
+			if (Volatile.Read(ref _fanCurveLazyInitState) == 2)
+			{
+				return;
+			}
+			_fanCurveLazyInitState = 1;
+			try
+			{
+				long start = Environment.TickCount64;
+				TryVerifyFanCurveReadOnly(out _);
+				_fanCurveLazyInitState = 2;
+				Logger.WriteLine("[init] 首次需要风扇能力 ⇒ 只读验证（耗时 " + (Environment.TickCount64 - start) + " ms，已缓存）");
+			}
+			catch (Exception ex)
+			{
+				_fanCurveLazyInitState = 2;
+				Logger.WriteLine("[init] 风扇闸门懒加载异常（已吞掉，按未验证处理）：" + ex.GetType().Name + " " + ex.Message);
+			}
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 首次打开设置时执行 —— 懒加载闸门验证 ＋ 启动清理（交回固件）✅。
+	/// <para>⚠️ 只在第一次调用时真正执行（进程内缓存）；⛔ 不做任何写操作除非已验证（闸门保持原判据）✅</para>
+	/// </summary>
+	internal void RunDeferredFanStartupCleanup()
+	{
+		if (!UsesBaolongda || _fanCurveDeferredCleanupDone)
+		{
+			return;
+		}
+		_fanCurveDeferredCleanupDone = true;
+		long start = Environment.TickCount64;
+		EnsureFanCurveLazyInit();
+		bool verified = FanCurveVerified;
+		if (verified)
+		{
+			RestoreBaolongdaFanFirmwareControl();
+		}
+		Logger.WriteLine("[init] 首次打开设置 ⇒ 初始化风扇闸门/清理（耗时 " + (Environment.TickCount64 - start) + " ms，已缓存）· verified=" + verified);
 	}
 
 	/// <summary>⭐ 最近一次只读验证结论（⭐ UI 说明行/日志用）✅</summary>
@@ -6093,8 +6155,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//   ⭐ 本方法**先读再决定**：⭐ 手动开关本来就关着 ⇒ ⛔ **一个字节都不写** ✅
 		// ⭐⭐ 2026-10-18（机主最高优先级 · 先验证再开放）：⭐ 启动时先做**只读**验证
 		//   ⭐ 未通过 ⇒ UI 隐藏风扇曲线/强冷入口，闭环/强冷/启动交回**都不写**（⭐ 防"能点但没用" + 卡死 ✅）
-		TryVerifyFanCurveReadOnly(out _);
-		RestoreBaolongdaFanFirmwareControl();
+		// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 启动阶段**不读 EC、不验证闸门、不做交回清理** ——
+		//   改为首次打开设置 / 首次需要风扇能力时懒加载（见 EnsureFanCurveLazyInit / RunDeferredFanStartupCleanup）✅
+		Logger.WriteLine("[init] 启动跳过设置预热（懒加载）：风扇闸门/EC 只读验证延后到首次需要");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath});"
 			+ $" 功耗墙范围 PL1/PL2=[{Pl1Minimum},{Pl1Maximum}]W · 温度墙=[{TccMinimum},{TccMaximum}]℃（⭐ 本地记忆 PL1={Pl1} PL2={Pl2} 温度墙={TccTarget} ⚠️ 非从机器读回）");
 		Logger.WriteLine($"Hardware backend: Baolongda ({backend.Wmi.InstancePath}); built-in modes only (本轮)."

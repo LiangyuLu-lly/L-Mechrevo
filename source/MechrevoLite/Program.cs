@@ -1123,7 +1123,9 @@ internal static class Program
 			// 2026-10-09（settingswarm）：把设置对话框外壳的预热排在**首帧之后**、且它自己还会再
 			// BeginInvoke 一次 —— 优先级低于主窗口首帧，冷启动到主窗口的数字一字不碰；用户点「设置」时
 			// 只剩 Show() + 刷新数据（本机实测首次 5347ms → 见报告）。失败/没做完自动退回按需构建。
-			settingsForm.ScheduleSettingsShellPreWarm();
+			// ⭐⭐ 2026-10-18（机主：取消「启动设置预热」）：⭐ 启动阶段**不再**隐形 Show 整个设置窗；
+			//   改成首次真正打开设置时才构建（按需）⇒ 启动少付这一大段 ✅
+			Logger.WriteLine("[init] 启动跳过设置预热（懒加载）");
 			if (!startMinimized)
 			{
 				settingsForm.ShowFirstRunGuideIfNeeded();
@@ -3115,6 +3117,15 @@ internal static class Program
 		}
 		Screen screen = Screen.FromRectangle(settingsForm.Bounds);
 		settingsForm.WindowState = FormWindowState.Normal;
+		// ⭐⭐ 2026-10-18（机主：取消启动预热）：⭐ 首次真正打开设置时才做风扇闸门只读验证/启动清理（懒加载、进程内缓存一次）✅
+		try
+		{
+			hw?.RunDeferredFanStartupCleanup();
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[init] 首次打开设置的风扇懒加载失败（已吞掉，不影响界面）：" + ex.Message);
+		}
 		settingsForm.VisualiseGPUMode();
 		settingsForm.ShowAll(screen.WorkingArea);
 		if (_showGuideOnFirstRestore)
