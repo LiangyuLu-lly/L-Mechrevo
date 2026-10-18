@@ -2210,6 +2210,12 @@ internal static class Program
 			MechrevoHw restoreHw = hw;
 			if (restoreHw != null && restoreHw.UsesBaolongda && !BaolongdaWantsStartupLightWrite())
 			{
+				// ⭐ 2026-10-19（机主：关灯后又自己开）：明确记录「恢复判定=只读」
+				string decisionMessage = "[light] 恢复判定：BaolongdaWantsStartupLightWrite()=False ⇒ 只读同步（不写）";
+				if (Logger.TryMarkChanged("light-restore-readonly-decision", decisionMessage))
+				{
+					Logger.WriteError(decisionMessage);
+				}
 				SyncBaolongdaLightStateReadOnly("启动/恢复（判定=不点亮）");
 				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
 				return true;

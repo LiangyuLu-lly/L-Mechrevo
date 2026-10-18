@@ -17341,6 +17341,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 					Program.rgb.KbPowerOn = requested;
 					if (!requested)
 					{
+						// ⭐ 2026-10-19（机主：关灯后又自己开）：明确记录「用户意图已落盘为关」
+						Logger.WriteError("[light] 键盘关灯：写入意图 keyboard_power=0 · 清除 PowerExplicit · 后续恢复不会自动点亮");
 						KeyboardRgb rgb = Program.rgb;
 						int stopGen = gen;
 						hidStop = Task.Run(() =>

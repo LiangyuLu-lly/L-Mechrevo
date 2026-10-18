@@ -296,6 +296,9 @@ public class KeyboardRgb : IDisposable
 				// 2026-10-12（根因①）：能走到这里的就是用户在 UI 上拨了「键盘」开关
 				// （SettingsForm 的 CheckedChanged）⇒ 值本身就是用户意图，**两个方向都记**。
 				KbPowerExplicitOff = !value;
+				// ⭐⭐ 2026-10-19（机主：关灯后又自己开）：⭐ 用户意图必须**立刻落盘**
+				//   ⇒ rgb.cfg 的 `kbPower=0/1` 马上写出去（不再只等窗口关闭/进程退出）✅
+				QueueSaveConfig();
 			}
 		}
 	}
