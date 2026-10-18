@@ -336,6 +336,18 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-19（机主：无界系列 + AMD APU 要能用 SMU 自定义）：
+		//   **只读**探测命令 `--wujie-smu-probe`（0 写入；桌面报告 + 日志）。
+		//   内容：机型名/板号/CPU/CpuVendor/APU 判据 · SMU 代号/家族/版本 · 当前 PL1/PL2/STAPM 读数 ·
+		//        可写命令支持情况 · 判据结论（逐条列哪一条不满足）。
+		case "--wujie-smu-probe":
+		{
+			string probeLog = WujieSmuProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[wujie-smu-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-18（宝龙达 · 风扇接管接口）：**只读**探针 `--fan-probe`。
 		//   ⚠️ 2026-10-18 收紧：写 WMI 20=1 真机会卡死 ⇒ ⛔ 本探针**不再写任何字节**！
 		//   ⭐ 内容：EC 0xC83C/0xC83D/0xB20 只读验证 + WMI 13/20/21 原始 hex 只读对照 + 结论。

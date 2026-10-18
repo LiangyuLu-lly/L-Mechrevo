@@ -427,6 +427,14 @@ public class CustomModeForm : RForm
 		StartPosition = FormStartPosition.Manual;
 		ClientSize = new Size(D(820), D(200));
 		InitTheme(setDPI: true);
+		// ⭐⭐ 2026-10-19（机主：无界系列 + AMD APU 要能用 SMU 自定义）：
+		//   ⭐ 打开自定义模式窗口时落一行**只读判据**日志（去重）：
+		//      `[smu-ui] 无界 APU 判据：model=… · amd=… · apu=… · smuReady=… ⇒ SMU自定义=True/False`
+		//   ⚠️ 判据只读（机型名/CpuVendor/无 NVIDIA 独显/SmuAvailability）；本步**尚不改变**任何 UI/写路径 ✅
+		if (!Program.UiAuditMode)
+		{
+			MechrevoLite.Hardware.WujieSmuGate.LogPredicate();
+		}
 		Panel panel = (_scrollHost = new Panel
 		{
 			Dock = DockStyle.Fill,
