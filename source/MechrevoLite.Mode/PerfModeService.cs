@@ -1150,11 +1150,24 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
+		// ⭐⭐ 2026-10-19（机主：重启后模式跳回「平衡」）：
+		//   ⭐ 配置里没有 ActiveModeId（首次）⇒ 不设（跟随固件/默认平衡）✅
+		if (!PerfModeStore.HasStoredActive)
+		{
+			return;
+		}
 		PerfModeDefinition mode = Find(ActiveModeId);
 		if ((object)mode == null || !mode.IsCustom)
 		{
 			return;
 		}
+		// ⭐ 指向自定义档 ⇒ 走与 ActivateLocalProfile 同路径把当前模式设为该档（持久化 + RaiseActiveChanged）✅
+		ActivateLocalProfile(mode.Id);
+		if (Logger.TryMarkChanged("wujie-startup-mode", "[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + "（来自配置）⇒ 模式=自定义 · 重放 SMU"))
+		{
+			Logger.WriteError("[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + "（来自配置）⇒ 模式=自定义 · 重放 SMU");
+		}
+
 		PerfModeSettings settings = mode.Settings;
 		if (TryReadWujieSmuCurrent(out int curPl1, out int curPl2, out int curTctl)
 			&& WujieSmuValuesMatch(settings, curPl1, curPl2, curTctl))
@@ -1802,9 +1815,25 @@ internal sealed class PerfModeService
 				return;
 			}
 			MechrevoHw hw = _hw;
-			if (hw == null || !hw.IsConnected)
+			if (hw == null || (!hw.IsConnected && !hw.WujieSmuApu))
 			{
 				return;
+			}
+			// ⭐⭐ 2026-10-19（机主：无界 14X 重启后模式跳回「平衡」）：
+			//   ⭐ 无界 APU 的本机自定义档**优先于固件回读**（无固件档语义）——
+			//      若配置里的 ActiveModeId 指向一个自定义档，⛔ 不被固件读回的「平衡/其它」覆盖 ✅
+			//   ⚠️ 宝龙达/GCU/同方不变（WujieSmuApu 恒 false；宝龙达仍按既有 reconcile 语义）✅
+			if (hw.WujieSmuApu)
+			{
+				PerfModeDefinition persisted = Find(ActiveModeId);
+				if ((object)persisted != null && persisted.IsCustom)
+				{
+					if (Logger.TryMarkChanged("wujie-reconcile-keep-local", "[perfmode] 无界 APU：固件模式回读 ⇒ 保持本机自定义档 ActiveModeId=" + persisted.Id + "（⛔ 不覆盖）"))
+					{
+						Logger.WriteError("[perfmode] 无界 APU：固件模式回读 ⇒ 保持本机自定义档 ActiveModeId=" + persisted.Id + "（⛔ 不覆盖）");
+					}
+					return;
+				}
 			}
 			IReadOnlyList<FirmwareSlotState> slots = PerfModeStore.LoadSlots(SlotCount);
 			PerfModeResolution perfModeResolution = PerfModeResolver.Resolve(Modes, slots, _hw.OperatingMode, _hw.CustomProfileIndex, MechrevoService.IsSilentTurboActive, PerfModeStore.LastCustomId);
