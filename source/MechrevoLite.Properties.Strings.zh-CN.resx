@@ -452,6 +452,12 @@
     
   
   </data>
+<data name="KeyboardAutoOff" xml:space="preserve">
+    <value>键盘灯自动关闭</value>
+  </data>
+<data name="IdleOff5Min" xml:space="preserve">
+    <value>5 分钟</value>
+  </data>
 <data name="BalancedMode" xml:space="preserve">
     
     

@@ -402,6 +402,12 @@
     
   
   </data>
+<data name="KeyboardAutoOff" xml:space="preserve">
+    <value>Keyboard light auto-off</value>
+  </data>
+<data name="IdleOff5Min" xml:space="preserve">
+    <value>5 minutes</value>
+  </data>
 <data name="BalancedMode" xml:space="preserve">
     
     

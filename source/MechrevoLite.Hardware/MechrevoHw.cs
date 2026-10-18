@@ -1645,6 +1645,53 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 软件彩虹是否正在后台刷色（只读；⛔ 不触发任何写入）。</summary>
 	internal bool IsKeyboardRainbowRunning => _rainbowRunning;
 
+	// ══════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」· 软件实现）：
+	//    硬件 WMI 没有该功能号 ⇒ 由本类用**系统输入空闲时间**（GetLastInputInfo）判定 ✅
+	//    ⭐ 每 5s 只读检查：`GetLastInputInfo` + `BaolongdaState` 状态缓存
+	//      ⛔ 不写 16/17/18、⛔ 不重启彩虹、⛔ 不下发效果、⛔ 不重建 UI（红线）✅
+	//    ⭐ 只有**真正超时**才写一次亮度 0；只有**检测到新输入**才恢复一次原状态 ✅
+	//    ⚠️ 默认关闭（配置 = 0）⇒ **不创建计时器**、不写灯、无额外检查开销 ✅
+	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>⭐ 自动关灯计时器（5s tick；<c>null</c> = 功能关闭 ⇒ 不建/已停）。</summary>
+	private System.Threading.Timer _kbdAutoOffTimer;
+
+	/// <summary>⭐ 自动关灯状态锁（应用/恢复/手动清除的唯一串行点）。</summary>
+	private readonly object _kbdAutoOffGate = new object();
+
+	/// <summary>⭐ 是否已因空闲而关灯（0/1；=1 时检测到新输入才恢复）。</summary>
+	private int _kbdAutoOffApplied;
+
+	/// <summary>⭐ 恢复写入期间置位（0/1）⇒ ⛔ 不把"恢复"误当成"用户手动改灯"而清标记 ✅。</summary>
+	private int _kbdAutoOffRestoring;
+
+	/// <summary>⭐ 计时器回调防重入（0/1）✅。</summary>
+	private int _kbdAutoOffTickBusy;
+
+	/// <summary>⭐ 关灯写入失败后置位 ⇒ 等用户重新输入再试（⛔ 不每 5s 重写）✅。</summary>
+	private int _kbdAutoOffSuppressUntilInput;
+
+	/// <summary>⭐ "已启用"日志只打一次（0/1）✅。</summary>
+	private int _kbdAutoOffEnabledLogged;
+
+	/// <summary>⭐ 自动关灯前记录的完整键盘灯状态（恢复用；只存内存、不落盘）✅。</summary>
+	private KeyboardAutoOffSavedState _kbdAutoOffSaved;
+
+	/// <summary>⭐ 自动关灯配置缓存（秒；-1 = 还没读过配置）。</summary>
+	private static int _kbdAutoOffSecondsCache = -1;
+
+	/// <summary>⭐ 自动关灯配置的读写锁（静态缓存 + 旧键迁移只做一次）✅。</summary>
+	private static readonly object _kbdAutoOffConfigGate = new object();
+
+	/// <summary>⭐ 自动关灯前记录的完整键盘灯状态（恢复用）✅。</summary>
+	private sealed class KeyboardAutoOffSavedState
+	{
+		internal byte Brightness;
+		internal int ColorArgb;
+		internal bool Rainbow;
+	}
+
 	/// <summary>
 	/// ⭐ 最近一次键盘灯亮度写入的**请求值**（硬件级；-1 = 还没写过）。
 	/// <para>⚠️ 它可能已被 <see cref="MechrevoHw.BaolongdaBrightnessFromUi" /> 夹过；⛔ 不代表用户拖到的界面值。</para>
@@ -3441,6 +3488,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
+			// ⭐⭐ 2026-10-19（自动关灯）：任何**非恢复**的键盘灯写入都视为"用户手动改灯"
+			//   ⇒ 清"自动关灯已应用"标记（⛔ 之后绝不误恢复用户手动关掉的灯）✅
+			if (Volatile.Read(ref _kbdAutoOffRestoring) == 0)
+			{
+				ClearKeyboardAutoOffApplied("键盘灯写入");
+			}
+			// ⭐ 确保自动关灯计时器与配置一致（0 = 关闭 ⇒ 不创建；⛔ 无额外检查开销）✅
+			ApplyKeyboardAutoOffSetting();
 			// ⭐ ① 先试读一次「键盘灯状态」（⭐ 功能号 10）—— ⭐ 读得到才敢写 ⚠️
 			if (!wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardStatus, out byte status))
 			{
@@ -3991,7 +4046,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			return;
 		}
 		// ⭐ 先把可能还在跑的旧循环停掉（不恢复单色 ⇒ 马上会被本方法重新写）✅
-		StopKeyboardRainbowCore(restoreSingleColor: false);
+		StopKeyboardRainbowCore(restoreSingleColor: false, noRestoreLog: "[kbd] 软件彩虹：停止（准备重新启动）");
 		byte level = (byte)Math.Clamp((int)brightness, 1, EffectiveKeyboardBrightnessMax());
 		// ⭐ ① 起始状态：固定色模式 16=2 + 亮度 18（7.3 彩虹的起始状态）✅
 		bool modeOk = wmi.TrySetKeyboardMode(2);
@@ -4021,7 +4076,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>⭐ 软件彩虹停止/重启共用实现（<paramref name="restoreSingleColor" /> = 是否恢复单色）✅。</summary>
-	private void StopKeyboardRainbowCore(bool restoreSingleColor)
+	/// <param name="restoreSingleColor">⭐ 是否在停止后恢复单色（自动关灯等场景传 <c>false</c>，由调用方自己写目标状态）✅。</param>
+	/// <param name="noRestoreLog">⭐ 不恢复单色时要打的日志（<c>null</c> = 安静；自动关灯有自己的一行日志）✅。</param>
+	private void StopKeyboardRainbowCore(bool restoreSingleColor, string noRestoreLog = null)
 	{
 		CancellationTokenSource cts;
 		Task task;
@@ -4064,9 +4121,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			RestoreKeyboardAfterRainbow(brightness);
 		}
-		else
+		else if (noRestoreLog != null)
 		{
-			Logger.WriteError("[kbd] 软件彩虹：停止（准备重新启动）");
+			Logger.WriteError(noRestoreLog);
 		}
 	}
 
@@ -4217,6 +4274,382 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			(byte)Math.Round(r * 255.0),
 			(byte)Math.Round(g * 255.0),
 			(byte)Math.Round(b * 255.0));
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」· 软件实现）：
+	//    硬件 WMI 没有该功能号 ⇒ 用**系统输入空闲时间**判定（覆盖键鼠）✅
+	//    ⭐ 选项：关（默认）/ 10 秒 / 5 分钟 / 10 分钟 / 30 分钟（配置统一存**秒**）✅
+	//    ⭐ 红线：5s 检查**只读**（GetLastInputInfo + BaolongdaState 缓存）；
+	//      ⛔ 不写 16/17/18、⛔ 不重启彩虹循环、⛔ 不下发效果、⛔ 不重建 UI；日志去重不刷屏 ✅
+	//    ⭐ 只有超时那一刻写一次关灯；只有检测到新输入那一刻恢复一次 ✅
+	// ══════════════════════════════════════════════════════════════════════
+
+	/// <summary>⭐ Win32 `LASTINPUTINFO`（本类自用；⛔ 不改 `NativeMethods` 的既有实现）✅。</summary>
+	[StructLayout(LayoutKind.Sequential)]
+	private struct KeyboardAutoOffLastInputInfo
+	{
+		internal uint cbSize;
+		internal uint dwTime;
+	}
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern bool GetLastInputInfo(ref KeyboardAutoOffLastInputInfo plii);
+
+	/// <summary>⭐ 读系统输入空闲毫秒（⭐ 读不到 ⇒ <c>false</c> ⇒ 自动关灯**不动作**，保守）✅。</summary>
+	private static bool TryGetKeyboardIdleMilliseconds(out long idleMilliseconds)
+	{
+		idleMilliseconds = 0;
+		try
+		{
+			KeyboardAutoOffLastInputInfo info = default;
+			info.cbSize = (uint)Marshal.SizeOf<KeyboardAutoOffLastInputInfo>();
+			if (!GetLastInputInfo(ref info))
+			{
+				return false;
+			}
+			idleMilliseconds = unchecked((uint)Environment.TickCount - info.dwTime);
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>⭐ 自动关灯配置的**唯一读入口**（秒；0 = 关）—— 缺键默认 0，旧键 `light_autooff_minutes` 只迁移一次 ✅。</summary>
+	internal static int GetKeyboardAutoOffSeconds()
+	{
+		int cached = Volatile.Read(ref _kbdAutoOffSecondsCache);
+		if (cached >= 0)
+		{
+			return cached;
+		}
+		lock (_kbdAutoOffConfigGate)
+		{
+			cached = _kbdAutoOffSecondsCache;
+			if (cached >= 0)
+			{
+				return cached;
+			}
+			int seconds = AppConfig.Get("light_autooff_seconds", -1);
+			if (seconds < 0)
+			{
+				// ⭐ 旧键迁移（只读一次、只写新键；⛔ 不维护两个键并行）✅
+				int oldMinutes = AppConfig.Get("light_autooff_minutes", 0);
+				seconds = oldMinutes switch
+				{
+					5 => 300,
+					10 => 600,
+					30 => 1800,
+					_ => 0
+				};
+				AppConfig.Set("light_autooff_seconds", seconds);
+			}
+			seconds = NormalizeKeyboardAutoOffSeconds(seconds);
+			Volatile.Write(ref _kbdAutoOffSecondsCache, seconds);
+			return seconds;
+		}
+	}
+
+	/// <summary>⭐ 自动关灯配置的**唯一写入口**（秒；只接受 0/10/300/600/1800）✅。</summary>
+	internal static void SetKeyboardAutoOffSeconds(int seconds)
+	{
+		seconds = NormalizeKeyboardAutoOffSeconds(seconds);
+		lock (_kbdAutoOffConfigGate)
+		{
+			AppConfig.Set("light_autooff_seconds", seconds);
+			Volatile.Write(ref _kbdAutoOffSecondsCache, seconds);
+		}
+	}
+
+	/// <summary>⭐ 把任意输入收敛到受支持的选项值（0 = 关；其它一律按"关"处理，⛔ 不猜）✅。</summary>
+	private static int NormalizeKeyboardAutoOffSeconds(int seconds)
+	{
+		return seconds switch
+		{
+			10 => 10,
+			300 => 300,
+			600 => 600,
+			1800 => 1800,
+			_ => 0
+		};
+	}
+
+	/// <summary>⭐ 人读描述（日志用；秒 ⇒ "10 秒" / "N 分钟"）✅。</summary>
+	private static string DescribeKeyboardAutoOffSeconds(int seconds)
+	{
+		if (seconds == 10)
+		{
+			return "10 秒";
+		}
+		return (seconds / 60) + " 分钟";
+	}
+
+	/// <summary>
+	/// ⭐⭐ 应用「自动关灯」配置（启动 / 设置变更 / 键盘灯写入时调用）✅：
+	/// ⭐ 0 = 关闭 ⇒ **停计时器、不创建任何计时任务**；&gt;0 ⇒ 只创建一个 **5s tick** 计时器（⛔ 不高频）✅。
+	/// <para>⚠️ 由关闭切到启用时打一行 `[light] 自动关灯：已启用（…）`；默认关**不记**（保持安静）✅。</para>
+	/// </summary>
+	internal void ApplyKeyboardAutoOffSetting()
+	{
+		if (_disposed || !UsesBaolongda)
+		{
+			StopKeyboardAutoOffTimer();
+			return;
+		}
+		int seconds = GetKeyboardAutoOffSeconds();
+		if (seconds <= 0)
+		{
+			StopKeyboardAutoOffTimer();
+			// ⭐ 用户把功能关掉时若正处于"自动关灯"状态 ⇒ 立刻恢复一次（用户刚操作 ≠ 空闲）✅
+			if (Volatile.Read(ref _kbdAutoOffApplied) != 0)
+			{
+				RestoreKeyboardAfterAutoOff(0L, 0);
+			}
+			return;
+		}
+		if (_kbdAutoOffTimer == null)
+		{
+			_kbdAutoOffTimer = new System.Threading.Timer(KeyboardAutoOffTick, null, 5000, 5000);
+		}
+		if (Interlocked.Exchange(ref _kbdAutoOffEnabledLogged, 1) == 0)
+		{
+			Logger.WriteError("[light] 自动关灯：已启用（" + DescribeKeyboardAutoOffSeconds(seconds) + "）");
+		}
+	}
+
+	/// <summary>⭐ 停掉自动关灯计时器（幂等；⛔ 不写灯）✅。</summary>
+	private void StopKeyboardAutoOffTimer()
+	{
+		System.Threading.Timer timer = Interlocked.Exchange(ref _kbdAutoOffTimer, null);
+		timer?.Dispose();
+	}
+
+	/// <summary>
+	/// ⭐ 5s tick：**只读检查**（`GetLastInputInfo` + `BaolongdaState` 缓存）✅。
+	/// <para>⛔ 正常情况下**一行日志都不打**（只有"超时/恢复/读不到/异常"这些状态变化才记，且去重）✅。</para>
+	/// </summary>
+	private void KeyboardAutoOffTick(object state)
+	{
+		if (_disposed || Interlocked.Exchange(ref _kbdAutoOffTickBusy, 1) != 0)
+		{
+			return;
+		}
+		try
+		{
+			KeyboardAutoOffTickCore();
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineIfChanged("kbd-autooff-tick-fail", "[light] 自动关灯：检查异常（已忽略）：" + ex.Message);
+		}
+		finally
+		{
+			Interlocked.Exchange(ref _kbdAutoOffTickBusy, 0);
+		}
+	}
+
+	/// <summary>⭐ tick 主体（⭐ 只读；只有真超时/真恢复才调写入）✅。</summary>
+	private void KeyboardAutoOffTickCore()
+	{
+		if (_disposed || !UsesBaolongda)
+		{
+			return;
+		}
+		int seconds = GetKeyboardAutoOffSeconds();
+		if (seconds <= 0)
+		{
+			return; // ⭐ 功能关闭 ⇒ 直接返回（连 GetLastInputInfo 都不调）✅
+		}
+		if (!TryGetKeyboardIdleMilliseconds(out long idleMilliseconds))
+		{
+			Logger.WriteLineIfChanged("kbd-autooff-idle-unreadable",
+				"[light] 自动关灯：读不到系统空闲时间 ⇒ 本轮**不关灯**（保守）");
+			return;
+		}
+		long thresholdMilliseconds = (long)seconds * 1000L;
+		bool applied = Volatile.Read(ref _kbdAutoOffApplied) != 0;
+		if (!applied)
+		{
+			if (idleMilliseconds < thresholdMilliseconds)
+			{
+				Volatile.Write(ref _kbdAutoOffSuppressUntilInput, 0);
+				return; // ⭐ 未超时 ⇒ 纯只读返回 ✅
+			}
+			if (Volatile.Read(ref _kbdAutoOffSuppressUntilInput) != 0)
+			{
+				return; // ⭐ 上次写失败 ⇒ 等用户重新输入后再试（⛔ 不每 5s 重写）✅
+			}
+			TryApplyKeyboardAutoOff(seconds, idleMilliseconds);
+			return;
+		}
+		// ⭐ 已自动关灯：一旦检测到新输入（空闲时间回到阈值内）⇒ 恢复一次 ✅
+		if (idleMilliseconds >= thresholdMilliseconds)
+		{
+			return;
+		}
+		// ⭐⭐ 恢复前**再读一次只读缓存**：若灯已经被"别的路径"重新点亮（用户按 Fn / 第三方控制台）
+		//   ⇒ ⛔ 不拿记录的旧状态覆盖它（清标记、静默返回；⛔ 不写任何灯）✅
+		BaolongdaStateSnapshot restoreSnapshot = BaolongdaState;
+		if (restoreSnapshot?.KeyboardBrightness.HasValue == true && restoreSnapshot.KeyboardBrightness.Value > 0)
+		{
+			lock (_kbdAutoOffGate)
+			{
+				_kbdAutoOffSaved = null;
+				Volatile.Write(ref _kbdAutoOffApplied, 0);
+			}
+			return;
+		}
+		RestoreKeyboardAfterAutoOff(idleMilliseconds, seconds);
+	}
+
+	/// <summary>
+	/// ⭐⭐ **关灯动作**（只有真正超时那一刻调用一次）✅：
+	/// ⭐ 记录关灯前完整状态 → 若彩虹在跑先停循环（⛔ 不恢复单色）→ 只写一次亮度 0 ✅。
+	/// </summary>
+	private void TryApplyKeyboardAutoOff(int seconds, long idleMilliseconds)
+	{
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			return;
+		}
+		// ⭐ **只读状态缓存**判断"灯是否开着"（3s 刷新的快照；读不到/不是开 ⇒ ⛔ 不写、不标记）✅
+		BaolongdaStateSnapshot snapshot = BaolongdaState;
+		int? cachedBrightness = snapshot?.KeyboardBrightness;
+		if (!cachedBrightness.HasValue || cachedBrightness.Value <= 0)
+		{
+			return;
+		}
+		bool rainbow = IsKeyboardRainbowRunning;
+		LightChannelSettings stored = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
+		KeyboardAutoOffSavedState saved = new KeyboardAutoOffSavedState
+		{
+			Rainbow = rainbow,
+			ColorArgb = stored.EffectiveColorArgb(),
+			Brightness = rainbow
+				? (byte)Math.Clamp(ReadKeyboardRainbowBrightness(), 1, EffectiveKeyboardBrightnessMax())
+				: (byte)Math.Clamp(cachedBrightness.Value, 1, EffectiveKeyboardBrightnessMax())
+		};
+		lock (_kbdAutoOffGate)
+		{
+			if (Volatile.Read(ref _kbdAutoOffApplied) != 0)
+			{
+				return;
+			}
+			_kbdAutoOffSaved = saved;
+			Volatile.Write(ref _kbdAutoOffApplied, 1);
+		}
+		// ⭐⭐ 只有"真正超时这一刻"才写灯 ✅
+		if (rainbow)
+		{
+			StopKeyboardRainbowCore(restoreSingleColor: false, noRestoreLog: null);
+		}
+		bool ok = wmi.TrySetKeyboardBrightness(0);
+		LastKeyboardBrightnessRequested = 0;
+		LastKeyboardBrightnessApplied = ok ? 0 : -1;
+		if (!ok)
+		{
+			lock (_kbdAutoOffGate)
+			{
+				_kbdAutoOffSaved = null;
+				Volatile.Write(ref _kbdAutoOffApplied, 0);
+			}
+			Volatile.Write(ref _kbdAutoOffSuppressUntilInput, 1);
+			Logger.WriteError("[light] 自动关灯：⚠️ 写亮度 0 失败 ⇒ 本轮不标记（等你重新输入后再试）");
+			return;
+		}
+		Logger.WriteError($"[light] 自动关灯：空闲 {idleMilliseconds / 1000.0:0} 秒 ≥ {seconds} 秒"
+			+ $"（{DescribeKeyboardAutoOffSeconds(seconds)}）⇒ 已关灯（亮度 0{(rainbow ? " · 先停了软件彩虹" : "")}）");
+	}
+
+	/// <summary>⭐ 读软件彩虹当前亮度（快照用；未在跑时无意义）✅。</summary>
+	private int ReadKeyboardRainbowBrightness()
+	{
+		lock (_rainbowGate)
+		{
+			return _rainbowBrightness;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ **恢复动作**（只有检测到新输入、且 <c>_kbdAutoOffApplied == true</c> 时调用一次）✅：
+	/// ⭐ 按关灯前记录恢复（彩虹 ⇒ 重启软件彩虹；单色 ⇒ 写回原模式/颜色/亮度）✅。
+	/// </summary>
+	private void RestoreKeyboardAfterAutoOff(long idleMilliseconds, int seconds)
+	{
+		KeyboardAutoOffSavedState saved;
+		lock (_kbdAutoOffGate)
+		{
+			if (Volatile.Read(ref _kbdAutoOffApplied) == 0)
+			{
+				return; // ⭐ 用户手动关的灯（标记已被清）⇒ ⛔ 不恢复 ✅
+			}
+			saved = _kbdAutoOffSaved;
+			_kbdAutoOffSaved = null;
+			Volatile.Write(ref _kbdAutoOffApplied, 0);
+		}
+		if (saved == null)
+		{
+			return;
+		}
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			// ⭐ 后端没就绪 ⇒ 放回标记，下次 tick 再试（⛔ 不丢恢复意图）✅
+			lock (_kbdAutoOffGate)
+			{
+				if (Volatile.Read(ref _kbdAutoOffApplied) == 0)
+				{
+					_kbdAutoOffSaved = saved;
+					Volatile.Write(ref _kbdAutoOffApplied, 1);
+				}
+			}
+			return;
+		}
+		Interlocked.Exchange(ref _kbdAutoOffRestoring, 1);
+		try
+		{
+			if (saved.Rainbow)
+			{
+				StartKeyboardRainbow(saved.Brightness, CancellationToken.None);
+			}
+			else if (saved.Brightness > 0)
+			{
+				TrySetKeyboardLightingViaBackend(true, saved.ColorArgb, saved.Brightness, (byte)2, out _);
+			}
+			Logger.WriteError($"[light] 自动关灯：检测到新输入"
+				+ (seconds > 0 ? $"（空闲 {idleMilliseconds / 1000.0:0} 秒 < {seconds} 秒）" : "（功能已关闭）")
+				+ $"⇒ 已恢复关灯前状态（{(saved.Rainbow ? "软件彩虹" : "单色")} · 亮度={saved.Brightness}）");
+		}
+		finally
+		{
+			Interlocked.Exchange(ref _kbdAutoOffRestoring, 0);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ **用户手动改灯** ⇒ 清 `_kbdAutoOffApplied`（⛔ 之后绝不误恢复用户手动关掉的灯）✅。
+	/// <para>⚠️ 自动恢复自身引起的写入用 <c>_kbdAutoOffRestoring</c> 排除，⛔ 不会被当成"手动改灯"✅。</para>
+	/// </summary>
+	private void ClearKeyboardAutoOffApplied(string reason)
+	{
+		if (Volatile.Read(ref _kbdAutoOffApplied) == 0)
+		{
+			return;
+		}
+		lock (_kbdAutoOffGate)
+		{
+			if (Volatile.Read(ref _kbdAutoOffApplied) == 0)
+			{
+				return;
+			}
+			_kbdAutoOffSaved = null;
+			Volatile.Write(ref _kbdAutoOffApplied, 0);
+		}
+		Volatile.Write(ref _kbdAutoOffSuppressUntilInput, 0);
+		Logger.WriteLine("[light] 自动关灯：用户手动改灯 ⇒ 已取消自动恢复标记（" + reason + "）");
 	}
 
 	// ⭐⭐ 2026-10-17（接手 · 按**原厂口径**修正转速百分比）：⭐ 100% 对应的 RPM ✅
@@ -10163,6 +10596,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⭐⭐ 2026-10-19（软件彩虹生命周期 · 机主第 3 条）：⭐ 程序退出前**先停掉后台刷色**
 		//   （取消循环 + 恢复用户单色）⇒ ⛔ 退出后不再有任何周期性 WMI 写入 ✅
 		StopKeyboardRainbow();
+		// ⭐⭐ 2026-10-19（自动关灯）：退出时停计时器 + 清内存标记（⛔ 不写灯；下次启动按配置正常）✅
+		StopKeyboardAutoOffTimer();
+		lock (_kbdAutoOffGate)
+		{
+			_kbdAutoOffSaved = null;
+			Volatile.Write(ref _kbdAutoOffApplied, 0);
+		}
 		_disposed = true;
 		_subscriptionsReady = false;
 		bool flag = false;
