@@ -8112,8 +8112,17 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			//   ⭐ 并**单独记住该行索引/行高**（所有重算/隐藏路径都跳过它）✅
 			int panelWidth = Math.Max(320, host.Width);
 			int panelHeight = Math.Max(100, panel.GetPreferredSize(new Size(panelWidth, 0)).Height);
-			host.RowStyles.Add(new RowStyle(SizeType.Absolute, panelHeight));
-			_bdChargePanelRowIndex = host.RowCount - 1;
+			// 2026-10-18（机主：电池区域仍然空白 · 诊断包实测 `rowIndex=7 · rows=5`）：
+			//   ⚠️ 根因 = 增量行之前 `RowStyles.Count` 可能**小于** `RowCount`（有行只加了 RowCount 没加样式）
+			//   ⇒ 只 `RowStyles.Add()` 会让"新行"落在 index=5，而控件加到 index=7 ⇒ **那一行没有样式 ⇒ 高度 0 ⇒ 面板看不见**。
+			//   ⇒ ⭐ 先把 RowStyles 补齐到 RowCount，再**按最后一行显式赋值样式**，索引与控件位置逐一对齐 ✅
+			while (host.RowStyles.Count < host.RowCount)
+			{
+				host.RowStyles.Add(new RowStyle(SizeType.Absolute, 0f));
+			}
+			int panelRow = host.RowCount - 1;
+			host.RowStyles[panelRow] = new RowStyle(SizeType.Absolute, panelHeight);
+			_bdChargePanelRowIndex = panelRow;
 			_bdChargePanelRowHeight = panelHeight;
 			host.Controls.Add(panel, 0, _bdChargePanelRowIndex);
 			host.SetColumnSpan(panel, 3);
