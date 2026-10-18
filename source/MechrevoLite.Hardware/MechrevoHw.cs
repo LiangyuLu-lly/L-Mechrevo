@@ -2505,6 +2505,55 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// 强冷可见性 = 旧判据（GCU 能力位 / 宝龙达）**或** 无界 APU（GCU 后端；入口恢复，避免能力位刷新前被永久隐藏）✅。
 	/// <para>⚠️ 下发仍走原 `SwitchQuick("fanboost")`：宝龙达=本机 EC；GCU/无界=GCU MQTT 话题（未改）✅</para>
 	/// </summary>
+	/// <summary>⭐ 2026-10-19（快捷开关防回归自检）：SupportsQuickSwitch 的全部键（新增键必须同步到这里）✅</summary>
+	internal static readonly string[] QuickSwitchKeys = new string[26]
+	{
+		"touchpad", "wifi", "bt", "webcam", "winkey", "fnkey", "capslock", "numpad", "osd", "usb",
+		"deepsleep", "copilot", "acrecovery", "highperf", "fanboost", "apuboost", "lightbar", "logolight",
+		"touchpadtoggle", "singlecolorkb", "uni", "omni", "powerlight", "batterylogo", "gamewhitelist", "cpuadvperf"
+	};
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（防回归）：某快捷键**是否有处理分支**（特殊分支 ∪ SwitchQuick action 表）。
+	/// <para>⚠️ 与 `SwitchQuick` 实现同源维护；`FunctionVerifier` 自检用它找「可见但静默失败」的缺口 ✅</para>
+	/// </summary>
+	internal static bool HasQuickSwitchDispatch(string key)
+	{
+		switch (key)
+		{
+		case "touchpad":
+		case "wifi":
+		case "bt":
+		case "webcam":
+		case "winkey":
+		case "fnkey":
+		case "capslock":
+		case "numpad":
+		case "osd":
+		case "highperf":
+		case "apuboost":
+		case "fanboost":
+		case "usb":
+		case "micmute":
+		case "deepsleep":
+		case "gamewhitelist":
+		case "cpuadvperf":
+		case "lightbar":
+		case "logolight":
+			return true;
+		case "copilot":
+		case "acrecovery":
+		case "batterylogo":
+		case "touchpadtoggle":
+		case "singlecolorkb":
+		case "uni":
+		case "omni":
+		case "powerlight":
+			return true;
+		default:
+			return false;
+		}
+	}
 	internal bool SupportsFanBoostQuickSwitch
 	{
 		get

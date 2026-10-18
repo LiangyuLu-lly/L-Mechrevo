@@ -13,11 +13,52 @@ internal static class FunctionVerifier
 {
 	private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(1600L);
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：强冷同类缺口统一修 · 防回归自检）：
+	/// 遍历所有快捷开关键，检查「可见 ⇔ 有处理分支」，不一致 ⇒ 记 issue 并打印清单 ✅
+	/// </summary>
+	private static void LogQuickSwitchCoverage(MechrevoHw hw)
+	{
+		List<string> supported = new List<string>();
+		List<string> handled = new List<string>();
+		List<string> gaps = new List<string>();
+		foreach (string key in MechrevoHw.QuickSwitchKeys)
+		{
+			bool visible;
+			try
+			{
+				visible = hw.SupportsQuickSwitch(key);
+			}
+			catch
+			{
+				visible = false;
+			}
+			if (!visible)
+			{
+				continue;
+			}
+			supported.Add(key);
+			if (MechrevoHw.HasQuickSwitchDispatch(key))
+			{
+				handled.Add(key);
+			}
+			else
+			{
+				gaps.Add(key);
+			}
+		}
+		Logger.WriteError("[selfcheck] 快捷开关覆盖：支持=" + supported.Count + " · 有处理=" + handled.Count
+			+ " · 缺口=[" + string.Join(",", gaps) + "]");
+		if (gaps.Count > 0)
+		{
+			Logger.WriteError("[selfcheck] ⛔ 快捷开关缺口（可见但无下发处理）：" + string.Join(",", gaps));
+		}
+	}
 	public static async Task<int> RunAsync(string outputPath)
 	{
 		List<VerifyResult> results = new List<VerifyResult>();
 		using MechrevoHw hw = new MechrevoHw();
-		Logger.WriteLine("VERIFY 开始，连接 GCU…");
+		Logger.WriteLine("VERIFY 开始，连接 GCU…");		LogQuickSwitchCoverage(hw);
 		if (!(await hw.ConnectAsync()))
 		{
 			Logger.WriteLine("VERIFY 连接失败，无法验证。");

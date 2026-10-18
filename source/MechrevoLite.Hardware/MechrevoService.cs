@@ -3065,7 +3065,33 @@ public class MechrevoService
 					return bdConfirmed;
 				}
 			}
-			// ⭐⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
+			// ⭐⭐ 2026-10-19（机主：强冷同类缺口统一修）：这些键的 UI 有独立 handler，但统一入口 SwitchQuick 也必须能处理，
+			//   ⛔ 不再落入 action==null 静默失败 ✅
+			if (string.Equals(key, "usb", StringComparison.Ordinal))
+			{
+				return await SwitchUsbCharger(on).ConfigureAwait(continueOnCapturedContext: false);
+			}
+			if (string.Equals(key, "micmute", StringComparison.Ordinal))
+			{
+				return await SwitchMicMute(on).ConfigureAwait(continueOnCapturedContext: false);
+			}
+			if (string.Equals(key, "deepsleep", StringComparison.Ordinal))
+			{
+				return await SwitchDeepSleep(on).ConfigureAwait(continueOnCapturedContext: false);
+			}
+			if (string.Equals(key, "gamewhitelist", StringComparison.Ordinal))
+			{
+				return await SwitchGameWhitelist(on).ConfigureAwait(continueOnCapturedContext: false);
+			}
+			if (string.Equals(key, "cpuadvperf", StringComparison.Ordinal))
+			{
+				return await SwitchCpuAdvancedPerformance(on).ConfigureAwait(continueOnCapturedContext: false);
+			}
+			if (string.Equals(key, "lightbar", StringComparison.Ordinal) || string.Equals(key, "logolight", StringComparison.Ordinal))
+			{
+				string lightTopic = ((key == "lightbar") ? "HidLightbar/Ctrl" : "HidLightbar_Logo/Ctrl");
+				return await SetLightPower(lightTopic, on).ConfigureAwait(continueOnCapturedContext: false);
+			}			// ⭐⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
 			//   ⚠️ 宝龙达没有 GCU、也没有摄像头功能号 ⇒ 旧的 `WEBCAM_ON/OFF`（厂商 MQTT）**必然无效**；
 			//      上一版的"摄像头隐私授权"只是系统隐私开关（隐私 Allow ≠ 设备没被禁用 ⚠️）。
 			//   ⭐ 现在：`on=true` ⇒ **启用摄像头设备**；`on=false` ⇒ **禁用摄像头设备**（SetupAPI，通用）✅
@@ -3163,6 +3189,8 @@ public class MechrevoService
 			};
 			if (action == null)
 			{
+				// ⭐⭐ 2026-10-19（防回归）：⛔ 不再静默 —— 缺动作映射必须默认可见地记 error ✅
+				Logger.WriteError("[quick] ⛔ SwitchQuick(" + key + ") 无下发动作映射 ⇒ 已返回 false（这会被 UI 当成失败）");
 				return false;
 			}
 			bool confirmed = false;
