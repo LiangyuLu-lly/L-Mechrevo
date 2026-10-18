@@ -2956,7 +2956,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// （⭐ 功能号 15 回读确认 ／ ⭐ 回读不一致时按实际读到的值），⛔ 绝不把"想让它变成什么"当成状态 ✅
 	/// （与 3 s 周期 <see cref="RefreshBaolongdaSwitchStates" /> 同一口径 ✅）。</para>
 	/// </summary>
-	private void SyncLogoLightQuickSwitch(bool on, string source)
+	internal void SyncLogoLightQuickSwitch(bool on, string source)
 	{
 		SyncBaolongdaQuickSwitch("logolight", on ? 1 : 0);
 		// ⭐ 用 WriteLineIfChanged 去重：状态没变就不刷屏 ✅（一变就换一行 ⇒ 诊断包能回查"谁改的"）
@@ -3407,6 +3407,72 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			Logger.WriteLine("宝龙达 LOGO 灯：⭐ 读取异常：" + ex.Message);
 			return false;
 		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（启动灯光策略：只读）：⭐ 读一次宝龙达键盘灯真实状态（⭐ 只读，⛔ 不写任何字节 ✅）。
+	/// <para>⭐ 判据（机主确认）：<c>16 != 0 且 18 &gt; 0</c> 才算「亮着」—— ⚠️ 只判功能号 16 会误判 ❌；
+	/// ⛔ 功能号 10 在宝龙达恒 0，**不用**它 ✅。</para>
+	/// <para>⭐ 非宝龙达 / 读不到 ⇒ 返回 <c>false</c>（调用方保持原判据，⛔ 不编造状态）✅。</para>
+	/// </summary>
+	/// <param name="on">⭐ 16!=0 且 18&gt;0 ——「亮着」✅。</param>
+	/// <param name="mode">⭐ 功能号 16 原值（读不到 = -1）✅。</param>
+	/// <param name="brightness">⭐ 功能号 18 原值（读不到 = -1）✅。</param>
+	/// <param name="detail">⭐ 供日志的如实摘要（16=… · 18=…）✅。</param>
+	internal bool TryReadKeyboardLightingViaBackend(out bool on, out int mode, out int brightness, out string detail)
+	{
+		on = false;
+		mode = -1;
+		brightness = -1;
+		detail = string.Empty;
+		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null || _disposed)
+		{
+			detail = "宝龙达后端不可用";
+			return false;
+		}
+		try
+		{
+			bool modeRead = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardMode, out byte modeValue) && modeValue != 255;
+			bool brightRead = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte brightValue) && brightValue != 255;
+			if (modeRead)
+			{
+				mode = modeValue;
+			}
+			if (brightRead)
+			{
+				brightness = brightValue;
+			}
+			if (!modeRead && !brightRead)
+			{
+				detail = "功能号 16/18 都读不到";
+				return false;
+			}
+			// ⭐ 机主确认的判据：16 != 0 且 18 > 0 才算亮；⛔ 不用功能号 10 ✅
+			on = modeRead && brightRead && modeValue != 0 && brightValue > 0;
+			detail = "16=" + (modeRead ? modeValue.ToString() : "读不到")
+				+ " · 18=" + (brightRead ? brightValue.ToString() : "读不到");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			detail = ex.GetType().Name + " " + ex.Message;
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（启动灯光策略：只读）：⭐ 把回读到的键盘灯真实状态写进 <see cref="KeyboardPower" /> 镜像
+	/// （⭐ 供 UI/「灯光」行同步；⛔ **不写硬件**、⛔ 不改用户保存的配置 ✅）。
+	/// </summary>
+	internal void SyncKeyboardPowerFromHardware(bool on, string source)
+	{
+		if (KeyboardPower == on)
+		{
+			return;
+		}
+		KeyboardPower = on;
+		Logger.WriteLine($"[light] 键盘灯电源镜像同步 ⇒ {(on ? "On" : "Off")}（来源：{source}；⛔ 未写硬件）");
 	}
 
 	// ══════════════════════════════════════════════════════════════════════════

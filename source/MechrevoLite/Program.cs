@@ -2054,6 +2054,16 @@ internal static class Program
 				await SuspendLightingTemporarilyAsync().ConfigureAwait(continueOnCapturedContext: false);
 				return true;
 			}
+			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 宝龙达下**判定为不点亮**时 ⇒
+			//   ⛔ 一个灯光字节都不写（Logo 15 / 键盘 16·17·18 全不碰），只回读真实状态 + 同步 UI ✅
+			//   ⚠️ 只有「用户显式点开过 Logo」（PowerOn && PowerExplicit）才允许走下面的写入路径 ✅
+			MechrevoHw restoreHw = hw;
+			if (restoreHw != null && restoreHw.UsesBaolongda && !BaolongdaWantsStartupLightWrite())
+			{
+				SyncBaolongdaLightStateReadOnly("启动/恢复（判定=不点亮）");
+				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
+				return true;
+			}
 			Task<bool> keyboardTask = RestoreKeyboardLightingAsync(forceKeyboardRestore);
 			Task<bool> externalTask = RestoreExternalLightingAsync();
 			InlineArray2<Task<bool>> buffer = default;
@@ -2333,6 +2343,78 @@ internal static class Program
 		Logger.WriteError($"[logo] 启动恢复判断：PowerOn={powerOnText} · PowerExplicit={explicitText} · 决策={(requested ? "点亮" : "不点亮")}（原因={reason}）");
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ **宝龙达启动/恢复的只读同步** ——
+	/// ⛔ 一个灯光字节都不写（功能号 15 / 16 / 17 / 18 全不碰），只回读真实状态并同步进
+	/// <c>QuickSwitches</c> / <c>KeyboardPower</c> / UI ✅。
+	/// <para>⭐ 回读判据（机主确认）：Logo = 功能号 15；键盘 = <c>16 != 0 且 18 &gt; 0</c> 才算「亮着」
+	/// （⛔ 不用功能号 10 —— 它在宝龙达恒 0）✅。</para>
+	/// <para>日志（默认日志级别可见；值变化才再记一次）：
+	/// <c>[light] 启动：只读同步（不写硬件）⇒ logo=…（来源=功能号15 回读）· keyboard=亮/灭（16=… · 18=…）</c></para>
+	/// </summary>
+	private static void SyncBaolongdaLightStateReadOnly(string reason)
+	{
+		MechrevoHw mechrevoHw = hw;
+		if (mechrevoHw == null || !mechrevoHw.UsesBaolongda)
+		{
+			return;
+		}
+		try
+		{
+			bool logoReadable = mechrevoHw.TryReadLogoLightViaBackend(out bool logoOn);
+			if (logoReadable)
+			{
+				// ⭐ 只同步镜像/UI（SyncLogoLightQuickSwitch 只写 QuickSwitches，⛔ 不写硬件）✅
+				mechrevoHw.SyncLogoLightQuickSwitch(logoOn, "功能号15 回读");
+			}
+			bool keyboardReadable = mechrevoHw.TryReadKeyboardLightingViaBackend(out bool keyboardOn,
+				out int keyboardMode, out int keyboardBrightness, out string _);
+			if (keyboardReadable)
+			{
+				mechrevoHw.SyncKeyboardPowerFromHardware(keyboardOn, "功能号16/18 回读");
+			}
+			string logoText = logoReadable ? (logoOn ? "亮" : "灭") : "读不到";
+			string keyboardText = keyboardReadable ? (keyboardOn ? "亮" : "灭") : "读不到";
+			string modeText = (keyboardMode >= 0) ? keyboardMode.ToString() : "读不到";
+			string brightnessText = (keyboardBrightness >= 0) ? keyboardBrightness.ToString() : "读不到";
+			string message = $"[light] 启动：只读同步（不写硬件）⇒ logo={logoText}（来源=功能号15 回读）"
+				+ $" · keyboard={keyboardText}（16={modeText} · 18={brightnessText}）";
+			// ⭐ 默认日志级别是「仅错误」⇒ 用 WriteError 保证可见；值没变不重复刷 ✅
+			if (Logger.TryMarkChanged("light-startup-readonly", message))
+			{
+				Logger.WriteError(message);
+			}
+			Logger.WriteLineIfChanged("light-startup-readonly-reason", "[light] 启动只读同步触发：" + reason);
+			// ⭐ UI 立刻按真实状态收敛（灯光行 +「更多开关」；⛔ 不改任何硬件）✅
+			ScheduleQuickSwitchUiRefresh("启动只读同步");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[light] 启动只读同步失败（已吞掉，⛔ 未写硬件）：" + ex.Message);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ **启动/恢复时是否允许写灯光硬件** ——
+	/// 宝龙达下只有「用户显式点开过 Logo 开关」（<c>PowerOn &amp;&amp; PowerExplicit</c>，见 98a3f70 标记）
+	/// 才允许发一次点亮命令 ✅；其余（旧配置/未配置/显式关）一律**只读**，⛔ 不写、⛔ 不"恢复成关"。
+	/// <para>⚠️ 键盘通道**没有**可靠的「显式开过」标记：<c>rgb.cfg</c> 的 <c>kbPower=1</c> 会被缺省值/退出时
+	/// 无条件 SaveConfig 写成 1（只有 <c>kbPower=0</c> 是可靠证据）⇒ 启动键盘一律只读、⛔ 不下发 ✅。</para>
+	/// </summary>
+	private static bool BaolongdaWantsStartupLightWrite()
+	{
+		MechrevoHw mechrevoHw = hw;
+		if (mechrevoHw == null || !mechrevoHw.UsesBaolongda)
+		{
+			return false;
+		}
+		if (LightingSettingsStore.TryLoad(MqttTopics.LogoLightCtrl, out LightChannelSettings logoSettings))
+		{
+			return logoSettings.PowerOn && logoSettings.PowerExplicit;
+		}
+		return false;
+	}
+
 	private static async Task<(bool AllIssued, bool Attempted, string IssuedSummary)> SetExternalLightingPowerAsync(bool on, bool restoreEffect, bool useTemporarySnapshot, int? restoreRequestId = null)
 	{
 		MechrevoHw mechrevoHw = hw;
@@ -2368,6 +2450,14 @@ internal static class Program
 			{
 				LogLogoRestoreDecision(logoHasSaved, logoSettings, logoRequested, logoCanAct);
 			}
+			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 判定为「不点亮」⇒ **一个字节都不写**
+			//   （⛔ 不再"恢复成关"、⛔ 不写功能号 15/16/17/18），只回读真实状态并同步 UI/镜像 ✅
+			//   ⚠️ 原实现这里会下发一次 off（机主日志：`on=False（请求 on=True）`）⇒ 已按机主要求去掉 ✅
+			if (on && !logoRequested)
+			{
+				SyncBaolongdaLightStateReadOnly("Logo 恢复（判定=不点亮）");
+				return (AllIssued: true, Attempted: true, IssuedSummary: "logo=只读（未写）");
+			}
 			if (logoCanAct && mechrevoHw.TrySetLogoLightViaBackend(logoRequested, out bool logoConfirmed))
 			{
 				string logoSummary = $"logo={(logoRequested ? "On" : "Off")}{(logoConfirmed ? "" : "(unconfirmed)")}";
@@ -2390,7 +2480,7 @@ internal static class Program
 			}
 			if (!logoCanAct)
 			{
-				// ⭐ 启动恢复：有用户意图标记但 Logo 通道没有可恢复内容 ⇒ 视为成功（⛔ 不点亮、⛔ 不写 off）
+				// ⭐ 防御：on=true 且无任何可恢复内容（上面已提前 return，正常走不到）⇒ 不写硬件
 				Logger.WriteError("[logo] 启动恢复：跳过 Logo 电源下发（无已保存配置/无临时快照 ⇒ 不写硬件）");
 				return (AllIssued: true, Attempted: true, IssuedSummary: "logo=skip");
 			}
@@ -2625,6 +2715,16 @@ internal static class Program
 			if (Volatile.Read(in _exitStarted) != 0 || rgb == null)
 			{
 				return false;
+			}
+			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 宝龙达键盘灯启动/恢复**一个字节都不写**
+			//   （⛔ 不发"关灯"、⛔ 不写功能号 16/17/18、⛔ 不启动 HID 帧流）⇒ 只回读真实状态 + 同步 UI/镜像 ✅
+			//   ⭐ 判据：16 != 0 且 18 > 0 才算「亮着」（⛔ 不用功能号 10）；显式关也只读 ✅
+			MechrevoHw keyboardRestoreHw = hw;
+			if (keyboardRestoreHw != null && keyboardRestoreHw.UsesBaolongda)
+			{
+				SyncBaolongdaLightStateReadOnly("键盘恢复（只读）");
+				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
+				return true;
 			}
 			// 2026-10-10（①「安装后灯被熄灭」）：情况 B —— 无已保存的灯效配置（从未配置，或被安装程序
 			// 删掉了 %APPDATA%\MechrevoLite 里的 keyboard.cfg 等）⇒ ⛔ 这条老路径"什么都不发"：

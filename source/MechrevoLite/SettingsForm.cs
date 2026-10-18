@@ -17160,7 +17160,14 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			// ⚠️ 2026-10-12（用户拍板「键盘灯光也修复」）：判据统一走 KeyboardLightingDecision ⇒
 			// 「用户明确关过」这条标记**只在硬件也报 Off 时才算数**（硬件报 On 时它是陈旧的，
 			// 由 Program.SyncKbPowerFromHardwareIfDiverged 清掉），故此处开关不再被陈旧标记永久压成"关"。
-			bool flag = LightingState.IsLightSwitchOn(KeyboardLightingDecision.ShouldWrite(hw != null && hw.IsConnected, hw != null && hw.KeyboardPower), isLightingTemporarilySuspended);
+			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 宝龙达下键盘行开关显示**硬件真实回读值**
+			//   （启动只读同步写进 hw.KeyboardPower 的那份）—— ⛔ 不再让"缓存想开"覆盖真值
+			//   （否则硬件是灭、开关却显示开 ⇒ UI 与真值不符）✅
+			//   ⚠️ GCU/同方保持原判据（KeyboardLightingDecision）⇒ **逐位不变** ✅
+			bool keyboardSwitchOn = (hw != null && hw.UsesBaolongda)
+				? (hw.IsConnected && hw.KeyboardPower)
+				: KeyboardLightingDecision.ShouldWrite(hw != null && hw.IsConnected, hw != null && hw.KeyboardPower);
+			bool flag = LightingState.IsLightSwitchOn(keyboardSwitchOn, isLightingTemporarilySuspended);
 			if (_kbPowerSw.Checked != flag)
 			{
 				_syncingSwitches = true;
