@@ -71,6 +71,7 @@ public class AboutLicensesForm : RForm
 	new Entry("IYATT-yx/NullSignal", "MIT", "https://github.com/IYATT-yx/NullSignal", Strings.AboutLicensesUseNullSignal),
 		// 2026-10-18 本次改动新增的协议参考（未复制代码）
 		new Entry("Zcodeoooo/JiaoLong16Pro-Battery-threshold", "无 LICENSE（协议事实参考）", "https://github.com/Zcodeoooo/JiaoLong16Pro-Battery-threshold", Strings.AboutLicensesUseBatteryThreshold),
+		new Entry("OpenRevo (open-revo)", "二进制分发（仅运行观察，未反编译）", "https://github.com/OpenRevo/OpenRevo", Strings.AboutLicensesUseOpenRevo),
 	};
 
 	public AboutLicensesForm()
