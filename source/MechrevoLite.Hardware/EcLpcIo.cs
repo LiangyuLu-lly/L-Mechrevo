@@ -11,15 +11,18 @@ namespace MechrevoLite.Hardware;
 /// <para><b>为什么再开一条通道</b>：EC 的访问方式<b>不止一套</b>，实测与上游共确认四条：
 /// ① ACPI EC 标准端口 <c>0x62</c>/<c>0x66</c>（命令 <c>0x92</c> 读 XRAM / <c>0x80</c> 读标准空间）
 /// —— 由 <see cref="EcPortIo"/> 走 <c>LpcACPIEC</c> 模块；
-/// ② <b>LPC/SuperIO 寄存器窗口（本类）</b> —— 索引/数据端口对 <c>0x2E</c>/<c>0x2F</c>（slot 0）
-/// 或 <c>0x4E</c>/<c>0x4F</c>（slot 1），子寄存器 <c>0x11</c> 地址高 / <c>0x10</c> 地址低 / <c>0x12</c> 数据；
+/// ② <b>LPC EC-RAM 命令协议（本类）</b> —— 端口对 <c>0x2E</c>/<c>0x2F</c>（slot 0）
+/// 或 <c>0x4E</c>/<c>0x4F</c>（slot 1）：<c>+0</c> 是**命令口**（<c>0x2E</c>=设置索引寄存器 ·
+/// <c>0x2F</c>=访问数据）、<c>+1</c> 是**数据口**；索引寄存器 <c>0x11</c> 地址高 / <c>0x10</c> 地址低 / <c>0x12</c> 数据；
+/// ⚠️ 2026-10-18 机主实测全 0 后已修正：**不是**标准 SuperIO index/data 两连写（详见
+/// <c>docs\notes\风扇EC时序对照-20261018.md</c>）；
 /// ③ 厂商控制台 7.3 的 <c>0x2E</c>/<c>0x2F</c> ＋ <c>Write_EC_Init</c> 解锁前置；
 /// ④ 斗战者的物理内存窗口 <c>0xFE800400</c>（长 <c>0xFF</c>，只覆盖标准空间）。</para>
 ///
 /// <para>⚠️ <b>四套的地址空间不同，绝不能跨套搬地址。</b> 例：两个上游都自称在读「EC 版本」，
 /// 但一个说 <c>0xC411</c>、一个说 <c>0x8410~0x8413</c> —— 这不可能是笔误，只能是两套空间。
-/// 本类存在的意义就是把第 ② 套打通，从而能<b>只读验证</b> <c>0xC4xx</c>/<c>0xC8xx</c> 段
-/// （蛟龙控制台口径：EC 版本 <c>0xC411</c>、风扇 <c>0xC834</c>/<c>0xC835</c>）。</para>
+/// 本类存在的意义就是把第 ② 套打通，从而能读/写 <c>0xC4xx</c>/<c>0xC8xx</c> 段
+/// （蛟龙控制台口径：EC 版本 <c>0xC411</c>、风扇目标 <c>0xC83C</c>/<c>0xC83D</c>、接管掩码 <c>0xB20</c>）。</para>
 ///
 /// <para><b>槽位选择</b>：上游 <c>LpcIO.p</c> 注释写明
 /// <i>"Slot 0 is at 0x2e/0x2f, slot 1 at 0x4e/0x4f"</i>。
@@ -30,10 +33,11 @@ namespace MechrevoLite.Hardware;
 /// ⭐ 那是把「读回全 <c>0xFF</c> 是**槽位不对**」与「**本机读不到**」分开的唯一手段。
 /// <c>ioctl_select_slot</c> 会 reset 模块内部状态，故<b>每次事务前都重新选择一次</b>。</para>
 ///
-/// <para><b>⚠️ 诚实边界：本类的「只读」包含对 SuperIO 窗口寄存器的写。</b>
-/// 读一个 EC 字节必须先向子寄存器 <c>0x11</c>/<c>0x10</c> 写「地址高/低字节」（这是<b>寻址</b>），
-/// 再读子寄存器 <c>0x12</c>。那两个写是<b>窗口寄存器</b>，不是修改 EC 数据；
-/// 而本类<b>没有任何写 EC 数据的路径</b>（不写 <c>0x12</c>、不发 <c>0x93</c>）。</para>
+/// <para><b>⚠️ 诚实边界：读也包含对端口/索引寄存器的写。</b>
+/// 按 ITE EC-RAM 命令协议，读一个 EC 字节必须先写命令 <c>0x2E</c>/索引号、再写命令 <c>0x2F</c> 访问数据
+/// （这些是**寻址/命令**，不是改 EC 数据）。⭐ 2026-10-18 起本类**额外**提供一条
+/// **严格白名单的 EC 写路径**（仅 <c>0xC83C</c>/<c>0xC83D</c>/<c>0xB20</c>，见 <see cref="TryWriteByte"/>）——
+/// ⛔ 其它地址一律拒绝并中毒；⛔ 不发 <c>0x93</c>/<c>0x81</c>。</para>
 ///
 /// <para><b>安全约束</b>（与 <see cref="EcPortIo"/> <b>同构</b>，逐条对齐 —— 两套护栏松紧必须一致）：
 /// ① 槽位固定 slot 1；模块本身只允许<b>所选槽位</b>的 <c>+0</c>/<c>+1</c> 两个端口（外加 ASUS 的
@@ -52,8 +56,10 @@ namespace MechrevoLite.Hardware;
 /// （<c>Access_ISABUS.HTP.Method</c> vs <c>Access_EC</c>）⇒ 只能是两个 wrapper 实例。
 /// 拆成独立类是为了让<b>安全策略保持同构</b>，避免出现「两套松紧不一」的护栏。</para>
 ///
-/// <para>⚠️ 本类<b>只用于诊断只读</b>。刻意<b>不提供</b> <c>TryWriteXxx</c>：写 EC 数据须先报方案
-/// （限充仍按用户指示暂缓）。</para>
+/// <para>⚠️ 本类原为**只读诊断**；2026-10-18 机主批准后新增**风扇白名单写**
+/// （<see cref="TryWriteByte"/> / <see cref="TryWriteFanTarget"/> / <see cref="TryWriteFanManualMask"/> /
+/// <see cref="TryRestoreFanFirmware"/>）—— ⛔ 仅 3 个地址、写后回读、失败即 false；
+/// 限充等其它写入仍按既有决定**暂缓**。</para>
 /// </summary>
 internal static class EcLpcIo
 {
@@ -314,6 +320,28 @@ internal static class EcLpcIo
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主实测「全 0 假阳性」后的**判据修正**）：⭐ EC **可访问性**判据 ——
+	/// ⭐ `0x2000` 芯片 ID 必须 `0x55`（或至少**非 0x00/0xFF**）**且** `0xC411` EC 版本**非 0x00/0xFF** ✅。
+	/// <para>⚠️ 为什么要这条：机主那台 `0xC83C/0xC83D/0xB20` 全读成 `0x00`，旧判据「三个地址都读得到」⇒ **假阳性** ❌；
+	/// 全 0 说明**地址/时序不对**（不是"值为 0"）⚠️ ⇒ ⭐ 全 0 一律判**不可访问** ✅</para>
+	/// <para>⛔ 本方法只读（只发读命令）；⛔ 不执行任何 EC 写（含 `0x1060 |= 0x80` 解锁）✅</para>
+	/// </summary>
+	internal static bool TryReadEcIdentity(out int chipId, out int version, out string note)
+	{
+		chipId = -1;
+		version = -1;
+		bool idRead = TryReadByte(0x2000, out chipId);
+		bool verRead = TryReadByte(0xC411, out version);
+		bool idValid = idRead && chipId != 0x00 && chipId != 0xFF;
+		bool verValid = verRead && version != 0x00 && version != 0xFF;
+		note = "0x2000=" + (idRead ? "0x" + chipId.ToString("X2") : "读不到")
+			+ "（" + (idValid ? (chipId == 0x55 ? "0x55 ✅" : "非 0 ✅（⚠️ 不是 0x55）") : "无效 ⚠️") + "）"
+			+ " · 0xC411=" + (verRead ? "0x" + version.ToString("X2") : "读不到")
+			+ "（" + (verValid ? "非 0 ✅" : "无效 ⚠️") + "）";
+		return idValid && verValid;
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主批准）：⭐ **白名单写一个 EC 字节**（仅 0xC83C/0xC83D/0xB20）+ **立刻回读比对** ✅。
 	/// <para>⚠️ 任何失败/超时按本类既有策略处理；⛔ 不抛出；⛔ 非白名单地址直接拒绝并中毒 ✅</para>
 	/// </summary>
@@ -428,20 +456,35 @@ internal static class EcLpcIo
 	}
 
 	// ══════════════════════════════════════════════════════════════════
-	//  LPC/SuperIO 时序（调用方必须已持锁 + 已确保模块 + 已取互斥体）
+	//  LPC EC-RAM 时序（调用方必须已持锁 + 已确保模块 + 已取互斥体）
 	//
+	//  ⚠️ 2026-10-18 修正：**不是**标准 SuperIO index/data，而是 ITE EC-RAM 命令协议 ——
+	//     · +0（0x4E）= 命令口：0x2E = 设置索引寄存器；0x2F = 访问数据
+	//     · +1（0x4F）= 数据口：命令 0x2E 后写索引号；命令 0x2F 后写数据 / 读回数据
 	//  读一个 EC 字节：
-	//    ① 选槽位（ioctl_select_slot <slot> ⇒ 内部 g_register_port = 0x2E（slot 0）或 0x4E（slot 1））
-	//    ② 子寄存器 0x11 ← 地址高字节        （寻址，不是写 EC 数据）
-	//    ③ 子寄存器 0x10 ← 地址低字节        （寻址，不是写 EC 数据）
-	//    ④ 读子寄存器 0x12 ⇒ 数据字节
-	//
-	//  上游 superio_outb(reg,val) 的实现 =
-	//      io_out_byte(g_register_port, reg); io_out_byte(g_register_port + 1, val);
-	//  与 JiaolongControl 的 WritePort(0x4E, reg); WritePort(0x4F, val) 逐字对应
-	//  （slot 0 只是把 0x4E/0x4F 换成 0x2E/0x2F，其余时序逐字相同）。
-	//  （只取协议事实；未抄任何第三方代码）
+	//    ① 选槽位（ioctl_select_slot <slot> ⇒ 端口基址 0x2E（slot 0）或 0x4E（slot 1））
+	//    ② 命令 0x2E + 索引 0x11 + 命令 0x2F + 地址高字节
+	//    ③ 命令 0x2E + 索引 0x10 + 命令 0x2F + 地址低字节
+	//    ④ 命令 0x2E + 索引 0x12 + 命令 0x2F + 读数据口 ⇒ 数据字节
+	//  （只取协议事实；未抄任何第三方代码 —— 逐行对照见 docs\notes\风扇EC时序对照-20261018.md）
 	// ══════════════════════════════════════════════════════════════════
+
+	// ⭐⭐ 2026-10-18（时序修正 · 依开源蛟龙 Blding64 的 EC_RAM_READ/WRITE 逐行对照）：
+	//   ⚠️ 我们原来把 0x4E/0x4F 当成**标准 SuperIO index/data**（0x4E←子寄存器号、0x4F←值）❌
+	//   ⭐ 蛟龙的真实时序是 **ITE EC-RAM 命令协议**：0x4E = 命令口 · 0x4F = 数据口
+	//     · 命令 0x2E =「设置索引寄存器」⇒ 0x4E←0x2E, 0x4F←寄存器号
+	//     · 命令 0x2F =「访问数据」    ⇒ 0x4E←0x2F, 0x4F←值（写）/ 读 0x4F（读）
+	//   ⇒ 一次寄存器访问 = **4 个端口写**（命令+寄存器号 2 个，命令+数据 2 个），不是 2 个 ❌
+	//   ⭐ 证据（Blding64.cs 187 行 · EC_RAM_READ）：
+	//       WritePort(0x4E,0x2E); WritePort(0x4F,0x11);   // 索引 = 0x11（地址高）
+	//       WritePort(0x4E,0x2F); WritePort(0x4F,high);   // 数据 = high
+	//       WritePort(0x4E,0x2E); WritePort(0x4F,0x10); WritePort(0x4E,0x2F); WritePort(0x4F,low);
+	//       WritePort(0x4E,0x2E); WritePort(0x4F,0x12); WritePort(0x4E,0x2F);
+	//       ReadPort(0x4F);                               // 数据 = 该地址的值
+	//   ⭐ 这与机主实测「全 0」完全吻合：旧时序把 0x11 当命令写到 0x4E，EC 不会吐出 XRAM 数据 ⚠️
+	private const byte EcCmdSetIndex = 0x2E;
+
+	private const byte EcCmdAccessData = 0x2F;
 
 	private static bool ReadByteCore(ulong slot, int address, out int value)
 	{
@@ -452,15 +495,15 @@ internal static class EcLpcIo
 		{
 			return false;
 		}
-		if (!SuperIoOutb(SubRegAddressHigh, (byte)((address >> 8) & 0xFF), "地址高字节"))
+		if (!EcWriteIndex(SubRegAddressHigh, (byte)((address >> 8) & 0xFF)))
 		{
 			return false;
 		}
-		if (!SuperIoOutb(SubRegAddressLow, (byte)(address & 0xFF), "地址低字节"))
+		if (!EcWriteIndex(SubRegAddressLow, (byte)(address & 0xFF)))
 		{
 			return false;
 		}
-		if (!SuperIoInb(SubRegData, out byte data))
+		if (!EcReadIndex(SubRegData, out byte data))
 		{
 			return false;
 		}
@@ -469,9 +512,9 @@ internal static class EcLpcIo
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主批准）：⭐ **EC 数据写**（调用方已持锁/模块/互斥体）——
-	/// ⭐ 时序与开源蛟龙 `Blding64.EC_RAM_WRITE` 同构：选槽位 → 写地址高/低（窗口寻址）→ 写数据子寄存器 0x12 ✅。
-	/// <para>⚠️ 数据子寄存器 0x12 是**唯一**写 EC 数据的入口（⭐ 白名单由 <see cref="TryWriteByte" /> 把守）✅</para>
+	/// ⭐⭐ 2026-10-18（时序修正）：⭐ **EC 数据写**（调用方已持锁/模块/互斥体）——
+	/// 按蛟龙 `EC_RAM_WRITE`：设置索引 0x11/0x10 后，用命令 0x2F 把值写入索引 0x12 ✅。
+	/// <para>⚠️ 数据索引 0x12 是**唯一**写 EC 数据的入口（⭐ 白名单由 <see cref="TryWriteByte" /> 把守）✅</para>
 	/// </summary>
 	private static bool WriteByteCore(ulong slot, int address, byte value)
 	{
@@ -479,16 +522,87 @@ internal static class EcLpcIo
 		{
 			return false;
 		}
-		if (!SuperIoOutb(SubRegAddressHigh, (byte)((address >> 8) & 0xFF), "地址高字节"))
+		if (!EcWriteIndex(SubRegAddressHigh, (byte)((address >> 8) & 0xFF)))
 		{
 			return false;
 		}
-		if (!SuperIoOutb(SubRegAddressLow, (byte)(address & 0xFF), "地址低字节"))
+		if (!EcWriteIndex(SubRegAddressLow, (byte)(address & 0xFF)))
 		{
 			return false;
 		}
-		// ⭐ 数据写：子寄存器 0x12（⭐ SuperIoOutb 内部走白名单 0x10/0x11/0x12）✅
-		return SuperIoOutb(SubRegData, value, "EC 数据（风扇白名单写）");
+		return EcWriteIndex(SubRegData, value);
+	}
+
+	/// <summary>⭐ 按蛟龙时序：命令 0x2E 设置索引寄存器 = <paramref name="indexRegister" />，再把 <paramref name="value" /> 写到它 ✅</summary>
+	private static bool EcWriteIndex(byte indexRegister, byte value)
+	{
+		ushort indexPort = IndexPortFor(_lastSlotUsed);
+		ushort dataPort = DataPortFor(_lastSlotUsed);
+		return PioOutb(indexPort, EcCmdSetIndex, "命令 0x2E（设置索引）")
+			&& PioOutb(dataPort, indexRegister, "索引寄存器 0x" + indexRegister.ToString("X2"))
+			&& PioOutb(indexPort, EcCmdAccessData, "命令 0x2F（访问数据）")
+			&& PioOutb(dataPort, value, "写入数据");
+	}
+
+	/// <summary>⭐ 按蛟龙时序：命令 0x2E 设置索引寄存器，再命令 0x2F 读回该索引的数据 ✅</summary>
+	private static bool EcReadIndex(byte indexRegister, out byte value)
+	{
+		value = 0;
+		ushort indexPort = IndexPortFor(_lastSlotUsed);
+		ushort dataPort = DataPortFor(_lastSlotUsed);
+		if (!PioOutb(indexPort, EcCmdSetIndex, "命令 0x2E（设置索引）")
+			|| !PioOutb(dataPort, indexRegister, "索引寄存器 0x" + indexRegister.ToString("X2"))
+			|| !PioOutb(indexPort, EcCmdAccessData, "命令 0x2F（访问数据）"))
+		{
+			return false;
+		}
+		return PioInb(dataPort, out value);
+	}
+
+	/// <summary>
+	/// ⭐ 原始端口写（PawnIO LpcIO `ioctl_pio_outb`；模块只放行**所选槽位 +0/+1** 等端口）✅。
+	/// <para>⚠️ 用于 ITE EC-RAM 命令协议（0x4E/0x4F）；⭐ 端口号由 <see cref="IndexPortFor" />/<see cref="DataPortFor" /> 决定 ✅</para>
+	/// </summary>
+	private static bool PioOutb(ushort port, byte value, string what)
+	{
+		try
+		{
+			if (!_pawn.Execute("ioctl_pio_outb", new ulong[2] { port, value }, null))
+			{
+				ReportSoftFailure("ioctl_pio_outb(0x" + port.ToString("X2") + ",0x" + value.ToString("X2") + " · " + what + ") 失败");
+				return false;
+			}
+			_ioCount++;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Poison("PIO 写 0x" + port.ToString("X2") + " 抛异常：" + ex.GetType().Name);
+			return false;
+		}
+	}
+
+	/// <summary>⭐ 原始端口读（PawnIO LpcIO `ioctl_pio_inb`）✅</summary>
+	private static bool PioInb(ushort port, out byte value)
+	{
+		value = 0;
+		try
+		{
+			ulong[] output = new ulong[1];
+			if (!_pawn.Execute("ioctl_pio_inb", new ulong[1] { port }, output))
+			{
+				ReportSoftFailure("ioctl_pio_inb(0x" + port.ToString("X2") + ") 失败");
+				return false;
+			}
+			_ioCount++;
+			value = (byte)(output[0] & 0xFF);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Poison("PIO 读 0x" + port.ToString("X2") + " 抛异常：" + ex.GetType().Name);
+			return false;
+		}
 	}
 
 	/// <summary>

@@ -73,6 +73,14 @@ internal static class FanEcTest
 			L("EC 0x2000（芯片 ID）= " + ReadHex(0x2000) + " · 0x1060（解锁寄存器）= " + ReadHex(0x1060)
 				+ " · 0xC411（EC 版本）= " + ReadHex(0xC411));
 			L("EC 0xC834 / 0xC835（上游转速字节，仅对照）= " + ReadHex(0xC834) + " / " + ReadHex(0xC835));
+			// ⭐⭐ 2026-10-18（机主「全 0 假阳性」后的判据修正）：⭐ 先判 EC **身份**（0x2000 + 0xC411）
+			bool identityOk = EcLpcIo.TryReadEcIdentity(out int chipId, out int ecVersion, out string idNote);
+			bool allZero = (fan1 == 0 && fan2 == 0 && mask == 0);
+			L("EC 身份：" + idNote + " ⇒ " + (identityOk ? "可访问 ✅" : "⛔ 不可访问（全 0/0xFF 不算可读）"));
+			if (allZero)
+			{
+				L("⚠️ 风扇三地址**全 0** ⇒ 说明地址/时序不对（⭐ 不是「值为 0」）⇒ ⛔ 不可访问");
+			}
 			L("");
 			try
 			{
@@ -99,11 +107,11 @@ internal static class FanEcTest
 			}
 			L("");
 
-			// ── 前置判据：EC 可读 + WMI 13 可读，否则**不写** ──
-			if (!ecOk)
+			// ── 前置判据：EC **身份可访问** + 三地址非全 0 + WMI 13 可读，否则**不写** ──
+			if (!ecOk || !identityOk || allZero)
 			{
-				L("结论：⛔ 不可用 —— EC 三地址未全部读到合理值（" + EcLpcIo.DescribeChannel() + "）");
-				L("⛔ 本命令**未写任何 EC 字节**");
+				L("结论：⛔ 不可用 —— EC 身份不可访问 或 三地址全 0（" + EcLpcIo.DescribeChannel() + "）");
+				L("⛔ 本命令**未写任何 EC 字节**（⭐ 全 0 状态下写 = 盲写，禁止）");
 				return 1;
 			}
 			if (wmi == null || baselineRpm < 0)

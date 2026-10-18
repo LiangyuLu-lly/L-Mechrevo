@@ -5142,17 +5142,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string ecDetail;
 		try
 		{
-			bool r1 = EcLpcIo.TryReadByte(0xC83C, out fan1Set);
-			bool r2 = EcLpcIo.TryReadByte(0xC83D, out fan2Set);
-			bool r3 = EcLpcIo.TryReadByte(0xB20, out mask);
-			// ⭐ 合理性：三个地址都读得到 · 不是 0xFF 填充值 · 目标档位在 0..0xC8（⭐ 留余量）✅
-			ecOk = r1 && r2 && r3
+			bool r1 = EcLpcIo.TryReadByte(EcLpcIo.Fan1TargetAddress, out fan1Set);
+			bool r2 = EcLpcIo.TryReadByte(EcLpcIo.Fan2TargetAddress, out fan2Set);
+			bool r3 = EcLpcIo.TryReadByte(EcLpcIo.FanManualMaskAddress, out mask);
+			// ⭐⭐ 2026-10-18（机主「全 0 假阳性」后的判据修正）：
+			//   ⭐ 必须先判 **EC 身份可访问**（0x2000 芯片 ID / 0xC411 版本非 0、非 0xFF）；
+			//   ⚠️ 只有"三个地址都读得到"是不够的 —— 机主那台全读成 0x00 也曾被判通过 ❌
+			bool identityOk = EcLpcIo.TryReadEcIdentity(out int chipId, out int ecVersion, out string idNote);
+			bool allZero = (fan1Set == 0 && fan2Set == 0 && mask == 0);
+			ecOk = identityOk
+				&& !allZero
+				&& r1 && r2 && r3
 				&& mask != 0xFF
 				&& fan1Set >= 0 && fan1Set <= 0xC8
 				&& fan2Set >= 0 && fan2Set <= 0xC8;
-			ecDetail = $"EC 0xC83C={(r1 ? fan1Set.ToString("X2") : "读不到")}"
+			ecDetail = $"EC 身份：{idNote} ⇒ {(identityOk ? "可访问" : "不可访问")}"
+				+ $" · 0xC83C={(r1 ? fan1Set.ToString("X2") : "读不到")}"
 				+ $" · 0xC83D={(r2 ? fan2Set.ToString("X2") : "读不到")}"
-				+ $" · 0xB20={(r3 ? mask.ToString("X2") : "读不到")} ⇒ ok={ecOk}";
+				+ $" · 0xB20={(r3 ? mask.ToString("X2") : "读不到")}"
+				+ $" · 全0={allZero} ⇒ ok={ecOk}";
 		}
 		catch (Exception ex)
 		{

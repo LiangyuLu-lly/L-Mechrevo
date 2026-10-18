@@ -184,16 +184,27 @@ internal static class FanProbe
 			log("EC 0xC83C（Fan1 目标）= " + (r1 ? "0x" + fan1.ToString("X2") : "读不到")
 				+ " · 0xC83D（Fan2 目标）= " + (r2 ? "0x" + fan2.ToString("X2") : "读不到")
 				+ " · 0xB20（接管掩码）= " + (r3 ? "0x" + mask.ToString("X2") : "读不到"));
-			ok = r1 && r2 && r3
+			// ⭐⭐ 2026-10-18（机主实测「全 0 假阳性」）：⭐ 单独判**EC 身份** —— 0x2000 芯片 ID + 0xC411 版本
+			bool identityOk = EcLpcIo.TryReadEcIdentity(out int chipId, out int ecVersion, out string idNote);
+			log("EC 身份：" + idNote + " ⇒ " + (identityOk ? "EC 可访问 ✅" : "⛔ EC **不可访问**（全 0/0xFF 不算可读）"));
+			bool allZero = (fan1 == 0 && fan2 == 0 && mask == 0);
+			bool regsOk = r1 && r2 && r3
 				&& mask != 0xFF
 				&& fan1 >= 0 && fan1 <= 0xC8
-				&& fan2 >= 0 && fan2 <= 0xC8;
-			log("判据：三地址都读得到 · 不是 0xFF 填充 · 目标档 0..0xC8 ⇒ " + (ok ? "通过 ✅" : "未通过 ⚠️"));
+				&& fan2 >= 0 && fan2 <= 0xC8
+				&& !allZero;
+			ok = regsOk && identityOk;
+			log("判据：EC 身份可访问 · 三地址可读合理 · **非全 0** ⇒ " + (ok ? "通过 ✅" : "未通过 ⚠️"));
+			if (allZero)
+			{
+				log("⚠️ 三地址**全 0** ⇒ 说明地址/时序不对（⭐ 不是「值为 0」）—— ⛔ 判不可访问 ✅");
+			}
 			if (!ok)
 			{
 				log("EC 通道详情：" + EcLpcIo.DescribeChannel());
 			}
 			log("⚠️ 说明：本判据只认 EC 实测（⭐ 30/40 系分开）；WMI 13/20 仅对照，⛔ 不作为开放依据");
+			log("⛔ 只读：本探针不会执行解锁写（0x1060 |= 0x80），也不会写任何 EC 数据 ✅");
 		}
 		catch (Exception ex)
 		{
