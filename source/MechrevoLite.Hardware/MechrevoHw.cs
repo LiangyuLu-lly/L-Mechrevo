@@ -3682,6 +3682,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 强冷前的曲线快照（关闭时原样恢复）✅</summary>
 	private static BaolongdaFanCurveSettings _fanBoostSavedCurve;
 
+	/// <summary>⭐ 曲线闭环的"上次已写档位"（x100RPM）—— 用于差异比较，避免同值反复写 ✅</summary>
+	private static int _fanCurveLastCh0 = -1;
+
+	private static int _fanCurveLastCh1 = -1;
+
+	/// <summary>⭐ 上次真正写入的时刻（TickCount64）—— 每 30 s 强制重写一次 ✅</summary>
+	private static long _fanCurveLastWriteTick;
+
+	/// <summary>⭐ 强制重写周期（ms）⭐ 30 s ✅</summary>
+	private const long FanCurveForceRewriteMs = 30000;
+
 	internal static bool FanBoostActive => _fanBoostActive;
 
 	/// <summary>
@@ -4436,7 +4447,32 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			int channel1Units = FanCurveEngine.ToUnits100Rpm(channel1Rpm);
 			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致 ✅
 			//    ⭐ ch0 = `FanType 0`（GPU）· ⭐ ch1 = `FanType 1`（CPU）✅
+			// ⭐⭐ 2026-10-19（机主要求：减少写入次数）：⭐ **差异比较** —— 目标档位与上次已写相同、
+			//   且手动开关仍为「开」⇒ ⭐ 本轮**不写**（只读一次功能号 20 确认状态，然后 return）✅
+			//   ⚠️ 每 30 秒**强制重写一次**（防固件静默丢状态）；⚠️ 强冷/开关变化会清空缓存 ⇒ 下一轮必写 ✅
+			bool sameAsLast = _fanCurveLastCh0 == channel0Units && _fanCurveLastCh1 == channel1Units;
+			long curveTick = Environment.TickCount64;
+			bool forceRewrite = curveTick - _fanCurveLastWriteTick >= FanCurveForceRewriteMs;
+			if (sameAsLast && !forceRewrite)
+			{
+				bool manualOn = false;
+				bool manualReadOk = wmi != null && wmi.TryReadMaxFanSpeedSwitch(out manualOn);
+				if (manualReadOk && manualOn)
+				{
+					Logger.WriteLineIfChanged("baolongda-fancurve-skip-same",
+						$"[fan] 曲线：目标未变（cpu={channel1Units} gpu={channel0Units} x100RPM）且手动开关仍开 ⇒ ⛔ 本轮不写");
+					return true;
+				}
+				Logger.WriteLineIfChanged("baolongda-fancurve-manual-lost",
+					"[fan] 曲线：⚠️ 手动开关被关掉了（外部改动？）⇒ 本轮强制重写");
+			}
 			bool handled = TrySetFanManualViaBackend(enable: true, channel0Units, channel1Units, out bool confirmed);
+			if (handled)
+			{
+				_fanCurveLastCh0 = channel0Units;
+				_fanCurveLastCh1 = channel1Units;
+				_fanCurveLastWriteTick = Environment.TickCount64;
+			}
 			// ⭐⭐ 2026-10-19（机主要求 · 日志格式 + 如实回读）：
 			//   `[fan] 曲线：cpu=..℃/gpu=..℃ → rpm cpu=.. gpu=..（联动后..）→ 写 ok=..`
 			//   ⚠️ `ok=` 用的是 `TrySetFanManualViaBackend` 的**回读确认**（⛔ 不是"调用没抛异常"）✅
