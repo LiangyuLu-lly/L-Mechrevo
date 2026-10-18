@@ -44,7 +44,8 @@ internal sealed class BatteryLimitPanel : Panel
 	// ⭐ 机主要求：用仓库现有开关控件（RCheckBox 的拨动开关样式），⛔ 不用普通 CheckBox 对勾 ✅
 	private readonly RCheckBox _enableBox;
 
-	private readonly Button _applyButton;
+	// ⭐ 机主要求：用仓库现有圆角按钮控件 RButton；半径**面板局部**调小（⛔ 不全局改）✅
+	private readonly RButton _applyButton;
 
 	private readonly Label _statusLabel;
 
@@ -100,12 +101,13 @@ internal sealed class BatteryLimitPanel : Panel
 		_toolTip.SetToolTip(_enableBox, EnableChargeTipText());
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
 
-		_applyButton = new Button
+		_applyButton = new RButton
 		{
 			AutoSize = false,
 			Dock = DockStyle.Fill,
-			FlatStyle = FlatStyle.Flat,
 			Text = "保存阈值",
+			// ⭐ 机主要求：**小圆角矩形**（≈4 逻辑像素；默认 8/12 太大）✅
+			BorderRadius = D(4),
 			Margin = new Padding(D(6), D(4), 0, D(4))
 		};
 		_applyButton.Click += ApplyButton_Click;
@@ -160,6 +162,7 @@ internal sealed class BatteryLimitPanel : Panel
 		LogLabelWidthCheck("停充标签", _highLabel, D(88));
 		LogLabelWidthCheck("状态行", _statusLabel, D(360));
 		LogSwitchRowCheck();
+		LogSaveButtonCheck();
 		RefreshFromEc();
 		UpdateSocSafetyHint();
 		ApplyTheme();
@@ -191,7 +194,7 @@ internal sealed class BatteryLimitPanel : Panel
 		_highBox.BackColor = UiVisualStyle.Input;
 		_applyButton.ForeColor = text;
 		_applyButton.BackColor = UiVisualStyle.ButtonFace;
-		_applyButton.FlatAppearance.BorderColor = UiVisualStyle.Border;
+		_applyButton.BorderColor = UiVisualStyle.Border;
 		ApplyStatusColor();
 		UpdateSocSafetyHint();
 		Logger.WriteLineIfChanged("battery-ui-theme",
@@ -539,6 +542,29 @@ internal sealed class BatteryLimitPanel : Panel
 	/// ⭐⭐ 机主要求：代码级 UI 自检 —— 开关 + 保存按钮同行时是否重叠：
 	/// 开关文本宽 vs 跨 3 列可用宽；按钮宽 vs 第 4 列宽 ✅
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 机主要求：代码级自检 —— 保存按钮小圆角 + 尺寸能否放下「保存阈值」且不裁切 ✅
+	/// </summary>
+	private void LogSaveButtonCheck()
+	{
+		try
+		{
+			Size preferred = _applyButton.GetPreferredSize(Size.Empty);
+			int textWidth = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font).Width;
+			int radius = _applyButton.BorderRadius;
+			bool enough = preferred.Width >= textWidth + radius * 2
+				&& preferred.Height >= TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font).Height + D(6);
+			string message = "[battery-ui] 保存按钮：圆角半径=" + radius + "px · 尺寸=" + preferred.Width
+				+ "x" + preferred.Height + " · 文本宽=" + textWidth + " ⇒ 不裁切=" + enough;
+			Logger.WriteLine(message);
+			Logger.WriteLineIfChanged("battery-ui-save-button", message);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery-ui] 保存按钮自检失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
 	private void LogSwitchRowCheck()
 	{
 		try
