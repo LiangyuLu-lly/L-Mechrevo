@@ -1780,6 +1780,12 @@ internal class Strings
 	internal static string AboutLicensesDerivedHeading => ResourceManager.GetString("AboutLicensesDerivedHeading", resourceCulture);
 
 	/// <summary>2026-10-12 署名：原项目 L-Mechrevo 由 LiangyuLu-lly 发布 + 本版维护者，含原项目地址。</summary>
+	/// <summary>2026-10-18 鸣谢：分组标题「鸣谢（真机测试协助）」。</summary>
+	internal static string AboutThanksHeading => ResourceManager.GetString("AboutThanksHeading", resourceCulture);
+
+	/// <summary>2026-10-18 鸣谢：真机测试协助者名单正文。</summary>
+	internal static string AboutThanksBody => ResourceManager.GetString("AboutThanksBody", resourceCulture);
+
 	internal static string AboutLicensesOrigin => ResourceManager.GetString("AboutLicensesOrigin", resourceCulture);
 
 	/// <summary>2026-10-10 licence: 分组标题「协议参考（未复制代码）」。</summary>

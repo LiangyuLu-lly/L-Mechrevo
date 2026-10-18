@@ -5437,7 +5437,13 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
     <data name="AboutLicensesIntro" xml:space="preserve">
       <value>L-Mechrevo is free software, distributed under the GNU General Public License version 3 only. It contains code derived from the projects below, and it ships one third-party binary module. The full licence texts are in the LICENSES folder next to the program (LICENSE / THIRD_PARTY_NOTICES.txt are in there too).</value>
     </data>
-    <data name="AboutLicensesOrigin" xml:space="preserve">
+    <data name="AboutThanksHeading" xml:space="preserve">
+    <value>Acknowledgements (real-device testing)</value>
+  </data>
+  <data name="AboutThanksBody" xml:space="preserve">
+    <value>Thanks to Chainsaw for most of the real-device testing on the Baolongda platform (fan control, charge threshold, lighting, GPU overclock, etc.).</value>
+  </data>
+  <data name="AboutLicensesOrigin" xml:space="preserve">
       <value>The original L-Mechrevo project this program is based on was published by LiangyuLu-lly: https://github.com/LiangyuLu-lly/L-Mechrevo/tree/v0.290.6 . This build is maintained by xiaohan (xmsjx) on top of it. Listed below are the third-party components and licences; the original project is likewise GPL-3.0-only.</value>
     </data>
     <data name="AboutLicensesCopyright" xml:space="preserve">

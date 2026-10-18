@@ -121,6 +121,10 @@ public class AboutLicensesForm : RForm
 		AddGroup(root, Strings.AboutLicensesDerivedHeading, Derived);
 		AddGroup(root, Strings.AboutLicensesShippedHeading, Shipped);
 		AddGroup(root, Strings.AboutLicensesReferenceHeading, References);
+		// 2026-10-18 机主要求：新增「鸣谢（真机测试协助）」分组 —— 不列代码许可，只感谢真机测试协助者。
+		//   名单里不出现 QQ 号（机主明确要求只写昵称）。
+		AddGroup(root, Strings.AboutThanksHeading, new Entry[0]);
+		AddParagraph(root, Strings.AboutThanksBody, UiVisualStyle.Text);
 
 		// ---- 底部：打开 LICENSES 文件夹 + 关闭 ----
 		TableLayoutPanel actions = new TableLayoutPanel

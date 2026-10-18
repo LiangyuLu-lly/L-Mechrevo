@@ -5417,7 +5417,13 @@
     <data name="AboutLicensesIntro" xml:space="preserve">
       <value>L-Mechrevo 是自由软件，以 GNU 通用公共许可证第 3 版（GPL-3.0-only）分发。本程序包含派生自下列项目的代码，并内嵌了一个第三方二进制模块。完整许可文本位于程序目录下的 LICENSES 文件夹里（LICENSE / THIRD_PARTY_NOTICES.txt 也在其中）。</value>
     </data>
-    <data name="AboutLicensesOrigin" xml:space="preserve">
+    <data name="AboutThanksHeading" xml:space="preserve">
+    <value>鸣谢（真机测试协助）</value>
+  </data>
+  <data name="AboutThanksBody" xml:space="preserve">
+    <value>感谢 Chainsaw 协助完成宝龙达机型的大部分真机测试（风扇、充电阈值、灯光、GPU 超频等）。</value>
+  </data>
+  <data name="AboutLicensesOrigin" xml:space="preserve">
       <value>本程序的原项目 L-Mechrevo 由 LiangyuLu-lly 发布，地址：https://github.com/LiangyuLu-lly/L-Mechrevo/tree/v0.290.6 ；本版由维护者 xiaohan（xmsjx）在原项目基础上继续维护。下面列出的是第三方代码与许可，原项目本身的许可同样是 GPL-3.0-only。</value>
     </data>
     <data name="AboutLicensesCopyright" xml:space="preserve">
