@@ -991,6 +991,12 @@ public class SettingsForm : RForm
 
 	private Panel panelBattery;
 
+	// ⭐⭐ 2026-10-18（机主：宝龙达电池页被隐藏）：⭐ 宝龙达充电阈值面板可用性（进程内缓存；
+	//    只有 `UsesBaolongda` 才会去读 EC，⛔ 非宝龙达不触发任何 EC 访问）✅
+	private bool _baolongdaChargePanelProbed;
+
+	private bool _baolongdaChargePanelAvailable;
+
 	private Panel panelFooter;
 
 	private RButton buttonQuit;
@@ -7636,6 +7642,25 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	/// HealthProtectionStatus 有上报（≥0）」为能力探测（与 FunctionVerifier 的「电池保护三档」同源）。
 	/// ⛔ 只读：不发报文、不写 config / EC、不碰任何控件。
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：宝龙达电池页被隐藏）：⭐ 宝龙达充电阈值面板是否可用（缓存一次）✅。
+	/// <para>⚠️ 只有 `UsesBaolongda` 才调用 `BatteryLimitPanel.IsAvailable`（会读 EC 状态）；
+	/// ⛔ 非宝龙达直接 false，**不触发任何 EC 访问**（本机 GM5HG0A 逐位不变）✅</para>
+	/// </summary>
+	private bool BaolongdaChargePanelAvailable(MechrevoHw hardware)
+	{
+		if (hardware == null || !hardware.UsesBaolongda)
+		{
+			return false;
+		}
+		if (!_baolongdaChargePanelProbed)
+		{
+			_baolongdaChargePanelAvailable = BatteryLimitPanel.IsAvailable(hardware);
+			_baolongdaChargePanelProbed = true;
+		}
+		return _baolongdaChargePanelAvailable;
+	}
+
 	private static bool GcuBatteryProtectionAvailable()
 	{
 		MechrevoHw hw = Program.hw;
@@ -9137,7 +9162,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		//   flag 会变 true ⇒ 三档可点 + 整个面板上屏 ❌。而 `EcChargeLimit.cs` 是**零改动红线**（用户明令）
 		//   ⇒ 判据只能放在界面侧这个「可见性唯一汇聚点」。
 		// ⚠️ 非宝龙达机型 `baolongdaNoChargeLimit` 恒 false ⇒ 下面两处判断与改动前**逐位一致**。
-		bool baolongdaNoChargeLimit = Program.hw?.UsesBaolongda == true;
+		// ⭐⭐ 2026-10-18（机主：宝龙达电池页被隐藏）：⭐ 若宝龙达充电阈值面板可用 ⇒ 电池页**必须可见**
+		//   （旧判据 `baolongdaNoChargeLimit = UsesBaolongda` 会把整张卡片隐藏 ❌）；其它机型逐位不变 ✅
+		bool baolongdaRaw = Program.hw?.UsesBaolongda == true;
+		bool baolongdaPanelAvailable = BaolongdaChargePanelAvailable(Program.hw);
+		bool baolongdaNoChargeLimit = baolongdaRaw && !baolongdaPanelAvailable;
 		// 2026-10-16（EC 直写逃生口）：`ec_charge_limit=0` 时 `IsAvailableOnThisMachine()` 恒 false ⇒ flag=false
 		// ⇒ 整张电池卡片被隐藏 —— 而「关闭 EC 直写」的那颗开关**就在这张卡片里**（第 6 行）⇒ 用户勾上之后
 		// 连撤销入口一起消失，等于把自己锁在门外。⇒ 这一支**保卡片可见**：此时 EC 各行已由
@@ -9160,12 +9189,20 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		if (panelBattery != null)
 		{
-			// ⭐ 2026-10-17：宝龙达 ⇒ 整张电池卡片**隐藏**（`Program.UiAuditMode` 仍放行，审计的是假硬件、
-			//   需要完整布局做回归；这与改动前的 UiAuditMode 分支语义一致）。
-			panelBattery.Visible = Program.UiAuditMode || (!baolongdaNoChargeLimit && (flag || (explicitEcOff && !unsupportedModel)));
+			// ⭐ 2026-10-17：宝龙达且充电阈值面板**不可用** ⇒ 整张电池卡片隐藏（UiAuditMode 仍放行）；
+			// ⭐⭐ 2026-10-18（机主实测）：⭐ 若 `BatteryLimitPanel.IsAvailable` 为真 ⇒ **强制可见**
+			//    （电池基础信息 + 新充电阈值区；旧三档/EC 直写行仍由下面 ApplyChargeLimitTierVisibility 收起）✅
+			bool visible = Program.UiAuditMode || baolongdaPanelAvailable
+				|| (!baolongdaNoChargeLimit && (flag || (explicitEcOff && !unsupportedModel)));
+			panelBattery.Visible = visible;
+			Logger.WriteLineIfChanged("battery-panel-visible",
+				"[battery] 电池页可见性：baolongda=" + baolongdaRaw
+				+ " · panelAvailable=" + baolongdaPanelAvailable + " ⇒ visible=" + visible
+				+ (baolongdaPanelAvailable ? "（旧判据会隐藏）" : ""));
 		}
 		// ⭐ 2026-10-17：宝龙达下三档按钮行也收起（⛔ 不删控件、不删代码路径，只改 Visible 与行高）。
-		ApplyChargeLimitTierVisibility(baolongdaNoChargeLimit);
+		// ⚠️ 2026-10-18：这里仍按 `baolongdaRaw` 收起旧三档（宝龙达没有 GCU 通路）；只放开电池阈值区 ✅
+		ApplyChargeLimitTierVisibility(baolongdaRaw);
 		// 2026-10-08 17:00：非 50 系滑块不上屏，这两句不会被人看到（50 系滑块的行内说明与开关共用同一条措辞）。
 		toolTip.SetToolTip(sliderBattery, flag ? Strings.ChargeLimitWindowsNote : ChargeLimitDisabledReason(RuntimeModelSupport.Current()));
 		// 2026-10-08：开关与三档快捷值跟随同一条 EC 通道的可用性，不能只灰滑块。
