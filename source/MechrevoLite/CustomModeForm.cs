@@ -1052,7 +1052,24 @@ public class CustomModeForm : RForm
 				});
 			}
 		};
-		_fanBoostRow = AddComboRow(Strings.ModeTuneFanBoost, _fanBoostCombo);
+		_fanBoostRow = AddComboRow(Strings.ModeTuneFanBoost, _fanBoostCombo);		// ⭐⭐ 2026-10-19（机主截图：无界 14X 自定义窗口暴露 GCU 专属行）：
+		//   ⭐ 判据 = 同一能力位 `hw.WujieSmuApu`（⛔ 不按机型名硬编码）⇒ **隐藏/不显示** GCU 专属行：
+		//      fPPT(PL4) / 风扇转换灵敏度 / 换挡延迟 / 风扇增强 / GPU 超频（开关+核心偏移+显存偏移）✅
+		//   ⚠️ 宝龙达 / GCU / 同方不变（WujieSmuApu 恒 false）✅
+		if (hw?.WujieSmuApu ?? false)
+		{
+			SetRowVisible(_pl4, false);
+			SetRowVisible(_fanSwitchSpeedChk, false);
+			SetRowVisible(_fanSwitchSpeed, false);
+			SetRowVisible(_fanBoostRow, false);
+			SetRowVisible(_ocChk, false);
+			SetRowVisible(_coreOc, false);
+			SetRowVisible(_memOc, false);
+			if (Logger.TryMarkChanged("wujie-custom-ui-hide-gcu", "[custom-ui] 无界 APU 本机模式：隐藏 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）"))
+			{
+				Logger.WriteError("[custom-ui] 无界 APU 本机模式：隐藏 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）");
+			}
+		}
 		_refreshCombo = new RComboBox
 		{
 			Name = "refreshCombo",
@@ -3284,8 +3301,12 @@ public class CustomModeForm : RForm
 			&& ((Program.hw?.UsesBaolongda ?? false) || (Program.hw?.WujieSmuApu ?? false));
 		if (firmwareSlotNotWritable && !outcome.AnyFailed)
 		{
-			_status.Text = LocalApplyText;
-			_status.ForeColor = UiVisualStyle.Warn;
+			// ⭐⭐ 2026-10-19（机主截图：灰字「设置保存到本机并立即应用…」重复两行）：
+			//   ⭐ 无界 APU：`_routeHint` 已常驻显示该说明 ⇒ 状态行只报"参数已确认"，⛔ 不重复同一句 ✅
+			//   ⚠️ 宝龙达保持原样（逐位不变）✅
+			bool wujieLocalUi = Program.hw?.WujieSmuApu ?? false;
+			_status.Text = wujieLocalUi ? Strings.ParamsConfirmed : LocalApplyText;
+			_status.ForeColor = wujieLocalUi ? UiVisualStyle.Ok : UiVisualStyle.Warn;
 			_tips.SetToolTip(_status, PerfModeText.Details(outcome, amd));
 			ResizeToContent();
 			// ⭐ 默认「仅错误」级别可见（⭐ WriteError ✅）；⭐ 用状态翻转去重 ⇒ ⭐ 不会随每次
