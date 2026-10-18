@@ -12,6 +12,7 @@
 // ⚠️ 40 系/其它机型不进入本类（调用方只在 Gen30 分支调用）。
 
 using System;
+using MechrevoLite.Gpu;
 
 namespace MechrevoLite.Hardware;
 
@@ -45,6 +46,18 @@ internal static class KeyboardEcBrightness
 	internal static bool TrySetLevel(int level, BaolongdaWmi wmi, out int readback, out int wmi18, string source = "未标注")
 	{
 		readback = -1;
+		wmi18 = -1;
+		// ⭐⭐ 2026-10-19（门控铁律）：**必须同时是宝龙达 + Gen30**（同方 30 系也 Gen30，⛔ 不碰 EC 0x1807）✅
+		MechrevoHw hw = Program.hw;
+		if (hw == null || hw.DgpuGeneration != DgpuGenerationKind.Gen30 || !hw.UsesBaolongda)
+		{
+			string skipMessage = $"[kbd] 30 系 EC 键盘：跳过（非宝龙达 · gen={(hw == null ? "hw=null" : hw.DgpuGeneration.ToString())}）";
+			if (Logger.TryMarkChanged("kbd30-ec-brightness-skip", skipMessage))
+			{
+				Logger.WriteError(skipMessage);
+			}
+			return false;
+		}
 		wmi18 = ReadWmi18(wmi);
 		int targetValue = ValueForLevel(level);
 		if (targetValue < 0)

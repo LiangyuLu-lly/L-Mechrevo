@@ -3180,7 +3180,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					return false; // ⭐ 理论上不会发生（宝龙达在管事）⇒ 交回原路更安全 ✅
 				}
 				// ⭐⭐ 2026-10-19（30 系）：开关镜像只认 EC 0x1807；读不到就保留上一次（⛔ 不凭 WMI16 恢复 ON）✅
-				if (DgpuGeneration == DgpuGenerationKind.Gen30)
+				// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，但 EC 0x1807 含义不同）✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 				{
 					if (TryReadKeyboardPowerFromEc(out bool ecOff, out int ecOffValue))
 					{
@@ -3237,7 +3238,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//      ⭐ `Unknow = 255` ⇒ ⭐ **「开」＝ 模式 ≠ 0** ✅ · ⭐ **「关」＝ 模式 0** ✅
 			//      （⭐ 本方法下发时正是这么写的：⭐ 关 ⇒ 模式 0 ✅ · ⭐ 开 ⇒ 模式 2 ✅）。
 			// ⭐⭐ 2026-10-19（30 系）：开关镜像只认 EC 0x1807（WMI16 仍是 2，不能拿来判「开」）✅
-			if (DgpuGeneration == DgpuGenerationKind.Gen30)
+			// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，⛔ 不进 EC）✅
+			if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 			{
 				if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
 				{
@@ -3307,7 +3309,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
 			{
 				// ⭐⭐ 2026-10-19（30 系）：开关确认只认 EC 0x1807（WMI16 仍是 2，不能拿来判「开」）✅
-				if (DgpuGeneration == DgpuGenerationKind.Gen30)
+				// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，⛔ 不进 EC）✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 				{
 					if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
 					{
@@ -3583,7 +3586,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				detail = $"30 系判据：EC 0x1807=0x{ecValue:X2} ⇒ {(ecOn ? "ON" : "OFF")}（⛔ 忽略 WMI16/18）";
 				return true;
 			}
-			if (DgpuGeneration == DgpuGenerationKind.Gen30)
+			if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 			{
 				detail = "30 系 EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16/18 判开关）";
 				return false;
@@ -3622,7 +3625,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// </summary>
 	private void TraceKeyboardPowerWrite(bool value, string source)
 	{
-		Logger.WriteError($"[kbd-trace] KeyboardPower={value} ← 来源={source} · 调用链={DescribeCallChain(3)}");
+		// ⚠️ 只在 Gen30 **且宝龙达** 才打（否则其它机型会被追踪日志刷屏）✅
+		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
+		{
+			Logger.WriteError($"[kbd-trace] KeyboardPower={value} ← 来源={source} · 调用链={DescribeCallChain(3)}");
+		}
 	}
 
 	/// <summary>⭐ 2026-10-19：截前 N 帧调用链（类型.方法 ← …），⛔ 不打完整栈 ✅。</summary>
@@ -3665,6 +3672,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		ecValue = -1;
 		if (DgpuGeneration != DgpuGenerationKind.Gen30)
 		{
+			return false;
+		}
+		// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，EC 0x1807 含义不同）✅
+		if (!UsesBaolongda)
+		{
+			string skipMessage = $"[kbd] 30 系 EC 键盘：跳过（非宝龙达 · gen={DgpuGeneration}）";
+			if (Logger.TryMarkChanged("kbd30-ec-skip", skipMessage))
+			{
+				Logger.WriteError(skipMessage);
+			}
 			return false;
 		}
 		if (!EcPortIo.TryReadByte(KeyboardEcBrightness.RegisterAddress, out int value))
@@ -3776,9 +3793,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// ⭐ 2026-10-19（30 系只读诊断）：每进程一次 raw OutData 探测（⛔ 不写任何字节）✅
 		ProbeKeyboardRawOnce(wmi);
-		// ⭐ 2026-10-19（追踪「谁把开关/亮度改回开」）：每次下发都记来源 + 前 3 帧调用链 ✅
-		Logger.WriteError($"[kbd-trace] TrySetKeyboardLightingViaBackend(on={on} · level={brightness0to3} · mode={mode})"
-			+ $" ← 调用链={DescribeCallChain(3)}");
+		// ⭐ 2026-10-19（追踪「谁把开关/亮度改回开」）：只在 Gen30 **且宝龙达**才打（⛔ 不刷别的机型）✅
+		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
+		{
+			Logger.WriteError($"[kbd-trace] TrySetKeyboardLightingViaBackend(on={on} · level={brightness0to3} · mode={mode})"
+				+ $" ← 调用链={DescribeCallChain(3)}");
+		}
 		try
 		{
 			// ⭐⭐ 2026-10-19（自动关灯）：任何**非恢复**的键盘灯写入都视为"用户手动改灯"
@@ -3806,7 +3826,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				//   ⚠️ 之前保留 WMI `18=0` 是因为"关灯曾经成功过"，但实测证明它不稳定/固件忽略
 				//   ⇒ 30 系统一走 EC（与档位 1/2/3 同一套：读→写→回读→失败再试 LPC→不重试）✅
 				//   ⚠️ 40 系/其它机型仍走下面的原 WMI `18=0` 路径，⛔ 不进 EC 分支 ✅
-				if (DgpuGeneration == DgpuGenerationKind.Gen30)
+				//   ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，⛔ 不进 EC）✅
+				if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 				{
 					LogKeyboardLightingState(wmi, "关灯前");
 					bool ecOffOk = KeyboardEcBrightness.TrySetLevel(0, wmi, out int ecOffReadback, out int ecOffWmi18,
@@ -3941,7 +3962,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			bool ecBrightnessOk = false;
 			int ecBrightnessReadback = -1;
 			int ecBrightnessWmi18 = -1;
-			if (kbGen == DgpuGenerationKind.Gen30)
+			if (kbGen == DgpuGenerationKind.Gen30 && UsesBaolongda)
 			{
 				// ⭐⭐ 2026-10-19（机主 WMI18↔EC 24/24 关联确认）：30 系亮度 = **EC 0x1807**（4 档 PWM）
 				//   ⇒ 档位 1/2/3 走 EC 白名单写（0x00/0x66/0xB3/0xFF）；⛔ 不再依赖 WMI 18（该机 18 只读/不稳）
