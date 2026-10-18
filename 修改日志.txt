@@ -1,3 +1,17 @@
+r73（2026-10-18 · **0.292.0 beta23**）★★★ 宝龙达全线并入 main + 无界 APU SMU 自定义 + 安装器收口
+用户原话：「合并后打包要带上同方的GCU 版本号升级到0.292.0 beta23 保留宝龙达分支的识别…」「无界机型+AMD APU 8745H 8845H H255 AI 365等」「直接开放就行无界CPU功耗最大给90W」「用自定义的时候别发GCU性能命令」「pawnio会重复安装」「实测无界可以用 打包0.292.0 beta23 不加test字样」
+① ⭐ 分支：baolongda → main 合并（`2c1bda3`），三处冲突解法：SettingsForm 保留 main 的滑块支持闸门 + baolongda 的统一行高重算；修改日志并集；git 小抄去重。
+② ⭐ 无界 APU（WujieSmuGate）：判据=四字段任一含 无界/WUJIE（Name/Family/SKU/Board，忽略大小写/空格）+ AMD APU 无 N 卡 + SmuAvailability.IsReady；
+   能力位 `WujieSmuLocalOnly`（默认 false，宝龙达/GCU/同方逐位不变）；`UsesSmuForCustomPower` 增加 wujie 分支；
+   UI 显示 PL1/PL2 [15,90]W + 温度墙 [60,105] + STAPM；clamp→写→回读、失败不重试。
+③ ⭐ 无界「应用自定义」= 纯本机：不生成 SwitchBuiltIn/SwitchFirmwareSlot/SwitchTurboSubMode、不生成 GCU 风扇曲线/GPU 功耗步（`22b7979`）；
+   选自定义档走 `ActivateLocalProfile`（ActiveModeId 指向该档并持久化，下拉显示「自定义」，无红字，`3ff9e61`）。
+④ ⭐ 安装器：整包带 GCU；所有 GCU 产物（payload/UWACPIDriver/logo/README/3 个 ps1/[Run]/[UninstallRun]）一律 `Check: ShouldInstallGcu`（板号 MRID6* ⇒ 不装、不建 {app}\GCU）。
+⑤ ⭐ PawnIO：`Install-PawnIO.ps1` 改为「运行中跳过 / 已装先 Start-Service / 版本≥2.2.0 跳过 / 才下载安装」；iss 新增 `ShouldInstallPawnIo` + `CurPageChanged` 在任务页自动取消勾选并改写说明；[Run] 加 Check。
+⑥ ⭐ 版本：0.292.0 / beta23；包名去掉 `-test`（`LM-0.292.0-beta23-setup.exe`）；旧安装包清理。
+⑦ ⭐ 归属：关于页新增「鸣谢 Chainsaw」+ 参考项目（JiaolongControl MIT / DOUZHANZHE / 电池阈值开源项目）；MIT 全文随包 LICENSES；OpenRevo 相关表述与材料已按机主要求删除（未反编译其代码）。
+⑧ ⭐ 验证：Rebuild 0 错误 / 1457 警告；perf-fix-selftest W1–W4 + WJ1–WJ4 ALL OK；机主真机确认无界 14X 可用；宝龙达风扇/电池/灯光/GPU 超频均已实测。
+
 r55（2026-10-16 · ★★ **项目初始化本地 git** · 真分支上线）★ 为"以后要合并"打地基
 用户原话：「git是什么意思」→（我解释后）「到时候做完我要合并的」→「那开始做吧」。
 ① ⭐ **为什么现在建**（owner 的理由说得很准）：⭐ 「⭐ 到时候做完我要合并」⭐ —— ⭐ 手工合并**正是最危险的部分** ⚠️：
