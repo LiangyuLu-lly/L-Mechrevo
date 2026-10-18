@@ -618,11 +618,11 @@ public class SettingsForm : RForm
 
 	private RComboBox? _lightSleepCombo;
 
-	/// <summary>⭐ 2026-10-19（宝龙达「灯光自动关闭时间」）：下拉同步守卫 ✅。</summary>
-	private bool _syncingKeyboardAutoOff;
-
-	/// <summary>⭐ 2026-10-19（宝龙达「灯光自动关闭时间」）：下拉（仅宝龙达行可见；回填配置用）✅。</summary>
-	private RComboBox _keyboardAutoOffCombo;
+	/// <summary>
+	/// ⭐ 2026-10-19（「自动关闭时间」复用头部下拉）：当前填充的平台（-1=未填 / 0=其它机型厂商逻辑 / 1=宝龙达软件实现）。
+	/// <para>⚠️ 只在**平台切换**时重填选项，⛔ 不每次刷新都清空重建 ✅。</para>
+	/// </summary>
+	private int _lightAutoOffComboPlatform = -1;
 
 	private bool _syncingLightHeader;
 
@@ -8623,12 +8623,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				{
 					item.Visible = flag6c;
 				}
-				if (item.Name == "rowKeyboardAutoOff")
-				{
-					// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」）：**仅宝龙达显示**；
-					//   ⚠️ 其它机型逐位不变（该行本来就不存在）✅
-					item.Visible = flag4 && (Program.hw?.UsesBaolongda ?? false);
-				}
 			}
 			EnableSection(_lightGroup, flag9);
 			SyncLightRows();
@@ -16265,88 +16259,6 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			_syncPowerSw = syncPowerSw;
 			_syncEffectCombo = syncEffectCombo;
 		});
-		// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」· 宝龙达软件实现；默认关）：
-		//   ⭐ 选项 = 关 / 10 秒 / 5 分钟 / 10 分钟 / 30 分钟；配置统一按**秒**存 ✅
-		//   ⚠️ **仅宝龙达可见**（见 RefreshDeviceCapabilities 里按 UsesBaolongda 设 Visible）；
-		//      ⛔ 默认 0 = 关闭 ⇒ 不创建计时器、不写灯、无额外检查开销 ✅
-		TableLayoutPanel keyboardAutoOffRow = new TableLayoutPanel
-		{
-			Name = "rowKeyboardAutoOff",
-			Dock = DockStyle.Top,
-			ColumnCount = 2,
-			RowCount = 1,
-			AutoSize = true,
-			AutoSizeMode = AutoSizeMode.GrowAndShrink,
-			Margin = Padding.Empty,
-			BackColor = UiVisualStyle.Window
-		};
-		keyboardAutoOffRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-		keyboardAutoOffRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(132)));
-		Label keyboardAutoOffLabel = new Label
-		{
-			Name = "labelKeyboardAutoOff",
-			Text = Strings.KeyboardAutoOff,
-			AutoSize = true,
-			ForeColor = UiVisualStyle.Text,
-			BackColor = UiVisualStyle.Window,
-			Font = UiStyleBody(),
-			TextAlign = ContentAlignment.MiddleLeft,
-			Margin = Padding.Empty,
-			Anchor = AnchorStyles.Left
-		};
-		RComboBox keyboardAutoOffCombo = new RComboBox
-		{
-			Name = "comboKeyboardAutoOff",
-			DropDownStyle = ComboBoxStyle.DropDownList,
-			DropDownWidth = D(150),
-			DisplayMember = "Key",
-			FlatStyle = FlatStyle.Flat,
-			ForeColor = UiVisualStyle.Text,
-			BackColor = UiVisualStyle.Window,
-			Font = UiStyleBody(),
-			Cursor = Cursors.Hand,
-			Anchor = (AnchorStyles.Left | AnchorStyles.Right),
-			Margin = new Padding(D(8), D(3), D(8), D(3))
-		};
-		foreach ((string Label, int Seconds) option in KeyboardAutoOffOptions)
-		{
-			keyboardAutoOffCombo.Items.Add(new KeyValuePair<string, int>(option.Label, option.Seconds));
-		}
-		_syncingKeyboardAutoOff = true;
-		keyboardAutoOffCombo.SelectedIndex = 0;
-		_syncingKeyboardAutoOff = false;
-		keyboardAutoOffCombo.SelectedIndexChanged += delegate
-		{
-			if (_syncingKeyboardAutoOff || Program.UiAuditMode)
-			{
-				return;
-			}
-			int selected = keyboardAutoOffCombo.SelectedIndex;
-			if (selected < 0 || selected >= KeyboardAutoOffOptions.Length)
-			{
-				return;
-			}
-			// ⭐ 配置**统一按秒**：0 / 10 / 300 / 600 / 1800（⛔ 不再留分钟键）✅
-			MechrevoHw.SetKeyboardAutoOffSeconds(KeyboardAutoOffOptions[selected].Seconds);
-			// ⭐ 立即按新配置启停 5s 计时器（0 ⇒ 停止、不创建；>0 ⇒ 只创建一次）✅
-			Program.hw?.ApplyKeyboardAutoOffSetting();
-		};
-		keyboardAutoOffRow.Controls.Add(keyboardAutoOffLabel, 0, 0);
-		keyboardAutoOffRow.Controls.Add(keyboardAutoOffCombo, 1, 0);
-		_keyboardAutoOffCombo = keyboardAutoOffCombo;
-		// ⚠️ 初始按"是否宝龙达"隐藏；真正的显隐在 RefreshDeviceCapabilities 里按能力刷新 ✅
-		keyboardAutoOffRow.Visible = Program.hw?.UsesBaolongda ?? false;
-		int keyboardAutoOffRowIndex = 0;
-		foreach (Control existing in body.Controls)
-		{
-			keyboardAutoOffRowIndex = Math.Max(keyboardAutoOffRowIndex, body.GetCellPosition(existing).Row + 1);
-		}
-		while (body.RowStyles.Count <= keyboardAutoOffRowIndex)
-		{
-			body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		}
-		body.RowCount = body.RowStyles.Count;
-		body.Controls.Add(keyboardAutoOffRow, 0, keyboardAutoOffRowIndex);
 		_lightGroup?.SetContent(body);
 		RCheckBox offOnBatteryChk = new RCheckBox
 		{
@@ -16413,36 +16325,48 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		// 而兄弟是 40。实测：只钉控件 Height/MaximumSize、以及只改行高 D(32)→D(29)，**都压不住**（仍是 217x48）；
 		// 把字体对齐后高度才会落到族标准。
 		sleepCombo.Font = UiStyleBody();
-		(string, int, int)[] lightingCloseTimerOptions = LightingCloseTimerOptions;
-		for (int num = 0; num < lightingCloseTimerOptions.Length; num++)
-		{
-			string item = lightingCloseTimerOptions[num].Item1;
-			sleepCombo.Items.Add(item);
-		}
-		int configuredIdleSeconds = AppConfig.Get("lighting_idle_seconds", Math.Max(0, Program.rgb?.CloseTimerMinutes ?? 0) * 60);
-		int num2 = Array.FindIndex(LightingCloseTimerOptions, ((string Label, int Mins, int IdleSeconds) o) => o.IdleSeconds == configuredIdleSeconds);
-		_syncingLightHeader = true;
-		sleepCombo.SelectedIndex = ((num2 >= 0) ? num2 : 0);
-		_syncingLightHeader = false;
+		// ⭐⭐ 2026-10-19（机主截 bug：不允许两个"自动关闭时间"入口）：
+		//   ⭐ **复用头部这颗已有下拉**（⛔ 不再新增独立行）；平台分支在 SelectedIndexChanged 里按 hw 判定：
+		//     · 宝龙达 ⇒ 软件实现（light_autooff_seconds：关/10秒/5分钟/10分钟/30分钟）✅
+		//     · 其它机型 ⇒ 原厂商逻辑（lighting_idle_seconds）**逐位不变** ✅
+		//   ⚠️ 构建时 hw 可能还没就绪 ⇒ 先按厂商选项填充；平台确定后 FillLightingAutoOffCombo() 切换 ✅
 		sleepCombo.SelectedIndexChanged += async (object? _, EventArgs _) =>
 		{
-			if (!_syncingLightHeader)
+			if (_syncingLightHeader)
 			{
-				int selectedIndex = sleepCombo.SelectedIndex;
-				if (selectedIndex >= 0 && selectedIndex < LightingCloseTimerOptions.Length)
+				return;
+			}
+			int selectedIndex = sleepCombo.SelectedIndex;
+			if (selectedIndex < 0)
+			{
+				return;
+			}
+			// ── ⭐ 宝龙达：用我们的软件实现（配置统一按秒）──
+			if (Program.hw?.UsesBaolongda == true)
+			{
+				if (selectedIndex >= KeyboardAutoOffOptions.Length)
 				{
-					(string, int, int) tuple = LightingCloseTimerOptions[selectedIndex];
-					AppConfig.Set("lighting_idle_seconds", tuple.Item3);
-					if (Program.rgb != null)
-					{
-						Program.rgb.CloseTimerMinutes = tuple.Item2;
-						Program.rgb.SaveConfig();
-					}
-					await Program.ReconcileLightingPowerAsync();
+					return;
 				}
+				MechrevoHw.SetKeyboardAutoOffSeconds(KeyboardAutoOffOptions[selectedIndex].Seconds);
+				Program.hw.ApplyKeyboardAutoOffSetting();
+				return;
+			}
+			// ── ⭐ 其它机型：厂商逻辑逐位不变 ──
+			if (selectedIndex < LightingCloseTimerOptions.Length)
+			{
+				(string, int, int) tuple = LightingCloseTimerOptions[selectedIndex];
+				AppConfig.Set("lighting_idle_seconds", tuple.Item3);
+				if (Program.rgb != null)
+				{
+					Program.rgb.CloseTimerMinutes = tuple.Item2;
+					Program.rgb.SaveConfig();
+				}
+				await Program.ReconcileLightingPowerAsync();
 			}
 		};
 		_lightSleepCombo = sleepCombo;
+		FillLightingAutoOffCombo();
 		// 2026-10-09（0.291 beta22 补丁⑥；用户原话「顺便把这个10分钟的高度改小一点」）：
 		// 这一行原来 `D(32)`（175% → 56 设备像素），而 `TableLayoutPanel` 会把 `Anchor=Left|Right` 的子控件
 		// **纵向拉伸填满单元格** ⇒ 里面的时间下拉被拉到 48 设备像素，比同族的 40 高一档
@@ -17125,28 +17049,85 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		return Math.Max(1, Math.Min(width, maxWidth));
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主截 bug：自动关闭时间做成两个入口）：
+	/// **唯一入口** = 灯光区头部已有的「自动关闭时间」下拉 ✅。
+	/// <para>⭐ 平台分支：宝龙达 ⇒ 软件实现选项（关/10 秒/5 分钟/10 分钟/30 分钟，`light_autooff_seconds`）；
+	/// 其它机型 ⇒ 原厂商选项（`lighting_idle_seconds`）**逐位不变** ✅。</para>
+	/// <para>⚠️ 只在平台切换时重填（⛔ 不每次刷新清空重建）；hw 未就绪时先按厂商表填充 ✅。</para>
+	/// </summary>
+	private void FillLightingAutoOffCombo()
+	{
+		RComboBox combo = _lightSleepCombo;
+		if (combo == null || combo.IsDisposed)
+		{
+			return;
+		}
+		int platform = (Program.hw?.UsesBaolongda == true) ? 1 : 0;
+		if (_lightAutoOffComboPlatform == platform && combo.Items.Count > 0)
+		{
+			return;
+		}
+		_lightAutoOffComboPlatform = platform;
+		_syncingLightHeader = true;
+		try
+		{
+			combo.Items.Clear();
+			if (platform == 1)
+			{
+				// ⭐ 宝龙达：我们的软件实现（统一按秒存）
+				foreach ((string Label, int Seconds) option in KeyboardAutoOffOptions)
+				{
+					combo.Items.Add(option.Label);
+				}
+				int seconds = MechrevoHw.GetKeyboardAutoOffSeconds();
+				int index = Array.FindIndex(KeyboardAutoOffOptions,
+					((string Label, int Seconds) o) => o.Seconds == seconds);
+				combo.SelectedIndex = Math.Max(0, index);
+			}
+			else
+			{
+				// ⭐ 其它机型：原厂商逻辑（逐位不变）
+				foreach ((string Label, int Mins, int IdleSeconds) option in LightingCloseTimerOptions)
+				{
+					combo.Items.Add(option.Label);
+				}
+				int configuredIdleSeconds = AppConfig.Get("lighting_idle_seconds",
+					Math.Max(0, Program.rgb?.CloseTimerMinutes ?? 0) * 60);
+				int index = Array.FindIndex(LightingCloseTimerOptions,
+					((string Label, int Mins, int IdleSeconds) o) => o.IdleSeconds == configuredIdleSeconds);
+				combo.SelectedIndex = (index >= 0) ? index : 0;
+			}
+		}
+		finally
+		{
+			_syncingLightHeader = false;
+		}
+	}
+
 	private void SyncLightRows()
 	{
 		MechrevoHw hw = Program.hw;
 		// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」）：每次刷新灯光行时确保计时器与配置一致
 		//   （默认 0 = 关闭 ⇒ 不创建任何计时器、无额外检查开销；幂等）✅
 		Program.hw?.ApplyKeyboardAutoOffSetting();
-		// ⭐ 仅宝龙达：把配置回填到下拉（⚠️ 非宝龙达**不读该配置** ⇒ 逐位不变）✅
-		if (Program.hw?.UsesBaolongda == true && _keyboardAutoOffCombo != null && !_keyboardAutoOffCombo.IsDisposed)
+		// ⭐ 「自动关闭时间」**唯一入口**：按平台填充/回填同一下拉（宝龙达软件实现 / 其它厂商逻辑）✅
+		FillLightingAutoOffCombo();
+		if (Program.hw?.UsesBaolongda == true && _lightSleepCombo != null && !_lightSleepCombo.IsDisposed)
 		{
 			int autoOffSeconds = MechrevoHw.GetKeyboardAutoOffSeconds();
 			int autoOffIndex = Array.FindIndex(KeyboardAutoOffOptions,
 				((string Label, int Seconds) o) => o.Seconds == autoOffSeconds);
-			if (autoOffIndex >= 0 && _keyboardAutoOffCombo.SelectedIndex != autoOffIndex)
+			if (autoOffIndex >= 0 && _lightSleepCombo.SelectedIndex != autoOffIndex)
 			{
-				_syncingKeyboardAutoOff = true;
+				_syncingLightHeader = true;
 				try
 				{
-					_keyboardAutoOffCombo.SelectedIndex = autoOffIndex;
+					_lightSleepCombo.SelectedIndex = autoOffIndex;
 				}
 				finally
 				{
-					_syncingKeyboardAutoOff = false;
+					_syncingLightHeader = false;
 				}
 			}
 		}
@@ -17218,13 +17199,18 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				_lightOffOnBatteryChk.Checked = flag4;
 				_syncingLightHeader = false;
 			}
-			int idleSeconds = AppConfig.Get("lighting_idle_seconds", Math.Max(0, Program.rgb?.CloseTimerMinutes ?? 0) * 60);
-			int num = Array.FindIndex(LightingCloseTimerOptions, ((string Label, int Mins, int IdleSeconds) o) => o.IdleSeconds == idleSeconds);
-			if (num >= 0 && _lightSleepCombo != null && _lightSleepCombo.SelectedIndex != num)
+			// ⭐ 2026-10-19：「自动关闭时间」下拉在**其它机型**仍回填原厂商配置；
+			//   ⚠️ 宝龙达走上面的软件实现分支（light_autooff_seconds）⇒ 这里不碰 ✅
+			if (Program.hw?.UsesBaolongda != true)
 			{
-				_syncingLightHeader = true;
-				_lightSleepCombo.SelectedIndex = num;
-				_syncingLightHeader = false;
+				int idleSeconds = AppConfig.Get("lighting_idle_seconds", Math.Max(0, Program.rgb?.CloseTimerMinutes ?? 0) * 60);
+				int num = Array.FindIndex(LightingCloseTimerOptions, ((string Label, int Mins, int IdleSeconds) o) => o.IdleSeconds == idleSeconds);
+				if (num >= 0 && _lightSleepCombo != null && _lightSleepCombo.SelectedIndex != num)
+				{
+					_syncingLightHeader = true;
+					_lightSleepCombo.SelectedIndex = num;
+					_syncingLightHeader = false;
+				}
 			}
 		}
 	}

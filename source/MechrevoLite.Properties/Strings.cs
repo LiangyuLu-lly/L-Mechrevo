@@ -1234,11 +1234,8 @@ internal class Strings
 
 	internal static string IdleOff45Min => ResourceManager.GetString("IdleOff45Min", resourceCulture);
 
-	/// <summary>⭐ 2026-10-19（宝龙达「灯光自动关闭时间」· 软件实现）：5 分钟选项 + 行标签 ✅。</summary>
+	/// <summary>⭐ 2026-10-19（宝龙达「灯光自动关闭时间」· 软件实现）：5 分钟选项 ✅。</summary>
 	internal static string IdleOff5Min => ResourceManager.GetString("IdleOff5Min", resourceCulture);
-
-	/// <summary>⭐ 2026-10-19（宝龙达「灯光自动关闭时间」）：设置行标签 ✅。</summary>
-	internal static string KeyboardAutoOff => ResourceManager.GetString("KeyboardAutoOff", resourceCulture);
 
 	internal static string QuickAcRecovery => ResourceManager.GetString("QuickAcRecovery", resourceCulture);
 
