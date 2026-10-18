@@ -4523,14 +4523,39 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				maskOk = FanWriter.TrySetManualMask(true, true, out maskDetail);
 			}
-			Thread.Sleep(1200);
-			bool readOk = TryReadFanSpeedsViaBackend(out int nowFirst, out int nowSecond);
-			int achievedRpm = readOk ? Math.Max(nowFirst, nowSecond) : 0;
-			bool reached = targetsOk && maskOk && readOk && achievedRpm >= units * 100 * 9 / 10;
+			// ⭐⭐ 2026-10-18（机主诊断包 · 强冷已写入但确认太急）：⭐ 3900→6000 RPM 需要更久 ⇒
+			//   改为**最多 10 s 轮询**（每 500 ms 读一次功能号 13，取**最大值**），满足任一条件即确认：
+			//   ① 峰值 ≥ 目标×90%  ② 峰值 ≥ 原值×1.15；⛔ 轮询期间**不再写**（只读 13）✅
+			bool readOk = false;
+			int peakRpm = baselineRpm;
+			long boostStart = Environment.TickCount64;
+			if (targetsOk && maskOk)
+			{
+				while (Environment.TickCount64 - boostStart <= 10000)
+				{
+					Thread.Sleep(500);
+					if (!TryReadFanSpeedsViaBackend(out int pollFirst, out int pollSecond))
+					{
+						continue;
+					}
+					readOk = true;
+					peakRpm = Math.Max(peakRpm, Math.Max(pollFirst, pollSecond));
+					bool targetReached = peakRpm >= units * 100 * 9 / 10;
+					bool improvedEnough = baselineRpm > 0 && peakRpm >= baselineRpm * 115 / 100;
+					if (targetReached || improvedEnough)
+					{
+						break;
+					}
+				}
+			}
+			double waitedSeconds = Math.Max(0, Environment.TickCount64 - boostStart) / 1000.0;
+			bool reached = targetsOk && maskOk && readOk
+				&& (peakRpm >= units * 100 * 9 / 10 || (baselineRpm > 0 && peakRpm >= baselineRpm * 115 / 100));
 			confirmed = reached;
-			Logger.WriteLine($"[fan] 强冷：开 ⇒ 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}"
-				+ $" · 目标={units * 100} RPM（两路）· 写={targetsOk}/{maskOk} · 13={baselineRpm}→{achievedRpm} RPM"
-				+ $" ⇒ 确认={confirmed} · {targetDetail} · {maskDetail}");
+			// ⭐ 日志格式（机主要求）：`[fan] 强冷：写 20→… · 目标=6000 · 实测峰值=… RPM（等待 6.5s）⇒ 确认=True/False`
+			Logger.WriteLine($"[fan] 强冷：写 EC→{units}（0xC83C/0xC83D={units} x100RPM · 0xB20=0x0A · 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}）"
+				+ $" · 目标={units * 100} · 实测峰值={peakRpm} RPM（等待 {waitedSeconds:0.0}s）⇒ 确认={confirmed}"
+				+ (reached ? "" : "（已写入但转速未达预期）"));
 			if (!targetsOk || !maskOk)
 			{
 				FanWriter.TryReleaseToFirmware(out string releaseDetail);
