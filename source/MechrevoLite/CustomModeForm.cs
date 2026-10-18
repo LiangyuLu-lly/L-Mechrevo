@@ -370,24 +370,6 @@ public class CustomModeForm : RForm
 
 	internal static string FanTableTimeoutText => Strings.FanTableNotReady;
 
-	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 诚实性 · 用户真机反馈）：⭐ <b>非 GCU 后端下"硬件状态页读不到"该怎么说</b> ✅。
-	/// <para>⚠️ <b>修的是什么</b>：⭐ <see cref="RefreshHardwareStateAsync" /> 原来在
-	/// <c>RequestCustomModePageStateAsync()</c> 失败时一律显示 <see cref="FanTableTimeoutText" />
-	/// （＝「⭐ 风扇曲线未就绪」⚠️）⭐ —— ⭐ 而<b>真实原因与风扇曲线无关</b> ❌：
-	/// ⭐ 那个方法体里是三条 <c>Publish("Fan/Control" …) / Publish("LCHWOC/Control" …)</c>
-	/// ⭐ ⭐ <b>纯 MQTT 下发</b>，⭐ 宝龙达机型<b>没有 GCU</b> ⇒ ⭐ 必然抛/为假 ✅。
-	/// ⭐ 机主真机日志原文：⭐ <c>Custom mode status refresh failed: 发布到 Fan/Control 失败：MQTT 未连接</c> ⚠️。</para>
-	/// <para>⭐ <b>为什么"硬件状态页"</b>：⭐ 该页要显示的风扇曲线 / 功耗墙 / 显卡功率，⭐ 在非 GCU 后端上
-	/// <b>没有可读来源</b> ✅ ⇒ ⭐ 如实说"读不到"比甩给风扇曲线准确 ✅。</para>
-	/// <para>⚠️ <b>为什么不进 resx</b>：⭐ <c>Strings*.resx</c> 是<b>混合行尾</b>（⭐ CRLF=14 ＋ ⭐ 裸 LF=5343 ⚠️）
-	/// ⇒ ⭐ <c>edit</c> 工具会把整个文件改写成 LF、⭐ diff 爆成全文 ❌；⭐ 且新增一条串要同时改
-	/// <c>Strings.resx</c> ＋ <c>Strings.zh-CN.resx</c> ＋ <c>Strings.cs</c> 三处 ⚠️。
-	/// ⭐ 本模块已有先例（⭐ <c>PerfModeRunner.WriteRejectedDetail</c> / <c>StepErrorDetail</c> 都是
-	/// 面向界面的中文字面量 ✅），⭐ 故沿用"⭐ 代码里给准确文案"⭐ 这条口径 ✅。</para>
-	/// <para>⚠️ <b>非宝龙达 ⇒ 恒不取用</b> ⇒ ⭐ 仍显示 <see cref="FanTableTimeoutText" />，⭐ 逐字不变 ✅。</para>
-	/// </summary>
-	internal static string HardwareStateUnavailableText => "本机无 GCU，硬件状态页不可读";
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-19（机主反馈：顶部黄字「本机无 GCU，不支持写入固件自定义档」**误导**）：
@@ -4310,11 +4292,21 @@ public class CustomModeForm : RForm
 			await Task.Run((Func<bool>)hw.EnsureDirectGpuOverclock);
 			if (!(await hw.RequestCustomModePageStateAsync()))
 			{
-				// ⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ 这条失败的真实原因是"三条 MQTT 下发发不出去"，
-				//   与风扇曲线无关 ❌ ⇒ ⭐ 非 GCU 后端改说实话（见 HardwareStateUnavailableText）。
-				//   ⚠️ 非宝龙达 ⇒ hw.UsesBaolongda 为 false ⇒ ⭐ 仍取 FanTableTimeoutText，逐字不变 ✅。
-				_status.Text = (hw.UsesBaolongda ? HardwareStateUnavailableText : FanTableTimeoutText);
-				_status.ForeColor = UiVisualStyle.Danger;
+				// ⭐⭐ 2026-10-19（机主：删掉顶部红字「本机无 GCU，硬件状态页不可读」）：
+				//   ⭐ 宝龙达下本机配置（SMU/WMI 23/NVAPI/NVML）照常可用，这条红字会让人误以为功能不可用 ⇒
+				//      **不显示任何状态文本**（`SyncStatusRow()` 随空文本折叠，⛔ 不留空白占位）✅
+				//   ⚠️ 非宝龙达（GCU/老接口）⇒ 仍显示 FanTableTimeoutText，**逐字不变** ✅
+				if (hw.UsesBaolongda)
+				{
+					_status.Text = string.Empty;
+					_status.ForeColor = UiVisualStyle.Muted;
+					SyncStatusRow();
+				}
+				else
+				{
+					_status.Text = FanTableTimeoutText;
+					_status.ForeColor = UiVisualStyle.Danger;
+				}
 				return false;
 			}
 			return true;
@@ -4322,9 +4314,20 @@ public class CustomModeForm : RForm
 		catch (Exception ex)
 		{
 			Logger.WriteLine("Custom mode status refresh failed: " + ex.Message);
-			// ⭐ 同上（宝龙达 · 诚实性）：⭐ 异常也是"MQTT 未连接"这条链 ⇒ ⭐ 按后端如实说 ✅。
-			_status.Text = (hw.UsesBaolongda ? HardwareStateUnavailableText : FanTableTimeoutText);
-			_status.ForeColor = UiVisualStyle.Danger;
+			// ⭐⭐ 2026-10-19（机主：删掉顶部红字「本机无 GCU，硬件状态页不可读」）：
+			//   ⭐ 宝龙达（异常同样是"MQTT 未连接"这条链）⇒ **不显示状态文本**（随空文本折叠）✅
+			//   ⚠️ 非宝龙达 ⇒ 仍显示 FanTableTimeoutText，逐字不变 ✅
+			if (hw.UsesBaolongda)
+			{
+				_status.Text = string.Empty;
+				_status.ForeColor = UiVisualStyle.Muted;
+				SyncStatusRow();
+			}
+			else
+			{
+				_status.Text = FanTableTimeoutText;
+				_status.ForeColor = UiVisualStyle.Danger;
+			}
 			return false;
 		}
 		finally

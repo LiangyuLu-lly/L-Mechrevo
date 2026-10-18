@@ -12015,7 +12015,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//      （⭐ 它内部 `RunToast(..., essential: true)` ✅ ⇒ ⭐ **即使「OSD 提示」快捷开关关掉也照样弹** ✅
 		//       —— ⭐ 因为这是"**功能结果告知**"、⭐ 不是装饰性 OSD ✅ 与 `ToastForm` 的既有设计一致 ✅）
 		//   ⭐ 文案走**行内**（⛔ 不动 `Strings*.resx`：⭐ 它是**混合行尾** ⚠️、⭐ 加串要同改 3 个文件；
-		//      ⭐ 且本文件/本项目**已有行内文案先例** ✅ —— ⭐ 例如 `CustomModeForm.HardwareStateUnavailableText`）
+		//      ⭐ 且本文件/本项目**已有行内文案先例** ✅ —— ⭐ 例如 `CustomModeForm.LocalApplyText`）
 		//   ⭐ ⭐ **必须区分成功与未确认** ✅（⭐ 诚实性铁律 ⚠️）：
 		//      ⭐ `confirmed` 为真 ⇒ ⭐ 回读已确认功能号 9 写对了 ✅ ⇒ ⭐ 才敢说「已切到」
 		//      ⚠️ 未确认 ⇒ ⭐ **不谎报"已切换"** ⚠️ ⇒ ⭐ 换一句"未确认"的说法 ✅
