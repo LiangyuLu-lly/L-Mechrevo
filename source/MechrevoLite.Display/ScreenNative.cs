@@ -372,10 +372,39 @@ internal static class ScreenNative
 	/// </summary>
 	public static IReadOnlyList<int> GetAvailableRefreshRates(string? laptopScreen)
 	{
+		return GetAvailableRefreshRates(laptopScreen, allowCurrentDeviceFallback: false);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 「屏幕刷新率没显示」）：
+	/// <paramref name="laptopScreen" /> 为 <c>null</c>（**认不出内屏**）时，
+	/// 可选地**退化为「当前显示设备」**（Win32 语义：<c>EnumDisplaySettingsEx(null, …)</c> = 当前显示设备）
+	/// —— 与 <see cref="GetRefreshRate" /> 自 2026-10-10 起就有的那条兜底**同构**。
+	/// <para>⚠️ 为什么需要这个开关（真机诊断包实证 · 蛟龙16Pro / <c>MRID6-23</c>）：</para>
+	/// <para>那台机接着 HDMI 外接屏（<c>S2719DGF</c>）时，活动显示路径里**没有内屏**
+	/// ⇒ <see cref="FindLaptopScreen" /> 返回 <c>null</c>、confidence=None；</para>
+	/// <para>而 <see cref="GetRefreshRate" /> 因已有兜底 ⇒ **能读到 144Hz**；
+	/// 本方法却因首句 <c>if (laptopScreen == null) return list;</c> ⇒ **返回空列表**
+	/// ⇒ 界面 <c>_hzButtons.Count == 0</c> ⇒ **「刷新率」整行消失**（用户报「宝龙达屏幕刷新率没显示」）。</para>
+	/// <para>⚠️⚠️ 默认（<c>false</c>）**保持原行为逐位不变** —— 因为**落盘 / 档位校正**那条路
+	/// （<c>MechrevoHw</c> 里 eDP 门槛之后的实测最大值）**绝不能**把外接屏的档位当成内屏的
+	/// ⇒ 那边必须先过 <c>confidence == Embedded</c> 才调用本方法（现状已如此，故不受本改动影响）。</para>
+	/// <para>⭐ 目前只有**界面**那一处传 <c>true</c>，且只在 **宝龙达** 机型上 ——
+	/// 其余机型（GCU / 老接口）行为**逐位不变**。</para>
+	/// </summary>
+	public static IReadOnlyList<int> GetAvailableRefreshRates(string? laptopScreen, bool allowCurrentDeviceFallback)
+	{
 		List<int> list = new List<int>();
 		if (laptopScreen == null)
 		{
-			return list;
+			if (!allowCurrentDeviceFallback)
+			{
+				return list;
+			}
+			// ⭐ 退化为「当前显示设备」——下面把 null 原样交给 EnumDisplaySettingsEx 即可
+			//   （⛔ 不在此处纠偏为某块具体屏：那是「猜」，宁可显示当前活动屏的真档位）。
+			Logger.WriteLineIfChanged("hz-rates-current-device-fallback",
+				"hz source: 未识别到内屏 -> 档位枚举退化为「当前显示设备」（只用于界面显示与即时切换，⛔ 不落盘）");
 		}
 		DisplayNative.DEVMODE current = CreateDevmode();
 		if (DisplayNative.EnumDisplaySettingsEx(laptopScreen, ENUM_CURRENT_SETTINGS, ref current) == 0)

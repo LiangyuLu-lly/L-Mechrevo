@@ -1,4 +1,4 @@
-﻿// 2026-10-15（C-1 第 2 步「后端化」）：把「本机走哪个后端」从写死的「有 GCU / 没 GCU」抽成**有序候选表**。
+// 2026-10-15（C-1 第 2 步「后端化」）：把「本机走哪个后端」从写死的「有 GCU / 没 GCU」抽成**有序候选表**。
 // 用途：MechrevoHw 启动时按 MechrevoBackendOrder.Candidates 顺序**逐个探测**，第一个可用的即为 ActiveBackend。
 // ⭐ 以后新增后端（例如宝龙达模具那套另行准备的 ACPI 驱动）**只需加一项**：
 //     ① MechrevoBackendKind 加枚举值；② 写一个「返回非 null 即成功」的探测委托；③ 加进 Candidates 数组。
@@ -70,9 +70,26 @@ internal static class MechrevoBackendOrder
 	/// 表现为「GCU 未连接」而不是"选错后端"）。判据 <see cref="MechrevoHw.IsGcuServiceInstalled" /> 只看
 	/// 服务注册表键 / GCU 是否留下过 ItemSupport 快照 —— 都是**只读**、不启服务、不发包。</para>
 	/// </summary>
-	internal static readonly MechrevoBackendProbe[] Candidates = new MechrevoBackendProbe[3]
+	internal static readonly MechrevoBackendProbe[] Candidates = new MechrevoBackendProbe[4]
 	{
 		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => MechrevoHw.IsGcuServiceInstalled ? MechrevoHw.GcuBackendMarker : null),
+		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配第 3 步）：⭐ **提到老接口【之前】** ✅
+		//   ⭐ 理由（⭐ 真机实测得出 ⚠️）：⭐ 宝龙达机型的 `MICommonInterface` **类 GUID 与老同方那份完全一致**
+		//     （⭐ `b60bfb48-3e5b-49e4-a0e9-8cffe1b3434b` ✅）⇒ ⭐ 老接口的 GUID 校验**也会通过** ⚠️
+		//     ⇒ ⭐ 若把宝龙达放在后面，⭐ 它**永远轮不到**，⭐ 新接的风扇/温度/灯效就都用不上 ✅
+		//   ⚠️ 不会误伤同方（⭐ **真正的保证在 `BaolongdaBackend.TryCreate` 里那道【机型白名单】硬闸门** ✅）：
+		//      ⭐ 本候选一旦探到 `MICommonInterface`，⭐ `BaolongdaBackend.TryCreate()` **会先查板号白名单**
+		//      （⭐ `MRID6` 精确 / `MRID6-` 前缀 ✅）⇒ ⭐ 不在白名单 ⇒ ⭐ **立即弃掉并返回 null** ✅
+		//      ⇒ ⭐ 自动落到下一格 `LegacyMifs` / `GCU` ⇒ ⭐ **行为与改动前一致** ✅
+		//   ⚠️⚠️ 2026-10-17（30 系宝龙达整机失效修复后**必须同步更正本段**）：
+		//      旧说法「`BaolongdaWmi.TryCreate` 要求真读一次 **CPU 温度（功能号 22）** 才算活体」
+		//      ⭐ **已不再是事实** ⚠️ —— 该判据被证明过严：**30 系宝龙达（`MRID6`·6800H+3070Ti）
+		//      实测读不到功能号 22**（官方 30 系控制台也不用它）⇒ 一个可选功能读不到却让**整机退回 legacy** ❌。
+		//      现在是 ⭐ **探测与能力位解耦** ✅：⭐ 板号白名单命中 ⇒ 必接管（功能号 22 只记日志）；
+		//      ⭐ 板号未命中 ⇒ 多判据任一成功（功能号 22/8/11/12/13，⭐ 见 `BaolongdaWmi.ProbeLiveness` ✅）。
+		//      ⇒ ⭐ 「不误伤同方」**不靠活体判据**，⭐ 靠**白名单** ✅（⭐ 这是本次更正的核心 ✅）。
+		//   ⚠️ 也不能放在 GCU **之前**：⭐ `IsGcuServiceInstalled` 为真说明这台机该走 GCU（⭐ 见上面那段注释 ⚠️）。
+		new MechrevoBackendProbe(MechrevoBackendKind.Baolongda, () => BaolongdaBackend.TryCreate()),
 		new MechrevoBackendProbe(MechrevoBackendKind.LegacyMifs, () => LegacyMifsWmi.TryCreate()),
 		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => MechrevoHw.GcuBackendMarker),
 	};

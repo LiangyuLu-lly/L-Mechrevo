@@ -17,13 +17,22 @@ public static class PerfModeApplyPlanner
 		List<PerfApplyStep> list = new List<PerfApplyStep>(16);
 		PerfModeSettings settings = mode.Settings;
 		PerfModeRoute perfModeRoute = routeOverride ?? mode.Route;
+		// ⭐⭐ 2026-10-16（宝龙达 · 自定义档诚实性）：⭐ 本后端【写不了固件自定义档】时，不生成那两步 ✅
+		//   ⭐ 依据见 PerfModeCapabilities.SupportsFirmwareSlot 的长注释 ——
+		//      档位步 `SwitchFirmwareSlot` 会经 `MechrevoService.SwitchCustomProfile*` 的两道 `!IsGcuConnected` 闸
+		//      而【恒失败】❌；⭐ 而 Runner 一见档位步失败就 `break` ⇒ ⭐ 把后面【所有】步骤（含本该能用的
+		//      电源计划/覆盖层/睿频/刷新率）一起废掉 ❌。
+		//   ⇒ ⭐ 所以宝龙达下退化为「只做后端无关的那些步骤」＝ 配置保存在本机（⭐ `perf_custom*_` 键本来就存得下 ✅）。
+		//   ⚠️ 非 FirmwareSlot 路由 ⇒ 恒 true ⇒ ⭐ 内置档路径【逐位不变】✅；
+		//   ⚠️ `caps.SupportsFirmwareSlot` 默认 true ⇒ ⭐ 所有既有后端（GCU/老接口）【逐位不变】✅。
+		bool canWriteFirmwareSlot = perfModeRoute != PerfModeRoute.FirmwareSlot || caps.SupportsFirmwareSlot;
 		if (perfModeRoute == PerfModeRoute.FirmwareSlot)
 		{
 			if ((object)slotPlan == null)
 			{
 				throw new ArgumentNullException("slotPlan", "走固件自定义档的模式必须先做档位决策");
 			}
-			if (includeSwitch)
+			if (canWriteFirmwareSlot && includeSwitch)
 			{
 				list.Add(new PerfApplyStep(PerfApplyStepKind.SwitchFirmwareSlot, null, null, slotPlan.SlotIndex, IsCpuCurve: false, null, PerfApplyVerify.ModeReadback));
 			}
@@ -43,7 +52,7 @@ public static class PerfModeApplyPlanner
 				list.Add(new PerfApplyStep(PerfApplyStepKind.SwitchTurboSubMode, null, null, (mode.Kind == PerfModeKind.SilentTurbo) ? 1 : 0));
 			}
 		}
-		if (perfModeRoute == PerfModeRoute.FirmwareSlot && (object)slotPlan != null && slotPlan.NeedsParameterWrite)
+		if (canWriteFirmwareSlot && perfModeRoute == PerfModeRoute.FirmwareSlot && (object)slotPlan != null && slotPlan.NeedsParameterWrite)
 		{
 			if (settings.TccOn.HasValue)
 			{
@@ -61,11 +70,16 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("FanSwitchSpeedEnabled", settings.FanSwitchSpeedOn.Value ? 1 : 0));
 			}
-			if (settings.Pl1.HasValue)
+			// ⭐⭐ 2026-10-16（宝龙达 · 功耗墙真下发）：⭐ 下面这三项（PL1 / PL2 / CpuTccOffset）
+			//   ⭐ 在"能用 WMI 写功耗墙"的后端（宝龙达 ✅）下【改到本方法末尾单独生成】✅
+			//   ⭐ 原因：⭐ 它们在宝龙达上**不走固件槽**、而是走 WMI 功能号 23 ✅
+			//      ⇒ ⭐ 所以这里加反向条件、避免与那一支重复生成 ✅
+			//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ ⭐ 所有既有后端【逐位不变】✅
+			if (!caps.SupportsWmiPowerFields && settings.Pl1.HasValue)
 			{
 				list.Add(Field("PL1", settings.Pl1.Value, PerfApplyVerify.CpuPackagePower));
 			}
-			if (settings.Pl2.HasValue)
+			if (!caps.SupportsWmiPowerFields && settings.Pl2.HasValue)
 			{
 				list.Add(Field("PL2", settings.Pl2.Value, PerfApplyVerify.CpuPackagePower));
 			}
@@ -73,7 +87,7 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("PL4", settings.Pl4.Value, PerfApplyVerify.CpuPackagePower));
 			}
-			if (settings.TccTarget.HasValue)
+			if (!caps.SupportsWmiPowerFields && settings.TccTarget.HasValue)
 			{
 				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
@@ -131,6 +145,92 @@ public static class PerfModeApplyPlanner
 				bool flag3 = settings.GpuOverclockOn ?? true;
 				list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyGpuOverclock, null, null, flag3 ? 1 : 0, IsCpuCurve: false, null, PerfApplyVerify.GpuClockOffset, flag3 ? (settings.GpuCoreOffset.GetValueOrDefault(), settings.GpuMemoryOffset.GetValueOrDefault()) : (0, 0)));
 			}
+		}
+		// ⭐⭐ 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）：⭐ 把 CPU 功耗墙三项【单独生成】✅
+		//   ⭐ 为什么单独：⭐ 它们与"固件槽"无关 —— 后端在 `MechrevoService.SetCustomDetail` 开头
+		//      就把这几个键就地摘出来、改写 WMI 功能号 23 ✅
+		//      （⭐ 见 `PerfModeCapabilities.SupportsWmiPowerFields` 的注释 ⚠️）
+		//   ⭐ 为什么仍要求 `NeedsParameterWrite`：⭐ 那是"⭐ 本次应用确实要改参数"⭐ 的语义 ⚠️
+		//      ⇒ ⭐ 只读 / 守卫场景（⭐ `NeedsParameterWrite = false` ✅）**不会**真去写功耗墙 ✅
+		//   ⭐ 为什么放这里（if/else 链之外）：⭐ 宝龙达下 `canWriteFirmwareSlot = false` ⇒
+		//      上面那个 FirmwareSlot 大块整块跳过（⭐ 连同那些**只走 MQTT**的字段一起 ✅）
+		//      ⇒ ⭐ 而功耗墙这三项**另有 WMI 通路**、不该被一起关掉 ✅ —— 这就是本次修的东西 ✅
+		//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ ⭐ 所有既有后端【逐位不变】✅
+		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite)
+		{
+			if (settings.Pl1.HasValue)
+			{
+				list.Add(Field("PL1", settings.Pl1.Value, PerfApplyVerify.CpuPackagePower));
+			}
+			if (settings.Pl2.HasValue)
+			{
+				list.Add(Field("PL2", settings.Pl2.Value, PerfApplyVerify.CpuPackagePower));
+			}
+			// ⭐⭐ 2026-10-19（机主 UI 顺序：PL1 → PL2 → 功耗时间窗（STAPM，秒）→ 温度墙）：
+			//   ⭐ 步骤顺序与 UI 行顺序一致（日志/执行顺序一眼可对照）✅
+			//   ⚠️ **不新增 FPPT 步骤**：SMU 只有 stapm/slow/fast 三档功率限制，
+			//      `fast limit`（MP1 0x15）**就是 fPPT**，而本映射里 PL2 已经写 fast（`SetFastLimit`）
+			//      ⇒ 再生成一条 FPPT 会重复写同一条命令（详见 CustomModeForm PL2 行注释）✅
+			//   ⚠️ 单位 = **秒**（MP1 0x18 `stapm_time`）；未设置（null）⇒ 不生成、不写（旧行为）✅
+			//   条件：`SupportsSmuPowerControls` = 宝龙达 && 30 系 && SMU 通路可用；默认 false ⇒ 既有后端逐位不变。
+			if (caps.SupportsSmuPowerControls && settings.StapmTimeSeconds.HasValue)
+			{
+				list.Add(Field("SmuStapmTimeSeconds", settings.StapmTimeSeconds.Value));
+			}
+			if (settings.TccTarget.HasValue)
+			{
+				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
+			}
+		}
+		// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线本地化）：⭐ 无固件槽的后端**不产生** GCU 的
+		//   `WriteFanCurve`（上面那个大块整块跳过），但风扇曲线**能**走本机软件闭环（功能号 20/21）✅
+		//   ⇒ ⭐ 这里单独生成步骤；执行侧（`PerfModeBackend.WriteFanCurveAsync`）在宝龙达下改为
+		//      把"占空比 %"换算成 RPM、存进 `BaolongdaFanCurveStore` 并启用 ✅
+		//   ⚠️ 仅 `SupportsWmiPowerFields`（=宝龙达）且确实要改参数时生成 ⇒ GCU/老接口逐位不变 ✅
+		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite)
+		{
+			if (settings.CpuFanDuty != null && settings.CpuFanDuty.Length == 16)
+			{
+				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: true, settings.CpuFanDuty, PerfApplyVerify.FanDuty));
+			}
+			if (settings.GpuFanDuty != null && settings.GpuFanDuty.Length == 16)
+			{
+				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: false, settings.GpuFanDuty, PerfApplyVerify.FanDuty));
+			}
+		}
+		// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：⭐ 只有"能写厂商 WMI 的本机后端"（宝龙达）才生成该步 ✅
+		//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ GCU/老接口逐位不变 ✅
+		if (caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite && settings.GpuPowerLimitW.HasValue)
+		{
+			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyGpuPowerLimit, null, null, settings.GpuPowerLimitW.Value, IsCpuCurve: false, null, PerfApplyVerify.ServiceEcho));
+		}
+		// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」· 根因）：⭐ 宝龙达没有 GCU ⇒ GPU 核心/显存偏移
+		//   ⭐ 走本机 **NVAPI P-States 20（P0）**（`PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支，
+		//     写后**回读确认**）✅ —— 但原来这一步**只在 BuiltIn 路由**生成，而自定义档**永远是 FirmwareSlot**
+		//     ⇒ 自定义模式窗口里的「GPU 超频」开关 + 核心/显存滑块只是存进了 `PerfModeSettings`，
+		//     **一个字节都没走到 NVAPI** ❌（⛔ 这就是"没用"的根因）✅。
+		//   ⭐ 现在：能走本机直写的后端（宝龙达 ⇒ `SupportsDirectGpuOverclock = true`）在 **FirmwareSlot 路由**
+		//     下也生成这一步 ⇒ 与 WMI 功耗墙/风扇曲线那几步同一条自定义档下发链 ✅。
+		//   ⚠️ 默认 false ⇒ GCU / 老接口的步骤列表【逐位不变】✅（它们仍走原来的固件字段/内置档分支）。
+		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
+		//   ⭐ 规划结果（生成/未生成 + 原因）由 **PerfModeService**（唯一有 route/slotPlan/日志上下文的地方）
+		//      在 Build 之后统一落一行默认可见日志 —— 见 `LogGpuOverclockPlan` ✅
+		//   ⚠️ 规划器本身保持**纯函数**（不引日志依赖）⇒ `perf-fix-selftest` 可直接 Link 本文件 ✅
+		if (caps.SupportsDirectGpuOverclock && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite
+			&& (settings.GpuOverclockOn.HasValue || settings.GpuCoreOffset.HasValue || settings.GpuMemoryOffset.HasValue))
+		{
+			bool gpuOcOn = settings.GpuOverclockOn ?? true;
+			list.Add(new PerfApplyStep(
+				PerfApplyStepKind.ApplyGpuOverclock,
+				WireKey: null,
+				Value: null,
+				Number: gpuOcOn ? 1 : 0,
+				IsCpuCurve: false,
+				Curve: null,
+				Verify: PerfApplyVerify.GpuClockOffset,
+				GpuOffsets: gpuOcOn
+					? (settings.GpuCoreOffset.GetValueOrDefault(), settings.GpuMemoryOffset.GetValueOrDefault())
+					: (0, 0)));
 		}
 		if (settings.FanBoost.HasValue)
 		{

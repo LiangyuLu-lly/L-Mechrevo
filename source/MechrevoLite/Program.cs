@@ -141,6 +141,12 @@ internal static class Program
 
 	private static int _lightingIdleSuspended;
 
+	/// <summary>
+	/// ⭐ 2026-10-19（平台互斥）：同方/GCU 的「自动关灯：已启用」日志只打一次（去重；关闭后重置）。
+	/// <para>⚠️ 宝龙达不使用本计时器（走 `MechrevoHw` 的 5s tick）⇒ 平台判定单一来源 `UsesBaolongda` ✅。</para>
+	/// </summary>
+	private static int _lightingAutoOffEnableLogged;
+
 	private static int _keyboardPowerTemporarilySuspended;
 
 	private static int _lightingRestoreRequestId;
@@ -150,6 +156,12 @@ internal static class Program
 	private static int _keyboardRestoreAppliedRequestId = int.MinValue;
 
 	private static readonly Dictionary<string, bool> _externalPowerBeforeTemporarySuspend = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>⭐ 启动 Logo 恢复判断只记一次（0=未记 · 1=已记）；⛔ 避免恢复重试时刷屏 ✅</summary>
+	private static int _logoRestoreDecisionLogged;
+
+	/// <summary>⭐ Logo powerexplicit 一次性迁移是否已检查（0=未查 · 1=已查）；⛔ 只对宝龙达执行 ✅</summary>
+	private static int _logoExplicitMigrationChecked;
 
 	private static readonly TimeSpan TelemetryStaleAfter = TimeSpan.FromSeconds(45L);
 
@@ -290,6 +302,132 @@ internal static class Program
 		}
 		switch (text)
 		{
+		// ⭐⭐ 2026-10-19（机主要求「直接调 LM 接口」）：⭐ 键盘灯 WMI 探针走**主程序自己的通道**
+		//   ⛔ 不再依赖 PowerShell（PS 5.1 对 WMI 的封送反复出问题）
+		//   ⭐ 用法：L-Mechrevo.exe --kbd-probe      （结果写 %APPDATA%\MechrevoLite\log.txt，并另存一份到桌面）
+		case "--kbd-probe":
+		{
+			string probeLog = KeyboardWmiProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[kbd-probe] " + probeLog);
+			return;
+		}
+		// ⭐⭐ 2026-10-19（宝龙达 · GPU 核心/显存偏移）：NVAPI P-States 20 真机探针。
+		//   用法：L-Mechrevo.exe --gpu-oc-probe
+		//   读 P0 基线 → 核心/显存各 +50 → 回读 → 各 +100 → 回读 → 归零 → 回读；
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-gpu-oc-probe-*.txt。
+		case "--gpu-oc-probe":
+		{
+			string probeLog = GpuOcProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[gpu-oc-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-19（30 系 · SMU 只读探针）：先确认 PawnIO/SMU 能否读，再决定 PL/温度墙是否改走 SMU。
+		//   用法：L-Mechrevo.exe --smu-probe
+		//   ⛔ 只读：不发任何 SMU 写命令；结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-smu-probe-*.txt。
+		//   ⚠️ 主程序清单是 requireAdministrator ⇒ 非管理员运行时 PawnIO 会回 AccessDenied（预期，报告会如实写）。
+		case "--smu-probe":
+		{
+			string probeLog = SmuProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[smu-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇接管接口）：**只读**探针 `--fan-probe`。
+		//   ⚠️ 2026-10-18 收紧：写 WMI 20=1 真机会卡死 ⇒ ⛔ 本探针**不再写任何字节**！
+		//   ⭐ 内容：EC 0xC83C/0xC83D/0xB20 只读验证 + WMI 13/20/21 原始 hex 只读对照 + 结论。
+		//   ⭐ EC 写通路验证请用 `--fan-ec-test`（白名单写 + finally 恢复）。
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-probe-*.txt。
+		case "--fan-probe":
+		{
+			string probeLog = FanProbe.Run();
+			Console.WriteLine(probeLog);
+			Logger.WriteLine("[fan-probe] " + probeLog);
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇 EC 写通路）：**最小验证** `--fan-ec-test [--acpi] [--ec81]`。
+		//   ⭐ 默认先 LPC 通道（白名单 3+1）写 Fan1 目标+5 → 置 bit1 → 读回；⛔ 失败自动改试 ACPI 0x93 写；
+		//   ⭐ `--acpi` 强制只测 ACPI 0x93；⭐ `--ec81` 只做一次 0x81（WR_EC）写实验（仅 reg=0x60 ← 0x1060|0x80）；
+		//   ⭐ 转速 ≥ +200 RPM ⇒ 可用；⛔ finally 恢复（目标 0、清位、0x1060 原值）。
+		//   ⚠️ 需要管理员（PawnIO 驱动访问）；⛔ 不写 WMI 20/21。
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-ec-test-*.txt。
+		case "--fan-ec-test":
+		{
+			Environment.ExitCode = FanEcTest.Run(args.Skip(1).ToArray());
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 风扇写入门面验证/放行）：`--fan-smu-ec-test`。
+		//   ⭐ 只读对照（ACPI EC vs LPC vs SmuEcAccess）→ 最小写 0xB20（置 bit1）→ 回读确认；
+		//   ⭐ 全部确认 ⇒ 写 `%APPDATA%\MechrevoLite\fan_ec_verified.cfg`（下次启动放开 UI 曲线/强冷）；
+		//   ⛔ 不确认 ⇒ 不写配置、UI 保持隐藏；⛔ 不写 0x1060 / WMI 20/21。
+		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-fan-smu-ec-test-*.txt。
+		case "--fan-smu-ec-test":
+		{
+			Environment.ExitCode = FanSmuEcTest.Run();
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（风扇闸门排查）：`--fan-gate-status`（⭐ 纯只读）。
+		//   ⭐ 打印 FanCurveVerified（读 cfg 的结果）、PreferredChannel、cfg 路径/存在/内容、板号/代际；
+		//   ⛔ 不探测 EC、不写任何文件、不发 WMI；⚠️ 改 cfg 后需重启 LM 才生效。
+		case "--fan-gate-status":
+		{
+			Environment.ExitCode = FanGateStatus.Run();
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值 · 阶段 1）：`--battery-limit-probe`（⭐ 纯只读）。
+		//   ⭐ 读参考机型（蛟龙16 Pro 2023 · 40 系 · 模具 MRID6/BM5235 · 23 款 = MRID6-23）实测地址：
+		//      常驻阈值 0x83A1/0x83A2 · 模式 0x83C0 · 命令 0x8151 · 触发 0x8150 · 结果 0x8152 ·
+		//      mailbox 参数 0x8153/0x8154（+ 旁证地址/EC 版本）+ 当前电池状态；
+		//   ⭐ 是否支持**只看 EC 是否含该布局**（0x83A1/0x83A2 是否为合理 1–100），⛔ 不按 30/40 标签；
+		//   ⛔ 不写任何 EC 字节、⛔ 不发 WMI 写；结果写桌面 lm-battery-probe-*.txt。
+		case "--battery-limit-probe":
+		{
+			Environment.ExitCode = BatteryLimitProbe.Run();
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值 · 阶段 2）：`--battery-limit-test [--low 60 --high 80] [--disable]`。
+		//   ⭐ 白名单写（仅 0x8153/0x8154/0x8151/0x8150）；严格时序；失败不重试、不做清理写；
+		//   ⭐ 结果写桌面 lm-battery-limit-test-*.txt + [battery-limit-test] 日志。
+		case "--battery-limit-test":
+		{
+			Environment.ExitCode = BatteryLimitTest.Run(args.Skip(1).ToArray());
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（SMU-EC 只读核对）：`--smu-ec-probe`。
+		//   ⭐ 核对 7.3 `RyzenAccess.Write_EC_EX/Read_EC_EX` 的真实通道（结论：LPC 端口 I/O，无 SMU 命令）；
+		//   ⭐ 双通道（ACPI/LPC）只读对照；⛔ 不发 SMU 命令、不写任何 EC 字节。
+		case "--smu-ec-probe":
+		{
+			Environment.ExitCode = SmuEcProbe.Run();
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-18（SMU 只读探索 · 阶段 1）：`--smu-reg-probe`。
+		//   ⭐ 只用 `ioctl_read_smu_register` 读少量候选寄存器（间隔 10ms），打印 地址/rc/值/LastError；
+		//   ⭐ 与 ACPI EC 只读值对照，看是否有 EC 映射迹象；⛔ 一个写都不发。
+		case "--smu-reg-probe":
+		{
+			Environment.ExitCode = SmuRegisterProbe.Run();
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-19（30 系 · SMU **保守写 + 回读** 实测，供开发机 HawkPoint 近似验证）：
+		//   用法：L-Mechrevo.exe --smu-write-test          只读（打印当前快照，不写）
+		//         L-Mechrevo.exe --smu-write-test --yes    保守写 + 每次回读 + finally 恢复快照并确认
+		//   ⚠️ 边界写死在 SmuWriteTest 里：温度墙只往 ≥85℃ 方向、PL 只往下 5W 内、stapm_time 只写回当前值。
+		case "--smu-write-test":
+			Environment.ExitCode = SmuWriteTest.Run(args.Skip(1).ToArray());
+			Logger.Close();
+			return;
 		// 2026-10-05 step7A (upstream 0.290.6 A-41): capability probe CLI.
 		// L-Mechrevo.exe --cpu-tuning-probe [output.json]
 		case "--cpu-tuning-probe":
@@ -617,6 +755,36 @@ internal static class Program
 			UiAuditMode = true;
 			Environment.SetEnvironmentVariable("LMECHREVO_LOG_LEVEL", "all");
 			Environment.ExitCode = UiAuditRunner.Run((args.Length > 1) ? Path.GetFullPath(args[1]) : Path.Combine(AppContext.BaseDirectory, "ui-audit"));
+			Logger.Close();
+			return;
+		}
+		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配）：⭐ 传感器能力转储（⭐ 落实"LHM 能读温度就优先用它"✅）
+		//    ⭐ 用法：⭐ `L-Mechrevo.exe --sensor-dump [输出目录]` ✅
+		// ⭐⭐ 2026-10-16（宝龙达 · 风扇前置）：⭐ 只读观察两个风扇通道 ＋ ⭐ CPU/GPU 温度
+		//    ⭐ 用法：⭐ `L-Mechrevo.exe --fan-watch [秒数] [输出目录]` ✅
+		//    ⭐ 目的：⭐ 确认"⭐ 哪个通道是 CPU、⭐ 哪个是 GPU"⭐（⭐ 搞反会导致散热逻辑全错 ⚠️）
+		if (text == "--fan-watch")
+		{
+			int seconds = 60;
+			string watchOut = null;
+			if (args.Length > 1 && int.TryParse(args[1], out int parsedSeconds))
+			{
+				seconds = parsedSeconds;
+				if (args.Length > 2)
+				{
+					watchOut = Path.GetFullPath(args[2]);
+				}
+			}
+			else if (args.Length > 1)
+			{
+				watchOut = Path.GetFullPath(args[1]);
+			}
+			Environment.ExitCode = MechrevoLite.Hardware.FanWatchRunner.Run(seconds, watchOut);
+			Logger.Close();
+			return;
+		}		if (text == "--sensor-dump")
+		{
+			Environment.ExitCode = MechrevoLite.Hardware.SensorDumpRunner.Run((args.Length > 1) ? Path.GetFullPath(args[1]) : null);
 			Logger.Close();
 			return;
 		}
@@ -997,7 +1165,9 @@ internal static class Program
 			// 2026-10-09（settingswarm）：把设置对话框外壳的预热排在**首帧之后**、且它自己还会再
 			// BeginInvoke 一次 —— 优先级低于主窗口首帧，冷启动到主窗口的数字一字不碰；用户点「设置」时
 			// 只剩 Show() + 刷新数据（本机实测首次 5347ms → 见报告）。失败/没做完自动退回按需构建。
-			settingsForm.ScheduleSettingsShellPreWarm();
+			// ⭐⭐ 2026-10-18（机主：取消「启动设置预热」）：⭐ 启动阶段**不再**隐形 Show 整个设置窗；
+			//   改成首次真正打开设置时才构建（按需）⇒ 启动少付这一大段 ✅
+			Logger.WriteLine("[init] 启动跳过设置预热（懒加载）");
 			if (!startMinimized)
 			{
 				settingsForm.ShowFirstRunGuideIfNeeded();
@@ -1025,6 +1195,9 @@ internal static class Program
 				hardwareOverlay?.StartOverlay();
 			}
 			GpuRestartVerifier.RunAfterBootAsync(TimeSpan.FromSeconds(8L));
+			// ⭐⭐ 2026-10-19（机主：后端初始化不是设置窗口的功能）：
+			//   ⭐ 启动后空闲再跑（单个后台任务、串行、⛔ 不阻塞 UI、⛔ 不挂在设置窗打开路径）✅
+			ScheduleIdleBackendWarmup();
 		};
 		Application.Idle += deferredInitialization;
 		switch (text)
@@ -1630,12 +1803,31 @@ internal static class Program
 
 	private static void StartLightingIdleMonitor()
 	{
-		if (!UiAuditMode && _lightingIdleTimer == null)
+		// ⭐⭐ 2026-10-19（平台互斥）：宝龙达**只用** `MechrevoHw` 的 5s 软件计时；
+		//   ⛔ 不再启动/保留同方厂商空闲计时器（平台判定单一来源 `UsesBaolongda`）✅
+		//   ⚠️ 启动时后端可能还没探测完 ⇒ 下面的 tick 里还会再判一次并自停（见 EvaluateLightingIdleAsync）✅
+		if (!UiAuditMode && _lightingIdleTimer == null && hw?.UsesBaolongda != true)
 		{
 			_lightingIdleTimer = new System.Threading.Timer((object? _) =>
 			{
 				_ = EvaluateLightingIdleAsync();
 			}, null, TimeSpan.FromSeconds(2L), TimeSpan.FromSeconds(2L));
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-19（自动关灯**平台互斥**）：宝龙达检测到时立刻调用 ——
+	/// 停掉同方/GCU 的 2s 空闲计时器；若它已把灯按"空闲"熄掉过（`_lightingIdleSuspended`），恢复一次并清标记 ✅。
+	/// <para>⚠️ 保证同一进程内**只有一个平台**的自动关灯计时器在动作（平台判定单一来源 `UsesBaolongda`）✅。</para>
+	/// </summary>
+	internal static void StopVendorLightingIdleMonitorForBaolongda()
+	{
+		System.Threading.Timer vendorTimer = Interlocked.Exchange(ref _lightingIdleTimer, null);
+		vendorTimer?.Dispose();
+		Interlocked.Exchange(ref _lightingAutoOffEnableLogged, 0);
+		if (Interlocked.Exchange(ref _lightingIdleSuspended, 0) != 0)
+		{
+			_ = RestoreLightingWithRetryAsync(force: true);
 		}
 	}
 
@@ -1859,7 +2051,44 @@ internal static class Program
 
 	internal static Task<LightingIdleAction> EvaluateLightingIdleAsync()
 	{
-		return EvaluateLightingIdleAsync(AppConfig.Get("lighting_idle_seconds", Math.Max(0, rgb?.CloseTimerMinutes ?? 0) * 60), Math.Max(0L, (long)NativeMethods.GetIdleTime().TotalMilliseconds));
+		int timeoutSeconds = AppConfig.Get("lighting_idle_seconds", Math.Max(0, rgb?.CloseTimerMinutes ?? 0) * 60);
+		// ⭐⭐ 2026-10-19（平台互斥 · 平台判定**单一来源** `UsesBaolongda`）：
+		//   宝龙达**只用** `MechrevoHw` 的 5s 软件计时 ⇒ ⛔ 同方/GCU 这条空闲计时器**自停**，
+		//   保证同一时刻只有一个平台的自动关灯计时器在动作（不会两个计时器同时生效）✅
+		if (hw?.UsesBaolongda == true)
+		{
+			StopVendorLightingIdleMonitorForBaolongda();
+			return Task.FromResult(LightingIdleAction.None);
+		}
+		// ⭐ 同方/GCU：原有**软件计时**（`lighting_idle_seconds` + GetIdleTime + ReconcileLightingPowerAsync）✅
+		//   启用时记一行（去重；关闭后重置）—— 注明平台与来源，机主可据此判断是哪套在计时 ✅
+		if (timeoutSeconds <= 0)
+		{
+			Interlocked.Exchange(ref _lightingAutoOffEnableLogged, 0);
+		}
+		else if (Interlocked.Exchange(ref _lightingAutoOffEnableLogged, 1) == 0)
+		{
+			Logger.WriteError("[light] 自动关灯：已启用（" + DescribeAutoOffSeconds(timeoutSeconds) + " · 软件计时 · 平台=同方/GCU）");
+		}
+		return EvaluateLightingIdleAsync(timeoutSeconds, Math.Max(0L, (long)NativeMethods.GetIdleTime().TotalMilliseconds));
+	}
+
+	/// <summary>⭐ 2026-10-19：自动关灯日志用的人读时长（10 秒 / N 分钟 / N 小时）✅。</summary>
+	private static string DescribeAutoOffSeconds(int seconds)
+	{
+		if (seconds == 10)
+		{
+			return "10 秒";
+		}
+		if (seconds >= 3600 && seconds % 3600 == 0)
+		{
+			return (seconds / 3600) + " 小时";
+		}
+		if (seconds % 60 == 0)
+		{
+			return (seconds / 60) + " 分钟";
+		}
+		return seconds + " 秒";
 	}
 
 	internal static async Task<LightingIdleAction> EvaluateLightingIdleAsync(int timeoutSeconds, long idleMilliseconds)
@@ -1909,6 +2138,16 @@ internal static class Program
 			if (IsLightingTemporarilySuspended)
 			{
 				await SuspendLightingTemporarilyAsync().ConfigureAwait(continueOnCapturedContext: false);
+				return true;
+			}
+			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 宝龙达下**判定为不点亮**时 ⇒
+			//   ⛔ 一个灯光字节都不写（Logo 15 / 键盘 16·17·18 全不碰），只回读真实状态 + 同步 UI ✅
+			//   ⚠️ 只有「用户显式点开过 Logo」（PowerOn && PowerExplicit）才允许走下面的写入路径 ✅
+			MechrevoHw restoreHw = hw;
+			if (restoreHw != null && restoreHw.UsesBaolongda && !BaolongdaWantsStartupLightWrite())
+			{
+				SyncBaolongdaLightStateReadOnly("启动/恢复（判定=不点亮）");
+				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
 				return true;
 			}
 			Task<bool> keyboardTask = RestoreKeyboardLightingAsync(forceKeyboardRestore);
@@ -2103,6 +2342,41 @@ internal static class Program
 		return flag;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」根因③：恢复后没有回灌界面）：
+	/// ⭐ 灯效电源经 **宝龙达 WMI（功能号 15）**下发之后，**立刻**让界面按真实状态收敛一次 ✅
+	/// <para>⚠️ 根因（机主诊断包 0.291.9.11-20261018-113538 实证）：启动「灯效恢复（单次下发）」
+	/// 把 LOGO 点亮了，硬件回读也确认了，但**没有任何路径通知界面** ⇒「灯光」里的 LOGO 开关一直显示
+	/// 关闭 ❌（该开关**不在** `_quickSwitches` 里 ⇒ 那个每 3 s 的快速开关刷新根本不碰它 ⚠️）。</para>
+	/// <para>⭐ 本方法只做"切 UI 线程调度"：真正的刷新在
+	/// <c>SettingsForm.RefreshQuickSwitchStatesNow()</c>（灯光行立刻收敛；「更多开关」仍守各自的
+	/// 12 秒宽限 ⇒ ⛔ 不覆盖用户刚点的值 ✅）。⭐ 任何异常都吞掉 —— 界面刷新失败绝不影响灯效恢复本身 ✅。</para>
+	/// </summary>
+	private static void ScheduleQuickSwitchUiRefresh(string reason)
+	{
+		try
+		{
+			SettingsForm form = settingsForm;
+			if (form == null || form.IsDisposed || !form.IsHandleCreated)
+			{
+				return;
+			}
+			if (form.InvokeRequired)
+			{
+				form.BeginInvoke((Action)form.RefreshQuickSwitchStatesNow);
+			}
+			else
+			{
+				form.RefreshQuickSwitchStatesNow();
+			}
+			Logger.WriteLineIfChanged("logo-ui-refresh", $"[logo] 已调度界面按真实状态刷新（触发：{reason}）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[logo] 调度界面刷新失败（已吞掉，不影响灯效）：" + ex.Message);
+		}
+	}
+
 	internal static async Task<bool> ApplyLightChannelEffectAsync(string topic, LightChannelSettings settings, int delayMs = 120, Func<bool>? shouldApply = null)
 	{
 		if (delayMs > 0)
@@ -2122,9 +2396,182 @@ internal static class Program
 		return await service.SetLightEffect(topic, settings.Effect, settings.Light, settings.Speed, "None", KeyboardFirmwareEffects.IsSingleColorEffect(settings.Effect) ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null), save: false).ConfigureAwait(continueOnCapturedContext: false);
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：每次启动仍默认打开 Logo 灯 —— 98a3f70 的 PowerExplicit 闸门没挡住）：
+	/// ⭐ **启动 Logo 恢复判断的唯一日志出口**（默认日志级别可见；只记一次，⛔ 恢复重试不刷屏）✅
+	/// <para>格式：<c>[logo] 启动恢复判断：PowerOn=… · PowerExplicit=… · 决策=点亮/不点亮（原因=…）</c></para>
+	/// </summary>
+	private static void LogLogoRestoreDecision(bool hasSaved, LightChannelSettings settings, bool requested, bool canAct)
+	{
+		if (Interlocked.Exchange(ref _logoRestoreDecisionLogged, 1) != 0)
+		{
+			return;
+		}
+		string powerOnText = hasSaved ? (settings.PowerOn ? "1" : "0") : "(无配置)";
+		string explicitText = hasSaved ? (settings.PowerExplicit ? "1" : "0") : "(无配置)";
+		string reason;
+		if (!canAct)
+		{
+			reason = "无已保存 Logo 配置且无临时快照 ⇒ 跳过（不写硬件、不点亮）";
+		}
+		else if (requested)
+		{
+			reason = "用户显式开过（PowerExplicit=1）⇒ 点亮";
+		}
+		else if (hasSaved)
+		{
+			reason = "用户未显式开过（旧配置/自动置位，已迁移）⇒ 不点亮";
+		}
+		else
+		{
+			reason = "临时快照=关 ⇒ 不点亮";
+		}
+		Logger.WriteError($"[logo] 启动恢复判断：PowerOn={powerOnText} · PowerExplicit={explicitText} · 决策={(requested ? "点亮" : "不点亮")}（原因={reason}）");
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ **宝龙达启动/恢复的只读同步** ——
+	/// ⛔ 一个灯光字节都不写（功能号 15 / 16 / 17 / 18 全不碰），只回读真实状态并同步进
+	/// <c>QuickSwitches</c> / <c>KeyboardPower</c> / UI ✅。
+	/// <para>⭐ 回读判据（机主确认）：Logo = 功能号 15；键盘 = <c>16 != 0 且 18 &gt; 0</c> 才算「亮着」
+	/// （⛔ 不用功能号 10 —— 它在宝龙达恒 0）✅。</para>
+	/// <para>日志（默认日志级别可见；值变化才再记一次）：
+	/// <c>[light] 启动：只读同步（不写硬件）⇒ logo=…（来源=功能号15 回读）· keyboard=亮/灭（16=… · 18=…）</c></para>
+	/// </summary>
+	private static void SyncBaolongdaLightStateReadOnly(string reason)
+	{
+		MechrevoHw mechrevoHw = hw;
+		if (mechrevoHw == null || !mechrevoHw.UsesBaolongda)
+		{
+			return;
+		}
+		try
+		{
+			bool logoReadable = mechrevoHw.TryReadLogoLightViaBackend(out bool logoOn);
+			if (logoReadable)
+			{
+				// ⭐ 只同步镜像/UI（SyncLogoLightQuickSwitch 只写 QuickSwitches，⛔ 不写硬件）✅
+				mechrevoHw.SyncLogoLightQuickSwitch(logoOn, "功能号15 回读");
+			}
+			bool keyboardReadable = mechrevoHw.TryReadKeyboardLightingViaBackend(out bool keyboardOn,
+				out int keyboardMode, out int keyboardBrightness, out string _);
+			if (keyboardReadable)
+			{
+				mechrevoHw.SyncKeyboardPowerFromHardware(keyboardOn, "功能号16/18 回读");
+			}
+			string logoText = logoReadable ? (logoOn ? "亮" : "灭") : "读不到";
+			string keyboardText = keyboardReadable ? (keyboardOn ? "亮" : "灭") : "读不到";
+			string modeText = (keyboardMode >= 0) ? keyboardMode.ToString() : "读不到";
+			string brightnessText = (keyboardBrightness >= 0) ? keyboardBrightness.ToString() : "读不到";
+			string message = $"[light] 启动：只读同步（不写硬件）⇒ logo={logoText}（来源=功能号15 回读）"
+				+ $" · keyboard={keyboardText}（16={modeText} · 18={brightnessText}）";
+			// ⭐ 默认日志级别是「仅错误」⇒ 用 WriteError 保证可见；值没变不重复刷 ✅
+			if (Logger.TryMarkChanged("light-startup-readonly", message))
+			{
+				Logger.WriteError(message);
+			}
+			Logger.WriteLineIfChanged("light-startup-readonly-reason", "[light] 启动只读同步触发：" + reason);
+			// ⭐ UI 立刻按真实状态收敛（灯光行 +「更多开关」；⛔ 不改任何硬件）✅
+			ScheduleQuickSwitchUiRefresh("启动只读同步");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[light] 启动只读同步失败（已吞掉，⛔ 未写硬件）：" + ex.Message);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ **启动/恢复时是否允许写灯光硬件** ——
+	/// 宝龙达下只有「用户显式点开过 Logo 开关」（<c>PowerOn &amp;&amp; PowerExplicit</c>，见 98a3f70 标记）
+	/// 才允许发一次点亮命令 ✅；其余（旧配置/未配置/显式关）一律**只读**，⛔ 不写、⛔ 不"恢复成关"。
+	/// <para>⚠️ 键盘通道**没有**可靠的「显式开过」标记：<c>rgb.cfg</c> 的 <c>kbPower=1</c> 会被缺省值/退出时
+	/// 无条件 SaveConfig 写成 1（只有 <c>kbPower=0</c> 是可靠证据）⇒ 启动键盘一律只读、⛔ 不下发 ✅。</para>
+	/// </summary>
+	private static bool BaolongdaWantsStartupLightWrite()
+	{
+		MechrevoHw mechrevoHw = hw;
+		if (mechrevoHw == null || !mechrevoHw.UsesBaolongda)
+		{
+			return false;
+		}
+		if (LightingSettingsStore.TryLoad(MqttTopics.LogoLightCtrl, out LightChannelSettings logoSettings))
+		{
+			return logoSettings.PowerOn && logoSettings.PowerExplicit;
+		}
+		return false;
+	}
+
 	private static async Task<(bool AllIssued, bool Attempted, string IssuedSummary)> SetExternalLightingPowerAsync(bool on, bool restoreEffect, bool useTemporarySnapshot, int? restoreRequestId = null)
 	{
 		MechrevoHw mechrevoHw = hw;
+		// ⭐⭐⭐ 2026-10-18（机主回归：每次启动仍默认打开 Logo 灯 —— 98a3f70 的 PowerExplicit 闸门没挡住）：
+		//   ⚠️ 根因：`savedPowerOn` 判据只写在**下面 GCU 循环**里；而宝龙达在这段开头就
+		//      `TrySetLogoLightViaBackend(on)` **提前 return** ⇒ 闸门**永远不执行** ⇒ 每次启动都点亮 ❌
+		//   ⭐ 修法：把**同一份 savedPowerOn 判据**前置到宝龙达分支（与 GCU 循环逐字同口径）：
+		//      · 有保存配置 ⇒ `PowerOn && (PowerExplicit || 非宝龙达)`（宝龙达下必须 explicit=1 才点亮）✅
+		//      · 无保存配置 ⇒ 只有"空闲熄灯前的临时快照"才算可恢复，否则**跳过、不写硬件** ✅
+		//      · 判为"不点亮"但确有保存配置 ⇒ 下发 off 恢复为关（与 GCU 循环一致）✅
+		//   ⚠️ 非宝龙达（GCU/同方）**逐位不变**：本分支只认 `UsesBaolongda` ✅
+		if (mechrevoHw != null && mechrevoHw.UsesBaolongda)
+		{
+			// ⭐ 一次性迁移：清掉 Logo 通道历史上被"自动路径/早期版本"置上的 powerexplicit=1
+			//   （⛔ 不碰 power 值；⛔ 只对宝龙达执行 —— GCU/同方的恢复判据逐位不变 ✅）
+			//   ⚠️ 必须在下面 TryLoad/判定**之前**跑（只查一次；标记 logo_explicit_migrated 落进 config.json）✅
+			if (Interlocked.Exchange(ref _logoExplicitMigrationChecked, 1) == 0)
+			{
+				LightingSettingsStore.MigrateLogoPowerExplicitOnce();
+			}
+			string logoTopic = MqttTopics.LogoLightCtrl;
+			bool logoHasSaved = LightingSettingsStore.TryLoad(logoTopic, out LightChannelSettings logoSettings);
+			bool? logoSuspendPower = (_externalPowerBeforeTemporarySuspend.TryGetValue(logoTopic, out bool logoSuspendOn)
+				? new bool?(logoSuspendOn)
+				: ((bool?)null));
+			// ⭐ 与 GCU 循环同口径：on=true 时"没有任何可恢复内容"⇒ 跳过（⛔ 不写硬件）
+			bool logoCanAct = !on || logoHasSaved || (useTemporarySnapshot && logoSuspendPower.HasValue);
+			bool logoSavedPowerOn = logoHasSaved
+				? (logoSettings.PowerOn && (logoSettings.PowerExplicit || !mechrevoHw.UsesBaolongda))
+				: (logoSuspendPower == true);
+			bool logoRequested = on && logoSavedPowerOn;
+			if (on)
+			{
+				LogLogoRestoreDecision(logoHasSaved, logoSettings, logoRequested, logoCanAct);
+			}
+			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 判定为「不点亮」⇒ **一个字节都不写**
+			//   （⛔ 不再"恢复成关"、⛔ 不写功能号 15/16/17/18），只回读真实状态并同步 UI/镜像 ✅
+			//   ⚠️ 原实现这里会下发一次 off（机主日志：`on=False（请求 on=True）`）⇒ 已按机主要求去掉 ✅
+			if (on && !logoRequested)
+			{
+				SyncBaolongdaLightStateReadOnly("Logo 恢复（判定=不点亮）");
+				return (AllIssued: true, Attempted: true, IssuedSummary: "logo=只读（未写）");
+			}
+			if (logoCanAct && mechrevoHw.TrySetLogoLightViaBackend(logoRequested, out bool logoConfirmed))
+			{
+				string logoSummary = $"logo={(logoRequested ? "On" : "Off")}{(logoConfirmed ? "" : "(unconfirmed)")}";
+				Logger.WriteLine($"外部灯效电源（⭐ 宝龙达 WMI 路径）：⭐ on={logoRequested}（请求 on={on}）· ⭐ 回读确认={logoConfirmed} · ⭐ {logoSummary}");
+				// ⭐⭐ 2026-10-18（「UI 与硬件状态不同步」根因③）：⭐ 真实状态已在 `TrySetLogoLightViaBackend`
+				//   里按功能号 15 的回读值回灌 `hw.QuickSwitches` ⇒ ⭐ **立刻**让界面跟上 ✅
+				ScheduleQuickSwitchUiRefresh("宝龙达 WMI 灯效电源");
+				if (logoConfirmed)
+				{
+					if (on && useTemporarySnapshot)
+					{
+						_externalPowerBeforeTemporarySuspend.Remove(logoTopic);
+					}
+					if (on && restoreRequestId.HasValue)
+					{
+						_lightingExternalRestoreAppliedIds[logoTopic] = restoreRequestId.Value;
+					}
+				}
+				return (AllIssued: logoConfirmed, Attempted: true, IssuedSummary: logoSummary);
+			}
+			if (!logoCanAct)
+			{
+				// ⭐ 防御：on=true 且无任何可恢复内容（上面已提前 return，正常走不到）⇒ 不写硬件
+				Logger.WriteError("[logo] 启动恢复：跳过 Logo 电源下发（无已保存配置/无临时快照 ⇒ 不写硬件）");
+				return (AllIssued: true, Attempted: true, IssuedSummary: "logo=skip");
+			}
+			Logger.WriteLine("外部灯效电源（宝龙达 WMI 路径）：⚠️ 门面层未接管（异常路径，继续原路）");
+		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：函数体全是 service.Issue*(MQTT) ⇒ 真正需要 GCU。
 		if (mechrevoHw == null || !mechrevoHw.IsGcuConnected || service == null)
 		{
@@ -2263,7 +2710,13 @@ internal static class Program
 					}
 				}
 			}
-			bool requested = on && (hasSavedSettings ? settings.PowerOn : (flag == true));
+			// ⭐⭐ 2026-10-19（机主：启动自动点亮 Logo 灯）：⭐ 宝龙达下只有**用户显式点过开关**
+			//   （`PowerExplicit`）才在启动/恢复时点亮；旧配置没有该标记 ⇒ ⛔ 不点灯 ✅
+			//   ⚠️ 非宝龙达（GCU/同方）保持原判据，逐位不变 ✅
+			bool savedPowerOn = hasSavedSettings
+				? (settings.PowerOn && (settings.PowerExplicit || !(Program.hw?.UsesBaolongda ?? false)))
+				: (flag == true);
+			bool requested = on && savedPowerOn;
 			if (LightCompatibilitySwitches.LightbarDedupEnabled && requested && dedupeSuppressed[i] && !lastResort && i > 0)
 			{
 				continue;
@@ -2348,6 +2801,16 @@ internal static class Program
 			if (Volatile.Read(in _exitStarted) != 0 || rgb == null)
 			{
 				return false;
+			}
+			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 宝龙达键盘灯启动/恢复**一个字节都不写**
+			//   （⛔ 不发"关灯"、⛔ 不写功能号 16/17/18、⛔ 不启动 HID 帧流）⇒ 只回读真实状态 + 同步 UI/镜像 ✅
+			//   ⭐ 判据：16 != 0 且 18 > 0 才算「亮着」（⛔ 不用功能号 10）；显式关也只读 ✅
+			MechrevoHw keyboardRestoreHw = hw;
+			if (keyboardRestoreHw != null && keyboardRestoreHw.UsesBaolongda)
+			{
+				SyncBaolongdaLightStateReadOnly("键盘恢复（只读）");
+				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
+				return true;
 			}
 			// 2026-10-10（①「安装后灯被熄灭」）：情况 B —— 无已保存的灯效配置（从未配置，或被安装程序
 			// 删掉了 %APPDATA%\MechrevoLite 里的 keyboard.cfg 等）⇒ ⛔ 这条老路径"什么都不发"：
@@ -2933,8 +3396,18 @@ internal static class Program
 		}
 		Screen screen = Screen.FromRectangle(settingsForm.Bounds);
 		settingsForm.WindowState = FormWindowState.Normal;
+		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+		//   ⭐ `RunDeferredFanStartupCleanup`（风扇闸门只读验证 + 启动风扇清理）**已移出**本方法 ⇒
+		//      改为启动后空闲的后台预热（见 `ScheduleIdleBackendWarmup` / `deferredInitialization`）✅
+		//   ⭐ 打开设置只做与界面直接相关的事：构建行、读亮度、按能力位显隐 ✅
+		long openStartTick = Environment.TickCount64;
 		settingsForm.VisualiseGPUMode();
 		settingsForm.ShowAll(screen.WorkingArea);
+		long openMs = Environment.TickCount64 - openStartTick;
+		if (Logger.TryMarkChanged("settings-open-timing", "[init] 设置窗打开耗时=" + openMs + " ms（只含 UI 构建，后端初始化未在此执行）"))
+		{
+			Logger.WriteError("[init] 设置窗打开耗时=" + openMs + " ms（只含 UI 构建，后端初始化未在此执行）");
+		}
 		if (_showGuideOnFirstRestore)
 		{
 			_showGuideOnFirstRestore = false;
@@ -2946,6 +3419,98 @@ internal static class Program
 			settingsForm.BeginInvoke(settingsForm.ShowIgpuOnlyGuideIfNeeded);
 		}
 	}
+
+	private static int _backendWarmupScheduled;
+
+	private static readonly CancellationTokenSource _backendWarmupCts = new CancellationTokenSource();
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主定稿：后端初始化留在「启动后空闲预热」，设置窗只管设置）✅。
+	/// ⭐ 主窗显示后 **Application.Idle + 2.5s** 起**单个**后台任务（串行、可取消）：
+	/// ⭐ ① 风扇闸门只读验证 + 启动风扇清理；② 摄像头 PnP 枚举；完成后回 UI 线程刷新对应行。
+	/// <para>⛔ 不在 UI 线程同步执行、⛔ 不挂在设置窗打开路径；每步独立 try/catch，失败只记日志并**标记失败、不重试** ✅</para>
+	/// </summary>
+	internal static void ScheduleIdleBackendWarmup()
+	{
+		if (Interlocked.Exchange(ref _backendWarmupScheduled, 1) != 0)
+		{
+			return;
+		}
+		_ = Task.Run(async () =>
+		{
+			long warmStart = Environment.TickCount64;
+			try
+			{
+				Logger.WriteError("[init] 启动空闲预热开始（后台，不阻塞 UI）");
+				await Task.Delay(2500, _backendWarmupCts.Token).ConfigureAwait(continueOnCapturedContext: false);
+				MechrevoHw warmHw = hw;
+				if (warmHw == null)
+				{
+					return;
+				}
+				long fanStart = Environment.TickCount64;
+				try
+				{
+					warmHw.RunDeferredFanStartupCleanup();
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[init] 后台初始化：风扇闸门/清理失败（已吞掉，标记失败不重试）：" + ex.Message);
+				}
+				Logger.WriteError("[init] 后台初始化：风扇闸门 ok=" + warmHw.FanCurveVerified + "（耗时 " + (Environment.TickCount64 - fanStart) + " ms）");
+				if (_backendWarmupCts.IsCancellationRequested)
+				{
+					return;
+				}
+				if (warmHw.UsesBaolongda)
+				{
+					long camStart = Environment.TickCount64;
+					bool cameraFound = false;
+					try
+					{
+						cameraFound = MechrevoLite.Hardware.CameraPnpControl.ProbeHasCamera();
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[init] 后台初始化：摄像头枚举失败（已吞掉，标记失败不重试）：" + ex.Message);
+					}
+					Logger.WriteError("[init] 后台初始化：摄像头枚举 ok=" + cameraFound + "（耗时 " + (Environment.TickCount64 - camStart) + " ms）");
+				}
+				SettingsForm form = settingsForm;
+				if (form != null && !form.IsDisposed && form.IsHandleCreated)
+				{
+					try
+					{
+						form.BeginInvoke((Action)(() =>
+						{
+							if (!form.IsDisposed)
+							{
+								form.RefreshDeviceCapabilities();
+								form.RefreshQuickSwitchStatesNow();
+							}
+						}));
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[init] 后台初始化后刷新界面失败（已吞掉，不影响 UI）：" + ex.Message);
+					}
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				Logger.WriteLine("[init] 启动空闲预热已取消（退出中）");
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[init] 后台初始化失败（已吞掉，不重试）：" + ex);
+			}
+			finally
+			{
+				Logger.WriteError("[init] 启动空闲预热完成（总耗时 " + (Environment.TickCount64 - warmStart) + " ms）");
+			}
+		});
+	}
+
 
 	private static void TrayIcon_MouseClick(object? sender, MouseEventArgs e)
 	{
@@ -2993,6 +3558,14 @@ internal static class Program
 	{
 		if (Interlocked.Exchange(ref _exitStarted, 1) == 0)
 		{
+			// ⭐⭐ 2026-10-19（机主定稿 · 启动空闲预热可取消）：退出时取消仍在排队的预热（幂等）✅
+			try
+			{
+				_backendWarmupCts.Cancel();
+			}
+			catch (ObjectDisposedException)
+			{
+			}
 			TryRestoreScreenAfterFailure();
 			_telemetryRecoveryTimer?.Dispose();
 			_telemetryRecoveryTimer = null;

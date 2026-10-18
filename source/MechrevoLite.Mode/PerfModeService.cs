@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using MechrevoLite.Gpu;
 using MechrevoLite.Hardware;
 using Microsoft.Win32;
 
@@ -184,6 +185,13 @@ internal sealed class PerfModeService
 		try
 		{
 			perfApplyOutcome = await PerfModeRunner.RunAsync(modeId, steps, _backend, ct).ConfigureAwait(continueOnCapturedContext: false);
+			// ⭐⭐ 2026-10-17（宝龙达 · 自定义档本地化）：⭐ 无固件槽的后端**不会**有 SwitchFirmwareSlot 步骤，
+			//   但 PL1/PL2/温度墙会走 WMI 23 真下发 ⇒ 标记 LocalApply，让 ModeSwitched 按"字段全成功"判定 ✅
+			//   ⚠️ 非宝龙达（GCU/老接口）不置位 ⇒ 行为逐位不变 ✅
+			if (_hw != null && _hw.UsesBaolongda)
+			{
+				perfApplyOutcome = perfApplyOutcome with { LocalApply = true };
+			}
 		}
 		finally
 		{
@@ -423,7 +431,172 @@ internal sealed class PerfModeService
 
 	public async Task<PerfApplyOutcome?> ActivateAsync(string modeId, string reason, bool forceParameters = false)
 	{
+		// ⭐⭐ 2026-10-17（「高性能电源」**彻底解耦 GCU**）：⭐ 切档时由 **LM 自己**同步 Windows「电源模式」
+		//   （设置 → 系统 → 电源 → 电源模式：最佳性能 / 平衡 / 最佳能效）✅
+		//   ⚠️ 纯 Windows API（powrprof `PowerSetActiveOverlayScheme`）⇒ ⛔ 不依赖 GCU、不按能力位、不写 EC ✅
+		//   ⭐ 用户口径：「GCU 也解耦（不按能力位来了），走 Windows 替换我的客户端」
+		//      ⇒ ⭐ **所有机型**都由这里设（GCU 机型不再等厂商链路）✅
+		ApplyWindowsPowerOverlay(modeId);
 		return await ActivateIfCurrentAsync(modeId, reason, forceParameters, null).ConfigureAwait(continueOnCapturedContext: false);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（「高性能电源」· **GCU 解耦**）：⭐ 按档位把 Windows **电源模式 overlay** 设成
+	/// 最佳性能 / 平衡 / 最佳能效 —— 这与厂商无关，就是 Windows 自己的三档：
+	/// <list type="bullet">
+	/// <item><c>0</c> = 平衡 <c>00000000-0000-0000-0000-000000000000</c></item>
+	/// <item><c>1</c> = 最佳性能 <c>ded574b5-45a0-4f42-8737-46345c09c238</c></item>
+	/// <item><c>2</c> = 最佳能效 <c>961cc777-2547-4f9d-8174-7d86181b8a7a</c></item>
+	/// </list>
+	/// <para>默认映射：安静 ⇒ 2、平衡 ⇒ 0、狂暴/静音狂暴 ⇒ 1；自定义档按其 <see cref="PerfModeSettings.WindowsPowerMode" />（设了才动）。</para>
+	/// <para>⭐ **所有机型都执行**（含 GCU）—— 用户要求"走 Windows 替换厂商客户端"，不再看能力位。</para>
+	/// <para>⚠️ 开关：AppConfig <c>bd_power_overlay</c>（默认 1 = 开；设 0 即关闭本行为）。</para>
+	/// </summary>
+	/// <summary>
+	/// ⭐ 2026-10-17（「高性能电源」开关）：⭐ 是否"跟着性能档位改 Windows 电源模式"（默认 **开**）。
+	/// <para>⚠️ 由「更多开关」里的 <c>highperf</c> 控制；无 GCU 时走 Windows API（见 <see cref="ApplyWindowsPowerOverlay" />）✅</para>
+	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主要求）：「APU 防缩缸」—— ⭐ 把 Windows「处理器性能提升模式」
+	/// （GUID `be337238-0d82-4146-a960-4f3749d470c7`）设成 **5 = 高效、积极且有保障**
+	/// （AC + DC 同时改，`PowerNative.SetCPUBoost` 内部就是两路都写）✅
+	/// <para>⭐ 打开时把**原值**记到 `apuboost_prev`，关闭时原样还原（⛔ 不写死 0）✅</para>
+	/// <para>⚠️ 纯 Windows 电源策略，与厂商/GCU 无关 ✅</para>
+	/// </summary>
+	public bool ApuAntiDegradeEnabled
+	{
+		get
+		{
+			return PowerNative.GetCPUBoost() == 5;
+		}
+		set
+		{
+			if (value)
+			{
+				int prev = PowerNative.GetCPUBoost();
+				if (prev != 5)
+				{
+					AppConfig.Set("apuboost_prev", prev);
+					PowerNative.SetCPUBoost(5);
+					Logger.WriteLine($"[power] APU 防缩缸：开 ⇒ 处理器性能提升模式 5（高效、积极且有保障）· 原值={prev} 已记");
+				}
+				return;
+			}
+			int restore = AppConfig.Get("apuboost_prev", 1);
+			PowerNative.SetCPUBoost(restore);
+			Logger.WriteLine($"[power] APU 防缩缸：关 ⇒ 还原处理器性能提升模式 = {restore}");
+		}
+	}
+
+	public bool WindowsPowerOverlayEnabled
+	{
+		get
+		{
+			return AppConfig.Get("bd_power_overlay", 1) != 0;
+		}
+		set
+		{
+			AppConfig.Set("bd_power_overlay", value ? 1 : 0);
+			Logger.WriteLine($"[power] 高性能电源联动 ⇒ {(value ? "开" : "关")}");
+			if (value)
+			{
+				// ⭐ 后台执行（回读+重试会 sleep，不能卡 UI 线程）
+				_ = Task.Run(() => ApplyWindowsPowerOverlay(Active?.Id ?? string.Empty));
+			}
+			else
+			{
+				PowerNative.SetPowerMode(0);
+				Logger.WriteLine("[power] 已关闭联动 ⇒ Windows 电源模式回到「平衡」");
+			}
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（UI 切档联动）：⭐ 主界面/托盘切模式时**直接**按模式设 Windows 电源模式
+	/// （GCU 机型走的是 `SwitchMode` → MQTT，**不会**经过 <see cref="ActivateAsync" /> ⇒ 需要单独一个入口 ✅）
+	/// <para>映射：2=静音 ⇒ 最佳能效 · 0=平衡 ⇒ 平衡 · 1=狂暴/静音狂暴 ⇒ 最佳性能</para>
+	/// </summary>
+	public void ApplyWindowsPowerOverlayForUiMode(int mode, bool silentTurbo)
+	{
+		if (!WindowsPowerOverlayEnabled)
+		{
+			return;
+		}
+		int overlay = mode switch
+		{
+			2 => 2,
+			0 => 0,
+			1 => 1,
+			_ => -1
+		};
+		if (overlay < 0)
+		{
+			return;
+		}
+		// ⭐ 后台执行：里面有"回读 + 重试（最多 ~1.4 s）"，⛔ 不能卡 UI 线程 ✅
+		_ = Task.Run(() => ApplyWindowsPowerOverlayValue(overlay));
+	}
+
+	/// <summary>⭐ 把 Windows 电源模式设成给定 overlay（0=平衡 / 1=最佳性能 / 2=最佳能效），失败只记日志。</summary>
+	private void ApplyWindowsPowerOverlayValue(int overlay)
+	{
+		// ⭐⭐ 2026-10-19（机主口径：「代码顺序 —— 直接跟着 GCU 发命令同时，不要等回读」）：
+		//   ⭐ 只在**同一时刻**把 Windows 电源模式发出去，⛔ 不等回读、⛔ 不重试、⛔ 不 sleep ✅
+		//   ⭐ 理由：回读要等 350ms×N，既慢又会被厂商随后写入覆盖（越等越乱）——
+		//      ⭐ 发出去即可，Windows 自己生效；谁最后写由时序决定，这里只保证**不落后** ✅
+		string name = (overlay == 1) ? "最佳性能" : ((overlay == 2) ? "最佳能效" : "平衡");
+		try
+		{
+			PowerNative.SetPowerMode(overlay);
+			Logger.WriteLine($"[power] Windows 电源模式 → {name}（overlay={overlay} · 与切档同时下发 · 不等回读 · 纯 Windows API）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[power] Windows 电源模式设置失败（已吞掉）：" + ex.Message);
+		}
+	}
+
+	private void ApplyWindowsPowerOverlay(string modeId)
+	{
+		if (AppConfig.Get("bd_power_overlay", 1) == 0)
+		{
+			return;
+		}
+		PerfModeDefinition mode = Find(modeId);
+		if ((object)mode == null)
+		{
+			return;
+		}
+		int overlay;
+		if (mode.Settings.WindowsPowerMode.HasValue)
+		{
+			overlay = mode.Settings.WindowsPowerMode.Value;
+		}
+		else
+		{
+			overlay = mode.Kind switch
+			{
+				PerfModeKind.Silent => 2,
+				PerfModeKind.Balanced => 0,
+				PerfModeKind.Turbo => 1,
+				PerfModeKind.SilentTurbo => 1,
+				_ => -1
+			};
+		}
+		if (overlay < 0 || overlay > 2)
+		{
+			return;
+		}
+		try
+		{
+			string name = (overlay == 1) ? "最佳性能" : ((overlay == 2) ? "最佳能效" : "平衡");
+			PowerNative.SetPowerMode(overlay);
+			Logger.WriteLine($"[power] Windows 电源模式 → {name}（overlay={overlay} · 纯 Windows API，不依赖 GCU/能力位）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[power] Windows 电源模式设置失败（已吞掉）：" + ex.Message);
+		}
 	}
 
 	private async Task<PerfApplyOutcome?> ActivateIfCurrentAsync(string modeId, string reason, bool forceParameters, int? expectedRequest)
@@ -517,9 +690,15 @@ internal sealed class PerfModeService
 		if (hw == null || !hw.IsConnected)
 		{
 			Logger.WriteLine("PerfModes: activate(" + modeId + ") refused, GCU not connected");
+			// ⭐⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ 失败原因【按后端如实写】✅ ——
+			//   ⭐ 原来恒写「GCU 未连接」⚠️，⭐ 但宝龙达机型**本来就没有 GCU**（⭐ 而 `IsConnected` 的判据是
+			//      `UsesBuiltInModes || IsGcuConnected` ⇒ ⭐ 语义是"后端在不在"、⭐ 不是"有没有跟 GCU 说过话" ✅）
+			//      ⇒ ⭐ 在宝龙达上这句是【误导】❌。
+			//   ⚠️ 非宝龙达（⭐ 含 `hw == null` 这种判不出来的情形 ✅）⇒ ⭐ 字符串逐字不变 ✅。
+			string refusalDetail = ((hw != null && hw.UsesBaolongda) ? "本机为非 GCU 后端（宝龙达），该步骤不适用" : "GCU 未连接");
 			PerfApplyOutcome perfApplyOutcome = new PerfApplyOutcome(modeId, new PerfApplyStepOutcome[1]
 			{
-				new PerfApplyStepOutcome(SwitchStepFor(mode, 0), PerfApplyResult.Failed, "GCU 未连接")
+				new PerfApplyStepOutcome(SwitchStepFor(mode, 0), PerfApplyResult.Failed, refusalDetail)
 			});
 			RaiseApplied(perfApplyOutcome);
 			return perfApplyOutcome;
@@ -541,6 +720,9 @@ internal sealed class PerfModeService
 			}
 		}
 		IReadOnlyList<PerfApplyStep> readOnlyList = PerfModeApplyPlanner.Build(mode, plan, caps);
+		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
+		//   ⭐ 规划结果（生成/未生成 + 原因）默认级别可见 ✅
+		LogGpuOverclockPlan(mode, plan, caps, readOnlyList);
 		Logger.WriteLine($"PerfModes: activate {mode.Id} ({reason}) route={mode.Route} slot={plan?.SlotIndex.ToString() ?? "-"} write={plan?.NeedsParameterWrite.ToString() ?? "-"} steps={readOnlyList.Count}");
 		Stopwatch elapsed = Stopwatch.StartNew();
 		PerfApplyOutcome outcome;
@@ -790,6 +972,56 @@ internal sealed class PerfModeService
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
+	/// ⭐ **规划结果一行日志**（默认级别可见、去重）：`[gpu-oc] 规划：supports=… · enabled=… · core=… mem=… ⇒ 生成步骤=是/否（原因=…）` ✅
+	/// <para>⚠️ 只在"宝龙达本机直写可用"或"该档确实设了 GPU 超频字段"时打 ⇒ GCU 机型不刷屏 ✅</para>
+	/// </summary>
+	private static void LogGpuOverclockPlan(PerfModeDefinition mode, FirmwareSlotPlan plan, PerfModeCapabilities caps, IReadOnlyList<PerfApplyStep> steps)
+	{
+		PerfModeSettings settings = mode.Settings;
+		if (!caps.SupportsDirectGpuOverclock && !settings.GpuOverclockOn.HasValue && !settings.GpuCoreOffset.HasValue && !settings.GpuMemoryOffset.HasValue)
+		{
+			return;
+		}
+		bool generated = steps.Any((PerfApplyStep s) => s.Kind == PerfApplyStepKind.ApplyGpuOverclock);
+		string reason;
+		if (generated)
+		{
+			reason = "生成";
+		}
+		else if (!caps.SupportsDirectGpuOverclock)
+		{
+			reason = "后端不支持本机直写（旧 GCU 固件字段路径）";
+		}
+		else if (mode.Route != PerfModeRoute.FirmwareSlot)
+		{
+			reason = "路由不是 FirmwareSlot（route=" + mode.Route + "）";
+		}
+		else if (plan == null)
+		{
+			reason = "无槽位计划（slotPlan=null）";
+		}
+		else if (!plan.NeedsParameterWrite)
+		{
+			reason = "本次不需要写参数（NeedsParameterWrite=false）";
+		}
+		else
+		{
+			reason = "该档没有 GPU 超频字段（开关/偏移都未设置）";
+		}
+		string enabledText = settings.GpuOverclockOn.HasValue ? (settings.GpuOverclockOn.Value ? "true" : "false") : "-";
+		string coreText = settings.GpuCoreOffset.HasValue ? settings.GpuCoreOffset.Value.ToString(CultureInfo.InvariantCulture) : "-";
+		string memText = settings.GpuMemoryOffset.HasValue ? settings.GpuMemoryOffset.Value.ToString(CultureInfo.InvariantCulture) : "-";
+		string writeText = (plan == null) ? "-" : plan.NeedsParameterWrite.ToString();
+		string message = "[gpu-oc] 规划：supports=" + caps.SupportsDirectGpuOverclock + " · enabled=" + enabledText + " · core=" + coreText + " · mem=" + memText
+			+ " ⇒ 生成步骤=" + (generated ? "是" : "否") + "（原因=" + reason + " · mode=" + mode.Id + " · route=" + mode.Route + " · write=" + writeText + "）";
+		if (Logger.TryMarkChanged("gpu-oc-plan", message))
+		{
+			Logger.WriteError(message);
+		}
+	}
+
 	private static PerfApplyStep SwitchStepFor(PerfModeDefinition mode, int slot)
 	{
 		if (mode.Route != PerfModeRoute.FirmwareSlot)
@@ -931,7 +1163,20 @@ internal sealed class PerfModeService
 				}
 				_editCts = editCts;
 			}
-			if (string.Equals(ActiveModeId, mode.Id, StringComparison.Ordinal))
+			// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 根因②）：
+			//   ⭐ 宝龙达**没有固件自定义档** ⇒ 自定义档**永远成不了 `ActiveModeId`**
+			//      （编辑器里选「自定义 N」只切换"正在编辑哪份本机配置"，不切档 ——
+			//       见 CustomModeForm.SelectModeAsync 的宝龙达分支 ⚠️）
+			//   ⭐ 而这里原来只在 `ActiveModeId == mode.Id` 时才走硬件下发 ⇒
+			//      用户点【应用】只把配置存进 `mode_tune_*`、**GPU 超频/PL 等步骤一步都没执行** ❌
+			//      （诊断包实证：日志只有「模式下拉切到 custom1」，grep `gpu-oc` 零命中）
+			//   ⭐ 现在：宝龙达 + 自定义档 ⇒ 即使不是"当前激活档"，`applyHardware=true` 也走下去：
+			//      下面的 `route/flag` 判据会返回 `NeedsActivation=true` ⇒ `UpdateAsync` 转 `ActivateAsync`
+			//      做**本机全量下发**（PL1/PL2/温度墙 → WMI 23；GPU 超频 → NVAPI P0；曲线 → 20/21）✅
+			//   ⚠️ 非宝龙达（GCU / 老接口）⇒ `PerfApplyGate` 恒等价旧口径 ⇒ 条件**逐位不变** ✅
+			bool isActiveMode = string.Equals(ActiveModeId, mode.Id, StringComparison.Ordinal);
+			bool localCustomApply = PerfApplyGate.ShouldApplyLocalCustom(_hw != null && _hw.UsesBaolongda, mode.IsCustom, isActiveMode);
+			if (localCustomApply)
 			{
 				MechrevoHw hw = _hw;
 				if (hw != null && hw.IsConnected)
@@ -961,6 +1206,11 @@ internal sealed class PerfModeService
 					{
 						Settings = settings2
 					}, plan, Capabilities(), includeSwitch: false, perfModeDefinition.Route);
+					// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：编辑路径同样落规划结果 ✅
+					LogGpuOverclockPlan(perfModeDefinition with
+					{
+						Settings = settings2
+					}, plan, Capabilities(), steps);
 					PerfApplyOutcome perfApplyOutcome;
 					try
 					{
@@ -1108,6 +1358,17 @@ internal sealed class PerfModeService
 			MechrevoHw hw = _hw;
 			if (hw != null && hw.IsConnected)
 			{
+				// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30/40 系宝龙达）：
+				//   ⭐ 宝龙达**没有 GCU** ⇒ 下面那条 `RestoreVendorProfileAsync()`（纯 MQTT 的 `RESTORE_*`）
+				//     必然失败；而它在 `catch` 里只写一行日志、返回 false ⇒ 结果：
+				//     ① 界面把「恢复出厂」显示成**失败**；② 硬件侧**一个字节都没动**（PL/温度墙/GPU 超频/NVML 功耗上限）
+				//     ⇒ 机主看到的就是「不重置」❌
+				//   ⭐ 现在：自定义档 + 宝龙达 ⇒ 走**本机后端**的恢复路径（SMU / WMI 23 / NVAPI / NVML）✅
+				//   ⚠️ 非自定义档 / GCU 机型 ⇒ 下面原有分支【逐位不变】✅
+				if (mode.IsCustom && hw.UsesBaolongda)
+				{
+					return ResetBaolongdaCustomLocally(hw);
+				}
 				if (!mode.IsCustom)
 				{
 					PerfApplyOutcome perfApplyOutcome = await ActivateAsync(mode.Id, "reset").ConfigureAwait(continueOnCapturedContext: false);
@@ -1127,6 +1388,166 @@ internal sealed class PerfModeService
 			}
 		}
 		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30/40 系宝龙达）：
+	/// ⭐ **自定义档「恢复出厂」的本机后端实现**（⛔ 不走 GCU 的 MQTT `RESTORE_*`）✅。
+	/// <para>⭐ 顺序：
+	/// ① 本机配置已由 <see cref="ResetAsync" /> 开头 `PerfModeStore.ResetSettings` 清除并落盘（`AppConfig.Flush`）✅；
+	/// ② 40 系：写 <c>功能号 23 = 0</c>（关闭自定义功耗墙）⇒ **固件回到默认 PL1/PL2/温度墙** ✅；
+	///    30 系：原厂 WMI 方法表没有功能号 23、SMU 也没有"恢复默认"命令 ⇒ ⛔ 不编造默认值、一条写命令都不发，
+	///    只清本地记忆并**如实记日志**（SMU 写入是运行时状态，重启后回固件默认）✅；
+	/// ③ 清空功耗墙本地记忆（界面因此显示「未设置」，⛔ 不拿"上次我们写的值"冒充当前值）✅；
+	/// ④ GPU 超频：NVAPI P0 偏移写 <c>0/0</c>（真恢复默认）＋ 清 `gpu_oc` 与直写记录（防下次切档又推回去）✅；
+	/// ⑤ 显卡功耗上限：NVML 写回**出厂默认值**（`nvmlDeviceGetPowerManagementDefaultLimit`，⛔ 不拿 max 冒充默认）✅。
+	/// </para>
+	/// <para>⚠️ 只对**活动档**执行（调用方已判 `active`）⇒ ⛔ 不会把别的档正在用的硬件状态改掉 ✅。</para>
+	/// <para>⚠️ 返回 <c>false</c> 只在"该动硬件却真的失败"时（如 40 系功能号 23 关闭写不进去）——
+	/// 界面据此显示「恢复没有得到确认」，⛔ 不假装成功 ✅。</para>
+	/// </summary>
+	private bool ResetBaolongdaCustomLocally(MechrevoHw hw)
+	{
+		bool is30 = hw.IsBaolongda30Series;
+		bool powerLimitReleased = false;
+		bool powerLimitConfirmed = false;
+		if (!is30)
+		{
+			// 40 系：功能号 23 单字节 0 = 关闭自定义 ⇒ 固件恢复默认功耗墙（协议未改）
+			powerLimitReleased = hw.TryApplyCpuPowerLimitViaBackend(enable: false, 0, 0, 0, out powerLimitConfirmed);
+		}
+		// ⭐ 40 系：**回读确认**关闭成功才算功耗墙恢复（写不进去/固件不认 ⇒ 如实 false）；
+		//   30 系：本机配置清空即算恢复（SMU 侧无恢复命令，日志如实说明）✅
+		bool powerLimitResetOk = is30 || (powerLimitReleased && powerLimitConfirmed);
+		// ⭐ 只有权限恢复成功才清本地记忆；失败则**保留**（界面继续显示硬件真实值，⛔ 不假装"未设置"）✅
+		if (powerLimitResetOk)
+		{
+			hw.ClearBaolongdaPowerLimitMemory();
+		}
+		// ④ GPU 超频：P0 0/0 + 清直写记录 / gpu_oc
+		bool gpuOcExpected = hw.SupportsGpuOverclock;
+		bool gpuOcReset = NvapiPStates.TrySetP0Offsets(0, 0, out int appliedCore, out int appliedMem);
+		// 直写记录（direct_gpu_oc_*）也要清：否则下次切到该自定义档时
+		// `RestoreDirectGpuOverclockProfile` 会把刚才的偏移又推回去（⛔ 重置等于白做）
+		hw.SelectGcuGpuOverclockBackend();
+		AppConfig.Set("gpu_oc", 0);
+		AppConfig.Flush();
+		MechrevoService.GpuOverclockEnabled = false;
+		if (gpuOcExpected && (!gpuOcReset || appliedCore != 0 || appliedMem != 0))
+		{
+			Logger.WriteError($"[reset] ⚠️ GPU 偏移恢复默认**未确认**：写成功={gpuOcReset} · 驱动回读 core={appliedCore} mem={appliedMem} MHz"
+				+ "（如实记录，⛔ 不假装已恢复）");
+		}
+		// ⑤ 显卡功耗上限：写回驱动默认值（读不到默认值 ⇒ 不动，如实记日志）
+		string powerDefaultText = "默认值读不到（未改）";
+		if (NvmlHelper.TryGetDefaultPowerLimitWatts(out int defaultW) && NvmlHelper.TrySetPowerLimitWatts(defaultW, out int appliedW))
+		{
+			powerDefaultText = appliedW + "W";
+		}
+		// ⭐ 后端恢复明细（⭐ 机主要求的那一行 `[reset] 自定义档已恢复默认 ⇒ …` 由 CustomModeForm 统一落盘）
+		Logger.WriteError($"[reset] 后端恢复明细：功耗墙={(powerLimitResetOk
+				? (is30 ? "本机配置已清（SMU 运行时值需重启才回固件默认）" : "WMI 23 已关闭自定义（回读确认）")
+				: "⚠️ 未确认（保留硬件当前值，界面不冒充已重置）")}"
+			+ $" · GPU 超频=关（NVAPI P0 0/0 写成功={gpuOcReset}）"
+			+ $" · 显卡功耗上限={powerDefaultText}"
+			+ (is30
+				? " · ⚠️ 30 系 SMU 无「恢复默认」命令 ⇒ 本次开机内 SMU 功耗墙保持当前值（本机配置已清；重启后回固件默认）"
+				: $" · WMI 23 关闭自定义 写成功={powerLimitReleased} · 回读确认={powerLimitConfirmed}"));
+		return powerLimitResetOk;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」风扇转速/曲线表没恢复 · 强冷也要复位）：
+	/// ⭐ **把宝龙达风扇整体恢复默认**（⛔ 不修改 <c>MechrevoHw</c> 的风扇段实现，只调用现有 API）✅。
+	/// <para>⭐ 顺序（⭐ 与机主要求一致）：
+	/// <list type="number">
+	/// <item>⭐ <b>强冷</b>：若正开着 ⇒ 先走既有「关闭」流程
+	///   （`TrySetFanBoostViaBackend(false)`：交回固件 + 恢复强冷前快照 + `FanBoostActive=false` + 清临时状态）✅；</item>
+	/// <item>⭐ <b>曲线表回默认</b>：`BaolongdaFanCurveSettings.CreateDefault(...)`
+	///   ⇒ 当前代际默认 16 点（40 系满转 **6000** / 30 系 **4900** —— 用现有常量
+	///   `FullRpm40Series/FullRpm30Series`，⛔ 不临时改基准），默认 `Enabled=false` ⇒ ⭐ **闭环停用**，
+	///   再 `SaveBaolongdaFanCurve` 落盘 ✅；</item>
+	/// <item>⭐ <b>交回固件</b>：`FanWriter.TryReleaseToFirmware()` ⇒ EC 目标写 0 + 清 `0xB20` 的 `0x02|0x08`，
+	///   ⭐ 每一步**写后回读比对**（成功与否以回读为准）✅；</item>
+	/// <item>⭐ <b>再读一次 EC</b>（`0xC83C/0xC83D/0xB20`）⇒ 日志证明「目标=0、接管位已清」✅。</item>
+	/// </list></para>
+	/// <para>⚠️ 闸门：`FanCurveVerified` 未放开 ⇒ UI 仍隐藏/禁用（由 UI 自己读闸门判断），
+	/// 但 **EC 复位照做**（清掉可能残留的接管位 —— 机主明确要求）✅。</para>
+	/// <para>⚠️ 所有步骤都有日志（默认级别可见）；失败如实写 `false`，⛔ 不假装成功、⛔ 不抛异常 ✅。</para>
+	/// </summary>
+	internal void ResetBaolongdaFanToFirmwareDefault()
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return;
+		}
+		// ── ① 强冷复位：开着 ⇒ 先走关闭流程（恢复快照 / FanBoostActive=false / 清临时状态）──
+		bool boostWasActive = MechrevoHw.FanBoostActive;
+		bool boostConfirmed = false;
+		if (boostWasActive)
+		{
+			hw.TrySetFanBoostViaBackend(false, out boostConfirmed);
+		}
+		bool boostClosed = !MechrevoHw.FanBoostActive;
+		// ── ② 曲线表回默认（按本机代际满转；默认 Enabled=false ⇒ 闭环停用）──
+		//   ⭐ 满转基准：⭐ 40 系 **6000** / 30 系 **4900**（⭐ `BaolongdaFanCurveSettings.FullRpm40Series/FullRpm30Series`
+		//      —— 与曲线默认值同一套现有常量；⛔ 不临时改基准、⛔ 不拿 `FanRpmMaxForPercent`（30 系那只是÷35 的显示分母）✅
+		int fullRpm = (hw.DgpuGeneration == DgpuGenerationKind.Gen30)
+			? BaolongdaFanCurveSettings.FullRpm30Series
+			: BaolongdaFanCurveSettings.FullRpm40Series;
+		BaolongdaFanCurveSettings defaults = BaolongdaFanCurveSettings.CreateDefault(fullRpm);
+		bool curveSaved = hw.SaveBaolongdaFanCurve(defaults);
+		BaolongdaFanCurveSettings curveNow = hw.LoadBaolongdaFanCurve();
+		bool curveDisabled = curveNow != null && !curveNow.Enabled;
+		// ── ③ EC 交回固件（目标 0 + 清 0x02|0x08，写后回读）──
+		//   ⚠️ 闸门未放开也照做：机主明确要求「清掉可能残留的接管位」✅
+		bool released = FanWriter.TryReleaseToFirmware(out string releaseDetail);
+		// ── ④ 再读一次 EC（0xC83C/0xC83D/0xB20）：证明真的回默认 ──
+		int fan1 = -1;
+		int fan2 = -1;
+		int mask = -1;
+		string readVia;
+		bool acpi1 = EcPortIo.TryReadByteStable(EcPortIo.AcpiFan1TargetAddress, out fan1, out _);
+		bool acpi2 = EcPortIo.TryReadByteStable(EcPortIo.AcpiFan2TargetAddress, out fan2, out _);
+		bool acpi3 = EcPortIo.TryReadByteStable(EcPortIo.AcpiFanManualMaskAddress, out mask, out _);
+		if (acpi1 && acpi2 && acpi3)
+		{
+			readVia = "ACPI-EC";
+		}
+		else
+		{
+			// ⭐ ACPI 有任一读不到 ⇒ 用 LPC 通道补读（同一批地址；两通道都只读）✅
+			if (!acpi1 && EcLpcIo.TryReadByteStable(EcLpcIo.Fan1TargetAddress, out int l1, out _))
+			{
+				fan1 = l1;
+			}
+			if (!acpi2 && EcLpcIo.TryReadByteStable(EcLpcIo.Fan2TargetAddress, out int l2, out _))
+			{
+				fan2 = l2;
+			}
+			if (!acpi3 && EcLpcIo.TryReadByteStable(EcLpcIo.FanManualMaskAddress, out int l3, out _))
+			{
+				mask = l3;
+			}
+			readVia = "ACPI-EC/LPC";
+		}
+		bool targetsZero = fan1 == 0 && fan2 == 0;
+		bool maskClean = mask >= 0 && (mask & 0x0A) == 0;
+		// ── ⑤ 日志（默认级别可见）──
+		Logger.WriteError($"[reset] 风扇：已交回固件（目标=0 · 掩码清位 ok={released && maskClean} · 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}）"
+			+ $" · 曲线表已重置为默认（满转={defaults.MaxRpm} RPM · 16 点 · 保存 ok={curveSaved}）· 闭环已停用（enabled={(curveNow != null ? curveNow.Enabled : false)}，应 false）");
+		Logger.WriteError($"[reset] 强冷：已关闭并交回固件（FanBoostActive={(MechrevoHw.FanBoostActive ? "true" : "false")} · 掩码={(mask < 0 ? "读不到" : "0x" + mask.ToString("X2"))} 回读 ok={maskClean}）"
+			+ (boostWasActive ? $" · 原状态=开 ⇒ 已走关闭流程（快照恢复={boostConfirmed}）" : " · 原状态=关（无需关闭流程）"));
+		Logger.WriteError($"[reset] 风扇 EC 回读（{readVia}）：0xC83C={(fan1 < 0 ? "读不到" : fan1.ToString())} · 0xC83D={(fan2 < 0 ? "读不到" : fan2.ToString())}"
+			+ $" · 0xB20={(mask < 0 ? "读不到" : "0x" + mask.ToString("X2"))} ⇒ 目标归零={targetsZero} · 接管位(0x02|0x08)已清={maskClean}"
+			+ $" · 诊断标记 FanCurveVerified={hw.FanCurveVerified}（仅诊断；UI/写入已直接开放）"
+			+ (string.IsNullOrEmpty(releaseDetail) ? "" : " · " + releaseDetail));
+		if (!boostClosed || !curveDisabled || !released || !targetsZero || !maskClean)
+		{
+			Logger.WriteError("[reset] ⚠️ 风扇恢复默认**未全部确认**（如实记录，⛔ 不假装成功）："
+				+ $"强冷已关={boostClosed} · 闭环已停={curveDisabled} · EC交回={released} · 目标归零={targetsZero} · 接管位已清={maskClean}");
+		}
 	}
 
 	private async Task<bool> RestoreVendorProfileAsync()

@@ -302,6 +302,12 @@ public class HardwareOverlay : OSDNativeForm
 
 	private string? _lastPaintedFingerprint;
 
+	/// <summary>
+	/// ⭐ 2026-10-18（机主：悬浮窗 CPU 温度停在开机时的温度）：⭐ 上一帧 CPU 温度是否被判「过期」✅
+	/// （⭐ 只在**状态翻转**时各记一行，⛔ 不重复刷屏 ✅）。
+	/// </summary>
+	private bool _cpuTempStale;
+
 	private static readonly HashSet<string> DesktopApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 	{
 		"chrome", "msedge", "firefox", "opera", "brave", "vivaldi", "iexplore", "chromium", "librewolf", "arc",
@@ -316,13 +322,8 @@ public class HardwareOverlay : OSDNativeForm
 		"PowerToys.ImageResizer", "PowerToys.PowerRename", "PowerToys.AdvancedPaste", "Microsoft.CmdPal.UI"
 	};
 
-	private static readonly nint HWND_TOPMOST = new IntPtr(-1);
-
-	private const uint SWP_NOMOVE = 2u;
-
-	private const uint SWP_NOSIZE = 1u;
-
-	private const uint SWP_NOACTIVATE = 16u;
+	// ⭐ 2026-10-18（机主：悬浮窗没有置顶）：⭐ 置顶改由基类 `OSDNativeForm.TopMost` / `AssertTopMost()` 统一实现
+	//   （⚠️ 原来这里的 `SetWindowPos(..., HWND_TOPMOST, ..., 19)` 只在 WS_EX_TOPMOST 位"丢失"时才跑 ⇒ 实际从未跑过 ❌）。
 
 	private const int WM_NCDESTROY = 130;
 
@@ -354,9 +355,6 @@ public class HardwareOverlay : OSDNativeForm
 
 	[DllImport("user32.dll")]
 	private static extern short GetAsyncKeyState(int vKey);
-
-	[DllImport("user32.dll")]
-	private static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int x, int y, int w, int h, uint flags);
 
 	public HardwareOverlay()
 	{
@@ -573,7 +571,12 @@ public class HardwareOverlay : OSDNativeForm
 		}
 		if (Handle != IntPtr.Zero && OverlayZOrderPolicy.ShouldReassertTopmost((GetWindowLong(Handle, -20) & 8) != 0))
 		{
-			SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0, 19u);
+			// ⭐⭐ 2026-10-18（机主反馈「悬浮窗没有置顶、会被其他窗口盖住」）：
+			//   ⚠️ 以前这句只在 `WS_EX_TOPMOST` 位**丢失**时才 `SetWindowPos(HWND_TOPMOST, …)` ——
+			//      而那个位在窗口创建时就写在 `CreateParams.ExStyle` 里 ⚠️ ⇒ 条件恒假 ⇒ **一次都没执行过** ❌。
+			//   ⭐ 现在策略改成「每帧重申」（见 `OverlayZOrderPolicy`），并统一走基类的
+			//      `OSDNativeForm.AssertTopMost()`（⭐ `SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE` ⇒ ⛔ 不抢焦点 ✅）。
+			AssertTopMost();
 		}
 		GetWindowThreadProcessId(GetForegroundWindow(), out var processId);
 		int num = (int)processId;
@@ -590,10 +593,18 @@ public class HardwareOverlay : OSDNativeForm
 		}
 		HardwareControl.ReadSensorsOverlay();
 		double num2 = D(HardwareControl.gpuTemp);
-		double t = D(HardwareControl.cpuTemp);
+		// ⭐⭐ 2026-10-18（机主反馈「开机很久了，悬浮窗 CPU 温度还停在开机时的温度」）：
+		//   ⚠️ 原来这里直接把 `HardwareControl.cpuTemp` 当实时值画出来、**没有任何新鲜度判据** ❌
+		//   ⇒ ⭐ 采样链一旦不再刷新它（真机根因：LHM 闸门失败 ⇒ `ApplySensorPriority` 整段不跑），
+		//   ⭐ 开机时那个值就会被**永远**当成实时温度显示 ⚠️。
+		//   ⭐ 修法：⭐ 先查时间戳（`HardwareControl.CpuTempUpdatedAt` 体系）⇒ ⭐ 超 10 s 未更新 ⇒
+		//   ⭐ 显示「—」、⛔ **不显示陈旧值**（⭐ 与主界面 `TelemetryTemp` 的「不新鲜 ⇒ —」同口径 ✅）。
+		bool cpuTempFresh = HardwareControl.CpuTempIsFresh(HardwareControl.CpuTempFreshAge);
+		LogCpuTempFreshness(cpuTempFresh);
+		double t = (cpuTempFresh ? D(HardwareControl.cpuTemp) : 0.0);
 		bool flag3 = num2 > 0.0;
 		_gpuTempStr = "GPU:" + FmtTemp(num2) + fmtFreq(HardwareControl.gpuCoreFreq) + " ";
-		_cpuTempStr = "CPU:" + FmtTemp(t) + fmtFreq(HardwareControl.cpuFrequency) + " ";
+		_cpuTempStr = "CPU:" + (cpuTempFresh ? FmtTemp(t) : " — ") + fmtFreq(HardwareControl.cpuFrequency) + " ";
 		_gpuFanNum = FormatFan(HardwareControl.gpuFanRPM);
 		_cpuFanNum = FormatFan(HardwareControl.cpuFanRPM);
 		_gpuPow = FormatPowerText(HardwareControl.gpuPower);
@@ -601,8 +612,14 @@ public class HardwareOverlay : OSDNativeForm
 		_cpuHistory[_historyHead] = (float)Math.Max(0.0, D(HardwareControl.cpuPower));
 		_gpuHistory[_historyHead] = (flag3 ? ((float)Math.Max(0.0, D(HardwareControl.gpuPower))) : 0f);
 		_historyHead = (_historyHead + 1) % 60;
-		_cpuUsage = HardwareControl.cpuUsage;
-		_gpuUsage = (flag3 ? new int?(HardwareControl.gpuUsage.GetValueOrDefault()) : ((int?)null));
+		// ⭐⭐ 2026-10-18（机主：遥测里 CPU/GPU 占用率显示不对）：
+		//   ⚠️ 旧代码：`_gpuUsage` 用 `GetValueOrDefault()` ⇒ ⭐ **null 被画成 0%** ❌；
+		//      `_cpuUsage` 则没有任何新鲜度判断 ⇒ ⭐ 采样链停了也会一直画旧百分比 ⚠️。
+		//   ⭐ 现在：⭐ 只在**新鲜**（≤ <see cref="HardwareControl.UsageFreshAge"/>）时才显示；
+		//      取不到/过期 ⇒ 画「—」（⛔ 不显示 0% 冒充 ✅；⭐ 与主界面温度「不新鲜 ⇒ —」同口径 ✅）。
+		//   ⚠️ 与旧 `flag3`（GPU 温度有没有值）**解耦**：占用率是独立采样，⛔ 不该被 GPU 温度缺失连带隐藏 ✅。
+		_cpuUsage = HardwareControl.CpuUsageIsFresh(HardwareControl.UsageFreshAge) ? HardwareControl.cpuUsage : ((int?)null);
+		_gpuUsage = HardwareControl.GpuUsageIsFresh(HardwareControl.UsageFreshAge) ? HardwareControl.gpuUsage : ((int?)null);
 		_vramUsage = (flag3 ? new int?(HardwareControl.vramUsage.GetValueOrDefault()) : ((int?)null));
 		_vramUsedMb = (flag3 ? new int?(HardwareControl.vramUsedMb.GetValueOrDefault()) : ((int?)null));
 		_ramUsage = HardwareControl.ramUsage;
@@ -678,6 +695,39 @@ public class HardwareOverlay : OSDNativeForm
 				return "";
 			}
 			return " " + ((double)mhz / 1000.0).ToString("F1") + "G";
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主反馈「开机很久了，悬浮窗 CPU 温度还停在开机时的温度」）：
+	/// ⭐ <b>CPU 温度新鲜度日志</b> ✅ —— ⭐ 过期/恢复时各记一行，⭐ 过期期间**每秒最多一条**
+	/// <c>[float] cpu temp stale age=…s</c>（⭐ 判据每秒都在跑 ⇒ 用 1 s 限流，⛔ 不刷屏 ✅）。
+	/// <para>⚠️ 与显示判据**同一套时间戳**（<see cref="HardwareControl.CpuTempIsFresh" /> /
+	/// <see cref="HardwareControl.CpuTempAgeMs" />）⇒ ⭐ 日志里看到的 age 就是"为什么显示「—」"的直接证据 ✅。</para>
+	/// </summary>
+	private void LogCpuTempFreshness(bool fresh)
+	{
+		long ageMs = HardwareControl.CpuTempAgeMs;
+		string ageText = ((ageMs < 0L) ? "never" : (ageMs / 1000.0).ToString("F1") + "s");
+		if (!fresh)
+		{
+			if (!_cpuTempStale)
+			{
+				// ⭐ 状态翻转：⭐ 用 `WriteError` ⇒ ⭐ 默认「仅错误」级别下也可见（诊断包能直接定位）✅
+				_cpuTempStale = true;
+				Logger.WriteError("[float] cpu temp stale age=" + ageText
+					+ " ⇒ 悬浮窗 CPU 温度显示「—」（⛔ 不再拿陈旧值冒充实时值；⭐ 超过 "
+					+ HardwareControl.CpuTempFreshAge.TotalSeconds.ToString("F0") + " s 未更新即判过期）");
+			}
+			else
+			{
+				Logger.WriteLineThrottled("float-cpu-temp-stale", "[float] cpu temp stale age=" + ageText, 1000);
+			}
+		}
+		else if (_cpuTempStale)
+		{
+			_cpuTempStale = false;
+			Logger.WriteLine("[float] cpu temp fresh again age=" + ageText + "（⭐ 恢复实时显示）");
 		}
 	}
 
@@ -908,11 +958,10 @@ public class HardwareOverlay : OSDNativeForm
 
 	private static void DrawUsagePercent(Graphics g, Font font, int x, int colW, int y, int? usage, SolidBrush brush)
 	{
-		if (usage.HasValue)
-		{
-			string text = usage.Value + "%";
-			g.DrawString(text, font, brush, new PointF((float)(x + colW) - g.MeasureString(text, font).Width, y));
-		}
+		// ⭐⭐ 2026-10-18（机主：占用率显示不对）：⭐ 取不到值画「—」（⛔ 不再什么都不画/画 0% 冒充 ✅；
+		//   ⭐ 与温度/功耗的「不新鲜 ⇒ —」同口径；⚠️ 只是同一格里的文字，⛔ 不改布局/列宽 ✅）
+		string text = (usage.HasValue ? (usage.Value + "%") : "—");
+		g.DrawString(text, font, brush, new PointF((float)(x + colW) - g.MeasureString(text, font).Width, y));
 	}
 
 	private static void DrawMemGb(Graphics g, Font font, int x, int colW, int y, int? usedMb, SolidBrush brush)
@@ -1323,6 +1372,11 @@ public class HardwareOverlay : OSDNativeForm
 		HardwareControl.ResetCPUPowerCounter();
 		UpdateOverlaySize();
 		RestorePosition();
+		// ⭐⭐ 2026-10-18（机主反馈「悬浮窗没有置顶、会被其他窗口盖住」）：
+		//   ⭐ 每次打开（含 ⭐ 从托盘重新打开 / ⭐ 息屏恢复后 `ResumeForDisplayOn` 重开 / ⭐ 句柄重建）都显式置顶 ✅
+		//   ⚠️ 不抢焦点：`base.Show()` 走 `SW_SHOWNOACTIVATE`、置顶动作带 `SWP_NOACTIVATE`、
+		//      窗口本身带 `WS_EX_NOACTIVATE` ⇒ ⭐ 焦点行为与改动前一致 ✅
+		TopMost = true;
 		base.Show();
 		ApplyDragMode(on: true);
 		if (_gameOnly)

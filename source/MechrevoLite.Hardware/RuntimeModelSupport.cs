@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Probe;
 
 namespace MechrevoLite.Hardware;
@@ -26,10 +26,49 @@ public static class RuntimeModelSupport
 			// 老接口（root\WMI:MICommonInterface，以及将来给宝龙达准备的那套）**不经过 GCU、也不依赖
 			// ACPI 机型码** ⇒ 只要探到它就一律判支持，与 ACPIDriver 能不能打开无关。
 			// 本机（GCU 机型）`UsesLegacyMifs` 恒 false ⇒ 这一支进不来，行为与改动前逐位一致。
+			// ⭐⭐ 2026-10-16（宝龙达适配）：⭐ 判据放宽为 `UsesBuiltInModes` ⇒ ⭐ 宝龙达机型**也判支持** ✅
+			//   （⭐ 两者都"不经过 GCU、也不依赖 ACPI 机型码" ✅ —— ⭐ 真机实测宝龙达机型拿不到 GCU 那套 ✅）
 			MechrevoHw legacyHw = Program.hw;
 			if (legacyHw != null && legacyHw.UsesLegacyMifs)
 			{
 				return SupportDecision.Supported("MICommonInterface");
+			}
+			if (legacyHw != null && legacyHw.UsesBaolongda)
+			{
+				// ⭐ 宝龙达走这里 —— ⭐ 与老接口**同样的判据**（⭐ 探到就判支持，⭐ 不看 ACPIDriver 能不能开 ✅）
+				return SupportDecision.Supported("Baolongda");
+			}
+			// ⭐⭐⭐ 2026-10-16（宝龙达 · 修「更多开关整块灰掉」⚠️ —— 真机症状：机主原话「开关都点不了」）：
+			//
+			//   ⚠️ **根因链**（已逐行核实 ✅）：
+			//     ⭐ ① `SettingsForm.ApplyUnsupportedModelNotice`（约 :8410）里有一圈
+			//        `quickSwitches[i].Enabled = !flag;` ⇒ ⭐ **一刀切**把**全部**快捷开关设成
+			//        `!IsReadOnlyDegraded` ⚠️ ⇒ ⭐ 只要整机被判"只读降级" ⇒ ⭐ **整块灰掉、一个都点不了** ❌
+			//     ⭐ ② 而 `IsReadOnlyDegraded` 来自 `ShouldDegradeToReadOnly(decision, …)` = `!decision.IsSupported`
+			//     ⭐ ③ 而上面的 `UsesBaolongda` 那一支 ⭐ **依赖 `Program.hw` 的后端探测结果** ⚠️
+			//        ⇒ ⭐ 而后端探测是**异步**的（WMI 探测要几十毫秒起步 ✅）
+			//        ⇒ ⭐ ⭐ **首次 UI 刷新时 `UsesBaolongda` 还是 `false`** ⚠️
+			//     ⭐ ④ ⇒ 于是掉到下面 `AcpiDriverReadTransport.TryOpen` ⚠️
+			//     ⭐ ⑤ ⇒ ⭐ ⭐ **蛟龙上没有 `\\.\ACPIDriver`**（真机实锤：
+			//        `CreateFile("\\.\ACPIDriver") failed: Win32 error 2 系统找不到指定的文件` ❌）
+			//     ⭐ ⑥ ⇒ `IsServiceServed()` 假、`IsGcuServiceInstalled` 假 ⇒ ⭐ **`Unparsable()`** ❌
+			//     ⭐ ⑦ ⇒ ⭐ `IsReadOnlyDegraded = true` ⇒ ⭐ ⭐ **29 个开关一起变灰** ❌❌
+			//     ⚠️ 而且 ⭐ **没有自愈** ⚠️：那条"预热期软重载"（`GcuWarmupReload`）⭐ **是 GCU 专有**的 ✅
+			//        ⇒ ⭐ 宝龙达上**永远不会触发** ⇒ ⭐ **灰掉的状态一直留着** ❌
+			//
+			//   ⇒ ⭐ ⭐ **修法：⭐ 补一道【静态机型判据】**（⭐ 只看板号，⭐ **不依赖后端探测是否完成** ✅）
+			//      ⭐ 判据与后端白名单**同一套**（⭐ `BaolongdaBackend.IsBaolongdaModelWhitelisted` ✅）
+			//      ⇒ ⭐ ⭐ **两处结论永远一致** ✅（⭐ 不会出现"后端认了、机型判定不认"的矛盾 ✅）
+			//      ⭐ 且 ⭐ **只读注册表**、⭐ 失败/空值一律按"不是宝龙达"处理 ⇒ ⭐ **安全方向** ✅
+			//   ⚠️ 为什么放在 `UsesBaolongda` **之后**：⭐ 后端已经认下来时走上面那支更"有据"（能记到实例名 ✅）；
+			//      ⭐ 这一支是**兜底**：⭐ 覆盖"后端还没探完 / 探测失败但机型确实是宝龙达"的窗口 ✅
+			//   ⚠️ 对同方/GCU 机型：⭐ 板号是 `GM5HG0A` / `GM6IX8B` / `KUANGSHI-*` / `YAOSHI-*` 等
+			//      ⇒ ⭐ **白名单判假** ⇒ ⭐ ⭐ **完全走原路，行为逐位不变** ✅
+			if (IsBaolongdaModelByBoard())
+			{
+				Logger.WriteLine("模型支持判定：⭐ 主板型号命中宝龙达白名单 ⇒ ⭐ 判**受支持** ✅"
+					+ "（⭐ 静态判据，⭐ 不依赖后端探测是否完成 ⚠️ —— ⭐ 这正是「更多开关整块灰掉」的修复 ✅）");
+				return SupportDecision.Supported("Baolongda");
 			}
 			if (!AcpiDriverReadTransport.TryOpen(out AcpiDriverReadTransport transport, out string error) || transport == null)
 			{
@@ -65,6 +104,46 @@ public static class RuntimeModelSupport
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达 · 修「更多开关整块灰掉」⚠️ 真机症状：机主原话「开关都点不了」）：
+	/// ⭐ **只看板号的静态机型判据** —— ⭐ 与后端白名单**同一套**（<see cref="BaolongdaBackend.IsBaolongdaModelWhitelisted" /> ✅）。
+	/// <para>⭐⭐ <b>为什么必须有它</b>：<see cref="Current" /> 里那一支 <c>UsesBaolongda</c> 依赖
+	/// <c>Program.hw</c> 的**异步**后端探测结果 ⚠️ ⇒ ⭐ 首次 UI 刷新时它还是 <c>false</c> ⇒
+	/// 掉进 <c>\\.\ACPIDriver</c> 分支 ⇒ ⭐ 蛟龙**没有**该驱动（真机实锤：<c>Win32 error 2</c> ✅）
+	/// ⇒ 判 <see cref="SupportReason.Unparsable" /> ⇒ ⭐ 而 <c>SettingsForm.ApplyUnsupportedModelNotice</c>
+	/// 会把**全部**快捷开关 <c>Enabled = !IsReadOnlyDegraded</c> ⇒ ⭐ ⭐ **整块灰掉、一个都点不了** ❌。</para>
+	/// <para>⭐ 判据**只读注册表**（<c>BaseBoardProduct</c> ✅）；⭐ 读不到/异常/空值一律按
+	/// **「不是宝龙达」** 处理 ⇒ ⭐ **安全方向** ✅（⭐ 宁可不认宝龙达，⭐ 也绝不误伤同方 ✅）。</para>
+	/// <para>⚠️ 缓存：⭐ 板号在运行期不会变 ⇒ ⭐ 只判一次 ✅（<see cref="Current" /> 每次界面刷新都会被调用 ⚠️）。
+	/// ⭐ 缓存写入用普通字段 —— ⭐ 竞态最多导致**多读一次注册表**，⭐ 结果恒定，⭐ 无害 ✅。</para>
+	/// </summary>
+	private static bool IsBaolongdaModelByBoard()
+	{
+		if (_baolongdaBoardHit.HasValue)
+		{
+			return _baolongdaBoardHit.Value;
+		}
+		bool hit = false;
+		try
+		{
+			hit = BaolongdaBackend.IsBaolongdaModelWhitelisted(out string note);
+			if (!hit)
+			{
+				Logger.WriteLine("模型支持判定：⭐ 静态板号判据**未命中** ⇒ ⭐ 按非宝龙达处理 ✅（⭐ 安全方向 ✅）：" + note);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("模型支持判定：⭐ 静态板号判据异常 ⇒ ⭐ 按非宝龙达处理 ✅（⭐ 安全方向 ✅）：" + ex.Message);
+			hit = false;
+		}
+		_baolongdaBoardHit = hit;
+		return hit;
+	}
+
+	/// <summary>⭐ 静态板号判据的缓存（<c>null</c> = 还没判过 ✅）。</summary>
+	private static bool? _baolongdaBoardHit;
+
 	public static bool IsPositivelyUnsupported(SupportDecision decision)
 	{
 		return decision.Reason == SupportReason.NotInSet;
@@ -88,6 +167,13 @@ public static class RuntimeModelSupport
 			// ⇒ 必须看 GCU 连接而不是 IsConnected，否则老接口机型会被误判成 "GCU 已服务"。
 			// ⚠️ 老接口机型另有单独一支（按 UsesLegacyMifs 返回 MICommonInterface），见下方分支。
 			if (hw != null && hw.IsGcuConnected)
+			{
+				return true;
+			}
+			// ⭐⭐ 2026-10-16（宝龙达适配）：⭐ 「有厂商后端在服务这台机器」也算 ——
+			//   ⭐ 老同方（老接口）与 ⭐ 宝龙达都是**不经 GCU** 的后端 ⇒ ⭐ 它们活着就说明这台机被服务着 ✅
+			//   ⚠️ 老同方机型上 `UsesBaolongda` 恒 false ⇒ ⭐ 与改动前一致 ✅。
+			if (hw != null && hw.UsesBuiltInModes)
 			{
 				return true;
 			}

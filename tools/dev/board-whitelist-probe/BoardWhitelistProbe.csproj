@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>BoardWhitelistProbe</AssemblyName>
+    <!-- ⚠️ 与生产工程同口径：**不开** ImplicitUsings（生产里每个文件自带 using）·
+         ⭐ Nullable 开，免得 link 进来的 `string?` 报 CS8632 -->
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace />
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- ⭐ link **生产源文件本体**（⛔ 不是副本）—— 验的就是真代码 -->
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\BoardWhitelist.cs" Link="BoardWhitelist.cs" />
+  </ItemGroup>
+</Project>

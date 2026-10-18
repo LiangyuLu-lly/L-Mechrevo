@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MechrevoLite.Display;
 using MechrevoLite.Gpu;
+using MechrevoLite.Helpers;
 using MechrevoLite.Mode;
 using Microsoft.Win32;
 using Probe;
@@ -400,11 +401,16 @@ public class MechrevoService
 			// ⭐⭐ 2026-10-15（C-1 第 2 步，对照 A-22）：老机型后端**不走 GCU** —— 这里单独一支：
 			// 视觉档 0/1/2 映射到老接口的内部档，档 3（自定义）老接口根本没有 ⇒ 直接判失败（⛔ 不假装可写）。
 			// ⚠️ GCU 分支（下面那一整段）**一字未动**，本机走的就是它。
-			if (hw != null && hw.UsesLegacyMifs)
+			// ⭐⭐ 2026-10-16（宝龙达适配）：⭐ 判据由 `UsesLegacyMifs` 放宽为 **`UsesBuiltInModes`**
+			//   ⇒ ⭐ 宝龙达（蛟龙16Pro 等）**也走这一支** ✅ —— ⭐ 因为两者**协议同族、档位映射逐字相同**
+			//     （⭐ 真机已验证：⭐ 静音→MIFS 2 · ⭐ 平衡→MIFS 0 · ⭐ 狂暴→MIFS 1 ✅）
+			//   ⇒ ⭐ 且 `SwitchLegacyModeAsync` 内部已经是"谁在管事就调谁"（⭐ 见 `SwitchBuiltInModeAsync` ✅）
+			//   ⚠️ 老同方机型上 `UsesBaolongda` 恒为 false ⇒ ⭐ 行为与改动前逐位一致 ✅。
+			if (hw != null && hw.UsesBuiltInModes)
 			{
 				if (mode == 3)
 				{
-					Logger.WriteLine($"MechrevoService.SwitchMode({mode}) 老接口后端不支持自定义档");
+					Logger.WriteLine($"MechrevoService.SwitchMode({mode}) 内置档位后端（老接口/宝龙达）不支持自定义档");
 					return ModeSwitchResult.Failed;
 				}
 				bool legacyOk = await hw.SwitchLegacyModeAsync((int)PowerModeMapping.FromVisualMode(mode), requestCts.Token).ConfigureAwait(continueOnCapturedContext: false);
@@ -876,6 +882,46 @@ public class MechrevoService
 
 	public async Task<bool> SetCustomDetail(Dictionary<string, string> fields)
 	{
+		// ⭐⭐ 2026-10-19（机主：「PL2 / PL4 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
+		//   ⭐ **校验层兜底** —— 下发前先把这一批里的 PL1/PL2/PL4 规范成 **PL1 ≤ PL2 ≤ PL4**：
+		//     · 用户降 PL2 到低于 PL1 ⇒ 把 PL1 一起降下来；
+		//     · 用户抬 PL1 超过 PL2 ⇒ 把 PL2（以及 PL4）一起抬高；
+		//     · 无 PL4 的机型（宝龙达没有 PL4）自动忽略 PL4；
+		//     · 历史非法存档回放（多字段同批）⇒ 优先往下压（安全方向）。
+		//   ⛔ **绝不允许把违反关系的组合发出去**；⛔ 不改 WMI 功能号 23 的写入协议（子命令 2/3/4 不变）。
+		//   ⚠️ 规则本体在 `PowerLimitOrder`（⭐ 与 CustomModeForm 的界面联动**同一份口径**）✅。
+		if (!NormalizePowerLimitOrder(fields))
+		{
+			Logger.WriteError("SetCustomDetail rejected: PL1 ≤ PL2 ≤ PL4 无法满足（硬件范围互相冲突）⇒ 本批不下发");
+			return false;
+		}
+		// ⭐⭐ 2026-10-19（机主：PL1/PL2 不可调 · 日志 `WriteFirmwareField:PL1=120 -> Failed`）：
+		//   ⭐ 宝龙达没有 GCU ⇒ 这几个键**先**走本机 WMI 功能号 23（`TryApplyPowerLimitViaBackend`），
+		//      剩下的字段才发给 MQTT ✅
+		//   ⚠️ 非宝龙达：`UsesBaolongda` 假 ⇒ 整段跳过，逐位不变 ✅
+		if (_hw != null && _hw.UsesBaolongda && fields != null && fields.Count > 0)
+		{
+			List<string> consumedKeys = new List<string>();
+			foreach (KeyValuePair<string, string> kv in fields)
+			{
+				if (TryApplyPowerLimitViaBackend(kv.Key, kv.Value))
+				{
+					consumedKeys.Add(kv.Key);
+				}
+			}
+			foreach (string k in consumedKeys)
+			{
+				fields.Remove(k);
+			}
+			if (consumedKeys.Count > 0)
+			{
+				Logger.WriteLine($"SetCustomDetail：宝龙达 ⇒ 走本机 WMI 的字段 = [{string.Join(",", consumedKeys)}] · 剩余发 MQTT = {fields.Count} 个");
+			}
+			if (fields.Count == 0)
+			{
+				return true;
+			}
+		}
 		CancellationTokenSource requestCts = new CancellationTokenSource();
 		Interlocked.Exchange(ref _customDetailCts, requestCts)?.Cancel();
 		// 2026-10-09（批量下发超时口径 + 重发前收敛）：批次取消令牌挂在方法最外层，
@@ -962,7 +1008,21 @@ public class MechrevoService
 					gcuFields.Clear();
 				}
 			}
-			KeyValuePair<string, string>[] gcuEntries = source.Where((KeyValuePair<string, string> field) => gcuFields.ContainsKey(field.Key)).ToArray();
+			// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 3 步 · 功耗墙 · ⭐ 前后端分离模板）：
+			//   ⭐ 功耗墙那几项（⭐ PL1 / PL2 / 温度墙）⭐ **在非 GCU 后端下走 WMI**（⭐ 它没有 GCU ✅）
+			//   ⇒ ⭐ 所以**先在这里把它们摘出去并就地应用** ✅ ⇒ ⭐ 剩下的才进 GCU 的待发列表 ✅
+			//   ⚠️ 作用范围：⭐ `TryApplyPowerLimitViaBackend` ⭐ **非宝龙达时恒返回 false** ✅
+			//      ⇒ ⭐ GCU / 老同方 机型 ⭐ **列表与原来逐项相同** ⇒ ⭐ **行为逐位不变** ✅
+			List<KeyValuePair<string, string>> sourceForGcu = new List<KeyValuePair<string, string>>(source.Length);
+			foreach (KeyValuePair<string, string> field2 in source)
+			{
+				if (TryApplyPowerLimitViaBackend(field2.Key, field2.Value))
+				{
+					continue; // ⭐ 已由非 GCU 后端处理 ⇒ ⛔ 这一条不发 MQTT ✅
+				}
+				sourceForGcu.Add(field2);
+			}
+			KeyValuePair<string, string>[] gcuEntries = sourceForGcu.Where((KeyValuePair<string, string> field) => gcuFields.ContainsKey(field.Key)).ToArray();
 			KeyValuePair<string, string>[] gcuConfirmationEntries = gcuEntries.Where((KeyValuePair<string, string> field) => !IsGpuOverclockField(field.Key)).ToArray();
 			// 2026-10-09（批量下发超时口径 + 重发前收敛）：
 			// 下发拆成两件事：① CancelBatch（保证首批不再继续发出新字段、供重发前收敛用）；
@@ -1180,6 +1240,119 @@ public class MechrevoService
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「PL2 / PL4 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
+	/// ⭐ **PL1 ≤ PL2 ≤ PL4 的校验层兜底** —— 就地规范化 <paramref name="fields" /> 里的 PL 三项。
+	/// <para>⭐ 规则本体在 <see cref="PowerLimitOrder.TryLink" />（⭐ 与界面联动同一份口径）。
+	/// 本方法只负责：① 把"待下发值 + 硬件当前值"凑成三元组；② 把联动结果写回字段表（⭐ 被联动的
+	/// 那一项即使不在本批里也会被**补进去**，⇒ 它会被真正写到硬件上）；③ 打机主要求的那一行日志 ✅。</para>
+	/// <para>⚠️ 非宝龙达的 GCU 机型同样生效（⭐ PL4 也在范围内）⇒ 只在"确实违反关系"时才多写字段，
+	/// 合法组合**一个字段都不改** ✅。</para>
+	/// <para>⚠️ 返回 <c>false</c> = 硬件范围互相冲突、无法同时满足关系 ⇒ 调用方必须**放弃本批**，
+	/// ⛔ 不许把违规组合发出去 ✅。</para>
+	/// </summary>
+	private bool NormalizePowerLimitOrder(Dictionary<string, string> fields)
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null || fields == null || fields.Count == 0)
+		{
+			return true;
+		}
+		bool hasPl1 = fields.ContainsKey("PL1");
+		bool hasPl2 = fields.ContainsKey("PL2");
+		bool hasPl4 = fields.ContainsKey("PL4");
+		if (!hasPl1 && !hasPl2 && !hasPl4)
+		{
+			return true;
+		}
+		int? pl1 = CurrentOrPendingPowerLimit(fields, "PL1", hw.Pl1Adjustable, hw.Pl1);
+		int? pl2 = CurrentOrPendingPowerLimit(fields, "PL2", hw.Pl2Adjustable, hw.Pl2);
+		// ⭐ 无 PL4 的机型（宝龙达 40 系）⇒ `Pl4Adjustable == false` ⇒ 传 null ⇒ 约束自动忽略 PL4 ✅
+		int? pl4 = hw.Pl4Adjustable ? CurrentOrPendingPowerLimit(fields, "PL4", adjustable: true, hw.Pl4) : ((int?)null);
+		int changedCount = (hasPl1 ? 1 : 0) + (hasPl2 ? 1 : 0) + (hasPl4 ? 1 : 0);
+		PowerLimitOrder.Field? changed = changedCount switch
+		{
+			1 when hasPl1 => PowerLimitOrder.Field.Pl1,
+			1 when hasPl2 => PowerLimitOrder.Field.Pl2,
+			1 when hasPl4 => PowerLimitOrder.Field.Pl4,
+			_ => (PowerLimitOrder.Field?)null
+		};
+		PowerLimitOrder.Range range1 = ToPowerLimitRange(hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1Adjustable);
+		PowerLimitOrder.Range range2 = ToPowerLimitRange(hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2Adjustable);
+		PowerLimitOrder.Range range4 = ToPowerLimitRange(hw.Pl4Minimum, hw.Pl4Maximum, hw.Pl4Adjustable);
+		if (!PowerLimitOrder.TryLink(changed, pl1, pl2, pl4, range1, range2, range4,
+			out int? linkedPl1, out int? linkedPl2, out int? linkedPl4,
+			out IReadOnlyList<PowerLimitOrder.Change> changes, out string reason))
+		{
+			return false;
+		}
+		if (changes == null || changes.Count == 0)
+		{
+			return true;
+		}
+		WriteLinkedPowerLimit(fields, "PL1", pl1, linkedPl1);
+		WriteLinkedPowerLimit(fields, "PL2", pl2, linkedPl2);
+		WriteLinkedPowerLimit(fields, "PL4", pl4, linkedPl4);
+		// ⭐ 机主要求的那一行日志（⭐ 例：`[pl] 联动：PL1 120→100（因 PL2=100）`）✅
+		//   ⚠️ 用 WriteError ⇒ 默认「仅错误」级别下也**一定落盘**（⭐ 这是真机取证的主要证据）✅
+		Logger.WriteError(PowerLimitOrder.Describe(changes, reason));
+		return true;
+	}
+
+	/// <summary>⭐ 读"这一批里的值"；本批没带 ⇒ 用硬件上报的当前值（⭐ <c>&gt; 0</c> 才算已知）✅。</summary>
+	private static int? CurrentOrPendingPowerLimit(IReadOnlyDictionary<string, string> fields, string key, bool adjustable, int current)
+	{
+		if (fields.TryGetValue(key, out string text))
+		{
+			// ⚠️ 非法数字不在这里兜底（交给后面的 `ValidateCustomField` 如实拒绝）
+			return int.TryParse(text, out int value) ? value : ((int?)null);
+		}
+		if (!adjustable || current <= 0)
+		{
+			return null;
+		}
+		return current;
+	}
+
+	/// <summary>⭐ 硬件范围 → <see cref="PowerLimitOrder.Range" />（⭐ 读不到 ⇒ 不夹）✅。</summary>
+	private static PowerLimitOrder.Range ToPowerLimitRange(int minimum, int maximum, bool adjustable)
+	{
+		return (adjustable && maximum > minimum)
+			? new PowerLimitOrder.Range(minimum, maximum)
+			: PowerLimitOrder.Range.Unbounded;
+	}
+
+	/// <summary>⭐ 把联动结果写回字段表（⭐ 只在"值真的变了"时才覆盖/补字段）✅。</summary>
+	private static void WriteLinkedPowerLimit(Dictionary<string, string> fields, string key, int? original, int? linked)
+	{
+		if (!linked.HasValue || !original.HasValue || linked.Value == original.Value)
+		{
+			return;
+		}
+		fields[key] = linked.Value.ToString(CultureInfo.InvariantCulture);
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-19（宝龙达 · GPU 偏移校验范围）：与 <c>CustomModeForm.GpuOffsetUiRange</c> **同源**
+	/// = NVAPI P0 驱动范围 ∩ <c>-900..+2000 MHz</c>。非宝龙达恒返回 false（调用方保持原判据）。
+	/// </summary>
+	private bool TryGetBaolongdaGpuOffsetUiRange(bool core, out int minimum, out int maximum)
+	{
+		minimum = 0;
+		maximum = 0;
+		if (_hw == null || !_hw.UsesBaolongda)
+		{
+			return false;
+		}
+		if (!NvapiPStates.TryGetP0OffsetRange(out int coreMin, out int coreMax, out int memMin, out int memMax))
+		{
+			return false;
+		}
+		minimum = Math.Max(core ? coreMin : memMin, NvapiPStates.UiOffsetMinimumMhz);
+		maximum = Math.Min(core ? coreMax : memMax, NvapiPStates.UiOffsetMaximumMhz);
+		return maximum > minimum;
+	}
+
 	private bool ValidateCustomField(string key, string text)
 	{
 		if (!int.TryParse(text, out var result))
@@ -1208,14 +1381,35 @@ public class MechrevoService
 			return _hw.SupportsFanSwitchSpeed && InRange(result, _hw.FanSwitchSpeedMinimum, _hw.FanSwitchSpeedMaximum);
 		case "CpuTccOffset":
 			return _hw.TccAdjustable && InRange(result, _hw.TccMinimum, _hw.TccMaximum);
+		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间」）：范围与 UI 同源（BaolongdaProfile 常量），
+		//   ⚠️ 只对「自定义档真的走 SMU」的机器有效（与 UI 显示、下发分支**同一判据**）。
+		case "SmuStapmTimeSeconds":
+			return PerfModeCapabilities.UsesSmuForCustomPower(_hw.UsesBaolongda, _hw.IsBaolongda30Series, SmuAvailability.IsReady)
+				&& InRange(result, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds);
 		case "GpuConfigurableTGPTarget":
 			return _hw.GpuTgpAdjustable && InRange(result, _hw.GpuTgpMinimum, _hw.GpuTgpMaximum);
 		case "GpuDynamicBoost":
 			return _hw.GpuDynamicBoostAdjustable && InRange(result, _hw.GpuDbMinimum, _hw.GpuDbMaximum);
 		case "GpuCoreClockOffsetOC":
+		{
+			// ⭐⭐ 2026-10-19（宝龙达 · GPU 偏移）：宝龙达的可用范围来自 NVAPI P0（与 CustomModeForm 的
+			//   GpuOffsetUiRange 同源：驱动范围 ∩ -900..+2000）。这里必须同口径，否则 UI 能拖到 +600、
+			//   校验却按 hw 的 ±500 拒掉，用户看到的就是"应用后又被弹回 0"。
+			//   ⚠️ 非宝龙达：helper 直接返回 false，判定与改动前逐字一致。
+			if (TryGetBaolongdaGpuOffsetUiRange(core: true, out int coreMin, out int coreMax))
+			{
+				return InOffsetRange(result, coreMin, coreMax);
+			}
 			return _hw.SupportsGpuOverclock && _hw.GpuCoreOffsetAdjustable && InOffsetRange(result, _hw.GpuCoreOffsetUserMinimum, _hw.GpuCoreOffsetUserMaximum);
+		}
 		case "GpuMemoryClockOffsetOC":
+		{
+			if (TryGetBaolongdaGpuOffsetUiRange(core: false, out int memMin, out int memMax))
+			{
+				return InOffsetRange(result, memMin, memMax);
+			}
 			return _hw.SupportsGpuOverclock && _hw.GpuMemoryOffsetAdjustable && InOffsetRange(result, _hw.GpuMemoryOffsetUserMinimum, _hw.GpuMemoryOffsetUserMaximum);
+		}
 		case "CpuTccOffsetSwitch":
 		{
 			bool flag = _hw.TccAdjustable;
@@ -1281,6 +1475,8 @@ public class MechrevoService
 			"FanSwitchSpeedEnabled" => _hw.FanSwitchSpeedEnabled == (result == 1), 
 			"FanSwitchSpeed" => _hw.FanSwitchSpeed == _hw.QuantiseFanSwitchSpeed(result), 
 			"CpuTccOffset" => _hw.TccTarget == result, 
+			// ⭐⭐ 2026-10-19（30 系 · SMU 时间窗）：本地记忆（写成功后更新）与下发值一致
+			"SmuStapmTimeSeconds" => _hw.BaolongdaStapmTimeSeconds == result, 
 			"GpuConfigurableTGPTarget" => _hw.GpuTgp == result, 
 			"GpuDynamicBoost" => _hw.GpuDb == result, 
 			"GpuCoreClockOffsetOC" => _hw.EffectiveGpuCoreClockOffset == result, 
@@ -2406,6 +2602,25 @@ public class MechrevoService
 		try
 		{
 			// 2026-10-15（C-1 第 2 步分类 ①）：GPU 模式状态回读（GCU 上报）⇒ 真正需要 GCU。
+			// ⭐⭐ 2026-10-16（宝龙达 · 修「显卡模式切换不行」⚠️ 真机症状：弹窗
+			//   「未能读取当前显卡模式。为避免依据旧状态切换，请稍后重试。」❌）：
+			//   ⚠️ 原来**第一句**就是这个 GCU 门槛 ⇒ ⭐ 宝龙达没有 GCU ⇒ 恒 Unavailable ❌
+			//      ⇒ ⭐ 界面（`SettingsForm.SwitchGpuModeFromUi` 约 :10890 ✅）判「读不到当前模式」
+			//      ⇒ ⭐ ⭐ **弹窗并直接 return ⇒ 切换被挡住** ❌
+			//   ⇒ ⭐ 所以 ⭐ **在 GCU 门槛【之前】**补一条**非 GCU 后端**的读法 ✅
+			//      ⭐ 我们那条读法**本来就读得通**（真机日志：⭐「宝龙达状态：… 显卡=独显直连(1) …」✅）
+			//      ⭐ ⇒ ⭐ 这里把它同步进 `_hw.GpuMode` ⇒ ⭐ 下游（`CurrentGpuMode` / ⭐ 界面高亮 /
+			//        ⭐ `GpuSwitchPolicy` ✅）**全部自然可用** ✅
+			//   ⚠️ 非宝龙达 ⇒ ⭐ `UsesBaolongda` 为假 ⇒ ⭐ **不进这一支** ⇒
+			//      ⭐ ⭐ **GCU 机型行为逐位不变** ✅（⭐ 下面那一整段一个字未改 ✅）
+			if (_hw.UsesBaolongda)
+			{
+				bool ok = _hw.TrySyncGpuModeViaBackend();
+				Logger.WriteLine($"RefreshGpuModeStatus（宝龙达路径）：⭐ 读功能号 9 ⇒ {(ok ? "成功" : "失败")}"
+					+ $" ⇒ 当前模式={CurrentGpuMode}（⭐ 1=混合 · ⭐ 2=独显直连 ✅）"
+					+ (ok ? " ⇒ ⭐ 放行切换 ✅" : " ⇒ ⚠️ 界面会如实报「读不到」（⛔ 不拿旧值冒充 ✅）"));
+				return ok ? GpuModeStatusReadback.Fresh : GpuModeStatusReadback.Unavailable;
+			}
 			if (!_hw.IsGcuConnected)
 			{
 				return GpuModeStatusReadback.Unavailable;
@@ -2769,6 +2984,161 @@ public class MechrevoService
 			if (!_hw.SupportsQuickSwitch(key))
 			{
 				return false;
+			}
+			// ⭐⭐ 2026-10-16（宝龙达 · 窄范围）：⭐ **Fn 键锁 / 触摸板 走 WMI**（⭐ 它没有 GCU ✅）
+			//   ⭐ 依据：⭐ 真机诊断包已回读到 ⭐ `Fn锁=0` ✅ / ⭐ `触摸板=1` ✅ ⇒ ⭐ **硬件支持** ✅
+			//   ⭐ 模板：⭐ 与档位/LOGO/键盘灯/功耗墙/显卡模式**同一套**（⭐ 非宝龙达恒 false ⇒ 下面原路 ✅）
+			if (string.Equals(key, "fnkey", StringComparison.Ordinal)
+				|| string.Equals(key, "touchpad", StringComparison.Ordinal))
+			{
+				bool baolongdaOk = false;
+				bool handled = string.Equals(key, "fnkey", StringComparison.Ordinal)
+					? _hw.TrySetFnLockViaBackend(on, out baolongdaOk)
+					: _hw.TrySetTouchpadViaBackend(on, out baolongdaOk);
+				if (handled)
+				{
+					Logger.WriteLine($"SwitchQuick({key},{on}) ⭐ 走宝龙达 WMI ⇒ 确认={baolongdaOk}（⛔ 未发任何 MQTT ✅）");
+					return baolongdaOk;
+				}
+			}
+			// ⭐⭐ 2026-10-17（WiFi / 蓝牙 · 本地开关）：⭐ 宝龙达没有 GCU ⇒ 走 Windows Radio ✅
+			//   ⭐ 依据（40 系 GCU 反编译，只取做法）：`DeviceSwitchItem.cs` 用 `Windows.Devices.Radios` 切这两个 ✅
+			//   ⚠️ 仅 `UsesBaolongda` 分派 ⇒ GCU 机型的 `WIFI_ON/OFF`、`BT_ON/OFF` 那条 MQTT 路径**逐位不变** ✅
+			if (_hw.UsesBaolongda
+				&& (string.Equals(key, "wifi", StringComparison.Ordinal) || string.Equals(key, "bt", StringComparison.Ordinal)))
+			{
+				RadioSwitchKind radioKind = string.Equals(key, "wifi", StringComparison.Ordinal)
+					? RadioSwitchKind.Wifi
+					: RadioSwitchKind.Bluetooth;
+				if (RadioSwitch.Available(radioKind))
+				{
+					(bool radioOk, string radioNote) = await RadioSwitch.SetAsync(radioKind, on).ConfigureAwait(continueOnCapturedContext: false);
+					Logger.WriteLine($"SwitchQuick({key},{on}) ⭐ 走本地 Radio（Windows.Devices.Radios）⇒ 确认={radioOk}（{radioNote}）");
+					return radioOk;
+				}
+				Logger.WriteLine($"SwitchQuick({key},{on})：⚠️ 本地 Radio 不可用（未探测到或无访问权限）⇒ 不下发");
+				return false;
+			}
+			// ⭐⭐ 2026-10-17（「高性能电源」解耦 GCU）：⭐ 无 GCU 时不再发注定失败的 MQTT，
+			//   改成"跟着性能档位设 Windows 电源模式"（powrprof overlay；狂暴=最佳性能/平衡=平衡/安静=最佳能效）✅
+			// ⭐ 2026-10-19（用户：「GCU 也解耦，走 Windows 替换我的客户端」）⇒ **所有机型**都走 Windows，
+			//   不再限定宝龙达；GCU 的 HIGHPERFORMANCEPOWERMODE_ON/OFF 那条 MQTT 分支不再被用到 ✅
+			if (string.Equals(key, "highperf", StringComparison.Ordinal))
+			{
+				MechrevoLite.Mode.PerfModeService perf = MechrevoLite.Mode.PerfModeService.Instance;
+				if (perf == null)
+				{
+					Logger.WriteLine("SwitchQuick(highperf)：⚠️ PerfModeService 不可用 ⇒ 不下发");
+					return false;
+				}
+				perf.WindowsPowerOverlayEnabled = on;
+				Logger.WriteLine($"SwitchQuick(highperf,{on}) ⭐ 走**Windows 电源模式联动**（不依赖 GCU）");
+				return true;
+			}
+			// ⭐⭐ 2026-10-19（APU 防缩缸）：⭐ 纯 Windows 电源策略（处理器性能提升模式 → 5）
+			//   ⚠️ 所有机型都走这里（与 GCU 无关）✅
+			if (string.Equals(key, "apuboost", StringComparison.Ordinal))
+			{
+				MechrevoLite.Mode.PerfModeService perfBoost = MechrevoLite.Mode.PerfModeService.Instance;
+				if (perfBoost == null)
+				{
+					Logger.WriteLine("SwitchQuick(apuboost)：⚠️ PerfModeService 不可用 ⇒ 不下发");
+					return false;
+				}
+				perfBoost.ApuAntiDegradeEnabled = on;
+				Logger.WriteLine($"SwitchQuick(apuboost,{on}) ⭐ 走 Windows 电源策略（boost mode=5）");
+				return true;
+			}
+			// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达）：⭐ 没有 GCU ⇒ 本机通道：暂停曲线闭环 + 两路满转 + 回读校验
+			if (_hw.UsesBaolongda && string.Equals(key, "fanboost", StringComparison.Ordinal))
+			{
+				// ⭐⭐ 2026-10-18（机主 UI 体验 · 乐观更新）：⭐ 强冷确认窗口最长 10 s（每 500ms 读 13）⇒
+				//   ⭐ 放到**后台线程**执行，UI 立刻显示选中态、不阻塞；⛔ 写入/回读仍严格校验、一步不少 ✅
+				(bool bdHandled, bool bdConfirmed) = await Task.Run(() =>
+				{
+					bool handled = _hw.TrySetFanBoostViaBackend(on, out bool confirmed);
+					return (handled, confirmed);
+				});
+				if (bdHandled)
+				{
+					Logger.WriteLine($"SwitchQuick(fanboost,{on}) ⭐ 走**本机通道**（EC 目标档/掩码 + 13 轮询）⇒ 确认={bdConfirmed}（⛔ 未发 MQTT）");
+					return bdConfirmed;
+				}
+			}
+			// ⭐⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
+			//   ⚠️ 宝龙达没有 GCU、也没有摄像头功能号 ⇒ 旧的 `WEBCAM_ON/OFF`（厂商 MQTT）**必然无效**；
+			//      上一版的"摄像头隐私授权"只是系统隐私开关（隐私 Allow ≠ 设备没被禁用 ⚠️）。
+			//   ⭐ 现在：`on=true` ⇒ **启用摄像头设备**；`on=false` ⇒ **禁用摄像头设备**（SetupAPI，通用）✅
+			//   ⭐ 结果/回读都来自**设备状态**（见 `CameraPnpControl`），并回灌 `QuickSwitches["webcam"]` ✅
+			//   ⚠️ 本机枚举不到可控制摄像头设备时才退回旧的隐私键兜底（保功能，⛔ 不假装成 PnP）；
+			//   ⚠️ **GCU / 同方机型不进入本分支** ⇒ 下面 `WEBCAM_ON/OFF` 那条厂商路径**逐位不变** ✅
+			if (_hw.UsesBaolongda && string.Equals(key, "webcam", StringComparison.Ordinal))
+			{
+				if (CameraPnpControl.HasCamera)
+				{
+					// ⭐ PnP 禁用/启用要等设备卸载/启动（数百 ms）⇒ 放**后台线程**，⛔ 不卡 UI（沿用 fanboost 同款做法）
+					(bool camOk, string camDetail) = await Task.Run(() =>
+					{
+						bool ok = CameraPnpControl.TrySetEnabled(on, out bool _, out string detail);
+						return (ok, detail);
+					}).ConfigureAwait(continueOnCapturedContext: false);
+					if (camOk)
+					{
+						// ⭐ 回读确认成立 ⇒ 把真值回灌镜像（界面/磁贴据此即时收敛）✅
+						_hw.SyncCameraPnpQuickSwitch(on, "PnP 写入确认");
+					}
+					else if (CameraPnpControl.TryGetEnabled(out bool camNow, out string _))
+					{
+						// ⚠️ 未确认 ⇒ **按真实设备状态**回灌（⛔ 不拿意图当状态）⇒ 界面按真值回滚 ✅
+						_hw.SyncCameraPnpQuickSwitch(camNow, "PnP 设备状态回读");
+					}
+					Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ 走 **Windows PnP 摄像头设备**（禁用/启用）⇒ 确认={camOk}（{camDetail}）");
+					return camOk;
+				}
+				if (CameraPrivacy.Available)
+				{
+					// ⭐ 兜底：本机没有可控制的摄像头设备（例如只有 Windows Hello 红外相机）⇒ 沿用旧隐私键（保功能）
+					bool camOk = CameraPrivacy.TrySetDenied(!on, out string camNote);
+					Logger.WriteLine($"SwitchQuick(webcam,{on}) ⚠️ 走**隐私键兜底**（无 PnP 摄像头设备 · ConsentStore）⇒ 确认={camOk}（{camNote}）");
+					if (camOk)
+					{
+						_hw.SyncCameraPnpQuickSwitch(on, "隐私键写入确认（无 PnP 摄像头设备兜底）");
+					}
+					return camOk;
+				}
+				Logger.WriteLine($"SwitchQuick(webcam,{on})：⚠️ 既没有可控制的摄像头设备、隐私键也不可用 ⇒ 不下发");
+				return false;
+			}
+			// ⭐⭐ 2026-10-16（宝龙达 · OSD 提示）：⭐ 走**本地实现**（⭐ 它连 WMI 都不用 ✅）
+			//   ⭐ 机主原话「⭐ OSD显示开关不可用（⭐ LM好像有自己的OSD部分 ✅）」⇒ ⭐ 让这个开关管 LM 自己的 OSD ✅
+			//   ⚠️ 原来那条 `OSD_HIDDEN_ON/OFF` **只能走 GCU 的 MQTT** ❌ ⇒ ⭐ 宝龙达恒失败 ⇒ ⭐ 点了没反应 ⚠️
+			//   ⭐ 模板同上：⭐ 非宝龙达恒 false ⇒ ⭐ 下面 action 那条**原路不变** ✅（⭐ 逐位一致 ✅）
+			if (string.Equals(key, "osd", StringComparison.Ordinal))
+			{
+				bool osdOk = false;
+				if (_hw.TrySetOsdViaBackend(on, out osdOk))
+				{
+					Logger.WriteLine($"SwitchQuick(osd,{on}) ⭐ 走宝龙达**本地** OSD ⇒ 确认={osdOk}（⛔ 未发任何 MQTT ✅）");
+					return osdOk;
+				}
+			}
+			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：走 **Windows 模拟按键**（纯 user32）
+			//   ⚠️ 判据分两种，⛔ 不能混：
+			//      · `capslock` —— **所有机型**都走这里。它是本轮**新增**的开关，纯系统级，
+			//        不依赖任何后端（WMI/GCU/EC 都不参与）。
+			//      · `numpad` —— **只宝龙达**走这里。老 GCU 机型的 `numpad` **必须保持**原 MQTT 路径
+			//        （`NUMPAD_LOCK` / `NUMPAD_UNLOCK`），⛔ 一个字都不能动（逐位不变）。
+			//   实现见 `MechrevoLite.Helpers.NativeLockKey`：读状态 `GetKeyState`（只看锁定位）、
+			//   写状态 `keybd_event`（带扩展键标志，按下＋抬起一次），并且**幂等**（已到位就不发）。
+			if (string.Equals(key, "capslock", StringComparison.Ordinal)
+				|| (string.Equals(key, "numpad", StringComparison.Ordinal) && _hw.UsesBaolongda))
+			{
+				bool isCapsLock = string.Equals(key, "capslock", StringComparison.Ordinal);
+				bool keyOk = isCapsLock
+					? MechrevoLite.Helpers.NativeLockKey.TrySetCapsLock(on, out string keyNote)
+					: MechrevoLite.Helpers.NativeLockKey.TrySetNumLock(on, out keyNote);
+				Logger.WriteError($"SwitchQuick({key},{on}) ⭐ 走系统锁定键（模拟按键 · 纯 user32）⇒ ⭐ 回读确认={keyOk} · {keyNote}（⛔ 未发任何 MQTT ✅）");
+				return keyOk;
 			}
 			string action = key switch
 			{
@@ -3617,8 +3987,538 @@ public class MechrevoService
 			}
 		}
 	}
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2 步 · 键盘灯）：⭐ **把"键盘灯"这一步分派给门面层** ✅
+	/// <para>⭐ 返回 <c>true</c> ⇒ ⭐ 已由**非 GCU 后端**处理完（⭐ 调用方 ⛔ 不要再走 MQTT ✅）；
+	/// ⭐ 返回 <c>false</c> ⇒ ⭐ 不归它管 ⇒ ⭐ 调用方**照原路走** ✅。</para>
+	/// <para>⚠️ 效果映射：⭐ 宝龙达只有 ⭐ "关 / ⭐ RGB 固定色" ⚠️（⭐ 功能号 16 的 0 / 2 ✅）
+	/// ⇒ ⭐ 我们那些复杂效果（⭐ 呼吸/波浪…）**统一降级成固定色** ✅ —— ⭐ 因为能力位只开了
+	/// <c>Keyboard</c>、⛔ 没开 `Lightbar`/`RgbLightbar` ⇒ ⭐ UI 上不会出现那些效果 ✅
+	/// （⚠️ 真机未验证项：⭐ 功能号 16/17/18 —— ⭐ 门面层内部会先读功能号 10，⭐ 读不到就拒绝写 ✅）</para>
+	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 3 步 · 功耗墙）：⭐ **把功耗墙那几项分派给门面层** ✅
+	/// <para>⭐ 处理哪些键：⭐ `PL1`（⭐ PL1 瓦数 ✅）· ⭐ `PL2` ✅ · ⭐ `CpuTccOffset`（⭐ 温度墙 ✅）</para>
+	/// <para>⭐ 返回 <c>true</c> ⇒ ⭐ 已由非 GCU 后端处理完（⭐ 调用方 ⛔ 不要再发 MQTT ✅）；
+	/// ⭐ 返回 <c>false</c> ⇒ ⭐ 不归它管（⭐ GCU / 老同方 ⭐ **恒返回 false** ⇒ ⭐ 行为逐位不变 ✅）。</para>
+	/// <para>⚠️ 数值语义（⭐ 2026-10-16 更正 —— 旧注释描述的是**已被删掉的双重换算** ⚠️）：
+	/// ⭐ 界面的 PL1/PL2 是**瓦** ✅；⭐ 温度墙这一项 ⭐ 界面与门面层**同口径**、⭐ 都是**绝对温度 ℃** ✅
+	/// ⇒ ⭐ 本方法 ⭐ **直接原样传下去**、⛔ **不做任何换算** ✅
+	/// （⭐ 依据：⭐ 界面 slider 的范围就是 `[hw.TccMinimum, hw.TccMaximum]` = `[60,105]`、⭐ 当前值就是
+	/// `hw.TccTarget` ✅；⭐ 且既有的校验 `"CpuTccOffset" => _hw.TccTarget == result` 也说明两者可直接比较 ✅）</para>
+	/// <para>⭐⭐ 2026-10-16（"未设置"）：⭐ 未设置的项（⭐ `≤0` ✅）⭐ **原样传"未设置"下去**，
+	/// ⛔ **不再**补一个"保守默认值"（⭐ 那组 45/65/95 是我们自己编的 ⚠️ —— ⭐ 见
+	/// `MechrevoHw` 里 `BaolongdaUnset` 那段注释的依据 ✅）。</para>
+	/// <para>⚠️ 实现取舍（⭐ 如实说明）：⭐ 这几个键是**分别**到达的 ⇒ ⭐ 每个都会**各触发一次写入** ⚠️
+	/// ⇒ ⭐ 结果是"⭐ 最后一个生效 ✅、⭐ 总开销多几次只读回读 ✅" —— ⭐ 功能正确、⛔ 不是最优 ✅
+	/// ⭐ （⭐ 更优做法是把它们**攒成一次**应用 ⚠️ ⇒ ⭐ 留待审查阶段优化 ✅）</para>
+	/// </summary>
+	private bool TryApplyPowerLimitViaBackend(string key, string rawValue)
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return false; // ⭐ 不是宝龙达在管事 ⇒ ⭐ 原样交给 GCU ✅
+		}
+		bool isPl1 = string.Equals(key, "PL1", StringComparison.Ordinal);
+		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
+		bool isTempWall = string.Equals(key, "CpuTccOffset", StringComparison.Ordinal);
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：新增键 `SmuStapmTimeSeconds`（单位**秒**）。
+		//   ⚠️ 只有 30 系 UI 会发出它（40 系不建那一行）; ⛔ 名字里带 Seconds 是为了在调用点一眼看清单位。
+		bool isStapmTime = string.Equals(key, "SmuStapmTimeSeconds", StringComparison.Ordinal);
+		if (!isPl1 && !isPl2 && !isTempWall && !isStapmTime)
+		{
+			return false; // ⭐ 别的键不归本方法管 ✅
+		}
+		if (!int.TryParse(rawValue, out int result))
+		{
+			Logger.WriteLine($"宝龙达 功耗墙：⭐ 键 {key} 的值 \"{rawValue}\" 不是整数 ⇒ 跳过 ⚠️");
+			return true; // ⭐ 已接管 ⇒ ⛔ 不让它走 GCU ✅
+		}
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：30 系**没有** WMI 功能号 23（原厂方法表只到 18）
+		//   ⇒ ⭐ PL1 / PL2 / 温度墙 / STAPM 时间窗**只能走 SMU** ✅
+		//   ⚠️ 40 系（宝龙达 `MRID6-23`）有功能号 23 ⇒ ⭐ 继续走下面的原 WMI 路径，**行为不变** ✅
+		if (hw.IsBaolongda30Series)
+		{
+			// ⭐⭐ 2026-10-19（机主 · 与 UI 同源）：只有「本机自定义档的功耗**真的**走 SMU」时才走 SMU。
+			//   判据 = `PerfModeCapabilities.UsesSmuForCustomPower`（宝龙达 && 30 系 && SMU 通路可用；缓存）。
+			//   ⚠️ 不可用 ⇒ 如实 false + 日志（30 系**没有** WMI 23 可退回，⛔ 不假装成功）。
+			if (!PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady))
+			{
+				Logger.WriteError("[smu] 不可用 ⇒ 30 系功耗墙**未下发**（原因：" + SmuAvailability.Reason + "）⇒ 如实失败");
+				return false;
+			}
+			return ApplyPowerLimitViaSmu(hw, isPl1, isPl2, isTempWall, isStapmTime, result);
+		}
+		// ⭐ 三个值取"现值（⭐ 本地记忆 ✅）"，⭐ 只覆盖这次要改的那一个 ✅
+		int pl1 = hw.Pl1;
+		int pl2 = hw.Pl2;
+		// ⭐⭐ 2026-10-16（修温度墙"双重换算"）：⭐ `hw.TccTarget` 存的就是**绝对温度 ℃** ✅
+		//   ⭐ 依据：⭐ 宝龙达门面层 `TryApplyCpuPowerLimitViaBackend` 里写的是 `TccTarget = wall`
+		//      （⭐ `wall` 是绝对温度 60~105 ✅）；⭐ 而 GCU 路径也把它夹在 `[TccMinimum, TccMaximum]`
+		//      = `[85, 95]` 这种绝对温度区间里 ✅ —— ⭐ 两处一致 ✅
+		//   ⚠️ 原来写 `TccMaximum - TccTarget` ⇒ ⭐ 等于**又减了一次** ⇒ ⭐ 第二次应用时
+		//      温度墙会被算成 `105 − 95 = 10` ❌ ⇒ ⭐ 再被 `Math.Max(60, …)` 抬到 **60℃** ❌
+		//      ⇒ ⭐ 用户设的 95℃ 被悄悄改成最保守的 60℃ ⚠️
+		int tempWallC = (hw.TccTarget > 0) ? hw.TccTarget : 0;
+		if (isPl1)
+		{
+			pl1 = result;
+		}
+		else if (isPl2)
+		{
+			pl2 = result;
+		}
+		else if (isTempWall)
+		{
+			// ⭐⭐ 2026-10-16（同上）：⭐ 界面那个 `CpuTccOffset` 与 `hw.TccTarget` **同口径** ——
+			//   ⭐ 都是**绝对温度 ℃** ✅（⭐ 依据：⭐ 界面 slider 的范围就是 `[TccMinimum, TccMaximum]`
+			//     = `[60, 105]`、⭐ 当前值就是 `TccTarget` ✅；⭐ 且 `MechrevoService` 的校验
+			//     `"CpuTccOffset" => _hw.TccTarget == result` 也说明两者可直接比较 ✅）
+			//   ⚠️ 原来这里把它当 offset 处理（⭐ `max - result` ⚠️）⇒ ⭐ 同上，⭐ 等于又减一次 ❌
+			//   ⭐ 现在：⭐ `0` ⇒ ⭐ 不限制（⭐ 用上限 ✅）；⭐ 正数 ⇒ ⭐ 直接用，⭐ 并夹进 `[60, 105]` ✅
+			int max = (hw.TccMaximum > 0) ? hw.TccMaximum : 105;
+			tempWallC = (result <= 0) ? max : Math.Max(60, Math.Min(max, result));
+		}
+		// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1）：⭐ **最后一道兜底** ——
+		//   即使本方法被"单键"调用（⭐ `PerfModeService` 的逐字段下发就是这种）、
+		//   也⛔ 不会写出 PL1 &gt; PL2 的组合 ✅（⭐ 正常路径已在 `SetCustomDetail` 开头按整批规范化过）✅
+		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
+		// ⭐⭐ 2026-10-16（"未设置" · 用户指导「⭐ 开源的都有方案的不是吗」）：
+		//   ⛔ **删掉了原来的"保守默认 45/65/95"** —— ⭐ 那是**我们自己编的**（⭐ 依据：⭐ 开源里
+		//      没有任何一处完整支持那组数；⭐ 蛟龙自己两处还互相矛盾 ⚠️ ⇒ ⭐ 不能编 ✅）
+		//   ⭐ 现在把"未设置"如实**传下去**（⭐ `≤0` = 未设置 ✅）⇒ ⭐ 门面层会**跳过**那一项、
+		//      ⛔ 不拿编造值去凑满三项 ✅（⭐ 这正是斗战者的做法：⭐ 只写用户覆盖过的 ✅）
+		//   ⭐ 全部未设置时 ⭐ 一个子命令都不发（⭐ 见 `TryApplyCpuPowerLimitViaBackend` ✅）
+		_ = hw.TryApplyCpuPowerLimitViaBackend(enable: true, pl1, pl2, tempWallC, out bool confirmed);
+		// ⭐⭐ 2026-10-16：⭐ 这条是**真机验证功耗墙下发**的主要证据 ⚠️ ⇒ ⭐ 必须用 `WriteError` ✅
+		//   （⭐ `Logger.WriteLine` 的级别由**消息内容**判定 ⇒ ⭐ 默认「仅错误」级别下**可能不落盘** ❌）
+		//   ⭐ 每次"应用"最多 3 行（⭐ PL1 / PL2 / 温度墙各一次 ✅）⇒ ⭐ 不需要额外去重 ✅
+		//   ⚠️ 措辞如实：⭐ 打印的是"⭐ 写成功"（⭐ = WMI 没报错 ⚠️），⛔ **不写"已确认生效"** ✅
+		Logger.WriteError($"宝龙达 功耗墙（⭐ 非 GCU 后端路径）：⭐ key={key}"
+			+ $" · ⭐ 下发 PL1={ShowPowerValue(pl1)} PL2={ShowPowerValue(pl2)} 温度墙={ShowTempValue(tempWallC)}"
+			+ $" · ⭐ 写成功={confirmed}（⚠️ ⛔ 非「数值已生效」）⇒ ⭐ 该项未发 MQTT ✅");
+		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「PL2 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
+	/// ⭐ **单键写入路径的 PL1/PL2 联动兜底**（⭐ WMI 23 与 SMU 两条路径共用）。
+	/// <para>⭐ 方向：用户抬 PL1 / 非 PL 项触发 ⇒ 把 PL2 抬到 PL1（受 PL2 上限约束，顶不上去就把 PL1 压下来）；
+	/// 用户降 PL2 ⇒ 把 PL1 一起降下来 ✅。</para>
+	/// <para>⚠️ 只改"已知且已违反"的组合（<c>&gt; 0</c>）；未设置（≤0）的项原样不动 ✅。</para>
+	/// </summary>
+	private static void LinkPowerLimitPair(MechrevoHw hw, bool isPl1, bool isPl2, ref int pl1, ref int pl2)
+	{
+		if (pl1 <= 0 || pl2 <= 0 || pl1 <= pl2)
+		{
+			return;
+		}
+		int oldPl1 = pl1;
+		int oldPl2 = pl2;
+		string reason;
+		if (isPl1 && !isPl2)
+		{
+			// ⭐ 用户抬高了 PL1 ⇒ 把 PL2 一起抬（⭐ 受 PL2 上限约束）
+			pl2 = ((hw.Pl2Maximum > 0) ? Math.Min(pl1, hw.Pl2Maximum) : pl1);
+			if (pl2 < pl1)
+			{
+				pl1 = pl2;
+			}
+			reason = "因 PL1=" + pl1.ToString(CultureInfo.InvariantCulture);
+		}
+		else
+		{
+			// ⭐ 用户在降 PL2（⭐ 或来源不明的键）⇒ 把 PL1 一起降（⭐ 安全方向）
+			pl1 = pl2;
+			reason = "因 PL2=" + pl2.ToString(CultureInfo.InvariantCulture);
+		}
+		string detail = string.Empty;
+		if (pl1 != oldPl1)
+		{
+			detail += $"PL1 {oldPl1}→{pl1}";
+		}
+		if (pl2 != oldPl2)
+		{
+			if (detail.Length > 0)
+			{
+				detail += "、";
+			}
+			detail += $"PL2 {oldPl2}→{pl2}";
+		}
+		Logger.WriteError($"[pl] 联动：{detail}（{reason}）");
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：把 PL1 / PL2 / 温度墙 / STAPM 时间窗下发到 **SMU**。
+	/// <para>⭐ 为什么 30 系必须走这里：30 系原厂 WMI 方法表**只到 18** ⇒ **没有**功能号 23
+	/// （`CPUPower`）⇒ 40 系那条 `TryApplyCpuPowerLimitViaBackend`（WMI）在 30 系上**根本不存在**。</para>
+	/// <para>⭐ 映射（与任务书一致）：<c>PL1 → slow limit + stapm limit（同值）</c> ·
+	/// <c>PL2 → fast limit</c> · <c>CpuTccOffset（温度墙）→ tctl_temp</c>。</para>
+	/// <para>⭐⭐ 2026-10-19（机主：「是持续功耗**时间**（STAPM time），不是 STAPM 功耗上限」）：
+	/// <c>SmuStapmTimeSeconds</c> 是**独立的一条命令**（MP1 0x18 `stapm_time`，单位**秒**）⇒ 走下面的
+	/// 独立分支：只写这一条，⛔ 不碰 PL1/PL2/温度墙；回读语义为"已下发 / 已确认 / 未确认"（该 PM 字段
+	/// 在部分表版本上读数不稳定），⛔ 不把"未确认"写成"成功"。</para>
+	/// <para>⚠️ <b>先读再写</b>：30 系 SMU **能读**当前值（PM 表）⇒ 下发前先 <see cref="MechrevoHw.RefreshBaolongda30SeriesSmuPower" />
+	/// 把"没被这次改动的另外两项"填成真实当前值，⛔ 不拿 0/编造值去凑（也就避免把另一项意外写坏）。</para>
+	/// <para>⚠️ <b>失败方向（如实）</b>：PawnIO/SMU 不可用、读不到基线、任何一条命令非 <c>OK</c> ⇒
+	/// 写日志 + 返回 <c>false</c>（调用方会显示「未生效」，⛔ 不假装成功）。</para>
+	/// <para>⚠️ 只读/只写本机 SMU；⛔ 不发 MQTT、⛔ 不碰 EC。</para>
+	/// </summary>
+	private bool ApplyPowerLimitViaSmu(MechrevoHw hw, bool isPl1, bool isPl2, bool isTempWall, bool isStapmTime, int result)
+	{
+		PawnIO.RyzenSmuService smu = MechrevoLite.Mode.ModeControl.SharedSmu;
+		if (smu == null)
+		{
+			Logger.WriteError("[smu-30] 30 系功耗墙**未下发**：PawnIO/SMU 不可用（需要管理员权限、AMD 平台）⇒ 如实失败");
+			return false;
+		}
+		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间，不是 STAPM 功耗上限」）：
+		//   `SmuStapmTimeSeconds`（单位**秒**）是**独立的一条命令**（MP1 0x18 `stapm_time`）
+		//   ⇒ ⭐ 单独分支处理：只写这一条，⛔ 不碰 PL1/PL2/温度墙（避免"改时间窗顺手改功耗"）。
+		//   回读：该字段在部分 PM 表版本上**读数不稳定**（本机 Phoenix/0x4C0009 实测 25~67s 跳）。
+		//   ⭐ 语义：命令被 SMU 接受 = 已下发；回读**一致**才写"已确认"；不稳定/读不到 ⇒ 如实记「未确认」，
+		//      ⛔ 不假装成功（也⛔不因为"读不到"就把已经下发的命令报成失败——那同样不诚实）。
+		if (isStapmTime)
+		{
+			if (result < BaolongdaProfile.StapmTimeMinSeconds || result > BaolongdaProfile.StapmTimeMaxSeconds)
+			{
+				Logger.WriteError($"[smu] STAPM 时间窗**拒绝下发**：{result}s 不在 UI/校验区间 "
+					+ $"[{BaolongdaProfile.StapmTimeMinSeconds},{BaolongdaProfile.StapmTimeMaxSeconds}]s（⛔ 不猜语义）⇒ 如实失败");
+				return false;
+			}
+			PawnIO.SmuStatus timeResult = smu.SetStapmTimeSeconds(result);
+			if (timeResult != PawnIO.SmuStatus.OK)
+			{
+				Logger.WriteError($"[smu] STAPM 时间窗={result}s（0x18）· 下发失败={timeResult}(0x{(uint)timeResult:X2}) ⇒ 如实失败");
+				return false;
+			}
+			// 回读确认（best-effort）：读 PM 表两次 ——
+			//   * 两次都读到、彼此一致（±1）且 ≈ 目标 ⇒ 已确认；
+			//   * 两次读数彼此不一致 ⇒ 字段不稳定 ⇒ **未确认**；
+			//   * 读不到 ⇒ **未确认**。
+			string readback;
+			bool confirmed = TryVerifyStapmTimeWindow(smu, result, out readback);
+			// ⭐ 本地记忆 = "我们下发的值"（与 PL 那几项的本地记忆同口径：**写成功后**就记，不等回读）。
+			//   ⚠️ 回读是否一致只影响日志措辞（已确认/未确认），⛔ 不把"未确认"写成"成功"。
+			hw.NoteBaolongdaSmuStapmTimeApplied(result);
+			if (confirmed)
+			{
+				Logger.WriteError($"[smu] STAPM 时间窗={result}s（0x18 `stapm_time`）· 回读={readback} ⇒ 一致 ✅（已确认）");
+			}
+			else
+			{
+				Logger.WriteError($"[smu] STAPM 时间窗={result}s（0x18 `stapm_time`）· 回读={readback} "
+					+ "⇒ 未确认（该 PM 表版本读数不稳定或读不到；命令已被 SMU 接受，⛔ 不假装已确认）");
+			}
+			// ⚠️ 返回 true = "已接管且命令被 SMU 接受"（调用方的字段步骤会显示"已下发，暂时确认不了"）；
+			//    回读是否一致已在日志里如实区分，⛔ 不把"未确认"写成"成功"。
+			return true;
+		}
+		// ① 先只读刷新当前值（30 s 内复用 UI 打开时读到的快照；读不到就现场读一次）。
+		//    目的：⭐ 只改一项时，另外两项用**真实当前值**做基线，⛔ 不拿 0/编造值去覆盖。
+		bool refreshed = hw.RefreshBaolongda30SeriesSmuPower();
+		int pl1 = isPl1 ? result : hw.Pl1;
+		int pl2 = isPl2 ? result : hw.Pl2;
+		int tempWallC = isTempWall ? ((result <= 0) ? 0 : result) : ((hw.TccTarget > 0) ? hw.TccTarget : 0);
+		// ⭐⭐ 2026-10-19（机主：PL2 不应低于 PL1）：⭐ SMU 这条路径同样**最后兜底**一次
+		//   （⭐ 正常路径已在 `SetCustomDetail` 开头按整批规范化过）⇒ ⛔ 不写出 PL1 > PL2 的组合 ✅
+		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
+		// ② 取值夹取（与 WMI 路径同一组范围；⛔ 不写 0 = "未设置"）
+		if (pl1 > 0)
+		{
+			pl1 = Math.Clamp(pl1, BaolongdaProfile.PlMinWatts, BaolongdaProfile.Pl1MaxWatts);
+		}
+		if (pl2 > 0)
+		{
+			pl2 = Math.Clamp(pl2, BaolongdaProfile.PlMinWatts, BaolongdaProfile.Pl2MaxWatts);
+		}
+		if (tempWallC > 0)
+		{
+			tempWallC = Math.Clamp(tempWallC, BaolongdaProfile.TccMinCelsius, BaolongdaProfile.TccMaxCelsius);
+		}
+		// ③ 一条都不发（三项都未设置）⇒ 与 WMI 路径同口径：已接管、不假装写了
+		if (pl1 <= 0 && pl2 <= 0 && tempWallC <= 0)
+		{
+			Logger.WriteError("[smu-30] 30 系功耗墙：⚠️ PL1／PL2／温度墙都未设置 ⇒ 本次**不下发任何 SMU 命令**"
+				+ "（⛔ 不编造默认值）—— 这是如实行为、⛔ 不是失败");
+			return true;
+		}
+		// ④ 逐项下发；每一条都必须回 OK
+		bool ok = true;
+		bool wrotePl1 = false;
+		bool wrotePl2 = false;
+		bool wroteWall = false;
+		string pl1Status;
+		string pl2Status;
+		if (pl1 > 0 && pl2 > 0)
+		{
+			// ⭐ 正常路径（两项都已知）：按任务书口径一次下发三项 —— PL1 同时写 slow 与 stapm
+			smu.SetAllLimits(pl1, pl2, pl1, out PawnIO.SmuStatus stapmStatus, out PawnIO.SmuStatus fastStatus, out PawnIO.SmuStatus slowStatus);
+			pl1Status = $"stapm={stapmStatus}/slow={slowStatus}";
+			pl2Status = fastStatus.ToString();
+			ok = stapmStatus == PawnIO.SmuStatus.OK && fastStatus == PawnIO.SmuStatus.OK && slowStatus == PawnIO.SmuStatus.OK;
+			wrotePl1 = stapmStatus == PawnIO.SmuStatus.OK && slowStatus == PawnIO.SmuStatus.OK;
+			wrotePl2 = fastStatus == PawnIO.SmuStatus.OK;
+			if (!ok)
+			{
+				Logger.WriteError($"[smu-30] PL 下发未全部成功：stapm={stapmStatus}(0x{(uint)stapmStatus:X2}) "
+					+ $"fast={fastStatus}(0x{(uint)fastStatus:X2}) slow={slowStatus}(0x{(uint)slowStatus:X2})");
+			}
+			if (wrotePl1 || wrotePl2)
+			{
+				hw.NoteBaolongdaSmuLimitsApplied(wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0, 0);
+			}
+		}
+		else
+		{
+			// ⭐ 只知一项（读基线失败 / 另一项确实未设置）：只写这一项，⛔ 不拿 0 去覆盖另一项
+			pl1Status = "未写";
+			pl2Status = "未写";
+			if (pl1 > 0)
+			{
+				PawnIO.SmuStatus st = smu.SetStapmLimit(pl1);
+				PawnIO.SmuStatus sl = smu.SetSlowLimit(pl1);
+				pl1Status = $"stapm={st} slow={sl}";
+				wrotePl1 = st == PawnIO.SmuStatus.OK && sl == PawnIO.SmuStatus.OK;
+				ok &= wrotePl1;
+				if (wrotePl1)
+				{
+					hw.NoteBaolongdaSmuLimitsApplied(pl1, 0, 0);
+				}
+			}
+			if (pl2 > 0)
+			{
+				PawnIO.SmuStatus sf = smu.SetFastLimit(pl2);
+				pl2Status = sf.ToString();
+				wrotePl2 = sf == PawnIO.SmuStatus.OK;
+				ok &= wrotePl2;
+				if (wrotePl2)
+				{
+					hw.NoteBaolongdaSmuLimitsApplied(0, pl2, 0);
+				}
+			}
+		}
+		// 温度墙（Tctl 上限，SMU 0x19）
+		string wallStatus = "未写";
+		if (tempWallC > 0)
+		{
+			PawnIO.SmuStatus wallResult = smu.SetTctlTemp(tempWallC);
+			wallStatus = wallResult.ToString();
+			wroteWall = wallResult == PawnIO.SmuStatus.OK;
+			ok &= wroteWall;
+			if (wroteWall)
+			{
+				hw.NoteBaolongdaSmuLimitsApplied(0, 0, tempWallC);
+			}
+			else
+			{
+				Logger.WriteError($"[smu-30] 温度墙下发失败：tctl={tempWallC}℃ ⇒ SMU {wallResult}(0x{(uint)wallResult:X2})");
+			}
+		}
+		// ⑤ **写入后回读确认**（任务硬性约束：任何写入后必须回读确认）——
+		//   ⭐ 用 PM 表再读一次（强制刷新），逐项比对刚下发的值。
+		//   ⚠️ 回读失败 / 对不上 ⇒ 如实返回 false（⛔ 不把"命令回 OK"当成"值已生效"）。
+		//   ⚠️ STAPM 时间窗（0x18）走上面的**独立分支**（该字段读数不稳定，语义为"已下发 / 未确认"）。
+		bool verified = false;
+		string verifyDetail;
+		if (!ok)
+		{
+			verifyDetail = "未回读（有下发失败项）";
+		}
+		else if (!wrotePl1 && !wrotePl2 && !wroteWall)
+		{
+			verified = true;
+			verifyDetail = "无写入（无需回读）";
+		}
+		else
+		{
+			verified = VerifyBaolongdaSmuPower(hw, wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0,
+				wroteWall ? tempWallC : 0, out verifyDetail);
+		}
+		Logger.WriteError($"[smu-30] 30 系功耗墙（SMU 路径 · 无 WMI 23）：基线刷新={refreshed} "
+			+ $"⇒ PL1(slow)={ShowPowerValue(pl1)} [{pl1Status}] · PL2(fast)={ShowPowerValue(pl2)} [{pl2Status}] "
+			+ $"· 温度墙(tctl)={ShowTempValue(tempWallC)} [{wallStatus}] "
+			+ $"⇒ 下发全部 OK={ok} · 回读确认={verified}（{verifyDetail}）"
+			+ (ok && verified ? "" : " ⇒ ⚠️ 如实返回 false"));
+		return ok && verified;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time），不是 STAPM 功耗上限」）：
+	/// **STAPM 时间窗（MP1 0x18，单位秒）的回读确认**（best-effort）。
+	/// <para>⚠️ 为什么不是硬失败：该字段在部分 PM 表版本上**读数是动态的**（本机 Phoenix/0x4C0009 实测
+	/// 25~67s 跳变）⇒ 回读"对不上"可能只是字段不稳定，而不是命令没生效。语义分三种：</para>
+	/// <list type="bullet">
+	/// <item>两次读数彼此一致（±1）且 ≈ 目标 ⇒ <c>confirmed=true</c>（回读一致）；</item>
+	/// <item>两次读数彼此不一致 ⇒ <c>confirmed=false</c>，<c>readback</c> 写明"字段不稳定"；</item>
+	/// <item>读不到 ⇒ <c>confirmed=false</c>，<c>readback</c> 写明"读不到"。</item>
+	/// </list>
+	/// <para>⚠️ 只读（两次 PM 表刷新）；⛔ 不写任何东西。</para>
+	/// </summary>
+	private bool TryVerifyStapmTimeWindow(PawnIO.RyzenSmuService smu, int targetSeconds, out string readback)
+	{
+		readback = "读不到";
+		// 给 SMU 一点时间把新值刷进 PM 表，再连续读两次判断"稳定/一致"。
+		Thread.Sleep(200);
+		PawnIO.SmuPowerSnapshot first = smu.GetPowerSnapshot();
+		Thread.Sleep(200);
+		PawnIO.SmuPowerSnapshot second = smu.GetPowerSnapshot();
+		int? firstTime = first != null ? first.StapmTimeSeconds : ((int?)null);
+		int? secondTime = second != null ? second.StapmTimeSeconds : ((int?)null);
+		if (!firstTime.HasValue && !secondTime.HasValue)
+		{
+			readback = "读不到（该 PM 表版本没有该字段/读表失败）";
+			return false;
+		}
+		if (!firstTime.HasValue || !secondTime.HasValue)
+		{
+			readback = $"只读到一次（{(firstTime.HasValue ? firstTime.Value : secondTime.Value)}s）";
+			return false;
+		}
+		if (Math.Abs(firstTime.Value - secondTime.Value) > 1)
+		{
+			readback = $"{firstTime.Value}s → {secondTime.Value}s（字段不稳定）";
+			return false;
+		}
+		readback = $"{firstTime.Value}s";
+		return Math.Abs(firstTime.Value - targetSeconds) <= 1;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**写入后回读确认** —— 重新读 PM 表，逐项比对刚下发的值
+	/// （容差 ±1；PL1↔slow、PL2↔fast、温度墙↔tctl）。
+	/// <para>⚠️ 只读：一次 PM 表刷新；⛔ 不再写任何东西。</para>
+	/// <para>⚠️ 回读失败（PawnIO/PM 表读不到）或对不上 ⇒ 返回 false（调用方如实报"未生效"）。</para>
+	/// <para>⚠️ STAPM 时间窗（0x18）**不走这里**：该字段读数不稳定，单独走
+	/// <see cref="TryVerifyStapmTimeWindow" /> 的"已下发 / 未确认"语义。</para>
+	/// </summary>
+	private bool VerifyBaolongdaSmuPower(MechrevoHw hw, int pl1, int pl2, int tempWallC, out string detail)
+	{
+		detail = string.Empty;
+		// 先给 SMU 一点时间把新值刷进 PM 表；再最多读 3 次（对不上就再等一等）。
+		for (int attempt = 0; attempt < 3; attempt++)
+		{
+			if (attempt > 0)
+			{
+				Thread.Sleep(200);
+			}
+			if (!hw.RefreshBaolongda30SeriesSmuPower(force: true))
+			{
+				detail = $"第 {attempt + 1} 次回读失败（PM 表读不到）";
+				continue;
+			}
+			PawnIO.SmuPowerSnapshot snapshot = hw.BaolongdaSmuSnapshot;
+			if (snapshot == null)
+			{
+				detail = $"第 {attempt + 1} 次回读失败（没有快照）";
+				continue;
+			}
+			int readPl1 = (int)Math.Round(snapshot.Slow, MidpointRounding.AwayFromZero);
+			int readPl2 = (int)Math.Round(snapshot.Fast, MidpointRounding.AwayFromZero);
+			int readWall = (int)Math.Round(snapshot.TctlTemp, MidpointRounding.AwayFromZero);
+			bool matchPl1 = (pl1 <= 0) || Math.Abs(readPl1 - pl1) <= 1;
+			bool matchPl2 = (pl2 <= 0) || Math.Abs(readPl2 - pl2) <= 1;
+			bool matchWall = (tempWallC <= 0) || Math.Abs(readWall - tempWallC) <= 1;
+			detail = $"读回 PL1(slow)={readPl1}W PL2(fast)={readPl2}W tctl={readWall}℃ "
+				+ $"⇒ 一致 PL1={matchPl1} PL2={matchPl2} 温度墙={matchWall}（第 {attempt + 1} 次）";
+			if (matchPl1 && matchPl2 && matchWall)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/// <summary>⭐ 把"未设置"（⭐ ≤0）如实打成「未设置」、⛔ 不打成 0 ✅。</summary>
+	private static string ShowPowerValue(int watts)
+	{
+		return (watts > 0) ? (watts + "W") : "未设置";
+	}
+
+	/// <summary>⭐ 同 <see cref="ShowPowerValue" />：⭐ 温度墙 ✅。</summary>
+	private static string ShowTempValue(int celsius)
+	{
+		return (celsius > 0) ? (celsius + "℃") : "未设置";
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-17（真机「颜色改不了 / 下发恒 #FFFFFF」）：⭐ 键盘灯单色（ARGB）的**唯一解析入口** ✅
+	/// <para>⚠️ 根因：⭐ 宝龙达 WMI 只有功能号 17 的 3 字节 RGB ⇒ 界面选「预设色板」时只存
+	/// <c>MonochromeIndex</c>（1~29），直接读 <c>ColorArgb</c> 会拿到**默认白** ❌
+	/// ⇒ ⭐ 必须换成调色板里的真实颜色（<see cref="LightChannelSettings.EffectiveColorArgb" />）✅。</para>
+	/// <para>⭐ 非宝龙达**逐位不变**：仍只在 <c>Single</c> 时带 <c>ColorArgb</c> ✅。</para>
+	/// </summary>
+	private Color? ResolveKeyboardColor(string effect, LightChannelSettings settings)
+	{
+		if (string.IsNullOrWhiteSpace(effect) || MechrevoHw.IsLightEffectOff(effect))
+		{
+			return null;
+		}
+		if (_hw != null && _hw.UsesBaolongda)
+		{
+			// ⭐ 宝龙达：固定色（模式 2）全靠功能号 17 的 RGB ⇒ 无论效果 Id 叫什么，都带真实颜色 ✅
+			return new Color?(Color.FromArgb(settings.EffectiveColorArgb()));
+		}
+		return (string.Equals(effect, "Single", StringComparison.Ordinal)
+			? new Color?(Color.FromArgb(settings.ColorArgb))
+			: (Color?)null);
+	}
+
+	private bool TryApplyKeyboardViaBackend(string effect, int light0to4, Color? singleColor)
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null)
+		{
+			return false;
+		}
+		// ⭐⭐ 2026-10-16（键盘灯「亮度不对」修正）：⭐ 亮度换算收归**唯一来源** ✅
+		//   ⚠️ 旧代码 `light0to4 - 1` 会把界面第 1 档（⭐ 用户想要"最暗"）算成硬件 0
+		//   ⇒ ⭐ 而硬件 0 **就是灭灯**（⭐ 参考实现界面原文「背光亮度设置为 0 时将关闭键盘灯光」✅）
+		//   ⇒ ⭐ 用户在第一档区间看到的是"灯灭"而不是"变暗" ❌（⭐ "亮度不能调节"的一个真实成因 ⚠️）
+		//   ⇒ ⭐ 现在统一走 <see cref="MechrevoHw.BaolongdaBrightnessFromUi" />（⭐ 0 ⇒ 0；正数 ⇒ 1~3 ✅）
+		byte level = MechrevoHw.BaolongdaBrightnessFromUi(light0to4);
+		// ⭐⭐ 2026-10-16（键盘灯模式）：⭐ 效果 Id → 模式（功能号 16）用**同一张表** ✅
+		//   ⚠️ 2026-10-17 收敛：⭐ 只有 2（固定色）／1（自动循环）可写；⛔ 3（自定义颜色）
+		//     本机固件写不进（真机写 3 回读仍为 2）⇒ 映射表里已撤掉，Manual 会落到下面的降级（模式 2）✅
+		byte mode;
+		if (!MechrevoHw.TryMapBaolongdaKeyboardMode(effect, out mode))
+		{
+			mode = 2;
+		}
+		bool on = (level > 0) && !MechrevoHw.IsLightEffectOff(effect);
+		// ⭐⭐ 2026-10-17（真机「每次下发都是白」）：⭐ 调用方没带颜色时**不再把白色写下去** ❌
+		//   ⇒ ⭐ 宝龙达下从已保存配置解析真实颜色（预设色板 → ARGB）；
+		//      开关类入口（SetKeyboardPower）也走这里 ✅；⚠️ 非宝龙达不会用到这枚颜色（下行返回 false）✅
+		int argb = singleColor?.ToArgb() ?? unchecked((int)0xFFFFFFFF);
+		if (!singleColor.HasValue && hw.UsesBaolongda)
+		{
+			LightChannelSettings storedColor = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
+			argb = ResolveKeyboardColor(effect, storedColor)?.ToArgb() ?? storedColor.EffectiveColorArgb();
+			if (on)
+			{
+				Logger.WriteError("宝龙达 键盘灯：⚠️ 调用方没带颜色 ⇒ ⭐ 用**已保存的用户颜色** #"
+					+ (argb & 0xFFFFFF).ToString("X6") + " ✅（⛔ 不再默认白色 ✅）");
+			}
+		}
+		if (!hw.TrySetKeyboardLightingViaBackend(on, argb, level, mode, out bool confirmed))
+		{
+			return false; // ⭐ 不是非 GCU 后端在管事 ⇒ 交回原路 ✅
+		}
+		Logger.WriteLine($"SetKeyboardEffect（⭐ 非 GCU 后端路径）：⭐ on={on} · ⭐ effect={effect} · ⭐ light={light0to4}"
+			+ $" · ⭐ mode={mode} · ⭐ level={level} · ⭐ 回读一致={confirmed} ⇒ ⭐ 未发任何 MQTT ✅");
+		return true;
+	}
+
 public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1, string direction = "None", Color? singleColor = null, bool save = false)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2 步 · 键盘灯 · ⭐ 前后端分离模板）：
+		//   ⭐ 先问门面层"这次归你管吗" ✅ ⇒ ⭐ 非 GCU 后端在管事就**处理完直接返回**（⭐ 一条 MQTT 不发 ✅）
+		//   ⭐ 否则 ⭐ **下面原来那两行一行未改** ✅（⭐ 回归风险 = 0 ✅）
+		if (TryApplyKeyboardViaBackend(effect, light, singleColor))
+		{
+			return Task.FromResult(result: true);
+		}
 		// 2026-10-09（kbdctrl，用户原话「只搁置用户模式」⇒「给 LM 接通键盘灯」这一条开工）：开关打开时
 		// 改走新的 Keyboard/Ctrl 直发链路（PublishKeyboardCtrlEffectAsync，跳过 Keyboard/Status 判定）；
 		// 开关关闭（默认）时**逐字**执行下面原来那一行 ⇒ 行为与改前完全一致。
@@ -3631,6 +4531,31 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardBrightnessPreservingEffect(int level0to4)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达"全部接入"第 2 步）：⭐ 亮度调整同样先问门面层 ✅
+		//   ⭐ 非 GCU 后端 ⇒ ⭐ 读出当前效果/颜色（⭐ 沿用下面的读取逻辑）后走 WMI ✅；
+		//   ⭐ 否则 ⭐ 原样往下走 ✅
+		if (_hw != null)
+		{
+			int speed0 = 1;
+			Color? singleColor0 = null;
+			string effect0;
+			if (LightingSettingsStore.TryLoad("Keyboard/Ctrl", out var settings0) && KeyboardFirmwareEffects.Contains(settings0.Effect))
+			{
+				effect0 = settings0.Effect;
+				speed0 = settings0.Speed;
+				// ⭐ 2026-10-17：⭐ 预设色板 → 真实 ARGB（宝龙达 WMI 只认 3 字节 RGB）✅
+				singleColor0 = ResolveKeyboardColor(effect0, settings0);
+			}
+			else
+			{
+				effect0 = (string.IsNullOrWhiteSpace(_hw.KeyboardEffect) ? "Single" : _hw.KeyboardEffect);
+			}
+			if (TryApplyKeyboardViaBackend(effect0, level0to4, singleColor0))
+			{
+				return Task.FromResult(result: true);
+			}
+			_ = speed0;
+		}
 		// 2026-10-09（kbdctrl）：开关打开时亮度也走新的 Keyboard/Ctrl 链路；关闭时逐字走原路径。
 		if (KeyboardCtrlPublishSwitch.Enabled)
 		{
@@ -3643,7 +4568,8 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		{
 			text = settings.Effect;
 			speed = settings.Speed;
-			singleColor = ((text == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null));
+			// ⭐ 2026-10-17：⭐ 预设色板 → 真实 ARGB（宝龙达 WMI 只认 3 字节 RGB）✅
+			singleColor = ResolveKeyboardColor(text, settings);
 		}
 		else
 		{
@@ -3659,6 +4585,15 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			if (!SupportsLightTopic(topic))
 			{
 				return false;
+			}
+			// ⭐⭐ 2026-10-16（宝龙达 · 灯光效果）：⭐ 把**颜色 ／ 亮度 ／ 效果**这条也分派给非 GCU 后端 ✅
+			//    ⚠️ 三个调用点（⭐ SettingsForm ／ Program ／ LightForm ✅）都**直接**调本方法
+			//    ⇒ 它原来**直发 MQTT** ⇒ 宝龙达上换颜色 ／ 调亮度发不出去 ⚠️
+			//    ⭐ 非宝龙达 ⇒ 分派返回 false ⇒ ⭐ 下面原路**逐位不变** ✅
+			if (_hw.TrySetLightEffectViaBackend(topic, effect, light,
+				singleColor.HasValue ? singleColor.Value.ToArgb() : (int?)null, out bool _))
+			{
+				return true;
 			}
 			Dictionary<string, object> color = new Dictionary<string, object>();
 			// ⚠️ 2026-10-16（owner 明确指示「键盘灯是正常的不用动」）：⭐ 本方法**只服务键盘**
@@ -3782,6 +4717,15 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			if (!SupportsLightTopic(topic))
 			{
 				return false;
+			}
+			// ⭐⭐ 2026-10-16（宝龙达 · 灯光效果）：⭐ 把**颜色 ／ 亮度 ／ 效果**这条也分派给非 GCU 后端 ✅
+			//    ⚠️ 三个调用点（⭐ SettingsForm ／ Program ／ LightForm ✅）都**直接**调本方法
+			//    ⇒ 它原来**直发 MQTT** ⇒ 宝龙达上换颜色 ／ 调亮度发不出去 ⚠️
+			//    ⭐ 非宝龙达 ⇒ 分派返回 false ⇒ ⭐ 下面原路**逐位不变** ✅
+			if (_hw.TrySetLightEffectViaBackend(topic, effect, light,
+				singleColor.HasValue ? singleColor.Value.ToArgb() : (int?)null, out bool _))
+			{
+				return true;
 			}
 			Dictionary<string, object> dictionary = new Dictionary<string, object>();
 			// ⭐⭐ 2026-10-16（0.291.8.1 · 按厂商反编译校正）：`isCircular` **不能恒为 true**。
@@ -4085,6 +5029,20 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardPower(bool on)
 	{
+		// ⭐⭐ 2026-10-17（真机反馈「logo 和键盘开关都无效」+ 用户澄清「宝龙达键盘灯其实关就是亮度 0，
+		//   不存在真的开关」）：⭐ **宝龙达没有独立的"电源开/关"命令** ⚠️
+		//   ⭐ 它的关灯手段就是**把亮度（功能号 18）写成 0** ✅（参考实现界面原文
+		//      「背光亮度设置为 0 时将关闭键盘灯光」；斗战者也全仓没有独立关灯操作，值域 0~3）。
+		//   ⚠️ 而原先本方法**没有任何宝龙达分派** ⇒ 永远落到 `SetLightPower("Keyboard/Ctrl")`（MQTT/GCU 通道）
+		//      ⇒ ⭐ 宝龙达（无 GCU）**永远无效** ❌ —— 这就是「键盘开关点了没反应」的根因。
+		//   ⇒ ⭐ 宝龙达下**转发到 `SetKeyboardEffect`**（它有分派、内部即 `TryApplyKeyboardViaBackend`）：
+		//      ⭐ 开 ⇒ 用「单色 + 正常亮度」；⭐ 关 ⇒ 用「关（Off）+ 亮度 0」✅
+		//      ⭐ 那里 `on = (level > 0) && !IsLightEffectOff(effect)` ⇒ 关时写亮度 0，与上面事实完全一致 ✅
+		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 下面原来的两行**逐字不变** ✅
+		if (_hw != null && _hw.UsesBaolongda)
+		{
+			return SetKeyboardEffect(on ? "Single" : "Off", on ? 4 : 0);
+		}
 		// 2026-10-09（kbdctrl）：开关打开时开关灯也走新的 Keyboard/Ctrl 链路；关闭时逐字走原路径。
 		if (KeyboardCtrlPublishSwitch.Enabled)
 		{
@@ -4178,7 +5136,8 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			{
 				effect = settings.Effect;
 				speed = settings.Speed;
-				singleColor = ((effect == "Single") ? new Color?(Color.FromArgb(settings.ColorArgb)) : ((Color?)null));
+				// ⭐ 2026-10-17：⭐ 预设色板 → 真实 ARGB（与宝龙达 WMI 同口径）✅
+				singleColor = ResolveKeyboardColor(effect, settings);
 			}
 			else
 			{
@@ -4249,6 +5208,38 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public async Task<bool> PublishLightPower(string topic, bool on)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达 · 灯光电源开关 · ⭐ 机主反馈「键盘灯 logo灯不可用」）：
+		//   ⚠️ 根因（⭐ 真机诊断包实证）：本方法**直发 MQTT** ⇒ 宝龙达**没有 GCU** ⇒
+		//      日志刷「PublishLightPower fail: 发布到 Keyboard/Ctrl 失败：MQTT 未连接」❌
+		//      ⇒ **完全没经过门面层** ⇒ 键盘灯/LOGO 灯都点不动 ⚠️
+		//   ⇒ ⭐ 先问门面层「这次归你管吗」✅ ⇒ 非 GCU 后端处理完就**直接返回**（⭐ 一条 MQTT 不发 ✅）
+		//   ⭐ 否则 ⭐ **下面原来那几行一行未改** ✅（⭐ 回归风险 = 0 ✅）
+		if (_hw != null)
+		{
+			bool handled;
+			bool confirmed;
+			try
+			{
+				handled = _hw.TrySetLightPowerViaBackend(topic, on, out confirmed);
+			}
+			catch (Exception ex2)
+			{
+				// ⚠️ 分派本身异常 ⇒ ⭐ 如实记录，⛔ 但**不让它影响原路**（⭐ 继续往下走 ✅）
+				Logger.WriteError("宝龙达 灯光：⚠️ 分派异常 ⇒ 交回原路：" + ex2.Message);
+				handled = false;
+				confirmed = false;
+			}
+			if (handled)
+			{
+				if (confirmed)
+				{
+					ObserveLightPower(topic, on);
+				}
+				Logger.WriteError($"PublishLightPower（⭐ 非 GCU 后端路径）：⭐ topic={topic} · ⭐ on={on}"
+					+ $" · ⭐ 确认={confirmed} ⇒ ⭐ 未发任何 MQTT ✅");
+				return confirmed;
+			}
+		}
 		try
 		{
 			if (!SupportsLightTopic(topic))
@@ -4271,6 +5262,39 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public async Task<bool> ConfirmLightPower(string topic, bool on)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX）：
+		//   ⚠️ 根因（⭐ 机主诊断包实证）：下面这条确认路**只认 GCU/MQTT** —— 它靠"等
+		//      `KeyboardPower`／`QuickSwitches[key]` 变成目标值"判定 ✅，等不到就发 `GETSTATUS` ❌。
+		//      宝龙达下①`KeyboardPower` **从不更新**（⭐ 只在 GCU payload 解析里赋值 ⚠️）
+		//      ②`QuickSwitches["logolight"]` 只每 3 s 刷一次（⭐ 180/500/700 ms 等不到 ✅）
+		//      ⇒ 它**恒判"未确认"** ⇒ 发 MQTT ⇒ 日志刷「ConfirmLightPower fail: …MQTT 未连接」❌
+		//      ⇒ 返回 **false** ⇒ ⭐ `SetLightPower` 返回 false
+		//      ⇒ ⭐ **界面把开关拨回去 = 用户看到的「关了又开」** ✅
+		//   ⇒ ⭐ 先问门面层「这次归你管吗」✅ ⇒ 非 GCU 后端**自己读硬件回读确认** ✅
+		//      ⇒ ⭐ 处理完**直接返回**（⭐ 一条 MQTT 不发 ✅）；⭐ 否则**下面原来那几行一行未改** ✅
+		//      （⭐ 非宝龙达恒 `false` ⇒ 逐位不变 ✅）
+		if (_hw != null)
+		{
+			bool handled;
+			bool backendConfirmed;
+			try
+			{
+				handled = _hw.TryConfirmLightPowerViaBackend(topic, on, out backendConfirmed);
+			}
+			catch (Exception ex2)
+			{
+				// ⚠️ 分派本身异常 ⇒ ⭐ 如实记录，⛔ 但**不让它影响原路**（⭐ 继续往下走 ✅）
+				Logger.WriteError("宝龙达 灯光：⚠️ 确认分派异常 ⇒ 交回原路：" + ex2.Message);
+				handled = false;
+				backendConfirmed = false;
+			}
+			if (handled)
+			{
+				Logger.WriteError($"ConfirmLightPower（⭐ 非 GCU 后端路径）：⭐ topic={topic} · ⭐ on={on}"
+					+ $" · ⭐ 硬件回读确认={backendConfirmed} ⇒ ⭐ 未发任何 MQTT ✅");
+				return backendConfirmed;
+			}
+		}
 		string lightKey;
 		try
 		{
@@ -4337,6 +5361,16 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public async Task RequestLightStatus(string topic)
 	{
+		// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX 的配套）：
+		//   ⭐ 本主题由非 GCU 后端本地接管 ⇒ ⭐ 这里**没有任何 MQTT 可问** ⚠️ ⇒ 直接返回 ✅
+		//   （⛔ 否则会刷一条注定失败的「RequestLightStatus fail: …MQTT 未连接」❌ ——
+		//    ⭐ 而真实状态本来就能由本后端用功能号本地回读 ✅）
+		if (_hw != null && _hw.HandlesLightTopicViaBackend(topic))
+		{
+			Logger.WriteError($"RequestLightStatus（⭐ 非 GCU 后端路径）：⭐ topic={topic} ⇒ ⭐ 跳过 MQTT ✅"
+				+ "（⭐ 状态由本后端用功能号回读 ✅）");
+			return;
+		}
 		try
 		{
 			await _hw.Publish(topic, new Dictionary<string, object> { ["Action"] = "GETSTATUS" }).ConfigureAwait(continueOnCapturedContext: false);

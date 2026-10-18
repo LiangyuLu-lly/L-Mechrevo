@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>EcPortProbe</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace />
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\..\source\PawnIO\PawnIOWrapper.cs" Link="PawnIOWrapper.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\EcPortIo.cs" Link="EcPortIo.cs" />
+  </ItemGroup>
+</Project>

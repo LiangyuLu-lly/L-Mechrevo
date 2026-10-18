@@ -82,6 +82,9 @@
 <data name="Brightness" xml:space="preserve">
     <value>亮度</value>
   </data>
+<data name="BrightnessUnsupported" xml:space="preserve">
+    <value>本机不支持软件调亮度</value>
+  </data>
 <data name="Battery" xml:space="preserve">
     <value>电池</value>
   </data>
@@ -452,6 +455,9 @@
     
   
   </data>
+<data name="IdleOff5Min" xml:space="preserve">
+    <value>5 分钟</value>
+  </data>
 <data name="BalancedMode" xml:space="preserve">
     
     
@@ -627,7 +633,7 @@
   
   </data>
 <data name="ChargeModeTip" xml:space="preserve">
-    <value>{0}：上限 {1}%。开关打开时按所选档位直写 EC（不依赖 GCU），写后回读确认</value>
+    <value>{0}：上限 {1}%。按所选档位设置充电上限（经 GCU 官方电池保护 BatteryProtection），写后回读确认</value>
   </data>
 <data name="CheckUpdates" xml:space="preserve">
     
@@ -726,6 +732,21 @@
     <value>CPU 功耗墙 PL2 (W)</value>
     
   
+  </data>
+<data name="CpuPl1Hint" xml:space="preserve">
+    <value>长时功耗上限（瓦）。负载持续时处理器维持的平均功耗。</value>
+  </data>
+<data name="CpuPl2Hint" xml:space="preserve">
+    <value>短时/峰值功耗上限（瓦）。突发负载时可以短时间冲到更高功耗。</value>
+  </data>
+<data name="CpuStapmTimeWindow" xml:space="preserve">
+    <value>功耗时间窗（STAPM，秒）</value>
+  </data>
+<data name="CpuStapmTimeWindowHint" xml:space="preserve">
+    <value>STAPM 时间窗（秒）：按机身温度约束持续功耗的统计窗口，数值越大功耗调整越平缓。</value>
+  </data>
+<data name="CpuTempWallHint" xml:space="preserve">
+    <value>处理器温度上限（℃）。达到该温度会主动降频。</value>
   </data>
 <data name="CpuPl4" xml:space="preserve">
     
@@ -3499,6 +3520,24 @@
     
   
   </data>
+<data name="FanCurveBaolongdaEnable" xml:space="preserve">
+    <value>启用软件闭环（本机无固件曲线表）</value>
+  </data>
+<data name="FanCurveSavedAndEnabled" xml:space="preserve">
+    <value>风扇曲线已保存并启用</value>
+  </data>
+<data name="FanCurveSavedNotEnabled" xml:space="preserve">
+    <value>风扇曲线已保存但未启用（勾选左边开关才会生效）</value>
+  </data>
+<data name="FanSyncSharedHeatPipe" xml:space="preserve">
+    <value>双风扇联动（共用热管）</value>
+  </data>
+<data name="FanSyncSharedHeatPipeTip" xml:space="preserve">
+    <value>两个风扇按共用热管的特性互相带动，避免一侧过热而另一侧低速。</value>
+  </data>
+<data name="QuickCameraPrivacy" xml:space="preserve">
+    <value>摄像头隐私</value>
+  </data>
 <data name="QuickCopilot" xml:space="preserve">
     
     
@@ -4194,10 +4233,150 @@
     
   
   </data>
+<data name="BatteryStateHeldAtBaolongdaLimit" xml:space="preserve">
+    
+    
+    <value>已到停充阈值（限充中）</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableCharge" xml:space="preserve">
+    
+    
+    <value>限制充电</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableChargeTip" xml:space="preserve">
+    
+    
+    <value>开启后接电源时会把充电限制在停充阈值</value>
+    
+  
+  </data>
+<data name="BatteryLimitStartPercent" xml:space="preserve">
+    
+    
+    <value>起充（%）</value>
+    
+  
+  </data>
+<data name="BatteryLimitStopPercent" xml:space="preserve">
+    
+    
+    <value>停充（%）</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveThreshold" xml:space="preserve">
+    
+    
+    <value>保存阈值</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocReading" xml:space="preserve">
+    
+    
+    <value>电量读取中…</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocFormat" xml:space="preserve">
+    
+    
+    <value>电量 {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocUnreadable" xml:space="preserve">
+    
+    
+    <value>电量读不到</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusReading" xml:space="preserve">
+    
+    
+    <value>状态读取中…</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusUnreadable" xml:space="preserve">
+    
+    
+    <value>状态读不到（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusActiveFormat" xml:space="preserve">
+    
+    
+    <value>限制充电已生效 · 当前生效 {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusInactive" xml:space="preserve">
+    
+    
+    <value>未限制充电</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleActiveFormat" xml:space="preserve">
+    
+    
+    <value>限制充电中（停充 {0}% / 起充 {1}%）</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleInactive" xml:space="preserve">
+    
+    
+    <value>未限制充电</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 启用失败（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitDisableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 关闭失败（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitOperationFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 操作异常（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveFailed" xml:space="preserve">
+    
+    
+    <value>⛔ 保存失败（详见日志）</value>
+    
+  
+  </data>
+<data name="BatteryLimitInvalidParams" xml:space="preserve">
+    
+    
+    <value>⛔ 参数非法：要求 0 &lt; 起充 &lt; 停充 ≤ 100</value>
+    
+  
+  </data>
 <data name="BatteryStateIdle" xml:space="preserve">
     
     
-    <value>未充电</value>
+    <value>未在充电</value>
     
   
   </data>
@@ -4298,6 +4477,12 @@
     <value>换挡延迟 (ms)</value>
     
   
+  </data>
+<data name="ApuAntiDegrade" xml:space="preserve">
+    <value>APU 防缩缸</value>
+  </data>
+<data name="GpuPowerLimit" xml:space="preserve">
+    <value>GPU 功耗限制（W）</value>
   </data>
 <data name="GpuTgp" xml:space="preserve">
     
@@ -4516,6 +4701,13 @@
     
   
   </data>
+<data name="PerfModeHintLocalApply" xml:space="preserve">
+    
+    
+    <value>设置保存到本机并立即应用（SMU / WMI 23），不写入固件自定义档。</value>
+    
+  
+  </data>
 <data name="PerfModeKeepOneCustom" xml:space="preserve">
     
     
@@ -4565,6 +4757,9 @@
     
   
   </data>
+<data name="PerfModeLocalProfileSwitched" xml:space="preserve">
+    <value>已切换到本机配置（本机无固件档；改动请点【应用】下发）</value>
+  </data>
 <data name="PerfModeNoSlotSeed" xml:space="preserve">
     
     
@@ -4583,6 +4778,13 @@
     
     
     <value>没生效：{0}</value>
+    
+  
+  </data>
+<data name="PerfModeRestoreSmuVolatileNote" xml:space="preserve">
+    
+    
+    <value>（SMU 功耗墙为本次开机内的运行时写入，重启后回到固件默认）</value>
     
   
   </data>
@@ -5215,7 +5417,22 @@
     <data name="AboutLicensesIntro" xml:space="preserve">
       <value>L-Mechrevo 是自由软件，以 GNU 通用公共许可证第 3 版（GPL-3.0-only）分发。本程序包含派生自下列项目的代码，并内嵌了一个第三方二进制模块。完整许可文本位于程序目录下的 LICENSES 文件夹里（LICENSE / THIRD_PARTY_NOTICES.txt 也在其中）。</value>
     </data>
-    <data name="AboutLicensesOrigin" xml:space="preserve">
+    <data name="AboutLicensesUseJiaolongControl" xml:space="preserve">
+    <value>2026-10 宝龙达协议事实来源（WMI `MiInterface` 调用方式、功能号 8~23、EC 通道）。内部笔记曾直接引用其代码片段（MIT，已随包附 MIT 许可全文）；产品代码未复制其实实现，按事实重写。</value>
+  </data>
+  <data name="AboutLicensesUseDouzhanzhe" xml:space="preserve">
+    <value>2026-10 工程做法与 NVAPI/EC 事实的交叉印证（仅取事实与做法，未复制代码）。</value>
+  </data>
+  <data name="AboutLicensesUseBatteryThreshold" xml:space="preserve">
+    <value>2026-10-18 充电阈值：EC 寄存器语义与命令时序参考（0x83A1/0x83A2/0x83C0、0x8150~0x8154），仅取协议事实，未复制代码。该仓库未附 LICENSE 文件，故仅作事实参考。</value>
+  </data>
+  <data name="AboutThanksHeading" xml:space="preserve">
+    <value>鸣谢（真机测试协助）</value>
+  </data>
+  <data name="AboutThanksBody" xml:space="preserve">
+    <value>感谢 Chainsaw 协助完成宝龙达机型的大部分真机测试（风扇、充电阈值、灯光、GPU 超频等）。</value>
+  </data>
+  <data name="AboutLicensesOrigin" xml:space="preserve">
       <value>本程序的原项目 L-Mechrevo 由 LiangyuLu-lly 发布，地址：https://github.com/LiangyuLu-lly/L-Mechrevo/tree/v0.290.6 ；本版由维护者 xiaohan（xmsjx）在原项目基础上继续维护。下面列出的是第三方代码与许可，原项目本身的许可同样是 GPL-3.0-only。</value>
     </data>
     <data name="AboutLicensesCopyright" xml:space="preserve">

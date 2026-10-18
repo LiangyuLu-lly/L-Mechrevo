@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -75,6 +76,9 @@ public class CustomModeForm : RForm
 	private bool _optionsLocked;
 
 	private readonly SemaphoreSlim _saveLock = new SemaphoreSlim(1, 1);
+
+	// ⭐⭐ 2026-10-19（机主：初始化纯按需、⛔ 不要启动预热）：风扇闸门/清理的"按需触发一次"闸门 ✅
+	private static int _deferredFanInitScheduled;
 
 	private readonly List<string> _rowLabels = new List<string>();
 
@@ -171,6 +175,13 @@ public class CustomModeForm : RForm
 
 	private bool _refreshingHardwareState;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1，低了要联动调 PL1）：
+	/// ⭐ 联动**正在进行**的标志 —— 程序化改被联动滑块的值时，它自己的 onChanged 只 `Queue`、⛔ 不再发起第二次联动
+	/// （⭐ 避免递归/重复日志；⭐ 值本身仍会正常登记、正常下发）✅。
+	/// </summary>
+	private bool _plLinking;
+
 	private Panel _scrollHost;
 
 	private int _laidOutContentHeight;
@@ -183,7 +194,21 @@ public class CustomModeForm : RForm
 
 	private RSlider _tcc;
 
+	// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：只要「本档真的走 SMU」就**建行**
+	//   （判据 = `PerfModeCapabilities.UsesSmuForCustomPower`，与真实下发分支同源；见 ctor 注释）。
+	//   ⚠️ 值读不到/不稳定 ⇒ 标题显示「（未设置）」；⛔ 不再因为读不到就隐藏整行。
+	private RSlider _stapmTime;
+
+	private RNumericUpDown _stapmTimeVal;
+
+	private Label _stapmTimeLabel;
+
 	private RSlider _tgp;
+
+	/// <summary>⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：只有能读到有效约束时才创建 ✅</summary>
+	private RSlider _gpuPowerLimit;
+
+	private RNumericUpDown _gpuPowerLimitVal;
 
 	private RSlider _db;
 
@@ -306,6 +331,30 @@ public class CustomModeForm : RForm
 
 	private Label _powerWallStatus;
 
+	// ⭐⭐ 2026-10-16（"未设置"标记 · 用户指导「⭐ 开源的都有方案的不是吗」）：
+	//   ⚠️ 宝龙达协议对功耗墙**只写不读**（⭐ 功能号 23 ⚠️）⇒ ⭐ 机器上的值我们**读不回来** ✅
+	//   ⇒ ⭐ 那就 ⛔ **不许编一个数**（⭐ 原来那组 45/65/95 是我们自己拼的 ⚠️）✅
+	//   ⇒ ⭐ 没下发过的行 ⇒ ⭐ 标题追加「（未设置）」（⭐ 见 `UnsetMark` ✅）
+	//   ⚠️ 为什么放标题而不是数字框：⭐ `NumericUpDown` **拒绝非数字文本**
+	//      （⭐ 本机探针实测：⭐ 赋 `Text = "未设置"` 被忽略、⭐ 值仍是原数字 ❌）
+	//      ⇒ ⭐ 标题是唯一能显示文字的既有位置 ✅；⭐ `MakeLabel` 会把**最终文本**记进 `_rowLabels`
+	//      ⇒ ⭐ 标题列宽**自动容纳**它、⛔ 不会裁字 ✅（⭐ 代价：⭐ 标题列随之变宽，⭐ 如实记录 ✅）
+	private Label _pl1Label;
+
+	private Label _pl2Label;
+
+	private Label _tccLabel;
+
+	/// <summary>⭐「未设置」标记（⭐ 见 <see cref="_pl1Label" /> 的注释 ✅）。</summary>
+	private const string UnsetMark = "（未设置）";
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"未设置"）：⭐ 功耗墙三行的**完整语义**（⭐ 悬浮提示用 ✅）。
+	/// <para>⚠️ 如实说明：⭐ 宝龙达协议对功耗墙**只写不读** ⚠️ ⇒ ⭐「未设置」的含义是
+	/// **"本次运行我们还没下发过"**，⛔ **不是**"机器上没设过" ✅ —— ⭐ 机器上到底是多少，我们读不回来 ⚠️。</para>
+	/// </summary>
+	private const string PowerWallUnsetHint = "本机协议读不回功耗墙的当前值（只写不读）。标题带「（未设置）」= 本次运行还没下发过，不代表机器上没设过。拖动滑块并点【应用】后，这里显示的就是我们下发的值。";
+
 	private readonly System.Windows.Forms.Timer _powerWallTimer = new System.Windows.Forms.Timer
 	{
 		Interval = 2000
@@ -320,6 +369,20 @@ public class CustomModeForm : RForm
 	internal static string GcuDisconnectedText => Strings.GcuDisconnectedShort;
 
 	internal static string FanTableTimeoutText => Strings.FanTableNotReady;
+
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主反馈：顶部黄字「本机无 GCU，不支持写入固件自定义档」**误导**）：
+	/// ⭐ <b>宝龙达（30/40 系）自定义档的如实说明</b> —— 设置保存到本机、并**立即应用**
+	/// （30 系 PL/温度墙走 **SMU**；40 系走 **WMI 功能号 23**；GPU 偏移走 NVAPI；显卡功耗上限走 NVML），
+	/// ⛔ 不写固件自定义档 ✅。
+	/// <para>⚠️ 为什么原来的文案是错的：⭐ 宝龙达确实没有 GCU、也写不了「固件自定义档」，
+	/// 但它的**功耗墙/温度墙/GPU 偏移/显卡功耗上限都能真下发**（`52d66da` / `d03da38` 已接）——
+	/// 旧文案用「不支持写入」把"本机后端能写"一起否定了 ❌，而且是否定句「无 GCU 所以不支持」❌。</para>
+	/// <para>⭐ 现在：30/40 系宝龙达显示「设置保存到本机并立即应用（SMU / WMI 23），不写入固件自定义档」✅；
+	/// ⚠️ GCU 机型仍用原来的 <see cref="Strings.PerfModeHintCustom" /> 等 resx 文案，**逐字不变** ✅。</para>
+	/// </summary>
+	internal static string LocalApplyText => Strings.PerfModeHintLocalApply;
 
 	internal string EditingModeId => _modeId;
 
@@ -432,6 +495,18 @@ public class CustomModeForm : RForm
 		_deleteButton = MakeModeButton("buttonModeDelete", Strings.PerfModeDelete, DeleteCustomModeAsync);
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayoutPanel.Controls.Add(modeFlow, 0, rowCount++);
+		// ⭐⭐ 2026-10-17（真机反馈「选了自定义 1 又跳回狂暴」）：⭐ 宝龙达**没有固件自定义档** ⚠️
+		//   ⇒ `PerfModeCapabilities.SupportsFirmwareSlot = !UsesBaolongda` = false ⇒ 切固件档必然失败
+		//      ⇒ ⭐ 下拉里选「自定义 N」后会**回弹到当前档**（用户看到的就是"自己又跳回狂暴"）❌
+		//   ⭐ 而自定义档在宝龙达上本来就只有**软件配置**（PL1/PL2/温度墙走 WMI 功能号 23，
+		//      配置存 `perf_custom*_` 键）—— ⛔ 不需要、"也切不了"固件档。
+		//   ⇒ ⭐ 宝龙达下把**整行模式选择（下拉 + 新建/重命名/删除）隐藏** ✅
+		//      ⭐ 用户仍可编辑 PL1/PL2/温度墙并「应用」⇒ 落到本机配置（这条本来就有 ✅）
+		//   ⚠️ 非宝龙达 ⇒ 恒 false ⇒ ⭐ 逐位不变 ✅
+		// ⭐⭐ 2026-10-19（机主：「配置下拉依旧没修」）：⭐ **不再隐藏**这一行 ✅
+		//   宝龙达没有固件档，但自定义档是**本机配置**（PL/温度墙/曲线存 `mode_tune_*`）⇒
+		//   下拉选择只切换"正在编辑哪一份配置"，不需要固件槽 ⇒ 完全可以正常用 ✅
+		//   （之前整行隐藏，用户看到的是"下拉没修"；见 SelectModeAsync 里新加的宝龙达分支）
 		_nameRow = new FlowLayoutPanel
 		{
 			Name = "modeNameRow",
@@ -652,24 +727,95 @@ public class CustomModeForm : RForm
 			}
 		};
 		AddComboRow(Strings.BoostMode, _boostCombo);
+		// ⭐⭐ 2026-10-19（机主：显示条件 =「当前自定义档**实际走 SMU 下发**」，不是"机型是 Gen30"）：
+		//   ⭐ 单一判据 = `PerfModeCapabilities.UsesSmuForCustomPower(宝龙达, 30 系, SMU 可用)` +
+		//      `SmuAvailability.IsReady`（PawnIO 已装 + RyzenSMU 初始化成功；**进程内只探测一次**，⛔ 不每次开窗读 SMU）。
+		//   ⭐ 与 `MechrevoService.ApplyPowerLimitViaSmu` 实际会走的分支**同源** ⇒ 不会出现"界面显示了、
+		//      实际却走 WMI 23（30 系根本没有）"的错位（守 §9.14）。
+		//   ⚠️ 40 系 / GCU / 老同方 / PawnIO 不可用 ⇒ 判据为假 ⇒ 下面这行都不建、tooltip 也不挂 ⇒ 行为逐位不变 ✅
+		bool smuPowerControls = false;
+		if (hw != null && hw.IsBaolongda30Series)
+		{
+			smuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady);
+			if (!smuPowerControls)
+			{
+				Logger.WriteLine("[smu] 不可用 ⇒ 隐藏 STAPM 时间窗行（原因：" + SmuAvailability.Reason + "）");
+			}
+		}
+		if (smuPowerControls)
+		{
+			// ⭐ 只读：先从 SMU PM 表读一次当前 PL1/PL2/温度墙/时间窗（顺便把本地记忆填成**真实当前值**，
+			//   这样标题不再显示「（未设置）」、下发基线也是真值）。读失败也继续：下面按"未设置"如实显示。
+			//   ⚠️ `requireStableStapmTime: true` ⇒ STAPM 时间窗必须**连续两次读数一致**才算"读得到"
+			//      （真机教训：部分 PM 表版本上这个字段是动态量、会跳）⇒ 不稳定按「未设置」显示（行照建）。
+			hw.RefreshBaolongda30SeriesSmuPower(force: true, requireStableStapmTime: true);
+		}
 		(int, int, int, bool) tuple2 = DeviceRange(hw?.Pl1Minimum ?? (-1), hw?.Pl1Maximum ?? (-1), hw?.Pl1 ?? 0);
 		(int, int, int, bool) tuple3 = DeviceRange(hw?.Pl2Minimum ?? (-1), hw?.Pl2Maximum ?? (-1), hw?.Pl2 ?? 0);
-		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(Strings.CpuPl1, tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
+		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl1, hw?.BaolongdaPl1Unset ?? false), tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
 		{
-			Queue("PL1", v.ToString());
+			QueuePowerLimit("PL1", v);
 		});
 		_pl1 = tuple4.Item1;
 		_pl1Val = tuple4.Item2;
-		tuple4 = AddSliderRow(Strings.CpuPl2, tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+		_pl1Label = RowLabelOf(_pl1);
+		AttachPowerWallUnsetHint(_pl1, _pl1Val, _pl1Label);
+		// ⭐⭐ 2026-10-19（机主："AMD 还有 FPPT，能不能加"）：⭐ **PL2 就是 FPPT，不重复加行** ✅
+		//   证据（事实，不猜）：
+		//     ① AMD APU SMU 只有三档功率限制：`stapm`(SPL) / `slow`(sPPT) / `fast`(**fPPT**)；
+		//        RyzenAdj 的 `--fast-limit` 官方口径就是 "Fast Package Power Tracking (fPPT)"，
+		//        命令号 MP1 0x15；本仓库 `RyzenSmuService.SetFastLimit` 用的正是它。
+		//     ② 本文件 PM 表快照（`SmuPowerSnapshot`）也只读 `Stapm/Fast/Slow` 三个功率字段
+		//        （另加 `ApuSlow` 内部档，不是 fPPT），没有第四个可写的 "fPPT" 字段。
+		//     ③ 同方 30 系 GCU 机型的厂商字段确实是三档（`CpuAmdSPL/SPPT/FPPT` → PL1/PL2/PL4），
+		//        ⇒ 在 GCU 那边 FPPT 是"第三档"；但在 SMU 这边第三档就是 `fast`，**已被 PL2 写掉** ✅
+		//   ⇒ 机主要求的行顺序（PL1 → PL2 → 功耗时间窗）**不插入 FPPT 行**；
+		//     若将来要改成"PL1=SPL / PL2=SPPT / FPPT=fPPT"的三轴语义，那属于**改 PL1/PL2 现有映射**，
+		//     必须另行批准（本轮 ⛔ 不改映射、⛔ 不动 PowerLimitOrder 联动）。
+		tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
 		{
-			Queue("PL2", v.ToString());
+			QueuePowerLimit("PL2", v);
 		});
 		_pl2 = tuple4.Item1;
 		_pl2Val = tuple4.Item2;
+		_pl2Label = RowLabelOf(_pl2);
+		AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
+		// ⭐⭐ 2026-10-19（机主要求的行顺序）：PL1 → PL2 → **功耗时间窗（STAPM，秒）** → 温度墙 ✅
+		//   （本行紧跟在 PL2 后面创建 ⇒ 表格里的顺序就是上面这个；FPPT 不单独成行，原因见 PL2 行注释）
+		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：只要「本档真的走 SMU」就**建行** ——
+		//   ⭐ 值读得到/稳定 ⇒ 显示当前值；读不到/不稳定 ⇒ 标题「（未设置）」+ 滑块停在最小档，
+		//      ⛔ 不再因为读不到就隐藏整行（那看起来像"没这个功能"）。
+		//   ⚠️ 单位 = **秒**（MP1 0x18 `stapm_time`；不是毫秒，也不是"PL2 生效时间"）。
+		if (smuPowerControls)
+		{
+			int currentStapmTime = hw.BaolongdaStapmTimeSeconds;
+			bool stapmTimeUnset = currentStapmTime < BaolongdaProfile.StapmTimeMinSeconds
+				|| currentStapmTime > BaolongdaProfile.StapmTimeMaxSeconds;
+			int stapmTimeStart = stapmTimeUnset ? BaolongdaProfile.StapmTimeMinSeconds : currentStapmTime;
+			tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuStapmTimeWindow, stapmTimeUnset),
+				BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, stapmTimeStart, (int v) =>
+			{
+				Queue("SmuStapmTimeSeconds", v.ToString());
+			});
+			_stapmTime = tuple4.Item1;
+			_stapmTimeVal = tuple4.Item2;
+			_stapmTimeLabel = RowLabelOf(_stapmTime);
+			// tooltip 正面解释（⛔ 不写"不是 PL2 生效时间"这类否定/对比句）
+			AttachPowerWallHint(_stapmTime, _stapmTimeVal, _stapmTimeLabel, Strings.CpuStapmTimeWindowHint);
+			if (stapmTimeUnset)
+			{
+				Logger.WriteLine("[smu] STAPM 时间窗当前值读不到/不稳定 ⇒ 行照建、显示「（未设置）」（不隐藏）");
+			}
+		}
+		// ⭐⭐ 2026-10-19（FPPT 结论的 UI 侧说明）：⭐ 这一行在 AMD 平台上用的是**厂商固件字段**
+		//   `CpuAmdFPPT`（`Strings.CpuFppt` = "CPU 峰值功耗墙 fPPT (W)"），即 GCU 三轴语义里的第三档；
+		//   但宝龙达 30 系**没有 GCU**、且 SMU 的第三档（fast limit）已经由 **PL2** 写入
+		//   ⇒ 本行在 30 系 SMU 路径上不可调（`Pl4Minimum/Maximum` 保持 -1 ⇒ `ApplyRange` 会把整行隐藏），
+		//      ⛔ 不拿它当"独立 FPPT 行"、也⛔ 不给它接 SMU 写入（否则与 PL2 重复写 0x15）✅
 		(int, int, int, bool) tuple5 = DeviceRange(hw?.Pl4Minimum ?? (-1), hw?.Pl4Maximum ?? (-1), hw?.Pl4 ?? 0);
 		tuple4 = AddSliderRow((hw != null && hw.UsesAmdPowerFields) ? Strings.CpuFppt : Strings.CpuPl4, tuple5.Item1, tuple5.Item2, tuple5.Item3, (int v) =>
 		{
-			Queue("PL4", v.ToString());
+			QueuePowerLimit("PL4", v);
 		});
 		_pl4 = tuple4.Item1;
 		_pl4Val = tuple4.Item2;
@@ -679,11 +825,32 @@ public class CustomModeForm : RForm
 			_tcc.Enabled = on;
 		});
 		(int, int, int, bool) tuple6 = DeviceRange(hw?.TccMinimum ?? (-1), hw?.TccMaximum ?? (-1), hw?.TccTarget ?? 0);
-		(_tcc, _tccVal) = AddSliderRow(Strings.TempWallValue, tuple6.Item1, tuple6.Item2, tuple6.Item3, (int v) =>
+		(_tcc, _tccVal) = AddSliderRow(PowerWallRowLabel(Strings.TempWallValue, hw?.BaolongdaTempWallUnset ?? false), tuple6.Item1, tuple6.Item2, tuple6.Item3, (int v) =>
 		{
 			Queue("CpuTccOffset", v.ToString());
 		});
+		_tccLabel = RowLabelOf(_tcc);
+		AttachPowerWallUnsetHint(_tcc, _tccVal, _tccLabel);
 		_tccChk.Enabled = tuple6.Item4;
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：⭐ 本档走 SMU 时这三行显示"这一项在 SMU 里是什么"
+		//   （PL1 = slow limit / PL2 = fast limit / 温度墙 = Tctl 上限）。⚠️ 只在**读到了当前值**时替换掉
+		//   「未设置」提示；读不到时保留原来的只读/未设置说明（更贴近用户看到的现象）。
+		//   ⚠️ 非 30 系 / 40 系 / GCU / SMU 不可用 ⇒ 一行都不挂 ⇒ 行为逐位不变 ✅
+		if (smuPowerControls)
+		{
+			if (!(hw?.BaolongdaPl1Unset ?? true))
+			{
+				AttachPowerWallHint(_pl1, _pl1Val, _pl1Label, Strings.CpuPl1Hint);
+			}
+			if (!(hw?.BaolongdaPl2Unset ?? true))
+			{
+				AttachPowerWallHint(_pl2, _pl2Val, _pl2Label, Strings.CpuPl2Hint);
+			}
+			if (!(hw?.BaolongdaTempWallUnset ?? true))
+			{
+				AttachPowerWallHint(_tcc, _tccVal, _tccLabel, Strings.CpuTempWallHint);
+			}
+		}
 		(int, int, int, bool) tuple8 = DeviceRange(hw?.GpuTgpMinimum ?? (-1), hw?.GpuTgpMaximum ?? (-1), hw?.GpuTgp ?? 0);
 		tuple4 = AddSliderRow(Strings.GpuTgp, tuple8.Item1, tuple8.Item2, tuple8.Item3, (int v) =>
 		{
@@ -691,6 +858,28 @@ public class CustomModeForm : RForm
 		});
 		_tgp = tuple4.Item1;
 		_tgpVal = tuple4.Item2;
+		// ⭐⭐ 2026-10-19（机主实测：GCU 机型上「GPU 功耗限制 (W)」无效）：⭐ **只在宝龙达（本机 NVML 可写）构建这一行** ✅
+		//   · GCU / 老接口：NVML 不是它的下发通道（写了也不生效）⇒ **连控件都不建**（⛔ 不是建后隐藏）；
+		//   · GCU 若支持厂商 TGP，走上面的 `Strings.GpuTgp` 厂商口径行（现有字段语义，⛔ 不混用）✅；
+		//   · 宝龙达：NVML 实测可写 ⇒ 保持现状 ✅
+		if (hw?.UsesBaolongda ?? false)
+		{
+			if (NvmlHelper.TryGetPowerLimitBounds(out int plMinW, out int plMaxW, out int plCurW) && plMaxW > plMinW)
+			{
+				int plStart = ((plCurW >= plMinW && plCurW <= plMaxW) ? plCurW : plMaxW);
+				var plRow = AddSliderRow(Strings.GpuPowerLimit, plMinW, plMaxW, plStart, (int v) =>
+				{
+					Queue("GpuPowerLimitW", v.ToString());
+				});
+				_gpuPowerLimit = plRow.Item1;
+				_gpuPowerLimitVal = plRow.Item2;
+				Logger.WriteLine($"[gpu-power] UI 显示功耗上限滑块：{plMinW}~{plMaxW} W（当前 {plCurW} W）");
+			}
+		}
+		else if (Logger.TryMarkChanged("gpu-power-non-baolongda-row-skip", "[gpu-power] 非宝龙达（GCU/老接口）⇒ 不构建 NVML 功耗上限行（该机型以厂商 TGP 行为准）"))
+		{
+			Logger.WriteLine("[gpu-power] 非宝龙达（GCU/老接口）⇒ 不构建 NVML 功耗上限行（该机型以厂商 TGP 行为准）");
+		}
 		_dbChk = AddCheckRow(Strings.GpuDynamicBoost, hw?.GpuDbSwitch ?? false, (bool on) =>
 		{
 			Queue("GpuDynamicBoostSwitch", on ? "1" : "0");
@@ -732,7 +921,14 @@ public class CustomModeForm : RForm
 			Queue("OverClockingSwitch", on ? "1" : "0");
 			SyncGpuOverclockDependents();
 		});
-		(int, int, int, bool) tuple13 = DeviceRange(hw?.GpuCoreOffsetUserMinimum ?? (-1), hw?.GpuCoreOffsetUserMaximum ?? (-1), hw?.EffectiveGpuCoreClockOffset ?? 0, allowNegative: true);
+		// ⭐⭐ 2026-10-19（机主：GPU 核心频率偏移滑块"不行"——灰的、值恒 0）：
+		//   ⚠️ 原来范围只来自**厂商 GCU 字段** `GpuCoreOffsetUserMinimum/Maximum`；宝龙达没有 GCU
+		//      ⇒ 常常是 -1/-1 ⇒ `DeviceRange` 判为不可调 ⇒ 滑块禁用/值恒 0 ❌
+		//   ⭐ 现在统一由 `GpuOffsetUiRange` 给范围：宝龙达读 **NVAPI P0 驱动范围**，再与 -900..+2000 MHz 取交集；
+		//      读不到才退回原有 UI 兜底（-100~+200），注释见该方法。⛔ 范围只是 UI 可操作区间，
+		//      真正写入仍走 NVAPI P0 并**回读确认**（写不进去会如实报失败）。
+		(int coreMin, int coreMax, int memMin, int memMax) = GpuOffsetUiRange(hw);
+		(int, int, int, bool) tuple13 = DeviceRange(coreMin, coreMax, hw?.EffectiveGpuCoreClockOffset ?? 0, allowNegative: true);
 		tuple4 = AddSliderRow(Strings.CoreOffset, tuple13.Item1, tuple13.Item2, tuple13.Item3, (int v) =>
 		{
 			// 2026-10-09：GPU 核心偏移改为「只改数值 + 置脏」，不再拖动即下发；
@@ -744,7 +940,7 @@ public class CustomModeForm : RForm
 		// 2026-10-09：文案改为「核心偏移过高，有损坏硬件的风险」——不再带占位符，故去掉 string.Format
 		// （阈值不写进提示，避免窄窗口长句折行；阈值判定逻辑一字未动，见 CoreOffsetWarnThreshold/SyncOcRiskVisuals）。
 		_coreOcRiskRow = MakeOcRiskRow(Strings.GpuCoreOffsetRisk);
-		(int, int, int, bool) tuple14 = DeviceRange(hw?.GpuMemoryOffsetUserMinimum ?? (-1), hw?.GpuMemoryOffsetUserMaximum ?? (-1), hw?.EffectiveGpuMemoryClockOffset ?? 0, allowNegative: true);
+		(int, int, int, bool) tuple14 = DeviceRange(memMin, memMax, hw?.EffectiveGpuMemoryClockOffset ?? 0, allowNegative: true);
 		(_memOc, _memOcVal) = AddSliderRow(Strings.MemoryOffset, tuple14.Item1, tuple14.Item2, tuple14.Item3, (int v) =>
 		{
 			// 2026-10-09：同上 —— 显存偏移也只在点「应用」时下发。
@@ -1113,6 +1309,54 @@ public class CustomModeForm : RForm
 				row.Height = Math.Max(row.Height, combo.Height);
 			}
 		}
+		// ⭐ 未设置时给行标题追加「（未设置）」（⭐ 见 `_pl1Label` 的注释 ✅）
+		string PowerWallRowLabel(string baseText, bool unset)
+		{
+			return unset ? (baseText + UnsetMark) : baseText;
+		}
+
+		// ⭐⭐ 2026-10-16（"未设置"）：⭐ 行标题（第 0 列）—— `AddSliderRow` 把**行面板**挂在 `bar.Tag` 上 ✅
+		//   ⚠️ 故意**不改 `AddSliderRow` 的返回签名**（⭐ 它有 9 个调用点 ⚠️）⇒ ⭐ 从行面板取风险更小 ✅
+		Label RowLabelOf(RSlider bar)
+		{
+			return (bar.Tag as TableLayoutPanel)?.GetControlFromPosition(0, 0) as Label;
+		}
+
+		// ⭐⭐ 2026-10-16（"未设置"）：⭐ 把完整语义挂成悬浮提示 ✅（⭐ 零布局代价 ✅）
+		void AttachPowerWallUnsetHint(Control bar, Control val, Control label)
+		{
+			if (bar != null)
+			{
+				_tips.SetToolTip(bar, PowerWallUnsetHint);
+			}
+			if (val != null)
+			{
+				_tips.SetToolTip(val, PowerWallUnsetHint);
+			}
+			if (label != null)
+			{
+				_tips.SetToolTip(label, PowerWallUnsetHint);
+			}
+		}
+
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：把"这一项在 SMU 里是什么"挂成悬浮提示（⭐ 与上面同一个 `_tips`）。
+		//   ⚠️ 只在 30 系 SMU 路径、且**该行真的建出来 / 读到了值**时调用（⛔ 不给不存在的行挂提示）。
+		void AttachPowerWallHint(Control bar, Control val, Control label, string hint)
+		{
+			if (bar != null)
+			{
+				_tips.SetToolTip(bar, hint);
+			}
+			if (val != null)
+			{
+				_tips.SetToolTip(val, hint);
+			}
+			if (label != null)
+			{
+				_tips.SetToolTip(label, hint);
+			}
+		}
+
 		(RSlider bar, RNumericUpDown valueInput) AddSliderRow(string label, int min, int max, int value2, Action<int> onChanged)
 		{
 			TableLayoutPanel tableLayoutPanel2 = MakeRow();
@@ -1696,7 +1940,12 @@ public class CustomModeForm : RForm
 		PerfModeDefinition? mode = FindMode(_modeId);
 		// 2026-10-04: firmware-profile mode edits a *preset* firmware config, which is the
 		// normal 30-series behaviour. Keep the Gen40+ preset lock for regular LM use.
-		bool locked = hw != null && IsGen40Plus(hw) && (mode == null || !mode.IsCustom) && !_firmwareMode;
+		// ⭐⭐ 2026-10-17（宝龙达 · 机主反馈「滑块是灰的」）：⭐ 这条锁的**原始理由**是
+		//   「Gen40+ 的预设档由固件（GCU）持有，改 LM 里的值不会生效、还会被固件顶回去」⚠️
+		//   ⇒ ⭐ 宝龙达**没有 GCU** ⇒ 这个理由不成立；而且它的 PL/温度墙**能走 WMI 23 真下发**
+		//      （见 `PerfModeCapabilities.SupportsWmiPowerFields`）⇒ ⭐ 不该再锁 ✅
+		//   ⚠️ 加 `hw.IsGcuConnected` 判据：GCU 机型（含 Gen40+）**逐位不变** ✅
+		bool locked = hw != null && hw.IsGcuConnected && IsGen40Plus(hw) && (mode == null || !mode.IsCustom) && !_firmwareMode;
 		_optionsLocked = locked;
 		foreach (Control control in OptionControls())
 		{
@@ -1726,7 +1975,10 @@ public class CustomModeForm : RForm
 		return new Control[]
 		{
 			_pl1, _pl2, _pl4, _tcc, _tgp, _db, _coreOc, _memOc, _fanSwitchSpeed,
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：本机没有该行时为 null（下面的循环会跳过 null）
+			_stapmTime,
 			_pl1Val, _pl2Val, _pl4Val, _tccVal, _tgpVal, _dbVal, _coreOcVal, _memOcVal, _fanSwitchSpeedVal,
+			_stapmTimeVal,
 			_dbChk, _tccChk, _ocChk, _fanSwitchSpeedChk,
 			_fanCurveButton, _gpuOcAdminRow,
 			_applyButton
@@ -1735,6 +1987,20 @@ public class CustomModeForm : RForm
 
 	private void UpdateRouteHint(PerfModeDefinition mode)
 	{
+		// ⭐⭐ 2026-10-19（机主：顶部黄字「本机无 GCU，不支持写入固件自定义档」误导）：
+		//   ⭐ 宝龙达（30/40 系）⇒ 统一显示「设置保存到本机并立即应用（SMU / WMI 23），不写入固件自定义档」✅
+		//   ⚠️ 原来这里会给自定义档显示「由固件自定义档 N 承载」、给未分配档显示「切换到该模式时分配固件自定义档」
+		//      —— 在宝龙达上**两句都不成立**（它根本没有固件自定义档，却**能**真下发本机后端）❌
+		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 下面原有分支【逐字不变】✅
+		if (Program.hw?.UsesBaolongda == true)
+		{
+			string baolongdaHint = LocalApplyText;
+			if (_routeHint.Text != baolongdaHint)
+			{
+				_routeHint.Text = baolongdaHint;
+			}
+			return;
+		}
 		int? num = PerfModeService.Instance?.SlotOf(mode.Id);
 		string text;
 		if (!mode.IsCustom)
@@ -2055,6 +2321,16 @@ public class CustomModeForm : RForm
 		}
 		DiscardPendingChanges();
 		BindMode(id);
+		// ⭐⭐ 2026-10-19（宝龙达 · 自定义档是"本机配置"）：⭐ 无固件档可切 ⇒ 不调 ActivateModeAsync
+		//   （它必然失败并把界面回弹到别的档，用户看到"选了又跳回去"）✅
+		//   ⚠️ 改动仍由【应用】下发（PL1/PL2/温度墙 → WMI 23；曲线 → 20/21 软件闭环）✅
+		if (Program.hw?.UsesBaolongda ?? false)
+		{
+			_status.Text = Strings.PerfModeLocalProfileSwitched;
+			_status.ForeColor = UiVisualStyle.Muted;
+			Logger.WriteLine("[perfmode] 宝龙达：模式下拉切到 " + id + "（本机配置，无固件档可切）");
+			return true;
+		}
 		bool ok = await ActivateModeAsync(id);
 		if (ok)
 		{
@@ -2271,6 +2547,23 @@ public class CustomModeForm : RForm
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30 系与 40 系都不重置）：
+	/// ⭐ 「恢复出厂」= ① 清 `PerfModeStore`（`perf_<档>_*` ＝ 原 `mode_tune_*` 同源键）并**落盘**；
+	/// ② 对宝龙达**真正恢复硬件默认**（详见 <c>PerfModeService.ResetBaolongdaCustomLocally</c>：
+	/// 40 系 WMI 23 关闭自定义 / 30 系如实说明 SMU 无恢复命令 / GPU 偏移 0/0 / NVML 功耗上限默认值）；
+	/// ③ **显式重置界面控件**（PL1/PL2/温度墙/GPU 超频/偏移/显卡功耗上限）✅。
+	/// <para>⭐⭐ <b>原实现为什么"看起来不生效"</b>：
+	/// <list type="number">
+	/// <item>`ResetAsync` 对宝龙达自定义档会走 GCU 的 `RestoreVendorProfileAsync()`（纯 MQTT）⇒ 必然失败；
+	/// 失败只写一行 `Logger.WriteLine`（默认级别不可见）就 `return false` —— 界面显示「恢复未确认」，
+	/// 而<strong>硬件侧一个字节都没动</strong> ❌（`ResetSettings` 其实已清配置，但没人看得到）；</item>
+	/// <item>就算配置清空了，界面这些行的值来自**硬件回读**（宝龙达清不掉/读回旧值）⇒ PL 还是旧值、
+	/// GPU 超频开关还是开、偏移还在 ⇒ 机主看到的就是「不重置」❌。</item>
+	/// </list>
+	/// ⇒ ⭐ 现在：宝龙达走本机后端真恢复 + 重置完**把控件压回"未设置/关"**，并落一行 `[reset]` 日志 ✅。</para>
+	/// <para>⚠️ 异常一律如实上报（状态行红字 + `Logger.WriteError`），⛔ 不再静默吞掉 ✅。</para>
+	/// </summary>
 	private async Task RestoreDefaultsAsync()
 	{
 		PerfModeService instance = PerfModeService.Instance;
@@ -2281,6 +2574,8 @@ public class CustomModeForm : RForm
 		MechrevoHw hw = Program.hw;
 		if (hw == null || !hw.IsConnected)
 		{
+			_status.Text = GcuDisconnectedText;
+			_status.ForeColor = UiVisualStyle.Danger;
 			return;
 		}
 		PerfModeDefinition mode = FindMode(_modeId);
@@ -2289,35 +2584,354 @@ public class CustomModeForm : RForm
 			return;
 		}
 		string name = PerfModeText.Name(mode);
-		if (MessageBox.Show(this, string.Format(Strings.PerfModeRestorePrompt, name), "L-Mechrevo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+		if (MessageBox.Show(this, string.Format(Strings.PerfModeRestorePrompt, name), "L-Mechrevo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 		{
-			// 2026-10-09（面板统一「显式应用」）：恢复出厂是最后的兜底 —— 它只丢掉未应用的临时改动，
-			// 然后走既有的 PerfModeService.ResetAsync（原有的一键恢复路径），不在这里下发自定义字段。
-			DiscardPendingChanges();
-			_gpuOcArmed = false;
-			_status.Text = Strings.Restoring;
-			_status.ForeColor = UiVisualStyle.Muted;
-			bool flag = await instance.ResetAsync(mode.Id);
-			if (!IsDisposed)
+			return;
+		}
+		// 2026-10-09（面板统一「显式应用」）：恢复出厂是最后的兜底 —— 它只丢掉未应用的临时改动，
+		// 然后走既有的 PerfModeService.ResetAsync（原有的一键恢复路径），不在这里下发自定义字段。
+		DiscardPendingChanges();
+		_gpuOcArmed = false;
+		_status.Text = Strings.Restoring;
+		_status.ForeColor = UiVisualStyle.Muted;
+		bool flag;
+		Exception resetException = null;
+		try
+		{
+			flag = await instance.ResetAsync(mode.Id);
+		}
+		catch (Exception ex)
+		{
+			// ⭐ 异常原文进日志（⛔ 不吞），状态行如实失败 ✅
+			resetException = ex;
+			flag = false;
+			Logger.WriteError("[reset] 自定义档恢复出厂**异常**（如实上报，未吞掉）：" + ex);
+		}
+		// ⭐⭐ 2026-10-19（机主：恢复出厂时风扇转速/曲线表也要恢复默认，强冷也要复位）：
+		//   ⭐ **不论自定义档配置复位是否成功，风扇都按机主要求复位到默认**（⛔ 不因前面失败就跳过）✅
+		//   ⭐ 内容：强冷关闭 → 曲线表回默认（Enabled=false）→ EC 目标 0 + 清接管位（回读确认）→ 再读 EC 证明 ✅
+		await ResetFanAfterFactoryResetAsync(hw, instance);
+		if (IsDisposed)
+		{
+			return;
+		}
+		if (resetException != null)
+		{
+			_status.Text = string.Format(Strings.PerfModeRestoreFailed, name);
+			_status.ForeColor = UiVisualStyle.Danger;
+			ResizeToContent();
+			return;
+		}
+		try
+		{
+			BindMode(mode.Id);
+			OnCustomChanged();
+			// ⭐⭐ 关键：宝龙达的这些行按"硬件回读"刷新（清不掉/旧值）⇒ 必须**显式压回默认显示** ✅
+			//   ⚠️ 只在**恢复确认成功**（`flag`）时压回：40 系功能号 23 关闭写若未被固件接受，
+			//      界面仍显示硬件真实值（⛔ 不拿"看起来已重置"骗人），状态行红字如实说明 ✅
+			//   ⚠️ 非宝龙达（GCU）⇒ 不调用 ⇒ 行为逐位不变 ✅
+			if (hw.UsesBaolongda && flag)
 			{
-				BindMode(mode.Id);
-				OnCustomChanged();
-				_status.Text = string.Format(flag ? Strings.PerfModeRestoreDone : Strings.PerfModeRestoreFailed, name);
-				_status.ForeColor = (flag ? UiVisualStyle.Ok : UiVisualStyle.Danger);
+				ApplyBaolongdaResetVisuals(hw);
 			}
 		}
+		catch (Exception ex2)
+		{
+			Logger.WriteError("[reset] 恢复出厂后刷新界面失败（如实上报，未吞掉）：" + ex2);
+		}
+		_status.Text = string.Format(flag ? Strings.PerfModeRestoreDone : Strings.PerfModeRestoreFailed, name);
+		// ⭐⭐ 2026-10-19（30 系 · SMU）：⭐ SMU 功耗墙**没有"恢复默认"命令**、写入是运行时状态 ⇒
+		//   恢复出厂只清本机配置；硬件侧需**重启**才回固件默认 —— 状态行如实补一句（⛔ 不假装已经写回去了）✅
+		if (flag && hw.UsesBaolongda && hw.IsBaolongda30Series)
+		{
+			_status.Text += Strings.PerfModeRestoreSmuVolatileNote;
+		}
+		_status.ForeColor = (flag ? UiVisualStyle.Ok : UiVisualStyle.Danger);
+		ResizeToContent();
+		// ⭐ 机主要求的一行日志（值 = 重置后的实际显示状态；默认日志级别可见）✅
+		LogCustomResetResult(hw);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 恢复出厂后**显式重置界面控件** ✅。
+	/// <para>⚠️ 只对宝龙达调用（GCU 机型的行按硬件回读显示的是"厂商默认"，⛔ 不能覆盖成"未设置"）✅。</para>
+	/// <para>⚠️ 全程 `_syncing = true` ⇒ 程序化改值**不会**触发 `Queue`/`MarkGpuOffsetDirty`（⛔ 不产生"待应用"脏值）✅。</para>
+	/// </summary>
+	private void ApplyBaolongdaResetVisuals(MechrevoHw hw)
+	{
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return;
+		}
+		bool syncing = _syncing;
+		_syncing = true;
+		try
+		{
+			// ① 功耗墙三项 ⇒ 回到「未设置」显示位（标题补回「（未设置）」）
+			ResetPowerWallRowVisual(_pl1, _pl1Val, _pl1Label, Strings.CpuPl1);
+			ResetPowerWallRowVisual(_pl2, _pl2Val, _pl2Label, Strings.CpuPl2);
+			ResetPowerWallRowVisual(_tcc, _tccVal, _tccLabel, Strings.TempWallValue);
+			if (_tccChk != null)
+			{
+				_tccChk.Checked = false;
+			}
+			if (_tcc != null)
+			{
+				_tcc.Enabled = false;
+			}
+			// ② GPU 超频 ⇒ 关；核心/显存偏移 ⇒ 0（重置时已用 NVAPI 写回 0/0）
+			_gpuOcArmed = false;
+			if (_ocChk != null)
+			{
+				_ocChk.Checked = false;
+			}
+			if (_coreOc != null)
+			{
+				ApplyRange(_coreOc, _coreOcVal, _coreOc.Minimum, _coreOc.Maximum, 0, allowNegative: true);
+			}
+			if (_memOc != null)
+			{
+				ApplyRange(_memOc, _memOcVal, _memOc.Minimum, _memOc.Maximum, 0, allowNegative: true);
+			}
+			_gpuOcDirty = false;
+			SyncGpuOverclockDependents();
+			// ③ 显卡功耗上限 ⇒ 按 NVML 回读的当前值显示（重置时已写回驱动默认值）
+			if (_gpuPowerLimit != null && NvmlHelper.TryGetPowerLimitBounds(out int minW, out int maxW, out int curW) && maxW > minW)
+			{
+				ApplyRange(_gpuPowerLimit, _gpuPowerLimitVal, minW, maxW, curW);
+			}
+		}
+		finally
+		{
+			_syncing = syncing;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 把一行功耗墙控件压回「未设置」显示位 ✅。
+	/// <para>⚠️ 只改**显示值/标题/悬浮提示**，⛔ 不发任何硬件命令、⛔ 不 Queue 字段 ✅。</para>
+	/// </summary>
+	private void ResetPowerWallRowVisual(RSlider bar, RNumericUpDown valueInput, Label label, string baseText)
+	{
+		if (bar == null)
+		{
+			return;
+		}
+		ApplyRange(bar, valueInput, bar.Minimum, bar.Maximum, bar.Minimum);
+		// ⭐ 构造期标题按"当时是否未设置"确定；重置后要**补回**标记（只减不增的旧纪律在这里必须破例，
+		//   否则重置后标题还停在"已下发"的短文案，会被误读成"仍然设置着"）—— 标题列宽按最长标题算过 ⇒ 不会裁 ✅
+		if (label != null && !label.Text.EndsWith(UnsetMark, StringComparison.Ordinal))
+		{
+			label.Text = baseText + UnsetMark;
+		}
+		// ⭐ 30 系曾把提示换成"SMU 语义" ⇒ 重置后恢复成「未设置」的完整语义 ✅
+		_tips.SetToolTip(bar, PowerWallUnsetHint);
+		if (valueInput != null)
+		{
+			_tips.SetToolTip(valueInput, PowerWallUnsetHint);
+		}
+		if (label != null)
+		{
+			_tips.SetToolTip(label, PowerWallUnsetHint);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ 恢复出厂后落**机主要求的那一行**日志 ✅
+	/// <para>⭐ 例：`[reset] 自定义档已恢复默认 ⇒ PL1=未设置 PL2=未设置 温度墙=未设置 GPU 超频=关`</para>
+	/// <para>⚠️ 值取**重置后的实际显示状态**（宝龙达 = 未设置/关；GCU = 硬件回读到的厂商默认值）✅</para>
+	/// </summary>
+	private void LogCustomResetResult(MechrevoHw hw)
+	{
+		string pl1 = ShowResetPower(hw?.Pl1Adjustable ?? false, hw?.BaolongdaPl1Unset ?? false, hw?.Pl1 ?? 0);
+		string pl2 = ShowResetPower(hw?.Pl2Adjustable ?? false, hw?.BaolongdaPl2Unset ?? false, hw?.Pl2 ?? 0);
+		string tcc = ((hw != null && hw.TccAdjustable && !hw.BaolongdaTempWallUnset && hw.TccTarget > 0)
+			? hw.TccTarget.ToString(CultureInfo.InvariantCulture) + "℃"
+			: "未设置");
+		string gpuOc = ((_ocChk != null && _ocChk.Checked) ? "开" : "关");
+		bool baolongda = hw != null && hw.UsesBaolongda;
+		// ⭐ 机主要求核查的第三点：⭐ 配置是否真的写回 `PerfModeStore`（`perf_<档>_*` ≡ 原 `mode_tune_*`）
+		//   并落盘 —— 这里**直读配置**复核（⛔ 不拿内存里的对象冒充）✅
+		//   ⚠️ 只对宝龙达输出：GCU 机型恢复后 `CaptureSlotAsync` 会按固件回读重填档位参数（既有语义），
+		//      那不是"残留"，⛔ 不该在这里误报 ✅
+		string storeSuffix = string.Empty;
+		if (baolongda)
+		{
+			string storeState;
+			try
+			{
+				PerfModeSettings persisted = PerfModeStore.LoadSettings(_modeId);
+				storeState = persisted.IsUntouched ? "已清空并落盘" : "⚠️ 仍有残留";
+			}
+			catch (Exception ex)
+			{
+				storeState = "⚠️ 回读失败：" + ex.GetType().Name;
+			}
+			storeSuffix = " · 本机配置=" + storeState;
+		}
+		Logger.WriteError($"[reset] 自定义档已恢复默认 ⇒ PL1={pl1} PL2={pl2} 温度墙={tcc} GPU 超频={gpuOc}"
+			+ storeSuffix
+			+ (baolongda ? "（本机后端：SMU / WMI 23；不写固件自定义档）" : ""));
+		static string ShowResetPower(bool adjustable, bool unset, int value)
+		{
+			return (adjustable && !unset && value > 0) ? value.ToString(CultureInfo.InvariantCulture) : "未设置";
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：恢复出厂时**风扇转速/曲线表**没恢复，**强冷也要复位**）：
+	/// ⭐ 调 <see cref="PerfModeService.ResetBaolongdaFanToFirmwareDefault" /> 把风扇整体恢复默认，
+	/// 然后按真实值刷新 UI ✅。
+	/// <para>⭐ 顺序：① 强冷正开着 ⇒ 先走关闭流程（快照恢复 / FanBoostActive=false / 清临时状态）；
+	/// ② 曲线表重置为**当前代际默认 16 点**且 `Enabled=false`（闭环停用）；
+	/// ③ `FanWriter.TryReleaseToFirmware()` 交回固件（EC 目标 0 + 清 `0x02|0x08`，回读确认）；
+	/// ④ 再读一次 EC（`0xC83C/0xC83D/0xB20`）写日志证明 ✅。</para>
+	/// <para>⚠️ 只在宝龙达执行；GCU 机型行为逐位不变 ✅。异常如实写日志、⛔ 不吞 ✅。</para>
+	/// </summary>
+	private async Task ResetFanAfterFactoryResetAsync(MechrevoHw hw, PerfModeService instance)
+	{
+		if (hw == null || instance == null || !hw.UsesBaolongda)
+		{
+			return;
+		}
+		try
+		{
+			instance.ResetBaolongdaFanToFirmwareDefault();
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[reset] 风扇恢复默认**异常**（如实上报，未吞掉）：" + ex);
+		}
+		await RefreshFanUiAfterFactoryResetAsync();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：恢复出厂后风扇 UI 要按真实值刷新）：
+	/// ① 「更多开关 / 磁贴」里的「风扇强冷」⇒ 调现有 <c>SettingsForm.RefreshQuickSwitchStatesNow()</c>
+	/// （⭐ 它内部 `UpdateQuickSwitches` 读 `MechrevoHw.FanBoostActive`，宝龙达同源）✅；
+	/// ② 风扇曲线窗口若正开着 ⇒ 关掉后走现有 <see cref="OpenFanCurveAsync" /> **重开**
+	/// （⭐ 新实例构造时从 store 读值 ⇒ 「启用软件闭环」= 未勾选、曲线 = 默认 16 点；
+	/// ⛔ 不改 <c>FanCurveForm</c> 代码；⭐ 闸门未放开时它自己会继续隐藏/禁用入口）✅。
+	/// <para>⚠️ 刷新失败只记日志，⛔ 不影响"恢复出厂"本身 ✅。</para>
+	/// </summary>
+	private async Task RefreshFanUiAfterFactoryResetAsync()
+	{
+		// ① 更多开关 / 磁贴（风扇强冷 = 关）
+		try
+		{
+			SettingsForm settingsForm = Program.settingsForm;
+			if (settingsForm != null && !settingsForm.IsDisposed)
+			{
+				if (settingsForm.InvokeRequired)
+				{
+					settingsForm.BeginInvoke(settingsForm.RefreshQuickSwitchStatesNow);
+				}
+				else
+				{
+					settingsForm.RefreshQuickSwitchStatesNow();
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[reset] 刷新「更多开关/磁贴」失败（已吞掉，不影响恢复）：" + ex.Message);
+		}
+		// ② 风扇曲线窗口（若开着）：按 store 真值重开
+		try
+		{
+			FanCurveForm[] openCurveForms = OwnedForms.OfType<FanCurveForm>()
+				.Where((FanCurveForm f) => f != null && !f.IsDisposed && f.Visible)
+				.ToArray();
+			if (openCurveForms.Length == 0)
+			{
+				return;
+			}
+			foreach (FanCurveForm fanCurveForm in openCurveForms)
+			{
+				try
+				{
+					fanCurveForm.Close();
+				}
+				catch (Exception ex2)
+				{
+					Logger.WriteLine("[reset] 关闭旧风扇曲线窗口失败（已吞掉）：" + ex2.Message);
+				}
+			}
+			if (!IsDisposed)
+			{
+				await OpenFanCurveAsync();
+				Logger.WriteError("[reset] 风扇曲线窗口已按默认状态重开（启用软件闭环=未勾选；闸门未放开时入口继续隐藏）");
+			}
+		}
+		catch (Exception ex3)
+		{
+			Logger.WriteError("[reset] 重开风扇曲线窗口失败（已吞掉，不影响恢复）：" + ex3);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：初始化必须纯按需、⛔ 不要启动预热）：
+	/// ⭐ 打开风扇曲线窗口时**后台**触发一次风扇闸门只读验证 + 启动清理（进程内缓存一次；⛔ 不阻塞 UI）✅。
+	/// <para>完成后回 UI 线程刷新「更多开关/磁贴」等入口（不重建窗口）。</para>
+	/// </summary>
+	private void ScheduleDeferredFanInit(string trigger)
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null || !hw.UsesBaolongda || Interlocked.Exchange(ref _deferredFanInitScheduled, 1) != 0)
+		{
+			return;
+		}
+		_ = Task.Run(() =>
+		{
+			long start = Environment.TickCount64;
+			try
+			{
+				hw.RunDeferredFanStartupCleanup();
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[init] 按需初始化：风扇闸门/清理失败（已吞掉，不影响 UI）：" + ex.Message);
+			}
+			Logger.WriteError("[init] 按需初始化：风扇闸门（触发=" + trigger + " · 耗时 " + (Environment.TickCount64 - start) + " ms）");
+			try
+			{
+				SettingsForm form = Program.settingsForm;
+				if (form != null && !form.IsDisposed && form.IsHandleCreated)
+				{
+					form.BeginInvoke((Action)(() =>
+					{
+						if (!form.IsDisposed)
+						{
+							form.RefreshQuickSwitchStatesNow();
+						}
+					}));
+				}
+			}
+			catch (Exception ex2)
+			{
+				Logger.WriteLine("[init] 按需初始化后刷新 UI 失败（已吞掉）：" + ex2.Message);
+			}
+		});
 	}
 
 	private async Task OpenFanCurveAsync()
 	{
 		PerfModeService perf = PerfModeService.Instance;
+		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
+		//   ⭐ 风扇闸门只读验证/启动清理改为**纯按需 + 后台**：打开风扇曲线窗口时才触发（进程内缓存一次）；
+		//      ⛔ 不阻塞 UI（先显示窗口，验证完再回 UI 刷新开关/入口）✅
+		ScheduleDeferredFanInit("打开风扇曲线窗口");
 		// 2026-10-05: in firmware-profile mode go straight to the editor.
 		// FanCurveForm already reads and writes the ACTIVE profile's curve through
 		// GET/SET_FAN_SPEED_CURVE_SETTING, and the active profile IS the config being
 		// edited, so the curve shown belongs to that config. Running the block below
 		// would call EnsureFirmwareSlotAsync() and convert the built-in preset mode
 		// into a firmware-slot route -- a side effect on LM's mode model we do not want.
-		if (perf != null && !_firmwareMode)
+		// ⭐⭐ 2026-10-19（宝龙达 · 自定义档"不能用"）：⭐ 没有 GCU ⇒ `EnsureFirmwareSlotAsync` 必然失败，
+		//   界面会停在「读不到该模式的厂商出厂参数，无法转到自定义档」❌
+		//   ⭐ 宝龙达下跳过这一步：曲线窗口直接开（曲线走本机软件闭环 20/21，不依赖固件槽）✅
+		//   ⚠️ 非宝龙达逐位不变 ✅
+		if (perf != null && !_firmwareMode && !(Program.hw?.UsesBaolongda ?? false))
 		{
 			PerfModeDefinition mode = FindMode(_modeId);
 			if ((object)mode != null && mode.Route == PerfModeRoute.BuiltIn)
@@ -2474,6 +3088,20 @@ public class CustomModeForm : RForm
 					_status.ForeColor = UiVisualStyle.Muted;
 				}
 			}
+			// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性③）：
+			//   ⭐ 把 **UI 控件值 → 待下发字段** 的真实映射落一行（默认级别可见）✅
+			//   ⚠️ 只在这一批确实带 GPU 超频字段时打 ⇒ 平时改 PL/温度墙不刷屏 ✅
+			if ((Program.hw?.UsesBaolongda ?? false)
+				&& (fields.ContainsKey("OverClockingSwitch") || fields.ContainsKey("GpuCoreClockOffsetOC") || fields.ContainsKey("GpuMemoryClockOffsetOC")))
+			{
+				string ocOnText = fields.TryGetValue("OverClockingSwitch", out string ocOnValue) ? ocOnValue : "(未改)";
+				string coreFieldText = fields.TryGetValue("GpuCoreClockOffsetOC", out string coreFieldValue) ? coreFieldValue : "(未改)";
+				string memFieldText = fields.TryGetValue("GpuMemoryClockOffsetOC", out string memFieldValue) ? memFieldValue : "(未改)";
+				Logger.WriteError("[gpu-oc] 应用请求（UI→字段）：开关=" + ocOnText + " · core=" + coreFieldText + " · mem=" + memFieldText
+					+ " · 滑块 core=" + _coreOc.Value + " mem=" + _memOc.Value
+					+ " · 偏移可调 core=" + _gpuOcCoreAdjustable + " mem=" + _gpuOcMemoryAdjustable
+					+ " · 偏移脏=" + offsetsPending);
+			}
 			PerfApplyOutcome? outcome = null;
 			bool confirmed = true;
 			bool applied = false;
@@ -2595,6 +3223,34 @@ public class CustomModeForm : RForm
 		});
 		PerfModeDefinition perfModeDefinition = FindMode(outcome.ModeId);
 		string arg = (((object)perfModeDefinition != null) ? PerfModeText.Name(perfModeDefinition) : "");
+		// ⭐⭐ 2026-10-16（宝龙达 · 自定义档诚实性）：⭐ 本机写不了「固件自定义档」时，⭐ 这条结果里
+		//   【不会】有档位步/固件字段步（⭐ 依据：PerfModeCapabilities.SupportsFirmwareSlot=false
+		//   ＋ PerfModeApplyPlanner 据此不生成那两步 ✅）⇒ ⭐ flag=false、⭐ ModeSwitched=false
+		//   ⇒ ⭐ 原来会掉进下面 else 分支，⭐ 而两种表现都不准确 ⚠️：
+		//     ① ⭐ 步骤为空（⭐ 用户只改了"不改变"的那些行 ✅）⇒ ⭐ 直接 return ⇒ ⭐ **界面毫无反应** ❌；
+		//     ② ⭐ 有步骤 ⇒ ⭐ 显示"已确认 N 项" ⇒ ⭐ 会被读成"档位已经切过去了" ❌。
+		//   ⭐ 所以这里如实说明：⭐ 保存下来的是【本机配置】，⭐ 固件档位**不切** ✅。
+		//   ⚠️ ⭐ 不掩盖真实失败：⭐ 有失败项 ⇒ ⭐ 仍走下面 AnyFailed 分支（⭐ 红字 ✅）。
+		//   ⚠️ 非宝龙达 ⇒ `firmwareSlotNotWritable` 恒 false ⇒ ⭐ 下面原有三分支【一字不变】✅。
+		// ⭐⭐ 2026-10-19（机主：顶部黄字误导）：⭐ 宝龙达**能真下发**（SMU / WMI 23 / NVAPI / NVML）⇒
+		//   ⛔ 不再说「本机无 GCU，不支持写入固件自定义档」；改说「设置保存到本机并立即应用…不写入固件自定义档」✅
+		bool firmwareSlotNotWritable = ((object)perfModeDefinition != null)
+			&& perfModeDefinition.Route == PerfModeRoute.FirmwareSlot
+			&& (Program.hw?.UsesBaolongda ?? false);
+		if (firmwareSlotNotWritable && !outcome.AnyFailed)
+		{
+			_status.Text = LocalApplyText;
+			_status.ForeColor = UiVisualStyle.Warn;
+			_tips.SetToolTip(_status, PerfModeText.Details(outcome, amd));
+			ResizeToContent();
+			// ⭐ 默认「仅错误」级别可见（⭐ WriteError ✅）；⭐ 用状态翻转去重 ⇒ ⭐ 不会随每次
+			//   懒验证/重绘刷屏（⭐ 只有"从别的情形变成这种"时才落一行 ✅）。
+			if (Logger.TryMarkChanged("perf-custom-firmware-slot-unsupported", "PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）⇒ 本机配置已应用（SMU / WMI 23），固件自定义档不写；已按后端如实提示"))
+			{
+				Logger.WriteError("PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）⇒ 本机配置已应用（SMU / WMI 23），固件自定义档不写；已按后端如实提示");
+			}
+			return;
+		}
 		if (flag && !outcome.ModeSwitched)
 		{
 			_status.Text = Strings.PerfModeSwitchFailed;
@@ -3006,6 +3662,111 @@ public class CustomModeForm : RForm
 		MarkPanelDirty();
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1；低了要联动调 PL1）：
+	/// ⭐ PL 三行的**唯一登记入口** —— 先登记本次改动，再做联动（⭐ 联动改出来的另一项也会走这里登记，
+	/// 但 <see cref="_plLinking" /> 保证⛔ 不会再发起第二次联动）✅。
+	/// </summary>
+	private void QueuePowerLimit(string field, int value)
+	{
+		Queue(field, value.ToString());
+		if (_plLinking)
+		{
+			return;
+		}
+		LinkPowerLimits(field);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1）：⭐ 界面联动 —— 把被联动的那几个滑块**一起改掉** ✅。
+	/// <para>⭐ 规则本体在 <see cref="PowerLimitOrder" />（⭐ 与校验层**同一份口径**，⛔ 不在 UI 里另写一套）✅。</para>
+	/// <para>⚠️ "未知值"不参与联动：⭐ 宝龙达 40 系的 PL 协议**只写不读** ⇒ 本次运行还没下发过时，
+	/// 另一项就是未知（⭐ 不能拿界面钳出来的下限当真值去把用户刚设的值改掉）✅。</para>
+	/// </summary>
+	private void LinkPowerLimits(string changedField)
+	{
+		if (_pl1 == null || _pl2 == null)
+		{
+			return;
+		}
+		MechrevoHw hw = Program.hw;
+		int? pl1 = KnownPowerLimitValue("PL1", _pl1, hw?.Pl1 ?? 0);
+		int? pl2 = KnownPowerLimitValue("PL2", _pl2, hw?.Pl2 ?? 0);
+		// ⭐ 无 PL4 的机型（宝龙达）⇒ `_pl4` 行不可调 ⇒ 这里自然是 null ⇒ 约束自动忽略 PL4 ✅
+		int? pl4 = (_pl4 == null) ? ((int?)null) : KnownPowerLimitValue("PL4", _pl4, hw?.Pl4 ?? 0);
+		PowerLimitOrder.Field? changed = changedField switch
+		{
+			"PL1" => PowerLimitOrder.Field.Pl1,
+			"PL2" => PowerLimitOrder.Field.Pl2,
+			"PL4" => PowerLimitOrder.Field.Pl4,
+			_ => (PowerLimitOrder.Field?)null
+		};
+		PowerLimitOrder.Range range1 = (_pl1.Maximum > _pl1.Minimum)
+			? new PowerLimitOrder.Range(_pl1.Minimum, _pl1.Maximum)
+			: PowerLimitOrder.Range.Unbounded;
+		PowerLimitOrder.Range range2 = (_pl2.Maximum > _pl2.Minimum)
+			? new PowerLimitOrder.Range(_pl2.Minimum, _pl2.Maximum)
+			: PowerLimitOrder.Range.Unbounded;
+		PowerLimitOrder.Range range4 = ((_pl4 != null && _pl4.Maximum > _pl4.Minimum))
+			? new PowerLimitOrder.Range(_pl4.Minimum, _pl4.Maximum)
+			: PowerLimitOrder.Range.Unbounded;
+		if (!PowerLimitOrder.TryLink(changed, pl1, pl2, pl4, range1, range2, range4,
+			out int? linkedPl1, out int? linkedPl2, out int? linkedPl4,
+			out IReadOnlyList<PowerLimitOrder.Change> changes, out string reason))
+		{
+			// ⭐ 极端情形（⭐ 三行范围互相冲突）⇒ 保持原值、如实说明；⛔ 不生成违规组合 ✅
+			Logger.WriteError("[pl] 联动：⚠️ 当前三行范围无法同时满足 PL1 ≤ PL2 ≤ PL4 ⇒ 本次不联动（保持原值）");
+			return;
+		}
+		if (changes == null || changes.Count == 0)
+		{
+			return;
+		}
+		_plLinking = true;
+		try
+		{
+			// ⭐ 程序化改值仍会走各自的 onChanged ⇒ 会把"被联动后的值"正常登记进 `_pending` ✅
+			//   （⭐ `_plLinking` 只拦住"再发起一次联动"，⛔ 不拦登记）✅
+			if (linkedPl1.HasValue && _pl1.Value != linkedPl1.Value)
+			{
+				_pl1.Value = linkedPl1.Value;
+			}
+			if (linkedPl2.HasValue && _pl2.Value != linkedPl2.Value)
+			{
+				_pl2.Value = linkedPl2.Value;
+			}
+			if (linkedPl4.HasValue && _pl4 != null && _pl4.Value != linkedPl4.Value)
+			{
+				_pl4.Value = linkedPl4.Value;
+			}
+		}
+		finally
+		{
+			_plLinking = false;
+		}
+		// ⭐ 机主要求的那一行日志（⭐ 例：`[pl] 联动：PL1 120→100（因 PL2=100）`）✅
+		//   ⚠️ 界面这一次联动只是"改了待应用的值"；真正下发时还会由校验层/单键兜底再记一条
+		//      **带下发结果**的 `[pl] 联动`（那条用 WriteError ⇒ 默认级别可见）✅
+		Logger.WriteLine(PowerLimitOrder.Describe(changes, reason));
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19：⭐ 界面某一行 PL 的"当前已知值" —— ⭐ 本次已登记（待应用，⭐ 以用户刚改的为准）
+	/// → ⭐ 硬件上报的真实值（&gt;0 才算已知）→ ⭐ 否则 <c>null</c>（⭐ 未知，不参与联动）✅。
+	/// </summary>
+	private int? KnownPowerLimitValue(string field, RSlider bar, int hwValue)
+	{
+		if (bar == null || bar.Maximum <= bar.Minimum)
+		{
+			return null;
+		}
+		if (_pending.TryGetValue(field, out string text) && int.TryParse(text, out int pending))
+		{
+			return pending;
+		}
+		return (hwValue > 0) ? hwValue : (int?)null;
+	}
+
 	internal static bool IsOcCheckboxEnabled(MechrevoHw? hw, bool rangesAdjustable)
 	{
 		int num;
@@ -3105,7 +3866,11 @@ public class CustomModeForm : RForm
 			Logger.WriteLine("[fan] 曲线自动应用跳过：保存未确认（回读不一致或写失败）——见曲线窗口状态行");
 			return;
 		}
-		_ = ApplyFanCurveAutoApplyAsync();
+		// ⭐⭐ 2026-10-18（机主：保存才算数）：⭐ 保存动作本身已经应用（宝龙达 SaveBaolongdaFanCurve 内立即闭环 / 同方保存时固件上传），
+		//   ⛔ 这里不再做第二次 auto-apply（避免拖一次保存触发两轮全量重写）✅
+		_status.Text = Strings.FanCurveSavedAndEnabled;
+		_status.ForeColor = UiVisualStyle.Muted;
+		Logger.WriteLine("[fan] 曲线：保存回调（保存动作已应用，⛔ 不再二次 auto-apply）");
 	}
 
 	/// <summary>
@@ -3248,6 +4013,13 @@ public class CustomModeForm : RForm
 			case "PL2":
 				RestoreSliderValue(_pl2, _pl2Val, value);
 				break;
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：行不存在（_stapmTime == null）时跳过（⛔ 不凭空补控件）。
+			case "SmuStapmTimeSeconds":
+				if (_stapmTime != null)
+				{
+					RestoreSliderValue(_stapmTime, _stapmTimeVal, value);
+				}
+				break;
 			case "PL4":
 				RestoreSliderValue(_pl4, _pl4Val, value);
 				break;
@@ -3329,6 +4101,12 @@ public class CustomModeForm : RForm
 					{
 						Pl2 = result
 					}, 
+					// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：键 = `SmuStapmTimeSeconds`，单位秒；
+					//   只有 30 系那一行会 Queue 它（其它机型不会出现该键）。
+					"SmuStapmTimeSeconds" => perfModeSettings with
+					{
+						StapmTimeSeconds = result
+					}, 
 					"PL4" => perfModeSettings with
 					{
 						Pl4 = result
@@ -3349,7 +4127,11 @@ public class CustomModeForm : RForm
 					{
 						GpuDynamicBoostOn = (result == 1)
 					}, 
-					"GpuDynamicBoost" => perfModeSettings with
+					"GpuPowerLimitW" => perfModeSettings with
+			{
+				GpuPowerLimitW = new int?(result)
+			},
+			"GpuDynamicBoost" => perfModeSettings with
 					{
 						GpuDynamicBoost = result
 					}, 
@@ -3408,6 +4190,66 @@ public class CustomModeForm : RForm
 		};
 	}
 
+	/// <summary>
+	/// 2026-10-19（宝龙达 · GPU 偏移范围）：核心/显存滑块的统一范围来源。
+	/// <para>⭐ 宝龙达没有 GCU ⇒ 厂商字段 <c>GpuCoreOffsetUserMinimum/Maximum</c> 常常是 -1/-1
+	/// ⇒ 原来滑块被禁用。现在直接读 **NVAPI P-States 20 的 P0 驱动范围**，再与
+	/// <c>-900..+2000 MHz</c>（第三方 7.3 的 MinCoreOffset/MaxCoreOffset）取交集。</para>
+	/// <para>⚠️ 读不到 NVAPI 范围时：核心保留**既有**兜底 <c>-100..+200 MHz</c>（来源：commit 6ab74f8 的
+	/// 宝龙达 UI 近似范围，只是让滑块可操作，⛔ 不是硬件范围；写入仍以回读为准）；显存不另造兜底，
+	/// 保持后端给出的范围（读不到就禁用，宁可不给也不给一个写不进去的滑块）。</para>
+	/// <para>⚠️ 非宝龙达：逐字返回原来的 <c>hw.GpuCoreOffsetUserMinimum/Maximum</c> 等值，行为不变。</para>
+	/// </summary>
+	private static (int CoreMin, int CoreMax, int MemMin, int MemMax) GpuOffsetUiRange(MechrevoHw hw)
+	{
+		int coreMin = hw?.GpuCoreOffsetUserMinimum ?? (-1);
+		int coreMax = hw?.GpuCoreOffsetUserMaximum ?? (-1);
+		int memMin = hw?.GpuMemoryOffsetUserMinimum ?? (-1);
+		int memMax = hw?.GpuMemoryOffsetUserMaximum ?? (-1);
+		if (!(hw?.UsesBaolongda ?? false))
+		{
+			return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
+		}
+		if (NvapiPStates.TryGetP0OffsetRange(out int driverCoreMin, out int driverCoreMax, out int driverMemMin, out int driverMemMax))
+		{
+			int uiCoreMin = Math.Max(driverCoreMin, NvapiPStates.UiOffsetMinimumMhz);
+			int uiCoreMax = Math.Min(driverCoreMax, NvapiPStates.UiOffsetMaximumMhz);
+			int uiMemMin = Math.Max(driverMemMin, NvapiPStates.UiOffsetMinimumMhz);
+			int uiMemMax = Math.Min(driverMemMax, NvapiPStates.UiOffsetMaximumMhz);
+			bool coreAxisValid = uiCoreMax > uiCoreMin;
+			bool memAxisValid = uiMemMax > uiMemMin;
+			if (coreAxisValid)
+			{
+				coreMin = uiCoreMin;
+				coreMax = uiCoreMax;
+			}
+			if (memAxisValid)
+			{
+				memMin = uiMemMin;
+				memMax = uiMemMax;
+			}
+			if (coreAxisValid || memAxisValid)
+			{
+				Logger.WriteLineIfChanged("gpu-oc-ui-range-baolongda",
+					$"[gpu-oc] 宝龙达 UI 范围：驱动 P0 core={driverCoreMin}..{driverCoreMax} mem={driverMemMin}..{driverMemMax} MHz ⇒ 与 -900..+2000 取交集 core={(coreAxisValid ? uiCoreMin + ".." + uiCoreMax : "(不可用)")} mem={(memAxisValid ? uiMemMin + ".." + uiMemMax : "(不可用)")} MHz");
+				return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
+			}
+			Logger.WriteLine("[gpu-oc] 宝龙达 NVAPI P0 范围与 -900..+2000 取交集后两轴都无效，改用既有兜底: core=" + uiCoreMin + ".." + uiCoreMax + " mem=" + uiMemMin + ".." + uiMemMax);
+		}
+		else
+		{
+			Logger.WriteLine("[gpu-oc] 宝龙达 NVAPI P0 范围读不到: " + NvapiPStates.LastError);
+		}
+		if ((coreMin < 0 || coreMax <= coreMin) && (hw?.SupportsGpuOverclock ?? false))
+		{
+			// 既有兜底（commit 6ab74f8）：仅 UI 可操作区间，来源不是硬件；写不进去时由回读如实报失败。
+			coreMin = -100;
+			coreMax = 200;
+			Logger.WriteLine("[gpu-oc] 宝龙达：NVAPI/厂商均未给核心偏移范围 ⇒ 保留既有 UI 兜底 -100~+200 MHz（非硬件范围，写入仍以回读为准）");
+		}
+		return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
+	}
+
 	private static (int Min, int Max, int Value, bool Adjustable) DeviceRange(int minimum, int maximum, int current, bool allowNegative = false)
 	{
 		if ((allowNegative || minimum >= 0) && maximum > minimum)
@@ -3450,8 +4292,21 @@ public class CustomModeForm : RForm
 			await Task.Run((Func<bool>)hw.EnsureDirectGpuOverclock);
 			if (!(await hw.RequestCustomModePageStateAsync()))
 			{
-				_status.Text = FanTableTimeoutText;
-				_status.ForeColor = UiVisualStyle.Danger;
+				// ⭐⭐ 2026-10-19（机主：删掉顶部红字「本机无 GCU，硬件状态页不可读」）：
+				//   ⭐ 宝龙达下本机配置（SMU/WMI 23/NVAPI/NVML）照常可用，这条红字会让人误以为功能不可用 ⇒
+				//      **不显示任何状态文本**（`SyncStatusRow()` 随空文本折叠，⛔ 不留空白占位）✅
+				//   ⚠️ 非宝龙达（GCU/老接口）⇒ 仍显示 FanTableTimeoutText，**逐字不变** ✅
+				if (hw.UsesBaolongda)
+				{
+					_status.Text = string.Empty;
+					_status.ForeColor = UiVisualStyle.Muted;
+					SyncStatusRow();
+				}
+				else
+				{
+					_status.Text = FanTableTimeoutText;
+					_status.ForeColor = UiVisualStyle.Danger;
+				}
 				return false;
 			}
 			return true;
@@ -3459,8 +4314,20 @@ public class CustomModeForm : RForm
 		catch (Exception ex)
 		{
 			Logger.WriteLine("Custom mode status refresh failed: " + ex.Message);
-			_status.Text = FanTableTimeoutText;
-			_status.ForeColor = UiVisualStyle.Danger;
+			// ⭐⭐ 2026-10-19（机主：删掉顶部红字「本机无 GCU，硬件状态页不可读」）：
+			//   ⭐ 宝龙达（异常同样是"MQTT 未连接"这条链）⇒ **不显示状态文本**（随空文本折叠）✅
+			//   ⚠️ 非宝龙达 ⇒ 仍显示 FanTableTimeoutText，逐字不变 ✅
+			if (hw.UsesBaolongda)
+			{
+				_status.Text = string.Empty;
+				_status.ForeColor = UiVisualStyle.Muted;
+				SyncStatusRow();
+			}
+			else
+			{
+				_status.Text = FanTableTimeoutText;
+				_status.ForeColor = UiVisualStyle.Danger;
+			}
 			return false;
 		}
 		finally
@@ -3604,6 +4471,25 @@ public class CustomModeForm : RForm
 		ProcessHelper.RunAsAdmin();
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-16（"未设置"）：⭐ 该行**已下发过** ⇒ ⭐ 把标题里的「（未设置）」去掉 ✅。
+	/// <para>⚠️ <b>只减不增</b>：⭐ 标题列宽是建窗体时按**最长**标题算好的
+	/// （⭐ 见 <c>_pl1Label</c> 的注释 ⚠️）⇒ ⭐ 变短一定安全、⭐ 变长会**裁字** ❌
+	/// ⇒ ⭐ 所以这里**只移除**标记、⛔ 绝不添加（⭐ 标记只由构造期按当时状态决定 ✅）。</para>
+	/// </summary>
+	private void SyncUnsetMark(Label label, bool unset)
+	{
+		if (label == null || unset)
+		{
+			return;
+		}
+		string text = label.Text;
+		if (text != null && text.EndsWith(UnsetMark, StringComparison.Ordinal))
+		{
+			label.Text = text.Substring(0, text.Length - UnsetMark.Length);
+		}
+	}
+
 	private void OnCustomChanged()
 	{
 		try
@@ -3639,8 +4525,29 @@ public class CustomModeForm : RForm
 			{
 				ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1);
 				ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2);
+				// ⭐⭐ 2026-10-19（机主：「是持续功耗时间」）：行存在时按"当前值"刷新
+				//   （写成功后 `NoteBaolongdaSmuStapmTimeApplied` 会把它更新成刚下发的值；
+				//     否则是最近一次 PM 表只读采样的值）。读不到/不稳定（0）⇒ 保持「（未设置）」不动。
+				//   ⚠️ 行不存在 ⇒ 一个控件都不碰（不存在的东西不刷新）。
+				if (_stapmTime != null)
+				{
+					int stapmTimeNow = hw.BaolongdaStapmTimeSeconds;
+					if (stapmTimeNow > 0)
+					{
+						ApplyRange(_stapmTime, _stapmTimeVal, BaolongdaProfile.StapmTimeMinSeconds,
+							BaolongdaProfile.StapmTimeMaxSeconds, stapmTimeNow);
+						// 「（未设置）」只减不增（列宽是建窗时算好的）
+						SyncUnsetMark(_stapmTimeLabel, unset: false);
+					}
+				}
+				// ⭐⭐ 2026-10-16（"未设置"）：⭐ 值一旦下发过 ⇒ ⭐ 把标题里的「（未设置）」**去掉** ✅
+				//   ⚠️ **只减不增** —— ⭐ 标题列宽是**建窗体时**按最长标题算好的（⭐ 见 `_pl1Label` 的注释 ⚠️）
+				//      ⇒ ⭐ 变短安全、⛔ 变长会裁字 ⇒ ⭐ 本方法只允许移除标记、⛔ 绝不添加 ✅
+				SyncUnsetMark(_pl1Label, hw.BaolongdaPl1Unset);
+				SyncUnsetMark(_pl2Label, hw.BaolongdaPl2Unset);
 				ApplyRange(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, hw.Pl4);
 				bool flag = ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, hw.TccTarget);
+				SyncUnsetMark(_tccLabel, hw.BaolongdaTempWallUnset);
 				bool enabled = ApplyRange(_tgp, _tgpVal, hw.GpuTgpMinimum, hw.GpuTgpMaximum, hw.GpuTgp);
 				bool flag2 = ApplyRange(_db, _dbVal, hw.GpuDbMinimum, hw.GpuDbMaximum, hw.GpuDb);
 				bool supportsGpuOverclock = hw.SupportsGpuOverclock;
@@ -3658,8 +4565,9 @@ public class CustomModeForm : RForm
 					// （否则用户刚拖好的值会被悄悄抹掉）；其余滑块/开关的 ApplyRange 路径一字未动。
 					if (!_gpuOcDirty)
 					{
-						_gpuOcCoreAdjustable = ApplyRange(_coreOc, _coreOcVal, hw.GpuCoreOffsetUserMinimum, hw.GpuCoreOffsetUserMaximum, hw.EffectiveGpuCoreClockOffset, allowNegative: true);
-						_gpuOcMemoryAdjustable = ApplyRange(_memOc, _memOcVal, hw.GpuMemoryOffsetUserMinimum, hw.GpuMemoryOffsetUserMaximum, hw.EffectiveGpuMemoryClockOffset, allowNegative: true);
+						(int refreshCoreMin, int refreshCoreMax, int refreshMemMin, int refreshMemMax) = GpuOffsetUiRange(hw);
+						_gpuOcCoreAdjustable = ApplyRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset, allowNegative: true);
+						_gpuOcMemoryAdjustable = ApplyRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset, allowNegative: true);
 					}
 				}
 				else if (_gpuOcArmed & supportsGpuOverclock)

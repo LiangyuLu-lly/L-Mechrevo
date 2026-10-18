@@ -263,6 +263,27 @@ internal static class EcChargeLimit
 		{
 			return true;
 		}
+		// ⭐⭐ 2026-10-16（0.291.9 · 修"宝龙达机上限充没隐藏"）：
+		//   ⚠️ 根因：⭐ 下面那条 ⭐ **机型白名单**（⭐ `IsSupportedMachine(...)` ✅）⭐ 的语义是"或" ✅，
+		//      本来是为"⭐ 有 GCU 但没装 ACPIDriver"⭐ 的同方机型放宽用的 ✅。
+		//   ⚠️ 但 ⭐ 我们给宝龙达加了 ⭐ `RuntimeModelSupport` 的 Supported 分支 ⚠️
+		//      ⇒ ⭐ 白名单**命中** ⇒ ⭐ 本方法**直接 return true** ❌
+		//      ⇒ ⭐ ⭐ **限充 UI 照样显示** ❌ —— ⭐ 而蛟龙上 `\\.\ACPIDriver` **打不开**
+		//      （⭐ 真机诊断包实锤：⭐ `Win32 error 2 系统找不到指定的文件` ❌）
+		//      ⇒ ⭐ ⭐ **"能点但没用" = ⭐ 违反铁律** ⚠️
+		//   ⭐ 修法：⭐ **宝龙达直接判不可用** ✅ —— ⭐ 该模具【本来就没有】`UWACPIDriver`
+		//      （⭐ 真机已证实 ✅）⇒ ⭐ 限充物理上做不到 ⇒ ⭐ 整块限充 UI 隐藏 ✅
+		//   ⚠️ 安全性：⭐ 这一支**只对宝龙达生效** ⇒ ⭐ 同方/GCU 机型（⭐ 含"有 GCU 但没装
+		//      ACPIDriver"⭐ 那些 ✅）**逐位不变** ✅
+		//   ⚠️ 位置：⭐ 在 ⭐ `ec_charge_limit` 配置覆盖**之后** ✅ ⇒ ⭐ 需要强行打开时
+		//      仍可用 `ec_charge_limit=1` 逃生 ✅（⭐ 与既有设计一致 ✅）
+		if (Program.hw?.UsesBaolongda == true)
+		{
+			Logger.WriteLineIfChanged("charge-limit-baolongda",
+				"限充可用性：本机是宝龙达模具（该模具没有 UWACPIDriver，真机诊断包已证实 \\\\.\\ACPIDriver 打不开）"
+				+ " ⇒ 判定不可用 ⇒ 限充 UI 隐藏（同方/GCU 机型不受本判断影响）");
+			return false;
+		}
 		// ⚠️ 语义是**或**、不是替换（用户批准的修法②：「ModelSupport 白名单**保留**…但**不再作为唯一门**」）：
 		//   ① 既有判据（机型白名单 / GCU 已服务）判支持 ⇒ 支持 —— 与改前逐字一致；
 		//   ② 否则再看**能力探测**（设备真能打开）⇒ 白名单外的可用机型也能进（正是用户报的「很多机型」）。
@@ -352,33 +373,13 @@ internal static class EcChargeLimit
 	/// </summary>
 	internal static bool IsFirmwareLimitSupported()
 	{
-		if (AppConfig.GetString("ec_charge_limit") == "1")
-		{
-			return true;
-		}
-		try
-		{
-			ChargeLimitEcProbe probe = ProbeRegisters();
-			if (!probe.ChannelOpened)
-			{
-				// 通道都读不到 ⇒ 不作否定结论（交给既有通道可用性判据处理）。
-				return true;
-			}
-			bool gateKnownClosed = probe.Gate >= 0 && probe.Gate != 4 && probe.Gate != 5;
-			bool romIdOpen = probe.RomId == 4 || probe.RomId == 5;
-			bool storedPresent = probe.StoredLimit >= 0 && probe.StoredLimit != 255;
-			bool supported = !(gateKnownClosed && !romIdOpen && !storedPresent);
-			if (!supported)
-			{
-				Logger.WriteLineIfChanged("charge-limit-fw-precheck", $"[charge-limit] 固件预检：本机 EC 固件按证据不支持限充（门控 0x{GateRegister:X3}={(probe.Gate < 0 ? "不可读" : "0x" + probe.Gate.ToString("X2"))}、0x{RomIdRegister:X3}={(probe.RomId < 0 ? "不可读" : "0x" + probe.RomId.ToString("X2"))}、存储区 0x{StoredLimitRegister:X3}={(probe.StoredLimit < 0 ? "不可读" : "0x" + probe.StoredLimit.ToString("X2"))}）⇒ 界面侧提前反馈，⛔ 不进写入路径");
-			}
-			return supported;
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("限充固件预检失败（按「可尝试」处理，零回归）：" + ex.Message);
-			return true;
-		}
+		// 2026-10-16（0.291.9.3）：本方法**不再是「固件支持与否」的判据** —— 它的旧判据与 TrySet 那道门逐字同源，
+		// 而那道门已被证明三条都不是正面证据（详见 TrySet 内 2026-10-16 那段注释：门控非 4/5 是正常初值、
+		// 0x0770 的 0xFF 疑似未映射填充、0x087F 只在一次成功写入后才被固件抄写 ⇒ 循环论证）。
+		// ⇒ 写之前**没有**可靠证据可以否定，故这里一律返回 true（「可尝试」），把判定交给写后证据
+		//    （0x07B9 写后回读确认 ＋ 0x0742 bit2 效果证据）。⚠️ 唯一例外：ec_charge_limit=0 表示用户显式关闭。
+		// ⛔ 只读：不发帧、不写 EC/config/注册表、不碰控件。
+		return AppConfig.GetString("ec_charge_limit") != "0";
 	}
 
 	/// <summary>
@@ -428,30 +429,33 @@ internal static class EcChargeLimit
 				// 全程尽力而为：读不到或写门控失败都跳过，行为与改前逐字一致，不影响原有写入/回读。
 				int gateOriginal = Read(num, GateRegister);
 				bool gateWasOpen = gateOriginal == 4 || gateOriginal == 5;
-				// 2026-10-15（写入前门控预读 · 用户批准的修法③）：写 0x07B9 之前先**只读** ROMID(0x0770) 与固件存储区
-				// (0x087F)，判定本机固件是否**真的**会跑限充控制循环（门控 0x07C3 或 ROMID 首字节为 4/5）。
-				// 门控不成立 **且** 存储区无内容 ⇒ 明确告知「本机固件不支持」并**拒绝盲写**（用户可见文案 + 日志）。
-				// ⚠️ 0xFF 的取舍（用户点名要报）：本机实测 0x770 / 0x87F 都读成 0xFF，而**同一个** H2RAM 窗口里的
-				//    0x7C3 / 0x7B9 读得到真实值 ⇒ 0xFF 更可能是「该地址未映射时的填充值」而非「固件说没有」。
-				//    故这里**只把 0xFF 当作「没有证据」**、不当作否定证据：拒绝只在「0x07C3 读得到且 ∉{4,5}」**且**
-				//    「0x0770 也不是 4/5」**且**「存储区无内容」三条同时成立时发生 —— 即**没有任何正面证据**表明
-				//    本机能限充。这样既不会拒绝「读不到 ROMID 但实际可用」的机型，又能在本机这类「写进去也不生效」
-				//    的机型上如实告知而不是静默无效。
-				// ⚠️ 逃生口：ec_charge_limit=1（强制覆盖）时**跳过**本次拒绝，行为与改前一致（便于用户强制尝试）。
-				if (AppConfig.GetString("ec_charge_limit") != "1")
+				// 2026-10-16（0.291.9.3 · ⭐ 撤销「写入前固件预检拒绝」——真机实例：翼龙15Pro 无极限充滑块被误挡）：
+				// 原判据「门控 0x07C3 ∉{4,5} **且** ROMID 0x0770 ∉{4,5} **且** 存储区 0x087F 无内容 ⇒ 判本机固件不支持、拒绝盲写」
+				// 经复核：**三条都不是正面证据**，故整条拒绝**删除**（只读预读与默认级别可见日志保留）：
+				//   ① 门控 0x07C3 ∉{4,5} 是**正常初值**、不是「不支持」的证据 —— 本方法紧接着（见下面 gateTouched 分支）
+				//      正是因为它非 4/5 才**自己把它写成 4** 来开闸；把开闸前的状态当否定证据，语义自相矛盾。
+				//   ② ROMID 0x0770 读成 0xFF：同一 H2RAM 窗口里的 0x07C3 / 0x07B9 都读得到真实值 ⇒ 0x0770 的 0xFF
+				//      更可能是「该地址未映射时的填充值」（上面旧注释自己也这么写），不是「固件说没有」。
+				//   ③ 存储区 0x087F 无内容：该地址是**固件在一次成功写入之后**（门控保持 2.5s 期间）才抄写的
+				//      ⇒ 拿它当「写入前的准入条件」是**循环论证**：永不写入 ⇒ 0x087F 永为 0xFF ⇒ 永远被拒。
+				// ⭐ 结论：**写之前没有任何可靠证据**能判定「本机不支持」；**写之后**才有真证据 ——
+				//    0x07B9 写后回读确认（掩 bit7，见下面）＋ ChargeLimitEffectEvidence（门控还原后等 >=7s 读 0x0742 bit2）。
+				//    ⇒ 改为「按上游口径先尝试写入，再用写后证据如实告知」：既不再放任「写进去也不生效」的静默无效
+				//    （那由写后证据与可见文案承担），也不再拿未经证实的判据把可用机型挡在门外（无极限充滑块 ⇒ 恢复可用）。
+				// ⚠️ 仍然保留的两道**真闸**：IsLegacyGenerationBlocked()（10/16/20/30 系，可能损坏硬件，见上面）
+				//    与 ec_charge_limit=0（用户显式关闭，见 IsAvailableOnThisMachine）。ec_charge_limit=1 依旧放行。
+				// ⚠️ refusedByFirmware 现恒为 false（保留出参以不动调用方签名与 BatteryControl 侧那条可见文案分支）。
 				{
 					int romId = Read(num, RomIdRegister);
 					int stored = Read(num, StoredLimitRegister);
-					bool gateKnownClosed = gateOriginal >= 0 && !gateWasOpen;
-					bool romIdOpen = romId == 4 || romId == 5;
-					bool storedPresent = stored >= 0 && stored != 255;
-					if (gateKnownClosed && !romIdOpen && !storedPresent)
+					string gateText = gateWasOpen ? "已开" : "未开（由本方法按上游口径临时开闸）";
+					string romText = ((romId == 4 || romId == 5) ? "为 4/5（正面证据）" : "非 4/5（含 0xFF，按未映射处理、不作否定证据）");
+					string storedText = ((stored >= 0 && stored != 255) ? "有内容" : "无内容/不可读（0x87F 由固件在一次成功写入后才抄写 ⇒ ⛔ 不作为写入前条件）");
+					string precheckFingerprint = $"{gateOriginal}|{romId}|{stored}";
+					if (Logger.TryMarkChanged("charge-limit-precheck", precheckFingerprint))
 					{
-						refusedByFirmware = true;
-						Logger.WriteError($"限充写入被拒绝：按证据判定本机 EC 固件不支持充电上限 —— 门控 0x{GateRegister:X3}={ChargeLimitEcProbe.FormatRaw(gateOriginal)}（非 4/5）、0x{RomIdRegister:X3}={ChargeLimitEcProbe.FormatRaw(romId)}（非 4/5）、存储区 0x{StoredLimitRegister:X3}={ChargeLimitEcProbe.FormatRaw(stored)}（无内容）⇒ ⛔ 未写 0x{UpperRegister:X3}，避免「写进去也不生效」的静默无效。如需强制尝试请设 ec_charge_limit=1。");
-						return false;
+						Logger.WriteError($"限充写入前预读（⭐ 只读 · ⭐ 仅作诊断 · ⛔ 不再据此拒绝）：0x{GateRegister:X3}={ChargeLimitEcProbe.FormatRaw(gateOriginal)}、0x{RomIdRegister:X3}={ChargeLimitEcProbe.FormatRaw(romId)}、0x{StoredLimitRegister:X3}={ChargeLimitEcProbe.FormatRaw(stored)}；门控 {gateText}、0x{RomIdRegister:X3} {romText}、存储区 {storedText}；⭐ 按上游口径继续尝试写入 0x{UpperRegister:X3}");
 					}
-					Logger.WriteLine($"限充写入前门控预读（只读）：0x{GateRegister:X3}={ChargeLimitEcProbe.FormatRaw(gateOriginal)}、0x{RomIdRegister:X3}={ChargeLimitEcProbe.FormatRaw(romId)}、0x{StoredLimitRegister:X3}={ChargeLimitEcProbe.FormatRaw(stored)} ⇒ 门控{(gateWasOpen || romIdOpen ? "成立" : "不成立")}、存储区{(storedPresent ? "有内容" : "无内容/不可读")}，按上游口径继续尝试写入");
 				}
 				bool gateTouched = false;
 				if (gateOriginal >= 0 && !gateWasOpen)
@@ -674,6 +678,48 @@ internal static class EcChargeLimit
 		}
 	}
 
+	// ── XRAM：EC 版本号（⭐ 只读试读 · 2026-10-16）──
+	// 蛟龙限充项目实测：EC 版本在 **XRAM 0x8410~0x8413**（4 字节，形如 00.28.00.00）。
+	// ⚠️⚠️ 那是**另一套地址空间** —— 我们既有的 \\.\ACPIDriver 通道按文档只覆盖
+	//   **H2RAM 0x700–0x7FF**（见 ProbeRegisters 的 channelNote），0x8410 远超该窗口。
+	//   ⇒ ⭐ 这个地址**能不能读到 {由驱动决定}，必须实测**，⛔ 不能想当然（用户批准的诊断项）。
+	// ⚠️ 只读：只发 IoctlEcRead，⛔ 绝不发 IoctlEcWrite、⛔ 不改任何寄存器。
+	// ⛔ 任何调用方都不得据此改变限充行为（限充当前【暂缓】）。
+	internal const int XramEcVersionRegister = 33808;
+
+	/// <summary>
+	/// 只读试读任意 EC 地址（⭐ 诊断用）。⛔ 不写任何寄存器。
+	/// <para>⚠️ 复用本类既有的 <c>\\.\ACPIDriver</c> IOCTL 封装（⛔ 不新造 IOCTL ✅）。</para>
+	/// <para>⚠️ 本方法**不保证**地址可达：现有通道按文档只覆盖 H2RAM 0x700–0x7FF，
+	/// 超出该窗口的地址（例如 XRAM 0x8410）能否读到由驱动决定 ⇒ 返回 false 只代表「这次没读到」✅。</para>
+	/// </summary>
+	/// <param name="address">EC 地址（H2RAM 或 XRAM 的完整 16 位地址）。</param>
+	/// <param name="value">读到的原始字节；失败时为 -1。</param>
+	internal static bool TryReadByteAt(int address, out int value)
+	{
+		value = -1;
+		if (address < 0)
+		{
+			return false;
+		}
+		lock (Gate)
+		{
+			nint handle = CreateFile("\\\\.\\ACPIDriver", 3221225472u, 3u, IntPtr.Zero, 3u, 0u, IntPtr.Zero);
+			if (handle == new IntPtr(-1))
+			{
+				return false;
+			}
+			try
+			{
+				value = Read(handle, address);
+				return value >= 0;
+			}
+			finally
+			{
+				CloseHandle(handle);
+			}
+		}
+	}
 	private static void EnsureGateExitHook()
 	{
 		if (System.Threading.Interlocked.Exchange(ref _gateExitHookRegistered, 1) != 0)

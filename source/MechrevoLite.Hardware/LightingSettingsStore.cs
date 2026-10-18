@@ -119,7 +119,7 @@ internal static class LightingSettingsStore
 	{
 		if (!TryLoad(topic, out var settings))
 		{
-			return new LightChannelSettings(defaultEffect, 4, 1, Color.White.ToArgb(), PowerOn: true);
+			return new LightChannelSettings(defaultEffect, 4, 1, Color.White.ToArgb(), PowerOn: false);
 		}
 		return settings;
 	}
@@ -143,13 +143,92 @@ internal static class LightingSettingsStore
 		}
 	}
 
-	internal static void SavePower(string topic, bool powerOn)
+	internal static void SavePower(string topic, bool powerOn, string trigger)
 	{
-		LightChannelSettings lightChannelSettings = Load(topic, DefaultEffect(topic));
-		Save(topic, lightChannelSettings with
+		LightChannelSettings current = Load(topic, DefaultEffect(topic));
+		LightChannelSettings next = current with
 		{
-			PowerOn = powerOn
-		});
+			PowerOn = powerOn,
+			PowerExplicit = true
+		};
+		if (!WriteSettingsFile(topic, next))
+		{
+			return;
+		}
+		// ⭐⭐⭐ 2026-10-18（机主：每次启动仍默认打开 Logo 灯）：⭐ **只有用户亲手点灯光开关**才走到这里
+		//   ⇒ 这是全仓唯一写 powerexplicit=1 的落点，记一行（默认日志级别可见，⛔ 自动路径不许调用本方法）✅
+		string tag = (topic == MqttTopics.LogoLightCtrl) ? "[logo]" : "[light]";
+		Logger.WriteError(tag + $" PowerExplicit 置 1（触发={trigger} · topic={topic} · powerOn={(powerOn ? 1 : 0)}）");
+		MarkUserLightingIntent("SavePower " + topic);
+	}
+
+	/// <summary>⭐ 一次性迁移标记（config.json）：Logo 通道旧的 powerexplicit 只清一次。</summary>
+	internal const string LogoPowerExplicitMigratedKey = "logo_explicit_migrated";
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：每次启动仍默认打开 Logo 灯）：**一次性迁移** —— 清掉 Logo 通道历史上
+	/// 可能被"自动路径/早期版本"置上的 `powerexplicit=1`（⛔ 不碰 power 本身）。
+	/// <para>⭐ 清后行为：启动恢复按"旧配置未显式设置"处理 ⇒ **不自动点亮** ✅
+	/// （用户以后亲手点 Logo 开关会重新置 1，届时正常恢复）✅。</para>
+	/// <para>⚠️ 只清 Logo 通道；键盘/灯带等通道的用户显式意图一律保持原样 ✅。</para>
+	/// </summary>
+	internal static void MigrateLogoPowerExplicitOnce()
+	{
+		try
+		{
+			if (AppConfig.Get(LogoPowerExplicitMigratedKey, 0) == 1)
+			{
+				return;
+			}
+			if (!TryLoad(MqttTopics.LogoLightCtrl, out LightChannelSettings settings))
+			{
+				Logger.WriteLine("[logo] PowerExplicit 迁移：无 logolight.cfg ⇒ 无需清理");
+			}
+			else if (!settings.PowerExplicit)
+			{
+				Logger.WriteLine("[logo] PowerExplicit 迁移：powerexplicit 已是 0 ⇒ 无需清理");
+			}
+			else
+			{
+				LightChannelSettings cleared = settings with
+				{
+					PowerExplicit = false
+				};
+				if (!WriteSettingsFile(MqttTopics.LogoLightCtrl, cleared))
+				{
+					// ⛔ 写回失败 ⇒ 不落标记，下次启动重试（⛔ 不谎报"迁移完成"）
+					Logger.WriteError("[logo] PowerExplicit 迁移：写回失败 ⇒ 本次不落标记，下次启动重试");
+					return;
+				}
+				Logger.WriteError($"[logo] PowerExplicit 迁移：清掉旧的自动置位（logolight.cfg · PowerOn={(settings.PowerOn ? 1 : 0)} · powerexplicit=1 ⇒ 0；启动将不再自动点亮）");
+			}
+			AppConfig.Set(LogoPowerExplicitMigratedKey, 1);
+			AppConfig.Flush();
+			Logger.WriteLine("[logo] PowerExplicit 迁移完成（一次性标记 logo_explicit_migrated=1）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[logo] PowerExplicit 迁移失败（已吞掉，不挡启动）：" + ex.Message);
+		}
+	}
+
+	/// <summary>⭐ 原子写配置文件（⛔ **不**记"用户灯光意图"标记 —— 迁移/内部路径专用）✅</summary>
+	private static bool WriteSettingsFile(string topic, LightChannelSettings settings)
+	{
+		string path = GetPath(topic);
+		string text = path + ".tmp";
+		try
+		{
+			Directory.CreateDirectory(Path.GetDirectoryName(path));
+			File.WriteAllText(text, Serialize(settings), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+			File.Move(text, path, overwrite: true);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("Lighting settings write failed (" + topic + "): " + ex.Message);
+			return false;
+		}
 	}
 
 	internal static LightChannelSettings ParseLines(IEnumerable<string> lines, string defaultEffect)
@@ -158,7 +237,8 @@ internal static class LightingSettingsStore
 		int light = 4;
 		int speed = 1;
 		int colorArgb = Color.White.ToArgb();
-		bool powerOn = true;
+		bool powerOn = false;
+		bool explicitPower = false;
 		int[]? manualIndexes = null;
 		int breathingIndex = 1;
 		int monoIndex = 4;
@@ -212,6 +292,14 @@ internal static class LightingSettingsStore
 				}
 				break;
 			}
+			case "powerexplicit":
+			{
+				// ⭐⭐ 2026-10-19（机主：启动自动点亮 Logo 灯）：
+				//   ⭐ 只有用户真的点过开关才有 powerexplicit=1；旧配置没有该键 ⇒ 视为"没设过"
+				//   ⇒ 启动恢复**不点灯**（⛔ 不再因为 power=1 就无条件点亮）✅
+				explicitPower = int.TryParse(text2, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ef) && ef != 0;
+				break;
+			}
 			case "manualindexes":
 			{
 				if (!string.IsNullOrWhiteSpace(text2))
@@ -260,7 +348,7 @@ internal static class LightingSettingsStore
 			}
 		}
 		}
-		return new LightChannelSettings(effect, light, speed, colorArgb, powerOn, manualIndexes, breathingIndex, monoIndex, usePreset);
+		return new LightChannelSettings(effect, light, speed, colorArgb, powerOn && explicitPower, manualIndexes, breathingIndex, monoIndex, usePreset, explicitPower);
 	}
 
 	private static string Serialize(LightChannelSettings settings)
@@ -275,13 +363,14 @@ internal static class LightingSettingsStore
 			}
 			stringBuilder.Append(colors[i].ToString(CultureInfo.InvariantCulture));
 		}
-		return string.Join('\n', new string[10]
+		return string.Join('\n', new string[11]
 		{
 			"effect=" + settings.Effect,
 			"light=" + settings.Light.ToString(CultureInfo.InvariantCulture),
 			"speed=" + settings.Speed.ToString(CultureInfo.InvariantCulture),
 			"color=" + settings.ColorArgb.ToString(CultureInfo.InvariantCulture),
 			"power=" + (settings.PowerOn ? "1" : "0"),
+			"powerexplicit=" + (settings.PowerExplicit ? "1" : "0"),
 			"breathingindex=" + settings.BreathingIndex.ToString(CultureInfo.InvariantCulture),
 			"monoindex=" + settings.MonochromeIndex.ToString(CultureInfo.InvariantCulture),
 			"usepreset=" + (settings.UsePresetColor ? "1" : "0"),

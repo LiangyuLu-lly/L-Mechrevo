@@ -38,6 +38,15 @@ internal static class DiagnosticSystemInfo
 		// ⛔ 不写注册表/EC/ACPI/NVRAM；⛔ 序列号字段从不读取；WMI 失败写 unavailable，不抛。
 		stringBuilder.Append(MachineCodeProbe.BuildSection());
 		AppendCpu(stringBuilder);
+		// ⭐ 2026-10-18（机主：30 系 CPU 温度显示卡在 80℃ 不动、调节电后真实温度变了显示没变）：
+		//   ⭐ 紧跟 [CPU] 之后追加「CPU 温度来源明细」一节 —— ⭐ 只读 ✅：
+		//   ① 厂商功能号 22（30 系 = 可读但值 0）；② LHM **全部** CPU 温度传感器（值 + 上次变化时刻）；
+		//   ③ ACPI 热区现读；④ 当前实际取源 + 「LHM 未刷新」判定。⛔ 不写任何硬件/配置。
+		stringBuilder.Append(DiagnosticCpuTempInfo.Build());
+		// ⭐ 2026-10-18（机主：遥测里 CPU/GPU 后面的占用率显示不对）：⭐ 紧跟「CPU 温度来源明细」之后
+		//   追加「占用率来源明细」一节 —— ⭐ 只读 ✅：CPU 来源 + 值 + 采样间隔 / GPU 来源 + engine + 值 /
+		//   NVML 同快照的显存控制器利用率（⚠️ 仅参考）/ 新鲜度。⛔ 不写任何硬件/配置。
+		stringBuilder.Append(DiagnosticUsageInfo.Build());
 		AppendGpus(stringBuilder);
 		// 2026-10-09（诊断增强）：[GPU] 之后追加「配置与注册表」一节 ——
 		// LM 关键配置 / 档位已保存值 / 注册表（L-Mechrevo·RGBKeyboard·ItemSupport·服务·BIOS）/
@@ -59,7 +68,18 @@ internal static class DiagnosticSystemInfo
 		stringBuilder.Append(DiagnosticGcuInventoryInfo.Build());
 		// 2026-10-09（诊断增强）：把显示器枚举 / 活动路径 / 适配器刷新率 / EDID 标识 /
 		// GCU 侧 HzList·CurrentHz 一并写进包 —— 只加采集，失败也只写"该项读取失败"。
-		stringBuilder.Append(DiagnosticDisplayInfo.Build());
+		// ⭐⭐ 2026-10-16（宝龙达适配 · ⭐ 用户「⭐ 把宝龙达的扫临时写入诊断里面」✅）：
+		//   ⭐ 临时诊断段 ✅ —— ⭐ 机型白名单取证 ＋ ⭐ 功能号 8~23 逐个试读 ＋ ⭐ 结论清单
+		//   ＋ ⭐ `\\.\ACPIDriver` 只读探测 ＋ ⭐ HID 事件如实说明 ✅
+		//   ⚠️ 全程**只读**（⭐ 只发 Get=250 ✅）· ⭐ 出错只记一行、⛔ 不影响诊断包其余部分 ✅
+		try
+		{
+			stringBuilder.Append(DiagnosticBaolongdaInfo.Build());
+		}
+		catch (Exception exBaolongda)
+		{
+			stringBuilder.AppendLine("⚠️ 宝龙达诊断段追加失败（已吞掉）：" + exBaolongda.Message);
+		}		stringBuilder.Append(DiagnosticDisplayInfo.Build());
 		AppendLiquidCooling(stringBuilder);
 		AppendCapabilities(stringBuilder);
 		AppendPowerInput(stringBuilder);

@@ -13,5 +13,7 @@
     <Compile Include="..\..\..\source\MechrevoLite.Hardware\LightingState.cs" Link="LightingState.cs" />
     <Compile Include="..\..\..\source\MechrevoLite.Hardware\LightingIdleAction.cs" Link="LightingIdleAction.cs" />
     <Compile Include="..\..\..\source\MechrevoLite.Hardware\KeyboardLightingPlan.cs" Link="KeyboardLightingPlan.cs" />
+    <!-- 2026-10-19（运行时自校准）：纯数据/纯函数 ⇒ 可离线断言（不碰硬件） -->
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\KeyboardLightingCalibration.cs" Link="KeyboardLightingCalibration.cs" />
   </ItemGroup>
 </Project>

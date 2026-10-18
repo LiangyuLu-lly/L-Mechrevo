@@ -1,6 +1,6 @@
 namespace MechrevoLite.Hardware;
 
-internal readonly record struct LightChannelSettings(string Effect, int Light, int Speed, int ColorArgb, bool PowerOn, int[]? ManualIndexes = null, int BreathingIndex = 1, int MonochromeIndex = 4, bool UsePresetColor = false)
+internal readonly record struct LightChannelSettings(string Effect, int Light, int Speed, int ColorArgb, bool PowerOn, int[]? ManualIndexes = null, int BreathingIndex = 1, int MonochromeIndex = 4, bool UsePresetColor = false, bool PowerExplicit = false)
 {
 	internal static readonly int[] DefaultManualIndexes = new int[6] { 1, 5, 9, 13, 21, 25 };
 
@@ -44,4 +44,20 @@ internal readonly record struct LightChannelSettings(string Effect, int Light, i
 		System.Drawing.Color.FromArgb(149, 8, 4).ToArgb(),
 		System.Drawing.Color.FromArgb(6, 8, 10).ToArgb()
 	};
+
+	/// <summary>
+	/// ⭐ 2026-10-17：⭐ 界面当前选中的**真实颜色**（ARGB）✅。
+	/// <para>⚠️ 预设色板只保存 <see cref="MonochromeIndex" />（1~29）⇒ 直接读 <see cref="ColorArgb" />
+	/// 拿到的是**默认白** ❌；而宝龙达 WMI（功能号 17）只吃 3 字节 RGB ⇒ 必须在这里把索引
+	/// 换算成调色板颜色 ✅（否则用户选任何预设色，下发仍是 #FFFFFF）。</para>
+	/// <para>⭐ 非宝龙达不受影响：它们各自按 <see cref="MonochromeIndex" /> 走 GCU 协议 ✅。</para>
+	/// </summary>
+	internal int EffectiveColorArgb()
+	{
+		if (UsePresetColor && MonochromeIndex >= 1 && MonochromeIndex <= 29)
+		{
+			return ManualPalette[MonochromeIndex - 1];
+		}
+		return ColorArgb;
+	}
 }

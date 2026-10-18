@@ -170,6 +170,8 @@ public static class PerfModeStore
 			GpuFanDuty = GetCurve(id, "fangpu"),
 			TccOn = GetBool(id, "tccon"),
 			TccTarget = GetInt(id, "tcc"),
+			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：`mode_tune_*` 新键（秒）；缺失 = null（不显示该行）。
+			StapmTimeSeconds = GetInt(id, "stapmtime"),
 			GpuOverclockOn = GetBool(id, "ocon"),
 			GpuCoreOffset = GetInt(id, "occore"),
 			GpuMemoryOffset = GetInt(id, "ocmem"),
@@ -197,6 +199,8 @@ public static class PerfModeStore
 		PutCurve(id, "fangpu", settings.GpuFanDuty);
 		PutBool(id, "tccon", settings.TccOn);
 		PutInt(id, "tcc", settings.TccTarget);
+		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：按档保存（秒）；null ⇒ 删除该键（旧配置自然保持兼容）。
+		PutInt(id, "stapmtime", settings.StapmTimeSeconds);
 		PutBool(id, "ocon", settings.GpuOverclockOn);
 		PutInt(id, "occore", settings.GpuCoreOffset);
 		PutInt(id, "ocmem", settings.GpuMemoryOffset);

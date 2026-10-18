@@ -69,6 +69,16 @@ public class ModeControl : IDisposable
 		return RyzenSmuService.IsPawnInstalled();
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**进程内共享同一个 RyzenSmuService 实例** ✅
+	/// <para>为什么不各建一个：SMU 服务会 `CreateFile(PawnIO)` + `LoadModule(RyzenSMU.bin)`；
+	/// 同一进程里**多个实例同时存在**是没必要的风险面（模块/句柄归属、以及 `Global\Access_PCI`
+	/// 互斥只在"一次事务"内串行）。本属性复用本类既有的 <see cref="GetSmu" /> 单例，
+	/// 让 30 系 PL/温度墙/时间窗的读写与既有的 UV/FMax 通路看到**同一个已初始化对象**。</para>
+	/// <para>⚠️ 返回 null = PawnIO 没装/没权限/非 AMD/代号未知 —— 调用方必须**如实**处理（⛔ 不假装成功）。</para>
+	/// </summary>
+	internal static RyzenSmuService SharedSmu => GetSmu();
+
 	public ModeControl()
 	{
 		int num = AppConfig.Get("reapply_time");

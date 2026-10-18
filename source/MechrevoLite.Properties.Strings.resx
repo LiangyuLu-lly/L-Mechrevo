@@ -34,6 +34,9 @@
 <data name="Brightness" xml:space="preserve">
     <value>Brightness</value>
   </data>
+<data name="BrightnessUnsupported" xml:space="preserve">
+    <value>Software brightness control is not supported on this device</value>
+  </data>
 <data name="Battery" xml:space="preserve">
     <value>Battery</value>
   </data>
@@ -402,6 +405,9 @@
     
   
   </data>
+<data name="IdleOff5Min" xml:space="preserve">
+    <value>5 minutes</value>
+  </data>
 <data name="BalancedMode" xml:space="preserve">
     
     
@@ -676,6 +682,21 @@
     <value>CPU power wall PL2 (W)</value>
     
   
+  </data>
+<data name="CpuPl1Hint" xml:space="preserve">
+    <value>Sustained power limit in watts. The average power the processor holds during sustained load.</value>
+  </data>
+<data name="CpuPl2Hint" xml:space="preserve">
+    <value>Short-term/peak power limit in watts. Burst loads can briefly boost to a higher power.</value>
+  </data>
+<data name="CpuStapmTimeWindow" xml:space="preserve">
+    <value>Power time window (STAPM, s)</value>
+  </data>
+<data name="CpuStapmTimeWindowHint" xml:space="preserve">
+    <value>STAPM time window (s): the averaging window over which sustained power is constrained by skin temperature. Larger values smooth power changes out.</value>
+  </data>
+<data name="CpuTempWallHint" xml:space="preserve">
+    <value>Processor temperature limit in °C. The CPU throttles when it reaches this temperature.</value>
   </data>
 <data name="CpuPl4" xml:space="preserve">
     
@@ -3449,6 +3470,24 @@ If you have suggestions or feedback, welcome to contact QQ: 2871715852.</value>
     
   
   </data>
+<data name="FanCurveBaolongdaEnable" xml:space="preserve">
+    <value>Enable software fan curve (no firmware table)</value>
+  </data>
+<data name="FanCurveSavedAndEnabled" xml:space="preserve">
+    <value>Fan curve saved and enabled</value>
+  </data>
+<data name="FanCurveSavedNotEnabled" xml:space="preserve">
+    <value>Fan curve saved but not enabled (tick the switch on the left to apply)</value>
+  </data>
+<data name="FanSyncSharedHeatPipe" xml:space="preserve">
+    <value>Fan sync (shared heat pipe)</value>
+  </data>
+<data name="FanSyncSharedHeatPipeTip" xml:space="preserve">
+    <value>Both fans drive each other through the shared heat pipe, so one side never overheats while the other stays slow.</value>
+  </data>
+<data name="QuickCameraPrivacy" xml:space="preserve">
+    <value>Camera privacy</value>
+  </data>
 <data name="QuickCopilot" xml:space="preserve">
     
     
@@ -4168,6 +4207,146 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="BatteryStateHeldAtBaolongdaLimit" xml:space="preserve">
+    
+    
+    <value>At charge stop threshold (limit active)</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableCharge" xml:space="preserve">
+    
+    
+    <value>Charge limit</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableChargeTip" xml:space="preserve">
+    
+    
+    <value>When plugged in, charging is limited to the stop threshold</value>
+    
+  
+  </data>
+<data name="BatteryLimitStartPercent" xml:space="preserve">
+    
+    
+    <value>Start (%)</value>
+    
+  
+  </data>
+<data name="BatteryLimitStopPercent" xml:space="preserve">
+    
+    
+    <value>Stop (%)</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveThreshold" xml:space="preserve">
+    
+    
+    <value>Save thresholds</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocReading" xml:space="preserve">
+    
+    
+    <value>Reading battery…</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocFormat" xml:space="preserve">
+    
+    
+    <value>Battery {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitSocUnreadable" xml:space="preserve">
+    
+    
+    <value>Battery level unreadable</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusReading" xml:space="preserve">
+    
+    
+    <value>Reading status…</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusUnreadable" xml:space="preserve">
+    
+    
+    <value>Status unreadable (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusActiveFormat" xml:space="preserve">
+    
+    
+    <value>Charge limit active · effective {0}%</value>
+    
+  
+  </data>
+<data name="BatteryLimitStatusInactive" xml:space="preserve">
+    
+    
+    <value>Charge limit off</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleActiveFormat" xml:space="preserve">
+    
+    
+    <value>Charge limit active (stop {0}% / start {1}%)</value>
+    
+  
+  </data>
+<data name="BatteryLimitTitleInactive" xml:space="preserve">
+    
+    
+    <value>Charge limit off</value>
+    
+  
+  </data>
+<data name="BatteryLimitEnableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Enable failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitDisableFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Disable failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitOperationFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Operation failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitSaveFailed" xml:space="preserve">
+    
+    
+    <value>⛔ Save failed (see log)</value>
+    
+  
+  </data>
+<data name="BatteryLimitInvalidParams" xml:space="preserve">
+    
+    
+    <value>⛔ Invalid values: require 0 &lt; start &lt; stop ≤ 100</value>
+    
+  
+  </data>
 <data name="BatteryStateIdle" xml:space="preserve">
     
     
@@ -4272,6 +4451,12 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     <value>Step delay (ms)</value>
     
   
+  </data>
+<data name="ApuAntiDegrade" xml:space="preserve">
+    <value>APU anti-degradation</value>
+  </data>
+<data name="GpuPowerLimit" xml:space="preserve">
+    <value>GPU power limit (W)</value>
   </data>
 <data name="GpuTgp" xml:space="preserve">
     
@@ -4497,6 +4682,13 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="PerfModeHintLocalApply" xml:space="preserve">
+    
+    
+    <value>Settings are saved locally and applied immediately (SMU / WMI 23); the firmware custom slot is not written.</value>
+    
+  
+  </data>
 <data name="PerfModeKeepOneCustom" xml:space="preserve">
     
     
@@ -4546,6 +4738,9 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
   
   </data>
+<data name="PerfModeLocalProfileSwitched" xml:space="preserve">
+    <value>Switched to a local profile (no firmware slot on this machine; press Apply to push changes)</value>
+  </data>
 <data name="PerfModeNoSlotSeed" xml:space="preserve">
     
     
@@ -4564,6 +4759,13 @@ It applies the selected ICC via Windows color management (not via GCU); turning 
     
     
     <value>Didn't take effect: {0}</value>
+    
+  
+  </data>
+<data name="PerfModeRestoreSmuVolatileNote" xml:space="preserve">
+    
+    
+    <value> (SMU power limits are runtime writes for this boot; a reboot restores firmware defaults.)</value>
     
   
   </data>
@@ -5235,7 +5437,22 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
     <data name="AboutLicensesIntro" xml:space="preserve">
       <value>L-Mechrevo is free software, distributed under the GNU General Public License version 3 only. It contains code derived from the projects below, and it ships one third-party binary module. The full licence texts are in the LICENSES folder next to the program (LICENSE / THIRD_PARTY_NOTICES.txt are in there too).</value>
     </data>
-    <data name="AboutLicensesOrigin" xml:space="preserve">
+    <data name="AboutLicensesUseJiaolongControl" xml:space="preserve">
+    <value>2026-10 authoritative source for the Baolongda protocol facts (WMI `MiInterface` call shape, function numbers 8-23, EC channel). Internal notes quote code fragments (MIT; the full MIT licence ships with this package). Product code contains no copied implementation - it was rewritten from the facts.</value>
+  </data>
+  <data name="AboutLicensesUseDouzhanzhe" xml:space="preserve">
+    <value>2026-10 cross-check of engineering practice and NVAPI/EC facts (facts and approach only, no code copied).</value>
+  </data>
+  <data name="AboutLicensesUseBatteryThreshold" xml:space="preserve">
+    <value>2026-10-18 charge threshold: EC register semantics and command sequence reference (0x83A1/0x83A2/0x83C0, 0x8150-0x8154). Protocol facts only, no code copied. The repository ships no LICENSE file, so it is used as a factual reference only.</value>
+  </data>
+  <data name="AboutThanksHeading" xml:space="preserve">
+    <value>Acknowledgements (real-device testing)</value>
+  </data>
+  <data name="AboutThanksBody" xml:space="preserve">
+    <value>Thanks to Chainsaw for most of the real-device testing on the Baolongda platform (fan control, charge threshold, lighting, GPU overclock, etc.).</value>
+  </data>
+  <data name="AboutLicensesOrigin" xml:space="preserve">
       <value>The original L-Mechrevo project this program is based on was published by LiangyuLu-lly: https://github.com/LiangyuLu-lly/L-Mechrevo/tree/v0.290.6 . This build is maintained by xiaohan (xmsjx) on top of it. Listed below are the third-party components and licences; the original project is likewise GPL-3.0-only.</value>
     </data>
     <data name="AboutLicensesCopyright" xml:space="preserve">

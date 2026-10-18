@@ -122,6 +122,27 @@ public sealed class RyzenSmuService : IDisposable
 		slow = SetSlow(slowW);
 	}
 
+	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**单项**入口 —— 与 `SetAllLimits` 是同一套私有实现
+	// （`SetStapm` / `SetFast` / `SetSlow`，含同一道白名单闸），只是把"三项一起发"拆开。
+	// 用途：30 系上如果"另一项"读不到（PM 表失败）⇒ 只下发用户真正改过的那一项，
+	//      ⛔ 不拿 0/编造值把另一项覆盖掉（`SetAllLimits` 做不到这一点：它三项都会发）。
+	public SmuStatus SetStapmLimit(int watts)
+	{
+		return SetStapm(watts);
+	}
+
+	/// <summary>单项：fast limit（= 30 系自定义模式的 PL2 口径，单位 W）。</summary>
+	public SmuStatus SetFastLimit(int watts)
+	{
+		return SetFast(watts);
+	}
+
+	/// <summary>单项：slow limit（= 30 系自定义模式的 PL1 口径，单位 W）。</summary>
+	public SmuStatus SetSlowLimit(int watts)
+	{
+		return SetSlow(watts);
+	}
+
 	public SmuStatus SetCoAll(int value)
 	{
 		uint arg = EncodeCurve(value);
@@ -689,6 +710,103 @@ public sealed class RyzenSmuService : IDisposable
 		}
 	}
 
+	// ==========================================================================================
+	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗 / 温度墙）：
+	//
+	// 背景：30 系（蛟龙16 / 板号 MRID6 / 6800H＝Rembrandt）的原厂控制台 WMI 方法表**只到 18**，
+	//       没有功能号 23（`CPUPower`）⇒ PL1/PL2/温度墙**没有** WMI 通路，只能走 SMU。
+	//       本机同为 AMD（8845H/HawkPoint）⇒ 同一组 APU 命令；30 系的 Family 是 `CpuFamily.Mobile`。
+	//
+	// 命令号语义（⭐ **只取事实**，不复制任何实现代码；两个独立开源实现逐条一致）：
+	//   * FlyGoat/RyzenAdj `lib/api.c`（LGPL-3.0）· set_slow_time / set_stapm_time / set_tctl_temp；
+	//   * HorizonUnix/ZenMaster `zenmaster/runner.py`（独立 Python 实现）· slow-time / stapm-time / tctl-temp。
+	//   本文件的命令号**不是**从参考实现抄下来的代码，而是"事实表"的重写；许可与来源说明见文件头。
+	//   组内代号（Renoir/Lucienne/Cezanne/VanGogh/Rembrandt/Mendocino/Phoenix/Phoenix2/HawkPoint/
+	//   KrackanPoint/StrixPoint/StrixHalo）：
+	//       slow_time  = MP1 0x17 · stapm_time = MP1 0x18 · tctl_temp = MP1 0x19
+	//   Raven/Picasso/Dali：0x1D / 0x1E / 0x1F
+	//   DragonRange/FireRange（本仓库 `CpuFamily.Raphael` 档）：0x60 / 0x4E / 0x3F
+	//   Zen1 桌面（SummitRidge…）与 Matisse/Vermeer（Zen2 桌面）：参考实现**没有**这三条命令
+	//   ⇒ ⭐ 不下发、返回 `SmuStatus.NotSupported`（⛔ 不猜命令号）。
+	//
+	// ⚠️ **命令号的两种时间窗**（都不是"PL2 生效时间"）：
+	//   * STAPM（Skin Temperature-Aware Power Management）：按**机壳（表面）温度**约束持续功耗；
+	//     `stapm_time` 是它的**平均时间窗**（单位：秒）；
+	//   * `slow_time` 是 slow limit（平均功耗上限）的时间常数（单位：秒）；
+	//   * fast limit（PL2）是**瞬时限值**，没有时间参数 —— ⛔ 本服务**不提供** `SetFastTime`
+	//     （两个独立开源实现里都没有 fast-time 这条命令；只有"STAPM 时间窗"与"slow 时间窗"）。
+	//
+	// 单位：参考实现的 `--stapm-time` / `--slow-time` 都是**秒**（u32）⇒ 本服务入参也用**秒**，
+	//       ⛔ 不做毫秒换算（名字里带 Seconds 就是为了让调用点一眼看清单位）。
+	//
+	// 安全护栏（与 SetStapm/SetFast/SetSlow/SetThm 同一把尺子）：
+	//   * 先过 `LegacyFamilyCommandsApproved` 白名单（名单外：**一条命令都不发**）；
+	//   * 家族未知/无依据 ⇒ `SmuStatus.NotSupported`（L-Mechrevo 私有状态，不是固件返回值）；
+	//   * 只有 SMU 回 `OK` 才算成功；⛔ 不把"发出去了"当成"生效了"。
+	// ==========================================================================================
+	public SmuStatus SetSlowTimeSeconds(int seconds)
+	{
+		if (!LegacyFamilyCommandsApproved(_cpu))
+		{
+			return RefuseLegacyFamilyCommand(nameof(SetSlowTimeSeconds));
+		}
+		return Family switch
+		{
+			CpuFamily.Raven => SendMp1(0x1Du, (uint)seconds),
+			CpuFamily.Renoir => SendMp1(0x17u, (uint)seconds),
+			CpuFamily.Mobile => SendMp1(0x17u, (uint)seconds),
+			CpuFamily.StrixPoint => SendMp1(0x17u, (uint)seconds),
+			CpuFamily.StrixHalo => SendMp1(0x17u, (uint)seconds),
+			CpuFamily.Raphael => SendMp1(0x60u, (uint)seconds),
+			_ => NotSupportedForFamily(nameof(SetSlowTimeSeconds))
+		};
+	}
+
+	public SmuStatus SetStapmTimeSeconds(int seconds)
+	{
+		if (!LegacyFamilyCommandsApproved(_cpu))
+		{
+			return RefuseLegacyFamilyCommand(nameof(SetStapmTimeSeconds));
+		}
+		return Family switch
+		{
+			CpuFamily.Raven => SendMp1(0x1Eu, (uint)seconds),
+			CpuFamily.Renoir => SendMp1(0x18u, (uint)seconds),
+			CpuFamily.Mobile => SendMp1(0x18u, (uint)seconds),
+			CpuFamily.StrixPoint => SendMp1(0x18u, (uint)seconds),
+			CpuFamily.StrixHalo => SendMp1(0x18u, (uint)seconds),
+			CpuFamily.Raphael => SendMp1(0x4Eu, (uint)seconds),
+			_ => NotSupportedForFamily(nameof(SetStapmTimeSeconds))
+		};
+	}
+
+	public SmuStatus SetTctlTemp(int celsius)
+	{
+		if (!LegacyFamilyCommandsApproved(_cpu))
+		{
+			return RefuseLegacyFamilyCommand(nameof(SetTctlTemp));
+		}
+		return Family switch
+		{
+			CpuFamily.Raven => SendMp1(0x1Fu, (uint)celsius),
+			CpuFamily.Renoir => SendMp1(0x19u, (uint)celsius),
+			CpuFamily.Mobile => SendMp1(0x19u, (uint)celsius),
+			CpuFamily.StrixPoint => SendMp1(0x19u, (uint)celsius),
+			CpuFamily.StrixHalo => SendMp1(0x19u, (uint)celsius),
+			CpuFamily.Raphael => SendMp1(0x3Fu, (uint)celsius),
+			_ => NotSupportedForFamily(nameof(SetTctlTemp))
+		};
+	}
+
+	// 家族已知但这三条命令**没有**已核实的命令号（Zen1 桌面 / Matisse 档）。
+	// 与 `RefuseLegacyFamilyCommand` 的区别只在返回值：这里明确回 `NotSupported`（"主动不发"），
+	// 而不是 `Failed`（"发了失败"）—— ⛔ 一个寄存器都没写。
+	private SmuStatus NotSupportedForFamily(string operation)
+	{
+		Logger.WriteLine($"[smu-30] {operation} not supported on {_cpu} (family {Family}): no verified command id in the family table -> no command sent");
+		return SmuStatus.NotSupported;
+	}
+
 	public bool GetCodeName(out CpuCodeName codeName)
 	{
 		codeName = CpuCodeName.Undefined;
@@ -785,6 +903,148 @@ public sealed class RyzenSmuService : IDisposable
 		finally
 		{
 			_smuMutex.ReleaseMutex();
+		}
+	}
+
+	// ==========================================================================================
+	// ⭐⭐ 2026-10-19（30 系 · SMU 只读快照）：一次 PM 表读取拿全「当前 limits + 两个时间窗」。
+	//
+	// 为什么单独一个方法（**不改** `GetPowerLimits`）：
+	//   * `GetPowerLimits` 只读 64 个 qword（= 256 个 float = 0x200 字节），足够 limits/tctl，
+	//     但**不够**读时间窗 —— 参考实现里这些字段在 0x564~0x9C0（见 `GetPmTimeOffset`）；
+	//   * ⚠️ PawnIO 模块的 `ioctl_read_pm_table` 上限 = 一页（`PAGE_SIZE / 8` = 512 个 qword，4096 B）
+	//     ⇒ 本方法按 **512 qword** 取（不是把表无限放大；内核侧自己会按页夹住）。
+	//   * `GetPowerLimits` 的时序/日志是对外可核对的（`ModeControl.ReadRyzenLimits` 依赖它），
+	//     所以**一字未动**；本方法只读一行摘要日志（不打印 512 个 float，避免刷屏）。
+	//
+	// ⚠️ 只读：除了 `ioctl_resolve_pm_table` / `ioctl_update_pm_table`（= 让 SMU 把 PM 表刷进内存）
+	//    与 `ioctl_read_pm_table` 这三条**读路径** ioctl 外，**不写任何东西**（⛔ 一条 SMU 写命令都不发）。
+	// ==========================================================================================
+	private const int PM_TABLE_SNAPSHOT_QWORDS = 512;
+
+	// ⚠️ 返回 null = 读不到（⛔ 不编默认值）；本工程未开 #nullable ⇒ 故意不写 `?` 注解（避免新增 CS8632 告警）。
+	public SmuPowerSnapshot GetPowerSnapshot()
+	{
+		if (!TryReadPmTable(PM_TABLE_SNAPSHOT_QWORDS, out uint tableVersion, out float[] floats))
+		{
+			return null;
+		}
+		if (floats.Length < 7 || floats[0] == 0f)
+		{
+			// 与 GetPowerLimits 同一判据：首字段为 0 = 表还没刷出来（参考实现：Raven/Picasso 开机首读常见）
+			return null;
+		}
+		int tctlIndex = GetTctlIndex(tableVersion);
+		if (tctlIndex < 0 || floats.Length <= tctlIndex)
+		{
+			return null;
+		}
+		int timeOffset = GetPmTimeOffset(tableVersion);
+		int? stapmTime = (timeOffset < 0) ? ((int?)null) : ReadSecondsAt(floats, timeOffset);
+		int? slowTime = (timeOffset < 0) ? ((int?)null) : ReadSecondsAt(floats, timeOffset + 4);
+		SmuPowerSnapshot result = new SmuPowerSnapshot(floats[0], floats[2], floats[4], floats[tctlIndex],
+			stapmTime, slowTime, tableVersion);
+		Logger.WriteLine($"[smu-30] PM snapshot: ver=0x{tableVersion:X6} SPL={result.Stapm:F1}W sPPT={result.Slow:F1}W "
+			+ $"fPPT={result.Fast:F1}W tctl={result.TctlTemp:F0}℃ stapm_time={(stapmTime.HasValue ? stapmTime.Value + "s" : "?")} "
+			+ $"slow_time={(slowTime.HasValue ? slowTime.Value + "s" : "?")}");
+		return result;
+	}
+
+	// PM 表读路径的公共骨架（只读）；`GetPowerLimits` **没走这里**（它的时序/日志保持改前逐字不变）。
+	private bool TryReadPmTable(int qwordCount, out uint tableVersion, out float[] floats)
+	{
+		tableVersion = 0u;
+		floats = Array.Empty<float>();
+		if (!AcquirePci())
+		{
+			return false;
+		}
+		try
+		{
+			ulong[] resolveOut = new ulong[2];
+			if (!_io.Execute("ioctl_resolve_pm_table", null, resolveOut))
+			{
+				return false;
+			}
+			tableVersion = (uint)resolveOut[0];
+			_io.Execute("ioctl_update_pm_table", null, null);
+			Thread.Sleep(100);
+			if (!_io.Execute("ioctl_update_pm_table", null, null))
+			{
+				return false;
+			}
+			Thread.Sleep(200);
+			ulong[] words = new ulong[qwordCount];
+			if (!_io.Execute("ioctl_read_pm_table", null, words))
+			{
+				return false;
+			}
+			floats = MemoryMarshal.Cast<ulong, float>(words).ToArray();
+			return true;
+		}
+		finally
+		{
+			_smuMutex.ReleaseMutex();
+		}
+	}
+
+	// 读 PM 表某个**字节偏移**处的 float 并四舍五入成整数秒；明显不像"秒"的值 ⇒ null（⛔ 不硬转）。
+	private static int? ReadSecondsAt(float[] floats, int byteOffset)
+	{
+		int index = byteOffset / 4;
+		if (index < 0 || index >= floats.Length)
+		{
+			return null;
+		}
+		float value = floats[index];
+		if (float.IsNaN(value) || float.IsInfinity(value) || value <= 0f || value > 100000f)
+		{
+			return null;
+		}
+		return (int)Math.Round(value, MidpointRounding.AwayFromZero);
+	}
+
+	// ⭐ `stapm_time` 的 PM 表偏移（**按表版本精确匹配**；与 GetTctlIndex 同一口径：未知版本 ⇒ -1）。
+	// ⭐ 事实来源（只取偏移，未复制代码）：RyzenAdj `get_stapm_time()` / `get_slow_time()` 的
+	//    per-table-version switch；`slow_time` 恒为 `stapm_time + 4`（两张表的每一版都如此）。
+	// ⚠️ 不是所有版本都有这两个字段（Raven 的 0x1E 系列有；Cezanne 的 0x3F0000 **没有**）⇒ -1。
+	private static int GetPmTimeOffset(uint tableVersion)
+	{
+		switch (tableVersion)
+		{
+		// --- Raven / Picasso / Dali ---
+		case 0x001E0002u: return 0x564;
+		case 0x001E0003u: return 0x55C;
+		case 0x001E0004u:
+		case 0x001E0005u:
+		case 0x001E000Au:
+		case 0x001E0101u: return 0x5E0;
+		// --- Renoir / Lucienne ---
+		case 0x00370000u: return 0x768;
+		case 0x00370001u: return 0x858;
+		case 0x00370002u: return 0x860;
+		case 0x00370003u:
+		case 0x00370004u: return 0x880;
+		case 0x00370005u: return 0x89C;
+		// --- Rembrandt / Phoenix / HawkPoint（0x40 / 0x45 系列）---
+		case 0x00400001u: return 0x8E4;
+		case 0x00400002u: return 0x8FC;
+		case 0x00400003u: return 0x920;
+		case 0x00400004u:
+		case 0x00400005u:
+		case 0x00450004u:
+		case 0x00450005u: return 0x918;
+		// --- Phoenix 2 / HawkPoint2 / Strix / Krackan（0x4C / 0x5D / 0x65）---
+		case 0x004C0006u:
+		case 0x004C0007u:
+		case 0x004C0008u:
+		case 0x004C0009u: return 0x918;
+		case 0x005D0008u:
+		case 0x005D0009u:
+		case 0x005D000Bu: return 0x9BC;
+		case 0x00650005u: return 0x90C;
+		default:
+			return -1;
 		}
 	}
 
@@ -1164,6 +1424,18 @@ public sealed class RyzenSmuService : IDisposable
 			return true;
 		}
 		return false;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（SMU 只读探索 · 阶段 1）：⭐ **只读**一个 SMU 寄存器（`ioctl_read_smu_register`）✅。
+	/// <para>⛔ 只读；⛔ 不发邮箱命令、⛔ 不写任何寄存器；`lastError` 返回 PawnIO 的 Win32 错误码（0=成功）✅</para>
+	/// </summary>
+	internal bool TryReadSmuRegister(uint address, out uint value, out int lastError)
+	{
+		value = 0u;
+		bool ok = ReadReg(address, out value);
+		lastError = _io.LastError;
+		return ok;
 	}
 
 	private bool WriteReg(uint addr, uint value)

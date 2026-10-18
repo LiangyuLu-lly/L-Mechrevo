@@ -18,7 +18,11 @@ namespace MechrevoLite.Hardware;
 
 internal sealed class LegacyMifsWmi : IDisposable
 {
-	private const string InterfaceGuid = "B60BFB48-3E5B-49E4-A0E9-8CFFE1B3434B";
+	// ⭐ 2026-10-16（0.291.9 · 宝龙达适配第 2 步）：⭐ 可见性从 private 放宽到 internal ——
+	//    ⭐ 仅供 `BaolongdaBackend` 做**只读对比诊断**（⭐ 看宝龙达机型的类 GUID 跟这份是否相同，
+	//    ⭐ 以解释"为什么 LegacyMifsWmi 可能探不到"）✅
+	//    ⚠️ 只是编译期可见性，⛔ **不改变任何运行时行为**（⭐ 值一字未动 ✅）。
+	internal const string InterfaceGuid = "B60BFB48-3E5B-49E4-A0E9-8CFFE1B3434B";
 
 	private readonly ManagementObject _instance;
 
@@ -93,12 +97,15 @@ internal sealed class LegacyMifsWmi : IDisposable
 
 	internal static int ReadOperatingMode(byte[] output)
 	{
-		switch (output[output.Length switch
+		// ⭐ 2026-10-17：先取出**原始值**再映射 —— 这样"未知值"能如实打进日志（⭐ 见下 default 分支）。
+		int index = output.Length switch
 		{
 			30 => 2, 
 			32 => 4, 
-			_ => throw new IOException("Invalid MIFS response length."), 
-		}])
+			_ => throw LogAndThrowUnknownLength(output.Length), 
+		};
+		byte raw = output[index];
+		switch (raw)
 		{
 		case 0:
 			return 1;
@@ -108,8 +115,26 @@ internal sealed class LegacyMifsWmi : IDisposable
 		case 2:
 			return 0;
 		default:
-			throw new IOException("Unknown MIFS performance mode.");
+			// ⭐⭐ 2026-10-17 真机排障（蛟龙16 · 6800H＋3070Ti · 板号 `MRID6`）：
+			//   该机 `SwitchMode(1)`/`SwitchMode(2)` 恒 Failed 而 `SwitchMode(0)` 成功，
+			//   且 A 面灯**确实变色** ⇒ ⭐ 说明指令下发成功、**只是回读值不在已知映射里** ⚠️
+			//   ⇒ ⭐ 旧代码在这里**静默抛异常**，日志里看不出"读到的是几" ❌
+			//   ⇒ ⭐ 现在如实打出原始值，下一份诊断包就能判断"是固件不认"还是"该机型映射不同" ✅
+			Logger.WriteError($"老接口 MIFS：读到**未知档位原始值 {raw}**（⭐ 响应长度={output.Length} · 取值下标={index}"
+				+ " ⇒ ⭐ 现有映射只覆盖原始 0/1/2/3 ⇒ ⭐ 该机型的原始→内部映射可能与 40 系不同 ⚠️）");
+			throw new IOException($"Unknown MIFS performance mode (raw={raw}).");
 		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-17：响应长度不在已知两档（30 / 32）时 —— ⭐ **也必须留下可见证据** ⚠️
+	/// （⭐ 旧代码只抛一句"Invalid MIFS response length"、不带实际长度 ⇒ ⭐ 排障时看不出"到底回了多少字节" ❌）。
+	/// </summary>
+	private static IOException LogAndThrowUnknownLength(int actualLength)
+	{
+		Logger.WriteError($"老接口 MIFS：**未知响应长度 {actualLength} 字节**（⭐ 已知只有 30 / 32 两档"
+			+ " ⇒ ⭐ 该机型的 MIFS 响应帧可能与本树假设不同 ⚠️）");
+		return new IOException($"Invalid MIFS response length ({actualLength}).");
 	}
 
 	internal LegacyMifsSnapshot ReadMode()
@@ -156,15 +181,22 @@ internal sealed class LegacyMifsWmi : IDisposable
 				}
 			}
 		}, ct).ConfigureAwait(continueOnCapturedContext: false);
+		int lastSeen = -1;
 		for (int attempt = 0; attempt < 5; attempt++)
 		{
 			ct.ThrowIfCancellationRequested();
-			if ((await Task.Run((Func<LegacyMifsSnapshot>)ReadMode, ct).ConfigureAwait(continueOnCapturedContext: false)).OperatingMode == operatingMode)
+			lastSeen = (await Task.Run((Func<LegacyMifsSnapshot>)ReadMode, ct).ConfigureAwait(continueOnCapturedContext: false)).OperatingMode;
+			if (lastSeen == operatingMode)
 			{
 				return true;
 			}
 			await Task.Delay(150, ct).ConfigureAwait(continueOnCapturedContext: false);
 		}
+		// ⭐ 2026-10-17：如实记下「写了什么 / 回读是什么」—— ⭐ 这是区分
+		//   「固件没接受这个档」与「该机型原始→内部映射不同」的唯一证据 ✅
+		//   （⚠️ 真机依据：蛟龙16 `MRID6` 上 0 成功、1/2 恒失败，而 A 面灯确实变色 ⇒ 多半是后者 ⚠️）
+		Logger.WriteError($"老接口 MIFS：写档位内部值 {operatingMode} ⇒ 5 次回读仍是 {lastSeen}（每次间隔 150ms）"
+			+ " ⇒ ⭐ 如实判为【未确认】（⚠️ 不是「写失败」：⛔ 本判据只证明回读不一致 ⚠️）");
 		return false;
 	}
 

@@ -78,6 +78,9 @@ internal class Strings
 
 	internal static string Brightness => ResourceManager.GetString("Brightness", resourceCulture);
 
+	/// <summary>⭐ 本机不支持软件调亮度（读不到系统亮度时滑块置灰后的标注）。</summary>
+	internal static string BrightnessUnsupported => ResourceManager.GetString("BrightnessUnsupported", resourceCulture);
+
 	internal static string BrightnessDown => ResourceManager.GetString("BrightnessDown", resourceCulture);
 
 	internal static string BrightnessUp => ResourceManager.GetString("BrightnessUp", resourceCulture);
@@ -426,7 +429,22 @@ internal class Strings
 
 	internal static string CpuPl1 => ResourceManager.GetString("CpuPl1", resourceCulture);
 
+	/// <summary>2026-10-19（30 系 · SMU 功耗墙）：PL1 行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuPl1Hint => ResourceManager.GetString("CpuPl1Hint", resourceCulture);
+
 	internal static string CpuPl2 => ResourceManager.GetString("CpuPl2", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 功耗墙）：PL2 行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuPl2Hint => ResourceManager.GetString("CpuPl2Hint", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 功耗时间窗）：行标题「功耗时间窗（STAPM，秒）」。</summary>
+	internal static string CpuStapmTimeWindow => ResourceManager.GetString("CpuStapmTimeWindow", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 功耗时间窗）：该行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuStapmTimeWindowHint => ResourceManager.GetString("CpuStapmTimeWindowHint", resourceCulture);
+
+	/// <summary>2026-10-19（30 系 · SMU 温度墙）：温度墙行的悬浮提示 —— 正面说明"它是什么 + 单位"。</summary>
+	internal static string CpuTempWallHint => ResourceManager.GetString("CpuTempWallHint", resourceCulture);
 
 	internal static string CpuPl4 => ResourceManager.GetString("CpuPl4", resourceCulture);
 
@@ -1219,11 +1237,35 @@ internal class Strings
 
 	internal static string IdleOff45Min => ResourceManager.GetString("IdleOff45Min", resourceCulture);
 
+	/// <summary>⭐ 2026-10-19（宝龙达「灯光自动关闭时间」· 软件实现）：5 分钟选项 ✅。</summary>
+	internal static string IdleOff5Min => ResourceManager.GetString("IdleOff5Min", resourceCulture);
+
 	internal static string QuickAcRecovery => ResourceManager.GetString("QuickAcRecovery", resourceCulture);
 
 	internal static string QuickBluetooth => ResourceManager.GetString("QuickBluetooth", resourceCulture);
 
 	internal static string QuickCamera => ResourceManager.GetString("QuickCamera", resourceCulture);
+
+	/// <summary>⭐ 2026-10-17（宝龙达 · 摄像头隐私开关）：⭐ 与控制台"摄像头"区分 ——
+	/// 宝龙达下它写的是 **Windows 摄像头隐私授权**（ConsentStore），⛔ 不是 EC 级断电。</summary>
+	internal static string QuickCameraPrivacy => ResourceManager.GetString("QuickCameraPrivacy", resourceCulture);
+
+	/// <summary>⭐ 2026-10-17（宝龙达 · 风扇曲线）：⭐ 「启用软件闭环」复选框文案
+	/// （宝龙达没有固件曲线表 ⇒ 这条曲线只能由本程序按温度下发）。</summary>
+	internal static string FanCurveBaolongdaEnable => ResourceManager.GetString("FanCurveBaolongdaEnable", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19（机主：状态行必须跟随 store 的 Enabled）：⭐ 已保存并启用。</summary>
+	internal static string FanCurveSavedAndEnabled => ResourceManager.GetString("FanCurveSavedAndEnabled", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19：⭐ 已保存但未启用（勾选左边开关才会生效）。</summary>
+	internal static string FanCurveSavedNotEnabled => ResourceManager.GetString("FanCurveSavedNotEnabled", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19（机主：双风扇 0.85 联动开关 · 放在「风扇曲线」窗口）：
+	/// 复选框文案「双风扇联动（共用热管）」。</summary>
+	internal static string FanSyncSharedHeatPipe => ResourceManager.GetString("FanSyncSharedHeatPipe", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19：⭐ 双风扇联动的正面解释（tooltip）。</summary>
+	internal static string FanSyncSharedHeatPipeTip => ResourceManager.GetString("FanSyncSharedHeatPipeTip", resourceCulture);
 
 	internal static string QuickCopilot => ResourceManager.GetString("QuickCopilot", resourceCulture);
 
@@ -1418,6 +1460,26 @@ internal class Strings
 	internal static string BatteryStateDischargingNoRate => ResourceManager.GetString("BatteryStateDischargingNoRate", resourceCulture);
 	internal static string BatteryStateFull => ResourceManager.GetString("BatteryStateFull", resourceCulture);
 	internal static string BatteryStateHeldAtLimit => ResourceManager.GetString("BatteryStateHeldAtLimit", resourceCulture);
+	internal static string BatteryStateHeldAtBaolongdaLimit => ResourceManager.GetString("BatteryStateHeldAtBaolongdaLimit", resourceCulture);
+	internal static string BatteryLimitEnableCharge => ResourceManager.GetString("BatteryLimitEnableCharge", resourceCulture);
+	internal static string BatteryLimitEnableChargeTip => ResourceManager.GetString("BatteryLimitEnableChargeTip", resourceCulture);
+	internal static string BatteryLimitStartPercent => ResourceManager.GetString("BatteryLimitStartPercent", resourceCulture);
+	internal static string BatteryLimitStopPercent => ResourceManager.GetString("BatteryLimitStopPercent", resourceCulture);
+	internal static string BatteryLimitSaveThreshold => ResourceManager.GetString("BatteryLimitSaveThreshold", resourceCulture);
+	internal static string BatteryLimitSocReading => ResourceManager.GetString("BatteryLimitSocReading", resourceCulture);
+	internal static string BatteryLimitSocFormat => ResourceManager.GetString("BatteryLimitSocFormat", resourceCulture);
+	internal static string BatteryLimitSocUnreadable => ResourceManager.GetString("BatteryLimitSocUnreadable", resourceCulture);
+	internal static string BatteryLimitStatusReading => ResourceManager.GetString("BatteryLimitStatusReading", resourceCulture);
+	internal static string BatteryLimitStatusUnreadable => ResourceManager.GetString("BatteryLimitStatusUnreadable", resourceCulture);
+	internal static string BatteryLimitStatusActiveFormat => ResourceManager.GetString("BatteryLimitStatusActiveFormat", resourceCulture);
+	internal static string BatteryLimitStatusInactive => ResourceManager.GetString("BatteryLimitStatusInactive", resourceCulture);
+	internal static string BatteryLimitTitleActiveFormat => ResourceManager.GetString("BatteryLimitTitleActiveFormat", resourceCulture);
+	internal static string BatteryLimitTitleInactive => ResourceManager.GetString("BatteryLimitTitleInactive", resourceCulture);
+	internal static string BatteryLimitEnableFailed => ResourceManager.GetString("BatteryLimitEnableFailed", resourceCulture);
+	internal static string BatteryLimitDisableFailed => ResourceManager.GetString("BatteryLimitDisableFailed", resourceCulture);
+	internal static string BatteryLimitOperationFailed => ResourceManager.GetString("BatteryLimitOperationFailed", resourceCulture);
+	internal static string BatteryLimitSaveFailed => ResourceManager.GetString("BatteryLimitSaveFailed", resourceCulture);
+	internal static string BatteryLimitInvalidParams => ResourceManager.GetString("BatteryLimitInvalidParams", resourceCulture);
 	internal static string BatteryStateIdle => ResourceManager.GetString("BatteryStateIdle", resourceCulture);
 	internal static string BatteryAbnormalTag => ResourceManager.GetString("BatteryAbnormalTag", resourceCulture);
 	internal static string BatteryCycleCountLine => ResourceManager.GetString("BatteryCycleCountLine", resourceCulture);
@@ -1456,6 +1518,12 @@ internal class Strings
 	internal static string FanSwitchDelay => ResourceManager.GetString("FanSwitchDelay", resourceCulture);
 
 	internal static string GpuTgp => ResourceManager.GetString("GpuTgp", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19：⭐ 显卡功耗上限（本机 NVML 字段，与厂商 TGP 区分）。</summary>
+	internal static string GpuPowerLimit => ResourceManager.GetString("GpuPowerLimit", resourceCulture);
+
+	/// <summary>⭐ 2026-10-19：⭐ 「APU 防缩缸」开关文案（把处理器性能提升模式设成"高效、积极且有保障"）。</summary>
+	internal static string ApuAntiDegrade => ResourceManager.GetString("ApuAntiDegrade", resourceCulture);
 
 	internal static string MemoryOffset => ResourceManager.GetString("MemoryOffset", resourceCulture);
 
@@ -1509,6 +1577,9 @@ internal class Strings
 
 	internal static string PerfModeHintEmulated => ResourceManager.GetString("PerfModeHintEmulated", resourceCulture);
 
+	/// <summary>⭐ 宝龙达（无 GCU）：设置保存到本机并立即应用（SMU / WMI 23），不写固件自定义档。</summary>
+	internal static string PerfModeHintLocalApply => ResourceManager.GetString("PerfModeHintLocalApply", resourceCulture);
+
 	internal static string PerfModeHintVendor => ResourceManager.GetString("PerfModeHintVendor", resourceCulture);
 
 	internal static string PerfModeKeepOneCustom => ResourceManager.GetString("PerfModeKeepOneCustom", resourceCulture);
@@ -1526,6 +1597,9 @@ internal class Strings
 	internal static string PerfModeNew => ResourceManager.GetString("PerfModeNew", resourceCulture);
 
 	internal static string PerfModeNoSlotSeed => ResourceManager.GetString("PerfModeNoSlotSeed", resourceCulture);
+
+	/// <summary>⭐ 宝龙达：模式下拉切到某个自定义配置时，提示"这是本机配置"（无固件档可切）。</summary>
+	internal static string PerfModeLocalProfileSwitched => ResourceManager.GetString("PerfModeLocalProfileSwitched", resourceCulture);
 
 	internal static string PerfModeOcArmed => ResourceManager.GetString("PerfModeOcArmed", resourceCulture);
 
@@ -1545,6 +1619,9 @@ internal class Strings
 	internal static string PerfModeRestoreFailed => ResourceManager.GetString("PerfModeRestoreFailed", resourceCulture);
 
 	internal static string PerfModeRestorePrompt => ResourceManager.GetString("PerfModeRestorePrompt", resourceCulture);
+
+	/// <summary>⭐ 30 系：SMU 功耗墙是运行时写入，重启才回固件默认（恢复出厂后的补充说明）。</summary>
+	internal static string PerfModeRestoreSmuVolatileNote => ResourceManager.GetString("PerfModeRestoreSmuVolatileNote", resourceCulture);
 
 	internal static string PerfModeSavedInactive => ResourceManager.GetString("PerfModeSavedInactive", resourceCulture);
 
@@ -1703,6 +1780,21 @@ internal class Strings
 	internal static string AboutLicensesDerivedHeading => ResourceManager.GetString("AboutLicensesDerivedHeading", resourceCulture);
 
 	/// <summary>2026-10-12 署名：原项目 L-Mechrevo 由 LiangyuLu-lly 发布 + 本版维护者，含原项目地址。</summary>
+	/// <summary>2026-10-18 鸣谢：分组标题「鸣谢（真机测试协助）」。</summary>
+	/// <summary>2026-10-18 协议参考：JiaolongControl（MIT）。</summary>
+	internal static string AboutLicensesUseJiaolongControl => ResourceManager.GetString("AboutLicensesUseJiaolongControl", resourceCulture);
+
+	/// <summary>2026-10-18 协议参考：DOUZHANZHE-Control。</summary>
+	internal static string AboutLicensesUseDouzhanzhe => ResourceManager.GetString("AboutLicensesUseDouzhanzhe", resourceCulture);
+
+	/// <summary>2026-10-18 协议参考：充电阈值开源项目。</summary>
+	internal static string AboutLicensesUseBatteryThreshold => ResourceManager.GetString("AboutLicensesUseBatteryThreshold", resourceCulture);
+
+	internal static string AboutThanksHeading => ResourceManager.GetString("AboutThanksHeading", resourceCulture);
+
+	/// <summary>2026-10-18 鸣谢：真机测试协助者名单正文。</summary>
+	internal static string AboutThanksBody => ResourceManager.GetString("AboutThanksBody", resourceCulture);
+
 	internal static string AboutLicensesOrigin => ResourceManager.GetString("AboutLicensesOrigin", resourceCulture);
 
 	/// <summary>2026-10-10 licence: 分组标题「协议参考（未复制代码）」。</summary>
