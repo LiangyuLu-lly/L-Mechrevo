@@ -188,7 +188,8 @@ internal sealed class PerfModeService
 			// ⭐⭐ 2026-10-17（宝龙达 · 自定义档本地化）：⭐ 无固件槽的后端**不会**有 SwitchFirmwareSlot 步骤，
 			//   但 PL1/PL2/温度墙会走 WMI 23 真下发 ⇒ 标记 LocalApply，让 ModeSwitched 按"字段全成功"判定 ✅
 			//   ⚠️ 非宝龙达（GCU/老接口）不置位 ⇒ 行为逐位不变 ✅
-			if (_hw != null && _hw.UsesBaolongda)
+			// ⭐⭐ 2026-10-19（无界 APU）：与宝龙达同为"本机配置"⇒ 无固件档切换步骤时 ModeSwitched 按字段全成功判定 ✅
+			if (_hw != null && (_hw.UsesBaolongda || _hw.WujieSmuApu))
 			{
 				perfApplyOutcome = perfApplyOutcome with { LocalApply = true };
 			}
@@ -1111,6 +1112,28 @@ internal sealed class PerfModeService
 		return (!tuple.Item2) ? perfApplyOutcome : (await ActivateIfCurrentAsync(modeId, "route changed by edit", forceParameters: true, request).ConfigureAwait(continueOnCapturedContext: false));
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：无界 APU 点自定义后模式仍显示「平衡」）：
+	/// ⭐ **本机自定义档激活**（无界 APU；与宝龙达同款语义）—— 直接把 ActiveModeId 指向该档并持久化，
+	/// ⛔ 不尝试固件自定义档、⛔ 不发 GCU 模式命令 ✅。
+	/// <para>⚠️ 只允许无界 APU 调用（调用点/CustomModeForm 已判 hw.WujieSmuApu）；其它机型行为不变 ✅</para>
+	/// </summary>
+	internal void ActivateLocalProfile(string modeId)
+	{
+		PerfModeDefinition mode = Find(modeId);
+		if ((object)mode == null || !mode.IsCustom)
+		{
+			return;
+		}
+		PerfModeStore.ActiveModeId = mode.Id;
+		PerfModeStore.SetActiveFor(PowerSourceKey(), mode.Id);
+		PerfModeStore.LastCustomId = mode.Id;
+		if (Logger.TryMarkChanged("wujie-local-profile-active", "[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + mode.Id + " · 不发固件档命令）"))
+		{
+			Logger.WriteError("[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + mode.Id + " · 不发固件档命令）");
+		}
+		RaiseActiveChanged();
+	}
 	internal void CancelPendingApply()
 	{
 		CancellationTokenSource activationCts;

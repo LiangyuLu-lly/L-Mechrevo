@@ -2022,7 +2022,7 @@ public class CustomModeForm : RForm
 		//   ⚠️ 原来这里会给自定义档显示「由固件自定义档 N 承载」、给未分配档显示「切换到该模式时分配固件自定义档」
 		//      —— 在宝龙达上**两句都不成立**（它根本没有固件自定义档，却**能**真下发本机后端）❌
 		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 下面原有分支【逐字不变】✅
-		if (Program.hw?.UsesBaolongda == true)
+		if ((Program.hw?.UsesBaolongda == true) || (Program.hw?.WujieSmuApu == true))
 		{
 			string baolongdaHint = LocalApplyText;
 			if (_routeHint.Text != baolongdaHint)
@@ -2359,6 +2359,16 @@ public class CustomModeForm : RForm
 			_status.Text = Strings.PerfModeLocalProfileSwitched;
 			_status.ForeColor = UiVisualStyle.Muted;
 			Logger.WriteLine("[perfmode] 宝龙达：模式下拉切到 " + id + "（本机配置，无固件档可切）");
+			return true;
+		}
+		// ⭐⭐ 2026-10-19（机主：无界 APU 点自定义后模式仍显示「平衡」+ 红字）：与宝龙达同款「本机配置」分支 ——
+		//   ✅ 直接把 ActiveModeId 指向该自定义档（下拉显示「自定义」）、持久化；⛔ 不尝试固件档、⛔ 不发 GCU 模式命令 ✅
+		if (Program.hw?.WujieSmuApu ?? false)
+		{
+			PerfModeService perf = PerfModeService.Instance;
+			perf?.ActivateLocalProfile(id);
+			_status.Text = Strings.PerfModeLocalProfileSwitched;
+			_status.ForeColor = UiVisualStyle.Muted;
 			return true;
 		}
 		bool ok = await ActivateModeAsync(id);
@@ -3266,7 +3276,7 @@ public class CustomModeForm : RForm
 		//   ⛔ 不再说「本机无 GCU，不支持写入固件自定义档」；改说「设置保存到本机并立即应用…不写入固件自定义档」✅
 		bool firmwareSlotNotWritable = ((object)perfModeDefinition != null)
 			&& perfModeDefinition.Route == PerfModeRoute.FirmwareSlot
-			&& (Program.hw?.UsesBaolongda ?? false);
+			&& ((Program.hw?.UsesBaolongda ?? false) || (Program.hw?.WujieSmuApu ?? false));
 		if (firmwareSlotNotWritable && !outcome.AnyFailed)
 		{
 			_status.Text = LocalApplyText;
@@ -3275,9 +3285,9 @@ public class CustomModeForm : RForm
 			ResizeToContent();
 			// ⭐ 默认「仅错误」级别可见（⭐ WriteError ✅）；⭐ 用状态翻转去重 ⇒ ⭐ 不会随每次
 			//   懒验证/重绘刷屏（⭐ 只有"从别的情形变成这种"时才落一行 ✅）。
-			if (Logger.TryMarkChanged("perf-custom-firmware-slot-unsupported", "PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）⇒ 本机配置已应用（SMU / WMI 23），固件自定义档不写；已按后端如实提示"))
+			if (Logger.TryMarkChanged("perf-custom-firmware-slot-unsupported", "PerfModes: " + outcome.ModeId + " 本机后端（宝龙达 / 无界 APU）⇒ 本机配置已应用（SMU / WMI 23 / NVAPI / NVML），固件自定义档不写；已按后端如实提示"))
 			{
-				Logger.WriteError("PerfModes: " + outcome.ModeId + " 宝龙达（非 GCU 后端）⇒ 本机配置已应用（SMU / WMI 23），固件自定义档不写；已按后端如实提示");
+				Logger.WriteError("PerfModes: " + outcome.ModeId + " 本机后端（宝龙达 / 无界 APU）⇒ 本机配置已应用（SMU / WMI 23 / NVAPI / NVML），固件自定义档不写；已按后端如实提示");
 			}
 			return;
 		}

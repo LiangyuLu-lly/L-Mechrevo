@@ -155,6 +155,9 @@ internal static class Program
 		Expect("WJ1 no GCU mode switch step", steps.All((PerfApplyStep s) => s.Kind != PerfApplyStepKind.SwitchBuiltIn && s.Kind != PerfApplyStepKind.SwitchFirmwareSlot && s.Kind != PerfApplyStepKind.SwitchTurboSubMode));
 		Expect("WJ2 has PL1/PL2 local SMU steps", steps.Any((PerfApplyStep s) => s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "PL1") && steps.Any((PerfApplyStep s) => s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "PL2"));
 		Expect("WJ3 no GCU fan-curve steps", steps.All((PerfApplyStep s) => s.Kind != PerfApplyStepKind.WriteFanCurve));
+		// WJ4：即使路由被当成本内置档（routeOverride=BuiltIn，例如选档路径误传），Wujie 也**不生成** GCU 模式步 ✅
+		IReadOnlyList<PerfApplyStep> builtInSteps = PerfModeApplyPlanner.Build(mode, null, caps, includeSwitch: true, PerfModeRoute.BuiltIn);
+		Expect("WJ4 wujie never emits GCU SwitchBuiltIn", builtInSteps.All((PerfApplyStep s) => s.Kind != PerfApplyStepKind.SwitchBuiltIn && s.Kind != PerfApplyStepKind.SwitchTurboSubMode));
 	}
 	private static void CheckSmuPowerRoutePredicate()
 	{
