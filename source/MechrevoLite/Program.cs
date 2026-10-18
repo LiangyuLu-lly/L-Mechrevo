@@ -3586,6 +3586,26 @@ internal static class Program
 					{
 						Logger.WriteError("[perfmode] 无界 APU 启动恢复异常（已吞掉、不重试）：" + ex.Message);
 					}
+					// ⭐⭐ 2026-10-19（机主：重启后高亮回平衡）：重放后**显式**刷一次性能模式行/上下文菜单（UI 线程）✅
+					try
+					{
+						SettingsForm refreshForm = settingsForm;
+						if (refreshForm != null && !refreshForm.IsDisposed && refreshForm.IsHandleCreated)
+						{
+							refreshForm.BeginInvoke((Action)(() =>
+							{
+								if (!refreshForm.IsDisposed)
+								{
+									refreshForm.ShowMode(4);
+									refreshForm.RefreshQuickSwitchStatesNow();
+								}
+							}));
+						}
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[perfmode] 无界 APU 重放后刷新界面失败（已吞掉）：" + ex.Message);
+					}
 				}
 
 				SettingsForm form = settingsForm;

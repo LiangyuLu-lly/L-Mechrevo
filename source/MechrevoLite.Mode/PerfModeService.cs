@@ -1215,6 +1215,8 @@ internal sealed class PerfModeService
 		catch (Exception ex)
 		{
 			Logger.WriteError("[perfmode] 无界 APU 启动恢复失败（已吞掉、不重试）：" + ex.Message);
+			// ⭐ 失败兜底：如实保留 ActiveModeId（界面高亮仍按自定义），⛔ 不静默改回平衡 ✅
+			Logger.WriteError("[perfmode] 无界 APU：重放失败 ⇒ 高亮仍按自定义（SMU 未恢复）· ActiveModeId=" + ActiveModeId);
 		}
 	}
 

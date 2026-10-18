@@ -13021,8 +13021,42 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：无界重启后高亮回平衡）：⭐ 高亮数据源修正 ——
+	/// 无界 APU 且 ActiveModeId 指向自定义档 ⇒ **优先 ActiveModeId**（高亮=自定义=4），⛔ 不被固件回读（平衡=0）覆盖 ✅。
+	/// <para>⚠️ 宝龙达/GCU/同方：`WujieSmuApu=false` ⇒ 原样返回固件模式（行为逐位不变）✅</para>
+	/// </summary>
+	private int ResolveVisualMode(int firmwareMode)
+	{
+		MechrevoHw hwResolve = Program.hw;
+		if (hwResolve == null || !hwResolve.WujieSmuApu)
+		{
+			return firmwareMode;
+		}
+		string activeId = PerfModeStore.ActiveModeId;
+		bool hasStored = PerfModeStore.HasStoredActive;
+		PerfModeDefinition active = PerfModeService.Instance?.Find(activeId);
+		bool customActive = (object)active != null && active.IsCustom;
+		// 重启后第一帧（去重）：把"持久化 / 固件回读 / 最终高亮来源"一次记全 ✅
+		if (Logger.TryMarkChanged("wujie-startup-highlight-source", "[perfmode] 启动：PerfModeStore.ActiveModeId=" + activeId + "（HasStoredActive=" + hasStored + "） · 固件回读=" + firmwareMode))
+		{
+			Logger.WriteError("[perfmode] 启动：PerfModeStore.ActiveModeId=" + activeId + "（HasStoredActive=" + hasStored + "） · 固件回读=" + firmwareMode);
+		}
+		if (customActive)
+		{
+			string highlightLog = "[ui] 性能模式高亮：来源=ActiveModeId ⇒ 高亮=自定义(" + activeId + ")";
+			if (Logger.TryMarkChanged("wujie-highlight-source", highlightLog))
+			{
+				Logger.WriteError(highlightLog);
+			}
+			return 4;
+		}
+		return firmwareMode;
+	}
 	protected void VisualiseMode(int mode)
 	{
+		// ⭐ 高亮来源修正：无界自定义档优先 ActiveModeId（⛔ 不让固件回读覆盖显示）✅
+		mode = ResolveVisualMode(mode);
 		bool flag = mode == 1 && MechrevoService.IsSilentTurboActive;
 		if (!ShouldRefreshVisualMode(_lastVisualMode, _lastVisualSilentTurbo, mode, flag))
 		{
