@@ -5356,8 +5356,13 @@ public class SettingsForm : RForm
 	/// <summary>
 	/// 「＋」自定义面板：可选来源 = 「更多开关」的**全部键去掉「睡眠省电」组**（用户原话
 	/// 「可选磁贴来源 = 「更多开关」除「睡眠省电」组以外的部分」），按 <see cref="QuickSwitchGroups" />
-	/// 的固定顺序排序；不支持的项置灰（<see cref="Strings.QuickTileSwitchMissing" />）。
-	/// 确定后写 <c>perf_quick_tiles</c> 并重建磁贴行；取消不动任何键。
+	/// 的固定顺序排序。
+	/// <para>⭐⭐ 2026-10-18（机主：本机不支持的功能项**直接隐藏**，⛔ 不再灰显）：能力位**唯一来源**仍是
+	/// <see cref="QuickTileSupported" />（= <c>hw.SupportsQuickSwitch</c> ∥ <see cref="StaticQuick" />；
+	/// 宝龙达 <c>fanboost</c> 的 <c>FanCurveVerified</c> 闸门在 <c>SupportsQuickSwitch</c> 内）⇒
+	/// 不支持项**不传入面板**（面板只给 supported 项建行；全部不支持时面板显示一行说明，⛔ 不灰显）✅</para>
+	/// <para>⭐⭐ 确定后按**可用集合**落盘：已保存选择里若含不支持项（换机型/能力位变化的残留）⇒
+	/// **静默剔除**（⛔ 不弹窗、⛔ 不报错），写 <c>perf_quick_tiles</c> 并重建磁贴行；取消不动任何键 ✅</para>
 	/// </summary>
 	private void OpenQuickTilePicker()
 	{
@@ -5390,7 +5395,18 @@ public class SettingsForm : RForm
 			{
 				return;
 			}
-			SaveQuickTileKeys(picker.SelectedKeys);
+			// ⭐⭐ 2026-10-18（机主需求 3）：保存时**按可用集合落盘** —— 已保存选择里若含不支持项
+			//   （换机型 / 能力位变化后的残留），这里**静默剔除**（⛔ 不弹窗、⛔ 不报错）✅
+			List<string> chosen = new List<string>();
+			for (int i = 0; i < picker.SelectedKeys.Count; i++)
+			{
+				string selectedKey = picker.SelectedKeys[i];
+				if (keys.Contains(selectedKey, StringComparer.OrdinalIgnoreCase) && QuickTileSupported(selectedKey))
+				{
+					chosen.Add(selectedKey);
+				}
+			}
+			SaveQuickTileKeys(chosen);
 		}
 		ApplyQuickTiles();
 	}

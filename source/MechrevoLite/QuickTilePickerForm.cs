@@ -16,9 +16,12 @@ namespace MechrevoLite;
 /// <list type="bullet">
 /// <item><b>可选项来源</b>＝「更多开关」的**全部键去掉「睡眠省电」组**（由调用方
 /// <c>SettingsForm.QuickTileCandidateKeys()</c> 生成并排序，本窗体不认识任何具体键名）。</item>
-/// <item><b>能力过滤</b>：调用方给出的 <c>supported</c> 为假的项**置灰显示**并在标题里写清
-/// 「本机型没有这个开关」——换机型时不会出现"能选上但没有对应硬件"的磁贴；
-/// 磁贴行本身另有一道按能力位的过滤（见 <c>SettingsForm.ApplyQuickTiles</c>）。</item>
+/// <item><b>能力过滤（2026-10-18 起：不支持的项直接隐藏，⛔ 不再灰显）</b>：调用方给出的
+/// <c>supported</c> 就是**能力位唯一来源**（<c>SettingsForm.QuickTileSupported</c> =
+/// <c>hw.SupportsQuickSwitch</c> ∥ <c>StaticQuick</c>；宝龙达 <c>fanboost</c> 的
+/// <c>FanCurveVerified</c> 闸门也在 <c>SupportsQuickSwitch</c> 里）⇒ 本窗体**只给 supported 项建行**，
+/// 不支持的项一个控件都不建。⚠️ 已保存选择里若含不支持项 ⇒ 它落不到任何行 ⇒ 确定时输出（= 落盘）的
+/// 只有可用项（静默剔除，⛔ 不弹窗）。若全部不支持 ⇒ 列表只显示一行说明（⛔ 不灰显、⛔ 不空白）。</item>
 /// <item><b>最多 <see cref="MaxSlots" /> 格</b>（= 磁贴行的动作格上限）：勾满之后再勾会被拒绝并提示，
 /// ⛔ 不会静默丢掉用户的勾选。</item>
 /// <item>2026-10-12（用户原话「快捷开关最少 0 个（全部不选就只显示自定义）」）：**允许 0 选** ——
@@ -65,9 +68,6 @@ internal sealed class QuickTilePickerForm : RForm
 	private readonly int _maxSlots;
 
 	private readonly Label _status;
-
-	/// <summary>置灰项的说明气泡（必须留在字段上，局部 ToolTip 会被 GC 掉、气泡不显示）。</summary>
-	private readonly ToolTip _unsupportedTip = new ToolTip();
 
 	private bool _syncing;
 
@@ -138,12 +138,26 @@ internal sealed class QuickTilePickerForm : RForm
 		};
 		_list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 		scroll.Controls.Add(_list);
-		// 2026-10-12（可自行调整顺序）：先按"已选中项（按存储顺序）+ 其余（按可选项顺序）"定初始顺序，
-		// 再按这个顺序建行 —— 面板一打开看到的就是当前磁贴的真实顺序。
-		// 2026-10-12（分组不变量）：前置段只收**本机型支持**的已选中项 —— 行上真正的勾选态是
-		// `isSupported && Contains(selected, key)`（见下），所以"配置里有、但本机型没这个开关"的键
-		// 建出来是**未勾选**的；若把它放进前置段，面板一打开就会出现"未勾选行坐在已勾选块中间/上面"，
-		// 正好违反本轮的分组不变量。让它落到后面那个循环 ⇒ 它按可选项顺序排在未勾选组里（置灰、不可点）。
+		// 2026-10-18（机主：本机不支持的功能项**直接隐藏**，⛔ 不再灰显）：
+		//   `supported` 由调用方按**能力位唯一来源**算好（SettingsForm.QuickTileSupported =
+		//   hw.SupportsQuickSwitch ∥ StaticQuick；宝龙达 fanboost 的 FanCurveVerified 闸门也在
+		//   SupportsQuickSwitch 里）⇒ 本面板只给 supported 项建行，不支持的项**一个控件都不建** ✅
+		//   ⚠️ 已保存选择里若含不支持项 ⇒ 它落不到任何行 ⇒ 确定时输出（= 落盘）的只有可用项（静默剔除）✅
+		// 2026-10-12（可自行调整顺序）：初始顺序 = 已选中项（按存储顺序）+ 其余可用项（按可选项顺序）。
+		List<string> hiddenKeys = new List<string>();
+		for (int hiddenIndex = 0; hiddenIndex < optionKeys.Count; hiddenIndex++)
+		{
+			if (!IsOptionSupported(supported, hiddenIndex) && !Contains(hiddenKeys, optionKeys[hiddenIndex]))
+			{
+				hiddenKeys.Add(optionKeys[hiddenIndex]);
+			}
+		}
+		// ⭐ 日志（去重）：`[QS] 自定义磁贴：按能力位隐藏 N 项（key=…）` ✅
+		if (hiddenKeys.Count > 0)
+		{
+			Logger.WriteLineIfChanged("qs-tile-hidden",
+				$"[QS] 自定义磁贴：按能力位隐藏 {hiddenKeys.Count} 项（key={string.Join(",", hiddenKeys)}）");
+		}
 		List<int> order = new List<int>();
 		if (selected != null)
 		{
@@ -151,12 +165,9 @@ internal sealed class QuickTilePickerForm : RForm
 			{
 				for (int i = 0; i < optionKeys.Count; i++)
 				{
-					if (!order.Contains(i) && string.Equals(optionKeys[i], selected[s], StringComparison.OrdinalIgnoreCase))
+					if (!order.Contains(i) && IsOptionSupported(supported, i)
+						&& string.Equals(optionKeys[i], selected[s], StringComparison.OrdinalIgnoreCase))
 					{
-						if (i >= supported.Count || !supported[i])
-						{
-							break;
-						}
 						order.Add(i);
 						break;
 					}
@@ -165,7 +176,7 @@ internal sealed class QuickTilePickerForm : RForm
 		}
 		for (int i2 = 0; i2 < optionKeys.Count; i2++)
 		{
-			if (!order.Contains(i2))
+			if (!order.Contains(i2) && IsOptionSupported(supported, i2))
 			{
 				order.Add(i2);
 			}
@@ -174,7 +185,6 @@ internal sealed class QuickTilePickerForm : RForm
 		{
 			int i3 = order[r];
 			string key = optionKeys[i3];
-			bool isSupported = i3 < supported.Count && supported[i3];
 			RCheckBox box = new RCheckBox
 			{
 				Name = "tile_" + key,
@@ -183,15 +193,10 @@ internal sealed class QuickTilePickerForm : RForm
 				AutoSize = true,
 				Margin = new Padding(0, 3, 0, 3),
 				BackColor = UiVisualStyle.Window,
-				ForeColor = isSupported ? UiVisualStyle.Text : UiVisualStyle.Muted,
-				Cursor = isSupported ? Cursors.Hand : Cursors.Default,
-				Enabled = isSupported,
-				Checked = isSupported && Contains(selected, key)
+				ForeColor = UiVisualStyle.Text,
+				Cursor = Cursors.Hand,
+				Checked = Contains(selected, key)
 			};
-			if (!isSupported)
-			{
-				_unsupportedTip.SetToolTip(box, Strings.QuickTileSwitchMissing);
-			}
 			box.CheckedChanged += OnOptionCheckedChanged;
 			TableLayoutPanel row = new TableLayoutPanel
 			{
@@ -218,7 +223,28 @@ internal sealed class QuickTilePickerForm : RForm
 			_rows.Add(row);
 			_list.Controls.Add(row, 0, r);
 		}
-		_list.RowCount = Math.Max(1, _rows.Count);
+		// ⭐ 空列表兜底（机主：全部不支持时**只保留「自定义」**，并显示一行说明；⛔ 不灰显、⛔ 不留空白）：
+		//   ⚠️ 这里不建任何勾选框 ⇒ 不存在"能勾但不支持"的项；「确定」仍可按 ⇒ 输出空集
+		//   （调用方写显式空集哨兵，磁贴行只剩末位「自定义」）✅
+		if (_rows.Count == 0)
+		{
+			_list.RowCount = 1;
+			_list.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			_list.Controls.Add(new Label
+			{
+				Name = "labelQuickTileNoOptions",
+				Text = "本机暂无可用的快捷开关",
+				AutoSize = true,
+				Font = UiVisualStyle.Font(8.5f),
+				ForeColor = UiVisualStyle.Muted,
+				BackColor = UiVisualStyle.Window,
+				Margin = new Padding(0, 10, 0, 10)
+			}, 0, 0);
+		}
+		else
+		{
+			_list.RowCount = Math.Max(1, _rows.Count);
+		}
 		Panel footer = new Panel
 		{
 			Dock = DockStyle.Fill,
@@ -496,6 +522,15 @@ internal sealed class QuickTilePickerForm : RForm
 			}
 		}
 		return false;
+	}
+
+	/// <summary>
+	/// ⭐ 该可选项是否**本机支持** —— 能力位由调用方按唯一来源算好并传入（见构造器注释：
+	/// <c>SettingsForm.QuickTileSupported</c>）；本方法只做数组越界保护（缺项按不支持处理）✅。
+	/// </summary>
+	private static bool IsOptionSupported(IList<bool> supported, int index)
+	{
+		return index >= 0 && index < supported.Count && supported[index];
 	}
 
 	private static RButton CreateButton(string text)
