@@ -375,6 +375,97 @@ internal static class BaolongdaFanCurveStore
 
 	private const string FileName = "fan_curve_bd.cfg";
 
+	// ⭐⭐ 2026-10-18（机主：多自定义档各自记录风扇曲线）：⭐ 每档一份文件
+	//   `baolongda_fancurve_<modeId>.cfg`（与旧全局 `fan_curve_bd.cfg` 同目录、同格式）✅
+	//   ⭐ 旧全局文件作为**所有档位的兜底**（读取时优先档位文件，不存在才回全局）⇒ ⛔ 不丢用户已有曲线 ✅
+	private const string ModeFileNamePrefix = "baolongda_fancurve_";
+
+	/// <summary>⭐ 线程局部路径覆盖：仅 <see cref="LoadForMode" /> / <see cref="SaveForMode" /> 内部使用 ✅</summary>
+	[ThreadStatic]
+	private static string _pathOverride;
+
+	/// <summary>⭐ 档位 id 是否等于"默认/全局"（空 / <c>default</c>）✅</summary>
+	internal static bool IsDefaultModeId(string modeId)
+	{
+		return string.IsNullOrWhiteSpace(modeId) || string.Equals(modeId, "default", StringComparison.OrdinalIgnoreCase);
+	}
+
+	/// <summary>⭐ 档位 id → 安全文件名片段（只留字母/数字/下划线/短横）✅</summary>
+	internal static string SanitizeModeId(string modeId)
+	{
+		if (IsDefaultModeId(modeId))
+		{
+			return "default";
+		}
+		StringBuilder sb = new StringBuilder(modeId.Length);
+		foreach (char c in modeId)
+		{
+			sb.Append((char.IsLetterOrDigit(c) || c == '_' || c == '-') ? c : '_');
+		}
+		return sb.Length == 0 ? "default" : sb.ToString();
+	}
+
+	/// <summary>⭐ 档位曲线文件路径（默认/全局 = 旧 <c>fan_curve_bd.cfg</c>）✅</summary>
+	internal static string GetModePath(string modeId)
+	{
+		if (IsDefaultModeId(modeId))
+		{
+			return GetPath();
+		}
+		return Path.Combine(GetConfigDirectory(), ModeFileNamePrefix + SanitizeModeId(modeId) + ".cfg");
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：多自定义档各自记录曲线）：⭐ 按**档位**读曲线 ✅。
+	/// <para>⭐ 顺序：档位文件存在 ⇒ 用它；不存在 ⇒ **回退旧全局存档**（作为该档初始值）；再没有 ⇒ 默认 ✅</para>
+	/// <para><paramref name="fromModeFile" /> = 本次是否真的来自档位文件（供调用方打印来源）✅</para>
+	/// </summary>
+	internal static BaolongdaFanCurveSettings LoadForMode(string modeId, int fullRpm, out bool fromModeFile)
+	{
+		fromModeFile = false;
+		if (IsDefaultModeId(modeId))
+		{
+			return Load(fullRpm);
+		}
+		string path = GetModePath(modeId);
+		if (!File.Exists(path))
+		{
+			// ⭐ 兼容旧数据：旧全局单份曲线作为所有档位的初始值 ✅
+			return Load(fullRpm);
+		}
+		_pathOverride = path;
+		try
+		{
+			BaolongdaFanCurveSettings settings = Load(fullRpm);
+			fromModeFile = true;
+			return settings;
+		}
+		finally
+		{
+			_pathOverride = null;
+		}
+	}
+
+	/// <summary>⭐⭐ 2026-10-18：⭐ 按**档位**写曲线（默认/全局仍写旧文件名）✅。</summary>
+	internal static bool SaveForMode(string modeId, BaolongdaFanCurveSettings settings, out string path)
+	{
+		if (IsDefaultModeId(modeId))
+		{
+			path = GetPath();
+			return Save(settings);
+		}
+		path = GetModePath(modeId);
+		_pathOverride = path;
+		try
+		{
+			return Save(settings);
+		}
+		finally
+		{
+			_pathOverride = null;
+		}
+	}
+
 	/// <summary>
 	/// ⭐ 读一次设置（⭐ 读不到/坏掉 ⇒ ⭐ 返回**默认**（⭐ `Enabled=false` ✅），⭐ 不外抛 ✅）。
 	/// <para>⭐⭐ 参数 <paramref name="fullRpm" /> = ⭐ **本机风扇满转**（40 系 6000 / 30 系 4900）✅
@@ -654,7 +745,7 @@ internal static class BaolongdaFanCurveStore
 
 	private static string GetPath()
 	{
-		return Path.Combine(GetConfigDirectory(), FileName);
+		return _pathOverride ?? Path.Combine(GetConfigDirectory(), FileName);
 	}
 
 	/// <summary>⭐ 配置目录（⭐ 与 `LightingSettingsStore` 完全同源 ✅ —— ⭐ 同一个覆盖变量 ✅）。</summary>

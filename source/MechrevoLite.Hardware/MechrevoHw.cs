@@ -4438,6 +4438,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	// ══════════════════════════════════════════════════════════════════
 
 	/// <summary>⭐ 30 系只读验证缓存（<c>null</c> = 还没验证过；false = 不可用；true = 可用）✅</summary>
+	// ⭐⭐ 2026-10-18（机主：多自定义档各自记录风扇曲线）：⭐ 当前档位 id（默认 "default" 走旧全局存档）✅
+	private static string _fanCurveModeId = "default";
+
 	private static bool? _fanCurveVerifiedGen30;
 
 	/// <summary>⭐ 40 系只读验证缓存（<c>null</c> = 还没验证过；false = 不可用；true = 可用）✅</summary>
@@ -5139,21 +5142,47 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// </summary>
 	internal BaolongdaFanCurveSettings LoadBaolongdaFanCurve()
 	{
-		return BaolongdaFanCurveStore.Load(FanRpmMaxForPercent);
+		return LoadBaolongdaFanCurve(_fanCurveModeId);
 	}
 
 	/// <summary>
-	/// ⭐⭐ 保存软件闭环曲线（⭐ 只落盘 ＋ ⭐ 立即应用一次 ✅）。
+	/// ⭐⭐ 2026-10-18（机主：多自定义档各自记录曲线）：⭐ 按**档位**读曲线
+	///（`custom1..custom5` 各一份；旧全局存档作为兜底）✅。
+	/// <para>⭐ 日志：<c>[fan] 曲线：读取档位=custom2（来源=档位存档/默认兜底）</c> ✅</para>
+	/// </summary>
+	internal BaolongdaFanCurveSettings LoadBaolongdaFanCurve(string modeId)
+	{
+		string id = string.IsNullOrWhiteSpace(modeId) ? "default" : modeId;
+		BaolongdaFanCurveSettings settings = BaolongdaFanCurveStore.LoadForMode(id, FanRpmMaxForPercent, out bool fromModeFile);
+		Logger.WriteLineIfChanged("fan-curve-mode-load-" + id,
+			"[fan] 曲线：读取档位=" + id + "（来源=" + (fromModeFile ? "档位存档" : "默认兜底") + "）");
+		return settings;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 保存软件闭环曲线（⭐ 只落盘 ＋ ⭐ **保存即应用一次** ✅）。
 	/// <para>⚠️ 若 <c>Enabled</c>=false ⇒ ⭐ **同时交回固件控制** ✅
 	/// （⭐ 不能"关了开关却还让风扇停在我们上次写的转速上" ⚠️）。</para>
 	/// </summary>
 	internal bool SaveBaolongdaFanCurve(BaolongdaFanCurveSettings settings)
 	{
+		return SaveBaolongdaFanCurve(_fanCurveModeId, settings);
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：多自定义档各自记录曲线）：⭐ 保存到**指定档位**并立即应用（保存即应用）✅。
+	/// <para>⭐ 只影响该档存档；其它档位曲线不被覆盖 ✅</para>
+	/// </summary>
+	internal bool SaveBaolongdaFanCurve(string modeId, BaolongdaFanCurveSettings settings)
+	{
 		if (settings == null)
 		{
 			return false;
 		}
-		bool ok = BaolongdaFanCurveStore.Save(settings);
+		string id = string.IsNullOrWhiteSpace(modeId) ? "default" : modeId;
+		_fanCurveModeId = id;
+		bool ok = BaolongdaFanCurveStore.SaveForMode(id, settings, out string path);
+		Logger.WriteLine("[fan] 曲线：已保存到档位 " + id + "（path=" + path + "）");
 		// ⭐ 曲线被保存（含只改开关）⇒ 决策器清零 ⇒ 下一个 tick **必定重写**
 		//   （⛔ 否则会拿旧回差状态压住新曲线，用户会以为"保存了没反应" ⚠️）
 		_baolongdaCurveDecider0.Reset();
@@ -5349,7 +5378,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		try
 		{
 			// ⭐⭐ 2026-10-19：⭐ 把**本机满转**传进存储层（40 系 6000 / 30 系 4900）⇒ 新装机默认曲线按代际校准 ✅
-			BaolongdaFanCurveSettings settings = BaolongdaFanCurveStore.Load(FanRpmMaxForPercent);
+			BaolongdaFanCurveSettings settings = LoadBaolongdaFanCurve();
 			if (!settings.Enabled)
 			{
 				// ⭐⭐ 2026-10-19（机主：风扇曲线不生效，且日志里**一条曲线行都没有**）：

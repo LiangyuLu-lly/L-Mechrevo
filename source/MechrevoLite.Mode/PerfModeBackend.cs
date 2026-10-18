@@ -160,8 +160,10 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			Channel1Temperatures = current.Channel1Temperatures,
 			Channel1Rpms = cpu ? rpms : current.Channel1Rpms
 		};
-		bool ok = _hw.SaveBaolongdaFanCurve(next);
-		Logger.WriteLine($"[fan] 宝龙达本地曲线已保存（{(cpu ? "CPU/ch1" : "GPU/ch0")} · {min}~{max} RPM · enabled=true）⇒ ok={ok}");
+		// ⭐⭐ 2026-10-18（多自定义档各自曲线）：⭐ 写回**当前档位**对应存档（旧全局作为兜底）✅
+		string modeId = PerfModeService.Instance?.ActiveModeId ?? "default";
+		bool ok = _hw.SaveBaolongdaFanCurve(modeId, next);
+		Logger.WriteLine($"[fan] 宝龙达本地曲线已保存（档位={modeId} · {(cpu ? "CPU/ch1" : "GPU/ch0")} · {min}~{max} RPM · enabled=true）⇒ ok={ok}");
 		return ok;
 	}
 

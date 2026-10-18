@@ -177,7 +177,7 @@ public class FanCurveForm : RForm
 					_dragIdx = i;
 				}
 			}
-			if (num > (double)(12f * UiDpi.Paint(this) / 96f))
+			if (num > (double)(18f * UiDpi.Paint(this) / 96f))
 			{
 				_dragIdx = -1;
 			}
@@ -194,8 +194,33 @@ public class FanCurveForm : RForm
 				int num = Math.Clamp((tuple.bottom - e.Y) * 100 / item, 0, 100);
 				if (num != _duties[_dragIdx])
 				{
-					_duties[_dragIdx] = num;
-					Array.Copy(MechrevoHw.NormalizeFanCurve(_duties, _temps), _duties, _duties.Length);
+					// ⭐⭐ 2026-10-18（机主：后段点拖不动）：⛔ 不再用 NormalizeFanCurve 强制单调钳制
+					//   （它会把下调点抬回左邻值 ⇒ 80~100% 平台段无法下调）；
+					//   ⭐ 友好规则：可下调，但不能低于左邻；冲突时把相邻点一起推，并记日志 ✅
+					int idx = _dragIdx;
+					int oldDuty = _duties[idx];
+					int value = Math.Clamp(num, 0, 100);
+					bool pushed = false;
+					if (idx > 0 && value < _duties[idx - 1])
+					{
+						for (int j = idx - 1; j >= 0 && _duties[j] > value; j--)
+						{
+							_duties[j] = value;
+							pushed = true;
+						}
+					}
+					if (idx < _valid - 1 && value > _duties[idx + 1])
+					{
+						for (int j = idx + 1; j < _valid && _duties[j] < value; j++)
+						{
+							_duties[j] = value;
+							pushed = true;
+						}
+					}
+					_duties[idx] = value;
+					Logger.WriteLineIfChanged("fan-curve-drag-" + idx,
+						$"[fan] 曲线编辑：点 index={idx} 拖动 {oldDuty}%→{value}%"
+						+ (pushed ? "（与相邻点冲突 ⇒ 已一起推动相邻点）" : ""));
 					Invalidate();
 					_changed();
 				}
@@ -244,7 +269,6 @@ public class FanCurveForm : RForm
 
 	private bool _initialIndependentControlRequested;
 
-	private readonly Timer _saveTimer;
 
 	private bool _cpuPending;
 
@@ -282,6 +306,12 @@ public class FanCurveForm : RForm
 		}
 	}
 
+	private void OnCurveEdited()
+	{
+		// ⭐⭐ 2026-10-18（机主：拖动不应写硬件）：⭐ 拖动/调整只改界面与待保存值，⛔ 不写 EC、不启动闭环/固件上传；
+		//   ⭐ 只有点「保存」才落盘 + 应用（FlushPendingAsync）✅
+		Logger.WriteLineIfChanged("fan-curve-editing", "[fan] 曲线：编辑中（未保存，不写硬件）");
+	}
 	internal static bool ShouldRequestIndependentControlOnOpen(bool supported, bool alreadyEnabled)
 	{
 		if (supported)
@@ -364,15 +394,6 @@ public class FanCurveForm : RForm
 		};
 		tableLayoutPanel2.Controls.Add(label, 2, 0);
 		tableLayoutPanel.Controls.Add(tableLayoutPanel2, 0, 0);
-		_saveTimer = new Timer
-		{
-			Interval = 150
-		};
-		_saveTimer.Tick += async (object? _, EventArgs _) =>
-		{
-			_saveTimer.Stop();
-			await FlushPendingAsync();
-		};
 		FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel
 		{
 			Dock = DockStyle.Top,
@@ -483,8 +504,7 @@ public class FanCurveForm : RForm
 		_cpuPanel = new CurvePanel("CPU", UiVisualStyle.Accent, () =>
 		{
 			_cpuPending = true;
-			_saveTimer.Stop();
-			_saveTimer.Start();
+			OnCurveEdited();
 		})
 		{
 			Dock = DockStyle.Fill,
@@ -493,8 +513,7 @@ public class FanCurveForm : RForm
 		_gpuPanel = new CurvePanel("GPU", UiVisualStyle.Danger, () =>
 		{
 			_gpuPending = true;
-			_saveTimer.Stop();
-			_saveTimer.Start();
+			OnCurveEdited();
 		})
 		{
 			Dock = DockStyle.Fill,
@@ -522,8 +541,6 @@ public class FanCurveForm : RForm
 			{
 				Program.hw.CurveUpdated -= OnCurveUpdated;
 				Program.hw.CustomModeChanged -= OnCustomChanged;
-				_saveTimer.Stop();
-				_saveTimer.Dispose();
 				_toolTip.Dispose();
 			};
 		}
@@ -531,8 +548,6 @@ public class FanCurveForm : RForm
 		{
 			FormClosed += (object? _, FormClosedEventArgs _) =>
 			{
-				_saveTimer.Stop();
-				_saveTimer.Dispose();
 				_toolTip.Dispose();
 			};
 		}
@@ -595,7 +610,7 @@ public class FanCurveForm : RForm
 				//      · `FanType 1`（小扇）= **CPU** <-> `_cpuPanel`
 				if (hw.UsesBaolongda)
 				{
-					BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve();
+					BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve(TargetModeId);
 					_cpuPanel.Load(TempsToBytes(s.Channel1Temperatures), RpmsToPercent(s.Channel1Rpms, s.MinRpm, s.MaxRpm));
 					_gpuPanel.Load(TempsToBytes(s.Channel0Temperatures), RpmsToPercent(s.Channel0Rpms, s.MinRpm, s.MaxRpm));
 					_status.Text = "风扇曲线：软件闭环（宝龙达）" + ((Program.hw?.FanCurveVerified ?? false) ? "" : " · ⚠️ 本机风扇接管尚未验证，暂不可用（运行 --fan-probe 查看）")
@@ -634,15 +649,15 @@ public class FanCurveForm : RForm
 		if (!hw.FanCurveVerified)
 		{
 			_status.Text = "本机风扇接管尚未验证，暂不可用（运行 --fan-probe 查看详情）";
-			SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve());
+			SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve(TargetModeId));
 			return;
 		}
 		try
 		{
-			BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve();
+			BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve(TargetModeId);
 			bool ok = hw.SaveBaolongdaFanCurve(s.WithEnabled(enabled));
 			// ⭐ 以**落盘后重新读回**的 store 值为准（⛔ 不拿内存里的「想存的」当真）
-			BaolongdaFanCurveSettings now = hw.LoadBaolongdaFanCurve();
+			BaolongdaFanCurveSettings now = hw.LoadBaolongdaFanCurve(TargetModeId);
 			SyncBaolongdaCurveSwitches(now);
 			Logger.WriteLine($"[fan] 软件闭环 ⇒ {(enabled ? "开" : "关")}（已保存）· 回读 enabled={now.Enabled} · ok={ok}");
 			_status.Text = !ok
@@ -657,7 +672,7 @@ public class FanCurveForm : RForm
 			// 异常时按 store 真实值回滚开关，⛔ 不留「看起来已启用」的假象
 			try
 			{
-				SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve());
+				SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve(TargetModeId));
 			}
 			catch
 			{
@@ -677,9 +692,9 @@ public class FanCurveForm : RForm
 		}
 		try
 		{
-			BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve();
+			BaolongdaFanCurveSettings s = hw.LoadBaolongdaFanCurve(TargetModeId);
 			bool ok = hw.SaveBaolongdaFanCurve(s.WithSyncEnabled(enabled));
-			BaolongdaFanCurveSettings now = hw.LoadBaolongdaFanCurve();
+			BaolongdaFanCurveSettings now = hw.LoadBaolongdaFanCurve(TargetModeId);
 			SyncBaolongdaCurveSwitches(now);
 			Logger.WriteLine($"[fan] 双风扇联动 ⇒ {(enabled ? "开" : "关")}（0.85 系数 · 已保存）· 回读 sync={now.SyncEnabled} · ok={ok}");
 			_status.Text = !ok
@@ -694,7 +709,7 @@ public class FanCurveForm : RForm
 			_status.Text = "风扇曲线：双风扇联动保存失败";
 			try
 			{
-				SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve());
+				SyncBaolongdaCurveSwitches(hw.LoadBaolongdaFanCurve(TargetModeId));
 			}
 			catch
 			{
@@ -836,7 +851,7 @@ public class FanCurveForm : RForm
 		//   ⚠️ 非宝龙达 => 下面的 GCU 逻辑**逐位不变**
 		if (hw != null && hw.UsesBaolongda)
 		{
-			BaolongdaFanCurveSettings prev = hw.LoadBaolongdaFanCurve();
+			BaolongdaFanCurveSettings prev = hw.LoadBaolongdaFanCurve(TargetModeId);
 			_cpuPending = (_gpuPending = false);
 			try
 			{
@@ -856,7 +871,11 @@ public class FanCurveForm : RForm
 					Channel1Temperatures = prev.Channel1Temperatures,
 					Channel1Rpms = PercentToRpms(cpuPercent, prev.MinRpm, prev.MaxRpm),
 				};
-				bool ok = hw.SaveBaolongdaFanCurve(next);
+				bool ok = hw.SaveBaolongdaFanCurve(TargetModeId, next);
+				if (ok)
+				{
+					Logger.WriteLine("[fan] 曲线：已保存并应用（平台=宝龙达 ⇒ 闭环" + (next.Enabled ? "启动" : "未启用") + "，档位=" + TargetModeId + "）");
+				}
 				// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线接入）：把本轮的 16 点占空比**同时记进该档配置** ✅
 				//   ⇒ 自定义档「应用」时 `PerfModeApplyPlanner` 会生成 `WriteFanCurve` 步骤，
 				//     再由 `PerfModeBackend` 换成 RPM 写回 `BaolongdaFanCurveStore`（本机软件闭环 20/21）✅
@@ -875,7 +894,7 @@ public class FanCurveForm : RForm
 				// ⭐ 2026-10-19（机主：状态行说「已保存并启用」、开关却是关的）：
 				//   ⭐ 保存后**重新从 store 读回**，状态行 + 两个开关全部以读回值为准 ✅
 				//   ⚠️ 「保存」按钮的语义不变（仍是保存曲线点）✅
-				BaolongdaFanCurveSettings now = ok ? hw.LoadBaolongdaFanCurve() : prev;
+				BaolongdaFanCurveSettings now = ok ? hw.LoadBaolongdaFanCurve(TargetModeId) : prev;
 				SyncBaolongdaCurveSwitches(now);
 				_status.Text = !ok
 					? "风扇曲线保存失败"
@@ -927,6 +946,7 @@ public class FanCurveForm : RForm
 				if (flag)
 				{
 					PerfModeService.Instance?.RecordFanCurves(TargetModeId, sendCpu ? cpu : null, sendGpu ? gpu : null);
+					Logger.WriteLine("[fan] 曲线：已保存并应用（平台=同方/GCU · 固件上传 ⇒ 确认=true）");
 					// 2026-10-15（bugfix-fan-logo bug①，round2）：落盘成功 ⇒ 通知 owner（CustomModeForm）
 					// 自动应用一次（owner 会以最新落盘值为基线强制重发，确保生效且可见结果）。
 					RaiseFanCurveSaved(confirmed: true);
@@ -949,10 +969,6 @@ public class FanCurveForm : RForm
 		finally
 		{
 			_saveInProgress = false;
-			if (_cpuPending || _gpuPending)
-			{
-				_saveTimer.Start();
-			}
 		}
 	}
 

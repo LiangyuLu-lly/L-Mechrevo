@@ -58,6 +58,10 @@ internal static class Program
 		TestStore();
 
 		Console.WriteLine();
+		Console.WriteLine("-- 8b. 按档位曲线存档（custom1..5 各自一份 + 旧全局兜底）--");
+		TestPerModeStore();
+
+		Console.WriteLine();
 		Console.WriteLine(_fail == 0
 			? $"✅ 全部通过：PASS={_pass} FAIL=0"
 			: $"❌ 有失败：PASS={_pass} FAIL={_fail}");
@@ -253,6 +257,68 @@ internal static class Program
 	//    （⭐ 方案文档 §4.2 / ⭐ 用户要求「⭐ 不要猜、⭐ 不要静默迁移」✅）
 	// ══════════════════════════════════════════════════════════════════
 	private static string _tempDir;
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：多自定义档各自记录风扇曲线）：⭐ 按档位读写 + 旧全局兜底 ✅。
+	/// <para>⭐ 用独立临时目录（`LMECHREVO_LIGHT_CFG_DIR`）⇒ ⛔ 不碰用户真实存档 ✅</para>
+	/// </summary>
+	private static void TestPerModeStore()
+	{
+		string dir = System.IO.Path.Combine(
+			System.IO.Path.GetTempPath(),
+			"lm-fancurve-permode-" + Guid.NewGuid().ToString("N"));
+		System.IO.Directory.CreateDirectory(dir);
+		Environment.SetEnvironmentVariable(BaolongdaFanCurveStore.ConfigDirectoryOverrideVariable, dir);
+		try
+		{
+			BaolongdaFanCurveSettings custom1 = new BaolongdaFanCurveSettings
+			{
+				Enabled = true,
+				MaxRpm = 6000,
+				Channel0Rpms = Ramp16(1000),
+				Channel1Rpms = Ramp16(1100)
+			};
+			BaolongdaFanCurveSettings custom2 = new BaolongdaFanCurveSettings
+			{
+				Enabled = false,
+				MaxRpm = 6000,
+				Channel0Rpms = Ramp16(2000),
+				Channel1Rpms = Ramp16(2100)
+			};
+			True("按档位保存 custom1", BaolongdaFanCurveStore.SaveForMode("custom1", custom1, out string p1));
+			True("custom1 文件名 = baolongda_fancurve_custom1.cfg", p1.EndsWith("baolongda_fancurve_custom1.cfg", StringComparison.OrdinalIgnoreCase), p1);
+			True("按档位保存 custom2", BaolongdaFanCurveStore.SaveForMode("custom2", custom2, out string p2));
+			True("两档文件不同", !string.Equals(p1, p2, StringComparison.OrdinalIgnoreCase));
+
+			BaolongdaFanCurveSettings l1 = BaolongdaFanCurveStore.LoadForMode("custom1", 6000, out bool from1);
+			True("custom1 读回来自档位文件", from1);
+			Eq("custom1 首点 RPM = 1000（互不覆盖）", 1000, l1.Channel0Rpms[0]);
+			BaolongdaFanCurveSettings l2 = BaolongdaFanCurveStore.LoadForMode("custom2", 6000, out bool from2);
+			True("custom2 读回来自档位文件", from2);
+			Eq("custom2 首点 RPM = 2000（互不覆盖）", 2000, l2.Channel0Rpms[0]);
+
+			// 旧全局作为兜底：custom3 没有档位文件 ⇒ 回旧全局 ✅
+			True("写旧全局存档成功", BaolongdaFanCurveStore.Save(custom1));
+			BaolongdaFanCurveSettings l3 = BaolongdaFanCurveStore.LoadForMode("custom3", 6000, out bool from3);
+			True("custom3 没有档位文件 ⇒ 不回档位来源", !from3);
+			Eq("custom3 兜底读旧全局首点 = 1000", 1000, l3.Channel0Rpms[0]);
+
+			// default 仍写旧全局文件名（兼容）✅
+			True("default 档位保存成功", BaolongdaFanCurveStore.SaveForMode("default", custom1, out string pDefault));
+			True("default 文件名 = fan_curve_bd.cfg", pDefault.EndsWith("fan_curve_bd.cfg", StringComparison.OrdinalIgnoreCase), pDefault);
+		}
+		finally
+		{
+			Environment.SetEnvironmentVariable(BaolongdaFanCurveStore.ConfigDirectoryOverrideVariable, null);
+			try
+			{
+				System.IO.Directory.Delete(dir, recursive: true);
+			}
+			catch
+			{
+			}
+		}
+	}
 
 	private static void TestStore()
 	{

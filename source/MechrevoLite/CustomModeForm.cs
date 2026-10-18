@@ -3790,7 +3790,11 @@ public class CustomModeForm : RForm
 			Logger.WriteLine("[fan] 曲线自动应用跳过：保存未确认（回读不一致或写失败）——见曲线窗口状态行");
 			return;
 		}
-		_ = ApplyFanCurveAutoApplyAsync();
+		// ⭐⭐ 2026-10-18（机主：保存才算数）：⭐ 保存动作本身已经应用（宝龙达 SaveBaolongdaFanCurve 内立即闭环 / 同方保存时固件上传），
+		//   ⛔ 这里不再做第二次 auto-apply（避免拖一次保存触发两轮全量重写）✅
+		_status.Text = Strings.FanCurveSavedAndEnabled;
+		_status.ForeColor = UiVisualStyle.Muted;
+		Logger.WriteLine("[fan] 曲线：保存回调（保存动作已应用，⛔ 不再二次 auto-apply）");
 	}
 
 	/// <summary>
