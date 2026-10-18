@@ -2435,7 +2435,8 @@ public static class HardwareControl
 		// ⭐⭐ 2026-10-19（机主：无界 14X 核显功耗不随负载变化；GCU Monitor 能读到 2.0W）：
 		//   ⭐ AMD 核显（无 NVIDIA 独显）⇒ **ADL PMLog 优先于 LHM**（只读；NVIDIA 机型一律不进）✅
 		bool amdIgpu = CpuVendor.IsAmd && Program.hw != null && Program.hw.DgpuGeneration == DgpuGenerationKind.NoDgpu;
-		if (amdIgpu && AdlPowerReader.Available)
+		// ⭐⭐ 2026-10-19（机主更正：LHM 在 APU 上能读到核显功耗）：ADL 改为**仅当 LHM 没给值时的兜底** ✅
+		if (amdIgpu && !gpuPower.HasValue && AdlPowerReader.Available)
 		{
 			if (AdlPowerReader.TryRead(out float adlPower, out string adlSource))
 			{

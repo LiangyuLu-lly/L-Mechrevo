@@ -66,6 +66,17 @@ public class LhmMonitor : IDisposable
 
 	private static bool _gpuPowerFrozen;
 
+	// ⭐ 2026-10-19（机主：待机恒定属正常，不能只凭"6 次相同"判冻结）：⭐ 必须看到 load/temp 在变而功率不动才判冻结 ✅
+	private static bool _gpuPowerMovementSeen;
+
+	private static int? _gpuPowerLastLoad;
+
+	private static float? _gpuPowerLastTemp;
+
+	private static long _lastGpuPowerLogTick;
+
+	private static float? _lastGpuPowerLoggedValue;
+
 	/// <summary>
 	/// ⭐⭐ 2026-10-16（宝龙达适配 · "接传感器"）：⭐ **CPU 温度（摄氏度）** —— 取自 LM 自带的
 	/// LibreHardwareMonitor ✅。
@@ -680,7 +691,13 @@ public class LhmMonitor : IDisposable
 				}
 				float? gpuPowerSelected = SelectGpuPower(flag, nvidiaPower, flag2, amdPower, integratedPower);
 				LogGpuPowerDiagnostics(gpuPowerSensors, gpuTemps, flag, flag2, amdIgpuSource, amdIgpuPower);
-				GpuPower = ApplyGpuPowerFreezeGuard(gpuPowerSelected, flag2 && !flag);
+				GpuPower = ApplyGpuPowerFreezeGuard(gpuPowerSelected, flag2 && !flag, gpuLoad, GpuTemperature);
+				LogGpuPowerTick(gpuPowerSensors, gpuTemps, amdIgpuSource, GpuPower, gpuLoad, GpuTemperature);
+				if (!_dumpedSensors)
+				{
+					Logger.WriteError("[gpu-power] LHM 启用检查：IsGpuEnabled=" + _computer.IsGpuEnabled + " · nvidiaSkipped=" + _nvidiaGpuSkipped
+						+ " · GPU 硬件数=" + _computer.Hardware.Count((IHardware h) => IsGpuHardwareType(h.HardwareType)));
+				}
 				if (!_updateHadFailure && Interlocked.Exchange(ref _consecutiveFailures, 0) != 0)
 				{
 					Logger.WriteLine("LHM 传感器更新已恢复（连续失败计数清零）");
@@ -923,12 +940,21 @@ public class LhmMonitor : IDisposable
 	/// ⭐⭐ 冻结值判据（仅 AMD 核显）：连续 6 次（≈15s）读数完全一致 ⇒ 视为冻结，
 	/// 返回 null（悬浮窗显示「—」），⛔ 不显示假实时值 ✅。
 	/// </summary>
-	private static float? ApplyGpuPowerFreezeGuard(float? value, bool amdIgpu)
+	private static float? ApplyGpuPowerFreezeGuard(float? value, bool amdIgpu, int? gpuLoad, float? gpuTemp)
 	{
 		if (!amdIgpu || !value.HasValue)
 		{
 			return value;
 		}
+		// ⭐ 负载/温度是否在动（待机恒定 = 正常，不能判冻结）✅
+		bool moved = (gpuLoad.HasValue && _gpuPowerLastLoad.HasValue && Math.Abs(gpuLoad.Value - _gpuPowerLastLoad.Value) >= 10)
+			|| (gpuTemp.HasValue && _gpuPowerLastTemp.HasValue && Math.Abs(gpuTemp.Value - _gpuPowerLastTemp.Value) >= 3f);
+		if (moved)
+		{
+			_gpuPowerMovementSeen = true;
+		}
+		_gpuPowerLastLoad = gpuLoad;
+		_gpuPowerLastTemp = gpuTemp;
 		float rounded = (float)Math.Round(value.Value, 1);
 		if (float.IsNaN(_gpuPowerLastValue) || Math.Abs(_gpuPowerLastValue - rounded) > 0.05f)
 		{
@@ -936,15 +962,49 @@ public class LhmMonitor : IDisposable
 			_gpuPowerChangeCount++;
 			_gpuPowerStableCount = 0;
 			_gpuPowerFrozen = false;
+			_gpuPowerMovementSeen = false;
 			return value;
 		}
 		_gpuPowerStableCount++;
-		if (_gpuPowerStableCount >= 6 && !_gpuPowerFrozen)
+		if (_gpuPowerStableCount >= 6 && _gpuPowerMovementSeen && !_gpuPowerFrozen)
 		{
 			_gpuPowerFrozen = true;
-			Logger.WriteError("[gpu-power] ⚠️ 读数疑似冻结（恒 " + rounded.ToString("F1") + "W）⇒ 悬浮窗显示「—」");
+			Logger.WriteError("[gpu-power] ⚠️ 读数疑似冻结（load/temp 在变但功率恒 " + rounded.ToString("F1") + "W）⇒ 悬浮窗显示「—」");
 		}
 		return _gpuPowerFrozen ? ((float?)null) : value;
+	}
+
+	/// <summary>⭐⭐ 逐 tick 日志（10s 节流）：load/temp/全部功耗传感器/选源/变化状态 ✅</summary>
+	private static void LogGpuPowerTick(List<(HardwareType Type, string Hardware, string Name, float Value)> sensors,
+		List<(string Name, float Value)> temps, string selectedSource, float? selectedValue, int? gpuLoad, float? gpuTemp)
+	{
+		long now = Environment.TickCount64;
+		if (now - _lastGpuPowerLogTick < 10000)
+		{
+			return;
+		}
+		_lastGpuPowerLogTick = now;
+		string detail = "";
+		foreach ((string Name, float Value) temp in temps)
+		{
+			detail += "GPU " + temp.Name + "=" + temp.Value.ToString("F1") + "℃ / ";
+		}
+		foreach ((HardwareType Type, string Hardware, string Name, float Value) sensor in sensors)
+		{
+			detail += sensor.Name + "=" + sensor.Value.ToString("F1") + "W / ";
+		}
+		string change = (!_lastGpuPowerLoggedValue.HasValue || !selectedValue.HasValue) ? "初次"
+			: ((Math.Abs(_lastGpuPowerLoggedValue.Value - selectedValue.Value) > 0.05f) ? "变化" : "未变");
+		if (selectedValue.HasValue)
+		{
+			_lastGpuPowerLoggedValue = selectedValue.Value;
+		}
+		Logger.WriteError("[gpu-power] tick：load=" + (gpuLoad.HasValue ? gpuLoad.Value.ToString() + "%" : "—")
+			+ " · temp=" + (gpuTemp.HasValue ? gpuTemp.Value.ToString("F1") + "℃" : "—")
+			+ " · 传感器：" + detail.TrimEnd(' ', '/')
+			+ " · 选源=" + (string.IsNullOrEmpty(selectedSource) ? "未选中" : selectedSource)
+			+ " ⇒ " + (selectedValue.HasValue ? selectedValue.Value.ToString("F1") + "W" : "—")
+			+ "（与上次相比 " + change + "）");
 	}
 	internal static float? SelectGpuPower(bool nvidiaPresent, float? nvidiaPower, bool amdPresent, float? amdPower, float? integratedPower)
 	{
@@ -970,11 +1030,16 @@ public class LhmMonitor : IDisposable
 		{
 			return false;
 		}
-		if (!text.Equals("GPU Package", StringComparison.OrdinalIgnoreCase) && !text.Equals("GPU Package Power", StringComparison.OrdinalIgnoreCase) && !text.Equals("GPU Power", StringComparison.OrdinalIgnoreCase) && !text.Equals("Total Board Power", StringComparison.OrdinalIgnoreCase) && !text.Equals("Board Power", StringComparison.OrdinalIgnoreCase))
+		// ⭐⭐ 2026-10-19（机主更正：LHM 在 APU 上能读出核显功耗）：⭐ 不再只认精确名 ——
+		//   任何含 GPU + Power 的传感器都接受（GPU Core Power / GPU SoC Power / GPU Package Power / GPU Power…）✅
+		//   ⚠️ 上限/容量类已在上面排除；⛔ 不改变 NVIDIA 路径（NVML 仍优先）✅
+		if (text.Contains("GPU", StringComparison.OrdinalIgnoreCase) && text.Contains("Power", StringComparison.OrdinalIgnoreCase))
 		{
-			return text.Contains("GPU Power", StringComparison.OrdinalIgnoreCase);
+			return true;
 		}
-		return true;
+		return text.Equals("GPU Package", StringComparison.OrdinalIgnoreCase)
+			|| text.Equals("Total Board Power", StringComparison.OrdinalIgnoreCase)
+			|| text.Equals("Board Power", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static bool IsGpuMemoryTotalSensorName(string? name)
