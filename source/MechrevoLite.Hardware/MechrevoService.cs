@@ -3052,10 +3052,16 @@ public class MechrevoService
 			// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达）：⭐ 没有 GCU ⇒ 本机通道：暂停曲线闭环 + 两路满转 + 回读校验
 			if (_hw.UsesBaolongda && string.Equals(key, "fanboost", StringComparison.Ordinal))
 			{
-				bool bdHandled = _hw.TrySetFanBoostViaBackend(on, out bool bdConfirmed);
+				// ⭐⭐ 2026-10-18（机主 UI 体验 · 乐观更新）：⭐ 强冷确认窗口最长 10 s（每 500ms 读 13）⇒
+				//   ⭐ 放到**后台线程**执行，UI 立刻显示选中态、不阻塞；⛔ 写入/回读仍严格校验、一步不少 ✅
+				(bool bdHandled, bool bdConfirmed) = await Task.Run(() =>
+				{
+					bool handled = _hw.TrySetFanBoostViaBackend(on, out bool confirmed);
+					return (handled, confirmed);
+				});
 				if (bdHandled)
 				{
-					Logger.WriteLine($"SwitchQuick(fanboost,{on}) ⭐ 走**本机通道**（功能号 21/13）⇒ 确认={bdConfirmed}（⛔ 未发 MQTT）");
+					Logger.WriteLine($"SwitchQuick(fanboost,{on}) ⭐ 走**本机通道**（EC 目标档/掩码 + 13 轮询）⇒ 确认={bdConfirmed}（⛔ 未发 MQTT）");
 					return bdConfirmed;
 				}
 			}

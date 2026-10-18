@@ -777,6 +777,13 @@ public class SettingsForm : RForm
 
 	private DateTime _lastQuickSwitchUi = DateTime.MinValue;
 
+	// ⭐⭐ 2026-10-18（机主 UI 体验 · 强冷乐观更新）：⏱ 宽限期内**保持用户点的状态**，
+	//   ⛔ 不让定时器/周期刷新按 `FanBoostActive` 提前拨回；只有**最终确认失败**才回滚 ✅
+	//   ⚠️ 用 static：`ReadQuickSwitchState` 是静态方法（磁贴/更多开关共用同一读回入口）✅
+	private static DateTime _fanBoostOptimisticUntil = DateTime.MinValue;
+
+	private static bool _fanBoostOptimisticValue;
+
 	/// <summary>
 	/// ⭐ 2026-10-17：<c>capslock</c> / <c>numpad</c> 直读系统锁定态时，**每个键首次必打一行**日志，
 	/// 之后只在值发生变化时打。用途：证明"这条读路径到底有没有跑过"（否则它静默生效，
@@ -1938,6 +1945,11 @@ public class SettingsForm : RForm
 					if (!_syncingSwitches)
 					{
 						_lastQuickSwitchUi = DateTime.Now;
+						// ⭐⭐ 2026-10-18（机主 UI 体验 · 乐观更新）：⭐ 点击后**立刻**保持选中态（不等硬件确认），
+						//   ⏱ 12 s 宽限内不被定时器拨回；⭐ 硬件仍严格校验，最终失败才回滚 ✅
+						_fanBoostOptimisticUntil = DateTime.Now.AddSeconds(12);
+						_fanBoostOptimisticValue = cb.Checked;
+						Logger.WriteLine("[fan] 强冷：UI 先乐观置" + (cb.Checked ? "开" : "关") + "（等待确认）");
 						if (Program.service != null)
 						{
 							MechrevoHw hw = Program.hw;
@@ -3789,6 +3801,13 @@ public class SettingsForm : RForm
 				}
 				if (!confirmed)
 				{
+					// ⭐⭐ 2026-10-18（机主 UI 体验）：⭐ 强冷确认窗口结束仍未达 ⇒ **这时才**回滚 UI
+					//   （写失败/明确回读不符）；⛔ 轮询期间不提前回滚 ✅
+					if (string.Equals(diagKey, "fanboost", StringComparison.Ordinal))
+					{
+						_fanBoostOptimisticUntil = DateTime.MinValue;
+						Logger.WriteLine("[fan] 强冷：确认失败 ⇒ UI 回滚");
+					}
 					bool flag4 = ReadQuickSwitchState((string)box.Tag) ?? (!requested);
 					_syncingSwitches = true;
 					try
@@ -4232,6 +4251,13 @@ public class SettingsForm : RForm
 				{
 					continue;
 				}
+				// ⭐⭐ 2026-10-18（机主 UI 体验）：⭐ 强冷确认窗口内保持**乐观置**的勾选态，
+				//   ⛔ 不按 `FanBoostActive` 提前拨回；只有最终确认失败才在 ApplyQuickSwitchAsync 里显式回滚 ✅
+				if (text == "fanboost" && DateTime.Now < _fanBoostOptimisticUntil)
+				{
+					checkBox.Checked = _fanBoostOptimisticValue;
+					continue;
+				}
 				bool? flag = ReadWindowsPersonalizationSwitch(text);
 				if (flag.HasValue)
 				{
@@ -4317,7 +4343,16 @@ public class SettingsForm : RForm
 				//   `hw.FanBoost`（GCU 上报字段）在宝龙达上**恒 false** ⇒ 原来 12 秒宽限一过
 				//   定时器就把开关拨回去（用户看到的"点了又弹回"）✅
 				//   ⚠️ 非宝龙达逐位不变（仍读 hw.FanBoost）✅
-				_fanBoostBox.Checked = Program.hw.UsesBaolongda ? MechrevoHw.FanBoostActive : Program.hw.FanBoost;
+				// ⭐⭐ 2026-10-18（机主 UI 体验）：⭐ 强冷确认窗口（最多 10 s）内保持**乐观置**的勾选态，
+				//   ⛔ 不被周期刷新拨回；最终失败路径会显式回滚并清乐观窗口 ✅
+				if (DateTime.Now < _fanBoostOptimisticUntil)
+				{
+					_fanBoostBox.Checked = _fanBoostOptimisticValue;
+				}
+				else
+				{
+					_fanBoostBox.Checked = Program.hw.UsesBaolongda ? MechrevoHw.FanBoostActive : Program.hw.FanBoost;
+				}
 			}
 		}
 		finally
@@ -5426,6 +5461,12 @@ public class SettingsForm : RForm
 				// ⭐ 2026-10-19（强冷核对 ②）：宝龙达没有 GCU ⇒ `hw.SupportsFanBoost` 恒 false、
 				//   `hw.FanBoost` 也不会被本机通道更新 ⇒ 读**静态** `FanBoostActive`（与写入侧同源）✅
 				//   ⚠️ 非宝龙达逐位不变 ✅
+				// ⭐⭐ 2026-10-18（机主 UI 体验）：⭐ 确认窗口内返回**乐观置**的值 ⇒ 磁贴与更多开关
+				//   立刻高亮且 12 s 内不被回读拨回；最终失败会清窗口并回滚 ✅
+				if (DateTime.Now < _fanBoostOptimisticUntil)
+				{
+					return new bool?(_fanBoostOptimisticValue);
+				}
 				if (hw.SupportsFanBoost)
 				{
 					return new bool?(hw.FanBoost);
