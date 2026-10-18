@@ -21,6 +21,10 @@ internal static class Program
 		//   C2 = 规划器只在判据为真时生成 `SmuStapmTimeSeconds`（未设置/不可用 ⇒ 不生成，旧行为）。
 		CheckSmuPowerRoutePredicate();
 		CheckPlannerEmitsStapmTimeWindowOnlyWhenSmuUsable();
+		// ⭐⭐ 2026-10-19（机主 UI 顺序 + FPPT 结论）：
+		//   C3a = 步骤顺序与 UI 行顺序一致：PL1 → PL2 → SmuStapmTimeSeconds → CpuTccOffset；
+		//   C3b = **没有**独立 FPPT 字段（fast limit 就是 fPPT，PL2 已在写它）⇒ 不重复加行。
+		CheckSmuPowerRowOrderAndNoIndependentFppt();
 		CheckPlannerEmitsGpuOverclockOnFirmwareSlotForBaolongda();
 		CheckPlannerKeepsGcuStepsUnchanged();
 		Console.WriteLine(_fail == 0 ? "ALL OK" : $"{_fail} FAILED");
@@ -168,6 +172,54 @@ internal static class Program
 		Expect("C2c no stapm-time step when unset (old behaviour)",
 			unsetSteps.All((PerfApplyStep s) => !(s.Kind == PerfApplyStepKind.WriteFirmwareField && s.WireKey == "SmuStapmTimeSeconds")));
 		Console.WriteLine("  C2 steps: " + string.Join("  ", smuSteps.Select((PerfApplyStep s) => s.ToString())));
+	}
+
+	private static void CheckSmuPowerRowOrderAndNoIndependentFppt()
+	{
+		// ⭐⭐ 2026-10-19（机主 UI 调整）：行顺序 = PL1 → PL2 → 功耗时间窗（STAPM，秒）→ 温度墙；
+		//   规划器步骤顺序与 UI 行顺序保持一致（日志可逐行对照）。
+		PerfModeSettings settings = new PerfModeSettings
+		{
+			Pl1 = 65,
+			Pl2 = 100,
+			TccTarget = 95,
+			StapmTimeSeconds = 30
+		};
+		PerfModeDefinition mode = new PerfModeDefinition("custom1", PerfModeKind.Custom, null, settings);
+		PerfModeCapabilities caps = new PerfModeCapabilities
+		{
+			SupportsFirmwareSlot = false,
+			SupportsWmiPowerFields = true,
+			SupportsSmuPowerControls = true
+		};
+		IReadOnlyList<PerfApplyStep> steps = PerfModeApplyPlanner.Build(mode, new FirmwareSlotPlan(0, NeedsParameterWrite: true, "test"), caps, includeSwitch: false);
+		int iPl1 = IndexOfWire(steps, "PL1");
+		int iPl2 = IndexOfWire(steps, "PL2");
+		int iTime = IndexOfWire(steps, "SmuStapmTimeSeconds");
+		int iTcc = IndexOfWire(steps, "CpuTccOffset");
+		Expect("C3a order: PL1 before PL2", iPl1 >= 0 && iPl2 > iPl1, $"{iPl1},{iPl2}");
+		Expect("C3a order: PL2 before STAPM time", iPl2 >= 0 && iTime > iPl2, $"{iPl2},{iTime}");
+		Expect("C3a order: STAPM time before temp wall", iTime >= 0 && iTcc > iTime, $"{iTime},{iTcc}");
+		// ⭐⭐ C3b：**FPPT 不是独立字段** —— SMU 的 `fast limit`（MP1 0x15）就是 fPPT，PL2 已经写它
+		//   ⇒ 机主要求的"若 FPPT 独立存在才加行"不成立，**不新增 FpptLimitW**（防将来重复加行）。
+		bool hasFpptField = typeof(PerfModeSettings).GetProperty("FpptLimitW") != null
+			|| typeof(PerfModeSettings).GetProperty("FpptLimit") != null;
+		Expect("C3b no independent FPPT field (PL2 is fPPT)", !hasFpptField);
+		// 缺省 = 未设置（⛔ 不编默认值）
+		Expect("C3b StapmTimeSeconds default null", new PerfModeSettings().StapmTimeSeconds == null);
+		Console.WriteLine("  C3 steps: " + string.Join("  ", steps.Select((PerfApplyStep s) => s.ToString())));
+	}
+
+	private static int IndexOfWire(IReadOnlyList<PerfApplyStep> steps, string wireKey)
+	{
+		for (int i = 0; i < steps.Count; i++)
+		{
+			if (steps[i].Kind == PerfApplyStepKind.WriteFirmwareField && steps[i].WireKey == wireKey)
+			{
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	private static void CheckPlannerEmitsGpuOverclockOnFirmwareSlotForBaolongda()

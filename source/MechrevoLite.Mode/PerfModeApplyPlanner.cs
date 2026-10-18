@@ -166,17 +166,20 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("PL2", settings.Pl2.Value, PerfApplyVerify.CpuPackagePower));
 			}
-			if (settings.TccTarget.HasValue)
-			{
-				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
-			}
-			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗 · 机主「持续功耗时间能不能放进去」）：
-			//   ⭐ 只有「SMU 功耗控制真的可用」时生成（`SupportsSmuPowerControls` = 宝龙达 && 30 系 && SMU 通路可用；
-			//      默认 false ⇒ GCU/老接口/40 系/PawnIO 不可用时步骤列表逐位不变 ✅）。
+			// ⭐⭐ 2026-10-19（机主 UI 顺序：PL1 → PL2 → 功耗时间窗（STAPM，秒）→ 温度墙）：
+			//   ⭐ 步骤顺序与 UI 行顺序一致（日志/执行顺序一眼可对照）✅
+			//   ⚠️ **不新增 FPPT 步骤**：SMU 只有 stapm/slow/fast 三档功率限制，
+			//      `fast limit`（MP1 0x15）**就是 fPPT**，而本映射里 PL2 已经写 fast（`SetFastLimit`）
+			//      ⇒ 再生成一条 FPPT 会重复写同一条命令（详见 CustomModeForm PL2 行注释）✅
 			//   ⚠️ 单位 = **秒**（MP1 0x18 `stapm_time`）；未设置（null）⇒ 不生成、不写（旧行为）✅
+			//   条件：`SupportsSmuPowerControls` = 宝龙达 && 30 系 && SMU 通路可用；默认 false ⇒ 既有后端逐位不变。
 			if (caps.SupportsSmuPowerControls && settings.StapmTimeSeconds.HasValue)
 			{
 				list.Add(Field("SmuStapmTimeSeconds", settings.StapmTimeSeconds.Value));
+			}
+			if (settings.TccTarget.HasValue)
+			{
+				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
 		}
 		// ⭐⭐ 2026-10-17（宝龙达 · 自定义档风扇曲线本地化）：⭐ 无固件槽的后端**不产生** GCU 的

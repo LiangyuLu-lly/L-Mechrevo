@@ -775,6 +775,18 @@ public class CustomModeForm : RForm
 		_pl1Val = tuple4.Item2;
 		_pl1Label = RowLabelOf(_pl1);
 		AttachPowerWallUnsetHint(_pl1, _pl1Val, _pl1Label);
+		// ⭐⭐ 2026-10-19（机主："AMD 还有 FPPT，能不能加"）：⭐ **PL2 就是 FPPT，不重复加行** ✅
+		//   证据（事实，不猜）：
+		//     ① AMD APU SMU 只有三档功率限制：`stapm`(SPL) / `slow`(sPPT) / `fast`(**fPPT**)；
+		//        RyzenAdj 的 `--fast-limit` 官方口径就是 "Fast Package Power Tracking (fPPT)"，
+		//        命令号 MP1 0x15；本仓库 `RyzenSmuService.SetFastLimit` 用的正是它。
+		//     ② 本文件 PM 表快照（`SmuPowerSnapshot`）也只读 `Stapm/Fast/Slow` 三个功率字段
+		//        （另加 `ApuSlow` 内部档，不是 fPPT），没有第四个可写的 "fPPT" 字段。
+		//     ③ 同方 30 系 GCU 机型的厂商字段确实是三档（`CpuAmdSPL/SPPT/FPPT` → PL1/PL2/PL4），
+		//        ⇒ 在 GCU 那边 FPPT 是"第三档"；但在 SMU 这边第三档就是 `fast`，**已被 PL2 写掉** ✅
+		//   ⇒ 机主要求的行顺序（PL1 → PL2 → 功耗时间窗）**不插入 FPPT 行**；
+		//     若将来要改成"PL1=SPL / PL2=SPPT / FPPT=fPPT"的三轴语义，那属于**改 PL1/PL2 现有映射**，
+		//     必须另行批准（本轮 ⛔ 不改映射、⛔ 不动 PowerLimitOrder 联动）。
 		tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
 		{
 			QueuePowerLimit("PL2", v);
@@ -783,6 +795,8 @@ public class CustomModeForm : RForm
 		_pl2Val = tuple4.Item2;
 		_pl2Label = RowLabelOf(_pl2);
 		AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
+		// ⭐⭐ 2026-10-19（机主要求的行顺序）：PL1 → PL2 → **功耗时间窗（STAPM，秒）** → 温度墙 ✅
+		//   （本行紧跟在 PL2 后面创建 ⇒ 表格里的顺序就是上面这个；FPPT 不单独成行，原因见 PL2 行注释）
 		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：只要「本档真的走 SMU」就**建行** ——
 		//   ⭐ 值读得到/稳定 ⇒ 显示当前值；读不到/不稳定 ⇒ 标题「（未设置）」+ 滑块停在最小档，
 		//      ⛔ 不再因为读不到就隐藏整行（那看起来像"没这个功能"）。
@@ -808,6 +822,11 @@ public class CustomModeForm : RForm
 				Logger.WriteLine("[smu] STAPM 时间窗当前值读不到/不稳定 ⇒ 行照建、显示「（未设置）」（不隐藏）");
 			}
 		}
+		// ⭐⭐ 2026-10-19（FPPT 结论的 UI 侧说明）：⭐ 这一行在 AMD 平台上用的是**厂商固件字段**
+		//   `CpuAmdFPPT`（`Strings.CpuFppt` = "CPU 峰值功耗墙 fPPT (W)"），即 GCU 三轴语义里的第三档；
+		//   但宝龙达 30 系**没有 GCU**、且 SMU 的第三档（fast limit）已经由 **PL2** 写入
+		//   ⇒ 本行在 30 系 SMU 路径上不可调（`Pl4Minimum/Maximum` 保持 -1 ⇒ `ApplyRange` 会把整行隐藏），
+		//      ⛔ 不拿它当"独立 FPPT 行"、也⛔ 不给它接 SMU 写入（否则与 PL2 重复写 0x15）✅
 		(int, int, int, bool) tuple5 = DeviceRange(hw?.Pl4Minimum ?? (-1), hw?.Pl4Maximum ?? (-1), hw?.Pl4 ?? 0);
 		tuple4 = AddSliderRow((hw != null && hw.UsesAmdPowerFields) ? Strings.CpuFppt : Strings.CpuPl4, tuple5.Item1, tuple5.Item2, tuple5.Item3, (int v) =>
 		{
