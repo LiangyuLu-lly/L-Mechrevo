@@ -334,6 +334,9 @@ public class SettingsForm : RForm
 	private int _chargeLimitTierRowHeight;
 	private bool _chargeLimitTierHidden;
 
+	// ⭐⭐ 2026-10-18（机主截图）：⭐ 宝龙达下隐藏旧「关闭 EC 直写充电上限（写入异常时用）」行 ✅
+	private bool _ecDirectWriteOffHidden;
+
 	private RButton? buttonSilentTurbo;
 
 	private RButton? buttonCustomMode;
@@ -8494,6 +8497,50 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主截图）：⭐ 宝龙达下隐藏旧的「关闭 EC 直写充电上限（写入异常时用）」行
+	/// （判据基于旧的 `\\.\ACPIDriver` 通路，宝龙达不适用）✅。
+	/// <para>⛔ 只改 Visible 与行高，**不删控件**；非宝龙达 `hidden=false` ⇒ 恢复原行高，逐位不变 ✅</para>
+	/// </summary>
+	private void ApplyEcDirectWriteOffVisibility(bool hidden)
+	{
+		if (_ecDirectWriteOffRowHeight <= 0)
+		{
+			// 构造期还没跑过 BuildChargeLimitControls（行高未登记）⇒ 不碰，等它建好后再由下一次刷新落地。
+			return;
+		}
+		if (_ecDirectWriteOffHidden == hidden)
+		{
+			return;
+		}
+		_ecDirectWriteOffHidden = hidden;
+		if (_checkEcDirectWriteOff != null)
+		{
+			_checkEcDirectWriteOff.Visible = !hidden;
+		}
+		TableLayoutPanel table = _chargeLimitHostTable;
+		if (table != null && _ecDirectWriteOffRowIndex >= 0 && table.RowStyles.Count > _ecDirectWriteOffRowIndex)
+		{
+			table.RowStyles[_ecDirectWriteOffRowIndex] = new RowStyle(SizeType.Absolute,
+				hidden ? 0 : _ecDirectWriteOffRowHeight);
+			float total = 0f;
+			foreach (RowStyle rowStyle in table.RowStyles)
+			{
+				total += rowStyle.Height;
+			}
+			table.Height = (int)Math.Round(total);
+			if (panelBattery != null)
+			{
+				panelBattery.MinimumSize = new Size(0, table.Bottom + panelBattery.Padding.Bottom);
+			}
+		}
+		if (hidden)
+		{
+			Logger.WriteLineIfChanged("battery-baolongda-legacy-rows-hidden",
+				"[battery] 宝龙达 ⇒ 隐藏旧 EC 直写/三档行（仅保留新充电阈值面板）");
+		}
+	}
+
+	/// <summary>
 	/// 2026-10-15（限充真效果判据上屏 · 用户批准的修法④）：把 <see cref="ChargeLimitEffectEvidence.Latest"/> 的
 	/// 上游口径判定（0x0742 bit2：生效 / 未生效 / 无法判定）显示在限充区。
 	/// <para>⛔ 纯只读：只读静态证据对象 + 改一个 Label 的 Text/Visible，不写 EC、不改 config、不发起任何探测。</para>
@@ -9203,6 +9250,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// ⭐ 2026-10-17：宝龙达下三档按钮行也收起（⛔ 不删控件、不删代码路径，只改 Visible 与行高）。
 		// ⚠️ 2026-10-18：这里仍按 `baolongdaRaw` 收起旧三档（宝龙达没有 GCU 通路）；只放开电池阈值区 ✅
 		ApplyChargeLimitTierVisibility(baolongdaRaw);
+		// ⭐⭐ 2026-10-18（机主截图）：⭐ 旧「关闭 EC 直写充电上限（写入异常时用）」行也一起收 ✅
+		ApplyEcDirectWriteOffVisibility(baolongdaRaw);
 		// 2026-10-08 17:00：非 50 系滑块不上屏，这两句不会被人看到（50 系滑块的行内说明与开关共用同一条措辞）。
 		toolTip.SetToolTip(sliderBattery, flag ? Strings.ChargeLimitWindowsNote : ChargeLimitDisabledReason(RuntimeModelSupport.Current()));
 		// 2026-10-08：开关与三档快捷值跟随同一条 EC 通道的可用性，不能只灰滑块。
