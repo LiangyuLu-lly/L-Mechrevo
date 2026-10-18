@@ -686,10 +686,38 @@ public class LhmMonitor : IDisposable
 				CpuHardwareCount = cpuHardwareCount;
 				SelectCpuTemperature(cpuTempReadings, tickCount);
 				// ⭐⭐ 2026-10-19（机主：无界 780M 核显功耗不随负载变化）：AMD 核显优先选源 + 全量诊断日志 + 冻结判据 ✅
-				(float? amdIgpuPower, string amdIgpuSource) = SelectAmdIgpuPower(gpuPowerSensors);
-				if (amdIgpuPower.HasValue)
+				bool gcuStylePower = false;
+				if (ContainsAmdGpuHardware())
 				{
-					amdPower = amdIgpuPower;
+					(float? gcuPower, float? gcuTemp, int? gcuLoad, string gcuDetail, string gcuTempDetail) = ReadAmdIgpuByGcuStyle();
+					if (gcuPower.HasValue)
+					{
+						amdPower = gcuPower;
+						gcuStylePower = true;
+					}
+					if (gcuTemp.HasValue)
+					{
+						GpuTemperature = gcuTemp;
+					}
+					if (gcuLoad.HasValue)
+					{
+						GpuLoadPercent = gcuLoad;
+					}
+					if (!string.IsNullOrEmpty(gcuDetail) && Logger.TryMarkChanged("gpu-power-gcu-style", gcuDetail + " · " + gcuTempDetail))
+					{
+						Logger.WriteError(gcuDetail);
+						Logger.WriteError(gcuTempDetail);
+					}
+				}
+				float? amdIgpuPower = null;
+				string amdIgpuSource = "";
+				if (!gcuStylePower)
+				{
+					(amdIgpuPower, amdIgpuSource) = SelectAmdIgpuPower(gpuPowerSensors);
+					if (amdIgpuPower.HasValue)
+					{
+						amdPower = amdIgpuPower;
+					}
 				}
 				float? gpuPowerSelected = SelectGpuPower(flag, nvidiaPower, flag2, amdPower, integratedPower);
 				GpuPower = ApplyGpuPowerFreezeGuard(gpuPowerSelected, flag2 && !flag, gpuLoad, GpuTemperature);
@@ -839,6 +867,117 @@ public class LhmMonitor : IDisposable
 	/// ② 否则 `GPU Package Power` / `GPU Power`；⛔ 排除名字含 Limit/Capacity/TDP 的（上限类，不是实时功耗）✅。
 	/// <para>⚠️ 只读；只影响 AMD 核显，NVIDIA 机型仍走 NVML/原路径 ✅</para>
 	/// </summary>
+	/// <summary>⭐ 递归判断本机是否存在 AMD GPU 硬件（含 SubHardware）✅</summary>
+	private bool ContainsAmdGpuHardware()
+	{
+		foreach (IHardware hardware in _computer.Hardware)
+		{
+			if (ContainsAmdGpu(hardware))
+			{
+				return true;
+			}
+		}
+		return false;
+		static bool ContainsAmdGpu(IHardware hardware)
+		{
+			if (hardware.HardwareType == HardwareType.GpuAmd)
+			{
+				return true;
+			}
+			foreach (IHardware sub in hardware.SubHardware)
+			{
+				if (ContainsAmdGpu(sub))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐⭐ 2026-10-19（机主：直接参照 GCU Monitor `igpu_w()`）：
+	/// **递归 SubHardware**，用「硬件名|传感器名」组合键取 AMD 核显功耗/温度/占用：
+	/// 功耗 = 组合键含 `GPU Core` 或 `GPU SoC` 的 Power 传感器**相加**；温度 = 含 `VR SoC`；占用 = 含 `GPU Core`。
+	/// <para>⭐ 每个分量先过我们额外加的合理性/尖峰过滤（GCU Monitor 没有这层）✅</para>
+	/// </summary>
+	private (float? Power, float? Temp, int? Load, string Detail, string TempDetail) ReadAmdIgpuByGcuStyle()
+	{
+		List<(string Key, float Value)> powers = new List<(string, float)>();
+		float? temp = null;
+		int? load = null;
+		string tempKey = "";
+		string loadKey = "";
+		foreach (IHardware hardware in _computer.Hardware)
+		{
+			Walk(hardware);
+		}
+		void Walk(IHardware hardware)
+		{
+			try
+			{
+				hardware.Update();
+			}
+			catch
+			{
+				return;
+			}
+			if (hardware.HardwareType == HardwareType.GpuAmd)
+			{
+				foreach (ISensor sensor in hardware.Sensors)
+				{
+					if (!sensor.Value.HasValue)
+					{
+						continue;
+					}
+					string key = hardware.Name + "|" + sensor.Name;
+					if (sensor.SensorType == SensorType.Power
+						&& (sensor.Name.IndexOf("GPU Core", StringComparison.OrdinalIgnoreCase) >= 0
+							|| sensor.Name.IndexOf("GPU SoC", StringComparison.OrdinalIgnoreCase) >= 0))
+					{
+						powers.Add((key, sensor.Value.Value));
+					}
+					else if (sensor.SensorType == SensorType.Temperature && sensor.Name.IndexOf("VR SoC", StringComparison.OrdinalIgnoreCase) >= 0)
+					{
+						temp = sensor.Value;
+						tempKey = key;
+					}
+					else if (sensor.SensorType == SensorType.Load && sensor.Name.IndexOf("GPU Core", StringComparison.OrdinalIgnoreCase) >= 0
+						&& sensor.Value.Value >= 0f && sensor.Value.Value <= 100f)
+					{
+						load = (int)Math.Round(sensor.Value.Value);
+						loadKey = key;
+					}
+				}
+			}
+			foreach (IHardware sub in hardware.SubHardware)
+			{
+				Walk(sub);
+			}
+		}
+		float? total = null;
+		List<string> parts = new List<string>();
+		foreach ((string Key, float Value) power in powers)
+		{
+			float? valid = ValidateIgpuComponent(power.Key, power.Value);
+			if (!valid.HasValue)
+			{
+				continue;
+			}
+			total = (total ?? 0f) + valid.Value;
+			parts.Add(power.Key + "=" + valid.Value.ToString("F1") + "W");
+		}
+		string detail = total.HasValue
+			? ("[gpu-power] GCU 口径：" + string.Join(" + ", parts) + " ⇒ " + total.Value.ToString("F1") + "W")
+			: "";
+		string tempDetail = "";
+		if (temp.HasValue || load.HasValue)
+		{
+			tempDetail = "[gpu-power] GCU 口径：温度=" + (temp.HasValue ? tempKey + "=" + temp.Value.ToString("F1") + "℃" : "—")
+				+ " · 占用=" + (load.HasValue ? loadKey + "=" + load.Value + "%" : "—");
+		}
+		return (total, temp, load, detail, tempDetail);
+	}
 	// ⭐ 合理性/尖峰过滤状态（AMD 核显专用；NVIDIA 不进入）✅
 	private static readonly Dictionary<string, float> _igpuLastValidWatts = new Dictionary<string, float>();
 
