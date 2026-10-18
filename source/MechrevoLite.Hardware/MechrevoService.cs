@@ -5187,7 +5187,11 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 下面原来的两行**逐字不变** ✅
 		if (_hw != null && _hw.UsesBaolongda)
 		{
-			return SetKeyboardEffect(on ? "Single" : "Off", on ? 4 : 0);
+			// ⭐⭐ 2026-10-19（机主：开关直接跟亮度走 + 关灯记忆上次亮度）：
+			//   Gen30 开灯 ⇒ 用 `kbd_last_brightness`（默认 3）；关灯 ⇒ 0（由 EC 写 0x00）✅
+			bool gen30Baolongda = _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
+			int powerOnLight = gen30Baolongda ? KeyboardEcBrightness.GetLastLevel() : 4;
+			return SetKeyboardEffect(on ? "Single" : "Off", on ? powerOnLight : 0);
 		}
 		// 2026-10-09（kbdctrl）：开关打开时开关灯也走新的 Keyboard/Ctrl 链路；关闭时逐字走原路径。
 		if (KeyboardCtrlPublishSwitch.Enabled)

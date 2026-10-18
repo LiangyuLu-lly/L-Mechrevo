@@ -34,6 +34,37 @@ internal static class KeyboardEcBrightness
 		return (level >= 0 && level <= 3) ? LevelValues[level] : -1;
 	}
 
+	/// <summary>⭐ 2026-10-19（机主：关灯记忆上次亮度）：配置键 ✅。</summary>
+	internal const string LastBrightnessKey = "kbd_last_brightness";
+
+	/// <summary>⭐ 上次亮度档位（1..3；缺省 3）✅。</summary>
+	internal static int GetLastLevel()
+	{
+		return Math.Clamp(AppConfig.Get(LastBrightnessKey, 3), 1, 3);
+	}
+
+	/// <summary>⭐ 记忆亮度档位（只接受 1..3；⛔ 0 不算"上次亮度"）✅。</summary>
+	private static void RememberLevel(int level)
+	{
+		if (level >= 1 && level <= 3)
+		{
+			AppConfig.Set(LastBrightnessKey, level);
+		}
+	}
+
+	/// <summary>⭐ PWM 值 ⇒ 档位（0x00/0x66/0xB3/0xFF ⇒ 0/1/2/3；其它 ⇒ -1）✅。</summary>
+	internal static int LevelFromPwm(int pwm)
+	{
+		return pwm switch
+		{
+			0x00 => 0,
+			0x66 => 1,
+			0xB3 => 2,
+			0xFF => 3,
+			_ => -1,
+		};
+	}
+
 	/// <summary>
 	/// ⭐ 尝试把 30 系键盘亮度设为指定档位（EC 0x1807）✅。
 	/// <para>流程：先读 → 已是目标则直接成功；否则 ACPI 0x93 写 → 回读；ACPI 不行再试 LPC → 回读；
@@ -73,6 +104,11 @@ internal static class KeyboardEcBrightness
 		if (currentOk && current == target)
 		{
 			readback = current;
+			if (level > 0)
+			{
+				RememberLevel(level);
+				LogOn(level, target);
+			}
 			LogVisible("kbd-ec-already-" + level,
 				$"[kbd-ec] 写亮度：档位={level} 已是目标 0x1807=0x{target:X2}"
 				+ $"（回读=0x{current:X2} ✅ · WMI18={FormatWmi18(wmi18)}）");
@@ -110,6 +146,11 @@ internal static class KeyboardEcBrightness
 		wmi18 = ReadWmi18(wmi);
 		if (ok)
 		{
+			if (level > 0)
+			{
+				RememberLevel(level);
+				LogOn(level, target);
+			}
 			LogVisible("kbd-ec-ok-" + level + "-" + via,
 				$"[kbd-ec] 写亮度：档位={level} ⇒ 0x1807=0x{target:X2}"
 				+ $"（回读=0x{readback:X2} ✅ · WMI18={FormatWmi18(wmi18)} · 通道={via}）");
@@ -120,6 +161,37 @@ internal static class KeyboardEcBrightness
 			+ $" 回读={(readback >= 0 ? "0x" + readback.ToString("X2") : "读不到")}"
 			+ $"（WMI18={FormatWmi18(wmi18)} · 通道={via}）⇒ 不重试");
 		return false;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：关灯记忆上次亮度 / 开关跟亮度走）：⭐ **统一的关灯操作** ✅。
+	/// <para>先读 0x1807：非 0 ⇒ 把当前档位记为 `kbd_last_brightness`；然后写 0x1807=0x00（走同一套白名单写/回读/LPC 回退/不重试）✅。</para>
+	/// </summary>
+	internal static bool TrySetOff(BaolongdaWmi wmi, out int readback, out int wmi18, string source = "关灯写(EC)")
+	{
+		int remembered = GetLastLevel();
+		if (EcPortIo.TryReadByte(RegisterAddress, out int current))
+		{
+			int currentLevel = LevelFromPwm(current);
+			if (currentLevel > 0)
+			{
+				remembered = currentLevel;
+				RememberLevel(currentLevel);
+			}
+		}
+		if (!TrySetLevel(0, wmi, out readback, out wmi18, source))
+		{
+			return false;
+		}
+		LogVisible("kbd30-bright-off", $"[kbd] 30 系亮度=OFF：0x1807=0x00（已记忆删除前档位={remembered}）");
+		return true;
+	}
+
+	/// <summary>⭐ 记录「30 系亮度=ON」日志（去重；含档位与上次亮度记忆）✅。</summary>
+	private static void LogOn(int level, byte target)
+	{
+		LogVisible("kbd30-bright-on", $"[kbd] 30 系亮度=ON：0x1807=0x{target:X2}"
+			+ $"（档位={level} · 上次亮度记忆={GetLastLevel()}）");
 	}
 
 	/// <summary>⭐ 只读 WMI 功能号 18（交叉验证；读不到返回 -1）✅。</summary>

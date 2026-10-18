@@ -3845,7 +3845,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 				{
 					LogKeyboardLightingState(wmi, "关灯前");
-					bool ecOffOk = KeyboardEcBrightness.TrySetLevel(0, wmi, out int ecOffReadback, out int ecOffWmi18,
+					bool ecOffOk = KeyboardEcBrightness.TrySetOff(wmi, out int ecOffReadback, out int ecOffWmi18,
 						"关灯写(EC) · TrySetKeyboardLightingViaBackend(on=false)");
 					confirmed = ecOffOk;
 					if (ecOffOk)
@@ -3984,9 +3984,27 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				//   ⚠️ 关灯（档位 0）仍走上面 !on 分支的原有 `18=0` 路径，**未改**；
 				//   ⚠️ 40 系/其它机型不进这里（继续原 WMI 18 写法）✅
 				ecBrightnessUsed = true;
+				// ⭐⭐ 2026-10-19（机主：开关直接跟亮度走 + 关灯记忆上次亮度）：
+				//   若当前 EC 0x1807==0（关灯）⇒ 开灯时用 `kbd_last_brightness`（默认 3）✅
+				if (EcPortIo.TryReadByte(KeyboardEcBrightness.RegisterAddress, out int currentPwm) && currentPwm == 0)
+				{
+					int rememberedLevel = KeyboardEcBrightness.GetLastLevel();
+					if (rememberedLevel != level)
+					{
+						Logger.WriteError($"[kbd] 30 系开灯：EC 0x1807=0x00 ⇒ 用上次亮度记忆={rememberedLevel}"
+							+ $"（请求档位={level}）");
+						level = (byte)rememberedLevel;
+					}
+				}
 				ecBrightnessOk = KeyboardEcBrightness.TrySetLevel(level, wmi, out ecBrightnessReadback, out ecBrightnessWmi18,
 					"亮度下发(固定色) · TrySetKeyboardLightingViaBackend(on=true)");
 				brightOk = ecBrightnessOk;
+				// ⭐ 2026-10-19（单源状态机）：电源镜像**只由 EC 回读推导**（⛔ 不用请求值）✅
+				if (ecBrightnessOk && TryReadKeyboardPowerFromEc(out bool ecOnAfter, out int _))
+				{
+					TraceKeyboardPowerWrite(ecOnAfter, "亮度路径后-EC回读");
+					KeyboardPower = ecOnAfter;
+				}
 				Logger.WriteError($"[kbd] 30 系亮度走 EC 0x1807：档位={level} ⇒ 回读="
 					+ $"{(ecBrightnessReadback >= 0 ? "0x" + ecBrightnessReadback.ToString("X2") : "读不到")}"
 					+ $" · WMI18={(ecBrightnessWmi18 >= 0 ? ecBrightnessWmi18.ToString() : "读不到")}"
@@ -4150,6 +4168,19 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			Logger.WriteLine("[kbd-cal] 亮度实际值通知 UI 时异常（已吞掉）：" + ex.Message);
 		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-19（机主：开关跟亮度走/统一两条路径）：写亮度档位的统一入口 ——
+	/// Gen30+宝龙达 ⇒ EC 0x1807（同时记忆 `kbd_last_brightness`）；其它机型 ⇒ 原 WMI 18 ✅。
+	/// </summary>
+	private bool TryApplyKeyboardBrightnessLevel(BaolongdaWmi wmi, byte level, string source)
+	{
+		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
+		{
+			return KeyboardEcBrightness.TrySetLevel(level, wmi, out int _, out int _, source);
+		}
+		return wmi.TrySetKeyboardBrightness(level);
 	}
 
 	/// <summary>
@@ -4544,7 +4575,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		byte level = (byte)Math.Clamp((int)brightness, 1, EffectiveKeyboardBrightnessMax());
 		// ⭐ ① 起始状态：固定色模式 16=2 + 亮度 18（7.3 彩虹的起始状态）✅
 		bool modeOk = wmi.TrySetKeyboardMode(2);
-		bool brightOk = wmi.TrySetKeyboardBrightness(level);
+		bool brightOk = TryApplyKeyboardBrightnessLevel(wmi, level, "软件彩虹起始亮度");
 		CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(token);
 		int generation;
 		lock (_rainbowGate)
@@ -4634,7 +4665,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			_rainbowBrightness = level;
 		}
-		bool ok = wmi.TrySetKeyboardBrightness(level);
+		bool ok = TryApplyKeyboardBrightnessLevel(wmi, level, "软件彩虹亮度更新");
 		Logger.WriteError($"[kbd] 软件彩虹：亮度更新={level}（循环继续，⛔ 不重启）⇒ ok={ok}");
 	}
 
@@ -4658,7 +4689,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		int b = argb & 0xFF;
 		bool modeOk = wmi.TrySetKeyboardMode(2);
 		bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
-		bool brightOk = wmi.TrySetKeyboardBrightness((byte)level);
+		bool brightOk = TryApplyKeyboardBrightnessLevel(wmi, (byte)level, "彩虹停止恢复单色亮度");
 		Logger.WriteError($"[kbd] 软件彩虹：停止 ⇒ 恢复单色 rgb=#{(argb & 0xFFFFFF):X6} 亮度={level}"
 			+ $"（16=2 {(modeOk ? "ok" : "失败")} · 17 {(colorOk ? "ok" : "失败")} · 18 {(brightOk ? "ok" : "失败")}）");
 	}
@@ -5049,7 +5080,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			StopKeyboardRainbowCore(restoreSingleColor: false, noRestoreLog: null);
 		}
-		bool ok = wmi.TrySetKeyboardBrightness(0);
+		bool ok = (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
+			? KeyboardEcBrightness.TrySetOff(wmi, out int _, out int _, "自动关灯(EC)")
+			: wmi.TrySetKeyboardBrightness(0);
 		LastKeyboardBrightnessRequested = 0;
 		LastKeyboardBrightnessApplied = ok ? 0 : -1;
 		if (!ok)
