@@ -118,7 +118,7 @@ internal sealed class BatteryLimitPanel : Panel
 				D(28)),
 			Padding = new Padding(D(8), D(2), D(8), D(2)),
 			BorderRadius = D(4),
-			Margin = new Padding(D(4), 0, 0, 0)
+			Margin = new Padding(D(4), D(2), 0, D(2))
 		};
 		_applyButton.Click += ApplyButton_Click;
 
@@ -508,7 +508,10 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			Size buttonPreferred = _applyButton.GetPreferredSize(Size.Empty);
 			Size switchPreferred = _enableBox.GetPreferredSize(Size.Empty);
-			int rowHeight = Math.Max(buttonPreferred.Height, switchPreferred.Height) + D(4);
+			// ⭐ 2026-10-19（预览工具：按钮溢出到下一行）：⭐ 行高必须 ≥ 按钮实际高度 + 上下 margin；
+			//   ⛔ 不再用 PreferredSize（固定 Size 时它可能小于实际 Height）✅
+			int buttonHeight = Math.Max(buttonPreferred.Height, _applyButton.Height + _applyButton.Margin.Vertical);
+			int rowHeight = Math.Max(buttonHeight, switchPreferred.Height + D(4));
 			if (_grid.RowStyles.Count > 1)
 			{
 				if ((int)_grid.RowStyles[1].Height != rowHeight)
@@ -590,13 +593,15 @@ internal sealed class BatteryLimitPanel : Panel
 			Size actual = _applyButton.Size;
 			Size text = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font);
 			bool fail = actual.Width > 0 && (actual.Height < text.Height + 6 || actual.Width < text.Width + 8);
+			int rowHeight = _grid.RowStyles.Count > 1 ? (int)_grid.RowStyles[1].Height : 0;
+			bool overlapsRow = rowHeight > 0 && actual.Height + _applyButton.Margin.Vertical > rowHeight;
 			string message = "[battery-ui] 按钮：名=保存阈值 · stage=" + stage + " · preferred=" + preferred.Width + "x" + preferred.Height
 				+ " · size=" + actual.Width + "x" + actual.Height + " · 文本=" + text.Width + "x" + text.Height
-				+ " ⇒ 裁切=" + fail;
+				+ " · overlapsRow=" + overlapsRow + " ⇒ 重叠=" + overlapsRow + " · 裁切=" + fail;
 			Logger.WriteLineIfChanged("battery-ui-save-button-" + stage, message);
-			if (fail)
+			if (fail || overlapsRow)
 			{
-				Logger.WriteError("[battery-ui] ⛔ 保存按钮裁切 FAIL（" + stage + "）：" + message);
+				Logger.WriteError("[battery-ui] ⛔ 保存按钮裁切/跨行 FAIL（" + stage + "）：" + message);
 			}
 		}
 		catch (Exception ex)
