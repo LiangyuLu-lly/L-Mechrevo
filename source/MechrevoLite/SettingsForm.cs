@@ -6955,6 +6955,17 @@ public class SettingsForm : RForm
 		panelBattery.Padding = new Padding(D(12), D(2), D(12), D(2));
 		panelBattery.MinimumSize = Size.Empty;
 		panelBattery.Height = D(56);
+		// ⭐⭐ 2026-10-18（机主：宝龙达电池卡片仍为空）：⭐ 本方法在电池表构建**之后**运行，
+		//   上面两行会清掉 RecalculateBatteryTableHeight 设置的 MinimumSize/高度 ⇒ 宝龙达充电阈值面板被裁掉。
+		//   ⇒ 这里重新按统一算法恢复（仅宝龙达且面板可用；非宝龙达保持原样，⛔ 不触发 EC）✅
+		if (Program.hw?.UsesBaolongda == true && BatteryLimitPanel.IsAvailable(Program.hw))
+		{
+			RecalculateBatteryTableHeight();
+			if (panelBattery.Height < panelBattery.MinimumSize.Height)
+			{
+				panelBattery.Height = panelBattery.MinimumSize.Height;
+			}
+		}
 		control.Height = D(112);
 		control3.Height = D(94);
 		panelVersion.Height = D(40);
@@ -7917,18 +7928,17 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			host.RowCount += 1;
 			// ⭐⭐ 2026-10-18（机主：电池行内容为空）：⭐ 宿主表是**固定高度**的 TableLayoutPanel，
 			//   只加控件不会自动长高 ⇒ 新行会被裁掉看不见。这里按面板首选高度补一行 **Absolute** 行高，
-			//   并把 host.Height / panelBattery.MinimumSize 一起加高（内容可见，⛔ 不依赖 AutoScroll）✅
+			//   然后交给**唯一**的 RecalculateBatteryTableHeight() 统一重算（所有 RowStyles 之和）✅
 			int panelWidth = Math.Max(320, host.Width);
 			int panelHeight = Math.Max(100, panel.GetPreferredSize(new Size(panelWidth, 0)).Height);
 			host.RowStyles.Add(new RowStyle(SizeType.Absolute, panelHeight));
 			host.Controls.Add(panel, 0, host.RowCount - 1);
 			host.SetColumnSpan(panel, 3);
-			host.Height += panelHeight;
+			RecalculateBatteryTableHeight();
 			host.PerformLayout();
-			if (panelBattery != null)
-			{
-				panelBattery.MinimumSize = new Size(0, host.Bottom + panelBattery.Padding.Bottom);
-			}
+			Logger.WriteLine("[battery] 充电阈值面板：rows=" + host.RowStyles.Count + " · preferredHeight=" + panelHeight
+				+ " · host.Width=" + host.Width + " · host.Height=" + host.Height
+				+ " · panel.Height=" + panel.Height + " · panel.Visible=" + panel.Visible);
 		}
 		catch (Exception ex)
 		{
@@ -8005,7 +8015,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num6));
 		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num5));
 		host.RowStyles.Add(new RowStyle(SizeType.Absolute, num7));
-		host.Height = num + num2 + num3 + num4 + num6 + num5 + num7;
+		// ⭐ 统一高度计算：所有 RowStyles 之和（含后续追加的宝龙达充电阈值行）✅
+		RecalculateBatteryTableHeight();
 		// 2026-10-15（限充真效果判据上屏 · 用户批准的修法④；同时按用户要求删掉原来那颗白色「实验」小胶囊）：
 		// 把上游口径的 0x0742 bit2 判定（ChargeLimitEffectEvidence.Latest：生效 / 未生效 / 无法判定）从
 		// 「只进日志」搬到限充区**用户看得到**的位置 —— 复用原角标所在的那一格（第 1 行容器的第 1 列）。
@@ -8117,7 +8128,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// 2026-10-16（EC 直写逃生口）：在既有两条布局（含/不含无极限充滑块行）都建完之后挂第 6 行。
 		BuildEcDirectWriteOffRow(host, _ecDirectWriteOffRowIndex);
 		ApplyChargeSliderVisibility();
-		panelBattery.MinimumSize = new Size(0, host.Bottom + panelBattery.Padding.Bottom);
+		RecalculateBatteryTableHeight();
 		RefreshBatteryModeButtons();
 		// 2026-10-15（限充真效果判据上屏 · 修法④）：构造时先按当前快照填一次（通常为空 ⇒ 隐藏，零回归）。
 		RefreshChargeLimitEffectLabel();
@@ -8343,13 +8354,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			_chargeSliderTable.RowStyles[_chargeSliderWarningRowIndex] = new RowStyle(SizeType.Absolute, flag ? _chargeSliderWarningRowHeight : 0);
 		}
-		float num = 0f;
-		foreach (RowStyle rowStyle in _chargeSliderTable.RowStyles)
-		{
-			num += rowStyle.Height;
-		}
-		_chargeSliderTable.Height = (int)Math.Round(num);
-		panelBattery.MinimumSize = new Size(0, _chargeSliderTable.Bottom + panelBattery.Padding.Bottom);
+		RecalculateBatteryTableHeight();
 	}
 
 	/// <summary>
@@ -8436,16 +8441,55 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			table.RowStyles[_chargeSliderRowIndex] = new RowStyle(SizeType.Absolute, hidden ? 0 : sliderRowHeight);
 		}
-		float num = 0f;
+		// ⭐ 统一高度计算（含所有 RowStyles，含宝龙达追加班龙达行）✅
+		RecalculateBatteryTableHeight();
+		Logger.WriteLine($"限充行显隐：{(hidden ? "隐藏" : "显示")} EC 直写方式专属各行（开关行/副标题/无极限充开关/警告/滑块）—— 规则 A（机型不支持/EC 通道不可用）或规则 B（10/16/20/30 系，可能损坏硬件）⇒ 只保留 GCU 路；⛔ 三档按钮行不受影响、未删任何控件");
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：宝龙达电池卡片内容仍为空）：⭐ **电池卡片高度的单一计算来源** ✅。
+	/// <para>高度 = **所有 RowStyles 高度之和**（含宝龙达追加的充电阈值行），据此设置表高与
+	/// <c>panelBattery.MinimumSize</c>；⛔ 各处不再各自硬编码 6 行 ✅</para>
+	/// <para>⚠️ 所有可见性/门控路径（gating / tier / ecDirectWriteOff / rowVisibility / 追加班龙达行）
+	/// 改完行高后都必须调用本方法 ✅</para>
+	/// </summary>
+	private void RecalculateBatteryTableHeight()
+	{
+		RecalculateTableHeight(_chargeLimitHostTable);
+		if (_chargeSliderTable != null && !ReferenceEquals(_chargeSliderTable, _chargeLimitHostTable))
+		{
+			RecalculateTableHeight(_chargeSliderTable);
+		}
+	}
+
+	private void RecalculateTableHeight(TableLayoutPanel table)
+	{
+		if (table == null || table.RowStyles.Count == 0)
+		{
+			return;
+		}
+		float total = 0f;
 		foreach (RowStyle rowStyle in table.RowStyles)
 		{
-			num += rowStyle.Height;
+			total += Math.Max(0f, rowStyle.Height);
 		}
-		// 表高 = 各行高之和（与 ApplyChargeSliderVisibility 的既有算法同源）—— 老机型（无滑块行）也必须算：
-		// 那两行被收成 0 后若不同步收表高，卡片底部会留下一块空白（用户要的是「隐藏」，不是「留空位」）。
-		table.Height = (int)Math.Round(num);
-		panelBattery.MinimumSize = new Size(0, table.Bottom + panelBattery.Padding.Bottom);
-		Logger.WriteLine($"限充行显隐：{(hidden ? "隐藏" : "显示")} EC 直写方式专属各行（开关行/副标题/无极限充开关/警告/滑块）—— 规则 A（机型不支持/EC 通道不可用）或规则 B（10/16/20/30 系，可能损坏硬件）⇒ 只保留 GCU 路；⛔ 三档按钮行不受影响、未删任何控件");
+		int height = (int)Math.Round(total);
+		table.Height = height;
+		if (panelBattery == null)
+		{
+			return;
+		}
+		int minimum = table.Bottom + panelBattery.Padding.Bottom;
+		panelBattery.MinimumSize = new Size(0, minimum);
+		if (panelBattery.Height < minimum)
+		{
+			panelBattery.Height = minimum;
+		}
+		Logger.WriteLineIfChanged("battery-card-height",
+			"[battery] 卡片高度：rows=" + table.RowStyles.Count + " · 合计=" + height
+			+ "px · panel.MinimumSize=" + panelBattery.MinimumSize
+			+ " · panel.Height=" + panelBattery.Height
+			+ " · table.Bottom=" + table.Bottom);
 	}
 
 	/// <summary>
@@ -8496,11 +8540,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			{
 				num += rowStyle.Height;
 			}
-			table.Height = (int)Math.Round(num);
-			if (panelBattery != null)
-			{
-				panelBattery.MinimumSize = new Size(0, table.Bottom + panelBattery.Padding.Bottom);
-			}
+			RecalculateBatteryTableHeight();
 		}
 		Logger.WriteLine($"限充三档显隐：{(hidden ? "隐藏" : "显示")} 三档按钮行（长效/平衡/工作站）—— "
 			+ (hidden ? "本机是宝龙达模具，没有任何限充通路（EC 直写无 UWACPIDriver、GCU 三档无 GCU）" : "非宝龙达机型，恢复原行高")
@@ -8533,16 +8573,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			table.RowStyles[_ecDirectWriteOffRowIndex] = new RowStyle(SizeType.Absolute,
 				hidden ? 0 : _ecDirectWriteOffRowHeight);
-			float total = 0f;
-			foreach (RowStyle rowStyle in table.RowStyles)
-			{
-				total += rowStyle.Height;
-			}
-			table.Height = (int)Math.Round(total);
-			if (panelBattery != null)
-			{
-				panelBattery.MinimumSize = new Size(0, table.Bottom + panelBattery.Padding.Bottom);
-			}
+			RecalculateBatteryTableHeight();
 		}
 		if (hidden)
 		{
