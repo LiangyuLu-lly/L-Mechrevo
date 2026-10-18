@@ -1781,9 +1781,6 @@ internal class Strings
 
 	/// <summary>2026-10-12 署名：原项目 L-Mechrevo 由 LiangyuLu-lly 发布 + 本版维护者，含原项目地址。</summary>
 	/// <summary>2026-10-18 鸣谢：分组标题「鸣谢（真机测试协助）」。</summary>
-	/// <summary>2026-10-18 协议参考：OpenRevo（风扇 EC 运行行为观察，未反编译）。</summary>
-	internal static string AboutLicensesUseOpenRevo => ResourceManager.GetString("AboutLicensesUseOpenRevo", resourceCulture);
-
 	/// <summary>2026-10-18 协议参考：充电阈值开源项目。</summary>
 	internal static string AboutLicensesUseBatteryThreshold => ResourceManager.GetString("AboutLicensesUseBatteryThreshold", resourceCulture);
 
