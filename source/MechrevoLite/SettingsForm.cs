@@ -1652,6 +1652,10 @@ public class SettingsForm : RForm
 		pictureScreen.Visible = false;
 		ApplyRowSkins();
 		RefreshThemeButtons();
+		// ⭐⭐ 2026-10-19（机主：新增行/主题按钮配色错乱）：⭐ 显式重刷「官方控制台 + PawnIO」卡片与
+		//   界面外观卡片（ApplyWindow 对自绘 RButton/自定义卡片不一定覆盖），并打覆盖自检日志 ✅
+		ApplyOfficialConsoleCardTheme();
+		LogSettingsThemeCoverage();
 		// 2026-10-08：模式高亮色是日/夜两套写死的 Color，换主题后必须重新下发一次。
 		ApplyPerfModeAccents();
 		RefreshBatteryModeButtons();
@@ -6165,100 +6169,122 @@ public class SettingsForm : RForm
 
 	private void BuildOfficialConsolePanel()
 	{
+		// ⭐⭐ 2026-10-19（机主：官方控制台卡片错乱）：⭐ 改成 **AutoSize + 2 列**（左信息 / 右按钮列）：
+		//   · 左侧信息区 = 标题 + 状态**上下两行**（状态 AutoEllipsis，⛔ 不会钻到按钮下面）；
+		//   · 右侧按钮列 **Absolute D(170)**，按钮自身 MinimumSize ≥ D(150) + Anchor=Right；
+		//   · 行高全部 AutoSize ⇒ 卡片随内容增高，⛔ 不再有固定坐标/固定高度导致的覆盖与裁切 ✅
 		_officialConsolePanel = new BufferedPanel
 		{
 			Name = "panelOfficialConsole",
 			CardStyle = true,
-			Height = D(112),
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
 			Padding = new Padding(D(12), D(8), D(12), D(8)),
 			BackColor = UiVisualStyle.Surface
 		};
-		TableLayoutPanel tableLayoutPanel = new TableLayoutPanel
+		TableLayoutPanel card = new TableLayoutPanel
 		{
 			Dock = DockStyle.Fill,
-			ColumnCount = 3,
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			ColumnCount = 2,
 			RowCount = 3,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = _officialConsolePanel.BackColor
 		};
-		tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(110)));
-		tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-		tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(140)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, D(56)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, D(56)));
-		Label label = new Label
+		card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+		card.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(170)));
+		card.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		card.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		card.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+		// ── 第 0 行：官方控制台 ──
+		Label consoleTitle = new Label
 		{
 			Name = "labelOfficialConsoleTitle",
 			Text = Strings.OfficialConsole,
 			Dock = DockStyle.Fill,
 			TextAlign = ContentAlignment.MiddleLeft,
-			
+			Margin = Padding.Empty
 		};
-		UiVisualStyle.ApplyGlyph(label, UiGlyph.Kind.Console);
+		UiVisualStyle.ApplyGlyph(consoleTitle, UiGlyph.Kind.Console);
 		_officialConsoleStatus = new Label
 		{
 			Text = Strings.Detecting,
-				Dock = DockStyle.Fill,
-			TextAlign = ContentAlignment.MiddleRight,
+			Dock = DockStyle.Fill,
+			TextAlign = ContentAlignment.MiddleLeft,
+			AutoSize = false,
 			AutoEllipsis = true,
-			
+			Margin = new Padding(0, D(2), D(8), 0)
 		};
+		TableLayoutPanel consoleInfo = BuildCardInfo(consoleTitle, _officialConsoleStatus, D);
+		card.Controls.Add(consoleInfo, 0, 0);
 		_officialConsoleButton = new RButton
 		{
-			Dock = DockStyle.Fill,
-			Margin = new Padding(D(8), 0, 0, 0),
-			// 2026-10-09（UI 打磨⑤，仅夜间）：按钮面 → ButtonFace（日间与 SurfaceRaised 同值，像素不变）。
+			Anchor = AnchorStyles.Right,
+			MinimumSize = new Size(D(150), D(28)),
+			Size = new Size(D(150), D(28)),
+			Margin = new Padding(D(8), D(6), 0, D(6)),
 			BackColor = UiVisualStyle.ButtonFace,
 			ForeColor = UiVisualStyle.Text,
 			Cursor = Cursors.Hand
 		};
 		_officialConsoleButton.Click += OfficialConsoleButton_Click;
-		tableLayoutPanel.Controls.Add(label, 0, 0);
-		tableLayoutPanel.Controls.Add(_officialConsoleStatus, 1, 0);
-		tableLayoutPanel.Controls.Add(_officialConsoleButton, 2, 0);
-		// ⭐⭐ 2026-10-18（机主：PawnIO 安装入口）：⭐ 官方控制台下一行（宝龙达未安装时前面加醒目提示）✅
+		card.Controls.Add(_officialConsoleButton, 1, 0);
+
+		// ── 第 1 行：宝龙达未安装 PawnIO 的醒目提示（默认隐藏；AutoSize 行高 0）──
 		_pawnioWarning = new Label
 		{
 			Dock = DockStyle.Fill,
 			TextAlign = ContentAlignment.MiddleLeft,
 			ForeColor = UiVisualStyle.Danger,
+			AutoSize = false,
 			AutoEllipsis = true,
+			Margin = new Padding(0, D(2), 0, D(2)),
 			Visible = false
 		};
-		tableLayoutPanel.Controls.Add(_pawnioWarning, 0, 1);
-		tableLayoutPanel.SetColumnSpan(_pawnioWarning, 3);
+		card.Controls.Add(_pawnioWarning, 0, 1);
+		card.SetColumnSpan(_pawnioWarning, 2);
+
+		// ── 第 2 行：PawnIO 驱动 ──
 		Label pawnioTitle = new Label
 		{
 			Name = "labelPawnIODriverTitle",
 			Text = Strings.PawnIODriver,
 			Dock = DockStyle.Fill,
-			TextAlign = ContentAlignment.MiddleLeft
+			TextAlign = ContentAlignment.MiddleLeft,
+			Margin = Padding.Empty
 		};
 		_pawnioStatus = new Label
 		{
 			Text = Strings.Detecting,
 			Dock = DockStyle.Fill,
-			TextAlign = ContentAlignment.MiddleRight,
-			AutoEllipsis = true
+			TextAlign = ContentAlignment.MiddleLeft,
+			AutoSize = false,
+			AutoEllipsis = true,
+			Margin = new Padding(0, D(2), D(8), 0)
 		};
+		TableLayoutPanel pawnioInfo = BuildCardInfo(pawnioTitle, _pawnioStatus, D);
+		card.Controls.Add(pawnioInfo, 0, 2);
 		_pawnioButton = new RButton
 		{
-			Dock = DockStyle.Fill,
-			Margin = new Padding(D(8), 0, 0, 0),
+			Anchor = AnchorStyles.Right,
+			MinimumSize = new Size(D(150), D(28)),
+			Size = new Size(D(150), D(28)),
+			Margin = new Padding(D(8), D(6), 0, D(6)),
 			BackColor = UiVisualStyle.ButtonFace,
 			ForeColor = UiVisualStyle.Text,
 			Cursor = Cursors.Hand,
 			Text = Strings.PawnIODownloadInstall
 		};
 		_pawnioButton.Click += PawnIOButton_Click;
-		tableLayoutPanel.Controls.Add(pawnioTitle, 0, 2);
-		tableLayoutPanel.Controls.Add(_pawnioStatus, 1, 2);
-		tableLayoutPanel.Controls.Add(_pawnioButton, 2, 2);
-		_officialConsolePanel.Controls.Add(tableLayoutPanel);
-		UiVisualStyle.ApplyTitle(label);
+		card.Controls.Add(_pawnioButton, 1, 2);
+
+		_officialConsolePanel.Controls.Add(card);
+		UiVisualStyle.ApplyTitle(consoleTitle);
 		UiVisualStyle.ApplyMuted(_officialConsoleStatus);
+		UiVisualStyle.ApplyMuted(_pawnioStatus);
 		if (!Program.UiAuditMode)
 		{
 			RefreshOfficialConsolePanel();
@@ -6271,17 +6297,178 @@ public class SettingsForm : RForm
 		{
 			RefreshOfficialConsolePanel();
 			RefreshPawnIOPanel();
+			LogOfficialConsoleCardLayout();
 			if (!Program.UiAuditMode)
 			{
 				_officialConsoleStatusTimer.Start();
 			}
 		};
+		// ⭐ DPI/布局变化后重算一次（按钮列固定最小宽 + 左信息 AutoEllipsis，⛔ 不重叠）✅
+		Layout += (object _, LayoutEventArgs _) => LogOfficialConsoleCardLayout();
 		int D(int value)
 		{
 			return ResponsiveLayout.LogicalToDevice(this, value);
 		}
 	}
 
+	/// <summary>⭐ 卡片左信息区：「标题 + 状态」上下两行（状态 AutoEllipsis，宽度受列约束）✅</summary>
+	private static TableLayoutPanel BuildCardInfo(Label title, Label status, Func<int, int> scale)
+	{
+		TableLayoutPanel info = new TableLayoutPanel
+		{
+			Dock = DockStyle.Fill,
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			ColumnCount = 1,
+			RowCount = 2,
+			Margin = Padding.Empty,
+			Padding = Padding.Empty,
+			BackColor = Color.Transparent
+		};
+		info.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(20)));
+		info.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(20)));
+		info.Controls.Add(title, 0, 0);
+		info.Controls.Add(status, 0, 1);
+		return info;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：官方控制台卡片错乱）：⭐ 实测自检 —— 卡片 / 左信息 / 右按钮列尺寸 +
+	/// 是否重叠/越界；发生问题时 `Logger.WriteError` 标 FAIL（去重）✅
+	/// </summary>
+	private void LogOfficialConsoleCardLayout()
+	{
+		try
+		{
+			if (_officialConsolePanel == null || _officialConsoleButton == null || _officialConsoleStatus == null)
+			{
+				return;
+			}
+			Rectangle cardRect = _officialConsolePanel.RectangleToScreen(_officialConsolePanel.ClientRectangle);
+			Rectangle buttonRect = _officialConsoleButton.Parent.RectangleToScreen(_officialConsoleButton.Bounds);
+			Rectangle statusRect = _officialConsoleStatus.Parent.RectangleToScreen(_officialConsoleStatus.Bounds);
+			bool overlap = statusRect.IntersectsWith(buttonRect);
+			bool clipped = !cardRect.Contains(buttonRect);
+			string message = "[settings-ui] 官方控制台卡片：card=" + cardRect.Width + "x" + cardRect.Height
+				+ " · 左信息=" + statusRect.Width + "x" + statusRect.Height
+				+ " · 右按钮列=" + buttonRect.Width + "x" + buttonRect.Height
+				+ " ⇒ 重叠=" + overlap + " · 裁切=" + clipped;
+			Logger.WriteLineIfChanged("settings-ui-official-console", message);
+			if (overlap || clipped)
+			{
+				Logger.WriteError("[settings-ui] ⛔ 官方控制台卡片布局 FAIL：" + message);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[settings-ui] 官方控制台卡片自检失败：" + ex.Message);
+		}
+	}
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：主题错乱）：⭐ 显式刷新「官方控制台 / PawnIO」卡片（标签、状态、按钮、提示）
+	/// + 界面外观卡片底色；浅/深色都用 UiVisualStyle 同一套语义 ✅
+	/// </summary>
+	private void ApplyOfficialConsoleCardTheme()
+	{
+		try
+		{
+			if (_themeModePanel != null)
+			{
+				_themeModePanel.BackColor = UiVisualStyle.Surface;
+			}
+			if (_officialConsolePanel != null)
+			{
+				_officialConsolePanel.BackColor = UiVisualStyle.Surface;
+				_officialConsolePanel.Invalidate(true);
+			}
+			if (_officialConsoleStatus != null)
+			{
+				_officialConsoleStatus.ForeColor = UiVisualStyle.Muted;
+			}
+			if (_pawnioStatus != null)
+			{
+				_pawnioStatus.ForeColor = UiVisualStyle.Muted;
+			}
+			if (_pawnioWarning != null)
+			{
+				_pawnioWarning.ForeColor = UiVisualStyle.Danger;
+			}
+			foreach (Control control in Controls.Find("labelOfficialConsoleTitle", searchAllChildren: true))
+			{
+				control.ForeColor = UiVisualStyle.Text;
+				UiVisualStyle.ApplyGlyph((Label)control, UiGlyph.Kind.Console);
+			}
+			foreach (Control control in Controls.Find("labelPawnIODriverTitle", searchAllChildren: true))
+			{
+				control.ForeColor = UiVisualStyle.Text;
+			}
+			ThemeCardButton(_officialConsoleButton);
+			ThemeCardButton(_pawnioButton);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[settings-ui] 官方控制台卡片主题刷新失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
+	private static void ThemeCardButton(RButton button)
+	{
+		if (button == null)
+		{
+			return;
+		}
+		button.BackColor = UiVisualStyle.ButtonFace;
+		button.ForeColor = UiVisualStyle.Text;
+		button.BorderColor = UiVisualStyle.Border;
+		button.Invalidate();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：必须发现漏配色）：⭐ 主题应用自检 —— 列出未被主题覆盖的控件（应为空）✅
+	/// </summary>
+	private void LogSettingsThemeCoverage()
+	{
+		try
+		{
+			List<string> uncovered = new List<string>();
+			CheckThemed("officialConsoleStatus", _officialConsoleStatus, UiVisualStyle.Muted, Color.Empty, uncovered);
+			CheckThemed("pawnioStatus", _pawnioStatus, UiVisualStyle.Muted, Color.Empty, uncovered);
+			CheckThemed("pawnioWarning", _pawnioWarning, UiVisualStyle.Danger, Color.Empty, uncovered);
+			CheckThemed("officialConsoleButton", _officialConsoleButton, UiVisualStyle.Text, UiVisualStyle.ButtonFace, uncovered);
+			CheckThemed("pawnioButton", _pawnioButton, UiVisualStyle.Text, UiVisualStyle.ButtonFace, uncovered);
+			CheckThemed("dayModeButton", _dayModeButton, UiVisualStyle.Text, UiVisualStyle.ButtonFace, uncovered);
+			CheckThemed("nightModeButton", _nightModeButton, UiVisualStyle.Text, UiVisualStyle.ButtonFace, uncovered);
+			CheckThemed("officialConsoleCard", _officialConsolePanel, Color.Empty, UiVisualStyle.Surface, uncovered);
+			string message = "[settings-ui] 主题应用：mode=" + (UiVisualStyle.IsNightMode ? "深色" : "浅色")
+				+ " · 卡片数=" + _dashboardSections.Length
+				+ " · 未覆盖控件=[" + string.Join(",", uncovered) + "]";
+			Logger.WriteLineIfChanged("settings-ui-theme-coverage", message);
+			if (uncovered.Count > 0)
+			{
+				Logger.WriteError("[settings-ui] ⛔ 主题未覆盖控件：" + message);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[settings-ui] 主题覆盖自检失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
+	private static void CheckThemed(string name, Control control, Color expectedFore, Color expectedBack, List<string> uncovered)
+	{
+		if (control == null)
+		{
+			return;
+		}
+		if (expectedFore != Color.Empty && control.ForeColor != expectedFore)
+		{
+			uncovered.Add(name + ".Fore=" + control.ForeColor.ToArgb().ToString("X8"));
+		}
+		if (expectedBack != Color.Empty && control.BackColor != expectedBack)
+		{
+			uncovered.Add(name + ".Back=" + control.BackColor.ToArgb().ToString("X8"));
+		}
+	}
 	/// <summary>
 	/// 2026-10-05「核显模式显示策略」③：设置对话框里的「核显模式显示」项。
 	/// 2026-10-09（igpugate）：由两态开关改成**三选** —— 自动（按硬件）/ 强制显示 / 强制隐藏。
@@ -6704,14 +6891,8 @@ public class SettingsForm : RForm
 		bool showWarning = baolongda && !status.Installed;
 		_pawnioWarning.Text = showWarning ? Strings.PawnIOBaolongdaDependency : "";
 		_pawnioWarning.Visible = showWarning;
-		// 警告行高度：显示时 24 逻辑像素，否则 0（不占空行）
-		if (_officialConsolePanel?.Controls.Count > 0 && _officialConsolePanel.Controls[0] is TableLayoutPanel table
-			&& table.RowStyles.Count > 1)
-		{
-			int warningHeight = showWarning ? ResponsiveLayout.LogicalToDevice(this, 24) : 0;
-			table.RowStyles[1] = new RowStyle(SizeType.Absolute, warningHeight);
-			_officialConsolePanel.Height = ResponsiveLayout.LogicalToDevice(this, 112 + (showWarning ? 24 : 0));
-		}
+		// ⭐ AutoSize 卡片：不再手动改行高/卡片高度（显示/隐藏自动收放）✅
+
 		Logger.WriteLineIfChanged("pawnio-settings-status",
 			"[pawnio] 设置页：状态=" + (status.Installed ? "已安装" + (status.Version.Length > 0 ? " " + status.Version : "") : "未安装")
 			+ " · 宝龙达=" + baolongda + " · 按钮=" + _pawnioButton.Text);
@@ -7169,7 +7350,6 @@ public class SettingsForm : RForm
 		{
 			return;
 		}
-		_officialConsolePanel.Height = D(48);
 		BuildThemeModePanel(D);
 		uiPerfPhase.Restart();
 		BuildTelemetryRow();
