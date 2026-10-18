@@ -347,10 +347,28 @@ internal static class EcLpcIo
 	/// <summary>⭐ 解锁位（bit7）✅</summary>
 	private const int EcUnlockBit = 0x80;
 
-	/// <summary>⭐ EC 写白名单（⭐ 只有风扇 3 个地址）✅</summary>
+	/// <summary>⭐ EC 写白名单（⭐ 风扇 3 个地址 + 键盘背光亮度 0x1807 的 4 个值）✅</summary>
 	internal static bool IsFanWriteAddress(int address)
 	{
 		return address == Fan1TargetAddress || address == Fan2TargetAddress || address == FanManualMaskAddress;
+	}
+
+	/// <summary>⭐ 2026-10-19（30 系键盘背光亮度）：EC 亮度寄存器 0x1807（值 = PWM：0x00/0x66/0xB3/0xFF）✅。</summary>
+	internal const int KeyboardBrightnessAddress = 0x1807;
+
+	/// <summary>⭐ 0x1807 **只允许的 4 个值**（档位 0/1/2/3 ⇒ 0x00/0x66/0xB3/0xFF）✅。</summary>
+	private static readonly byte[] KeyboardBrightnessValues = new byte[4] { 0x00, 0x66, 0xB3, 0xFF };
+
+	/// <summary>⭐ 地址是否键盘背光亮度 0x1807 ✅。</summary>
+	internal static bool IsKeyboardBrightnessWriteAddress(int address)
+	{
+		return address == KeyboardBrightnessAddress;
+	}
+
+	/// <summary>⭐ 值是否 0x1807 允许的 4 个 PWM 值之一 ✅。</summary>
+	internal static bool IsKeyboardBrightnessValue(byte value)
+	{
+		return Array.IndexOf(KeyboardBrightnessValues, value) >= 0;
 	}
 
 	/// <summary>
@@ -432,15 +450,25 @@ internal static class EcLpcIo
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主批准）：⭐ **白名单写一个 EC 字节**（仅 0xC83C/0xC83D/0xB20）+ **立刻回读比对** ✅。
+	/// ⭐⭐ 2026-10-18（机主批准）：⭐ **白名单写一个 EC 字节**（风扇 0xC83C/0xC83D/0xB20，
+	/// 以及 2026-10-19 起键盘背光亮度 <c>0x1807</c> 的 4 个 PWM 值）+ **立刻回读比对** ✅。
 	/// <para>⚠️ 任何失败/超时按本类既有策略处理；⛔ 不抛出；⛔ 非白名单地址直接拒绝并中毒 ✅</para>
+	/// <para>⚠️ 2026-10-19：<c>0x1807</c> 只允许 <c>0x00/0x66/0xB3/0xFF</c>；⛔ 其它值一律拒绝（不写）✅</para>
 	/// </summary>
 	internal static bool TryWriteByte(int address, byte value, out int readBack)
 	{
 		readBack = -1;
-		if (!IsFanWriteAddress(address))
+		if (IsKeyboardBrightnessWriteAddress(address))
 		{
-			Poison("EC 写被拒：地址 0x" + address.ToString("X4") + " 不在风扇白名单（只允许 0xC83C/0xC83D/0xB20）");
+			if (!IsKeyboardBrightnessValue(value))
+			{
+				_lastReadFailure = "0x1807 只允许 0x00/0x66/0xB3/0xFF（拒绝写 0x" + value.ToString("X2") + "）";
+				return false;
+			}
+		}
+		else if (!IsFanWriteAddress(address))
+		{
+			Poison("EC 写被拒：地址 0x" + address.ToString("X4") + " 不在白名单（只允许 0xC83C/0xC83D/0xB20，及 0x1807 的 4 个亮度值）");
 			_lastReadFailure = "写地址不在白名单";
 			return false;
 		}

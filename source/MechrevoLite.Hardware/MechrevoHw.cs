@@ -3703,43 +3703,75 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				level = 1;
 				Logger.WriteLine("[kbd] 开灯时亮度为 0 ⇒ 自动抬到 1（否则表现为\"开了不亮\"，需再拖亮度）");
 			}
-			bool brightKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte curBright);
-			bool needBright = !brightKnown || curBright != level;
+			bool needBright = false;
 			bool brightOk;
-			if (!needBright)
+			bool ecBrightnessUsed = false;
+			bool ecBrightnessOk = false;
+			int ecBrightnessReadback = -1;
+			int ecBrightnessWmi18 = -1;
+			if (kbGen == DgpuGenerationKind.Gen30)
 			{
-				brightOk = true;
+				// ⭐⭐ 2026-10-19（机主 WMI18↔EC 24/24 关联确认）：30 系亮度 = **EC 0x1807**（4 档 PWM）
+				//   ⇒ 档位 1/2/3 走 EC 白名单写（0x00/0x66/0xB3/0xFF）；⛔ 不再依赖 WMI 18（该机 18 只读/不稳）
+				//   ⚠️ 关灯（档位 0）仍走上面 !on 分支的原有 `18=0` 路径，**未改**；
+				//   ⚠️ 40 系/其它机型不进这里（继续原 WMI 18 写法）✅
+				ecBrightnessUsed = true;
+				ecBrightnessOk = KeyboardEcBrightness.TrySetLevel(level, wmi, out ecBrightnessReadback, out ecBrightnessWmi18);
+				brightOk = ecBrightnessOk;
+				Logger.WriteError($"[kbd] 30 系亮度走 EC 0x1807：档位={level} ⇒ 回读="
+					+ $"{(ecBrightnessReadback >= 0 ? "0x" + ecBrightnessReadback.ToString("X2") : "读不到")}"
+					+ $" · WMI18={(ecBrightnessWmi18 >= 0 ? ecBrightnessWmi18.ToString() : "读不到")}"
+					+ $" ⇒ {(ecBrightnessOk ? "成功" : "失败（不重试）")}");
 			}
 			else
 			{
-				// ⭐⭐ 2026-10-19（机主：「参照 7.3 的实现，另外的灯效」）：
-				//   ⭐ 第三方 7.3 设亮度用的是**复位序列**：先写满(4) → 再写 0 → 最后写目标值 ✅
-				//   ⭐ 我们原来"只写变化项、直接写目标" ⇒ 固件可能不认（真机上亮度/灯效常不生效）⚠️
-				//   ⚠️ 中间那次 0 会让灯瞬灭 ~120ms（7.3 同样如此）✅
-				//   ⭐⭐ 2026-10-19：⭐ 复位序列的"写满"也取**本机探测上限**（⛔ 不写超过上限的值）✅
-				byte maxLevel = (byte)EffectiveKeyboardBrightnessMax();
-				wmi.TrySetKeyboardBrightness(maxLevel);
-				Thread.Sleep(120);
-				wmi.TrySetKeyboardBrightness(0);
-				Thread.Sleep(120);
-				brightOk = wmi.TrySetKeyboardBrightness(level);
-				Logger.WriteLine($"[kbd] 亮度复位序列：{maxLevel} → 0 → {level}（7.3 做法）⇒ ok={brightOk}");
-			}
-			// ⭐ 2026-10-19（只读诊断）：真的写了 18 之后连续读 5 次 raw（看滞后/夹回）✅
-			if (needBright)
-			{
-				LogKeyboardRawAfterBrightnessWrite(wmi, level);
+				bool brightKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte curBright);
+				needBright = !brightKnown || curBright != level;
+				if (!needBright)
+				{
+					brightOk = true;
+				}
+				else
+				{
+					// ⭐⭐ 2026-10-19（机主：「参照 7.3 的实现，另外的灯效」）：
+					//   ⭐ 第三方 7.3 设亮度用的是**复位序列**：先写满(4) → 再写 0 → 最后写目标值 ✅
+					//   ⭐ 我们原来"只写变化项、直接写目标" ⇒ 固件可能不认（真机上亮度/灯效常不生效）⚠️
+					//   ⚠️ 中间那次 0 会让灯瞬灭 ~120ms（7.3 同样如此）✅
+					//   ⭐⭐ 2026-10-19：⭐ 复位序列的"写满"也取**本机探测上限**（⛔ 不写超过上限的值）✅
+					byte maxLevel = (byte)EffectiveKeyboardBrightnessMax();
+					wmi.TrySetKeyboardBrightness(maxLevel);
+					Thread.Sleep(120);
+					wmi.TrySetKeyboardBrightness(0);
+					Thread.Sleep(120);
+					brightOk = wmi.TrySetKeyboardBrightness(level);
+					Logger.WriteLine($"[kbd] 亮度复位序列：{maxLevel} → 0 → {level}（7.3 做法）⇒ ok={brightOk}");
+				}
+				// ⭐ 2026-10-19（只读诊断）：真的写了 18 之后连续读 5 次 raw（看滞后/夹回）✅
+				if (needBright)
+				{
+					LogKeyboardRawAfterBrightnessWrite(wmi, level);
+				}
 			}
 			// ⭐⭐ 回读：⭐ 逐值比对（⭐ 旧代码只判"非 0 ＝ 开" ⇒ ⭐ 选自动循环/自定义时会误判成功 ❌）
 			bool modeMatch = TryConfirmModeExact(wmi, mode);
-			bool brightMatch = TryConfirmKeyboardBrightness(wmi, level);
+			bool brightMatch = ecBrightnessUsed ? ecBrightnessOk : TryConfirmKeyboardBrightness(wmi, level);
 			confirmed = modeMatch && brightMatch;
 			// ⭐⭐ 2026-10-19（机主：「拖到最大没反应/回弹」）：
 			//   ⭐ 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
 			//     UI 必须显示**实际生效值**、并记一条 `[kbd-cal]` 日志（⛔ 不拿用户拖到的值骗人）✅
-			RecordAppliedKeyboardBrightness(wmi, level);
+			if (ecBrightnessUsed && ecBrightnessOk)
+			{
+				// ⭐ 30 系 EC 写成功：UI 直接显示目标档位（EC 回读已校验，⛔ 不用 WMI18 的旧值冒充）✅
+				RecordKeyboardBrightnessApplied(level);
+			}
+			else
+			{
+				RecordAppliedKeyboardBrightness(wmi, level);
+			}
 			Logger.WriteError($"宝龙达 键盘灯：⭐ 下发 rgb=#{r:X2}{g:X2}{b:X2} · 模式={mode} · 亮度={level}"
-				+ $" · ⭐ 本次**只写变化项**（模式={modeChanged} · 颜色=是 · 亮度={needBright}）"
+				+ (ecBrightnessUsed
+					? $" · 30系亮度=EC 0x1807（{(ecBrightnessOk ? "成功" : "失败")}）"
+					: $" · ⭐ 本次**只写变化项**（模式={modeChanged} · 颜色=是 · 亮度={needBright}）")
 				+ $" ⇒ ⭐ ① 写成功={colorOk && modeOk && brightOk}（色={colorOk} 模式={modeOk} 亮度={brightOk}）"
 				+ $" · ⭐ ② 回读一致={confirmed}（模式={modeMatch} 亮度={brightMatch}）"
 				+ " · ⭐ ③ ⚠️ 灯效/亮度是否**真的**变了 —— **我们测不到，需目视确认** ⚠️");
@@ -3824,6 +3856,29 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		catch (Exception ex)
 		{
 			// ⭐ UI 订阅方自己的异常⛔ 不允许影响硬件写入链路（⭐ 已写完，这里只是通知）✅
+			Logger.WriteLine("[kbd-cal] 亮度实际值通知 UI 时异常（已吞掉）：" + ex.Message);
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-19（30 系 EC 亮度）：EC 0x1807 写成功且回读已校验 ⇒ 直接把**目标档位**作为实际生效值
+	/// 通知 UI（⛔ 不用该机不稳定的 WMI18 旧值冒充）✅。
+	/// </summary>
+	private void RecordKeyboardBrightnessApplied(int appliedLevel)
+	{
+		LastKeyboardBrightnessRequested = appliedLevel;
+		LastKeyboardBrightnessApplied = appliedLevel;
+		Action<int> handler = KeyboardBrightnessApplied;
+		if (handler == null)
+		{
+			return;
+		}
+		try
+		{
+			handler(appliedLevel);
+		}
+		catch (Exception ex)
+		{
 			Logger.WriteLine("[kbd-cal] 亮度实际值通知 UI 时异常（已吞掉）：" + ex.Message);
 		}
 	}
