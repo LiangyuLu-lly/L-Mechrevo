@@ -1385,6 +1385,100 @@ internal sealed class PerfModeService
 		return powerLimitResetOk;
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」风扇转速/曲线表没恢复 · 强冷也要复位）：
+	/// ⭐ **把宝龙达风扇整体恢复默认**（⛔ 不修改 <c>MechrevoHw</c> 的风扇段实现，只调用现有 API）✅。
+	/// <para>⭐ 顺序（⭐ 与机主要求一致）：
+	/// <list type="number">
+	/// <item>⭐ <b>强冷</b>：若正开着 ⇒ 先走既有「关闭」流程
+	///   （`TrySetFanBoostViaBackend(false)`：交回固件 + 恢复强冷前快照 + `FanBoostActive=false` + 清临时状态）✅；</item>
+	/// <item>⭐ <b>曲线表回默认</b>：`BaolongdaFanCurveSettings.CreateDefault(...)`
+	///   ⇒ 当前代际默认 16 点（40 系满转 **6000** / 30 系 **4900** —— 用现有常量
+	///   `FullRpm40Series/FullRpm30Series`，⛔ 不临时改基准），默认 `Enabled=false` ⇒ ⭐ **闭环停用**，
+	///   再 `SaveBaolongdaFanCurve` 落盘 ✅；</item>
+	/// <item>⭐ <b>交回固件</b>：`FanWriter.TryReleaseToFirmware()` ⇒ EC 目标写 0 + 清 `0xB20` 的 `0x02|0x08`，
+	///   ⭐ 每一步**写后回读比对**（成功与否以回读为准）✅；</item>
+	/// <item>⭐ <b>再读一次 EC</b>（`0xC83C/0xC83D/0xB20`）⇒ 日志证明「目标=0、接管位已清」✅。</item>
+	/// </list></para>
+	/// <para>⚠️ 闸门：`FanCurveVerified` 未放开 ⇒ UI 仍隐藏/禁用（由 UI 自己读闸门判断），
+	/// 但 **EC 复位照做**（清掉可能残留的接管位 —— 机主明确要求）✅。</para>
+	/// <para>⚠️ 所有步骤都有日志（默认级别可见）；失败如实写 `false`，⛔ 不假装成功、⛔ 不抛异常 ✅。</para>
+	/// </summary>
+	internal void ResetBaolongdaFanToFirmwareDefault()
+	{
+		MechrevoHw hw = _hw;
+		if (hw == null || !hw.UsesBaolongda)
+		{
+			return;
+		}
+		// ── ① 强冷复位：开着 ⇒ 先走关闭流程（恢复快照 / FanBoostActive=false / 清临时状态）──
+		bool boostWasActive = MechrevoHw.FanBoostActive;
+		bool boostConfirmed = false;
+		if (boostWasActive)
+		{
+			hw.TrySetFanBoostViaBackend(false, out boostConfirmed);
+		}
+		bool boostClosed = !MechrevoHw.FanBoostActive;
+		// ── ② 曲线表回默认（按本机代际满转；默认 Enabled=false ⇒ 闭环停用）──
+		//   ⭐ 满转基准：⭐ 40 系 **6000** / 30 系 **4900**（⭐ `BaolongdaFanCurveSettings.FullRpm40Series/FullRpm30Series`
+		//      —— 与曲线默认值同一套现有常量；⛔ 不临时改基准、⛔ 不拿 `FanRpmMaxForPercent`（30 系那只是÷35 的显示分母）✅
+		int fullRpm = (hw.DgpuGeneration == DgpuGenerationKind.Gen30)
+			? BaolongdaFanCurveSettings.FullRpm30Series
+			: BaolongdaFanCurveSettings.FullRpm40Series;
+		BaolongdaFanCurveSettings defaults = BaolongdaFanCurveSettings.CreateDefault(fullRpm);
+		bool curveSaved = hw.SaveBaolongdaFanCurve(defaults);
+		BaolongdaFanCurveSettings curveNow = hw.LoadBaolongdaFanCurve();
+		bool curveDisabled = curveNow != null && !curveNow.Enabled;
+		// ── ③ EC 交回固件（目标 0 + 清 0x02|0x08，写后回读）──
+		//   ⚠️ 闸门未放开也照做：机主明确要求「清掉可能残留的接管位」✅
+		bool released = FanWriter.TryReleaseToFirmware(out string releaseDetail);
+		// ── ④ 再读一次 EC（0xC83C/0xC83D/0xB20）：证明真的回默认 ──
+		int fan1 = -1;
+		int fan2 = -1;
+		int mask = -1;
+		string readVia;
+		bool acpi1 = EcPortIo.TryReadByteStable(EcPortIo.AcpiFan1TargetAddress, out fan1, out _);
+		bool acpi2 = EcPortIo.TryReadByteStable(EcPortIo.AcpiFan2TargetAddress, out fan2, out _);
+		bool acpi3 = EcPortIo.TryReadByteStable(EcPortIo.AcpiFanManualMaskAddress, out mask, out _);
+		if (acpi1 && acpi2 && acpi3)
+		{
+			readVia = "ACPI-EC";
+		}
+		else
+		{
+			// ⭐ ACPI 有任一读不到 ⇒ 用 LPC 通道补读（同一批地址；两通道都只读）✅
+			if (!acpi1 && EcLpcIo.TryReadByteStable(EcLpcIo.Fan1TargetAddress, out int l1, out _))
+			{
+				fan1 = l1;
+			}
+			if (!acpi2 && EcLpcIo.TryReadByteStable(EcLpcIo.Fan2TargetAddress, out int l2, out _))
+			{
+				fan2 = l2;
+			}
+			if (!acpi3 && EcLpcIo.TryReadByteStable(EcLpcIo.FanManualMaskAddress, out int l3, out _))
+			{
+				mask = l3;
+			}
+			readVia = "ACPI-EC/LPC";
+		}
+		bool targetsZero = fan1 == 0 && fan2 == 0;
+		bool maskClean = mask >= 0 && (mask & 0x0A) == 0;
+		// ── ⑤ 日志（默认级别可见）──
+		Logger.WriteError($"[reset] 风扇：已交回固件（目标=0 · 掩码清位 ok={released && maskClean} · 通道={FanWriter.ChannelName(FanWriter.PreferredChannel)}）"
+			+ $" · 曲线表已重置为默认（满转={defaults.MaxRpm} RPM · 16 点 · 保存 ok={curveSaved}）· 闭环已停用（enabled={(curveNow != null ? curveNow.Enabled : false)}，应 false）");
+		Logger.WriteError($"[reset] 强冷：已关闭并交回固件（FanBoostActive={(MechrevoHw.FanBoostActive ? "true" : "false")} · 掩码={(mask < 0 ? "读不到" : "0x" + mask.ToString("X2"))} 回读 ok={maskClean}）"
+			+ (boostWasActive ? $" · 原状态=开 ⇒ 已走关闭流程（快照恢复={boostConfirmed}）" : " · 原状态=关（无需关闭流程）"));
+		Logger.WriteError($"[reset] 风扇 EC 回读（{readVia}）：0xC83C={(fan1 < 0 ? "读不到" : fan1.ToString())} · 0xC83D={(fan2 < 0 ? "读不到" : fan2.ToString())}"
+			+ $" · 0xB20={(mask < 0 ? "读不到" : "0x" + mask.ToString("X2"))} ⇒ 目标归零={targetsZero} · 接管位(0x02|0x08)已清={maskClean}"
+			+ $" · 闸门 FanCurveVerified={hw.FanCurveVerified}（未放开 ⇒ UI 继续隐藏，但 EC 复位已照做）"
+			+ (string.IsNullOrEmpty(releaseDetail) ? "" : " · " + releaseDetail));
+		if (!boostClosed || !curveDisabled || !released || !targetsZero || !maskClean)
+		{
+			Logger.WriteError("[reset] ⚠️ 风扇恢复默认**未全部确认**（如实记录，⛔ 不假装成功）："
+				+ $"强冷已关={boostClosed} · 闭环已停={curveDisabled} · EC交回={released} · 目标归零={targetsZero} · 接管位已清={maskClean}");
+		}
+	}
+
 	private async Task<bool> RestoreVendorProfileAsync()
 	{
 		try

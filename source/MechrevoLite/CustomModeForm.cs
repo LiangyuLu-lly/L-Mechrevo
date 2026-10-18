@@ -2582,6 +2582,7 @@ public class CustomModeForm : RForm
 		_status.Text = Strings.Restoring;
 		_status.ForeColor = UiVisualStyle.Muted;
 		bool flag;
+		Exception resetException = null;
 		try
 		{
 			flag = await instance.ResetAsync(mode.Id);
@@ -2589,17 +2590,23 @@ public class CustomModeForm : RForm
 		catch (Exception ex)
 		{
 			// ⭐ 异常原文进日志（⛔ 不吞），状态行如实失败 ✅
+			resetException = ex;
+			flag = false;
 			Logger.WriteError("[reset] 自定义档恢复出厂**异常**（如实上报，未吞掉）：" + ex);
-			if (!IsDisposed)
-			{
-				_status.Text = string.Format(Strings.PerfModeRestoreFailed, name);
-				_status.ForeColor = UiVisualStyle.Danger;
-				ResizeToContent();
-			}
-			return;
 		}
+		// ⭐⭐ 2026-10-19（机主：恢复出厂时风扇转速/曲线表也要恢复默认，强冷也要复位）：
+		//   ⭐ **不论自定义档配置复位是否成功，风扇都按机主要求复位到默认**（⛔ 不因前面失败就跳过）✅
+		//   ⭐ 内容：强冷关闭 → 曲线表回默认（Enabled=false）→ EC 目标 0 + 清接管位（回读确认）→ 再读 EC 证明 ✅
+		await ResetFanAfterFactoryResetAsync(hw, instance);
 		if (IsDisposed)
 		{
+			return;
+		}
+		if (resetException != null)
+		{
+			_status.Text = string.Format(Strings.PerfModeRestoreFailed, name);
+			_status.ForeColor = UiVisualStyle.Danger;
+			ResizeToContent();
 			return;
 		}
 		try
@@ -2758,6 +2765,96 @@ public class CustomModeForm : RForm
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：恢复出厂时**风扇转速/曲线表**没恢复，**强冷也要复位**）：
+	/// ⭐ 调 <see cref="PerfModeService.ResetBaolongdaFanToFirmwareDefault" /> 把风扇整体恢复默认，
+	/// 然后按真实值刷新 UI ✅。
+	/// <para>⭐ 顺序：① 强冷正开着 ⇒ 先走关闭流程（快照恢复 / FanBoostActive=false / 清临时状态）；
+	/// ② 曲线表重置为**当前代际默认 16 点**且 `Enabled=false`（闭环停用）；
+	/// ③ `FanWriter.TryReleaseToFirmware()` 交回固件（EC 目标 0 + 清 `0x02|0x08`，回读确认）；
+	/// ④ 再读一次 EC（`0xC83C/0xC83D/0xB20`）写日志证明 ✅。</para>
+	/// <para>⚠️ 只在宝龙达执行；GCU 机型行为逐位不变 ✅。异常如实写日志、⛔ 不吞 ✅。</para>
+	/// </summary>
+	private async Task ResetFanAfterFactoryResetAsync(MechrevoHw hw, PerfModeService instance)
+	{
+		if (hw == null || instance == null || !hw.UsesBaolongda)
+		{
+			return;
+		}
+		try
+		{
+			instance.ResetBaolongdaFanToFirmwareDefault();
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[reset] 风扇恢复默认**异常**（如实上报，未吞掉）：" + ex);
+		}
+		await RefreshFanUiAfterFactoryResetAsync();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：恢复出厂后风扇 UI 要按真实值刷新）：
+	/// ① 「更多开关 / 磁贴」里的「风扇强冷」⇒ 调现有 <c>SettingsForm.RefreshQuickSwitchStatesNow()</c>
+	/// （⭐ 它内部 `UpdateQuickSwitches` 读 `MechrevoHw.FanBoostActive`，宝龙达同源）✅；
+	/// ② 风扇曲线窗口若正开着 ⇒ 关掉后走现有 <see cref="OpenFanCurveAsync" /> **重开**
+	/// （⭐ 新实例构造时从 store 读值 ⇒ 「启用软件闭环」= 未勾选、曲线 = 默认 16 点；
+	/// ⛔ 不改 <c>FanCurveForm</c> 代码；⭐ 闸门未放开时它自己会继续隐藏/禁用入口）✅。
+	/// <para>⚠️ 刷新失败只记日志，⛔ 不影响"恢复出厂"本身 ✅。</para>
+	/// </summary>
+	private async Task RefreshFanUiAfterFactoryResetAsync()
+	{
+		// ① 更多开关 / 磁贴（风扇强冷 = 关）
+		try
+		{
+			SettingsForm settingsForm = Program.settingsForm;
+			if (settingsForm != null && !settingsForm.IsDisposed)
+			{
+				if (settingsForm.InvokeRequired)
+				{
+					settingsForm.BeginInvoke(settingsForm.RefreshQuickSwitchStatesNow);
+				}
+				else
+				{
+					settingsForm.RefreshQuickSwitchStatesNow();
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[reset] 刷新「更多开关/磁贴」失败（已吞掉，不影响恢复）：" + ex.Message);
+		}
+		// ② 风扇曲线窗口（若开着）：按 store 真值重开
+		try
+		{
+			FanCurveForm[] openCurveForms = OwnedForms.OfType<FanCurveForm>()
+				.Where((FanCurveForm f) => f != null && !f.IsDisposed && f.Visible)
+				.ToArray();
+			if (openCurveForms.Length == 0)
+			{
+				return;
+			}
+			foreach (FanCurveForm fanCurveForm in openCurveForms)
+			{
+				try
+				{
+					fanCurveForm.Close();
+				}
+				catch (Exception ex2)
+				{
+					Logger.WriteLine("[reset] 关闭旧风扇曲线窗口失败（已吞掉）：" + ex2.Message);
+				}
+			}
+			if (!IsDisposed)
+			{
+				await OpenFanCurveAsync();
+				Logger.WriteError("[reset] 风扇曲线窗口已按默认状态重开（启用软件闭环=未勾选；闸门未放开时入口继续隐藏）");
+			}
+		}
+		catch (Exception ex3)
+		{
+			Logger.WriteError("[reset] 重开风扇曲线窗口失败（已吞掉，不影响恢复）：" + ex3);
+		}
+	}
 
 	private async Task OpenFanCurveAsync()
 	{
