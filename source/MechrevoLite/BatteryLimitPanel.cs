@@ -65,15 +65,17 @@ internal sealed class BatteryLimitPanel : Panel
 	// 0=正常（Muted）· 1=错误（Danger）· 2=警示（Warn）
 	private int _statusKind;
 
-	// ⭐ 2026-10-19（机主：上下空白过多 / 按钮被裁）：⭐ 紧凑行高（22/30/28/22/22）✅
+	// ⭐ 2026-10-19（机主指定）：⭐ 紧凑行高（22/28/26/20/20 = 116）✅
 	private const int RowSoc = 22;
 
-	// 开关 + 保存按钮同一行：30 逻辑像素（按钮上下各 2 外边距 ⇒ 26 高）
-	private const int RowSwitch = 30;
+	// 开关 + 保存按钮同一行：28 逻辑像素（按钮上下各 2 外边距 ⇒ 24 高）
+	private const int RowSwitch = 28;
 
-	private const int RowInput = 28;
+	private const int RowInput = 26;
 
-	private const int RowStatus = 22;
+	private const int RowAdvanced = 20;
+
+	private const int RowStatus = 20;
 
 
 	public BatteryLimitPanel()
@@ -146,13 +148,13 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
 		}
-		// 紧凑：① 电量 22 ② 开关+保存 30 ③ 起充/停充 28 ④ 允许初次放电 22 ⑤ 状态 22 = 124 ✅
+		// 紧凑：① 电量 22 ② 开关+保存 28 ③ 起充/停充 26 ④ 放电开关 20 ⑤ 状态 20 = 116 ✅
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSwitch)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
-		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
+		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowAdvanced)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
-		grid.Height = D(RowSoc + RowSwitch + RowInput + RowSoc + RowStatus);
+		grid.Height = D(RowSoc + RowSwitch + RowInput + RowAdvanced + RowStatus);
 
 		// ⭐ 开关 + 保存按钮同一行：内嵌表 2 列（开关占满、按钮固定 120 逻辑像素，⛔ 不再被 25% 列裁字）✅
 		TableLayoutPanel switchRow = new TableLayoutPanel
@@ -165,7 +167,7 @@ internal sealed class BatteryLimitPanel : Panel
 			BackColor = Color.Transparent
 		};
 		switchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-		switchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(120)));
+		switchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(96)));
 		switchRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 		_enableBox.Dock = DockStyle.Fill;
 		switchRow.Controls.Add(_enableBox, 0, 0);
@@ -192,6 +194,8 @@ internal sealed class BatteryLimitPanel : Panel
 		LogSaveButtonCheck();
 		RefreshFromEc();
 		ApplyTheme();
+		LogDiagnostics("build");
+		HandleCreated += delegate { LogDiagnostics("handle"); };
 	}
 
 	/// <summary>⭐ Tooltip 是组件、不随 Panel 自动释放 ⇒ 手动释放 ✅</summary>
@@ -478,7 +482,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Value = value,
 			Dock = DockStyle.Fill,
 			TextAlign = HorizontalAlignment.Right,
-			Margin = new Padding(D(2), D(3), D(10), D(3))
+			Margin = new Padding(D(2), D(1), D(6), D(1))
 		};
 	}
 
@@ -489,6 +493,47 @@ internal sealed class BatteryLimitPanel : Panel
 	/// <summary>
 	/// ⭐⭐ 机主要求：代码级自检 —— 保存按钮小圆角 + 尺寸能否放下「保存阈值」且不裁切 ✅
 	/// </summary>
+	/// <summary>
+	/// ⭐ 2026-10-19（机主：先量再说）：⭐ 面板/行高/控件 bounds 实测日志（build/handle/host 三处）✅
+	/// </summary>
+	internal void LogDiagnostics(string stage)
+	{
+		try
+		{
+			Size preferred = GetPreferredSize(Size.Empty);
+			Logger.WriteLineIfChanged("battery-ui-metrics-panel",
+				"[battery-ui] 面板(" + stage + ")：size=" + Width + "x" + Height + " · preferred=" + preferred.Width + "x" + preferred.Height
+				+ " · grid.size=" + _grid.Width + "x" + _grid.Height + " · grid.height=" + _grid.Height);
+			string rows = "";
+			float total = 0f;
+			for (int i = 0; i < _grid.RowStyles.Count; i++)
+			{
+				rows += (i == 0 ? "" : " ") + i + "=" + _grid.RowStyles[i].Height;
+				total += _grid.RowStyles[i].Height;
+			}
+			Logger.WriteLineIfChanged("battery-ui-metrics-rows",
+				"[battery-ui] 行高(" + stage + ")：0=" + Value(0) + " 1=" + Value(1) + " 2=" + Value(2) + " 3=" + Value(3)
+				+ " 4=" + Value(4) + " · 合计=" + total);
+			Logger.WriteLineIfChanged("battery-ui-metrics-bounds",
+				"[battery-ui] 控件 bounds(" + stage + ")：电量=" + Rect(_socLabel) + " · 开关行=" + Rect(_enableBox)
+				+ " · 起充/停充=" + Rect(_lowBox) + "/" + Rect(_highBox) + " · 高级=" + Rect(_allowInitialDischargeBox)
+				+ " · 状态=" + Rect(_statusLabel));
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery-ui] 面板自检失败（" + stage + "）：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
+	private string Value(int index)
+	{
+		return index >= 0 && index < _grid.RowStyles.Count ? _grid.RowStyles[index].Height.ToString("0") : "?";
+	}
+
+	private static string Rect(Control control)
+	{
+		return control == null ? "null" : (control.Left + "," + control.Top + " " + control.Width + "x" + control.Height);
+	}
 	private void LogSaveButtonCheck()
 	{
 		try
@@ -497,7 +542,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Size textSize = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font);
 			int textWidth = textSize.Width;
 			int radius = _applyButton.BorderRadius;
-			int availableWidth = D(120);
+			int availableWidth = D(96);
 			bool enough = textWidth + radius * 2 <= availableWidth
 				&& preferred.Height >= textSize.Height + D(4);
 			string message = "[battery-ui] 保存按钮：圆角半径=" + radius + "px · 尺寸=" + preferred.Width
@@ -517,7 +562,7 @@ internal sealed class BatteryLimitPanel : Panel
 		try
 		{
 			// 新布局：内嵌行 = 开关占满剩余宽 + 按钮固定 120 逻辑像素
-			int buttonAvailable = D(120);
+			int buttonAvailable = D(96);
 			int checkAvailable = D(352) - buttonAvailable - D(8);
 			int checkWidth = TextRenderer.MeasureText(_enableBox.Text, _enableBox.Font).Width;
 			int buttonTextWidth = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font).Width;

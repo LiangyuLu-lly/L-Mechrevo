@@ -8145,6 +8145,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				_bdChargePanelRowHeight = panelHeight;
 				RecalculateBatteryTableHeight();
 			}
+			panel.LogDiagnostics("host");
+			Logger.WriteLineIfChanged("battery-ui-host-metrics",
+				"[battery-ui] 宿主：rowIndex=" + _bdChargePanelRowIndex + " · rowHeight=" + host.RowStyles[_bdChargePanelRowIndex].Height
+				+ " · table.Height=" + host.Height + " · panelBattery.Height=" + panelBattery.Height
+				+ " · cardBottom=" + panelBattery.Bottom);
 			Logger.WriteLine("[battery] 充电阈值面板：rowIndex=" + _bdChargePanelRowIndex + " · rows=" + host.RowStyles.Count
 				+ " · preferredHeight=" + panelHeight + " · host.Width=" + host.Width + " · host.Height=" + host.Height
 				+ " · panel.Height=" + panel.Height + " · panel.Visible=" + panel.Visible);
