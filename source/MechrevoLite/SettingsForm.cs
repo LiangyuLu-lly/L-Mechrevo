@@ -1657,6 +1657,7 @@ public class SettingsForm : RForm
 		//   界面外观卡片（ApplyWindow 对自绘 RButton/自定义卡片不一定覆盖），并打覆盖自检日志 ✅
 		ApplyOfficialConsoleCardTheme();
 		LogSettingsThemeCoverage();
+		LogSettingsCardButtonFits();
 		// 2026-10-08：模式高亮色是日/夜两套写死的 Color，换主题后必须重新下发一次。
 		ApplyPerfModeAccents();
 		RefreshBatteryModeButtons();
@@ -6577,6 +6578,95 @@ public class SettingsForm : RForm
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：不管哪个按钮四边都被裁）：⭐ 设置对话框卡片内 RButton/Button 的**四边余量**自检：
+	/// 下边余量 = 行底 − (按钮底 + margin.Bottom)；左边余量 = 按钮左 − margin.Left − 父 Padding.Left；
+	/// 判据：⛔ 不 Dock=Fill，下边余量 ≥ 0，左边余量 ≥ 2 逻辑像素 ✅
+	/// </summary>
+	private void LogSettingsCardButtonFits()
+	{
+		try
+		{
+			Control[] roots = new Control[3] { _officialConsolePanel, _themeModePanel, _quickGroup };
+			foreach (Control root in roots)
+			{
+				if (root == null)
+				{
+					continue;
+				}
+				List<Control> buttons = new List<Control>();
+				CollectButtons(root, buttons);
+				foreach (Control button in buttons)
+				{
+					LogOneButtonFit(button);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[ui-fit] 设置卡片按钮自检失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
+	private static void CollectButtons(Control root, List<Control> result)
+	{
+		foreach (Control child in root.Controls)
+		{
+			if (child is ButtonBase)
+			{
+				result.Add(child);
+			}
+			CollectButtons(child, result);
+		}
+	}
+
+	private void LogOneButtonFit(Control button)
+	{
+		try
+		{
+			Control parent = button.Parent;
+			if (parent == null)
+			{
+				return;
+			}
+			int rowTop = 0;
+			int rowHeight = parent.ClientSize.Height;
+			if (parent is TableLayoutPanel table && table.RowStyles.Count > 0)
+			{
+				int row = table.GetRow(button);
+				rowHeight = 0;
+				for (int i = 0; i < table.RowStyles.Count; i++)
+				{
+					if (i < row)
+					{
+						rowTop += (int)table.RowStyles[i].Height;
+					}
+					else if (i == row)
+					{
+						rowHeight = (int)table.RowStyles[i].Height;
+					}
+				}
+			}
+			Padding margin = button.Margin;
+			Padding padding = parent.Padding;
+			int bottomGap = rowTop + rowHeight - (button.Bottom + margin.Bottom);
+			int leftGap = button.Left - margin.Left - padding.Left;
+			bool fit = button.Dock != DockStyle.Fill && bottomGap >= 0 && leftGap >= 2;
+			string name = string.IsNullOrEmpty(button.Text) ? button.Name : button.Text;
+			string message = "[ui-fit] 按钮=" + name + " · 控件=" + button.Bounds
+				+ " · 所在行高=" + rowHeight + " · 父Padding=" + padding
+				+ " · 下边余量=" + bottomGap + " · 左边余量=" + leftGap + " ⇒ 裁切=" + !fit;
+			Logger.WriteLineIfChanged("ui-fit-settings-" + parent.Name + "-" + button.Name, message);
+			if (!fit)
+			{
+				Logger.WriteError("⛔ 按钮裁切 FAIL：" + message);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[ui-fit] 单个按钮自检失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
 	private static void CheckThemed(string name, Control control, Color expectedFore, Color expectedBack, List<string> uncovered)
 	{
 		if (control == null)
@@ -7769,7 +7859,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(46),
+				Height = scale(48),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7786,7 +7876,7 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
-			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(30)));
+			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			Label label = new Label
 			{
 				Name = "labelThemeModeTitle",

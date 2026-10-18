@@ -113,10 +113,9 @@ internal sealed class BatteryLimitPanel : Panel
 			Dock = DockStyle.None,
 			Anchor = AnchorStyles.Right,
 			Text = Strings.BatteryLimitSaveThreshold,
-			Size = new Size(
-				Math.Min(D(110), Math.Max(D(96), TextRenderer.MeasureText(Strings.BatteryLimitSaveThreshold, UiVisualStyle.Font(8.5f)).Width + D(32))),
-				D(28)),
-			Padding = new Padding(D(8), D(2), D(8), D(2)),
+			// ⭐ 2026-10-19（机主：按钮四边被裁）：⭐ 固定 **88×24**（行高 24+上下 4+2=30），四边留 2~4px ✅
+			Size = new Size(D(88), D(24)),
+			Padding = new Padding(D(6), D(2), D(6), D(2)),
 			BorderRadius = D(4),
 			Margin = new Padding(D(4), D(2), 0, D(2))
 		};
@@ -510,7 +509,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Size switchPreferred = _enableBox.GetPreferredSize(Size.Empty);
 			// ⭐ 2026-10-19（预览工具：按钮溢出到下一行）：⭐ 行高必须 ≥ 按钮实际高度 + 上下 margin；
 			//   ⛔ 不再用 PreferredSize（固定 Size 时它可能小于实际 Height）✅
-			int buttonHeight = Math.Max(buttonPreferred.Height, _applyButton.Height + _applyButton.Margin.Vertical);
+			int buttonHeight = Math.Max(buttonPreferred.Height, _applyButton.Height + _applyButton.Margin.Vertical) + D(2);
 			int rowHeight = Math.Max(buttonHeight, switchPreferred.Height + D(4));
 			if (_grid.RowStyles.Count > 1)
 			{
@@ -602,6 +601,19 @@ internal sealed class BatteryLimitPanel : Panel
 			if (fail || overlapsRow)
 			{
 				Logger.WriteError("[battery-ui] ⛔ 保存按钮裁切/跨行 FAIL（" + stage + "）：" + message);
+			}
+			// ⭐ 2026-10-19（机主：按钮四边被裁）：⭐ 通用四边余量自检（下边/左边各留 2~3px）✅
+			int fitRowHeight = _grid.RowStyles.Count > 1 ? (int)_grid.RowStyles[1].Height : 0;
+			int bottomGap = fitRowHeight - (_applyButton.Bottom + _applyButton.Margin.Bottom);
+			int leftGap = _applyButton.Left - _applyButton.Margin.Left;
+			bool fit = _applyButton.Dock != DockStyle.Fill && bottomGap >= 0 && leftGap >= 2;
+			string fitMessage = "[ui-fit] 按钮=保存阈值 · 控件=" + _applyButton.Bounds
+				+ " · 所在行高=" + fitRowHeight + " · 父Padding=" + (_applyButton.Parent?.Padding.ToString() ?? "null")
+				+ " · 下边余量=" + bottomGap + " · 左边余量=" + leftGap + " ⇒ 裁切=" + !fit;
+			Logger.WriteLineIfChanged("ui-fit-save-button-" + stage, fitMessage);
+			if (!fit)
+			{
+				Logger.WriteError("⛔ 按钮裁切 FAIL：" + fitMessage);
 			}
 		}
 		catch (Exception ex)
