@@ -144,8 +144,11 @@ internal sealed class BatteryLimitPanel : Panel
 		UpdateSocSafetyHint();
 	}
 
-	/// <summary>⭐ 能力判据：`UsesBaolongda` + 板号命中宝龙达白名单（MRID6/MRID6-*）+ EC 可读 ✅。</summary>
-	internal static bool IsAvailable(MechrevoHw hw)
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：面板行被裁 / 面板未构建）：⭐ **只判机型**（不读 EC）——
+	/// `UsesBaolongda && BoardWhitelist.Matches(MRID6…)` ⇒ 允许构建面板（EC 读不到时面板内部显示“状态读不到”）✅
+	/// </summary>
+	internal static bool IsSupportedBoard(MechrevoHw hw)
 	{
 		try
 		{
@@ -154,11 +157,20 @@ internal sealed class BatteryLimitPanel : Panel
 				return false;
 			}
 			// ⭐ 机主要求“板号以 MRID6 开头”；这里用同一份白名单纯函数（更严：排除 MRID60 之类假板号）✅
-			if (!BoardWhitelist.Matches(ReadBaseBoardProduct()))
-			{
-				return false;
-			}
-			return BatteryLimitWriter.TryReadState(out _, out _, out _, out _);
+			return BoardWhitelist.Matches(ReadBaseBoardProduct());
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>⭐ 能力判据：`UsesBaolongda` + 板号命中宝龙达白名单 + EC 可读（用于电池页整体可见性）✅。</summary>
+	internal static bool IsAvailable(MechrevoHw hw)
+	{
+		try
+		{
+			return IsSupportedBoard(hw) && BatteryLimitWriter.TryReadState(out _, out _, out _, out _);
 		}
 		catch
 		{

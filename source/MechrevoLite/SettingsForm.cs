@@ -1000,6 +1000,11 @@ public class SettingsForm : RForm
 
 	private bool _baolongdaChargePanelAvailable;
 
+	// ⭐⭐ 2026-10-18（机主：行索引撞车）：⭐ 宝龙达面板行**单独标记**（-1 = 未追加）✅
+	private int _bdChargePanelRowIndex = -1;
+
+	private int _bdChargePanelRowHeight;
+
 	private Panel panelFooter;
 
 	private RButton buttonQuit;
@@ -6958,7 +6963,8 @@ public class SettingsForm : RForm
 		// ⭐⭐ 2026-10-18（机主：宝龙达电池卡片仍为空）：⭐ 本方法在电池表构建**之后**运行，
 		//   上面两行会清掉 RecalculateBatteryTableHeight 设置的 MinimumSize/高度 ⇒ 宝龙达充电阈值面板被裁掉。
 		//   ⇒ 这里重新按统一算法恢复（仅宝龙达且面板可用；非宝龙达保持原样，⛔ 不触发 EC）✅
-		if (Program.hw?.UsesBaolongda == true && BatteryLimitPanel.IsAvailable(Program.hw))
+		if (Program.hw?.UsesBaolongda == true && _bdChargePanelRowIndex >= 0
+			&& BatteryLimitPanel.IsSupportedBoard(Program.hw))
 		{
 			RecalculateBatteryTableHeight();
 			if (panelBattery.Height < panelBattery.MinimumSize.Height)
@@ -7924,20 +7930,26 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			{
 				return;
 			}
+			if (!BatteryLimitPanel.IsSupportedBoard(hardware))
+			{
+				return;
+			}
 			BatteryLimitPanel panel = new BatteryLimitPanel();
 			host.RowCount += 1;
-			// ⭐⭐ 2026-10-18（机主：电池行内容为空）：⭐ 宿主表是**固定高度**的 TableLayoutPanel，
+			// ⭐⭐ 2026-10-18（机主：电池行内容为空 / 行索引撞车）：⭐ 宿主表是**固定高度**的 TableLayoutPanel，
 			//   只加控件不会自动长高 ⇒ 新行会被裁掉看不见。这里按面板首选高度补一行 **Absolute** 行高，
-			//   然后交给**唯一**的 RecalculateBatteryTableHeight() 统一重算（所有 RowStyles 之和）✅
+			//   ⭐ 并**单独记住该行索引/行高**（所有重算/隐藏路径都跳过它）✅
 			int panelWidth = Math.Max(320, host.Width);
 			int panelHeight = Math.Max(100, panel.GetPreferredSize(new Size(panelWidth, 0)).Height);
 			host.RowStyles.Add(new RowStyle(SizeType.Absolute, panelHeight));
-			host.Controls.Add(panel, 0, host.RowCount - 1);
+			_bdChargePanelRowIndex = host.RowCount - 1;
+			_bdChargePanelRowHeight = panelHeight;
+			host.Controls.Add(panel, 0, _bdChargePanelRowIndex);
 			host.SetColumnSpan(panel, 3);
 			RecalculateBatteryTableHeight();
 			host.PerformLayout();
-			Logger.WriteLine("[battery] 充电阈值面板：rows=" + host.RowStyles.Count + " · preferredHeight=" + panelHeight
-				+ " · host.Width=" + host.Width + " · host.Height=" + host.Height
+			Logger.WriteLine("[battery] 充电阈值面板：rowIndex=" + _bdChargePanelRowIndex + " · rows=" + host.RowStyles.Count
+				+ " · preferredHeight=" + panelHeight + " · host.Width=" + host.Width + " · host.Height=" + host.Height
 				+ " · panel.Height=" + panel.Height + " · panel.Visible=" + panel.Visible);
 		}
 		catch (Exception ex)
@@ -8467,6 +8479,19 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		if (table == null || table.RowStyles.Count == 0)
 		{
 			return;
+		}
+		// ⭐⭐ 2026-10-18（机主：行索引撞车）：⭐ 宝龙达面板行**单独标记、单独保护** ——
+		//   其它行（旧三档/EC 直写/滑块）收 0 时⛔ 不得连带把这一行收掉；若被误清零则按记录还原 ✅
+		int panelRow = ((object)table == (object)_chargeLimitHostTable) ? _bdChargePanelRowIndex : -1;
+		if (panelRow >= 0 && panelRow < table.RowStyles.Count)
+		{
+			if (table.RowStyles[panelRow].Height <= 0f && _bdChargePanelRowHeight > 0)
+			{
+				table.RowStyles[panelRow] = new RowStyle(SizeType.Absolute, _bdChargePanelRowHeight);
+			}
+			Logger.WriteLineIfChanged("battery-panel-row",
+				"[battery] 面板行：index=" + panelRow + " · 行高=" + table.RowStyles[panelRow].Height
+				+ " · 期望>0 ⇒ ok=" + (table.RowStyles[panelRow].Height > 0f));
 		}
 		float total = 0f;
 		foreach (RowStyle rowStyle in table.RowStyles)
@@ -9294,6 +9319,13 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		ApplyChargeLimitTierVisibility(baolongdaRaw);
 		// ⭐⭐ 2026-10-18（机主截图）：⭐ 旧「关闭 EC 直写充电上限（写入异常时用）」行也一起收 ✅
 		ApplyEcDirectWriteOffVisibility(baolongdaRaw);
+		// ⭐⭐ 2026-10-18（机主：面板行缺失）：⭐ 宝龙达且板号命中白名单 ⇒ **确保面板行存在**
+		//   （构造期若本机 EC 还没就绪也不能漏建；这里补建一次并单独标记行索引）✅
+		if (baolongdaRaw && _bdChargePanelRowIndex < 0 && _chargeLimitHostTable != null
+			&& BatteryLimitPanel.IsSupportedBoard(Program.hw))
+		{
+			BuildBaolongdaChargeLimitSection(_chargeLimitHostTable);
+		}
 		// 2026-10-08 17:00：非 50 系滑块不上屏，这两句不会被人看到（50 系滑块的行内说明与开关共用同一条措辞）。
 		toolTip.SetToolTip(sliderBattery, flag ? Strings.ChargeLimitWindowsNote : ChargeLimitDisabledReason(RuntimeModelSupport.Current()));
 		// 2026-10-08：开关与三档快捷值跟随同一条 EC 通道的可用性，不能只灰滑块。
@@ -9309,6 +9341,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// （代际门控**故意不进** flag）⇒ 老机型保留完整电池卡片 + 三档（GCU 路）。
 		ApplyChargeLimitRowVisibility(!flag || EcChargeLimit.IsLegacyGenerationBlocked());
 		ApplyChargeLimitStageEnablement();
+		// ⭐⭐ 2026-10-18（机主：面板行被裁）：⭐ 所有行高调整结束后**统一重算一次**（单一来源）✅
+		RecalculateBatteryTableHeight();
 	}
 
 	internal static string ChargeLimitDisabledReason(SupportDecision support)
