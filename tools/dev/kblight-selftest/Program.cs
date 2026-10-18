@@ -246,38 +246,34 @@ internal static class Program
 
 		Console.WriteLine();
 		Console.WriteLine("== 2026-10-19 键盘灯运行时自校准（KeyboardLightingCalibration 纯函数）==");
-		Console.WriteLine("机主口径：40 系亮度只有 0/1/2/3（最大 3）；彩虹 = 写模式 16=1 能保持 1 才可用");
+		Console.WriteLine("机主口径：40 系亮度只有 0/1/2/3（最大 3）；彩虹已改为软件刷色（与本校准无关）");
 
-		// ① 探测到 3 档（与机主口径一致）⇒ 上限 3、彩虹可用
-		KeyboardLightingCalibration full = KeyboardLightingCalibration.FromProbe(3, 3, true, true, "t");
+		// ① 探测到 3 档（与机主口径一致）⇒ 上限 3
+		KeyboardLightingCalibration full = KeyboardLightingCalibration.FromProbe(3, 3, "t");
 		Check("亮度探测成功(3) => BrightnessProbed", full.BrightnessProbed, true);
 		CheckInt("亮度探测成功(3) => 上限 3", full.BrightnessMax, 3);
-		Check("彩虹可保持 1 => RainbowSupported", full.RainbowSupported, true);
 		// ② 只能写到 2（写 3 被夹回）⇒ 上限取 2（界面不再给"拖到没用"的档）
-		KeyboardLightingCalibration clamped = KeyboardLightingCalibration.FromProbe(3, 2, true, false, "t");
+		KeyboardLightingCalibration clamped = KeyboardLightingCalibration.FromProbe(3, 2, "t");
 		CheckInt("写 3 被夹回 2 => 上限 2", clamped.BrightnessMax, 2);
-		Check("彩虹回读不是 1 => RainbowSupported=false", clamped.RainbowSupported, false);
-		// ③ 探测失败 ⇒ 亮度退回声明值、彩虹隐藏（保守）
-		KeyboardLightingCalibration failed = KeyboardLightingCalibration.FromProbe(3, 0, false, false, "t");
+		// ③ 探测失败 ⇒ 亮度退回声明值（保守）
+		KeyboardLightingCalibration failed = KeyboardLightingCalibration.FromProbe(3, 0, "t");
 		Check("亮度探测失败 => BrightnessProbed=false", failed.BrightnessProbed, false);
 		CheckInt("亮度探测失败 => 退回声明值 3", failed.BrightnessMax, 3);
-		Check("彩虹未测 => RainbowSupported=false（隐藏）", failed.RainbowSupported, false);
 		// ④ 探测值不得高于声明值（防"被夹回/越界读数"把上限抬高）
-		KeyboardLightingCalibration over = KeyboardLightingCalibration.FromProbe(3, 5, true, true, "t");
+		KeyboardLightingCalibration over = KeyboardLightingCalibration.FromProbe(3, 5, "t");
 		CheckInt("探测值 5 > 声明 3 => 上限仍 3（不抬高）", over.BrightnessMax, 3);
 		// ⑤ 保守回退（非宝龙达 / 实例不可用）
 		KeyboardLightingCalibration cons = KeyboardLightingCalibration.Conservative(3, "非宝龙达");
 		Check("保守回退 => 未探测", cons.BrightnessProbed, false);
 		CheckInt("保守回退 => 上限=声明值 3", cons.BrightnessMax, 3);
-		Check("保守回退 => 彩虹隐藏", cons.RainbowSupported, false);
 		CheckInt("声明值 0 => 保守回退下限 1", KeyboardLightingCalibration.Conservative(0, "x").BrightnessMax, 1);
 		// ⑥ 只能写到 1 档也如实（不拿声明值冒充实测值）
-		KeyboardLightingCalibration onlyOne = KeyboardLightingCalibration.FromProbe(3, 1, true, true, "t");
+		KeyboardLightingCalibration onlyOne = KeyboardLightingCalibration.FromProbe(3, 1, "t");
 		Check("只能写到 1 => BrightnessProbed", onlyOne.BrightnessProbed, true);
 		CheckInt("只能写到 1 => 上限 1", onlyOne.BrightnessMax, 1);
 
 		Console.WriteLine();
-		Console.WriteLine(_fail == 0 ? $"== 全绿：门控真值表 {_total}/{_total} ==" : $"== 失败 {_fail}/{_total} 项 ==");
+		Console.WriteLine(_fail == 0 ? $"== 全绿：键盘灯自检 {_total}/{_total} ==" : $"== 失败 {_fail}/{_total} 项 ==");
 		return (_fail == 0) ? 0 : 1;
 	}
 }

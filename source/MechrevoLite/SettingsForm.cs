@@ -596,7 +596,9 @@ public class SettingsForm : RForm
 	//   ⭐ 恢复「彩虹」，并按第三方 7.3 的做法（**同一套 WMI 16/17/18**）补写入细节：
 	//     · 7.3 设亮度是「先 4 → 再 0 → 再目标值」的**复位序列**（我们的"只写变化项"可能因此被固件忽略）
 	//     · 7.3 设彩虹 = `RGBKeyboardMode = Mode_RGBAutoCyclic(1)`，固定色 = 2 + 颜色(17)
-	//   ⚠️ 先放回界面让机主真机验证；若仍不生效，再按"能力位"隐回去（⛔ 不长期给无效项）
+	// ⭐⭐ 2026-10-19 第三轮（机主批准「软件彩虹」）：
+	//   ⭐ 真机确认本机固件「模式 16=1」无效 ⇒ 彩虹改为**软件刷色**（16=2 + 每 50ms 写 17）✅
+	//   ⇒ 界面**始终保留**这两项（⛔ 不再按"彩虹可用性"隐藏）✅
 	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[2]
 	{
 		("Single", Strings.EffectSingle),
@@ -604,35 +606,12 @@ public class SettingsForm : RForm
 	};
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：宝龙达键盘灯**当前可用**的效果表 ✅。
-	/// <para>⭐ 探测确认彩虹不可用（或探测失败 ⇒ 保守隐藏）⇒ **动态去掉 Rainbow**
-	/// （⛔ 不长期给无效项、⛔ 不假装支持）；尚未探测 ⇒ 先按完整表展示（探测完成后界面随即收敛）✅。</para>
-	/// <para>⚠️ 与下面键盘行的「索引 → 效果 Id」映射**必须**用同一个方法 ⇒ 否则下拉项与下发值错位 ❌。</para>
-	/// </summary>
-	private static (string Effect, string Name)[] CurrentBaolongdaLightEffects()
-	{
-		if (!MechrevoHw.IsKeyboardRainbowKnownUnavailable())
-		{
-			return BaolongdaLightEffects;
-		}
-		List<(string Effect, string Name)> filtered = new List<(string, string)>(BaolongdaLightEffects.Length);
-		foreach ((string Effect, string Name) item in BaolongdaLightEffects)
-		{
-			if (!string.Equals(item.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase))
-			{
-				filtered.Add(item);
-			}
-		}
-		return (filtered.Count > 0) ? filtered.ToArray() : new (string, string)[1] { ("Single", Strings.EffectSingle) };
-	}
-
-	/// <summary>
 	/// ⭐ 宝龙达时把任意「声明的效果表」收敛成**本机真能做到的项** ✅；
 	/// ⭐ 其他机型（⭐ GCU ／ 老同方 ／ 非宝龙达 ✅）**原样返回** ⇒ ⭐ 逐位不变 ✅。
 	/// </summary>
 	private static (string Effect, string Name)[] EffectsForCurrentBackend((string Effect, string Name)[] declared)
 	{
-		return (Program.hw?.UsesBaolongda == true) ? CurrentBaolongdaLightEffects() : declared;
+		return (Program.hw?.UsesBaolongda == true) ? BaolongdaLightEffects : declared;
 	}
 
 	private RCheckBox? _lightOffOnBatteryChk;
@@ -1747,8 +1726,8 @@ public class SettingsForm : RForm
 
 	private void OpenRgbForm()
 	{
-		// ⭐⭐ 2026-10-19（运行时自校准）：机主打开**键盘灯设置窗口** ⇒ 排队一次能力探测 ✅
-		//   （后台线程、结果缓存；完成后重填本界面的键盘效果下拉 ⇒ 彩虹不可用就动态去掉）
+		// ⭐⭐ 2026-10-19（运行时自校准）：机主打开**键盘灯设置窗口** ⇒ 排队一次亮度上限探测 ✅
+		//   （后台线程、结果缓存；供 RgbForm 的亮度滑块范围使用）
 		EnsureBaolongdaKeyboardCalibrationQueued();
 		if (rgbForm == null || rgbForm.IsDisposed)
 		{
@@ -15909,8 +15888,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		_kbPowerSw = sw;
 		_kbEffectCombo = effectCombo;
 		FillKeyboardEffectCombo(effectCombo);
-		// ⭐⭐ 2026-10-19（运行时自校准）：机主**打开键盘灯效果下拉**（= 打开键盘灯设置）时排队一次能力探测 ✅
-		//   ⚠️ 后台线程 + 结果缓存；完成后重填本下拉 ⇒ 彩虹不可用就**动态去掉**（⛔ 不长期给无效项）
+		// ⭐⭐ 2026-10-19（运行时自校准）：机主**打开键盘灯效果下拉**（= 打开键盘灯设置）时排队一次亮度上限探测 ✅
+		//   ⚠️ 后台线程 + 结果缓存；结果供 RgbForm 的亮度滑块范围使用（彩虹已改软件刷色，与校准无关）✅
 		effectCombo.DropDown += delegate
 		{
 			EnsureBaolongdaKeyboardCalibrationQueued();
@@ -15928,7 +15907,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 					if (ShouldUseGcuKeyboardFallback(Program.rgb) || Program.hw?.UsesBaolongda == true)
 					{
 						(string, string)[] array2 = (Program.hw?.UsesBaolongda == true)
-							? CurrentBaolongdaLightEffects()
+							? BaolongdaLightEffects
 							: KeyboardFirmwareEffects.Visible(CurrentKeyboardType());
 						if (selectedIndex < array2.Length)
 						{
@@ -16764,11 +16743,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：打开/刷新键盘灯设置时**排队一次**能力探测 ✅。
-	/// <para>⭐ 探测本体（写 WMI 16/18 + 回读 + try/finally 恢复）在
+	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准」）：打开/刷新键盘灯设置时**排队一次**亮度上限探测 ✅。
+	/// <para>⭐ 探测本体（写 WMI 18 + 回读 + try/finally 恢复）在
 	/// <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 里**只跑一次并缓存**；
-	/// 本方法只负责"后台线程触发 + 完成后回 UI 重填效果下拉（过滤彩虹）"✅。</para>
+	/// 本方法只负责"后台线程触发"（结果供 <c>RgbForm</c> 的亮度滑块范围使用）✅。</para>
 	/// <para>⚠️ 必须后台线程：探测含多次 WMI 往返（约 &lt; 1s），⛔ 不阻塞设置界面 ✅。</para>
+	/// <para>⚠️ 彩虹**不参与校准**：它已改为软件刷色 ⇒ 界面始终显示「单色 + 彩虹」✅。</para>
 	/// </summary>
 	private void EnsureBaolongdaKeyboardCalibrationQueued()
 	{
@@ -16790,61 +16770,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			try
 			{
 				hw.EnsureKeyboardLightingCalibration();
-				if (IsDisposed || Disposing || !IsHandleCreated)
-				{
-					return;
-				}
-				BeginInvoke(new Action(delegate
-				{
-					if (IsDisposed || Disposing)
-					{
-						return;
-					}
-					// ⭐ 探测结果可能把 Rainbow 从效果表里去掉 ⇒ 重填下拉（展开中会等收起再填）✅
-					RefreshKeyboardEffectComboAfterCalibration();
-				}));
 			}
 			catch (Exception ex)
 			{
-				Logger.WriteError("[kbd-cal] 键盘灯自校准（设置界面触发）异常（已吞掉）：" + ex.Message);
+				Logger.WriteError("[kbd-cal] 键盘灯亮度上限探测（设置界面触发）异常（已吞掉）：" + ex.Message);
 			}
 		});
-	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19：自校准完成后刷新键盘灯效果下拉（彩虹不可用 ⇒ 动态去掉）—— 供 <c>RgbForm</c> 回调 ✅。
-	/// <para>⚠️ 必须在 UI 线程调用；内部只重填下拉（没变化时 <see cref="FillKeyboardEffectCombo" /> 自己会 return）✅。</para>
-	/// </summary>
-	internal void RefreshKeyboardEffectComboAfterCalibration()
-	{
-		if (IsDisposed || Disposing)
-		{
-			return;
-		}
-		if (_kbEffectCombo == null || _kbEffectCombo.IsDisposed)
-		{
-			return;
-		}
-		// ⚠️ 下拉正展开时**不要**清空 Items（会闪、且焦点/命中会乱）⇒ 等它收起后再重填 ✅
-		if (_kbEffectCombo.DroppedDown)
-		{
-			EventHandler refillAfterClose = null;
-			refillAfterClose = delegate
-			{
-				_kbEffectCombo.DropDownClosed -= refillAfterClose;
-				RefreshKeyboardEffectComboAfterCalibration();
-			};
-			_kbEffectCombo.DropDownClosed += refillAfterClose;
-			return;
-		}
-		try
-		{
-			FillKeyboardEffectCombo(_kbEffectCombo);
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("[kbd-cal] 校准后刷新键盘灯效果下拉失败（已吞掉）：" + ex.Message);
-		}
 	}
 
 	private void FillKeyboardEffectCombo(ComboBox combo)
@@ -16859,9 +16790,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		if (Program.hw?.UsesBaolongda == true)
 		{
 			flag = true;
-			// ⭐⭐ 2026-10-19（运行时自校准）：彩虹被探测确认不可用 ⇒ 这里**动态过滤**掉
-			//   （与 SelectedIndexChanged 的索引→Id 映射用同一方法 ⇒ 不会错位）✅
-			array = CurrentBaolongdaLightEffects();
+			// ⭐⭐ 2026-10-19（软件彩虹）：彩虹始终可用（软件刷色）⇒ 固定用「单色 + 彩虹」两项 ✅
+			array = BaolongdaLightEffects;
 		}
 		(int, string)[] array2 = RgbForm.VisibleHidEffects(keyboardType);
 		string[] array3 = (flag ? array.Select(((string Id, string Label) e) => e.Label).ToArray() : array2.Select(((int Mode, string Name) e) => e.Name).ToArray());

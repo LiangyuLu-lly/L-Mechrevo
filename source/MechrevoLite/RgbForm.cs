@@ -250,8 +250,8 @@ public class RgbForm : RForm
 		{
 			_brightnessSource.KeyboardBrightnessApplied += OnKeyboardBrightnessApplied;
 		}
-		// ⭐⭐ 2026-10-19（运行时自校准）：打开键盘灯设置 ⇒ **排队一次**能力探测
-		//   （后台线程；完成后重建面板 ⇒ 亮度滑块范围 1..实测上限、彩虹按能力位显隐）✅
+		// ⭐⭐ 2026-10-19（运行时自校准）：打开键盘灯设置 ⇒ **排队一次**亮度上限探测
+		//   （后台线程；完成后重建面板 ⇒ 亮度滑块范围 1..实测上限）✅
 		KickKeyboardCalibration();
 		FormClosing += (object? _, FormClosingEventArgs e) =>
 		{
@@ -357,10 +357,10 @@ public class RgbForm : RForm
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：
-	/// 打开键盘灯设置（本窗）时**排队一次**宝龙达键盘灯能力探测 ✅。
-	/// <para>⭐ 探测本体（写 WMI 16/18 + 回读 + try/finally 恢复）在
+	/// 打开键盘灯设置（本窗）时**排队一次**宝龙达键盘灯**亮度上限**探测 ✅。
+	/// <para>⭐ 探测本体（写 WMI 18 + 回读 + try/finally 恢复）在
 	/// <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 里**只跑一次并缓存**；
-	/// 本方法只负责"后台线程触发 + 完成后回 UI 重建面板"（滑块范围 / 彩虹显隐随之收敛）✅。</para>
+	/// 本方法只负责"后台线程触发 + 完成后回 UI 重建面板"（亮度滑块范围随之收敛）✅。</para>
 	/// <para>⚠️ 必须后台线程：探测含多次 WMI 往返（约 &lt; 1s），⛔ 不阻塞窗口 ✅。</para>
 	/// </summary>
 	private void KickKeyboardCalibration()
@@ -389,13 +389,11 @@ public class RgbForm : RForm
 					{
 						return;
 					}
-					// ⭐ 探测可能改变亮度上限（也可能把 Rainbow 从效果表去掉）⇒ 重建参数面板 ✅
+					// ⭐ 校准可能改变亮度上限 ⇒ 重建参数面板（滑块范围随之收敛）✅
 					if (IsGcuKeyboardFallback())
 					{
 						BuildGcuFirmwareParams();
 					}
-					// ⭐ 设置界面的键盘效果下拉也要按新能力位收敛（彩虹不可用 ⇒ 动态去掉）✅
-					Program.settingsForm?.RefreshKeyboardEffectComboAfterCalibration();
 				}));
 			}
 			catch (Exception ex)
@@ -488,7 +486,7 @@ public class RgbForm : RForm
 		//      ⛔ 不再把不存在的模式 3 当选项显示/下发 ✅；⚠️ 非宝龙达原样返回 ⇒ 逐位不变 ✅
 		if (Program.hw?.UsesBaolongda == true)
 		{
-			settings = settings with { Effect = MechrevoHw.NormalizeKeyboardLightingEffect(settings.Effect) };
+			settings = settings with { Effect = BaolongdaProfile.NormalizeKeyboardEffect(settings.Effect) };
 		}
 		return settings;
 	}
@@ -514,7 +512,7 @@ public class RgbForm : RForm
 		}
 		// ⭐ 2026-10-17（宝龙达 · Manual 已撤掉）：⭐ 亮度/颜色操作会把这个效果 Id 写回配置，
 		//   ⛔ 不要因为它来自 stats/GCU 就绕过收敛 ⇒ ⭐ 宝龙达下一律回到可写三项 ✅
-		return (Program.hw?.UsesBaolongda == true) ? MechrevoHw.NormalizeKeyboardLightingEffect(effect) : effect;
+		return (Program.hw?.UsesBaolongda == true) ? BaolongdaProfile.NormalizeKeyboardEffect(effect) : effect;
 	}
 
 	private void PersistGcuLightAndPublishBrightness(int light0to4)
