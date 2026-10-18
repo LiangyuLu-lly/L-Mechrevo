@@ -563,18 +563,15 @@ public class SettingsForm : RForm
 	private ComboBox? _kbEffectCombo;
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右）：宝龙达**非键盘灯行**
-	/// （灯带 / Logo / 铰链 / 同步）在隐藏效果下拉和「编辑」按钮后，需要把开关仍放回**标签右侧**、
-	/// 并与键盘行开关**逐像素对齐** ⇒ 这里记下这些行与其开关，供
-	/// <see cref="ApplyBaolongdaCollapsedLightRowWidths" /> 按键盘行的实际像素列宽重算 ✅。
+	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右 —— 第 3 次修复）：
+	/// 宝龙达**非键盘灯行**（灯带 / Logo / 铰链 / 同步）的「记录」（行 + 开关 + 日志名）。
+	/// ⚠️ 该表在**刷新期**由 <see cref="ApplyBaolongdaLightRowLayout" /> 每次更新
+	/// （建行期 hw 可能还没就绪 ⇒ 不能只在建行期记录）✅。
 	/// </summary>
 	private readonly List<(TableLayoutPanel Row, RCheckBox Switch, string Label)> _baolongdaCollapsedLightRows = new List<(TableLayoutPanel, RCheckBox, string)>();
 
-	/// <summary>防止 <see cref="ApplyBaolongdaCollapsedLightRowWidths" /> 在 Layout 事件里递归重入 ✅。</summary>
+	/// <summary>防止 <see cref="ApplyBaolongdaLightRowLayout" /> 在 Layout 事件里递归重入 / 反复重排 ✅。</summary>
 	private bool _applyingCollapsedLightRowLayout;
-
-	/// <summary>⭐ 每行布局日志只记一次（对齐失败时仍会按变化记；⛔ 拖动窗口不刷屏）✅。</summary>
-	private readonly HashSet<string> _collapsedLightRowLayoutLogged = new HashSet<string>(StringComparer.Ordinal);
 
 	private ComboBox? _lbEffectCombo;
 
@@ -7060,6 +7057,8 @@ public class SettingsForm : RForm
 		{
 			UpdateDashboardWindowHeight();
 			UpdateDashboardScroll();
+			// ⭐ 2026-10-19（机主：Logo 开关跑到最右）：展开/折叠灯光组后立即按平台重排（幂等；body.Layout 也会兜一次）✅
+			ApplyBaolongdaLightRowLayout(Program.hw);
 		};
 		// ⭐ 分段计时：灯光组（键盘/灯带/Logo/铰链/同步行）
 		Stopwatch uiLightPhase = Stopwatch.StartNew();
@@ -8892,6 +8891,10 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			_igpuOnlyUiPanel.Visible = igpuRow;
 		}
 		string text = string.Join('|', new object[10] { true, true, true, true, flag21, flag23, true, flag14, flag9, flag3 }) + "|" + string.Join('|', list) + $"|{flag4}|{flag5}|{flag6}|{flag6b}|{flag6c}|{flag7}|{flag15}|{flag16}|{flag17}|{flag18}|{flag19}|{flag22}|{flag}|{flag24}|igpuRow={igpuRow}";
+		// ⭐⭐ 2026-10-19（机主：宝龙达 Logo 开关跑到最右）：能力刷新也是布局修正的触发点之一
+		//   ⚠️ 必须放在下面 `text == _lastCapabilityLayout` 早退**之前**（否则能力没变化就永远不重排）；
+		//      方法内部幂等 + 仅宝龙达生效 + 行未布局时自动跳过 ⇒ 其它机型逐位不变 ✅
+		ApplyBaolongdaLightRowLayout(hw);
 		if (text == _lastCapabilityLayout)
 		{
 			ApplyChargeLimitSliderGating(flag);
@@ -11030,6 +11033,19 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				//   ⭐ **重新打开设置页**（ShowAll → Visible=true）⇒ 立刻只读同步一次系统亮度；
 				//      ⛔ 不写硬件；值没变时只更新 UI 不刷日志（去重在同步方法内）✅
 				SyncBrightnessFromSystemReadOnly(force: true);
+				// ⭐⭐ 2026-10-19（机主：宝龙达 Logo 开关跑到最右 —— 第 3 次修复）：
+				//   ⭐ 窗口显示后**立即排队**一次灯光行重排（BeginInvoke 落在本次布局完成之后 ⇒ 键盘行已有真实像素列宽）；
+				//      覆盖"建行时 hw 还没就绪 / 面板刚建好还没布局"的时序；幂等、仅宝龙达生效 ✅
+				if (IsHandleCreated)
+				{
+					BeginInvoke(() =>
+					{
+						if (!IsDisposed)
+						{
+							ApplyBaolongdaLightRowLayout(Program.hw);
+						}
+					});
+				}
 				if (_themeModePanel != null)
 				{
 					UiVisualStyle.ApplyWindow(this);
@@ -17137,16 +17153,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			_logoPowerSw = logoPowerSw;
 			_logoEffectCombo = logoEffectCombo;
-		// ⭐⭐ 2026-10-19（机主：「Logo 灯光没有正确屏蔽特效下拉框，宝龙达只有开关」）：
-		//   ⭐ 宝龙达的 Logo 灯只有 开/关（功能号 15），没有效果字段 ⇒ **整颗下拉不显示** ✅
-		//   ⭐ 开关本身照常可用（`TrySetLogoLightViaBackend`）✅
-		//   ⚠️ 非宝龙达保持原样 ✅
-		if (Program.hw?.UsesBaolongda == true)
-		{
-			logoEffectCombo.Visible = false;
-			logoEffectCombo.Enabled = false;
-			Logger.WriteLine("[light] 宝龙达：Logo 灯只有开/关 ⇒ 已隐藏特效下拉");
-		}
+			// ⭐ 2026-10-19：显隐/收列结论改在**刷新期** `ApplyBaolongdaLightRowLayout` 做
+			//   （建行时 hw 往往还没就绪 ⇒ 原来这里判断恒 false，正是前两次修复失效的原因）✅
 		});		BuildLightChannelRow("rowHinge", Strings.LightChannelHinge, "HidLightbar_Hinge/Ctrl", Strings.LightHingeTitle, LightForm.HingeEffects, 3, (RCheckBox hingePowerSw, ComboBox hingeEffectCombo) =>
 		{
 			_hingePowerSw = hingePowerSw;
@@ -17395,44 +17403,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			//   ⚠️ 而 EffectsForCurrentBackend 对**所有**灯光行都返回同一张 3 项表
 			//      ⇒ ⭐ LOGO 行会露出这 3 项 ⇒ ⭐ 点了不会有效果（违反能力位铁律）❌
 			//   ⇒ ⭐ 宝龙达下 **LOGO 行不显示效果下拉**（只保留开/关开关）✅；非宝龙达 ⭐ 逐位不变 ✅。
-			// ⭐⭐ 2026-10-17（真机反馈「氛围灯/灯带有点但无效」）：⭐ 宝龙达下**非键盘灯**的行都没有效果通路 ⚠️
-			//   ① TrySetLightEffectViaBackend 只认 Keyboard/ 前缀，其余交回 GCU —— 而宝龙达**没有 GCU**
-			//   ② EffectsForCurrentBackend **不区分 topic** ⇒ 灯带/铰链/同步三行也被替换成键盘灯那 4 项（语义完全不对）
-			//   ③ LOGO 灯协议里只有一个字节功能号 15（AmbientLight 0/1），没有颜色/效果/亮度/速度/帧率/角度
-			//   ⇒ ⭐ 宝龙达下**非键盘灯**的行：隐藏效果下拉 + 隐藏「编辑」按钮 + 收掉那两列宽度
-			//      ⭐ 行本身**保留**（LightExtraRowAvailable() 恒 true 是刻意的"判据判错时的后路"，
-			//         用户还能改 light_strip_ui / light_logo_ui —— 这条设计不动 ✅）
-			//   ⚠️ 非宝龙达 / 键盘灯 ⇒ 恒 false ⇒ **逐位不变** ✅
-			bool baolongdaNonKeyboard = (Program.hw?.UsesBaolongda ?? false)
-				&& !topic.StartsWith("Keyboard/", StringComparison.OrdinalIgnoreCase);
+			// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右 —— 第 3 次修复）：
+			//   ⚠️ 前两次失效的根因：宝龙达非键盘灯行（灯带/Logo/铰链/同步）的「隐藏效果列 + 隐藏编辑按钮 +
+			//      开关对齐」原来在**建行那一刻**按 `Program.hw?.UsesBaolongda` 做一次；而启动懒加载 +
+			//      后端探测异步 ⇒ 建行时它往往还是 false ⇒ 建行分支不成立（也没记录行）❌
+			//   ⭐ 现在统一挪到**每次灯光同步**的 `ApplyBaolongdaLightRowLayout`（幂等；非宝龙达门控直接 return）✅
+			//   行本身**保留**（LightExtraRowAvailable() 恒 true 是刻意的"判据判错时的后路"，
+			//   用户还能改 light_strip_ui / light_logo_ui —— 这条设计不动 ✅）
 			TableLayoutPanel tableLayoutPanel3 = MakeRow(rowName);
 			FillRow(tableLayoutPanel3, label, out var sw2, out var effectCombo2, () =>
 			{
 				OpenLightForm(topic, title, effects);
 			});
 			storeControls(sw2, effectCombo2);
-			if (baolongdaNonKeyboard)
-			{
-				// ⚠️ 只改 Visible 与列宽，⛔ 不删控件、⛔ 不改开关逻辑、⛔ 不动任何下发
-				effectCombo2.Visible = false;
-				foreach (Control child in tableLayoutPanel3.Controls)
-				{
-					// 第 3 列（0 基）＝「编辑」按钮 —— 隐藏它，否则点进去还是满屏无效项
-					if (tableLayoutPanel3.GetColumn(child) == 3)
-					{
-						child.Visible = false;
-					}
-				}
-				// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右）：⭐ 开关**显式放回第 1 列**（标签右侧）✅
-				//   ⚠️ 旧实现把列宽改成 80%/20%/0/0 ⇒ 开关虽在第 1 列，但第 0 列占 80% ⇒ 视觉上被推到最右 ❌
-				//   ⭐ 新做法见 `ApplyBaolongdaCollapsedLightRowWidths`：按**键盘行的实际像素列宽**
-				//     （col0/col1）复制过来、col2/col3 = 0 ⇒ 开关 x 与键盘行**逐像素相同** ✅
-				if (tableLayoutPanel3.GetColumn(sw2) != 1)
-				{
-					tableLayoutPanel3.SetColumn(sw2, 1);
-				}
-				_baolongdaCollapsedLightRows.Add((tableLayoutPanel3, sw2, LightRowLogName(rowName)));
-			}
 			(string, string)[] array2 = effects;
 			for (int num3 = 0; num3 < array2.Length; num3++)
 			{
@@ -17631,108 +17614,148 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			int height = TextRenderer.MeasureText(lblKeyboardControllerStatus.Text, lblKeyboardControllerStatus.Font, new Size(width, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding).Height;
 			lblKeyboardControllerStatus.Height = height + 4;
 		}
-		// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右）：宝龙达非键盘灯行的列宽**按键盘行的实际像素列宽**重算
-		//   （挂 Layout/SizeChanged ⇒ 窗口缩放、DPI 变化、折叠组展开后都会重算；
-		//    ⚠️ 非宝龙达时 `_baolongdaCollapsedLightRows` 恒空 ⇒ 本回调是 no-op，其它机型逐位不变 ✅）
-		body.Layout += (object _, LayoutEventArgs _) => ApplyBaolongdaCollapsedLightRowWidths(body);
-		body.SizeChanged += (object _, EventArgs _) => ApplyBaolongdaCollapsedLightRowWidths(body);
-		ApplyBaolongdaCollapsedLightRowWidths(body);
+		// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右 —— 第 3 次修复）：
+		//   布局修正的**补充触发点**（主触发 = 每次 `SyncLightRows`；这里保证窗口缩放 / DPI 变化 /
+		//   「灯光」组展开后立即重排；⚠️ 非宝龙达 ⇒ 方法内 `UsesBaolongda` 门控直接 return，其它机型逐位不变 ✅）
+		body.Layout += (object _, LayoutEventArgs _) => ApplyBaolongdaLightRowLayout(Program.hw);
+		body.SizeChanged += (object _, EventArgs _) => ApplyBaolongdaLightRowLayout(Program.hw);
+		ApplyBaolongdaLightRowLayout(Program.hw);
 	}
 
 	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右）：⭐ 宝龙达**非键盘灯行**（灯带 / Logo / 铰链 / 同步）
-	/// 在隐藏效果下拉与「编辑」按钮之后，把**开关放回标签右侧、并与键盘行开关逐像素对齐** ✅
-	/// <para>⚠️ 两个已排除的错解法：
-	/// ① 旧实现列宽写成 80%/20%/0/0 —— 开关虽然在第 1 列，但第 0 列占 80% ⇒ 视觉上被推到最右 ❌；
-	/// ② 若把 2/3 列设 0、只留 22%/10% 两个百分比列 —— TableLayoutPanel 会按 22:10 **归一化**
-	///    ⇒ 第 0 列实际变 68.75% ⇒ 开关又被推到最右 ❌。</para>
-	/// <para>⭐ 本方法：把键盘行当前的实际像素列宽 <c>col0</c> / <c>col1</c> **原样复制**到非键盘行，
-	/// col2 / col3 = 0 ⇒ 开关 x = col0 = 键盘行开关 x ⇒ **逐像素相同** ✅
-	/// （键盘行本身仍是 22%/10%/56%/12% 百分比，窗口缩放时本方法重新取像素宽）。</para>
-	/// <para>⭐ 日志（每行只记一次；对齐变 False 时再记）：<c>[light] 行=Logo · switchCol=1 · label=…% ·
-	/// col1=…%（宽 …px）· switchX=… · 键盘行switchX=… ⇒ 对齐=True（x差=…px）</c></para>
+	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右 —— 第 3 次修复，先做代码级 UI 审查）：
+	/// ⭐ **宝龙达非键盘灯行（灯带 / Logo / 铰链 / 同步）的「按平台收列 + 开关对齐」唯一入口** ✅
+	/// <para>⭐ 每次 <see cref="SyncLightRows" /> / <see cref="RefreshDeviceCapabilities" /> / 窗口缩放 /
+	/// 「灯光」组展开都会调用（**幂等**，可重复进）：
+	/// ① 隐藏效果下拉（col2）与「编辑」按钮（col3）；② 开关钉在 col1；
+	/// ③ 列宽 = 键盘行**当前实际像素列宽**（col0/col1），col2/col3 = 0 ⇒ 开关 x 与键盘行逐像素相同。</para>
+	/// <para>⚠️ 为什么必须在刷新期做而不是建行期：启动懒加载 + 后端探测异步 ⇒ 建行时
+	/// <c>Program.hw?.UsesBaolongda</c> 往往还是 false（建行分支不成立）；运行期老实现又把列宽写回
+	/// 80%/20%/0/0 ⇒ 开关被推到最右（机主截图）。本方法每次同步都重新判定平台并重排，不依赖建行时刻 ✅</para>
+	/// <para>⛔ 非宝龙达：入口 `UsesBaolongda` 门控直接 return ⇒ GCU/同方布局逐位不变 ✅</para>
 	/// </summary>
-	private void ApplyBaolongdaCollapsedLightRowWidths(TableLayoutPanel body)
+	private void ApplyBaolongdaLightRowLayout(MechrevoHw hw)
 	{
-		if (_applyingCollapsedLightRowLayout || _baolongdaCollapsedLightRows.Count == 0 || body == null || body.IsDisposed)
+		if (hw == null || !hw.UsesBaolongda || IsDisposed || _applyingCollapsedLightRowLayout)
 		{
 			return;
 		}
-		TableLayoutPanel keyboardRow = null;
-		foreach (Control child in body.Controls)
+		TableLayoutPanel keyboardRow = _kbPowerSw?.Parent as TableLayoutPanel;
+		if (keyboardRow == null)
 		{
-			if (child is TableLayoutPanel row && string.Equals(row.Name, "rowKeyboard", StringComparison.Ordinal))
+			Control[] foundKeyboard = Controls.Find("rowKeyboard", true);
+			if (foundKeyboard.Length > 0 && foundKeyboard[0] is TableLayoutPanel found)
 			{
-				keyboardRow = row;
-				break;
+				keyboardRow = found;
 			}
 		}
-		if (keyboardRow == null || keyboardRow.ColumnStyles.Count < 2 || keyboardRow.ClientSize.Width <= 0)
+		// ⭐ 对齐基准 = 键盘行**当前实际像素列宽**（唯一来源；键盘行本身仍是 22/10/56/12 百分比）
+		int col0Width = -1;
+		int col1Width = -1;
+		if (keyboardRow != null && keyboardRow.ClientSize.Width > 0)
 		{
-			return;
+			keyboardRow.PerformLayout();
+			int[] keyboardColumns = keyboardRow.GetColumnWidths();
+			if (keyboardColumns.Length >= 2 && keyboardColumns[0] > 0)
+			{
+				col0Width = keyboardColumns[0];
+				col1Width = keyboardColumns[1];
+			}
 		}
-		keyboardRow.PerformLayout();
-		int[] keyboardColumns = keyboardRow.GetColumnWidths();
-		if (keyboardColumns.Length < 2 || keyboardColumns[0] <= 0)
+		if (col0Width <= 0 || keyboardRow == null)
 		{
-			return;
+			// ⭐ 可诊断性：明确记录"刷新路径已跑到、但在等键盘行宽"（灯光组折叠/窗口未显示时会出现）
+			Logger.WriteLineIfChanged("light-ui-audit-wait",
+				"[light][UI审查] 宝龙达：灯光行布局修正等待键盘行布局（键盘行=" + ((keyboardRow == null) ? "未找到" : (keyboardRow.ClientSize.Width.ToString() + "px")) + "）⇒ 显示/展开灯光组后自动重试");
 		}
-		int col0Width = keyboardColumns[0];
-		int col1Width = keyboardColumns[1];
-		int keyboardSwitchX = _kbPowerSw?.Location.X ?? int.MinValue;
+		(string RowName, string Label, RCheckBox Switch, ComboBox Combo)[] rows = new (string, string, RCheckBox, ComboBox)[4]
+		{
+			("rowLightbar", "灯带", _lbPowerSw, _lbEffectCombo),
+			("rowLogo", "Logo", _logoPowerSw, _logoEffectCombo),
+			("rowHinge", "铰链", _hingePowerSw, _hingeEffectCombo),
+			("rowSync", "同步", _syncPowerSw, _syncEffectCombo)
+		};
 		_applyingCollapsedLightRowLayout = true;
 		try
 		{
-			foreach (var (row, powerSwitch, rowLabel) in _baolongdaCollapsedLightRows)
+			for (int i = 0; i < rows.Length; i++)
 			{
-				if (row.IsDisposed || powerSwitch.IsDisposed)
+				RCheckBox powerSwitch = rows[i].Switch;
+				if (powerSwitch == null || powerSwitch.IsDisposed)
 				{
 					continue;
 				}
-				bool needApply = row.ColumnStyles.Count < 4
-					|| row.ColumnStyles[0].SizeType != SizeType.Absolute || Math.Abs(row.ColumnStyles[0].Width - col0Width) > 0.5f
-					|| row.ColumnStyles[1].SizeType != SizeType.Absolute || Math.Abs(row.ColumnStyles[1].Width - col1Width) > 0.5f
-					|| row.ColumnStyles[2].SizeType != SizeType.Absolute || row.ColumnStyles[2].Width > 0.5f
-					|| row.ColumnStyles[3].SizeType != SizeType.Absolute || row.ColumnStyles[3].Width > 0.5f;
-				if (needApply)
+				TableLayoutPanel row = powerSwitch.Parent as TableLayoutPanel;
+				if (row == null)
 				{
-					row.ColumnStyles[0] = new ColumnStyle(SizeType.Absolute, col0Width);
-					row.ColumnStyles[1] = new ColumnStyle(SizeType.Absolute, col1Width);
-					row.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, 0f);
-					row.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
-				}
-				row.PerformLayout();
-				int switchColumn = row.GetColumn(powerSwitch);
-				int switchX = powerSwitch.Location.X;
-				int rowWidth = row.ClientSize.Width;
-				string labelPercent = ((rowWidth > 0) ? (col0Width * 100.0 / rowWidth) : 0.0).ToString("0.#", CultureInfo.InvariantCulture);
-				string switchPercent = ((rowWidth > 0) ? (col1Width * 100.0 / rowWidth) : 0.0).ToString("0.#", CultureInfo.InvariantCulture);
-				string aligned;
-				string diffText;
-				if (keyboardSwitchX == int.MinValue)
-				{
-					aligned = "?";
-					diffText = "?";
-				}
-				else
-				{
-					int diff = switchX - keyboardSwitchX;
-					aligned = (diff == 0) ? "True" : "False";
-					diffText = diff.ToString(CultureInfo.InvariantCulture);
-				}
-				string keyboardSwitchXText = (keyboardSwitchX == int.MinValue) ? "?" : keyboardSwitchX.ToString(CultureInfo.InvariantCulture);
-				string message = $"[light] 行={rowLabel} · switchCol={switchColumn} · label={labelPercent}%"
-					+ $" · col1={switchPercent}%（宽 {col1Width}px）· switchX={switchX}"
-					+ $" · 键盘行switchX={keyboardSwitchXText} ⇒ 对齐={aligned}（x差={diffText}px）";
-				if (!_collapsedLightRowLayoutLogged.Contains(rowLabel) || aligned == "False")
-				{
-					Logger.WriteLineIfChanged("light-row-layout-" + rowLabel, message);
-					if (aligned != "False")
+					Control[] foundRows = Controls.Find(rows[i].RowName, true);
+					if (foundRows.Length > 0 && foundRows[0] is TableLayoutPanel foundRow)
 					{
-						_collapsedLightRowLayoutLogged.Add(rowLabel);
+						row = foundRow;
 					}
 				}
+				if (row == null || row.IsDisposed)
+				{
+					continue;
+				}
+				bool changed = false;
+				// ① 隐藏效果下拉（col2）与「编辑」按钮（col3）—— 每次同步确保（⛔ 只改 UI，不改开关逻辑）
+				ComboBox combo = rows[i].Combo;
+				if (combo != null && !combo.IsDisposed && (combo.Visible || combo.Enabled))
+				{
+					combo.Visible = false;
+					combo.Enabled = false;
+					changed = true;
+				}
+				foreach (Control child in row.Controls)
+				{
+					if (row.GetColumn(child) == 3 && child.Visible)
+					{
+						child.Visible = false;
+						changed = true;
+					}
+				}
+				// ② 开关钉在 col1（标签右侧）
+				int previousColumn = row.GetColumn(powerSwitch);
+				if (previousColumn != 1)
+				{
+					row.SetColumn(powerSwitch, 1);
+					Logger.WriteLine("[light] 宝龙达：" + rows[i].Label + " 行开关从 col" + previousColumn + " 移回 col1（标签右侧）");
+					changed = true;
+				}
+				// ③ 列宽 = 键盘行**实际像素列宽**（col0/col1），col2/col3 = 0
+				if (col0Width > 0 && col1Width >= 0)
+				{
+					if (ApplyBaolongdaLightRowWidths(row, col0Width, col1Width, force: false))
+					{
+						changed = true;
+					}
+				}
+				if (changed)
+				{
+					row.PerformLayout();
+				}
+				// 记录/更新（机主/后续排查用；同标签覆盖）
+				bool recorded = false;
+				for (int j = 0; j < _baolongdaCollapsedLightRows.Count; j++)
+				{
+					if (string.Equals(_baolongdaCollapsedLightRows[j].Label, rows[i].Label, StringComparison.Ordinal))
+					{
+						_baolongdaCollapsedLightRows[j] = (row, powerSwitch, rows[i].Label);
+						recorded = true;
+						break;
+					}
+				}
+				if (!recorded)
+				{
+					_baolongdaCollapsedLightRows.Add((row, powerSwitch, rows[i].Label));
+				}
+				// ④ ⭐ UI 审查：读**真实运行值**；不一致 ⇒ 标 FAIL 并继续尝试修正（最多 3 次）✅
+				AuditBaolongdaLightRowLayout(row, powerSwitch, rows[i].Label, keyboardRow, col0Width, col1Width);
 			}
+			// ⭐ 需求 4：顺带核对「更多开关」分区 —— 那边是 FlowLayoutPanel 分组（无隐藏列）⇒ 不受同一问题影响
+			Logger.WriteLineIfChanged("light-ui-audit-quick",
+				"[light][UI审查] 「更多开关」分区：FlowLayoutPanel 分组布局（无 TableLayoutPanel 隐藏列）⇒ 不受灯光行同一问题影响");
 		}
 		finally
 		{
@@ -17740,21 +17763,91 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 	}
 
-	/// <summary>⭐ 灯光行日志名（宝龙达非键盘灯行对齐日志用）✅。</summary>
-	private static string LightRowLogName(string rowName)
+	/// <summary>
+	/// ⭐ 把**键盘行的实际像素列宽**复制给非键盘灯行；<paramref name="force" /> = 即使数值相同也重设
+	/// （FAIL 重试时强制触发布局）✅。返回是否真的改动了列宽样式。
+	/// </summary>
+	private static bool ApplyBaolongdaLightRowWidths(TableLayoutPanel row, int col0Width, int col1Width, bool force)
 	{
-		switch (rowName)
+		if (row.ColumnStyles.Count < 4)
 		{
-		case "rowLightbar":
-			return "灯带";
-		case "rowLogo":
-			return "Logo";
-		case "rowHinge":
-			return "铰链";
-		case "rowSync":
-			return "同步";
-		default:
-			return rowName ?? "";
+			return false;
+		}
+		bool same = row.ColumnStyles[0].SizeType == SizeType.Absolute && Math.Abs(row.ColumnStyles[0].Width - col0Width) <= 0.5f
+			&& row.ColumnStyles[1].SizeType == SizeType.Absolute && Math.Abs(row.ColumnStyles[1].Width - col1Width) <= 0.5f
+			&& row.ColumnStyles[2].SizeType == SizeType.Absolute && row.ColumnStyles[2].Width <= 0.5f
+			&& row.ColumnStyles[3].SizeType == SizeType.Absolute && row.ColumnStyles[3].Width <= 0.5f;
+		if (same && !force)
+		{
+			return false;
+		}
+		row.ColumnStyles[0] = new ColumnStyle(SizeType.Absolute, col0Width);
+		row.ColumnStyles[1] = new ColumnStyle(SizeType.Absolute, col1Width);
+		row.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, 0f);
+		row.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
+		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：必须做代码级 UI 审查，别再"算了应该行"）：⭐ **读真实运行值**并打日志；
+	/// 若 <c>switchX != kbSwitchX</c> ⇒ 直接标 <c>FAIL</c>（默认日志级别可见）并**继续尝试修正**（最多 3 次）✅
+	/// <para>日志：<c>[light][UI审查] 行=Logo · col=1 · switchX=111 · kbSwitchX=111 · kb列宽=[111,50,283,56] · rowW=506 · kbRowW=506 · 列宽=[111,50,0,345] ⇒ 对齐=True（x差=0px）</c></para>
+	/// </summary>
+	private void AuditBaolongdaLightRowLayout(TableLayoutPanel row, RCheckBox powerSwitch, string rowLabel,
+		TableLayoutPanel keyboardRow, int col0Width, int col1Width)
+	{
+		for (int attempt = 1; attempt <= 3; attempt++)
+		{
+			int rowWidth = row.ClientSize.Width;
+			int keyboardSwitchX = _kbPowerSw?.Location.X ?? int.MinValue;
+			int switchColumn = row.GetColumn(powerSwitch);
+			int switchX = powerSwitch.Location.X;
+			if (rowWidth <= 0 || col0Width <= 0 || keyboardSwitchX == int.MinValue)
+			{
+				// 行还没真正布局（灯光组折叠 / 窗口未显示）⇒ ⛔ 不谎报 FAIL，等下一次刷新再审查
+				return;
+			}
+			int diff = switchX - keyboardSwitchX;
+			bool aligned = diff == 0 && switchColumn == 1;
+			int[] rowColumns = row.GetColumnWidths();
+			string columnsText = (rowColumns.Length > 0) ? ("[" + string.Join(",", rowColumns) + "]") : "?";
+			int keyboardRowWidth = keyboardRow?.ClientSize.Width ?? -1;
+			int[] keyboardColumns = (keyboardRow != null) ? keyboardRow.GetColumnWidths() : Array.Empty<int>();
+			string keyboardColumnsText = (keyboardColumns.Length > 0) ? ("[" + string.Join(",", keyboardColumns) + "]") : "?";
+			string message = $"[light][UI审查] 行={rowLabel} · col={switchColumn} · switchX={switchX}"
+				+ $" · kbSwitchX={keyboardSwitchX} · kb列宽={keyboardColumnsText} · rowW={rowWidth} · kbRowW={keyboardRowWidth} · 列宽={columnsText}"
+				+ $" ⇒ 对齐={(aligned ? "True" : "FAIL")}（x差={diff}px · 第 {attempt} 次）";
+			if (aligned)
+			{
+				Logger.WriteLineIfChanged("light-ui-audit-" + rowLabel, message);
+				return;
+			}
+			// ❌ 不一致 ⇒ ⛔ 不只打日志：列宽/列位没到位就强制重设后再读一次；
+			//    ⚠️ 若列宽已经等于键盘行像素宽仍偏 ⇒ 属于测量/边距问题，记一次 FAIL 后结束本轮（⛔ 不做无意义重排死循环）
+			bool widthsMatch = rowColumns.Length >= 2 && rowColumns[0] == col0Width && rowColumns[1] == col1Width;
+			bool columnFixed = switchColumn == 1;
+			if (columnFixed && widthsMatch)
+			{
+				if (Logger.TryMarkChanged("light-ui-audit-fail-" + rowLabel, message))
+				{
+					Logger.WriteError(message);
+				}
+				return;
+			}
+			if (switchColumn != 1)
+			{
+				row.SetColumn(powerSwitch, 1);
+			}
+			if (col0Width > 0)
+			{
+				ApplyBaolongdaLightRowWidths(row, col0Width, col1Width, force: true);
+			}
+			keyboardRow?.PerformLayout();
+			row.PerformLayout();
+			if (Logger.TryMarkChanged("light-ui-audit-fail-" + rowLabel, message))
+			{
+				Logger.WriteError(message);
+			}
 		}
 	}
 
@@ -18138,57 +18231,16 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	private void SyncLightRows()
 	{
 		MechrevoHw hw = Program.hw;
-		// ⭐⭐ 2026-10-19（机主：「Logo 灯的效果选择依旧不隐藏」）：
-		//   ⚠️ 原来只在**建行那一刻**按 `Program.hw?.UsesBaolongda` 隐藏一次；
-		//      而启动改懒加载后，建行时 hw 可能还没就绪 ⇒ 隐藏没生效（或之后又被显示）❌
-		//   ⭐ 现在每次同步灯光行都**重新按平台**设置一次显隐（幂等、只在值变化时写日志）✅
-		// ⭐⭐ 2026-10-19（机主：「Logo 那行的编辑按钮也隐藏」）：
-		//   ⚠️ 原来只在建行那一刻按 `Program.hw?.UsesBaolongda` 隐藏效果下拉/编辑按钮；
-		//      启动改懒加载后建行时 hw 可能为 null ⇒ 没隐藏 ❌
-		//   ⭐ 现在每次同步灯光行都重新应用一次（非键盘灯行：隐藏效果列 + 编辑按钮）✅
-		if (hw != null && hw.UsesBaolongda)
-		{
-			foreach (string lightRowName in new string[4] { "rowLightbar", "rowLogo", "rowHinge", "rowSync" })
-			{
-				Control[] foundRows = Controls.Find(lightRowName, true);
-				if (foundRows.Length == 0 || foundRows[0] is not TableLayoutPanel lightRow)
-				{
-					continue;
-				}
-				bool changedRow = false;
-				foreach (Control child in lightRow.Controls)
-				{
-					if (lightRow.GetColumn(child) == 3 && child.Visible)
-					{
-						child.Visible = false;
-						changedRow = true;
-					}
-				}
-				if (changedRow)
-				{
-					lightRow.ColumnStyles[0] = new ColumnStyle(SizeType.Percent, 80f);
-					lightRow.ColumnStyles[1] = new ColumnStyle(SizeType.Percent, 20f);
-					lightRow.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, 0f);
-					lightRow.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
-					Logger.WriteLineIfChanged("light-edit-btn-hidden-" + lightRowName,
-						"[light] 宝龙达：" + lightRowName + " 收掉效果列与「编辑」按钮（每次同步灯自行确保）");
-				}
-			}
-		}
-		if (_logoEffectCombo != null)
-		{
-			bool hideLogoEffect = hw != null && hw.UsesBaolongda;
-			if (_logoEffectCombo.Visible == hideLogoEffect || _logoEffectCombo.Enabled == hideLogoEffect)
-			{
-				_logoEffectCombo.Visible = !hideLogoEffect;
-				_logoEffectCombo.Enabled = !hideLogoEffect;
-				if (hideLogoEffect)
-				{
-					Logger.WriteLineIfChanged("light-logo-effect-hidden",
-						"[light] 宝龙达：Logo 灯只有开/关 ⇒ 已隐藏特效下拉（每次同步灯自行确保）");
-				}
-			}
-		}
+		// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关依旧跑到最右 —— 这次先做代码级 UI 审查）：
+		//   ⚠️ 前两次失效根因（与「Logo 特效下拉每次同步隐藏」同一个坑）：
+		//     1) 建行时 `Program.hw?.UsesBaolongda` 往往还是 false（启动懒加载 + 后端探测异步）
+		//        ⇒ 建行时的"收列 + 记录行"没发生；
+		//     2) 运行期老实现（下面这段）只在"编辑按钮可见"那一次写列宽，而且写的是 **80%/20%/0/0**
+		//        ⇒ 开关被推到最右 ❌（正是机主截图）
+		//   ⭐ 现在把「按平台收列 + 开关对齐 + [UI审查]」整体挪到
+		//      `ApplyBaolongdaLightRowLayout(hw)`：每次灯光同步都跑（RefreshDeviceCapabilities /
+		//      3 s 灯光轮询 / 「灯光」组展开 都会进这里），不再依赖建行时刻 ✅
+		ApplyBaolongdaLightRowLayout(hw);
 		// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」）：每次刷新灯光行时确保计时器与配置一致
 		//   （默认 0 = 关闭 ⇒ 不创建任何计时器、无额外检查开销；幂等）✅
 		Program.hw?.ApplyKeyboardAutoOffSetting();
