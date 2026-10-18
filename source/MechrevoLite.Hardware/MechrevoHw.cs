@@ -3405,6 +3405,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// ⭐ ④ 亮度（功能号 18）—— **只在变化时写**（改颜色时不再重写亮度 ✅）
 			//   ⚠️ 上限按代数：Gen40/50 = 4（原厂 Level_4）· 其余 = 3 —— 与 `BaolongdaProfile` 同一事实 ✅
 			byte level = (byte)Math.Clamp(brightness0to3, 0, BaolongdaProfile.BrightnessMax(kbGen));
+			// ⭐⭐ 2026-10-18（机主：「键盘灯打开得手动调一下亮度才能开」）：
+			//   ⚠️ 亮了但亮度=0 ⇒ 看起来就是"没开"；用户必须再拖一下亮度才有光 ❌
+			//   ⭐ 规则：**开灯状态下亮度不允许是 0**（0 等于关），最低给 1 ✅
+			//   ⚠️ 关灯（mode=0 / on=false）不受影响，仍写 0 ✅
+			bool wantOn = on && mode != 0;
+			if (wantOn && level == 0)
+			{
+				level = 1;
+				Logger.WriteLine("[kbd] 开灯时亮度为 0 ⇒ 自动抬到 1（否则表现为\"开了不亮\"，需再拖亮度）");
+			}
 			bool brightKnown = wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte curBright);
 			bool needBright = !brightKnown || curBright != level;
 			bool brightOk;
