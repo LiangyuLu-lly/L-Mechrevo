@@ -872,14 +872,17 @@ public class SettingsForm : RForm
 
 	private int _performanceRequest;
 
-	private readonly BrightnessCommitQueue _brightnessCommitQueue = new BrightnessCommitQueue((int value, CancellationToken token) => Task.Run(() =>
-	{
-		token.ThrowIfCancellationRequested();
-		ScreenBrightness.Set(value);
-	}, token), TimeSpan.FromMilliseconds(120L), (Exception ex) =>
-	{
-		Logger.WriteLine("Screen brightness update failed: " + ex.Message);
-	});
+	private readonly BrightnessCommitQueue _brightnessCommitQueue;
+
+	// ⭐⭐ 2026-10-19（机主：亮度调节有延迟 / 外部改亮度 LM 不同步）：
+	//   · `_brightnessMergedSubmits`：上一轮实际写之前合并了多少次拖动/输入（写日志用）；
+	//   · `_brightnessLastThrottleFlushTick`：拖动期的**节流写**时间戳（~120ms 合并一次）；
+	//   · `_brightnessReadInFlight`：只读回读的"在飞"标记（回读放到后台线程，⛔ 不阻塞 UI）。
+	private int _brightnessMergedSubmits;
+
+	private long _brightnessLastThrottleFlushTick;
+
+	private int _brightnessReadInFlight;
 
 	private readonly System.Windows.Forms.Timer _liquidCoolingStatusTimer = new System.Windows.Forms.Timer
 	{
@@ -2436,13 +2439,30 @@ public class SettingsForm : RForm
 				_lastBrightnessUi = DateTime.UtcNow;
 				if (Program.hw != null && !Program.UiAuditMode)
 				{
-					_brightnessCommitQueue.Submit(value);
+					RequestBrightnessWrite(value);
 				}
 			}
 		};
 		brightSlider.KeyUp += (object? _, KeyEventArgs _) =>
 		{
+			// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：松手/按键结束 ⇒ **补一次最终值**（立即写，不等防抖）
+			_brightnessLastThrottleFlushTick = 0;
 			_brightnessCommitQueue.Flush();
+		};
+		brightSlider.MouseUp += (object _, MouseEventArgs _) =>
+		{
+			// ⭐ 鼠标拖动松手同上（⛔ 不改滑块自身行为，只是把最终值立即补写一次）✅
+			_brightnessLastThrottleFlushTick = 0;
+			_brightnessCommitQueue.Flush();
+		};
+		brightSlider.MouseCaptureChanged += (object _, EventArgs _) =>
+		{
+			// ⭐ 在滑块外松手（捕获丢失）也算"松手"：补最终值 ✅
+			if (!brightSlider.Capture)
+			{
+				_brightnessLastThrottleFlushTick = 0;
+				_brightnessCommitQueue.Flush();
+			}
 		};
 		Label label2 = new Label
 		{
@@ -5570,6 +5590,12 @@ public class SettingsForm : RForm
 	{
 		BackColor = UiVisualStyle.Window;
 		InitializeComponent();
+		// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：写入改成**节流合并**（拖动期 ~120ms 一次 + 松手补最终值）；
+		//   写后回读在后台线程执行 ⇒ ⛔ 不阻塞 UI。日志：`[brightness] 写（节流合并 n 次）请求=… ⇒ 实际=…`
+		_brightnessCommitQueue = new BrightnessCommitQueue(WriteBrightnessValueAsync, TimeSpan.FromMilliseconds(120L), (Exception ex) =>
+		{
+			Logger.WriteLine("Screen brightness update failed: " + ex.Message);
+		});
 		labelVersion.Text = (Program.ReleaseLabel == Program.ReleaseVersion) ? Program.ReleaseLabel : Program.ReleaseVersion + " " + Program.ReleaseLabel;
 		InitTheme(setDPI: true);
 		Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
@@ -10361,8 +10387,10 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			return;
 		}
-		// 用户正在拖 / 刚拖过 3 s 内、或写入在飞 ⇒ 不拿回读值覆盖（与旧回读口径一致）
-		if (_brightnessCommitQueue.HasPendingOrRunning || (DateTime.UtcNow - _lastBrightnessUi).TotalSeconds < 3.0)
+		// ⭐⭐ 2026-10-19（机主：外部改亮度 LM 不同步 / 调节防回环）：
+		//   ⭐ 用户正在拖 / 刚写入 **2 秒内** / 还有写入在飞 ⇒ **跳过本次同步**（以用户输入为准）；
+		//      ⛔ 不写硬件、⛔ 不覆盖用户刚设的值 ✅
+		if (_brightnessCommitQueue.HasPendingOrRunning || (DateTime.UtcNow - _lastBrightnessUi).TotalSeconds < 2.0)
 		{
 			return;
 		}
@@ -10370,6 +10398,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		bool firstSync = _lastBrightnessSystemSyncTick == 0;
 		if (!force)
 		{
+			// ⭐ 复用**既有** `_displayStatusTimer`（3 s）的 tick，只在本页可见时执行；
+			//   ⭐ 读 WMI 有开销 ⇒ 节流到 ~5 s 一次（⛔ 不新增任何定时器）✅
 			if (!Visible)
 			{
 				return;
@@ -10380,11 +10410,81 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			}
 		}
 		_lastBrightnessSystemSyncTick = now;
-		bool ok = TryReadSystemBrightness(out int value, out string source, out string reason);
+		if (Interlocked.CompareExchange(ref _brightnessReadInFlight, 1, 0) != 0)
+		{
+			return;
+		}
+		// ⭐⭐ 2026-10-19（机主：回读校验不要阻塞 UI）：读 WMI 放**后台线程**，结果再回 UI 线程；
+		//   ⛔ 不用任何新定时器 —— 触发源仍是既有 tick / 打开页 / 显示器变化 ✅
+		Task.Run(() =>
+		{
+			bool ok;
+			int value;
+			string source;
+			string reason;
+			try
+			{
+				ok = TryReadSystemBrightness(out value, out source, out reason);
+			}
+			catch (Exception ex)
+			{
+				ok = false;
+				value = -1;
+				source = string.Empty;
+				reason = "读取线程异常：" + ex.GetType().Name + " " + ex.Message;
+			}
+			bool posted = false;
+			try
+			{
+				if (!IsDisposed && IsHandleCreated)
+				{
+					BeginInvoke((Action)(() =>
+					{
+						try
+						{
+							ApplyBrightnessReadResult(ok, value, source, reason, firstSync);
+						}
+						finally
+						{
+							Interlocked.Exchange(ref _brightnessReadInFlight, 0);
+						}
+					}));
+					posted = true;
+				}
+			}
+			catch (Exception ex2)
+			{
+				Logger.WriteLine("[brightness] 回读结果回主线程失败（已吞掉，不阻塞 UI）：" + ex2.Message);
+			}
+			finally
+			{
+				if (!posted)
+				{
+					Interlocked.Exchange(ref _brightnessReadInFlight, 0);
+				}
+			}
+		});
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：外部改亮度 LM 不同步）：⭐ 把**后台只读回读**的结果应用到 UI（主线程）✅。
+	/// <para>⚠️ 应用前再查一次"用户正在拖 / 刚写入 2 秒内" ⇒ 有就丢弃本次结果（⛔ 不与用户输入打架）。</para>
+	/// </summary>
+	private void ApplyBrightnessReadResult(bool ok, int value, string source, string reason, bool firstSync)
+	{
+		if (IsDisposed || _brightnessSlider == null || _brightnessValueLabel == null)
+		{
+			return;
+		}
+		if (_brightnessCommitQueue.HasPendingOrRunning || (DateTime.UtcNow - _lastBrightnessUi).TotalSeconds < 2.0)
+		{
+			return;
+		}
 		if (!ok)
 		{
 			_brightnessUnsupportedShown = true;
 			ApplyBrightnessVisualState();
+			BrightnessDiagnosticsState.NoteRead(ok: false, source, reason);
 			string failMsg = "[brightness] ⚠️ 读不到系统亮度（原因=" + reason + "）";
 			if (Logger.TryMarkChanged("brightness-read-fail", failMsg))
 			{
@@ -10392,7 +10492,9 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			}
 			return;
 		}
+		BrightnessDiagnosticsState.NoteRead(ok: true, source, string.Empty);
 		bool wasUnsupported = _brightnessUnsupportedShown || !_brightnessSlider.Enabled;
+		int previousUi = _brightnessSlider.Value;
 		_brightnessUnsupportedShown = false;
 		ApplyBrightnessVisualState();
 		bool changed = false;
@@ -10416,14 +10518,86 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			_syncingDisplay = prevSyncing;
 		}
-		if (changed || wasUnsupported || firstSync)
+		if (!(changed || wasUnsupported || firstSync))
 		{
-			string okMsg = "[brightness] 只读同步 ⇒ 系统值=" + value + "%（来源=" + source + "）· UI 已更新（未写硬件）";
-			if (Logger.TryMarkChanged("brightness-read-sync", okMsg))
-			{
-				Logger.WriteError(okMsg);
-			}
+			return;
 		}
+		string okMsg;
+		if (!firstSync && !wasUnsupported && changed && previousUi != value)
+		{
+			// ⭐ 机主要求的"外部变化"日志（挂既有刷新 tick 的低频校验发现的不一致）
+			okMsg = "[brightness] 外部变化同步 ⇒ 系统=" + value + "% → UI " + value + "%（未写入，来源=既有刷新 tick）";
+		}
+		else
+		{
+			okMsg = "[brightness] 只读同步 ⇒ 系统值=" + value + "%（来源=" + source + "）· UI 已更新（未写硬件）";
+		}
+		if (Logger.TryMarkChanged("brightness-read-sync", okMsg))
+		{
+			Logger.WriteError(okMsg);
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：⭐ **拖动期节流写**（~120ms 合并一次；首个输入立即写）。
+	/// <para>⚠️ 仍只在用户亲手拖动/点按时调用（`ValueChanged` 且 `_syncingDisplay == false`）；
+	/// 回读同步改 UI 时 `_syncingDisplay = true` ⇒ ⛔ 不会走到这里、⛔ 不会写硬件 ✅。</para>
+	/// </summary>
+	private void RequestBrightnessWrite(int value)
+	{
+		Interlocked.Increment(ref _brightnessMergedSubmits);
+		// ⭐ 先 Submit（记录最新值），再按节流窗口决定是否立即 Flush（= 真写）。
+		_brightnessCommitQueue.Submit(value);
+		long now = Environment.TickCount64;
+		if (_brightnessLastThrottleFlushTick == 0 || now - _brightnessLastThrottleFlushTick >= 120)
+		{
+			_brightnessLastThrottleFlushTick = now;
+			_brightnessCommitQueue.Flush();
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：亮度调节有延迟 / 回读校验不要阻塞 UI）：
+	/// ⭐ 实际写亮度（后台线程）—— 写后**异步回读**并落一行机主要求的日志 ✅。
+	/// <para>日志：`[brightness] 写（节流合并 n 次）请求=… ⇒ 实际=…`（默认级别可见）✅</para>
+	/// </summary>
+	private Task WriteBrightnessValueAsync(int requested, CancellationToken token)
+	{
+		return Task.Run(() =>
+		{
+			token.ThrowIfCancellationRequested();
+			int merged = Interlocked.Exchange(ref _brightnessMergedSubmits, 0);
+			if (merged <= 0)
+			{
+				merged = 1;
+			}
+			bool ok = ScreenBrightness.TrySet(requested);
+			int actual = -1;
+			try
+			{
+				// ⭐ 写后回读（后台线程，⛔ 不阻塞 UI）；WMI 生效可能有延迟 ⇒ 对不上就再等 60ms 读一次
+				if (ScreenBrightness.TryGet(out int readNow))
+				{
+					actual = readNow;
+				}
+				else
+				{
+					Thread.Sleep(60);
+					if (ScreenBrightness.TryGet(out int retry))
+					{
+						actual = retry;
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[brightness] 写后回读异常（已吞掉，不阻塞 UI）：" + ex.Message);
+			}
+			BrightnessDiagnosticsState.NoteWrite(ok, requested, actual);
+			string actualText = (actual >= 0) ? (actual + "%") : "读不到";
+			Logger.WriteError("[brightness] 写（节流合并 " + merged + " 次）请求=" + requested + "% ⇒ 实际=" + actualText
+				+ " · 写成功=" + ok + "（回读在后台线程，⛔ 不阻塞 UI）");
+		}, token);
 	}
 
 	/// <summary>
@@ -10514,6 +10688,20 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：界面刷新计时器关闭 UI 后应停止）：⭐ 可见性启停日志（去重，低调）✅。
+	/// <para>⚠️ 只记 `_displayStatusTimer` / `_quickSwitchStatusTimer` 两个**界面刷新** tick；
+	/// ⛔ 不涉及常驻传感器泵、风扇闭环、灯光自动关闭、强冷轮询等后台定时器（它们不受可见性影响）✅</para>
+	/// </summary>
+	private static void LogUiRefreshTimerLifecycle(bool visible)
+	{
+		string msg = "[ui] 刷新计时器随可见性启停 ⇒ Visible=" + (visible ? "true" : "false");
+		if (Logger.TryMarkChanged("ui-refresh-timer-lifecycle", msg))
+		{
+			Logger.WriteError(msg);
+		}
+	}
+
 	private void SettingsForm_VisibleChanged(object? sender, EventArgs e)
 	{
 		if (!Program.UiAuditMode)
@@ -10522,6 +10710,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			if (!IsDisposed)
 			{
 				_displayStatusTimer.Enabled = Visible;
+				// ⭐⭐ 2026-10-19（机主：界面刷新在关闭 UI 后应停止）：
+				//   ⭐ `_quickSwitchStatusTimer` 改成与 `_displayStatusTimer` **同款**随可见性启停；
+				//      ⛔ 不影响常驻传感器泵 / 风扇闭环 / 灯光自动关闭 / 强冷轮询等后台独立定时器 ✅
+				_quickSwitchStatusTimer.Enabled = Visible;
+				LogUiRefreshTimerLifecycle(Visible);
 			}
 			if (Visible)
 			{
@@ -13122,18 +13315,28 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			//     用户刚点过（宽限内）就不抢，宽限一过才按真值回拨（与 UpdateQuickSwitches 语义一致 ✅）。
 			//   ⚠️ **只在宝龙达启用**：GCU / 同方的灯光行继续保持"仅能力刷新时同步"的既有行为
 			//      （⛔ 不在本轮顺手改其它机型）✅
+			// ⭐⭐ 2026-10-19（机主：宝龙达专属轮询不能在 GCU/同方机器上空转）：
+			//   ⭐ 这一行是**周期任务门控**的唯一入口：`UsesBaolongda` 为假 ⇒ 连 `SyncLightRows()` 都不调用
+			//      （⛔ 不读宝龙达 WMI、⛔ 不刷宝龙达日志）✅
 			if ((hw?.UsesBaolongda ?? false) && (DateTime.Now - _lastQuickSwitchUi).TotalSeconds >= 12.0)
 			{
 				SyncLightRows();
 			}
 			if (hw != null && hw.IsConnected)
 			{
+				// ⚠️ 电池标题是**通用 UI**（GCU 机器也显示），不属于宝龙达专属轮询 ⇒ 保持原样 ✅
 				VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent());
 			}
 		};
 		if (!Program.UiAuditMode)
 		{
-			_quickSwitchStatusTimer.Start();
+			// ⭐⭐ 2026-10-19（机主：界面刷新在关闭 UI 后应停止）：
+			//   ⭐ 原来这里无条件 Start() ⇒ 隐藏到托盘后仍在跑（含 SyncLightRows/电池标题）
+			//   ⭐ 改为**随可见性启停**：可见才启动，隐藏由 `SettingsForm_VisibleChanged` 统一 Stop ✅
+			if (Visible)
+			{
+				_quickSwitchStatusTimer.Start();
+			}
 		}
 	}
 

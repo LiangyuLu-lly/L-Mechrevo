@@ -29,6 +29,8 @@ internal static class DiagnosticDisplayInfo
 			AppendVideoControllers(stringBuilder);
 			AppendMonitorEdid(stringBuilder);
 			AppendGcuRefresh(stringBuilder);
+			// ⭐⭐ 2026-10-19（机主：亮度调节延迟 / 外部变化不同步）：诊断包补「屏幕亮度」一节
+			AppendBrightnessState(stringBuilder);
 		}
 		catch (Exception ex)
 		{
@@ -333,6 +335,61 @@ internal static class DiagnosticDisplayInfo
 		{
 			sb.AppendLine("  该项读取失败（" + ex.Message + "）");
 		}
+	}
+
+	private static void AppendBrightnessState(StringBuilder sb)
+	{
+		sb.AppendLine("屏幕亮度（只读 · WMI 优先 / dxva2 备选）：");
+		try
+		{
+			// ⚠️ 本节**只读**：ScreenBrightness.TryGet / MonitorBrightness.TryGet 都不写硬件；
+			//    ⛔ 不调用 ScreenBrightness.Set（诊断包绝不能改用户亮度）。
+			bool wmiOk = ScreenBrightness.TryGet(out int wmi);
+			bool wmiCached = ScreenGateProbe.WmiBrightnessReadable();
+			bool dxOk = MonitorBrightness.TryGet(out int dx, out string dxReason);
+			string currentText;
+			string sourceText;
+			if (wmiOk)
+			{
+				currentText = wmi + "%";
+				sourceText = "WMI WmiMonitorBrightness";
+			}
+			else if (dxOk)
+			{
+				currentText = dx + "%";
+				sourceText = "Win32 dxva2 GetMonitorBrightness";
+			}
+			else
+			{
+				currentText = "读不到";
+				sourceText = "无（WMI 读不到、dxva2：" + dxReason + "）";
+			}
+			sb.AppendLine("  当前亮度=" + currentText + "（来源=" + sourceText + "）");
+			sb.AppendLine("  软件调亮度支持=" + ((wmiOk || wmiCached) ? "是（WMI WmiMonitorBrightnessMethods 写入可用）" : "否（WmiMonitorBrightness 读不到 ⇒ 设置页滑块置灰并标注）")
+				+ " · WMI 本次可读=" + (wmiOk ? "是" : "否") + " · WMI 探测缓存可读=" + (wmiCached ? "是" : "否") + " · dxva2 可读=" + (dxOk ? "是" : "否"));
+			sb.AppendLine("  最近一次只读同步：" + FmtBrightnessTime(BrightnessDiagnosticsState.LastReadUtc)
+				+ " · 成功=" + (BrightnessDiagnosticsState.LastReadOk ? "是" : "否")
+				+ " · 来源=" + EmptyDash(BrightnessDiagnosticsState.LastReadSource)
+				+ " · 原因=" + EmptyDash(BrightnessDiagnosticsState.LastReadReason));
+			sb.AppendLine("  最近一次写：" + FmtBrightnessTime(BrightnessDiagnosticsState.LastWriteUtc)
+				+ " · 写成功=" + (BrightnessDiagnosticsState.LastWriteOk ? "是" : "否")
+				+ " · 请求=" + ((BrightnessDiagnosticsState.LastWriteRequested >= 0) ? (BrightnessDiagnosticsState.LastWriteRequested + "%") : "—")
+				+ " ⇒ 回读=" + ((BrightnessDiagnosticsState.LastWriteApplied >= 0) ? (BrightnessDiagnosticsState.LastWriteApplied + "%") : "读不到/未发生"));
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("  该项读取失败（" + ex.Message + "）");
+		}
+	}
+
+	private static string FmtBrightnessTime(DateTime utc)
+	{
+		return (utc == DateTime.MinValue) ? "—（本次进程尚未发生）" : utc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+	}
+
+	private static string EmptyDash(string text)
+	{
+		return string.IsNullOrWhiteSpace(text) ? "—" : text;
 	}
 
 	private static string DecodeUshortString(object? value)
