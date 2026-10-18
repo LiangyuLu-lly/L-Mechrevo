@@ -2385,7 +2385,13 @@ internal static class Program
 					}
 				}
 			}
-			bool requested = on && (hasSavedSettings ? settings.PowerOn : (flag == true));
+			// ⭐⭐ 2026-10-19（机主：启动自动点亮 Logo 灯）：⭐ 宝龙达下只有**用户显式点过开关**
+			//   （`PowerExplicit`）才在启动/恢复时点亮；旧配置没有该标记 ⇒ ⛔ 不点灯 ✅
+			//   ⚠️ 非宝龙达（GCU/同方）保持原判据，逐位不变 ✅
+			bool savedPowerOn = hasSavedSettings
+				? (settings.PowerOn && (settings.PowerExplicit || !(Program.hw?.UsesBaolongda ?? false)))
+				: (flag == true);
+			bool requested = on && savedPowerOn;
 			if (LightCompatibilitySwitches.LightbarDedupEnabled && requested && dedupeSuppressed[i] && !lastResort && i > 0)
 			{
 				continue;
