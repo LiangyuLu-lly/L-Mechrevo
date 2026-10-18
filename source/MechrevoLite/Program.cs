@@ -141,6 +141,12 @@ internal static class Program
 
 	private static int _lightingIdleSuspended;
 
+	/// <summary>
+	/// ⭐ 2026-10-19（平台互斥）：同方/GCU 的「自动关灯：已启用」日志只打一次（去重；关闭后重置）。
+	/// <para>⚠️ 宝龙达不使用本计时器（走 `MechrevoHw` 的 5s tick）⇒ 平台判定单一来源 `UsesBaolongda` ✅。</para>
+	/// </summary>
+	private static int _lightingAutoOffEnableLogged;
+
 	private static int _keyboardPowerTemporarilySuspended;
 
 	private static int _lightingRestoreRequestId;
@@ -1773,12 +1779,31 @@ internal static class Program
 
 	private static void StartLightingIdleMonitor()
 	{
-		if (!UiAuditMode && _lightingIdleTimer == null)
+		// ⭐⭐ 2026-10-19（平台互斥）：宝龙达**只用** `MechrevoHw` 的 5s 软件计时；
+		//   ⛔ 不再启动/保留同方厂商空闲计时器（平台判定单一来源 `UsesBaolongda`）✅
+		//   ⚠️ 启动时后端可能还没探测完 ⇒ 下面的 tick 里还会再判一次并自停（见 EvaluateLightingIdleAsync）✅
+		if (!UiAuditMode && _lightingIdleTimer == null && hw?.UsesBaolongda != true)
 		{
 			_lightingIdleTimer = new System.Threading.Timer((object? _) =>
 			{
 				_ = EvaluateLightingIdleAsync();
 			}, null, TimeSpan.FromSeconds(2L), TimeSpan.FromSeconds(2L));
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-19（自动关灯**平台互斥**）：宝龙达检测到时立刻调用 ——
+	/// 停掉同方/GCU 的 2s 空闲计时器；若它已把灯按"空闲"熄掉过（`_lightingIdleSuspended`），恢复一次并清标记 ✅。
+	/// <para>⚠️ 保证同一进程内**只有一个平台**的自动关灯计时器在动作（平台判定单一来源 `UsesBaolongda`）✅。</para>
+	/// </summary>
+	internal static void StopVendorLightingIdleMonitorForBaolongda()
+	{
+		System.Threading.Timer vendorTimer = Interlocked.Exchange(ref _lightingIdleTimer, null);
+		vendorTimer?.Dispose();
+		Interlocked.Exchange(ref _lightingAutoOffEnableLogged, 0);
+		if (Interlocked.Exchange(ref _lightingIdleSuspended, 0) != 0)
+		{
+			_ = RestoreLightingWithRetryAsync(force: true);
 		}
 	}
 
@@ -2002,7 +2027,44 @@ internal static class Program
 
 	internal static Task<LightingIdleAction> EvaluateLightingIdleAsync()
 	{
-		return EvaluateLightingIdleAsync(AppConfig.Get("lighting_idle_seconds", Math.Max(0, rgb?.CloseTimerMinutes ?? 0) * 60), Math.Max(0L, (long)NativeMethods.GetIdleTime().TotalMilliseconds));
+		int timeoutSeconds = AppConfig.Get("lighting_idle_seconds", Math.Max(0, rgb?.CloseTimerMinutes ?? 0) * 60);
+		// ⭐⭐ 2026-10-19（平台互斥 · 平台判定**单一来源** `UsesBaolongda`）：
+		//   宝龙达**只用** `MechrevoHw` 的 5s 软件计时 ⇒ ⛔ 同方/GCU 这条空闲计时器**自停**，
+		//   保证同一时刻只有一个平台的自动关灯计时器在动作（不会两个计时器同时生效）✅
+		if (hw?.UsesBaolongda == true)
+		{
+			StopVendorLightingIdleMonitorForBaolongda();
+			return Task.FromResult(LightingIdleAction.None);
+		}
+		// ⭐ 同方/GCU：原有**软件计时**（`lighting_idle_seconds` + GetIdleTime + ReconcileLightingPowerAsync）✅
+		//   启用时记一行（去重；关闭后重置）—— 注明平台与来源，机主可据此判断是哪套在计时 ✅
+		if (timeoutSeconds <= 0)
+		{
+			Interlocked.Exchange(ref _lightingAutoOffEnableLogged, 0);
+		}
+		else if (Interlocked.Exchange(ref _lightingAutoOffEnableLogged, 1) == 0)
+		{
+			Logger.WriteError("[light] 自动关灯：已启用（" + DescribeAutoOffSeconds(timeoutSeconds) + " · 软件计时 · 平台=同方/GCU）");
+		}
+		return EvaluateLightingIdleAsync(timeoutSeconds, Math.Max(0L, (long)NativeMethods.GetIdleTime().TotalMilliseconds));
+	}
+
+	/// <summary>⭐ 2026-10-19：自动关灯日志用的人读时长（10 秒 / N 分钟 / N 小时）✅。</summary>
+	private static string DescribeAutoOffSeconds(int seconds)
+	{
+		if (seconds == 10)
+		{
+			return "10 秒";
+		}
+		if (seconds >= 3600 && seconds % 3600 == 0)
+		{
+			return (seconds / 3600) + " 小时";
+		}
+		if (seconds % 60 == 0)
+		{
+			return (seconds / 60) + " 分钟";
+		}
+		return seconds + " 秒";
 	}
 
 	internal static async Task<LightingIdleAction> EvaluateLightingIdleAsync(int timeoutSeconds, long idleMilliseconds)

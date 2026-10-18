@@ -2784,6 +2784,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private async Task ApplyLegacyBackendAsync(LegacyMifsWmi legacy)
 	{
 		_activeBackend = MechrevoBackendKind.LegacyMifs;
+		// ⭐⭐ 2026-10-19（机主：宝龙达专属周期任务不能在 GCU/同方机器上空转）：
+		//   ⭐ 启动时**只打一行**（去重）说明本机是"非宝龙达 ⇒ 这些周期任务全部跳过"✅
+		LogNonBaolongdaPeriodicGateOnce("LegacyMifs");
 		// ⚠️ 最小能力集：老机型没有 GCU 那套 ItemSupport，凡"靠上报才知道"的能力一律保持 false
 		// ⇒ 风扇曲线/灯效/液冷/校色等页签照旧判"不支持"（⛔ 不假装可写）。对照 A-22 第 5 条。
 		Capabilities = new MechrevoDeviceCapabilities
@@ -2799,15 +2802,18 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_legacyTimer = new Timer(delegate
 		{
 			_ = RefreshLegacyModeAsync();
-				// ⭐⭐ 2026-10-17（风扇曲线接入 · 补漏）：这个 3s 定时器原来**只刷模式** ⚠️
-				//   ⇒ 软件闭环不周期跑 = 曲线存完就不动了 ❌
-				//   ⇒ 现在把「传感器刷新 + 开关状态 + 曲线步」都挂上来 ✅
-				//   ⚠️ 顺序：先刷传感器（曲线要读刚更新的 CpuTemp/GpuTemp）⇒ 再跑曲线 ✅
-				//   ⚠️ 曲线在"未启用 / 非宝龙达 / 通道未确认"时自己直接返回，⛔ 不写任何字节 ✅
-				//   ⚠️ 曲线异常已被内部吞掉 ⇒ ⛔ 不会拖垮定时器 ✅
+			// ⭐⭐ 2026-10-19（机主：宝龙达专属轮询不能在 GCU/同方机器上空转）：
+			//   ⭐ 本 3 s tick 在**非宝龙达**分支里也会走到（老同方/无 GCU 的 legacy 后端）——
+			//     旧实现每 3 s 都**调用**这 3 个宝龙达方法（它们内部再 `_baolongda == null` 早退，
+			//     但仍是纯空转调用，其中 `ApplyBaolongdaFanCurveStep` 还会打"未验证"日志 ⚠️）
+			//   ⭐ 现在用**单一判据** `UsesBaolongda` 直接不调用 ⇒ 非宝龙达零开销、零日志 ✅
+			//   ⚠️ GCU / 同方侧行为逐位不变（本来就走不到宝龙达写路径）✅
+			if (UsesBaolongda)
+			{
 				RefreshBaolongdaSensors();
 				RefreshBaolongdaSwitchStates();
 				ApplyBaolongdaFanCurveStep();
+			}
 		}, null, LegacyRefreshIntervalMs, LegacyRefreshIntervalMs);
 		await RefreshLegacyModeAsync().ConfigureAwait(continueOnCapturedContext: false);
 		RaiseIsolated(CapabilitiesChanged, "CapabilitiesChanged");
@@ -4481,7 +4487,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		if (Interlocked.Exchange(ref _kbdAutoOffEnabledLogged, 1) == 0)
 		{
-			Logger.WriteError("[light] 自动关灯：已启用（" + DescribeKeyboardAutoOffSeconds(seconds) + "）");
+			Logger.WriteError("[light] 自动关灯：已启用（" + DescribeKeyboardAutoOffSeconds(seconds) + " · 软件计时 · 平台=宝龙达）");
 		}
 	}
 
@@ -6626,6 +6632,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private async Task ApplyBaolongdaBackendAsync(BaolongdaBackend backend)
 	{
 		_activeBackend = MechrevoBackendKind.Baolongda;
+		// ⭐⭐ 2026-10-19（自动关灯平台互斥）：宝龙达只用本类的 5s 软件计时
+		//   ⇒ 立刻停掉 Program 里同方/GCU 的 2s 空闲计时器（若已建/已动作则恢复），
+		//   保证同一进程内不会有两个自动关灯计时器同时生效（平台判定单一来源 `UsesBaolongda`）✅
+		Program.StopVendorLightingIdleMonitorForBaolongda();
 		// ⭐⭐ 2026-10-16：⭐ 能力位**只认一个来源** —— <see cref="BaolongdaBackend.BuildCapabilities" /> ✅
 		//    ⚠️ 起因：⭐ 我先前在两个地方各写了一份（⭐ 这里 ＋ ⭐ `BuildCapabilities`）⇒ ⭐ **必然有一天只改一处** ⚠️
 		//    ⇒ ⭐ 现在统一走 `BuildCapabilities()` ✅（⭐ 与 GCU 那条支的风格一致：⭐
@@ -7021,6 +7031,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// 没探到老接口（或 GCU 服务已装、直接优先 GCU）⇒ 落到 GCU（默认后端）。
 				// ⛔ 这一档不碰任何既有字段：行为与改动前逐项一致。
 				_activeBackend = MechrevoBackendKind.Gcu;
+				// ⭐⭐ 2026-10-19（机主：宝龙达专属周期任务不能在 GCU 机器上空转）：启动只打一行"跳过 N 项"✅
+				LogNonBaolongdaPeriodicGateOnce("Gcu");
 				// ⭐ 2026-10-15：**两条分支都要留痕**（原来只有老接口那条有日志）——诊断「GCU 连不上」时必须能
 				// 区分"被误判成老机型"与"确实走的是 GCU 通路、连不上另有原因"。
 				// 注：级别过滤下（默认 error）本行不进日志，用户可见的信号是顶部状态：非 GCU 后端显示「● 已就绪」。
@@ -7384,6 +7396,21 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_clientIdFallbackCount++;
 		Logger.WriteLine($"mqtt clientId 回退: {text2} -> {text} (原因: {reason})");
 		return true;
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：宝龙达专属功能/轮询不能在同方（GCU）机器上跑）：
+	/// ⭐ **周期任务平台门控**的启动留痕 —— 非宝龙达机器只打**一行**（去重），说明跳过了哪些宝龙达周期任务 ✅。
+	/// <para>⚠️ 纯日志：⛔ 不改变任何行为；`UsesBaolongda` 才是唯一门控判据（⛔ 不用板号猜测）✅。</para>
+	/// </summary>
+	private static void LogNonBaolongdaPeriodicGateOnce(string backend)
+	{
+		string msg = "[gate] 非宝龙达（backend=" + backend + "）⇒ 跳过 6 项宝龙达周期任务"
+			+ "（传感器回读 / 开关状态回读 / 风扇闸门只读验证 / 软件闭环+强冷轮询 / 灯光自动关闭计时器 / 软件彩虹刷色）";
+		if (Logger.TryMarkChanged("non-baolongda-periodic-gate", msg))
+		{
+			Logger.WriteError(msg);
+		}
 	}
 
 	internal int NotifyConnectionReady()
