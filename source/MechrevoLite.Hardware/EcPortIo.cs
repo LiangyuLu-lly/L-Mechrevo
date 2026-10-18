@@ -668,6 +668,23 @@ internal static class EcPortIo
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主实测 bug）：⭐ 触发寄存器 `0x8150` 是**自清零/脉冲型** ——
+	/// 写入 `0x10` 后 EC 立即执行并清回 `0x00` ⇒ ⛔ **不能校验回读==0x10**（参考实现是 write → poll until 0）。
+	/// <para>⭐ 本方法只要求**写入调用成功**；<paramref name="readBack" /> 仅作诊断回读（可能是 0）。</para>
+	/// </summary>
+	internal static bool TryWriteBatteryTriggerPulse(out int readBack)
+	{
+		readBack = -1;
+		if (!TryWriteByte(BatteryTriggerRegister, 0x10))
+		{
+			return false;
+		}
+		// ⭐ 仅诊断回读：自清零寄存器，写完立刻读通常就是 0x00（⛔ 不据此判失败）✅
+		TryReadByteStable(BatteryTriggerRegister, out readBack, out _);
+		return true;
+	}
+
+	/// <summary>
 	/// ⭐⭐ 2026-10-18（机主批准 · **0x81 写实验**）：⭐ ACPI 标准空间写（WR_EC=`0x81` · **8 位地址**）——
 	/// 每步 `WaitIbfClear` + 记录 0x66 状态位（IBF/OBF）✅。
 	/// <para>⛔ 严格限制：**只允许 `reg == 0x60`**（`0x1060` 的低字节）做**一次**实验；

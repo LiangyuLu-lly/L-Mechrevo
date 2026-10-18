@@ -154,19 +154,19 @@ internal static class BatteryLimitWriter
 				detail = log + "⛔ 触发前 0x8150=" + Fmt(triggerBefore) + " ≠ 0 ⇒ 不触发";
 				return false;
 			}
-			if (!WriteVerified(EcPortIo.BatteryTriggerRegister, 0x10, "0x8150=0x10(触发)", log))
+			if (!WriteTriggerPulse(log))
 			{
 				detail = log.ToString();
 				return false;
 			}
 
-			log.AppendLine("③ 轮询 0x8150 回 0（≤" + TimeoutMs + " ms）");
+			log.AppendLine("③ 轮询 0x8150 回 0（≤" + TimeoutMs + " ms；⭐ 触发寄存器自清零，不校验回读==0x10）");
 			if (!WaitTriggerDone(log))
 			{
 				detail = log.ToString();
 				return false;
 			}
-			log.AppendLine("④ 校验 0x8152==0x55 且 0x83C0==0x48（+ 常驻阈值）");
+			log.AppendLine("④ 结果态校验（成功判据）：0x83C0==0x48 且 0x83A1==high 且 0x83A2==low 且 0x8152==0x55");
 			bool resultOk = ReadEc(ResultRegister, out int result) && result == 0x55;
 			bool modeOk = ReadEc(ModeRegister, out int modeAfter) && modeAfter == ModeActive;
 			bool highAfterOk = ReadEc(HighRegister, out int highAfter);
@@ -249,7 +249,7 @@ internal static class BatteryLimitWriter
 			log.AppendLine("⛔ 触发前 0x8150=" + Fmt(triggerBefore) + " ≠ 0 ⇒ 不触发");
 			return false;
 		}
-		if (!WriteVerified(EcPortIo.BatteryTriggerRegister, 0x10, "0x8150=0x10(触发)", log))
+		if (!WriteTriggerPulse(log))
 		{
 			return false;
 		}
@@ -288,6 +288,15 @@ internal static class BatteryLimitWriter
 		}
 		log.AppendLine("⛔ 等待 0x8150 回 0 超时（最后=" + Fmt(last) + "，≤" + TimeoutMs + " ms）⇒ 不重试");
 		return false;
+	}
+
+	private static bool WriteTriggerPulse(StringBuilder log)
+	{
+		bool ok = EcPortIo.TryWriteBatteryTriggerPulse(out int readBack);
+		log.AppendLine("写 0x8150=0x10(触发) ⇒ "
+			+ (ok ? "已发送（自清零寄存器，不校验回读）" : "写入调用失败")
+			+ " · 立即回读=" + Fmt(readBack));
+		return ok;
 	}
 
 	private static bool WriteVerified(int address, int value, string label, StringBuilder log)
