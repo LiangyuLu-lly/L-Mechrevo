@@ -107,18 +107,20 @@ internal sealed class BatteryLimitPanel : Panel
 
 		_applyButton = new RButton
 		{
-			// ⭐ 2026-10-19（机主：应用按钮太大被裁）：⭐ **固定逻辑尺寸**（高 28；宽 = 文本宽 + 内边距，
-			//   夹在 96~110）—— ⛔ AutoSize、⛔ Dock=Fill 拉伸 ✅
+			// ⭐ 2026-10-19（机主：应用按钮裁切）：⭐ **固定逻辑尺寸 88×24**，⛔ AutoSize / ⛔ Dock=Fill ✅
 			AutoSize = false,
 			Dock = DockStyle.None,
-			Anchor = AnchorStyles.Right,
 			Text = Strings.BatteryLimitSaveThreshold,
-			// ⭐ 2026-10-19（机主：按钮四边被裁）：⭐ 固定 **88×24**（行高 24+上下 4+2=30），四边留 2~4px ✅
-			Size = new Size(D(88), D(24)),
-			Padding = new Padding(D(6), D(2), D(6), D(2)),
+			// ⭐ 2026-10-19（机主：125/150% 下仍裁）：⭐ 固定 88×24；行高按 **ceil(按钮)+ceil(上)+ceil(下)+D(3)**
+			//   计算，任何 DPI 下下方至少 3 设备像素；按钮整体上移 1px（Margin.Top=D(1)）✅
+			Size = new Size(ScaleCeil(88), ScaleCeil(24)),
+			Padding = new Padding(D(4), D(1), D(4), D(1)),
 			BorderRadius = D(4),
-			Margin = new Padding(D(4), D(2), 0, D(2))
+			Margin = new Padding(D(2), ScaleCeil(1), 0, ScaleCeil(1)),
+			Anchor = AnchorStyles.Top | AnchorStyles.Right
 		};
+		_applyButton.Font = UiVisualStyle.Font(8f);
+		_applyButton.AutoEllipsis = false;
 		_applyButton.Click += ApplyButton_Click;
 
 		_allowInitialDischargeBox = new RCheckBox
@@ -459,6 +461,12 @@ internal sealed class BatteryLimitPanel : Panel
 		_highBox.Enabled = !busy;
 	}
 
+	/// <summary>⭐ DPI 取整向上（DPI 缩放后 ceil）—— 用于按钮高/行高，避免 125/150% 下向下取整吃余量 ✅</summary>
+	private int ScaleCeil(int logical)
+	{
+		return (int)Math.Ceiling(logical * (DeviceDpi / 96.0));
+	}
+
 	private int D(int logical)
 	{
 		return ResponsiveLayout.LogicalToDevice(this, logical);
@@ -509,8 +517,11 @@ internal sealed class BatteryLimitPanel : Panel
 			Size switchPreferred = _enableBox.GetPreferredSize(Size.Empty);
 			// ⭐ 2026-10-19（预览工具：按钮溢出到下一行）：⭐ 行高必须 ≥ 按钮实际高度 + 上下 margin；
 			//   ⛔ 不再用 PreferredSize（固定 Size 时它可能小于实际 Height）✅
-			int buttonHeight = Math.Max(buttonPreferred.Height, _applyButton.Height + _applyButton.Margin.Vertical) + D(2);
-			int rowHeight = Math.Max(buttonHeight, switchPreferred.Height + D(4));
+			// ⭐ 机主要求：行高 = ceil(按钮高) + ceil(上 margin) + ceil(下 margin) + D(3)（留 3 设备像素）✅
+			int scaledButtonHeight = ScaleCeil(24);
+			int marginTop = ScaleCeil(1);
+			int marginBottom = ScaleCeil(1);
+			int rowHeight = Math.Max(scaledButtonHeight + marginTop + marginBottom + D(3), switchPreferred.Height + D(4));
 			if (_grid.RowStyles.Count > 1)
 			{
 				if ((int)_grid.RowStyles[1].Height != rowHeight)
@@ -606,10 +617,11 @@ internal sealed class BatteryLimitPanel : Panel
 			int fitRowHeight = _grid.RowStyles.Count > 1 ? (int)_grid.RowStyles[1].Height : 0;
 			int bottomGap = fitRowHeight - (_applyButton.Bottom + _applyButton.Margin.Bottom);
 			int leftGap = _applyButton.Left - _applyButton.Margin.Left;
-			bool fit = _applyButton.Dock != DockStyle.Fill && bottomGap >= 0 && leftGap >= 2;
-			string fitMessage = "[ui-fit] 按钮=保存阈值 · 控件=" + _applyButton.Bounds
-				+ " · 所在行高=" + fitRowHeight + " · 父Padding=" + (_applyButton.Parent?.Padding.ToString() ?? "null")
-				+ " · 下边余量=" + bottomGap + " · 左边余量=" + leftGap + " ⇒ 裁切=" + !fit;
+			int dpiPercent = (int)Math.Round(DeviceDpi / 96.0 * 100.0);
+			bool fit = _applyButton.Dock != DockStyle.Fill && bottomGap >= 3 && leftGap >= 2;
+			string fitMessage = "[ui-fit] 按钮=保存阈值 · dpi=" + dpiPercent + "% · size=" + _applyButton.Width + "x" + _applyButton.Height
+				+ " · 行高=" + fitRowHeight + " · 下边余量(设备px)=" + bottomGap + " · 左边余量=" + leftGap
+				+ " ⇒ 裁切=" + !fit;
 			Logger.WriteLineIfChanged("ui-fit-save-button-" + stage, fitMessage);
 			if (!fit)
 			{
