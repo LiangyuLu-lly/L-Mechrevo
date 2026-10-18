@@ -94,6 +94,7 @@ has source in this repo; they are credited as protocol references only.
 | tomups/watercooler-manager | https://github.com/tomups/watercooler-manager | GPL-3.0 | BLE liquid-cooler GATT layout. The shipped notice prints a **broken URL** (`https://github.com/` — no repo path). |
 | BetterRGB ("Copyright (c) 2026 TheYamo", MIT per the notice) | — | MIT per our own notice | ⚠️ **Unverifiable.** A GitHub search for `BetterRGB in:name` returns `ZavierChen/BetterRGB-ITE8291-Adaptive` (MIT), `imsudip/betterrgb` (no licence) and `Erdletheterdle/BetterRGB-Profiles` (no licence) — **no repository owned by "TheYamo"**. The MIT text is reproduced in our notice, so the obligation is met if the claim is accurate; the URL/provenance needs a human to confirm. |
 | IYATT-yx/NullSignal | https://github.com/IYATT-yx/NullSignal | MIT | 2026-10-11 (screen-blank rework): the virtual-display blank **approach/flow** (usbmmidd driver + `displayswitch /external` + mouse-move restore) was re-implemented in `source\MechrevoLite.Display\VirtualDisplayBlank.cs` — reference only, **no Python code copied**. Listed in the in-app window under *References*. |
+| Zcodeoooo/JiaoLong16Pro-Battery-threshold | https://github.com/Zcodeoooo/JiaoLong16Pro-Battery-threshold | No LICENSE file in the repo | 2026-10-18 charge threshold: EC register semantics (`0x83A1`/`0x83A2`/`0x83C0`, mailbox `0x8150`-`0x8154`) and enable/disable sequence. **Protocol facts only, no code copied.** |
 
 ---
 

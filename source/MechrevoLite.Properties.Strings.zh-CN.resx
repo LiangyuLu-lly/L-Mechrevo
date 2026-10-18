@@ -5417,7 +5417,10 @@
     <data name="AboutLicensesIntro" xml:space="preserve">
       <value>L-Mechrevo 是自由软件，以 GNU 通用公共许可证第 3 版（GPL-3.0-only）分发。本程序包含派生自下列项目的代码，并内嵌了一个第三方二进制模块。完整许可文本位于程序目录下的 LICENSES 文件夹里（LICENSE / THIRD_PARTY_NOTICES.txt 也在其中）。</value>
     </data>
-    <data name="AboutThanksHeading" xml:space="preserve">
+    <data name="AboutLicensesUseBatteryThreshold" xml:space="preserve">
+    <value>2026-10-18 充电阈值：EC 寄存器语义与命令时序参考（0x83A1/0x83A2/0x83C0、0x8150~0x8154），仅取协议事实，未复制代码。该仓库未附 LICENSE 文件，故仅作事实参考。</value>
+  </data>
+  <data name="AboutThanksHeading" xml:space="preserve">
     <value>鸣谢（真机测试协助）</value>
   </data>
   <data name="AboutThanksBody" xml:space="preserve">

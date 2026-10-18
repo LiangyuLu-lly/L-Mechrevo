@@ -68,7 +68,9 @@ public class AboutLicensesForm : RForm
 	// 2026-10-10（限充门控持久化 · 用户要求「UI 层标明源码作者」）：MIT 移植实现，放本组末尾。
 	new Entry("Leo-stro/mechrevo-charge-limit", "MIT", "https://github.com/Leo-stro/mechrevo-charge-limit", Strings.AboutLicensesUseMechrevoChargeLimit),
 	// 2026-10-11（息屏改造 · 用户要求 UI 层鸣谢）：息屏（不睡眠）的虚拟显示器方案参考实现，MIT，放本组末尾。
-	new Entry("IYATT-yx/NullSignal", "MIT", "https://github.com/IYATT-yx/NullSignal", Strings.AboutLicensesUseNullSignal)
+	new Entry("IYATT-yx/NullSignal", "MIT", "https://github.com/IYATT-yx/NullSignal", Strings.AboutLicensesUseNullSignal),
+		// 2026-10-18 本次改动新增的协议参考（未复制代码）
+		new Entry("Zcodeoooo/JiaoLong16Pro-Battery-threshold", "无 LICENSE（协议事实参考）", "https://github.com/Zcodeoooo/JiaoLong16Pro-Battery-threshold", Strings.AboutLicensesUseBatteryThreshold),
 	};
 
 	public AboutLicensesForm()

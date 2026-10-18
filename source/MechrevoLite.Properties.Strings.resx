@@ -5437,7 +5437,10 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
     <data name="AboutLicensesIntro" xml:space="preserve">
       <value>L-Mechrevo is free software, distributed under the GNU General Public License version 3 only. It contains code derived from the projects below, and it ships one third-party binary module. The full licence texts are in the LICENSES folder next to the program (LICENSE / THIRD_PARTY_NOTICES.txt are in there too).</value>
     </data>
-    <data name="AboutThanksHeading" xml:space="preserve">
+    <data name="AboutLicensesUseBatteryThreshold" xml:space="preserve">
+    <value>2026-10-18 charge threshold: EC register semantics and command sequence reference (0x83A1/0x83A2/0x83C0, 0x8150-0x8154). Protocol facts only, no code copied. The repository ships no LICENSE file, so it is used as a factual reference only.</value>
+  </data>
+  <data name="AboutThanksHeading" xml:space="preserve">
     <value>Acknowledgements (real-device testing)</value>
   </data>
   <data name="AboutThanksBody" xml:space="preserve">
