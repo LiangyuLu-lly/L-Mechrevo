@@ -572,6 +572,14 @@ internal static FontFamily FontFamilyOrDefault()
 
 	public static Color Danger => Current.Danger;
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（机主：状态行成功色）：⭐ 成功色**浅/深分别取色**（⛔ 不在面板里写死）：
+	/// 浅色主题用更深的绿（白底对比度足够），深色主题用更亮的绿（深底可读）✅
+	/// </summary>
+	public static Color Success => IsNightMode
+		? Color.FromArgb(96, 214, 132)
+		: Color.FromArgb(18, 118, 64);
+
 	public static Color Ok => Current.Ok;
 
 	public static Color Warn => Current.Warn;

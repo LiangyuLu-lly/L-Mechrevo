@@ -50,6 +50,8 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private readonly Label _hintLabel;
 
+	private TableLayoutPanel _grid;
+
 	private readonly ToolTip _toolTip = new ToolTip();
 
 	private bool _busy;
@@ -91,11 +93,11 @@ internal sealed class BatteryLimitPanel : Panel
 		_enableBox = new RCheckBox
 		{
 			AutoSize = true,
-			Text = Strings.BatteryLimitEnableCharge,
+			Text = EnableChargeText(),
 			BackColor = Color.Transparent,
 			Margin = new Padding(0, D(4), 0, 0)
 		};
-		_toolTip.SetToolTip(_enableBox, Strings.BatteryLimitEnableChargeTip);
+		_toolTip.SetToolTip(_enableBox, EnableChargeTipText());
 		_enableBox.CheckedChanged += EnableBox_CheckedChanged;
 
 		_applyButton = new Button
@@ -111,8 +113,9 @@ internal sealed class BatteryLimitPanel : Panel
 		_statusLabel = MakeFixedLabel("状态读取中…", D(360));
 		_statusLabel.Margin = new Padding(0, D(4), 0, 0);
 
-		_hintLabel = MakeFixedLabel("开启后接电源时会限制充电上限；建议保持接电源使用。", D(420));
+		_hintLabel = MakeFixedLabel("", D(420));
 		_hintLabel.Margin = new Padding(0, D(4), 0, 0);
+		_hintLabel.Visible = false;
 
 		TableLayoutPanel grid = new TableLayoutPanel
 		{
@@ -124,6 +127,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Padding = Padding.Empty,
 			BackColor = Color.Transparent
 		};
+		_grid = grid;
 		for (int c = 0; c < 4; c++)
 		{
 			grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
@@ -210,8 +214,23 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private void ApplyStatusColor()
 	{
-		_statusLabel.ForeColor = _statusKind == 1 ? UiVisualStyle.Danger
-			: (_statusKind == 2 ? UiVisualStyle.Warn : UiVisualStyle.Muted);
+		// ⭐ 浅色主题用更深的次要色（Text）保证对比度；深色保持 Muted；成功色走 UiVisualStyle.Success ✅
+		if (_statusKind == 1)
+		{
+			_statusLabel.ForeColor = UiVisualStyle.Danger;
+		}
+		else if (_statusKind == 2)
+		{
+			_statusLabel.ForeColor = UiVisualStyle.Warn;
+		}
+		else if (_statusKind == 3)
+		{
+			_statusLabel.ForeColor = UiVisualStyle.Success;
+		}
+		else
+		{
+			_statusLabel.ForeColor = UiVisualStyle.IsNightMode ? UiVisualStyle.Muted : UiVisualStyle.Text;
+		}
 	}
 
 	/// <summary>
@@ -288,10 +307,8 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			_syncing = false;
 		}
-		// ⭐ 无“当前:”前缀；无 EC 原始值 ✅
-		SetStatus(active
-			? "✅ 限制充电已生效（停充 " + high + "% / 起充 " + low + "%）"
-			: "未启用限制充电", 0);
+		// ⭐ 机主要求：纯文字、无对勾、无括号；生效=绿色 Success，未启用=灰/Muted ✅
+		SetStatus(active ? "限制充电已生效" : "未限制充电", active ? 3 : 0);
 		UpdateSocLine(active);
 		UpdateSocSafetyHint();
 	}
@@ -317,13 +334,11 @@ internal sealed class BatteryLimitPanel : Panel
 	/// </summary>
 	private void UpdateSocSafetyHint()
 	{
-		const string NormalHint = "开启后接电源时会限制充电上限；建议保持接电源使用。";
 		try
 		{
 			if (_active)
 			{
-				_hintLabel.ForeColor = UiVisualStyle.Muted;
-				_hintLabel.Text = NormalHint;
+				HideHint();
 				return;
 			}
 			int soc = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
@@ -334,20 +349,74 @@ internal sealed class BatteryLimitPanel : Panel
 				_hintLabel.Text = "⚠️ 当前电量 " + soc + "% ≥ 停充阈值 " + high
 					+ "% ⇒ 不会发送启用命令。请二选一：① 先把电量放到低于阈值；② 把停充阈值设到当前电量以上（例如 "
 					+ Math.Min(100, soc + 1) + "%）。";
+				ShowHintRow(true);
 			}
 			else
 			{
-				_hintLabel.ForeColor = UiVisualStyle.Muted;
-				_hintLabel.Text = NormalHint;
+				HideHint();
 			}
 		}
 		catch
 		{
-			_hintLabel.ForeColor = UiVisualStyle.Muted;
-			_hintLabel.Text = NormalHint;
+			HideHint();
 		}
 	}
 
+	/// <summary>⭐ 机主要求：普通说明行已删除 ⇒ 无警示时整行高 0（⛔ 不留空行）✅</summary>
+	private void HideHint()
+	{
+		_hintLabel.Text = "";
+		ShowHintRow(false);
+	}
+
+	private void ShowHintRow(bool show)
+	{
+		_hintLabel.Visible = show;
+		if (_grid == null || _grid.RowStyles.Count <= 4)
+		{
+			return;
+		}
+		_grid.RowStyles[4] = new RowStyle(SizeType.Absolute, show ? D(RowHint) : 0);
+		float total = 0f;
+		foreach (RowStyle rowStyle in _grid.RowStyles)
+		{
+			total += Math.Max(0f, rowStyle.Height);
+		}
+		_grid.Height = (int)Math.Round(total);
+	}
+
+	private static string EnableChargeText()
+	{
+		string text = Strings.BatteryLimitEnableCharge;
+		// ⭐ 中文系统上若资源回退成英文（satellite 未命中）⇒ 保底显示中文，⛔ 不让 UI 出现英文 ✅
+		if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh" && !ContainsChinese(text))
+		{
+			return "限制充电";
+		}
+		return text;
+	}
+
+	private static string EnableChargeTipText()
+	{
+		string text = Strings.BatteryLimitEnableChargeTip;
+		if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh" && !ContainsChinese(text))
+		{
+			return "开启后接电源时会把充电限制在停充阈值";
+		}
+		return text;
+	}
+
+	private static bool ContainsChinese(string text)
+	{
+		foreach (char c in text ?? string.Empty)
+		{
+			if (c >= '\u4e00' && c <= '\u9fff')
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 	private async void EnableBox_CheckedChanged(object sender, EventArgs e)
 	{
 		if (_busy || _syncing)
