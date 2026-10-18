@@ -41,6 +41,9 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private bool _syncing;
 
+	// ⭐ 当前是否“限充生效中”（来自 EC）；用于 SOC 安全提示（未启用时才提示 SOC≥high）✅
+	private bool _active;
+
 	public BatteryLimitPanel()
 	{
 		BackColor = Color.Transparent;
@@ -66,6 +69,9 @@ internal sealed class BatteryLimitPanel : Panel
 		_lowBox = MakeNumeric(1, 99, 60);
 		Label highLabel = MakeLabel("停充 %（高）");
 		_highBox = MakeNumeric(2, 100, 80);
+		// ⭐ 机主要求：SOC ≥ high 时给**红色可操作提示**（开关/按钮仍可用，不是静默失败）✅
+		_lowBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
+		_highBox.ValueChanged += delegate { UpdateSocSafetyHint(); };
 
 		grid.RowCount = 4;
 		grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -121,6 +127,7 @@ internal sealed class BatteryLimitPanel : Panel
 		_hintLabel.BringToFront();
 		grid.BringToFront();
 		RefreshFromEc();
+		UpdateSocSafetyHint();
 	}
 
 	/// <summary>⭐ 能力判据：`UsesBaolongda` + 板号命中宝龙达白名单（MRID6/MRID6-*）+ EC 可读 ✅。</summary>
@@ -162,10 +169,13 @@ internal sealed class BatteryLimitPanel : Panel
 	{
 		if (!BatteryLimitWriter.TryReadState(out int high, out int low, out int mode, out string detail))
 		{
+			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
 			_statusLabel.Text = "状态读不到：" + detail + "（可稍后点「保存阈值」重试）";
+			UpdateSocSafetyHint();
 			return;
 		}
 		bool active = mode == BatteryLimitWriter.ModeActive;
+		_active = active;
 		_syncing = true;
 		try
 		{
@@ -180,10 +190,49 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			_syncing = false;
 		}
+		_statusLabel.ForeColor = SystemColors.ControlText;
 		_statusLabel.Text = (active
 			? "当前：✅ 限制充电生效中（停充 " + high + "% · 起充 " + low + "%）"
 			: "当前：未启用（正常充电）")
 			+ " · 来源 EC " + detail;
+		UpdateSocSafetyHint();
+	}
+
+	/// <summary>
+	/// ⭐⭐ 机主要求（UX）：未启用且 `SOC ≥ high` 时，给出**红色、可操作**提示；
+	/// ⛔ 不静默失败、⛔ 不移除 SOC&lt;high 安全前置（启用仍会被 writer 拒绝，但用户知道下一步怎么做）✅
+	/// </summary>
+	private void UpdateSocSafetyHint()
+	{
+		const string NormalHint = "开启后接电源时会限制充电上限；建议保持接电源使用。";
+		try
+		{
+			if (_active)
+			{
+				_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
+				_hintLabel.Text = NormalHint;
+				return;
+			}
+			int soc = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
+			int high = (int)_highBox.Value;
+			if (soc >= 0 && soc >= high)
+			{
+				_hintLabel.ForeColor = Color.FromArgb(200, 40, 40);
+				_hintLabel.Text = "⚠️ 当前电量 " + soc + "% ≥ 停充阈值 " + high
+					+ "% ⇒ 不会发送启用命令。请二选一：① 先把电量放到低于阈值；② 把停充阈值设到当前电量以上（例如 "
+					+ Math.Min(100, soc + 1) + "%）。";
+			}
+			else
+			{
+				_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
+				_hintLabel.Text = NormalHint;
+			}
+		}
+		catch
+		{
+			_hintLabel.ForeColor = Color.FromArgb(120, 120, 120);
+			_hintLabel.Text = NormalHint;
+		}
 	}
 
 	private async void EnableBox_CheckedChanged(object sender, EventArgs e)
@@ -209,12 +258,14 @@ internal sealed class BatteryLimitPanel : Panel
 			Logger.WriteLine("[battery] 充电限制" + (want ? "启用" : "关闭") + "（UI）：ok=" + ok + " · " + detail);
 			if (!ok)
 			{
+				_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
 				_statusLabel.Text = "⛔ " + (want ? "启用失败（未重试）：" : "关闭失败（未重试）：") + Tail(detail);
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
+			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
 			_statusLabel.Text = "⛔ 操作异常：" + ex.GetType().Name + " " + ex.Message;
 			Logger.WriteLine("[battery] 充电限制 UI 异常：" + ex.GetType().Name + " " + ex.Message);
 		}
@@ -234,6 +285,7 @@ internal sealed class BatteryLimitPanel : Panel
 		int high = (int)_highBox.Value;
 		if (!(low >= 1 && low < high && high <= 100))
 		{
+			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
 			_statusLabel.Text = "⛔ 参数非法：要求 0 < 起充 < 停充 <= 100（当前 " + low + "/" + high + "）";
 			return;
 		}
@@ -248,12 +300,14 @@ internal sealed class BatteryLimitPanel : Panel
 			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + " · " + detail);
 			if (!ok)
 			{
+				_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
 				_statusLabel.Text = "⛔ 保存失败（未重试）：" + Tail(detail);
 			}
 			RefreshFromEc();
 		}
 		catch (Exception ex)
 		{
+			_statusLabel.ForeColor = Color.FromArgb(200, 40, 40);
 			_statusLabel.Text = "⛔ 操作异常：" + ex.GetType().Name + " " + ex.Message;
 		}
 		finally

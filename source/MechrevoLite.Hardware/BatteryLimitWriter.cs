@@ -46,8 +46,17 @@ internal static class BatteryLimitWriter
 		return h && l && m;
 	}
 
-	/// <summary>⭐ 启用限充（high=停充、low=起充）；失败不重试 ✅。</summary>
+	/// <summary>⭐ 启用限充（high=停充、low=起充；默认遵守 SOC&lt;high，失败不重试）✅。</summary>
 	internal static bool TryEnable(int low, int high, out string detail)
+	{
+		return TryEnable(low, high, allowAboveSoc: false, out detail);
+	}
+
+	/// <summary>
+	/// ⭐ 启用限充。<paramref name="allowAboveSoc" /> = true 时**仅测试**允许 SOC ≥ high（会打印警告）；
+	/// ⛔ 默认 false（参考实现要求 SOC&lt;high，否则可能触发固件放电辅助）✅。
+	/// </summary>
+	internal static bool TryEnable(int low, int high, bool allowAboveSoc, out string detail)
 	{
 		StringBuilder log = new StringBuilder();
 		try
@@ -106,9 +115,16 @@ internal static class BatteryLimitWriter
 			log.AppendLine("电池 SOC = " + batteryPercent + "%");
 			if (batteryPercent >= high)
 			{
-				detail = log + "⛔ SOC（" + batteryPercent + "%）≥ high（" + high + "%）⇒ 参考实现要求 SOC<high 才初始化"
-					+ "（否则可能触发固件放电辅助）；⛔ 未发启用触发。请先放电到 <" + high + "% 或改用 --disable";
-				return false;
+				string suggestion = "请二选一：① 先把电量放到低于阈值；② 把停充阈值设到当前电量以上（例如 "
+					+ Math.Min(100, batteryPercent + 1) + "%）。";
+				if (!allowAboveSoc)
+				{
+					detail = log + "当前电量 " + batteryPercent + "% ≥ 停充阈值 " + high + "% ⇒ 不会发送启用命令。"
+						+ suggestion;
+					return false;
+				}
+				log.AppendLine("⚠️ --allow-above-soc（仅测试）：当前电量 " + batteryPercent + "% ≥ 停充阈值 " + high
+					+ "% ⇒ 用户已显式允许继续；⚠️ 参考实现警告：可能触发固件放电辅助");
 			}
 
 			log.AppendLine("① 写参数：0x8153=high(" + high + ") → 0x8154=low(" + low + ")");

@@ -34,6 +34,7 @@ internal static class BatteryLimitTest
 		int low = 60;
 		int high = 80;
 		bool disable = false;
+		bool allowAboveSoc = false;
 		if (args != null)
 		{
 			for (int i = 0; i < args.Length; i++)
@@ -42,6 +43,10 @@ internal static class BatteryLimitTest
 				if (string.Equals(arg, "--disable", StringComparison.OrdinalIgnoreCase))
 				{
 					disable = true;
+				}
+				else if (string.Equals(arg, "--allow-above-soc", StringComparison.OrdinalIgnoreCase))
+				{
+					allowAboveSoc = true;
 				}
 				else if (string.Equals(arg, "--low", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
 				{
@@ -86,13 +91,24 @@ internal static class BatteryLimitTest
 			else
 			{
 				L("模式：启用限充（high=" + high + "% · low=" + low + "%）");
+				if (allowAboveSoc)
+				{
+					L("⚠️ --allow-above-soc 已启用：仅测试用途；允许 SOC ≥ 停充阈值时仍发送启用命令（可能触发固件放电辅助）");
+				}
 				bool stateOk = BatteryLimitWriter.TryReadState(out int curHigh, out int curLow, out int curMode, out string state);
 				L("当前状态：" + state + (stateOk ? "" : "（⚠️ 读取不完整）"));
-				bool ok = BatteryLimitWriter.TryEnable(low, high, out string detail);
+				bool ok = BatteryLimitWriter.TryEnable(low, high, allowAboveSoc, out string detail);
 				L(detail);
 				BatteryLimitWriter.TryReadState(out int afterHigh, out int afterLow, out int afterMode, out string after);
 				L("写后状态：" + after);
 				L("结论：" + (ok ? "✅ 限充已启用（mode=0x48）" : "⛔ 启用失败/未确认（见上）"));
+				if (!ok)
+				{
+					L("失败时状态：当前模式=" + FmtMode(afterMode) + " · 0x83A1=" + FmtHex(afterHigh)
+						+ " · 0x83A2=" + FmtHex(afterLow) + " · SOC=" + CurrentSocPercent() + "%");
+					L("建议：若上方为「当前电量 ≥ 停充阈值」⇒ 按提示二选一（先放电到 <阈值，或把停充阈值设到 >当前电量）；"
+						+ "否则检查 AC/EC 身份/触发是否空闲；⛔ 勿反复重试。");
+				}
 				exitCode = ok ? 0 : 1;
 			}
 			L("");
@@ -103,5 +119,31 @@ internal static class BatteryLimitTest
 			L("测试异常：" + ex.GetType().Name + " " + ex.Message);
 		}
 		return exitCode;
+	}
+
+	private static string FmtHex(int value)
+	{
+		return value < 0 ? "读不到" : "0x" + value.ToString("X2");
+	}
+
+	private static string FmtMode(int mode)
+	{
+		if (mode < 0)
+		{
+			return "读不到";
+		}
+		return "0x" + mode.ToString("X2") + (mode == BatteryLimitWriter.ModeActive ? "（限充生效）" : (mode == 0 ? "（正常）" : ""));
+	}
+
+	private static int CurrentSocPercent()
+	{
+		try
+		{
+			return (int)Math.Round(System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
+		}
+		catch
+		{
+			return -1;
+		}
 	}
 }
