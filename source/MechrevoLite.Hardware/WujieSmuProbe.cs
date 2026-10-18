@@ -45,10 +45,13 @@ internal static class WujieSmuProbe
 
 			// ── ① 只读判据（与 UI/日志**同一口径**：WujieSmuGate.Evaluate）──
 			WujieSmuVerdict verdict = WujieSmuGate.Evaluate();
-			L("机型名(SystemProductName)=" + Show(verdict.Model) + " · 板号=" + Show(verdict.Board)
+			MechrevoDeviceCapabilities identity = MechrevoDeviceCapabilities.Current;
+			L("机型名(SystemProductName)=" + Show(verdict.Model) + " · 系列=" + Show(identity.SystemFamily) + " · SKU=" + Show(identity.SystemSku) + " · 板号=" + Show(verdict.Board)
 				+ " · CPU=" + Show(verdict.CpuName) + " · CpuVendor=" + Show(verdict.CpuVendorRaw)
 				+ " · APU判据=" + (verdict.ApuOk ? "是（AMD 且无 NVIDIA 独显）" : "否")
 				+ "（isAmd=" + verdict.IsAmd + " · hasNvidia=" + verdict.HasNvidia + "）");
+			L("无界机型命中: 命中字段=" + (string.IsNullOrEmpty(verdict.HitField) ? "无（四个字段均不含 WUJIE/无界）" : verdict.HitField)
+				+ " · 值=" + Show(verdict.HitValue));
 
 			// ── ② SMU 代号/家族/版本（只读；与 SmuAvailability 同一单例）──
 			RyzenSmuService smu = null;
@@ -108,7 +111,7 @@ internal static class WujieSmuProbe
 			// ── ④ 结论（逐条列哪一条不满足）──
 			L("⇒ 判据结果：可开放 SMU 自定义=" + (verdict.Allowed ? "True" : "False")
 				+ "（model含无界=" + verdict.IsWujie + " · amd=" + verdict.IsAmd + " · apu=" + verdict.ApuOk
-				+ " · smuReady=" + verdict.SmuReady + "）");
+				+ " · smuReady=" + verdict.SmuReady + " · 命中字段=" + verdict.HitField + "）");
 			if (!verdict.Allowed)
 			{
 				L("   不满足项: " + verdict.UnmetReasons);

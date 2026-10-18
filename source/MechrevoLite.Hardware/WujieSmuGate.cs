@@ -29,7 +29,9 @@ internal sealed record WujieSmuVerdict(
 	bool ApuOk,
 	bool IsWujie,
 	bool SmuReady,
-	string SmuReason)
+	string SmuReason,
+	string HitField,
+	string HitValue)
 {
 	/// <summary>⭐⭐ 三条全真 ⇒ 允许「SMU 自定义」。</summary>
 	internal bool Allowed => IsWujie && ApuOk && SmuReady;
@@ -42,7 +44,7 @@ internal sealed record WujieSmuVerdict(
 			List<string> list = new List<string>(3);
 			if (!IsWujie)
 			{
-				list.Add("机型名不含「无界/WUJIE/WJXY」");
+				list.Add("四个字段(Name/Family/SKU/Board)均不含「无界/WUJIE」");
 			}
 			if (!ApuOk)
 			{
@@ -110,7 +112,8 @@ internal static class WujieSmuGate
 			string code = (smu != null) ? smu.CpuCodeName.ToString() : "读不到";
 			string version = (smu != null) ? ("0x" + smu.SmuVersion.ToString("X")) : "读不到";
 			string message = "[smu-ui] 无界 APU：SMU自定义=" + (SmuAvailability.IsReady ? "True" : "False")
-				+ "（model=" + verdict.Model + " · code=" + code + " · smuVer=" + version + "）· PL上限=" + PlMaxWatts + "W";
+				+ "（model=" + verdict.Model + " · 命中字段=" + verdict.HitField + " · 值=" + verdict.HitValue
+				+ " · code=" + code + " · smuVer=" + version + "）· PL上限=" + PlMaxWatts + "W";
 			if (Logger.TryMarkChanged("wujie-smu-allowed", message))
 			{
 				Logger.WriteError(message);
@@ -121,29 +124,60 @@ internal static class WujieSmuGate
 			Logger.WriteLine("[smu-ui] 无界 APU 允许日志异常（已吞掉）：" + ex.Message);
 		}
 	}
-	/// <summary>⭐ 机型名判据：SystemProductName 含「无界」/ WUJIE / WJXY（大小写不敏感）。</summary>
-	internal static bool IsWujieModel(string model)
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：无界还有 15X 系列，判据不能判太死）：
+	/// **无界机型判据** = 下列任一字段含「无界」/ WUJIE（忽略大小写与空格；⛔ 不写死具体型号）：
+	/// ① SystemProductName(Model) ② SystemFamily ③ SystemSku ④ BaseBoardProduct ✅。
+	/// <para>⭐ 返回命中字段/值（供日志：15X 上来时一眼看出靠哪个字段命中）。</para>
+	/// </summary>
+	internal static bool IsWujieMachine(string model, string family, string sku, string board, out string hitField, out string hitValue)
 	{
-		if (string.IsNullOrWhiteSpace(model))
+		string[] fields = new string[4] { "Name", "Family", "SKU", "Board" };
+		string[] values = new string[4]
 		{
-			return false;
-		}
-		foreach (string keyword in WujieModelKeywords)
+			model ?? "",
+			family ?? "",
+			sku ?? "",
+			board ?? ""
+		};
+		for (int i = 0; i < values.Length; i++)
 		{
-			if (model.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+			string normalized = values[i].Replace(" ", "").Replace("\u3000", "");
+			if (normalized.Length == 0)
 			{
-				return true;
+				continue;
+			}
+			foreach (string keyword in WujieModelKeywords)
+			{
+				if (normalized.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+				{
+					hitField = fields[i];
+					hitValue = values[i];
+					return true;
+				}
 			}
 		}
+		hitField = "";
+		hitValue = "";
 		return false;
 	}
 
+	/// <summary>⭐ 兼容旧入口：只按 SystemProductName 判（内部/诊断用）。</summary>
+	internal static bool IsWujieModel(string model)
+	{
+		return IsWujieMachine(model, "", "", "", out string _, out string _);
+	}
 	/// <summary>⭐ 执行只读判据（进程内不缓存结果本身，但底层探测各自有缓存/只读）。</summary>
 	internal static WujieSmuVerdict Evaluate()
 	{
 		MechrevoDeviceCapabilities caps = MechrevoDeviceCapabilities.Current;
 		string model = caps.Model ?? "";
 		string board = caps.BaseboardProduct ?? "";
+		string family = caps.SystemFamily ?? "";
+		string sku = caps.SystemSku ?? "";
+		string hitField;
+		string hitValue;
+		bool isWujie = IsWujieMachine(model, family, sku, board, out hitField, out hitValue);
 		string cpuName = "";
 		string cpuVendorRaw = "";
 		bool isAmd = false;
@@ -186,7 +220,7 @@ internal static class WujieSmuGate
 			smuReason = "探测异常：" + ex.GetType().Name;
 		}
 		return new WujieSmuVerdict(model, board, cpuName, cpuVendorRaw, isAmd, hasNvidia, apuOk,
-			IsWujieModel(model), smuReady, smuReason);
+			isWujie, smuReady, smuReason, hitField, hitValue);
 	}
 
 	/// <summary>
@@ -202,7 +236,8 @@ internal static class WujieSmuGate
 				+ " · amd=" + verdict.IsAmd
 				+ " · apu=" + verdict.ApuOk
 				+ " · smuReady=" + verdict.SmuReady
-				+ " ⇒ SMU自定义=" + (verdict.Allowed ? "True" : "False");
+				+ " ⇒ SMU自定义=" + (verdict.Allowed ? "True" : "False")
+				+ "（命中字段=" + (string.IsNullOrEmpty(verdict.HitField) ? "无" : verdict.HitField) + " · 值=" + (string.IsNullOrEmpty(verdict.HitValue) ? "-" : verdict.HitValue) + "）";
 			if (!verdict.Allowed)
 			{
 				message += "（不满足：" + verdict.UnmetReasons + "）";
