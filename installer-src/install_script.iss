@@ -4,23 +4,23 @@
 
 [Setup]
 AppName=L-Mechrevo
-AppVerName=L-Mechrevo 0.292.1 beta23
+AppVerName=L-Mechrevo 0.292.2 beta23
 AppId={{8F4E2C71-9B3A-4D6E-A1C2-7E5B9D0F3A64}
-AppVersion=0.292.1
+AppVersion=0.292.2
 AppPublisher=L-Mechrevo contributors
 AppCopyright=Copyright (C) 2026 L-Mechrevo contributors. GPL-3.0-only.
 DefaultDirName={autopf}\L-Mechrevo
 DefaultGroupName=L-Mechrevo
 #ifdef NOGCU
-OutputBaseFilename=LM-0.292.1-beta23-baolongda-test-setup
+OutputBaseFilename=LM-0.292.2-beta23-baolongda-test-setup
 #else
-OutputBaseFilename=LM-0.292.1-beta23-test-setup
+OutputBaseFilename=LM-0.292.2-beta23-test-setup
 #endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
-VersionInfoVersion=0.292.1
-VersionInfoProductVersion=0.292.1
-UninstallDisplayName=L-Mechrevo 0.292.1 beta23
+VersionInfoVersion=0.292.2
+VersionInfoProductVersion=0.292.2
+UninstallDisplayName=L-Mechrevo 0.292.2 beta23
 Compression=lzma2
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -329,7 +329,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 ;   只在该任务被勾选时执行；失败**不阻断安装**（命令末尾 exit 0 兜掉返回码）——
 ;     驱动装不上最坏只是 CPU 温度显示「—」，不该让整个安装失败
 ;   runhidden：脚本会下载 + 静默装，不需要黑窗；waituntilterminated 保证装完再启动 LM。
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: runhidden waituntilterminated; Tasks: pawnio
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: runhidden waituntilterminated; Tasks: pawnio; Check: ShouldInstallPawnIo
 Filename: "{app}\L-Mechrevo.exe"; Description: "{cm:LaunchApp}"; Flags: postinstall skipifsilent nowait
 
 [UninstallRun]
@@ -2464,6 +2464,14 @@ begin
   RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardProduct', Result);
   if Result = '' then Result := '(读不到)';
 end;
+function ShouldInstallPawnIo(): Boolean;
+// 2026-10-18（机主反馈「PawnIO 会重复安装」）：驱动服务键已存在 ⇒ 认为已安装，安装包不再重复跑安装脚本。
+//   ⚠️ 只读注册表，⛔ 不探测设备；驱动坏了仍可从 LM「CPU 调节」里手动重装。
+begin
+  Result := not RegKeyExists(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Services\PawnIO');
+  if not Result then Log('LM-PAWNIO-SKIP: 已安装 PawnIO（服务键存在）=> 跳过安装包里的驱动安装步骤');
+end;
+
 function IsBaolongdaMold(): Boolean;
 var
   Board: String;

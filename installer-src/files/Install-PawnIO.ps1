@@ -35,8 +35,26 @@ try {
     if ($ValidateOnly) { Write-Output 'PawnIO installer hash and signature verified.'; exit 0 }
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Administrator privileges required.' }
-    $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'"
+    # 2026-10-18（机主反馈「PawnIO 会重复安装」）：先判是否已装、能否直接启动，避免每次安装包升级都重装一遍驱动。
+    $svcKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\PawnIO'
+    $alreadyInstalled = Test-Path $svcKey
+    $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'" -ErrorAction SilentlyContinue
     if ($driver -and $driver.State -eq 'Running') { Write-Output 'PawnIO is already running.'; exit 0 }
+    if ($alreadyInstalled) {
+        try { Start-Service -Name 'PawnIO' -ErrorAction Stop; Start-Sleep -Seconds 2 } catch { }
+        $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'" -ErrorAction SilentlyContinue
+        if ($driver -and $driver.State -eq 'Running') { Write-Output 'PawnIO was installed but stopped; service started, no reinstall.'; exit 0 }
+        $ver = $null
+        try {
+            $entry = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
+                Where-Object { $_.DisplayName -like 'PawnIO*' } | Select-Object -First 1
+            if ($entry -and $entry.DisplayVersion) { $ver = [version]$entry.DisplayVersion }
+        } catch { }
+        if ($ver -and $ver -ge [version]'2.2.0') {
+            Write-Output ('PawnIO already installed (v' + $ver.ToString() + ', service not running); skip reinstall.')
+            exit 0
+        }
+    }
     $process = Start-Process -FilePath $InstallerPath -ArgumentList '-install','-silent' -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -eq 3010) { Write-Output 'PawnIO installed; restart required.'; exit 3010 }
     if ($process.ExitCode -ne 0) { throw ('PawnIO installer exit code: ' + $process.ExitCode) }
