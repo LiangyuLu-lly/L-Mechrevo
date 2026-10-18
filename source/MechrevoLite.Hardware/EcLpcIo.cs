@@ -473,6 +473,12 @@ internal static class EcLpcIo
 				// ⭐ 仪表化：只记录**这一次写操作**的完整端口序列（含 ioctl 结果/错误码）✅
 				_ioTrace.Clear();
 				_ioTraceEnabled = true;
+				// ⭐⭐ 2026-10-18（7.3 `Write_EC_Init` 对照结论）：⭐ 7.3 在每次 `Write_EC_EX` 前都先
+				//   `ECStatus(EC_IBF)` —— 轮询 ACPI EC 状态口 `0x66` 的 IBF（bit1）直到清空；我们之前**缺这一步**。
+				//   ⭐ 这里只做**只读**预检（通过 ACPI 通道读 0x66；读不到/超时 ⇒ best-effort 继续，⛔ 不阻塞写入）✅
+				bool ibfClear = EcPortIo.TryWaitAcpiIbfClear(50, out string ibfDetail);
+				_ioTrace.Append("0x66 IBF 预检：").Append(ibfClear ? "已清" : "⚠️ 未清/不可读（继续）")
+					.Append(" · ").Append(ibfDetail).Append('\n');
 				bool wrote = WriteByteCore(DefaultSlot, address, value);
 				int check = -1;
 				bool readOk = wrote && ReadByteCore(DefaultSlot, address, out check);

@@ -75,17 +75,25 @@ internal static class SmuEcAccess
 		return false;
 	}
 
-	/// <summary>⭐ 7.3 `Write_EC_Init` 等价：身份通过才把 `0x1060` 置 bit7（回读确认）✅</summary>
+	/// <summary>
+	/// ⭐⭐ 7.3 `Write_EC_Init` 等价：⭐ 先读 `0x2000`/`0x2001`（芯片 ID1/ID2），
+	/// `0x2000 == 0x55` 才读 `0x1060` 并写 `|0x80`（回读确认）✅。
+	/// <para>⭐ 7.3 逐步：`EC_CHIP_ID1 = Read_EC_EX(8192)` → `EC_CHIP_ID2 = Read_EC_EX(8193)` →
+	/// `if (85 == EC_CHIP_ID1) { EC_CHIP_Ver = Read_EC_EX(4192); EC_CHIP_Ver |= 128; Write_EC_EX(4192, EC_CHIP_Ver); }` ✅</para>
+	/// </summary>
 	internal static bool TryEcInit(out string note)
 	{
+		// ⭐ 7.3 先读两个芯片 ID；⭐ 我们身份判据还看 0xC411（EC 版本），多读无害 ✅
+		bool id2Ok = EcLpcIo.TryReadByteStable(0x2001, out int id2, out string id2Note);
+		string id2Text = "0x2001=" + (id2Ok ? "0x" + id2.ToString("X2") : "读不到") + "（" + id2Note + "）";
 		if (!EcLpcIo.TryReadEcIdentity(out _, out _, out string idNote))
 		{
-			note = "身份未通过 ⇒ ⛔ 不解锁（" + idNote + "）";
+			note = "身份未通过 ⇒ ⛔ 不解锁（" + idNote + "）· " + id2Text;
 			return false;
 		}
 		bool ok = EcLpcIo.TryUnlockEcRam(out int before, out int after, out string unlockNote);
 		note = "Init：0x1060 " + (before < 0 ? "读不到" : "0x" + before.ToString("X2"))
-			+ " → " + (after < 0 ? "读不到" : "0x" + after.ToString("X2")) + " · " + unlockNote;
+			+ " → " + (after < 0 ? "读不到" : "0x" + after.ToString("X2")) + " · " + unlockNote + " · " + id2Text;
 		return ok;
 	}
 

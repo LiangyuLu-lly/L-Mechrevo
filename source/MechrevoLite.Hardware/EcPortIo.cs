@@ -181,6 +181,84 @@ internal static class EcPortIo
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-18（7.3 `Write_EC_Init` 对照结论 · **只读**）：⭐ 读 ACPI EC 状态口 `0x66`（EC_SC）✅。
+	/// <para>⭐ 7.3 `RyzenAccess.ECStatus(EC_IBF)` 在每次 `Write_EC_EX/Read_EC_EX` **之前**轮询 `0x66` 的 IBF 位
+	/// （bit1；写要等它清空）——这是我们 LPC 写路径缺的一步；本方法只读，⛔ 不写任何字节 ✅</para>
+	/// </summary>
+	internal static bool TryReadStatus(out int status)
+	{
+		status = -1;
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				_lastReadFailure = "通道已中毒：" + _poisonReason;
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				_lastReadFailure = "模块未装载：" + _loadFailure;
+				return false;
+			}
+			if (!TryEnterEcMutex(out Mutex mutex, out bool held))
+			{
+				_lastReadFailure = "无法获取 " + MutexName + " 互斥体";
+				return false;
+			}
+			try
+			{
+				if (!PortIn(PortStatus, out byte value, IoKind.Read))
+				{
+					return false;
+				}
+				_lastStatusSeen = value;
+				status = value;
+				return true;
+			}
+			catch (Exception ex)
+			{
+				_lastReadFailure = "读 0x66 异常：" + ex.GetType().Name;
+				return false;
+			}
+			finally
+			{
+				ReleaseEcMutex(mutex, held);
+			}
+		}
+	}
+
+	/// <summary>
+	/// ⭐⭐ 2026-10-18（7.3 `ECStatus(EC_IBF)` 等价 · **只读**）：⭐ 轮询 `0x66` 直到 IBF（bit1）清空 ✅。
+	/// <para>⭐ 给 LPC 写事务做前置条件（7.3 在每次 `Write_EC_EX` 前都做）；超时/读不到 ⇒ false，调用方 best-effort 继续 ✅</para>
+	/// </summary>
+	internal static bool TryWaitAcpiIbfClear(int timeoutMs, out string detail)
+	{
+		detail = "";
+		int tries = 0;
+		long deadline = Environment.TickCount64 + Math.Max(1, timeoutMs);
+		while (true)
+		{
+			if (!TryReadStatus(out int status))
+			{
+				detail = "读 0x66 失败：" + LastReadFailure;
+				return false;
+			}
+			if ((status & StatusIbf) == 0)
+			{
+				detail = "0x66=0x" + status.ToString("X2") + " · IBF=0（轮询 " + tries + " 次）";
+				return true;
+			}
+			if (Environment.TickCount64 >= deadline)
+			{
+				detail = "0x66=0x" + status.ToString("X2") + " · IBF=1 超时 " + timeoutMs + "ms（" + tries + " 次）";
+				return false;
+			}
+			tries++;
+			Thread.Sleep(1);
+		}
+	}
+
+	/// <summary>
 	/// 只读：读 XRAM 一个字节。
 	/// <para>任何失败都返回 false，并按需标记中毒（超时/异常）。<b>绝不抛出</b>。</para>
 	/// </summary>
