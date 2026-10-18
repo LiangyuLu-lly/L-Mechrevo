@@ -107,13 +107,16 @@ internal sealed class BatteryLimitPanel : Panel
 
 		_applyButton = new RButton
 		{
-			// ⭐ 2026-10-19（机主：按钮一直裁切 "从没对过"）：⭐ 尺寸**由内容决定**，不再猜固定宽/高 ✅
-			AutoSize = true,
-			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			// ⭐ 2026-10-19（机主：应用按钮太大被裁）：⭐ **固定逻辑尺寸**（高 28；宽 = 文本宽 + 内边距，
+			//   夹在 96~110）—— ⛔ AutoSize、⛔ Dock=Fill 拉伸 ✅
+			AutoSize = false,
+			Dock = DockStyle.None,
 			Anchor = AnchorStyles.Right,
 			Text = Strings.BatteryLimitSaveThreshold,
-			// ⭐ 显式内边距（左右 10 / 上下 2）—— 先保“不裁字”，外观其次 ✅
-			Padding = new Padding(D(10), D(2), D(10), D(2)),
+			Size = new Size(
+				Math.Min(D(110), Math.Max(D(96), TextRenderer.MeasureText(Strings.BatteryLimitSaveThreshold, UiVisualStyle.Font(8.5f)).Width + D(32))),
+				D(28)),
+			Padding = new Padding(D(8), D(2), D(8), D(2)),
 			BorderRadius = D(4),
 			Margin = new Padding(D(4), 0, 0, 0)
 		};
@@ -587,8 +590,8 @@ internal sealed class BatteryLimitPanel : Panel
 			Size actual = _applyButton.Size;
 			Size text = TextRenderer.MeasureText(_applyButton.Text, _applyButton.Font);
 			bool fail = actual.Width > 0 && (actual.Height < text.Height + 6 || actual.Width < text.Width + 8);
-			string message = "[battery-ui] 保存按钮(" + stage + ")：preferred=" + preferred.Width + "x" + preferred.Height
-				+ " · 实际=" + actual.Width + "x" + actual.Height + " · 文本=" + text.Width + "x" + text.Height
+			string message = "[battery-ui] 按钮：名=保存阈值 · stage=" + stage + " · preferred=" + preferred.Width + "x" + preferred.Height
+				+ " · size=" + actual.Width + "x" + actual.Height + " · 文本=" + text.Width + "x" + text.Height
 				+ " ⇒ 裁切=" + fail;
 			Logger.WriteLineIfChanged("battery-ui-save-button-" + stage, message);
 			if (fail)

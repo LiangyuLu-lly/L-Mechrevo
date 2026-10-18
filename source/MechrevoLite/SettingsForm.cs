@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
@@ -8406,6 +8407,111 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	/// <para>⭐ 能力判据：`UsesBaolongda` + 板号以 `MRID6` 开头 + EC 可读 ⇒ 才构建；
 	/// ⛔ 非宝龙达 / 其它板号 / EC 读不到 ⇒ **不构建**（非宝龙达逐位不变）✅</para>
 	/// </summary>
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：电池卡片上下空白 / 先量再说）：⭐ 完整布局实测日志：
+	/// 宿主表逐行（含控件 bounds/visible）、panelBattery 属性、面板内部 grid、隐藏但仍占高的行、
+	/// 空白来源判定；发现隐藏行占高或 panel 超出 content ⇒ WriteError 标 FAIL ✅
+	/// </summary>
+	private void LogBatteryCardLayout(TableLayoutPanel host, BatteryLimitPanel panel)
+	{
+		try
+		{
+			StringBuilder sb = new StringBuilder();
+			sb.AppendLine("[battery-ui] host：RowCount=" + host.RowCount + " · RowStyles=" + host.RowStyles.Count
+				+ " · Size=" + host.Width + "x" + host.Height);
+			List<int> suspiciousRows = new List<int>();
+			for (int i = 0; i < host.RowStyles.Count; i++)
+			{
+				float rowHeight = host.RowStyles[i].Height;
+				List<string> controls = new List<string>();
+				bool hasVisible = false;
+				foreach (Control control in host.Controls)
+				{
+					if (host.GetRow(control) != i)
+					{
+						continue;
+					}
+					if (control.Visible)
+					{
+						hasVisible = true;
+					}
+					controls.Add(control.Name + "/" + control.GetType().Name + "(" + control.Bounds + ",visible=" + control.Visible + ")");
+				}
+				if (rowHeight > 0 && !hasVisible)
+				{
+					suspiciousRows.Add(i);
+				}
+				sb.AppendLine("[battery-ui] host 行[" + i + "]=" + host.RowStyles[i].SizeType + " " + rowHeight
+					+ " · 控件=(" + string.Join(" | ", controls) + ")");
+			}
+			if (panelBattery != null)
+			{
+				sb.AppendLine("[battery-ui] panelBattery：Height=" + panelBattery.Height + " · MinimumSize=" + panelBattery.MinimumSize
+					+ " · Padding=" + panelBattery.Padding + " · Dock=" + panelBattery.Dock + " · Anchor=" + panelBattery.Anchor);
+				int contentBottom = 0;
+				foreach (Control control in panelBattery.Controls)
+				{
+					if (control.Visible)
+					{
+						contentBottom = Math.Max(contentBottom, control.Bottom);
+					}
+				}
+				int extra = panelBattery.ClientSize.Height - contentBottom;
+				sb.AppendLine("[battery-ui] panelBattery 内容底=" + contentBottom + " · 客户区高=" + panelBattery.ClientSize.Height
+					+ " · 多余=" + extra + "px");
+			}
+			TableLayoutPanel grid = null;
+			foreach (Control control in panel.Controls)
+			{
+				if (control is TableLayoutPanel table)
+				{
+					grid = table;
+					break;
+				}
+			}
+			if (grid != null)
+			{
+				sb.AppendLine("[battery-ui] 面板 grid：RowCount=" + grid.RowCount + " · RowStyles=" + grid.RowStyles.Count
+					+ " · Size=" + grid.Width + "x" + grid.Height);
+				for (int i = 0; i < grid.RowStyles.Count; i++)
+				{
+					sb.AppendLine("[battery-ui] grid 行[" + i + "]=" + grid.RowStyles[i].SizeType + " " + grid.RowStyles[i].Height);
+				}
+				foreach (Control control in grid.Controls)
+				{
+					sb.AppendLine("[battery-ui] grid 控件=" + control.Name + "/" + control.GetType().Name
+						+ "(" + control.Bounds + ",visible=" + control.Visible + ")");
+				}
+			}
+			string conclusion;
+			if (suspiciousRows.Count > 0)
+			{
+				conclusion = "空白来源判定：隐藏/无可见控件行仍占高 -> " + string.Join(",", suspiciousRows);
+			}
+			else
+			{
+				conclusion = "空白来源判定：隐藏行未占高（未发现可疑空白）";
+			}
+			sb.AppendLine("[battery-ui] " + conclusion);
+			string message = sb.ToString().TrimEnd();
+			Logger.WriteLineIfChanged("battery-ui-card-layout", message);
+			if (suspiciousRows.Count > 0)
+			{
+				Logger.WriteError("[battery-ui] ⛔ 电池卡片空白 FAIL：" + conclusion);
+				// ⭐ 机主要求：隐藏/无可见控件的行**行高必须 0** ⇒ 自动收 0 并重算（只在本机宝龙达卡片路径）✅
+				foreach (int row in suspiciousRows)
+				{
+					host.RowStyles[row] = new RowStyle(SizeType.Absolute, 0f);
+				}
+				RecalculateBatteryTableHeight();
+				Logger.WriteError("[battery-ui] 已将可疑空白行自动收 0：[" + string.Join(",", suspiciousRows) + "]");
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery-ui] 电池卡片布局自检失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
 	private void BuildBaolongdaChargeLimitSection(TableLayoutPanel host)
 	{
 		try
@@ -9968,6 +10074,12 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		ApplyChargeLimitStageEnablement();
 		// ⭐⭐ 2026-10-18（机主：面板行被裁）：⭐ 所有行高调整结束后**统一重算一次**（单一来源）✅
 		RecalculateBatteryTableHeight();
+		// ⭐ 2026-10-19（机主：电池卡片空白）：⭐ 门控全部跑完后再量一次（隐藏行已收 0），并自动收 0 可疑空白行 ✅
+		if (baolongdaRaw && _chargeLimitHostTable != null)
+		{
+			BatteryLimitPanel bdPanel = Controls.Find(BatteryLimitPanel.PanelControlName, searchAllChildren: true).OfType<BatteryLimitPanel>().FirstOrDefault();
+			LogBatteryCardLayout(_chargeLimitHostTable, bdPanel);
+		}
 	}
 
 	internal static string ChargeLimitDisabledReason(SupportDecision support)
