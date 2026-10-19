@@ -3181,9 +3181,15 @@ internal static class Program
 			bool isConnected = rgb.IsConnected;
 			LogLightBoot($"HID 帧流准备：IsConnected={isConnected} · forceEffectRestore={forceEffectRestore}"
 				+ $" · powerJustIssued={powerJustIssued}（来源=恢复）");
-			if (!isConnected && !rgb.Connect())
+			if (!isConnected)
 			{
-				return false;
+				if (!rgb.Connect())
+				{
+					return false;
+				}
+				// 刚连上 HID 时先进入自定义模式，否则 StartMode 的帧不生效
+				LogLightBoot("HID 已连接：进入自定义模式（ReInitCustomMode）");
+				rgb.ReInitCustomMode();
 			}
 			if ((isConnected & forceEffectRestore) && !powerJustIssued && !rgb.ReInitCustomMode() && !rgb.Connect())
 			{
