@@ -1861,12 +1861,22 @@ public class CustomModeForm : RForm
 			_modeCombo.BeginUpdate();
 			_modeCombo.Items.Clear();
 			MechrevoHw hw = Program.hw;
+			// 编辑自定义档时，下拉只列自定义档（不混入办公/游戏/狂飙）
+			bool customOnly = !_firmwareMode && (FindMode(_modeId)?.IsCustom ?? false);
 			foreach (PerfModeDefinition item in ModesSnapshot())
 			{
-				if (_firmwareMode || IsOffered(item, hw) || string.Equals(item.Id, _modeId, StringComparison.Ordinal))
+				if (customOnly)
 				{
-					_modeCombo.Items.Add(new ModeItem(item.Id, PerfModeText.ComboText(item)));
+					if (!item.IsCustom)
+					{
+						continue;
+					}
 				}
+				else if (!(_firmwareMode || IsOffered(item, hw) || string.Equals(item.Id, _modeId, StringComparison.Ordinal)))
+				{
+					continue;
+				}
+				_modeCombo.Items.Add(new ModeItem(item.Id, PerfModeText.ComboText(item)));
 			}
 			SelectModeItem(_firmwareMode ? PerfModeDefinition.BuiltInId(FirmwareKind()) : _modeId);
 			_modeCombo.EndUpdate();
