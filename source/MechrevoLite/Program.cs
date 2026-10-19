@@ -2273,6 +2273,8 @@ internal static class Program
 					Logger.WriteError(decisionMessage);
 				}
 				SyncBaolongdaLightStateReadOnly("启动/恢复（判定=不点亮）");
+				// ⭐ 启动/恢复只读分支同样尝试恢复软件彩虹（仅硬件亮着 + 保存效果=彩虹；幂等）✅
+				TryResumeBaolongdaSoftwareRainbow("启动/恢复判定=只读");
 				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
 				return true;
 			}
@@ -2919,6 +2921,76 @@ internal static class Program
 		return (AllIssued: !attempted | allSucceeded, Attempted: attempted, IssuedSummary: string.Join(' ', issuedSummary));
 	}
 
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（宝龙达：开机/重启后软件彩虹不继续）：**只在硬件当前亮着**时恢复进程内刷色循环 ✅。
+	/// <para>⚠️ 前置：UsesBaolongda；硬件真实状态必须 on（⛔ 不主动点亮）；保存效果必须是 Rainbow；
+	/// 有可靠的"用户显式关灯"标记（`KbPowerExplicitOff` / kbPower=0）⇒ 跳过 ✅。</para>
+	/// <para>⚠️ 幂等：`IsKeyboardRainbowRunning` 已跑 ⇒ 直接返回；非宝龙达/非彩虹/硬件灭 ⇒ 只记 skip 日志 ✅。</para>
+	/// </summary>
+	private static void TryResumeBaolongdaSoftwareRainbow(string reason)
+	{
+		MechrevoHw mechrevoHw = hw;
+		if (mechrevoHw == null || !mechrevoHw.UsesBaolongda)
+		{
+			return;
+		}
+		if (mechrevoHw.IsKeyboardRainbowRunning)
+		{
+			return; // ⭐ 幂等：已在跑，不重复启动 ✅
+		}
+		if (!mechrevoHw.TryReadKeyboardLightingViaBackend(out bool hardwareOn, out int _, out int brightness18, out string _))
+		{
+			LogBaolongdaRainbowSkip(reason, "硬件状态读不到");
+			return;
+		}
+		if (!hardwareOn)
+		{
+			LogBaolongdaRainbowSkip(reason, "硬件灭");
+			return;
+		}
+		KeyboardRgb keyboardRgb = rgb;
+		if (keyboardRgb != null && keyboardRgb.KbPowerExplicitOff)
+		{
+			LogBaolongdaRainbowSkip(reason, "用户显式关灯（kbPower=0）");
+			return;
+		}
+		if (!LightingSettingsStore.TryLoad("Keyboard/Ctrl", out LightChannelSettings settings)
+			|| !string.Equals(settings.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase))
+		{
+			LogBaolongdaRainbowSkip(reason, "未保存彩虹效果/保存值读不到");
+			return;
+		}
+		int brightness = brightness18;
+		if (brightness <= 0 && mechrevoHw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30)
+		{
+			// 30 系状态源是 EC 0x1807；WMI18 不是可靠状态源 ⇒ 用 EC 当前档位 ✅
+			KeyboardEcBrightness.TryReadCurrentLevel(out brightness);
+		}
+		if (brightness <= 0)
+		{
+			LogBaolongdaRainbowSkip(reason, "读不到亮度");
+			return;
+		}
+		int max = Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax());
+		brightness = Math.Clamp(brightness, 1, max);
+		mechrevoHw.StartKeyboardRainbow((byte)brightness, CancellationToken.None);
+		string message = $"[light] 宝龙达启动：软件彩虹恢复（原因={reason} · 硬件亮着 · 亮度={brightness}）⇒ 已重启刷色循环";
+		if (Logger.TryMarkChanged("light-bd-rainbow-resume-ok", message))
+		{
+			Logger.WriteError(message);
+		}
+	}
+
+	/// <summary>⭐ 宝龙达彩虹恢复的跳过日志（按原因去重、默认可见）✅。</summary>
+	private static void LogBaolongdaRainbowSkip(string reason, string why)
+	{
+		string message = $"[light] 宝龙达启动：跳过彩虹恢复（原因={reason} · {why}）";
+		if (Logger.TryMarkChanged("light-bd-rainbow-skip-" + reason, message))
+		{
+			Logger.WriteError(message);
+		}
+	}
+
 	private static async Task<bool> RestoreKeyboardLightingAsync(bool force = false)
 	{
 		await _keyboardRestoreLock.WaitAsync().ConfigureAwait(continueOnCapturedContext: false);
@@ -2935,6 +3007,8 @@ internal static class Program
 			if (keyboardRestoreHw != null && keyboardRestoreHw.UsesBaolongda)
 			{
 				SyncBaolongdaLightStateReadOnly("键盘恢复（只读）");
+				// ⭐ 只读同步之后：仅当硬件亮着且保存效果=彩虹 ⇒ 重启进程内刷色（⛔ 不点亮）✅
+				TryResumeBaolongdaSoftwareRainbow("键盘恢复");
 				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
 				return true;
 			}

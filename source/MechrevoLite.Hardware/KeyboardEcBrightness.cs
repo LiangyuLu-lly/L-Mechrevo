@@ -34,6 +34,20 @@ internal static class KeyboardEcBrightness
 		return (level >= 0 && level <= 3) ? LevelValues[level] : -1;
 	}
 
+	/// <summary>
+	/// ⭐ 2026-10-19（宝龙达软件彩虹启动恢复）：只读当前 EC 0x1807 并换算档位（0/1/2/3；读不到/未知值 ⇒ false）✅。
+	/// </summary>
+	internal static bool TryReadCurrentLevel(out int level)
+	{
+		level = -1;
+		if (!EcPortIo.TryReadByte(RegisterAddress, out int pwm))
+		{
+			return false;
+		}
+		level = LevelFromPwm(pwm);
+		return level >= 0;
+	}
+
 	/// <summary>⭐ 2026-10-19（机主：关灯记忆上次亮度）：配置键 ✅。</summary>
 	internal const string LastBrightnessKey = "kbd_last_brightness";
 
