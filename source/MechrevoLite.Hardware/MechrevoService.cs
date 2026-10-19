@@ -4902,12 +4902,13 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			}
 			Dictionary<string, object> value = dictionary;
 			bool isLogoLightbar = string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal);
-			// 官方 Logo 协议先只用于 40 系同方（50 系保持原逻辑）
-			bool applyOfficialLogo = isLogoLightbar && !_hw.UsesBaolongda && _hw.DgpuGeneration == DgpuGenerationKind.Gen40;
+			bool isLightbarCtrl = string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal);
+			// 官方灯效协议先只用于 40 系同方（50 系保持原逻辑）
+			bool applyOfficialLogo = (isLogoLightbar || isLightbarCtrl) && !_hw.UsesBaolongda && _hw.DgpuGeneration == DgpuGenerationKind.Gen40;
 			if (applyOfficialLogo)
 			{
 				// Logo 通道按效果分流：单色=1 段，呼吸/彩虹=7 段循环，其余效果由固件配色
-				int logoColorMode = LightForm.LogoColorMode(effect);
+				int logoColorMode = LightForm.LightEffectColorMode(effect);
 				if (logoColorMode == 7)
 				{
 					dictionary["isCircular"] = true;
@@ -4950,9 +4951,22 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			}
 			if (!string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
 			{
+				string paletteLog = "";
+				if (applyOfficialLogo && dictionary["ColorBuffer"] is object[] paletteBuf && paletteBuf.Length > 0)
+				{
+					paletteLog = " palette=" + string.Join(",", paletteBuf.Take(7).Select(item =>
+					{
+						if (item is Dictionary<string, object> rgb)
+						{
+							return Convert.ToInt32(rgb["R"]).ToString("X2") + Convert.ToInt32(rgb["G"]).ToString("X2") + Convert.ToInt32(rgb["B"]).ToString("X2");
+						}
+						return "--";
+					}));
+				}
 				string payloadLog = $"[light] 下发 topic={topic} effect={effect} light={light} speed={speed}"
 					+ $" ColorBlocks={dictionary["ColorBlocks"]} isCircular={dictionary["isCircular"]}"
-					+ $" singleColor={(singleColor.HasValue ? singleColor.Value.ToArgb().ToString("X6") : "null")}";
+					+ $" singleColor={(singleColor.HasValue ? singleColor.Value.ToArgb().ToString("X6") : "null")}"
+					+ paletteLog;
 				if (Logger.TryMarkChanged("light-payload-" + topic, payloadLog))
 				{
 					Logger.WriteError(payloadLog);

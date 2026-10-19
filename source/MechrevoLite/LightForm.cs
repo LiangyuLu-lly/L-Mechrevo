@@ -39,14 +39,14 @@ public class LightForm : RForm
 		("Raindrop", Strings.EffectMeteor)
 	};
 
-	/// <summary>Logo 效果的颜色数：1=单色，7=七色，0=不支持自定义颜色。</summary>
-	internal static int LogoColorMode(string effect)
+	/// <summary>灯效的颜色数：1=单色，7=七色，0=不支持自定义颜色。</summary>
+	internal static int LightEffectColorMode(string effect)
 	{
 		if (effect == "Single" || effect == "Raindrop")
 		{
 			return 1;
 		}
-		if (effect == "Breathing" || effect == "ColorMarquee")
+		if (effect == "Breathing" || effect == "Impact" || effect == "ColorMarquee")
 		{
 			return 7;
 		}
@@ -167,6 +167,9 @@ public class LightForm : RForm
 		bool logoGrade = string.Equals(_topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal)
 			&& Program.hw != null && !Program.hw.UsesBaolongda
 			&& Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+		bool lightbarGrade = string.Equals(_topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+			&& Program.hw != null && !Program.hw.UsesBaolongda
+			&& Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
 		RSlider sliderLight = new RSlider
 		{
 			Minimum = 0,
@@ -226,7 +229,7 @@ public class LightForm : RForm
 		AddRow(Strings.SingleColor, colorBtn);
 		// 彩虹下颜色无意义 ⇒ 颜色行隐藏/置灰
 		Label colorLabel = table.GetControlFromPosition(0, colorRow) as Label;
-		int logoColorMode = logoGrade ? LogoColorMode(_effect) : (-1);
+		int logoColorMode = (logoGrade || lightbarGrade) ? LightEffectColorMode(_effect) : (-1);
 		FlowLayoutPanel mixPanel = null;
 		int[] mixColors = null;
 		if (logoColorMode == 7)
@@ -433,7 +436,7 @@ public class LightForm : RForm
 			// 通道开着就能调；保存值可能滞后于硬件开关
 			bool powerOn = LightingSettingsStore.Load(_topic, _effects[0].Effect).PowerOn
 				|| Program.IsExternalLightChannelOn(_topic);
-			bool colorMeaningful = logoGrade ? (logoColorMode == 1) : KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
+			bool colorMeaningful = (logoGrade || lightbarGrade) ? (logoColorMode == 1) : KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
 			sliderLight.Enabled = powerOn;
 			sliderSpeed.Enabled = powerOn;
 			if (mixPanel != null)
