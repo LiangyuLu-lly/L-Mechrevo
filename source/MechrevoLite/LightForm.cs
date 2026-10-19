@@ -28,15 +28,30 @@ public class LightForm : RForm
 		("Mix", Strings.EffectMix)
 	};
 
-	// Logo（40 系同方）：官方控制台五项
-	public static readonly (string Effect, string Name)[] LogoEffectsGen40 = new (string, string)[5]
+	// Logo（40 系同方）：官方控制台效果
+	public static readonly (string Effect, string Name)[] LogoEffectsGen40 = new (string, string)[6]
 	{
+		("Single", Strings.EffectSingle),
 		("ColorMarquee", Strings.EffectRainbow),
 		("Breathing", Strings.EffectBreathing),
 		("Wave", Strings.EffectWave),
 		("Impact", Strings.EffectImpact),
 		("Raindrop", Strings.EffectMeteor)
 	};
+
+	/// <summary>Logo 效果的颜色数：1=单色，7=七色，0=不支持自定义颜色。</summary>
+	internal static int LogoColorMode(string effect)
+	{
+		if (effect == "Single")
+		{
+			return 1;
+		}
+		if (effect == "Breathing" || effect == "ColorMarquee")
+		{
+			return 7;
+		}
+		return 0;
+	}
 
 	/// <summary>当前机型该用哪张 Logo 效果表。</summary>
 	internal static (string Effect, string Name)[] CurrentLogoEffects()
@@ -211,9 +226,10 @@ public class LightForm : RForm
 		AddRow(Strings.SingleColor, colorBtn);
 		// 彩虹下颜色无意义 ⇒ 颜色行隐藏/置灰
 		Label colorLabel = table.GetControlFromPosition(0, colorRow) as Label;
+		int logoColorMode = logoGrade ? LogoColorMode(_effect) : (-1);
 		FlowLayoutPanel mixPanel = null;
 		int[] mixColors = null;
-		if (logoGrade)
+		if (logoColorMode == 7)
 		{
 			LightChannelSettings savedMix = LightingSettingsStore.Load(_topic, "ColorMarquee");
 			mixColors = (int[])(savedMix.MixColors != null ? savedMix.MixColors.Clone() : LightChannelSettings.DefaultMixColors.Clone());
@@ -229,12 +245,12 @@ public class LightForm : RForm
 				int swatchIndex = mi;
 				RColorButton swatch = new RColorButton
 				{
-					Size = new Size(30, 22),
+					Size = new Size(26, 20),
 					BackColor = UiVisualStyle.Input,
 					BorderColor = UiVisualStyle.Border,
 					SwatchColor = Color.FromArgb(mixColors[mi]),
 					Cursor = Cursors.Hand,
-					Margin = new Padding(3, 0, 0, 0)
+					Margin = new Padding(2, 0, 0, 0)
 				};
 				swatch.Click += (object _, EventArgs _) =>
 				{
@@ -254,8 +270,8 @@ public class LightForm : RForm
 			RButton resetMix = new RButton
 			{
 				Text = Strings.Default,
-				Size = new Size(64, 22),
-				Margin = new Padding(8, 0, 0, 0)
+				Size = new Size(52, 20),
+				Margin = new Padding(6, 0, 0, 0)
 			};
 			resetMix.Click += (object _, EventArgs _) =>
 			{
@@ -415,7 +431,7 @@ public class LightForm : RForm
 			// 通道开着就能调；保存值可能滞后于硬件开关
 			bool powerOn = LightingSettingsStore.Load(_topic, _effects[0].Effect).PowerOn
 				|| Program.IsExternalLightChannelOn(_topic);
-			bool colorMeaningful = !logoGrade && KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
+			bool colorMeaningful = logoGrade ? (logoColorMode == 1) : KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
 			sliderLight.Enabled = powerOn;
 			comboSpeed.Enabled = powerOn;
 			if (mixPanel != null)
