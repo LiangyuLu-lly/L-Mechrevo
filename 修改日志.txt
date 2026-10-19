@@ -1,3 +1,23 @@
+r77（2026-10-19 · **0.292.2.1 beta23.2.1**）★★ GPU 偏移 UI 重做 + 同方 GCU 负偏移（核心 -95 / 显存 -1000 实测）+ 显存风控
+用户原话：「核心偏移有没有减频率的能力」「同方 GCU接受降低频率吗 可以先做一个试试」「可以生效 看看GCU的offset能不能-100也实验一下」「NVAPI保留但默认不用 然后滑块默认一半可+-500 旁边数字框则是可以填NV允许的」「注意是GCU机型默认不用」「显存+-2000吧 然后数字框也是可以填NV允许的范围 宝龙达同方都是 路径不一致但是逻辑一样」「显存超过+1000 红色字提示显存偏移过高有损坏硬件风险」「GCU最多是-900的显存 NV的范围允许是多少」「GCU可以写入最多是-1000 只是我们UI弹了-900」「滑块最低-1000吧 最高+2000 宝龙达那边也是数字范围就还是NV允许的显存范围」「可以 打包23.2.1」
+① ⭐ 实测结论（真机诊断包 14:02）：**同方 GCU 厂商字段原生支持负偏移** —— `GpuCoreClockOffsetOC=-95` 经原 `WriteFirmwareField` 链下发、`SetCustomDetail confirmed=True` 回读一致 ⇒ **不需要 NVAPI 绕路**；
+   显存负值固件可写到 **-1000**（机主实测；更负写不进去）。
+② ⭐ 路径矩阵（逻辑一致、通道不同）：
+   - 宝龙达（`UsesBaolongda`）⇒ **NVAPI P0 直写**（`NvapiPStates.TrySetP0Offsets` + 回读），⛔ 不受 `gpu_oc_nvapi_for_gcu` 影响；
+   - 同方 GCU（`!UsesBaolongda && NVIDIA`）⇒ 默认**厂商字段**（核心/显存 `WriteFirmwareField` + `SetCustomDetail` 回读 `confirmed`）；
+   - NVAPI 兜底保留：`gpu_oc_nvapi_for_gcu` 默认 **0**（设 1 才为 GCU 启用 NVAPI 写）；`gpu_oc_gcu_negative_field` 默认 0（GCU-first 实验段标记为死路径/未来兜底）；
+   - 切回 0/正值：GCU 字段与 NVAPI 两侧都清残留（NVAPI 清零不再受开关影响，只要上次由它接管过）。
+③ ⭐ UI 形态（两种模具共用）：核心滑块 **±500**；显存滑块 **-1000..+2000**（非对称，0 不强制居中）；数字框范围 = `max(驱动/厂商下限[, -1000]) .. min(上限, +2000)`
+   （宝龙达=NVAPI P0 范围；GCU 显存下限锁 -1000）；**数字框可超滑块**并保留真实值；**应用以数字框为准**（`_coreOcVal/_memOcVal`）。
+   同步统一走 `ApplyGpuOffsetUiRange` / `AddSliderRow(numericMinOverride…)`，先设 Min/Max 再赋值 ⇒ 不新增 `ArgumentOutOfRangeException`（此前踩过滑块崩溃）。
+④ ⭐ 风控提示：判据改为**数字框实际值** —— 显存 `> 1000` 红字（`VramOffsetRisk`）、核心 `> CoreOffsetWarnThreshold()`（50 系 200 / 其它 150）；滑块拖动/数字框输入/面板刷新都会重评（`SyncOcRiskVisuals`），日志 `[gpu-oc] 风险提示…`。
+⑤ ⭐ 路径自检日志（首次打开自定义模式、去重）：
+   `[gpu-oc] 路径自检：模具=… · 写入=NVAPI/厂商字段 · 开关 gpu_oc_nvapi_for_gcu=… · 数字框范围=… · 滑块=core±500 mem=-1000..2000`，判据与实现同源（`GpuOffsetUiRange` + `UsesBaolongda`）。
+⑥ ⭐ 只读探针：`--gpu-offset-probe`（`GpuOffsetProbe.cs`）打印 NVAPI P0 范围/当前值、厂商字段范围、UI 采用范围，写桌面 `lm-gpu-offset-probe-*.txt`；⛔ 无任何 Set（用于排查“频率没变化”与确认驱动/固件边界）。
+⑦ ⭐ 回归/无伤害记录：本次仅改 GPU 偏移 UI 与实验路由；GCU 其它字段（TGP/DynamicBoost/风扇/PL…）与宝龙达能力位未动；宝龙达 NVAPI 路径保持原样；
+   新增文案均走资源键（中/英），未硬编码；`CustomModeForm`/`PerfModeBackend` 纯 LF。
+⑧ ⭐ 版本：0.292.2.1 / beta23.2.1；包名 `LM-0.292.2.1-beta23.2.1-setup.exe`。
+
 r76（2026-10-19 · **0.292.2 beta23.2**）★★ 休眠唤醒弹窗 + 设置页启动/响应优化 + 板号识别增强（含两处自引入回归的修复记录）
 用户原话：「设页启动慢问题存在好几个版本了 看看能不能优化」「速度区别不大,但是页面不会未响应了」「那先这样 有机主反应就是机器休眠(会关机的睡眠那个) 再启动后LM会弹出UI主界面 就算之前关闭了也会」「依旧会」「可以 没有弹了」「打包 beta23.2 写修改日志 更新日志(回归问题不写更新日志 但是要记录修改)」
 ① ⭐ 休眠唤醒弹主界面：两层修法 ——
