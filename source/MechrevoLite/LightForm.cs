@@ -23,7 +23,7 @@ public class LightForm : RForm
 	// Logo：与官方控制台一致的五项效果
 	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[5]
 	{
-		("ColorMarquee", Strings.EffectMix),
+		("ColorMarquee", Strings.EffectRainbow),
 		("Breathing", Strings.EffectBreathing),
 		("Wave", Strings.EffectWave),
 		("Impact", Strings.EffectImpact),
