@@ -5672,4 +5672,16 @@
     <data name="GpuOcNvapiExperimentHint" xml:space="preserve">
     <value>实验特性：负偏移由厂商字段（GCU）承载；NVAPI 仅作可选兜底（gpu_oc_nvapi_for_gcu=1 开启）</value>
   </data>
+  <data name="ScreenBlankBusyRestoring" xml:space="preserve">
+    <value>上一次息屏还在恢复中，请稍等片刻再试</value>
+  </data>
+  <data name="ScreenBlankStaleFailed" xml:space="preserve">
+    <value>息屏功能异常，已尝试复位，请重试或重启 LM</value>
+  </data>
+  <data name="FanBoostNeedsPawnIO" xml:space="preserve">
+    <value>强冷需要 PawnIO 驱动（EC 写入），现在安装吗？</value>
+  </data>
+  <data name="FanBoostNeedsPawnIOHint" xml:space="preserve">
+    <value>强冷需要 PawnIO 驱动，可在「CPU 调节」页安装</value>
+  </data>
 </root>

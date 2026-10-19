@@ -51,6 +51,9 @@ internal static class VirtualDisplayBlank
 
 	private static bool _restoring;
 
+	// ⭐⭐ 2026-10-19（机主：息屏永久卡「an earlier blank session…」）：恢复开始时刻 —— 用于识别残留会话 ✅
+	private static DateTime _restoreStartedUtc;
+
 	private static DateTime _blankStartedUtc;
 
 	/// <summary>
@@ -140,11 +143,44 @@ internal static class VirtualDisplayBlank
 	/// </summary>
 	internal static string Start()
 	{
+		bool staleReset = false;
 		lock (Gate)
 		{
 			if (_active || _restoring)
 			{
-				return "an earlier blank session is still active or restoring; please wait.";
+				// ⭐⭐ 2026-10-19（机主：息屏永久卡英文提示）：先判断**残留会话**并自愈 ✅
+				//   active > 120s 或 restoring > 30s ⇒ 视为残留（线程异常/睡眠打断）⇒ 强制复位后继续本次息屏
+				DateTime now = DateTime.UtcNow;
+				double activeAge = _active ? (now - _blankStartedUtc).TotalSeconds : 0.0;
+				double restoreAge = _restoring ? (now - _restoreStartedUtc).TotalSeconds : 0.0;
+				double age = Math.Max(activeAge, restoreAge);
+				bool stale = (_active && activeAge > 120.0) || (_restoring && restoreAge > 30.0);
+				if (!stale)
+				{
+					return Strings.ScreenBlankBusyRestoring;
+				}
+				Logger.WriteError("[blank] 检测到残留息屏会话（active=" + _active + " restoring=" + _restoring
+					+ " age=" + age.ToString("F0") + "s）⇒ 强制复位");
+				bool needTeardown = _virtualDisplayOn || _topologySwitched || _active;
+				_active = false;
+				_restoring = false;
+				_restoreStartedUtc = default(DateTime);
+				_virtualDisplayOn = false;
+				_topologySwitched = false;
+				if (needTeardown)
+				{
+					try
+					{
+						TeardownVirtualDisplay("stale-reset", restoreTopology: true);
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteError("[blank] 残留复位失败 ⇒ " + ex.Message);
+						return Strings.ScreenBlankStaleFailed;
+					}
+				}
+				Logger.WriteError("[blank] 残留复位完成 ⇒ 重试 Start()");
+				staleReset = true;
 			}
 			string driverDir = GetDriverDir();
 			if (!VerifyDriverFiles(driverDir, out string missing))
@@ -153,10 +189,14 @@ internal static class VirtualDisplayBlank
 			}
 			_active = true;
 			_blankStartedUtc = DateTime.UtcNow;
+			_restoreStartedUtc = default(DateTime);
 			// ⭐ 息屏前先记拓扑（必须在 displayswitch /external 之前）⇒ 恢复时按它切回 ✅
 			_topologyBeforeBlank = ReadCurrentTopology();
 		}
-		Task.Run(delegate
+		if (staleReset)
+		{
+			Logger.WriteLine("[blank] 残留复位后重新开始息屏序列（本次点击不再要求用户重试）");
+		}		Task.Run(delegate
 		{
 			try
 			{
@@ -199,6 +239,7 @@ internal static class VirtualDisplayBlank
 				return;
 			}
 			_restoring = true;
+			_restoreStartedUtc = DateTime.UtcNow;
 			// 置 _active=false：让黑屏线程的等待循环（WaitForExitCondition）立即退出，随后走它自己的恢复路径
 			//（/internal + enableidd 0，与这里幂等重复无害）。
 			needTeardown = _active || _virtualDisplayOn || _topologySwitched;
@@ -221,6 +262,7 @@ internal static class VirtualDisplayBlank
 			lock (Gate)
 			{
 				_restoring = false;
+				_restoreStartedUtc = default(DateTime);
 			}
 			ApplyExecutionState(ES_CONTINUOUS);
 		}

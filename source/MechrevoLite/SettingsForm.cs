@@ -2192,6 +2192,44 @@ public class SettingsForm : RForm
 						_fanBoostOptimisticUntil = DateTime.Now.AddSeconds(12);
 						_fanBoostOptimisticValue = cb.Checked;
 						Logger.WriteLine("[fan] 强冷：UI 先乐观置" + (cb.Checked ? "开" : "关") + "（等待确认）");
+						// ⭐⭐ 2026-10-19（机主：宝龙达强冷点开无反应）：宝龙达 EC 写入依赖 PawnIO ⇒
+						//   缺失时**弹确认框**引导安装（复用 PawnIOInstaller，同一入口；⛔ 不静默安装）✅
+						if (cb.Checked && (Program.hw?.UsesBaolongda ?? false) && !PawnIO.RyzenSmuService.IsPawnInstalled())
+						{
+							Logger.WriteError("[fan] 强冷：PawnIO 缺失 ⇒ 弹安装提示");
+							DialogResult installChoice = MessageBox.Show(this, Strings.FanBoostNeedsPawnIO, "L-Mechrevo", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+							Logger.WriteError("[fan] 强冷：PawnIO 缺失 ⇒ 用户选择=" + ((installChoice == DialogResult.Yes) ? "安装" : "取消"));
+							bool pawnInstalled = false;
+							if (installChoice == DialogResult.Yes)
+							{
+								try
+								{
+									int pawnExitCode = await PawnIOInstaller.RunInstallerAsync();
+									pawnInstalled = PawnIOInstaller.GetStatus().Installed;
+									Logger.WriteError("[fan] 强冷：PawnIO 安装结果 code=" + pawnExitCode + " installed=" + pawnInstalled);
+								}
+								catch (Exception ex)
+								{
+									Logger.WriteError("[fan] 强冷：PawnIO 安装异常（已吞掉）：" + ex.Message);
+								}
+							}
+							if (!pawnInstalled)
+							{
+								_syncingSwitches = true;
+								try
+								{
+									cb.Checked = false;
+								}
+								finally
+								{
+									_syncingSwitches = false;
+								}
+								_fanBoostOptimisticUntil = DateTime.MinValue;
+								ToastForm.ShowFailure(Strings.FanBoostNeedsPawnIOHint);
+								return;
+							}
+							Logger.WriteError("[fan] 强冷：PawnIO 已就绪 ⇒ 自动重试本次强冷");
+						}
 						if (Program.service != null)
 						{
 							MechrevoHw hw = Program.hw;

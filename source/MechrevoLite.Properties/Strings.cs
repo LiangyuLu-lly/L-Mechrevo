@@ -1116,6 +1116,10 @@ internal class Strings
 
 	internal static string ScreenBlankDriverMissing => ResourceManager.GetString("ScreenBlankDriverMissing", resourceCulture);
 
+	internal static string ScreenBlankBusyRestoring => ResourceManager.GetString("ScreenBlankBusyRestoring", resourceCulture);
+
+	internal static string ScreenBlankStaleFailed => ResourceManager.GetString("ScreenBlankStaleFailed", resourceCulture);
+
 	internal static string ScreenBlankFailed => ResourceManager.GetString("ScreenBlankFailed", resourceCulture);
 
 	internal static string SelectColor => ResourceManager.GetString("SelectColor", resourceCulture);
@@ -1491,6 +1495,10 @@ internal class Strings
 	internal static string PawnIOInstallFailed => ResourceManager.GetString("PawnIOInstallFailed", resourceCulture);
 	internal static string PawnIODriverRestart => ResourceManager.GetString("PawnIODriverRestart", resourceCulture);
 	internal static string PawnIOBaolongdaDependency => ResourceManager.GetString("PawnIOBaolongdaDependency", resourceCulture);
+
+	internal static string FanBoostNeedsPawnIO => ResourceManager.GetString("FanBoostNeedsPawnIO", resourceCulture);
+
+	internal static string FanBoostNeedsPawnIOHint => ResourceManager.GetString("FanBoostNeedsPawnIOHint", resourceCulture);
 	internal static string BatteryLimitAllowInitialDischarge => ResourceManager.GetString("BatteryLimitAllowInitialDischarge", resourceCulture);
 	internal static string BatteryLimitAllowInitialDischargeTip => ResourceManager.GetString("BatteryLimitAllowInitialDischargeTip", resourceCulture);
 	internal static string BatteryLimitAboveSocBlockedFormat => ResourceManager.GetString("BatteryLimitAboveSocBlockedFormat", resourceCulture);

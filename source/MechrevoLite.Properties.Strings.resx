@@ -5689,4 +5689,16 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
     <data name="GpuOcNvapiExperimentHint" xml:space="preserve">
     <value>Experimental: negative offsets are carried by the vendor field (GCU). NVAPI fallback is optional via gpu_oc_nvapi_for_gcu=1.</value>
   </data>
+  <data name="ScreenBlankBusyRestoring" xml:space="preserve">
+    <value>The previous screen-off session is still restoring. Please wait a moment and try again.</value>
+  </data>
+  <data name="ScreenBlankStaleFailed" xml:space="preserve">
+    <value>The screen-off feature is in an abnormal state. It was reset automatically; please retry or restart L-Mechrevo.</value>
+  </data>
+  <data name="FanBoostNeedsPawnIO" xml:space="preserve">
+    <value>Fan boost needs the PawnIO driver (for EC writes). Install it now?</value>
+  </data>
+  <data name="FanBoostNeedsPawnIOHint" xml:space="preserve">
+    <value>Fan boost needs the PawnIO driver. You can install it on the CPU Tuning page.</value>
+  </data>
 </root>
