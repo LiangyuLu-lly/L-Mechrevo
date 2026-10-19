@@ -1222,6 +1222,9 @@ internal sealed class PerfModeService
 
 		PerfModeSettings settings = mode.Settings;
 		// 幂等先读后比：无界用 SMU；宝龙达用 WMI 本机值（Pl1/Pl2/TccTarget，未设置/读不到视为不一致 ⇒ 重放）✅
+		// ⭐⭐ 2026-10-19（机主：「记得参数也要应用一次 无论30 40」）：
+		//   ⚠️ 宝龙达重启后固件参数可能已被复位，但 WMI 回读可能仍是**缓存/默认值**恰好与配置相同 ⇒ 用「一致就跳过」会漏应用 ❌
+		//   ⇒ 宝龙达分支**每次启动强制应用一次**（⛔ 不再按“一致”跳过）；无界保持原「一致就跳过」✅
 		bool match;
 		if (isWujie)
 		{
@@ -1231,6 +1234,11 @@ internal sealed class PerfModeService
 		else
 		{
 			match = BaolongdaLocalValuesMatch(settings, hw);
+			if (match)
+			{
+				Logger.WriteLine("[perfmode] 宝龙达启动恢复：回读与配置一致，但按机主要求仍**强制应用一次**（30/40 系通用）");
+			}
+			match = false;
 		}
 		if (match)
 		{
