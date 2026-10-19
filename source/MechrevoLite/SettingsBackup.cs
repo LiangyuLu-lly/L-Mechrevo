@@ -33,7 +33,10 @@ internal static class SettingsBackup
 	internal const string BackupFolderPrefix = "userdata-backup-";
 
 	/// <summary>%APPDATA%\MechrevoLite 里参与备份的设置文件（缺失即跳过，并在 README 与结果里如实列出）。</summary>
-	private static readonly string[] RoamingFiles = new string[6] { "config.json", "config.json.bak", "rgb.cfg", "lightbar.cfg", "keyboard.cfg", "lhm_sensors.txt" };
+	private static readonly string[] RoamingFiles = new string[9] { "config.json", "config.json.bak", "rgb.cfg", "lightbar.cfg", "logolight.cfg", "keyboard.cfg", "lighting.user-configured", "fan_curve_bd.cfg", "lhm_sensors.txt" };
+
+	/// <summary>%APPDATA%\MechrevoLite 里按命名规则参与备份的文件（如宝龙达每个自定义档的风扇曲线）。</summary>
+	private static readonly string[] RoamingPatterns = new string[1] { "baolongda_fancurve_*.cfg" };
 
 	/// <summary>%ProgramData%\MechrevoLite 里参与备份的设置文件。</summary>
 	private static readonly string[] ProgramDataFiles = new string[2] { "config.json", "config.json.bak" };
@@ -170,6 +173,32 @@ internal static class SettingsBackup
 		{
 			yield return (ProgramDataEntryFolder + "/" + file, Path.Combine(ProgramDataDirectory, file));
 		}
+		foreach (string pattern in RoamingPatterns)
+		{
+			if (!Directory.Exists(RoamingDirectory))
+			{
+				yield break;
+			}
+			foreach (string path in Directory.EnumerateFiles(RoamingDirectory, pattern))
+			{
+				yield return (RoamingEntryFolder + "/" + Path.GetFileName(path), path);
+			}
+		}
+	}
+
+	/// <summary>文件名是否匹配带 * 的简单通配（只允许一个 *）。</summary>
+	private static bool MatchFilePattern(string name, string pattern)
+	{
+		int star = pattern.IndexOf('*');
+		if (star < 0)
+		{
+			return string.Equals(name, pattern, StringComparison.OrdinalIgnoreCase);
+		}
+		string prefix = pattern.Substring(0, star);
+		string suffix = pattern.Substring(star + 1);
+		return name.Length >= prefix.Length + suffix.Length
+			&& name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+			&& name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
 	}
 
 	/// <summary>
@@ -262,6 +291,18 @@ internal static class SettingsBackup
 				return true;
 			}
 		}
+		if (string.Equals(root, RoamingEntryFolder, StringComparison.Ordinal)
+			&& parts[1].IndexOfAny(new char[2] { '/', '\\' }) < 0)
+		{
+			foreach (string pattern in RoamingPatterns)
+			{
+				if (MatchFilePattern(parts[1], pattern))
+				{
+					canonicalEntryName = root + "/" + parts[1];
+					return true;
+				}
+			}
+		}
 		return false;
 	}
 
@@ -296,6 +337,20 @@ internal static class SettingsBackup
 			if (CopyIfExists(source, Path.Combine(backupDirectory, ProgramDataEntryFolder, file)))
 			{
 				backedUp.Add(ProgramDataEntryFolder + "/" + file);
+			}
+		}
+		if (Directory.Exists(RoamingDirectory))
+		{
+			foreach (string pattern in RoamingPatterns)
+			{
+				foreach (string path in Directory.EnumerateFiles(RoamingDirectory, pattern))
+				{
+					string fileName = Path.GetFileName(path);
+					if (CopyIfExists(path, Path.Combine(backupDirectory, RoamingEntryFolder, fileName)))
+					{
+						backedUp.Add(RoamingEntryFolder + "/" + fileName);
+					}
+				}
 			}
 		}
 		return backedUp;
