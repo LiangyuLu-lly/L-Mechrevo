@@ -4600,8 +4600,21 @@ public class CustomModeForm : RForm
 				SetRowVisible(_fanSwitchSpeed, hw.SupportsFanSwitchSpeed, _fanSwitchSpeedVal);
 				_fanSwitchSpeedChk.Checked = hw.FanSwitchSpeedEnabled;
 				_fanSwitchSpeedChk.Enabled = hw.SupportsFanSwitchSpeed;
+				if (!keepPending)
+				{
+					PerfModeSettings persistedFan = PerfModeStore.LoadSettings(_modeId);
+					if (persistedFan.FanSwitchSpeedOn.HasValue)
+					{
+						_fanSwitchSpeedChk.Checked = persistedFan.FanSwitchSpeedOn.Value;
+					}
+					if (persistedFan.FanSwitchSpeedMs.HasValue && hw.SupportsFanSwitchSpeed)
+					{
+						_fanSwitchSpeed.Value = persistedFan.FanSwitchSpeedMs.Value;
+					}
+				}
 				RSlider fanSwitchSpeed = _fanSwitchSpeed;
-				bool enabled2 = (_fanSwitchSpeedVal.Enabled = (hw.SupportsFanSwitchSpeed && hw.FanSwitchSpeedEnabled) & flag5);
+				bool fanSwitchOn = hw.SupportsFanSwitchSpeed && _fanSwitchSpeedChk.Checked;
+				bool enabled2 = (_fanSwitchSpeedVal.Enabled = fanSwitchOn & flag5);
 				fanSwitchSpeed.Enabled = enabled2;
 				_tgp.Enabled = enabled;
 				_dbChk.Checked = hw.GpuDbSwitch;
