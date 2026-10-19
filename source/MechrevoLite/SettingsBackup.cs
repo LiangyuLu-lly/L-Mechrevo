@@ -38,6 +38,24 @@ internal static class SettingsBackup
 	/// <summary>%APPDATA%\MechrevoLite 里按命名规则参与备份的文件（如宝龙达每个自定义档的风扇曲线）。</summary>
 	private static readonly string[] RoamingPatterns = new string[1] { "baolongda_fancurve_*.cfg" };
 
+	/// <summary>%APPDATA%\MechrevoLite 下参与备份的子目录（如自定义 ICC）。</summary>
+	private static readonly string[] RoamingSubdirs = new string[1] { "customICC" };
+
+	private static readonly string[] IccExtensions = new string[2] { ".icc", ".icm" };
+
+	private static bool IsIccFile(string path)
+	{
+		string extension = Path.GetExtension(path);
+		foreach (string candidate in IccExtensions)
+		{
+			if (string.Equals(extension, candidate, StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/// <summary>%ProgramData%\MechrevoLite 里参与备份的设置文件。</summary>
 	private static readonly string[] ProgramDataFiles = new string[2] { "config.json", "config.json.bak" };
 
@@ -184,6 +202,22 @@ internal static class SettingsBackup
 				yield return (RoamingEntryFolder + "/" + Path.GetFileName(path), path);
 			}
 		}
+		foreach (string subdir in RoamingSubdirs)
+		{
+			string directory = Path.Combine(RoamingDirectory, subdir);
+			if (!Directory.Exists(directory))
+			{
+				continue;
+			}
+			foreach (string path in Directory.EnumerateFiles(directory))
+			{
+				if (!IsIccFile(path))
+				{
+					continue;
+				}
+				yield return (RoamingEntryFolder + "/" + subdir + "/" + Path.GetFileName(path), path);
+			}
+		}
 	}
 
 	/// <summary>文件名是否匹配带 * 的简单通配（只允许一个 *）。</summary>
@@ -263,6 +297,41 @@ internal static class SettingsBackup
 		canonicalEntryName = "";
 		string normalized = entryName.Replace('\\', '/').TrimStart('/');
 		string[] parts = normalized.Split('/');
+		if (parts.Length == 3)
+		{
+			if (!string.Equals(parts[0], RoamingEntryFolder, StringComparison.OrdinalIgnoreCase))
+			{
+				return false;
+			}
+			bool knownSubdir = false;
+			foreach (string subdir in RoamingSubdirs)
+			{
+				if (string.Equals(parts[1], subdir, StringComparison.OrdinalIgnoreCase))
+				{
+					knownSubdir = true;
+					break;
+				}
+			}
+			if (!knownSubdir)
+			{
+				return false;
+			}
+			bool knownExt = false;
+			foreach (string ext in IccExtensions)
+			{
+				if (string.Equals(Path.GetExtension(parts[2]), ext, StringComparison.OrdinalIgnoreCase))
+				{
+					knownExt = true;
+					break;
+				}
+			}
+			if (!knownExt || parts[2].IndexOfAny(new char[2] { '\\', ':' }) >= 0)
+			{
+				return false;
+			}
+			canonicalEntryName = parts[0] + "/" + parts[1] + "/" + parts[2];
+			return true;
+		}
 		if (parts.Length != 2)
 		{
 			return false;
@@ -310,7 +379,16 @@ internal static class SettingsBackup
 	{
 		targetPath = "";
 		string[] parts = canonicalEntryName.Split('/');
-		if (parts.Length != 2 || !IsKnownEntry(canonicalEntryName))
+		if (!IsKnownEntry(canonicalEntryName))
+		{
+			return false;
+		}
+		if (parts.Length == 3)
+		{
+			targetPath = Path.Combine(RoamingDirectory, parts[1], parts[2]);
+			return true;
+		}
+		if (parts.Length != 2)
 		{
 			return false;
 		}
@@ -349,6 +427,26 @@ internal static class SettingsBackup
 					if (CopyIfExists(path, Path.Combine(backupDirectory, RoamingEntryFolder, fileName)))
 					{
 						backedUp.Add(RoamingEntryFolder + "/" + fileName);
+					}
+				}
+			}
+			foreach (string subdir in RoamingSubdirs)
+			{
+				string directory = Path.Combine(RoamingDirectory, subdir);
+				if (!Directory.Exists(directory))
+				{
+					continue;
+				}
+				foreach (string path in Directory.EnumerateFiles(directory))
+				{
+					if (!IsIccFile(path))
+					{
+						continue;
+					}
+					string fileName = Path.GetFileName(path);
+					if (CopyIfExists(path, Path.Combine(backupDirectory, RoamingEntryFolder, subdir, fileName)))
+					{
+						backedUp.Add(RoamingEntryFolder + "/" + subdir + "/" + fileName);
 					}
 				}
 			}
