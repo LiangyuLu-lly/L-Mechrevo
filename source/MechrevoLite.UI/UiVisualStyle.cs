@@ -92,10 +92,21 @@ private static void LoadEmbeddedFonts()
 	}
 }
 
-internal static FontFamily FontFamilyOrDefault()
-{
-	return _embeddedFamily ?? new FontFamily("Microsoft YaHei UI");
-}
+	/// <summary>⭐ 2026-10-19（设置窗启动慢 · 缓存）：回退字体族只创建一次（GDI+ 的 FontFamily 构造不便宜，
+	/// 以前每次 <see cref="Font(float, FontStyle)" /> 都会 new 一个）✅。</summary>
+	private static readonly FontFamily _fallbackFamily = new FontFamily("Microsoft YaHei UI");
+
+	/// <summary>⭐ 2026-10-19（设置窗启动慢 · 缓存）：同一个 (字号/字重/单位) 复用同一个 Font 实例。
+	/// <para>⚠️ Font 不可变 ⇒ 共享安全；Control.Font 只是引用，控件 Dispose **不会**释放共享 Font ✅。
+	/// ⭐ 目的：设置窗 236 个控件、上百次取字体 ⇒ 省掉大量 <c>new Font</c> 的 GDI+ 开销 ✅</para></summary>
+	private static readonly Dictionary<(int SizeKey, FontStyle Style, GraphicsUnit Unit), Font> _fontCache = new();
+
+	private static readonly object _fontCacheLock = new();
+
+	internal static FontFamily FontFamilyOrDefault()
+	{
+		return _embeddedFamily ?? _fallbackFamily;
+	}
 
 	// 2026-10-09（UI 打磨②b，仅夜间；用户原话「可以 虽然说好像没有看出区别」）：上一轮②的幅度太小
 	// （Window/Surface 1.11、Surface/SurfaceRaised 1.16，大面积平色上不可辨）。本轮**只抬卡片、不动页面**：
@@ -845,12 +856,25 @@ internal static FontFamily FontFamilyOrDefault()
 
 	internal static Font Font(float size, FontStyle style = FontStyle.Regular)
 	{
-		return new Font(FontFamilyOrDefault(), size, style);
+		return Font(size, style, GraphicsUnit.Point);
 	}
 
 	internal static Font Font(float size, FontStyle style, GraphicsUnit unit)
 	{
-		return new Font(FontFamilyOrDefault(), size, style, unit);
+		// ⭐ 2026-10-19（设置窗启动慢 · 字体缓存）：同 (字号,字重,单位) 只构造一次 GDI+ Font。
+		//   以 0.1pt 为键（四舍五入）—— UI 里所有字号都是 0.5pt 的整数倍，不存在精度歧义 ✅
+		int sizeKey = (int)Math.Round(size * 10f);
+		var key = (sizeKey, style, unit);
+		lock (_fontCacheLock)
+		{
+			if (_fontCache.TryGetValue(key, out Font cached))
+			{
+				return cached;
+			}
+			Font created = new Font(FontFamilyOrDefault(), sizeKey / 10f, style, unit);
+			_fontCache[key] = created;
+			return created;
+		}
 	}
 
 	internal static bool ResolveNightMode(string? savedMode)
