@@ -4610,8 +4610,9 @@ public class CustomModeForm : RForm
 				_tccChk.Checked = hw.TccSwitch;
 				_tccChk.Enabled = flag;
 				_tcc.Enabled = hw.TccSwitch & flag;
-				// 宝龙达：功耗墙/温度墙只写不读，显示与开关按本档保存值回显
-				if (hw.UsesBaolongda && !keepPending)
+				// 宝龙达只写不读；同方 GCU 以 LM 本地保存值为准（更新/GCU 重装后不依赖 GCU 里的档位文件）
+				bool gcuGen40 = hw.IsGcuConnected && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+				if ((hw.UsesBaolongda || gcuGen40) && !keepPending)
 				{
 					PerfModeSettings persisted = PerfModeStore.LoadSettings(_modeId);
 					ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, persisted.Pl1 ?? hw.Pl1);
