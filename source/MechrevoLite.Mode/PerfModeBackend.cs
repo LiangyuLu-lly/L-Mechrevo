@@ -296,13 +296,13 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		int expCoreMax = 0;
 		int expMemMin = 0;
 		int expMemMax = 0;
-		bool nvapiExperiment = AppConfig.Get("gpu_oc_nvapi_for_gcu", 1) != 0
+		bool nvapiExperiment = AppConfig.Get("gpu_oc_nvapi_for_gcu", 0) != 0
 			&& !_hw.UsesBaolongda
 			&& _hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu
 			&& NvapiPStates.TryGetP0OffsetRange(out expCoreMin, out expCoreMax, out expMemMin, out expMemMax);
 		bool negativeRequest = on && (core < 0 || memory < 0);
-		// ⭐⭐ 2026-10-19（实验：GCU 厂商字段直写负值）：默认开启；若回读被夹回/忽略 ⇒ 自动回退 NVAPI ✅
-		bool gcuNegativeFieldExperiment = AppConfig.Get("gpu_oc_gcu_negative_field", 1) != 0
+		// ⭐⭐ 2026-10-19（实验：GCU 厂商字段直写负值）：⚠️ **当前 GCU 机型负值走 `WriteFirmwareField` 原路径（14:02 实测 -95 Confirmed）**，本段是**死路径/未来兜底**，默认关闭（`gpu_oc_gcu_negative_field=0`）；若回读被夹回/忽略 ⇒ 自动回退 NVAPI ✅
+		bool gcuNegativeFieldExperiment = AppConfig.Get("gpu_oc_gcu_negative_field", 0) != 0
 			&& !_hw.UsesBaolongda
 			&& _hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu;
 		if (gcuNegativeFieldExperiment && negativeRequest)

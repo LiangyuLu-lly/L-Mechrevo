@@ -5670,6 +5670,6 @@
       <value>本机使用老机型接口，仅支持三个内置性能档</value>
     </data>
     <data name="GpuOcNvapiExperimentHint" xml:space="preserve">
-    <value>实验特性：负偏移走 NVAPI，可能与厂商超频冲突，出现异常请设 gpu_oc_nvapi_for_gcu=0</value>
+    <value>实验特性：负偏移由厂商字段（GCU）承载；NVAPI 仅作可选兜底（gpu_oc_nvapi_for_gcu=1 开启）</value>
   </data>
 </root>

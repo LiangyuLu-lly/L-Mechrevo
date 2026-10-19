@@ -1003,7 +1003,7 @@ public class CustomModeForm : RForm
 		// （阈值不写进提示，避免窄窗口长句折行；阈值判定逻辑一字未动，见 CoreOffsetWarnThreshold/SyncOcRiskVisuals）。
 		_coreOcRiskRow = MakeOcRiskRow(Strings.GpuCoreOffsetRisk);
 		// ⭐⭐ 2026-10-19（实验）：仅负偏移实验生效时显示一行小字提示（资源键，⛔ 不硬编码）✅
-		if (AppConfig.Get("gpu_oc_nvapi_for_gcu", 1) != 0 && hw != null
+		if (hw != null
 			&& hw.DgpuGeneration != DgpuGenerationKind.NoDgpu && !(hw.UsesBaolongda))
 		{
 			_coreOcRiskRow.Controls.Add(new RLabel
@@ -4357,9 +4357,15 @@ public class CustomModeForm : RForm
 			// ⭐⭐ 2026-10-19（机主：同方 GCU 先试负偏移）：实验特性 —— 仅 NVIDIA + 配置开关 + NVAPI 范围可用时，
 			//   把**负区间**并进 UI（负值走 NVAPI P0；正区间仍以厂商字段为准，上限 ≤ +200/驱动上限）✅
 			//   ⚠️ 拉不到 NVAPI 范围 ⇒ 完全保持现状（不改 GCU 行为）✅
-			bool gcuNvapiExperiment = AppConfig.Get("gpu_oc_nvapi_for_gcu", 1) != 0
-				&& hw != null
+			// ⭐⭐ 2026-10-19（实测：GCU 厂商字段本身支持负值 -95 Confirmed）：UI 负区间**不再依赖 NVAPI 路由开关** ✅
+			bool gcuNvapiExperiment = hw != null
 				&& hw.DgpuGeneration != DgpuGenerationKind.NoDgpu;
+			string vendorRangeUi = "[gpu-oc] 厂商字段范围：core=" + (hw?.GpuCoreOffsetMinimum ?? -1) + ".." + (hw?.GpuCoreOffsetMaximum ?? -1)
+				+ " · mem=" + (hw?.GpuMemoryOffsetMinimum ?? -1) + ".." + (hw?.GpuMemoryOffsetMaximum ?? -1);
+			if (Logger.TryMarkChanged("gpu-oc-vendor-field-range-ui", vendorRangeUi))
+			{
+				Logger.WriteError(vendorRangeUi);
+			}
 			if (gcuNvapiExperiment
 				&& NvapiPStates.TryGetP0OffsetRange(out int nvCoreMin, out int nvCoreMax, out int nvMemMin, out int nvMemMax))
 			{

@@ -5687,6 +5687,6 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
       <value>This machine uses the legacy MICommonInterface; only the three built-in performance modes are available.</value>
     </data>
     <data name="GpuOcNvapiExperimentHint" xml:space="preserve">
-    <value>Experimental: negative offsets use NVAPI and may conflict with vendor overclocking; set gpu_oc_nvapi_for_gcu=0 if anything goes wrong.</value>
+    <value>Experimental: negative offsets are carried by the vendor field (GCU). NVAPI fallback is optional via gpu_oc_nvapi_for_gcu=1.</value>
   </data>
 </root>
