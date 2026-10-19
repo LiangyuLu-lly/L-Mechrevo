@@ -4634,8 +4634,22 @@ public class CustomModeForm : RForm
 		{
 			return;
 		}
-		bool flag = ApplyOcRiskVisual(_coreOc, _coreOcVal, _coreOcRiskRow, _coreOc.Value > CoreOffsetWarnThreshold());
-		bool flag2 = ApplyOcRiskVisual(_memOc, _memOcVal, _memOcRiskRow, _memOc.Value > VramOffsetWarn);
+		// ⭐⭐ 2026-10-19（机主：显存 >+1000 红字提示）：风险判据统一用**实际生效值 = 数字框值** ✅
+		//   ⚠️ 新 UI 数字框可超出滑块 ±500/±2000 且应用以数字框为准 ⇒ 只看滑块会漏报/误报。
+		//   显存负数（< -1000）不触发该提示（只针对过高正值）✅
+		int coreRiskValue = (int)_coreOcVal.Value;
+		int memRiskValue = (int)_memOcVal.Value;
+		int coreThreshold = CoreOffsetWarnThreshold();
+		bool coreRisk = coreRiskValue > coreThreshold;
+		bool memRisk = memRiskValue > VramOffsetWarn;
+		bool flag = ApplyOcRiskVisual(_coreOc, _coreOcVal, _coreOcRiskRow, coreRisk);
+		bool flag2 = ApplyOcRiskVisual(_memOc, _memOcVal, _memOcRiskRow, memRisk);
+		string riskLog = "[gpu-oc] 风险提示：core=" + coreRiskValue + "（阈值 " + coreThreshold + "） · mem=" + memRiskValue
+			+ "（阈值 " + VramOffsetWarn + "） ⇒ core提示=" + coreRisk + " mem提示=" + memRisk;
+		if (Logger.TryMarkChanged("gpu-oc-risk-hint", riskLog))
+		{
+			Logger.WriteError(riskLog);
+		}
 		if ((flag || flag2) && _minContentWidth > 0)
 		{
 			ResizeToContent();
@@ -4780,6 +4794,8 @@ public class CustomModeForm : RForm
 						(int refreshCoreMin, int refreshCoreMax, int refreshMemMin, int refreshMemMax) = GpuOffsetUiRange(hw);
 						_gpuOcCoreAdjustable = ApplyGpuOffsetUiRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset, -500, 500);
 						_gpuOcMemoryAdjustable = ApplyGpuOffsetUiRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset, -2000, 2000);
+						// ⭐ 面板刷新后也要重新评估风险提示（数字框值可能已被更新）✅
+						SyncOcRiskVisuals();
 					}
 				}
 				else if (_gpuOcArmed & supportsGpuOverclock)
