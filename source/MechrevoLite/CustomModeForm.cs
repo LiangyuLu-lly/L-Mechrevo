@@ -4391,7 +4391,7 @@ public class CustomModeForm : RForm
 	/// 保持后端给出的范围（读不到就禁用，宁可不给也不给一个写不进去的滑块）。</para>
 	/// <para>⚠️ 非宝龙达：逐字返回原来的 <c>hw.GpuCoreOffsetUserMinimum/Maximum</c> 等值，行为不变。</para>
 	/// </summary>
-	private static (int CoreMin, int CoreMax, int MemMin, int MemMax) GpuOffsetUiRange(MechrevoHw hw)
+	internal static (int CoreMin, int CoreMax, int MemMin, int MemMax) GpuOffsetUiRange(MechrevoHw hw)
 	{
 		// ⭐⭐ 2026-10-19（机主定稿）：数字框允许的 NV 范围 —— 来源优先级 **NVAPI P0 → 厂商字段 → 兜底 [-900,2000]** ✅
 		//   ⚠️ 滑块本身固定 -500..500（见构造点），数字框可超出 ±500 并保留真实值 ✅

@@ -368,6 +368,17 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// ⭐⭐ 2026-10-19（机主：GCU 最多 -900 显存？NV 范围到底多少）：**只读** 偏移范围探针。
+		//   用法：L-Mechrevo.exe --gpu-offset-probe [输出文件，可选]
+		//   ⛔ 不调用任何 Set、不改配置；结果写桌面 lm-gpu-offset-probe-<时间>.txt。
+		case "--gpu-offset-probe":
+		{
+			string offsetPath = GpuOffsetProbe.Run((args.Length > 1) ? args[1] : null);
+			Console.WriteLine(offsetPath);
+			Logger.WriteLine("[gpu-offset-probe] " + offsetPath);
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-19（30 系 · SMU 只读探针）：先确认 PawnIO/SMU 能否读，再决定 PL/温度墙是否改走 SMU。
 		//   用法：L-Mechrevo.exe --smu-probe
 		//   ⛔ 只读：不发任何 SMU 写命令；结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-smu-probe-*.txt。
