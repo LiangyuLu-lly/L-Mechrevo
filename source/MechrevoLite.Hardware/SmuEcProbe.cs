@@ -2,10 +2,10 @@
 //
 // ⭐⭐ 背景：机主/负责人看到 7.3 的 `SMUCommands.RyzenAccess.Write_EC_EX / Read_EC_EX / Write_EC_Init`
 //    出现在 `Fan_Speed` 里，怀疑还有一条 **SMU 转发 EC** 的通道（我们没试过）。
-//    ⭐ 本轮先做**只读核对**：对照 7.3 官方组件行为 看 `RyzenAccess` 到底走什么；再用我们已有的
+//    ⭐ 本轮先做**只读核对**：查看 `RyzenAccess` 到底走什么；再用我们已有的
 //      `RyzenSmuService`（PawnIO RyzenSMU）确认它有没有 EC 命令可发。
 //
-// ⭐ 官方组件行为事实（`内部参考材料（路径略）`）：
+// ⭐ 事实：
 //    · `EC.RW.ECRW_Tool.Fan_Speed`（约 931-947 行）确实调用
 //      `SMUCommands.RyzenAccess.Write_EC_EX(51260/51261, speed)` 与 `Read_EC_EX(2848)`；
 //    · 但 `RyzenAccess.Write_EC_EX / Read_EC_EX`（约 1567/1588 行）的实现是
@@ -102,9 +102,9 @@ internal static class SmuEcProbe
 			}
 			L("");
 
-			// ── 2. 命令来源核对（对照 7.3 官方组件行为）──
-			L("── 2. 命令来源核对（7.3 官方组件行为）──");
-			L("文件：_upstream\\内部参考材料\\thirdparty-JiaoLong7.3\\第三方蛟龙游戏控制中心.参考材料.cs");
+			// ── 2. 命令来源核对──
+			L("── 2. 命令来源核对──");
+			L("（实现细节略）");
 			L("  · EC.RW.ECRW_Tool.Fan_Speed（约 931-947 行）调用 SMUCommands.RyzenAccess.Write_EC_EX(51260/51261, speed)、Read_EC_EX(2848)");
 			L("  · RyzenAccess.Write_EC_EX / Read_EC_EX（约 1567/1588 行）实现 = RyzenNbAccesss.WriteIoPortByte(EC_ADDR_PORT=0x4E / EC_DATA_PORT=0x4F)");
 			L("    ⇒ 这是 **LPC 端口 I/O**（0x2E/0x2F 命令 + 0x11/0x10/0x12 索引），**不是 SMU 邮箱命令**");

@@ -6,7 +6,7 @@
 // ⚠️ 2026-10-15 C-1 第 1 步：纯增量底座。
 // ✅ 2026-10-15 C-1 第 2 步（本轮）：已接线 —— 由 MechrevoBackendOrder.Probe() 按有序候选表探测，
 //    探中即 ActiveBackend=LegacyMifs（见 MechrevoHw.ConnectAsync / ApplyLegacyBackendAsync）。
-//   沿用官方组件的写法（((Func<bool>)delegate {...}).Invoke()、显式 new char[2]{...}）已改写为正常 C#，语义不变。
+//   沿用既有写法（((Func<bool>)delegate {...}).Invoke()、显式 new char[2]{...}）已改写为正常 C#，语义不变。
 
 using System;
 using System.IO;
