@@ -173,6 +173,9 @@ public class CustomModeForm : RForm
 
 	private bool _syncingModes;
 
+	// ⭐ 2026-10-19（GPU 偏移 UI）：数字框→滑块同步时抑制反向回写（数字框可超出滑块 ±500 且保留真实值）
+	private bool _sliderSyncFromNumeric;
+
 	private bool _refreshingHardwareState;
 
 	/// <summary>
@@ -989,14 +992,18 @@ public class CustomModeForm : RForm
 		//   ⭐ 现在统一由 `GpuOffsetUiRange` 给范围：宝龙达读 **NVAPI P0 驱动范围**，再与 -900..+2000 MHz 取交集；
 		//      读不到才退回原有 UI 兜底（-100~+200），注释见该方法。⛔ 范围只是 UI 可操作区间，
 		//      真正写入仍走 NVAPI P0 并**回读确认**（写不进去会如实报失败）。
+		// ⭐⭐ 2026-10-19（机主定稿 UI 形态）：滑块固定 ±500（默认 0 居中）；数字框允许 **NV 范围**
+		//   （NVAPI P0 → 厂商 → 兜底 -900..2000）；应用以数字框为准 ✅
 		(int coreMin, int coreMax, int memMin, int memMax) = GpuOffsetUiRange(hw);
-		(int, int, int, bool) tuple13 = DeviceRange(coreMin, coreMax, hw?.EffectiveGpuCoreClockOffset ?? 0, allowNegative: true);
+		int coreCurrent = hw?.EffectiveGpuCoreClockOffset ?? 0;
+		int memCurrent = hw?.EffectiveGpuMemoryClockOffset ?? 0;
+		(int, int, int, bool) tuple13 = DeviceRange(-500, 500, coreCurrent, allowNegative: true);
 		tuple4 = AddSliderRow(Strings.CoreOffset, tuple13.Item1, tuple13.Item2, tuple13.Item3, (int v) =>
 		{
 			// 2026-10-09：GPU 核心偏移改为「只改数值 + 置脏」，不再拖动即下发；
 			// 真正下发只在点【应用】时发生（ApplyPendingAsync —— 与面板里其余改动同一次下发）。
 			MarkGpuOffsetDirty();
-		});
+		}, numericMinOverride: coreMin, numericMaxOverride: coreMax, keepNumericOnSliderClamp: true);
 		_coreOc = tuple4.Item1;
 		_coreOcVal = tuple4.Item2;
 		// 2026-10-09：文案改为「核心偏移过高，有损坏硬件的风险」——不再带占位符，故去掉 string.Format
@@ -1014,12 +1021,12 @@ public class CustomModeForm : RForm
 				Margin = new Padding(0, D(2), 0, 0)
 			});
 		}
-		(int, int, int, bool) tuple14 = DeviceRange(memMin, memMax, hw?.EffectiveGpuMemoryClockOffset ?? 0, allowNegative: true);
+		(int, int, int, bool) tuple14 = DeviceRange(-500, 500, memCurrent, allowNegative: true);
 		(_memOc, _memOcVal) = AddSliderRow(Strings.MemoryOffset, tuple14.Item1, tuple14.Item2, tuple14.Item3, (int v) =>
 		{
 			// 2026-10-09：同上 —— 显存偏移也只在点「应用」时下发。
 			MarkGpuOffsetDirty();
-		});
+		}, numericMinOverride: memMin, numericMaxOverride: memMax, keepNumericOnSliderClamp: true);
 		// 2026-10-09：同上——显存提示也不带占位符（VramOffsetWarn 仍只用于下面的变红判定）。
 		_memOcRiskRow = MakeOcRiskRow(Strings.VramOffsetRisk);
 		ConfigureGpuOffsetSlider(_coreOc, _coreOcVal, CoreOffsetDragStep);
@@ -1470,7 +1477,7 @@ public class CustomModeForm : RForm
 			}
 		}
 
-		(RSlider bar, RNumericUpDown valueInput) AddSliderRow(string label, int min, int max, int value2, Action<int> onChanged)
+		(RSlider bar, RNumericUpDown valueInput) AddSliderRow(string label, int min, int max, int value2, Action<int> onChanged, int? numericMinOverride = null, int? numericMaxOverride = null, bool keepNumericOnSliderClamp = false)
 		{
 			TableLayoutPanel tableLayoutPanel2 = MakeRow();
 			tableLayoutPanel2.Controls.Add(MakeLabel(label, subtitle: true), 0, 0);
@@ -1487,11 +1494,18 @@ public class CustomModeForm : RForm
 			};
 			bar.Tag = tableLayoutPanel2;
 			bar.Enabled = max > min;
+			int numericMin = numericMinOverride ?? min;
+			int numericMax = numericMaxOverride ?? max;
+			if (numericMax < numericMin)
+			{
+				numericMin = min;
+				numericMax = max;
+			}
 			RNumericUpDown valueInput = new RNumericUpDown
 			{
-				Minimum = min,
-				Maximum = max,
-				Value = bar.Value,
+				Minimum = numericMin,
+				Maximum = numericMax,
+				Value = Math.Clamp(value2, numericMin, numericMax),
 				Increment = 1m,
 				DecimalPlaces = 0,
 				TextAlign = HorizontalAlignment.Right,
@@ -1570,41 +1584,53 @@ public class CustomModeForm : RForm
 			int lastSent = int.MinValue;
 			bar.ValueChanged += (object? _, EventArgs _) =>
 			{
-				// ⭐⭐⭐ 2026-10-19（crash：NumericUpDown 值超 Maximum 反复抛 ArgumentOutOfRangeException）：
-				//   ⭐ 先把数字框范围扩到包含滑块值，再 clamp 赋值（⛔ 不再先塞 Value 后撞上限）✅
-				if (bar.Value > valueInput.Maximum)
+				// ⭐⭐⭐ 2026-10-19（crash 修复 + GPU 偏移 UI）：先确保数字框范围包含滑块值再赋值 ✅
+				//   ⚠️ 数字框→滑块同步期间（_sliderSyncFromNumeric）**不回写数字框** ⇒ 数字框可保留超出 ±500 的真实值 ✅
+				if (!_sliderSyncFromNumeric)
 				{
-					valueInput.Maximum = bar.Value;
-				}
-				else if (bar.Value < valueInput.Minimum)
-				{
-					valueInput.Minimum = bar.Value;
-				}
-				int clampedBarValue = Math.Clamp(bar.Value, (int)valueInput.Minimum, (int)valueInput.Maximum);
-				try
-				{
-					if (valueInput.Value != (decimal)clampedBarValue)
+					if (bar.Value > valueInput.Maximum)
 					{
-						valueInput.Value = clampedBarValue;
+						valueInput.Maximum = bar.Value;
+					}
+					else if (bar.Value < valueInput.Minimum)
+					{
+						valueInput.Minimum = bar.Value;
+					}
+					int clampedBarValue = Math.Clamp(bar.Value, (int)valueInput.Minimum, (int)valueInput.Maximum);
+					try
+					{
+						if (valueInput.Value != (decimal)clampedBarValue)
+						{
+							valueInput.Value = clampedBarValue;
+						}
+					}
+					catch (ArgumentOutOfRangeException ex)
+					{
+						Logger.WriteError("[rslider] ⛔ 值超范围（slider=" + bar.Value + " · numeric="
+							+ valueInput.Minimum + "~" + valueInput.Maximum + "）：" + ex.Message);
 					}
 				}
-				catch (ArgumentOutOfRangeException ex)
+				if (!_syncing && bar.Value != lastSent)
 				{
-					Logger.WriteError("[rslider] ⛔ 值超范围（slider=" + bar.Value + " · numeric="
-						+ valueInput.Minimum + "~" + valueInput.Maximum + "）：" + ex.Message);
-				}
-				if (!_syncing && clampedBarValue != lastSent)
-				{
-					lastSent = clampedBarValue;
-					onChanged(clampedBarValue);
+					lastSent = bar.Value;
+					onChanged(bar.Value);
 				}
 			};
 			valueInput.ValueChanged += (object? _, EventArgs _) =>
 			{
 				int num7 = decimal.ToInt32(valueInput.Value);
-				if (bar.Value != num7)
+				int sliderValue = Math.Clamp(num7, bar.Minimum, bar.Maximum);
+				if (bar.Value != sliderValue)
 				{
-					bar.Value = num7;
+					_sliderSyncFromNumeric = true;
+					try
+					{
+						bar.Value = sliderValue;
+					}
+					finally
+					{
+						_sliderSyncFromNumeric = false;
+					}
 				}
 			};
 			TableLayoutPanel tableLayoutPanel3 = new TableLayoutPanel
@@ -3202,8 +3228,8 @@ public class CustomModeForm : RForm
 			if (offsetsPending)
 			{
 				// GPU 核心/显存偏移的值就活在滑块上：只在「应用」这一瞬间读一次。
-				fields["GpuCoreClockOffsetOC"] = _coreOc.Value.ToString();
-				fields["GpuMemoryClockOffsetOC"] = _memOc.Value.ToString();
+				fields["GpuCoreClockOffsetOC"] = _coreOcVal.Value.ToString();
+				fields["GpuMemoryClockOffsetOC"] = _memOcVal.Value.ToString();
 			}
 			_pending.Clear();
 			_pendingEdits.Clear();
@@ -3215,13 +3241,13 @@ public class CustomModeForm : RForm
 				// 与旧代码的区别只有一点：**其余待应用项照发**（旧代码是 continue 把整批一起丢掉）。
 				if (_gpuOcCoreAdjustable)
 				{
-					fields["GpuCoreClockOffsetOC"] = _coreOc.Value.ToString();
+					fields["GpuCoreClockOffsetOC"] = _coreOcVal.Value.ToString();
 				}
 				if (_gpuOcMemoryAdjustable)
 				{
-					fields["GpuMemoryClockOffsetOC"] = _memOc.Value.ToString();
+					fields["GpuMemoryClockOffsetOC"] = _memOcVal.Value.ToString();
 				}
-				if ((!_gpuOcCoreAdjustable || _coreOc.Value == 0) && (!_gpuOcMemoryAdjustable || _memOc.Value == 0))
+				if ((!_gpuOcCoreAdjustable || _coreOcVal.Value == 0) && (!_gpuOcMemoryAdjustable || _memOcVal.Value == 0))
 				{
 					fields.Remove("OverClockingSwitch");
 					fields.Remove("GpuCoreClockOffsetOC");
@@ -3240,7 +3266,7 @@ public class CustomModeForm : RForm
 				string coreFieldText = fields.TryGetValue("GpuCoreClockOffsetOC", out string coreFieldValue) ? coreFieldValue : "(未改)";
 				string memFieldText = fields.TryGetValue("GpuMemoryClockOffsetOC", out string memFieldValue) ? memFieldValue : "(未改)";
 				Logger.WriteError("[gpu-oc] 应用请求（UI→字段）：开关=" + ocOnText + " · core=" + coreFieldText + " · mem=" + memFieldText
-					+ " · 滑块 core=" + _coreOc.Value + " mem=" + _memOc.Value
+					+ " · 数字框 core=" + _coreOcVal.Value + " mem=" + _memOcVal.Value + "（滑块 core=" + _coreOc.Value + " mem=" + _memOc.Value + "）"
 					+ " · 偏移可调 core=" + _gpuOcCoreAdjustable + " mem=" + _gpuOcMemoryAdjustable
 					+ " · 偏移脏=" + offsetsPending);
 			}
@@ -4348,87 +4374,69 @@ public class CustomModeForm : RForm
 	/// </summary>
 	private static (int CoreMin, int CoreMax, int MemMin, int MemMax) GpuOffsetUiRange(MechrevoHw hw)
 	{
-		int coreMin = hw?.GpuCoreOffsetUserMinimum ?? (-1);
-		int coreMax = hw?.GpuCoreOffsetUserMaximum ?? (-1);
-		int memMin = hw?.GpuMemoryOffsetUserMinimum ?? (-1);
-		int memMax = hw?.GpuMemoryOffsetUserMaximum ?? (-1);
-		if (!(hw?.UsesBaolongda ?? false))
+		// ⭐⭐ 2026-10-19（机主定稿）：数字框允许的 NV 范围 —— 来源优先级 **NVAPI P0 → 厂商字段 → 兜底 [-900,2000]** ✅
+		//   ⚠️ 滑块本身固定 -500..500（见构造点），数字框可超出 ±500 并保留真实值 ✅
+		int coreMin = -900;
+		int coreMax = 2000;
+		int memMin = -900;
+		int memMax = 2000;
+		string source = "兜底";
+		if (NvapiPStates.TryGetP0OffsetRange(out int nvCoreMin, out int nvCoreMax, out int nvMemMin, out int nvMemMax))
 		{
-			// ⭐⭐ 2026-10-19（机主：同方 GCU 先试负偏移）：实验特性 —— 仅 NVIDIA + 配置开关 + NVAPI 范围可用时，
-			//   把**负区间**并进 UI（负值走 NVAPI P0；正区间仍以厂商字段为准，上限 ≤ +200/驱动上限）✅
-			//   ⚠️ 拉不到 NVAPI 范围 ⇒ 完全保持现状（不改 GCU 行为）✅
-			// ⭐⭐ 2026-10-19（实测：GCU 厂商字段本身支持负值 -95 Confirmed）：UI 负区间**不再依赖 NVAPI 路由开关** ✅
-			bool gcuNvapiExperiment = hw != null
-				&& hw.DgpuGeneration != DgpuGenerationKind.NoDgpu;
-			string vendorRangeUi = "[gpu-oc] 厂商字段范围：core=" + (hw?.GpuCoreOffsetMinimum ?? -1) + ".." + (hw?.GpuCoreOffsetMaximum ?? -1)
-				+ " · mem=" + (hw?.GpuMemoryOffsetMinimum ?? -1) + ".." + (hw?.GpuMemoryOffsetMaximum ?? -1);
-			if (Logger.TryMarkChanged("gpu-oc-vendor-field-range-ui", vendorRangeUi))
-			{
-				Logger.WriteError(vendorRangeUi);
-			}
-			if (gcuNvapiExperiment
-				&& NvapiPStates.TryGetP0OffsetRange(out int nvCoreMin, out int nvCoreMax, out int nvMemMin, out int nvMemMax))
-			{
-				int uiCoreNegMin = Math.Max(nvCoreMin, -900);
-				int uiMemNegMin = Math.Max(nvMemMin, -900);
-				int uiCoreMax = Math.Min(Math.Max(coreMax, nvCoreMax), 200);
-				int uiMemMax = Math.Min(Math.Max(memMax, nvMemMax), 200);
-				if (uiCoreNegMin < 0)
-				{
-					coreMin = Math.Min(coreMin > 0 ? coreMin : uiCoreNegMin, uiCoreNegMin);
-					coreMax = uiCoreMax;
-				}
-				if (uiMemNegMin < 0)
-				{
-					memMin = Math.Min(memMin > 0 ? memMin : uiMemNegMin, uiMemNegMin);
-					memMax = uiMemMax;
-				}
-				string rangeLog = "[gpu-oc] 实验：GCU UI 范围 core=" + coreMin + ".." + coreMax + " · mem=" + memMin + ".." + memMax;
-				if (Logger.TryMarkChanged("gpu-oc-gcu-nvapi-range", rangeLog))
-				{
-					Logger.WriteError(rangeLog);
-				}
-			}
-			return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
-		}
-		if (NvapiPStates.TryGetP0OffsetRange(out int driverCoreMin, out int driverCoreMax, out int driverMemMin, out int driverMemMax))
-		{
-			int uiCoreMin = Math.Max(driverCoreMin, NvapiPStates.UiOffsetMinimumMhz);
-			int uiCoreMax = Math.Min(driverCoreMax, NvapiPStates.UiOffsetMaximumMhz);
-			int uiMemMin = Math.Max(driverMemMin, NvapiPStates.UiOffsetMinimumMhz);
-			int uiMemMax = Math.Min(driverMemMax, NvapiPStates.UiOffsetMaximumMhz);
-			bool coreAxisValid = uiCoreMax > uiCoreMin;
-			bool memAxisValid = uiMemMax > uiMemMin;
-			if (coreAxisValid)
-			{
-				coreMin = uiCoreMin;
-				coreMax = uiCoreMax;
-			}
-			if (memAxisValid)
-			{
-				memMin = uiMemMin;
-				memMax = uiMemMax;
-			}
-			if (coreAxisValid || memAxisValid)
-			{
-				Logger.WriteLineIfChanged("gpu-oc-ui-range-baolongda",
-					$"[gpu-oc] 宝龙达 UI 范围：驱动 P0 core={driverCoreMin}..{driverCoreMax} mem={driverMemMin}..{driverMemMax} MHz ⇒ 与 -900..+2000 取交集 core={(coreAxisValid ? uiCoreMin + ".." + uiCoreMax : "(不可用)")} mem={(memAxisValid ? uiMemMin + ".." + uiMemMax : "(不可用)")} MHz");
-				return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
-			}
-			Logger.WriteLine("[gpu-oc] 宝龙达 NVAPI P0 范围与 -900..+2000 取交集后两轴都无效，改用既有兜底: core=" + uiCoreMin + ".." + uiCoreMax + " mem=" + uiMemMin + ".." + uiMemMax);
+			coreMin = Math.Max(nvCoreMin, -900);
+			coreMax = Math.Min(nvCoreMax, 2000);
+			memMin = Math.Max(nvMemMin, -900);
+			memMax = Math.Min(nvMemMax, 2000);
+			source = "NVAPI";
 		}
 		else
 		{
-			Logger.WriteLine("[gpu-oc] 宝龙达 NVAPI P0 范围读不到: " + NvapiPStates.LastError);
+			int vendorCoreMin = hw?.GpuCoreOffsetUserMinimum ?? (-1);
+			int vendorCoreMax = hw?.GpuCoreOffsetUserMaximum ?? (-1);
+			int vendorMemMin = hw?.GpuMemoryOffsetUserMinimum ?? (-1);
+			int vendorMemMax = hw?.GpuMemoryOffsetUserMaximum ?? (-1);
+			if (vendorCoreMax > vendorCoreMin)
+			{
+				coreMin = Math.Max(vendorCoreMin, -900);
+				coreMax = Math.Min(vendorCoreMax, 2000);
+				source = "厂商";
+			}
+			if (vendorMemMax > vendorMemMin)
+			{
+				memMin = Math.Max(vendorMemMin, -900);
+				memMax = Math.Min(vendorMemMax, 2000);
+			}
 		}
-		if ((coreMin < 0 || coreMax <= coreMin) && (hw?.SupportsGpuOverclock ?? false))
+		if (coreMax <= coreMin)
 		{
-			// 既有兜底（commit 6ab74f8）：仅 UI 可操作区间，来源不是硬件；写不进去时由回读如实报失败。
-			coreMin = -100;
-			coreMax = 200;
-			Logger.WriteLine("[gpu-oc] 宝龙达：NVAPI/厂商均未给核心偏移范围 ⇒ 保留既有 UI 兜底 -100~+200 MHz（非硬件范围，写入仍以回读为准）");
+			coreMin = -900;
+			coreMax = 2000;
+		}
+		if (memMax <= memMin)
+		{
+			memMin = -900;
+			memMax = 2000;
+		}
+		string uiLog = "[gpu-oc] 偏移 UI：slider=-500..500 · numeric=core=" + coreMin + ".." + coreMax
+			+ " mem=" + memMin + ".." + memMax + "（来源=" + source + "）";
+		if (Logger.TryMarkChanged("gpu-oc-offset-ui-range", uiLog))
+		{
+			Logger.WriteError(uiLog);
 		}
 		return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
+	}
+
+	/// <summary>⭐ 刷新时应用 GPU 偏移 UI 范围：滑块固定 ±500，数字框用 NV 范围，各自 clamp（⛔ 不互相覆盖真实值）✅</summary>
+	private static bool ApplyGpuOffsetUiRange(RSlider bar, RNumericUpDown valueInput, int numericMin, int numericMax, int current)
+	{
+		bar.Minimum = -500;
+		bar.Maximum = 500;
+		valueInput.Minimum = numericMin;
+		valueInput.Maximum = numericMax;
+		int real = Math.Clamp(current, numericMin, numericMax);
+		valueInput.Value = real;
+		bar.Value = Math.Clamp(real, bar.Minimum, bar.Maximum);
+		return numericMax > numericMin;
 	}
 
 	private static (int Min, int Max, int Value, bool Adjustable) DeviceRange(int minimum, int maximum, int current, bool allowNegative = false)
@@ -4751,8 +4759,8 @@ public class CustomModeForm : RForm
 					if (!_gpuOcDirty)
 					{
 						(int refreshCoreMin, int refreshCoreMax, int refreshMemMin, int refreshMemMax) = GpuOffsetUiRange(hw);
-						_gpuOcCoreAdjustable = ApplyRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset, allowNegative: true);
-						_gpuOcMemoryAdjustable = ApplyRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset, allowNegative: true);
+						_gpuOcCoreAdjustable = ApplyGpuOffsetUiRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset);
+						_gpuOcMemoryAdjustable = ApplyGpuOffsetUiRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset);
 					}
 				}
 				else if (_gpuOcArmed & supportsGpuOverclock)
