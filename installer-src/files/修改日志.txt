@@ -30,6 +30,7 @@ r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 
 - 修复：宝龙达自定义档新旧档混在一起、温度墙开关不保存（WMI 只写不读 ⇒ 改为按本档保存值回显）。
 - 修复（宝龙达）：新建自定义档不再继承当前档数据（AddCustomModeAsync 在宝龙达传 null 种子）——以前连续新建会一路复制成第一个自定义档的参数。
 - 修复（宝龙达）：下拉选中自定义档时同步 ActivateLocalProfile(id)；以前保存/刷新/ActiveChanged 回调会按旧 ActiveModeId 绑回第一个自定义档（表现为“点哪个都一样”）。
+- 修复（宝龙达/无界）：新建的空白自定义档界面显示「未设置」，不再沿用上一次应用后的实时硬件值（避免看起来像复制了上一个自定义档）。
 - 链路核对：PerfModeService.AddCustom → PerfModeStore.SaveSettings(perf_<id>_*) 各自独立；UpdateCoreAsync 存本档 + Invalidate；BindMode 按本档 LoadSettings 回显。
 - 修复（回归）：恢复路径曾用硬件回写改写保存的开关/亮度 ⇒ 已移除，改为保存值优先。
 

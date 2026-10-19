@@ -1951,6 +1951,12 @@ public class CustomModeForm : RForm
 			UpdateRouteHint(mode);
 			LoadAppSide(mode.Settings);
 			ApplyPersistedComboOverrides(mode.Id);
+			// 空白的本机自定义档（如刚新建）显示「未设置」，不沿用上一次应用后的实时值
+			if (mode.IsCustom && mode.Settings.IsUntouched
+				&& (Program.hw?.UsesBaolongda == true || Program.hw?.WujieSmuApu == true))
+			{
+				ApplyBaolongdaResetVisuals(Program.hw);
+			}
 			// 2026-10-09：换模式/档位后屏幕上已是另一份（已保存的）值 ⇒ 未应用的改动作废（不下发、不静默应用）。
 			DiscardPendingChanges();
 		}
