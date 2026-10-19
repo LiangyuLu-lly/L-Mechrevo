@@ -117,6 +117,24 @@ internal class PowerNative
 		return ((IntPtr)AcValueIndex).ToInt32();
 	}
 
+	/// <summary>只写电池（DC）侧的处理器性能提升模式。</summary>
+	public static void SetCPUBoostDc(int boost)
+	{
+		Guid activeScheme = GetActiveScheme();
+		PowerWriteDCValueIndex(IntPtr.Zero, activeScheme, GUID_CPU, GUID_BOOST, boost);
+		PowerSetActiveScheme(IntPtr.Zero, activeScheme);
+	}
+
+	/// <summary>读插电（AC）/电池（DC）两套处理器性能提升模式。</summary>
+	public static void GetCPUBoostBoth(out int ac, out int dc)
+	{
+		Guid activeScheme = GetActiveScheme();
+		PowerReadACValueIndex(IntPtr.Zero, activeScheme, GUID_CPU, GUID_BOOST, out var acValue);
+		PowerReadDCValueIndex(IntPtr.Zero, activeScheme, GUID_CPU, GUID_BOOST, out var dcValue);
+		ac = ((IntPtr)acValue).ToInt32();
+		dc = ((IntPtr)dcValue).ToInt32();
+	}
+
 	public static void SetCPUBoost(int boost = 0)
 	{
 		Guid activeScheme = GetActiveScheme();

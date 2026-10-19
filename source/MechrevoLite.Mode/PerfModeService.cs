@@ -442,24 +442,59 @@ internal sealed class PerfModeService
 	{
 		get
 		{
-			return PowerNative.GetCPUBoost() == 5;
+			// AC / DC 两套都是 5（高效、积极且有保障）才算开
+			PowerNative.GetCPUBoostBoth(out int ac, out int dc);
+			return ac == 5 && dc == 5;
 		}
 		set
 		{
 			if (value)
 			{
-				int prev = PowerNative.GetCPUBoost();
-				if (prev != 5)
+				PowerNative.GetCPUBoostBoth(out int prevAc, out int prevDc);
+				if (prevAc != 5 || prevDc != 5)
 				{
-					AppConfig.Set("apuboost_prev", prev);
+					AppConfig.Set("apuboost_prev", prevAc);
+					AppConfig.Set("apuboost_prev_dc", prevDc);
 					PowerNative.SetCPUBoost(5);
-					Logger.WriteLine($"[power] APU 防缩缸：开 ⇒ 处理器性能提升模式 5（高效、积极且有保障）· 原值={prev} 已记");
+					Logger.WriteLine($"[power] APU 防缩缸：开 ⇒ 处理器性能提升模式 5（高效、积极且有保障）· 原值 AC={prevAc}/DC={prevDc} 已记");
 				}
+				AppConfig.Set("apuboost", 1);
 				return;
 			}
-			int restore = AppConfig.Get("apuboost_prev", 1);
-			PowerNative.SetCPUBoost(restore);
-			Logger.WriteLine($"[power] APU 防缩缸：关 ⇒ 还原处理器性能提升模式 = {restore}");
+			int restoreAc = AppConfig.Get("apuboost_prev", 1);
+			int restoreDc = AppConfig.Get("apuboost_prev_dc", restoreAc);
+			PowerNative.SetCPUBoost(restoreAc);
+			if (restoreDc != restoreAc)
+			{
+				PowerNative.SetCPUBoostDc(restoreDc);
+			}
+			AppConfig.Set("apuboost", 0);
+			Logger.WriteLine($"[power] APU 防缩缸：关 ⇒ 还原处理器性能提升模式 AC={restoreAc}/DC={restoreDc}");
+		}
+	}
+
+	/// <summary>启动时按用户保存的意图恢复「APU 防缩缸」；不强制关闭（避免覆盖其它来源的设置）。</summary>
+	internal void ApplyApuAntiDegradeOnStartup()
+	{
+		if (AppConfig.Get("apuboost", 0) == 0)
+		{
+			return;
+		}
+		PowerNative.GetCPUBoostBoth(out int ac, out int dc);
+		if (ac == 5 && dc == 5)
+		{
+			return;
+		}
+		try
+		{
+			AppConfig.Set("apuboost_prev", ac);
+			AppConfig.Set("apuboost_prev_dc", dc);
+			PowerNative.SetCPUBoost(5);
+			Logger.WriteError($"[power] 启动恢复 APU 防缩缸：处理器性能提升模式 AC={ac}/DC={dc} → 5");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[power] 启动恢复 APU 防缩缸失败：" + ex.Message);
 		}
 	}
 

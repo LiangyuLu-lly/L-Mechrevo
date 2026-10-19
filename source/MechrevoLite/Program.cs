@@ -3763,6 +3763,7 @@ internal static class Program
 					try
 					{
 						await warmPerf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
+				warmPerf.ApplyApuAntiDegradeOnStartup();
 					}
 					catch (Exception ex)
 					{
