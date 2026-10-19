@@ -4626,6 +4626,15 @@ public class CustomModeForm : RForm
 					ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, persisted.TccTarget ?? hw.TccTarget);
 				}
 				_ocChk.Checked = flag3 & flag4;
+				// 宝龙达/同方 GCU 40 系：GPU 超频开关按本档保存值回显
+				if ((hw.UsesBaolongda || gcuGen40) && !keepPending)
+				{
+					PerfModeSettings persistedOc = PerfModeStore.LoadSettings(_modeId);
+					if (persistedOc.GpuOverclockOn.HasValue)
+					{
+						_ocChk.Checked = persistedOc.GpuOverclockOn.Value;
+					}
+				}
 				_ocChk.Enabled = flag3 && hw.Capabilities.OverclockSettings;
 				if (_gpuOcAdminRow != null)
 				{
