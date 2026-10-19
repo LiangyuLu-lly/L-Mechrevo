@@ -18134,6 +18134,15 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			string saved = LightingSettingsStore.Load(topic, effects[0].Effect).Effect;
 			int num4 = Array.FindIndex(effects, ((string Effect, string Name) e) => e.Effect == saved);
 			effectCombo2.SelectedIndex = ((num4 >= 0) ? num4 : 0);
+			if (num4 < 0)
+			{
+				// 旧保存值该通道已不支持 ⇒ 迁移到第一项，避免启动恢复继续下发
+				LightChannelSettings migrated = LightingSettingsStore.Load(topic, effects[0].Effect);
+				LightingSettingsStore.Save(topic, migrated with
+				{
+					Effect = effects[0].Effect
+				});
+			}
 			effectCombo2.SelectedIndexChanged += async (object? _, EventArgs _) =>
 			{
 				if (!_syncingEffectCombos && !Program.UiAuditMode)

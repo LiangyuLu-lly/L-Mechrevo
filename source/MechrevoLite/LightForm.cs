@@ -20,12 +20,11 @@ public class LightForm : RForm
 		("Impact", Strings.EffectImpact),
 		("Raindrop", Strings.EffectMeteor)
 	};
-	// 机主：耀世16super 的 Logo 有固件原生彩虹）：按 组件行为对照
-	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[4]
+	// Logo：单色 / 呼吸 / 彩虹（该通道不支持混色）
+	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[3]
 	{
 		("Single", Strings.EffectSingle),
 		("Breathing", Strings.EffectBreathing),
-		("Mix", Strings.EffectMix),
 		("Rainbow", Strings.EffectRainbow)
 	};
 
@@ -237,6 +236,11 @@ public class LightForm : RForm
 		{
 			LightChannelSettings lightChannelSettings = LightingSettingsStore.Load(_topic, _effects[0].Effect);
 			_effect = lightChannelSettings.Effect;
+			// 保存的效果不在本通道支持列表里 ⇒ 回落到第一项
+			if (Array.FindIndex(_effects, e => e.Effect == _effect) < 0)
+			{
+				_effect = _effects[0].Effect;
+			}
 			_light = lightChannelSettings.Light;
 			_speed = lightChannelSettings.Speed;
 			_singleColor = Color.FromArgb(lightChannelSettings.ColorArgb);
