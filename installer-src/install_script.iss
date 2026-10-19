@@ -1637,7 +1637,8 @@ begin
     Exit;
   end;
   Log('LM-UNINST: 发现用户数据: ' + ExistList);
-  DoDelete := True;
+  // 静默卸载（升级触发）一律保留用户配置
+  DoDelete := False;
   if not UninstallSilent() then
   begin
     Prompt := ExistList;
@@ -1646,11 +1647,11 @@ begin
       '卸载时一并删除你的自定义设置？ / Delete your custom settings too?',
       '包括：性能模式自定义档（自定义 1/2 的参数与风扇曲线）、灯效与屏幕校色设置、' + #13#10 +
       '传感器与界面偏好。位置：' + #13#10 + Prompt + #13#10 + #13#10 +
-      '「删除」= 直接删除，删除后无法找回（默认，推荐）。' + #13#10 + #13#10 +
-      '「保留」= 不删除，设置原样留在机器上。' + #13#10 + #13#10 +
+      '「删除」= 直接删除，删除后无法找回。' + #13#10 + #13#10 +
+      '「保留」= 不删除，设置原样留在机器上（默认，推荐）。' + #13#10 + #13#10 +
       'Includes custom mode profiles and fan curves, lighting and screen-calibration' + #13#10 +
       'settings, sensor/UI preferences. Delete removes them permanently; Keep leaves them untouched.',
-      mbConfirmation, MB_YESNO, ['删除 / Delete', '保留 / Keep'], 0) = IDYES);
+      mbConfirmation, MB_YESNO, ['保留 / Keep', '删除 / Delete'], 0) = IDNO);
   end;
   if not DoDelete then
   begin
