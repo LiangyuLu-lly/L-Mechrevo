@@ -137,6 +137,11 @@ internal static class Program
 
 	private static int _resumeKeyboardRestorePending;
 
+	/// <summary>
+	/// ⭐ 2026-10-19（同方单键 RGB 开机闪）：硬件状态重申的最后一次执行时间（TickCount64；用于 3s 防抖）✅。
+	/// </summary>
+	private static long _lastReassertKeyboardCustomModeTick;
+
 	private static System.Threading.Timer? _lightingIdleTimer;
 
 	private static int _lightingIdleSuspended;
@@ -2070,13 +2075,44 @@ internal static class Program
 	private static void ReassertKeyboardCustomMode()
 	{
 		KeyboardRgb keyboardRgb = rgb;
-		if (keyboardRgb != null && keyboardRgb.KbPowerOn)
+		if (keyboardRgb == null || !keyboardRgb.KbPowerOn)
 		{
-			LogLightBoot($"HID 帧流：ReInitCustomMode + StartMode(mode={keyboardRgb.KbHidMode})（来源=硬件状态重申）");
-			keyboardRgb.ReInitCustomMode();
-			keyboardRgb.StartMode(keyboardRgb.KbHidMode);
-			Logger.WriteLine($"RGB 固件接管，立即重申自定义帧模式：mode={keyboardRgb.KbHidMode}");
+			return;
 		}
+		// ⭐⭐ 2026-10-19（同方单键 RGB 开机闪 · 低风险防御）：只对 per-key 键盘生效
+		//   （KeyboardType 非 0 且不属于 GCU 分区族；如耀世 KeyboardType=7）✅
+		int keyboardType = hw?.Capabilities?.KeyboardType ?? 0;
+		if (keyboardType > 0 && !KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(keyboardType))
+		{
+			long bootMilliseconds;
+			try
+			{
+				bootMilliseconds = (long)(DateTime.Now - Process.GetCurrentProcess().StartTime).TotalMilliseconds;
+			}
+			catch
+			{
+				bootMilliseconds = 0;
+			}
+			// ① 开机宽限 15s：只做数值同步，不重启 HID 帧流 ✅
+			if (bootMilliseconds < 15000)
+			{
+				LogLightBoot($"硬件状态重申：跳过（开机宽限 t={bootMilliseconds}ms）");
+				return;
+			}
+			// ② 防抖：两次重申至少间隔 3s（期间多次状态变化合并；pending 标记由调用方保证）✅
+			long now = Environment.TickCount64;
+			long last = Interlocked.Read(ref _lastReassertKeyboardCustomModeTick);
+			if (last != 0 && now - last < 3000)
+			{
+				LogLightBoot($"硬件状态重申：跳过（防抖 {now - last}ms < 3000ms）");
+				return;
+			}
+			Interlocked.Exchange(ref _lastReassertKeyboardCustomModeTick, now);
+		}
+		LogLightBoot($"HID 帧流：ReInitCustomMode + StartMode(mode={keyboardRgb.KbHidMode})（来源=硬件状态重申）");
+		keyboardRgb.ReInitCustomMode();
+		keyboardRgb.StartMode(keyboardRgb.KbHidMode);
+		Logger.WriteLine($"RGB 固件接管，立即重申自定义帧模式：mode={keyboardRgb.KbHidMode}");
 	}
 
 	internal static void OnHardwareStateChanged(string topic)
