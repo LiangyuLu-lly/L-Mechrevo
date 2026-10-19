@@ -1146,9 +1146,11 @@ internal sealed class PerfModeService
 		PerfModeStore.ActiveModeId = mode.Id;
 		PerfModeStore.SetActiveFor(PowerSourceKey(), mode.Id);
 		PerfModeStore.LastCustomId = mode.Id;
-		if (Logger.TryMarkChanged("wujie-local-profile-active", "[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + previousActive + " → " + mode.Id + "（已落盘 perf_active）· 不发固件档命令）"))
+		string backendName = ((_hw != null && _hw.WujieSmuApu) ? "无界 APU" : "宝龙达");
+		string activateLog = "[perfmode] " + backendName + "：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + previousActive + " → " + mode.Id + "（已落盘 perf_active）· 不发固件档命令）";
+		if (Logger.TryMarkChanged("wujie-local-profile-active", activateLog))
 		{
-			Logger.WriteError("[perfmode] 无界 APU：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + previousActive + " → " + mode.Id + "（已落盘 perf_active）· 不发固件档命令）");
+			Logger.WriteError(activateLog);
 		}
 		RaiseActiveChanged();
 	}
@@ -1166,60 +1168,125 @@ internal sealed class PerfModeService
 		return ReconcileAsync("startup warmup");
 	}
 
-	internal async Task ReplayWujieLocalProfileOnStartupAsync()
+	/// <summary>
+	/// ⭐⭐ 2026-10-19（机主：宝龙达「自定义模式」重启不记忆）：启动重放**泛化**到宝龙达 + 无界 ✅
+	/// <para>⭐ 宝龙达：重放 `ActivateAsync(id, "baolongda startup replay", forceParameters:true)` ⇒ 走 WMI 本机字段
+	/// （`SupportsFirmwareSlot=false` 已保证不生成固件档步骤）✅</para>
+	/// <para>⭐ 无界：走本机 SMU（原逻辑保留）✅</para>
+	/// <para>⚠️ 幂等：先读当前值，与配置一致 ⇒ 跳过；失败不重试、只记日志 ✅</para>
+	/// </summary>
+	internal async Task ReplayLocalProfileOnStartupAsync()
 	{
 		MechrevoHw hw = _hw;
-		if (hw == null || !hw.WujieSmuApu)
+		if (hw == null || (!hw.WujieSmuApu && !hw.UsesBaolongda))
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-19（机主：重启后模式跳回「平衡」）：
-		//   ⭐ 配置里没有 ActiveModeId（首次）⇒ 不设（跟随固件/默认平衡）✅
+		bool isWujie = hw.WujieSmuApu;
+		bool isBaolongda = !isWujie && hw.UsesBaolongda;
+		if (isBaolongda)
+		{
+			string stateLog = "[perfmode] 宝龙达启动：PerfModeStore.ActiveModeId=" + PerfModeStore.ActiveModeId
+				+ "（HasStoredActive=" + PerfModeStore.HasStoredActive + "）· 固件回读=" + hw.OperatingMode;
+			if (Logger.TryMarkChanged("baolongda-startup-state", stateLog))
+			{
+				Logger.WriteError(stateLog);
+			}
+		}
 		if (!PerfModeStore.HasStoredActive)
 		{
 			return;
 		}
+		// ⭐ 优先 ActiveModeId；宝龙达若 ActiveModeId 非自定义但 LastCustomId 指向自定义 ⇒ 用 LastCustomId ✅
 		PerfModeDefinition mode = Find(ActiveModeId);
 		if ((object)mode == null || !mode.IsCustom)
 		{
+			mode = ((object)Find(PerfModeStore.LastCustomId ?? "") is PerfModeDefinition lastCustom && lastCustom.IsCustom)
+				? lastCustom
+				: null;
+		}
+		if ((object)mode == null)
+		{
 			return;
 		}
-		// ⭐ 指向自定义档 ⇒ 走与 ActivateLocalProfile 同路径把当前模式设为该档（持久化 + RaiseActiveChanged）✅
+		// ⭐ 把当前模式设为该档（持久化 + RaiseActiveChanged）✅
 		ActivateLocalProfile(mode.Id);
-		if (Logger.TryMarkChanged("wujie-startup-mode", "[perfmode] 无界 APU 启动恢复（晚于 GCU 各项）：ActiveModeId=" + mode.Id + " ⇒ 重放 SMU"))
+		string backendLabel = isWujie ? "无界 APU" : "宝龙达";
+		string modeLog = isWujie
+			? "[perfmode] 无界 APU 启动恢复（晚于 GCU 各项）：ActiveModeId=" + mode.Id + " ⇒ 重放 SMU"
+			: "[perfmode] 宝龙达启动恢复：ActiveModeId=" + mode.Id + " ⇒ 模式=自定义";
+		if (Logger.TryMarkChanged("local-startup-mode-" + backendLabel, modeLog))
 		{
-			Logger.WriteError("[perfmode] 无界 APU 启动恢复（晚于 GCU 各项）：ActiveModeId=" + mode.Id + " ⇒ 重放 SMU");
+			Logger.WriteError(modeLog);
 		}
 
 		PerfModeSettings settings = mode.Settings;
-		if (TryReadWujieSmuCurrent(out int curPl1, out int curPl2, out int curTctl)
-			&& WujieSmuValuesMatch(settings, curPl1, curPl2, curTctl))
+		// 幂等先读后比：无界用 SMU；宝龙达用 WMI 本机值（Pl1/Pl2/TccTarget，未设置/读不到视为不一致 ⇒ 重放）✅
+		bool match;
+		if (isWujie)
 		{
-			string skip = "[perfmode] 无界 APU 启动恢复：当前值与配置一致 ⇒ 跳过（ActiveModeId=" + mode.Id + "）";
-			if (Logger.TryMarkChanged("wujie-startup-skip", skip))
+			match = TryReadWujieSmuCurrent(out int curPl1, out int curPl2, out int curTctl)
+				&& WujieSmuValuesMatch(settings, curPl1, curPl2, curTctl);
+		}
+		else
+		{
+			match = BaolongdaLocalValuesMatch(settings, hw);
+		}
+		if (match)
+		{
+			string skip = "[perfmode] " + backendLabel + " 启动恢复：当前值与配置一致 ⇒ 跳过（ActiveModeId=" + mode.Id + "）";
+			if (Logger.TryMarkChanged("local-startup-skip-" + backendLabel, skip))
 			{
 				Logger.WriteError(skip);
 			}
 			return;
 		}
-		string replay = "[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机 SMU（PL1="
-			+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）";
-		if (Logger.TryMarkChanged("wujie-startup-replay", replay))
+		string replay = isWujie
+			? "[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机 SMU（PL1="
+				+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）"
+			: "[perfmode] 宝龙达启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机参数（PL1="
+				+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）";
+		if (Logger.TryMarkChanged("local-startup-replay-" + backendLabel, replay))
 		{
 			Logger.WriteError(replay);
 		}
 		try
 		{
-			await ActivateAsync(mode.Id, "wujie startup replay", forceParameters: true).ConfigureAwait(continueOnCapturedContext: false);
+			await ActivateAsync(mode.Id, isWujie ? "wujie startup replay" : "baolongda startup replay", forceParameters: true).ConfigureAwait(continueOnCapturedContext: false);
 		}
 		catch (Exception ex)
 		{
-			Logger.WriteError("[perfmode] 无界 APU 启动恢复失败（已吞掉、不重试）：" + ex.Message);
-			// ⭐ 失败兜底：如实保留 ActiveModeId（界面高亮仍按自定义），⛔ 不静默改回平衡 ✅
-			Logger.WriteError("[perfmode] 无界 APU：重放失败 ⇒ 高亮仍按自定义（SMU 未恢复）· ActiveModeId=" + ActiveModeId);
+			Logger.WriteError("[perfmode] " + backendLabel + " 启动恢复失败（已吞掉、不重试）：" + ex.Message);
+			Logger.WriteError("[perfmode] " + backendLabel + "：重放失败 ⇒ 高亮仍按自定义（参数未恢复）· ActiveModeId=" + ActiveModeId);
 		}
 	}
 
+	/// <summary>⭐ 兼容旧调用：无界专用入口（转发到泛化方法）✅</summary>
+	internal Task ReplayWujieLocalProfileOnStartupAsync()
+	{
+		return ReplayLocalProfileOnStartupAsync();
+	}
+
+	/// <summary>⭐ 幂等判据（宝龙达）：配置里设过的项与当前 WMI 本机值一致（±2W / ±1℃）⇒ 无需重写 ✅</summary>
+	private static bool BaolongdaLocalValuesMatch(PerfModeSettings settings, MechrevoHw hw)
+	{
+		int curPl1 = hw.Pl1;
+		int curPl2 = hw.Pl2;
+		int curTctl = hw.TccTarget;
+		if (settings.Pl1.HasValue && (curPl1 <= 0 || Math.Abs(settings.Pl1.Value - curPl1) > 2))
+		{
+			return false;
+		}
+		if (settings.Pl2.HasValue && (curPl2 <= 0 || Math.Abs(settings.Pl2.Value - curPl2) > 2))
+		{
+			return false;
+		}
+		if (settings.TccTarget.HasValue && (curTctl <= 0 || Math.Abs(settings.TccTarget.Value - curTctl) > 1))
+		{
+			return false;
+		}
+		return true;
+	}
 	/// <summary>⭐ 只读：SMU 当前 PL1(slow)/PL2(fast)/tctl（读不到返回 false；⛔ 不写任何东西）✅</summary>
 	private static bool TryReadWujieSmuCurrent(out int pl1, out int pl2, out int tctl)
 	{
@@ -1848,14 +1915,16 @@ internal sealed class PerfModeService
 			//   ⭐ 无界 APU 的本机自定义档**优先于固件回读**（无固件档语义）——
 			//      若配置里的 ActiveModeId 指向一个自定义档，⛔ 不被固件读回的「平衡/其它」覆盖 ✅
 			//   ⚠️ 宝龙达/GCU/同方不变（WujieSmuApu 恒 false；宝龙达仍按既有 reconcile 语义）✅
-			if (hw.WujieSmuApu)
+			// ⭐⭐ 2026-10-19（宝龙达重启不记忆）：宝龙达与无界一样，持久化自定义档优先于固件回读 ✅
+			if (hw.WujieSmuApu || hw.UsesBaolongda)
 			{
 				PerfModeDefinition persisted = Find(ActiveModeId);
 				if ((object)persisted != null && persisted.IsCustom)
 				{
-					if (Logger.TryMarkChanged("wujie-external-mode-change", "[perfmode] ⚠️ 检测到外部性能档位变化（来源=固件回读）⇒ 自定义档保持本机配置，不回写固件（ActiveModeId=" + persisted.Id + "）"))
+					string keepMsg = "[perfmode] " + (hw.WujieSmuApu ? "无界 APU" : "宝龙达") + "：固件模式回读 ⇒ 保持本机自定义档（ActiveModeId=" + persisted.Id + "，⛔ 不覆盖）";
+					if (Logger.TryMarkChanged("wujie-external-mode-change", keepMsg))
 					{
-						Logger.WriteError("[perfmode] ⚠️ 检测到外部性能档位变化（来源=固件回读）⇒ 自定义档保持本机配置，不回写固件（ActiveModeId=" + persisted.Id + "）");
+						Logger.WriteError(keepMsg);
 					}
 					return;
 				}

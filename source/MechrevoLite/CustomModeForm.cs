@@ -446,7 +446,7 @@ public class CustomModeForm : RForm
 		//   顺序：能力刷新 → 模式对账（ReconcileForStartupAsync） → 无界重放；改为 Shown 之后串行执行 ✅
 		Shown += async (object? _, EventArgs _) =>
 		{
-			if (Program.UiAuditMode || !(Program.hw?.WujieSmuApu ?? false))
+			if (Program.UiAuditMode || !((Program.hw?.WujieSmuApu ?? false) || (Program.hw?.UsesBaolongda ?? false)))
 			{
 				return;
 			}
@@ -466,7 +466,7 @@ public class CustomModeForm : RForm
 			try
 			{
 				await perf.ReconcileForStartupAsync();
-				await perf.ReplayWujieLocalProfileOnStartupAsync();
+				await perf.ReplayLocalProfileOnStartupAsync();
 			}
 			catch (Exception ex)
 			{

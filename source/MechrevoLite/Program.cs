@@ -3666,11 +3666,11 @@ internal static class Program
 						Logger.WriteLine("[init] 后台初始化：模式对账失败（已吞掉，继续无界重放）：" + ex.Message);
 					}
 				}
-				if (warmHw.WujieSmuApu && warmPerf != null)
+				if ((warmHw.WujieSmuApu || warmHw.UsesBaolongda) && warmPerf != null)
 				{
 					try
 					{
-						await warmPerf.ReplayWujieLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
+						await warmPerf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
 					}
 					catch (Exception ex)
 					{
