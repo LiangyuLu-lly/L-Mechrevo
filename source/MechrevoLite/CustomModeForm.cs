@@ -4610,6 +4610,20 @@ public class CustomModeForm : RForm
 				_tccChk.Checked = hw.TccSwitch;
 				_tccChk.Enabled = flag;
 				_tcc.Enabled = hw.TccSwitch & flag;
+				// 宝龙达：功耗墙/温度墙只写不读，显示与开关按本档保存值回显
+				if (hw.UsesBaolongda && !keepPending)
+				{
+					PerfModeSettings persisted = PerfModeStore.LoadSettings(_modeId);
+					ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, persisted.Pl1 ?? hw.Pl1);
+					ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, persisted.Pl2 ?? hw.Pl2);
+					ApplyRange(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, persisted.Pl4 ?? hw.Pl4);
+					if (persisted.TccOn.HasValue)
+					{
+						_tccChk.Checked = persisted.TccOn.Value;
+						_tcc.Enabled = persisted.TccOn.Value & flag;
+					}
+					ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, persisted.TccTarget ?? hw.TccTarget);
+				}
 				_ocChk.Checked = flag3 & flag4;
 				_ocChk.Enabled = flag3 && hw.Capabilities.OverclockSettings;
 				if (_gpuOcAdminRow != null)
