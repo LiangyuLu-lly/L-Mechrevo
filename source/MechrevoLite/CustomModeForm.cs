@@ -1935,10 +1935,8 @@ public class CustomModeForm : RForm
 		_syncingModes = true;
 		try
 		{
-			if (_modeCombo.Items.Cast<object>().All((object o) => !(o is ModeItem modeItem) || modeItem.Id != mode.Id))
-			{
-				RebuildModeItems();
-			}
+			// 每次绑定都重建：自定义/内置切换后下拉的过滤范围会变
+			RebuildModeItems();
 			SelectModeItem(mode.Id);
 			Text = Strings.PerfEditorTitle + " · " + PerfModeText.Name(mode);
 			IReadOnlyList<PerfModeDefinition> existing = ModesSnapshot();
