@@ -6037,8 +6037,8 @@ public class SettingsForm : RForm
 		{
 			// ⭐ 电池标题状态读取后移（构建期只搭 UI，⛔ 不读硬件）✅
 			try { VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent()); } catch { }
-			// ⭐ 快捷开关 tile 构建后移（204ms → 首帧后一个 BeginInvoke）✅
-			BeginInvoke(new Action(EnsureQuickSwitchPanelBuilt));
+			// ⭐ 快捷开关**状态同步**后移（tile 构建仍在 ctor，布局依赖它）✅
+			BeginInvoke(new Action(RefreshQuickStatesAfterShown));
 			if (!Program.UiAuditMode)
 			{
 				RefreshStartupStatusAsync();
@@ -14532,10 +14532,22 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 
 	private void InitQuickSwitchRefresh()
 	{
-		// ⭐ 2026-10-19（机主：快捷开关=240ms）：⭐ tile 构建 / 状态读取分开计时；状态读取后移到 Shown ✅
-		// ⭐ 2026-10-19（机主：快捷开关=204ms）：⭐ tile 构建后移到 Shown 后的第一个消息循环
-		//   （ctor 只挂延后动作；最终 UI 与顺序不变，仅晚一个 BeginInvoke）✅
+		// ⭐ 2026-10-19（回归修复）：tile 构建**必须留在 ctor** —— BuildDashboardLayout 依赖 panelQuickSwitch；
+		//   只有「状态读取」后移到 Shown（见 RefreshQuickStatesAfterShown）✅
 		buttonBatteryFull.Visible = false;
+		Stopwatch quickTileWatch = Stopwatch.StartNew();
+		BuildQuickSwitchPanel();
+		Control quickPanel = Controls["panelQuickSwitch"];
+		if (quickPanel != null)
+		{
+			Controls.SetChildIndex(panelPerformance, 9);
+			Controls.SetChildIndex(Controls["panelLc"], 8);
+			Controls.SetChildIndex(panelGPU, 7);
+			Controls.SetChildIndex(quickPanel, 6);
+			Controls.SetChildIndex(panelBattery, 5);
+			Controls.SetChildIndex(Controls["panelBrightness"], 3);
+		}
+		_uiBuildQuickTileMs += quickTileWatch.ElapsedMilliseconds;
 		panelStartup.Controls.Remove(checkStartup);
 		labelVersion.Dock = DockStyle.Left;
 		labelVersion.AutoSize = false;
@@ -14584,41 +14596,28 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	}
 
 	/// <summary>
-	/// ⭐ 2026-10-19（机主：设置页启动慢）：⭐ 快捷开关 tile 构建/状态读取延后到显示后第一个消息循环；
-	/// 构建完成后恢复原来的子控件顺序，并做一次状态同步（最终 UI 与 ctor 内构建一致）✅
+	/// ⭐ 2026-10-19（回归修复）：⭐ tile 构建**必须在 ctor 内**完成 ——
+	/// <c>BuildDashboardLayout()</c> 依赖 <c>panelQuickSwitch</c>（找不到会整套布局直接 return，界面会错乱）。
+	/// <para>⇒ 只把**状态读取**（UpdateQuickSwitches / 电池标题）后移到 Shown 后一个消息循环；
+	/// ⛔ 不再延后 tile 构建本身 ✅</para>
 	/// </summary>
-	private void EnsureQuickSwitchPanelBuilt()
+	private void RefreshQuickStatesAfterShown()
 	{
 		try
 		{
-			if (IsDisposed || Controls.ContainsKey("panelQuickSwitch"))
+			if (IsDisposed)
 			{
 				return;
 			}
 			Stopwatch quickWatch = Stopwatch.StartNew();
-			BuildQuickSwitchPanel();
-			long quickTileMs = quickWatch.ElapsedMilliseconds;
-			_uiBuildQuickTileMs += quickTileMs;
-			quickWatch.Restart();
-			Control control = Controls["panelQuickSwitch"];
-			if (control != null)
-			{
-				Controls.SetChildIndex(panelPerformance, 9);
-				Controls.SetChildIndex(Controls["panelLc"], 8);
-				Controls.SetChildIndex(panelGPU, 7);
-				Controls.SetChildIndex(control, 6);
-				Controls.SetChildIndex(panelBattery, 5);
-				Controls.SetChildIndex(Controls["panelBrightness"], 3);
-			}
 			UpdateQuickSwitches();
-			VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent());
 			long quickStateMs = quickWatch.ElapsedMilliseconds;
 			_uiBuildQuickStateMs += quickStateMs;
-			Logger.WriteError("[ui-build] 快捷开关延后构建（Shown 后）：tile=" + quickTileMs + " ms · 状态=" + quickStateMs + " ms");
+			Logger.WriteError("[ui-build] 快捷开关状态同步（Shown 后）：状态=" + quickStateMs + " ms");
 		}
 		catch (Exception ex)
 		{
-			Logger.WriteLine("[ui-build] 快捷开关延后构建失败（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
+			Logger.WriteLine("[ui-build] 快捷开关状态同步失败（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
 		}
 	}
 	public void VisualiseBatteryTitle(int limit)

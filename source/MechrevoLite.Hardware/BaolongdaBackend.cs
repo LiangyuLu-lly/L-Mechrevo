@@ -71,7 +71,20 @@ internal sealed class BaolongdaBackend : IDisposable
 			wmi = BaolongdaWmi.TryCreate();
 			if (wmi == null)
 			{
-				// ⭐ 没探到 ⇒ 静默返回（⭐ 非宝龙达机型每次启动都走到这里，⛔ 不能刷日志）
+				// ⭐ 2026-10-19（机型识别排障）：⭐ 非宝龙达机型每次启动都会走到这里 ⇒ 平时静默；
+				//   ⭐ 但**板号命中白名单却探不到接口**是真异常 ⇒ 必须留一行 error 证据 ✅
+				//   （真机案例：MRID6-23 诊断包里白名单命中、运行期却 backend=Gcu，原因不可见）
+				try
+				{
+					if (IsBaolongdaModelWhitelisted(out string boardNoteWhenNull))
+					{
+						Logger.WriteError("宝龙达后端：⚠️ 板号命中白名单但**未探到 MICommonInterface** ⇒ 本会话退回 GCU/legacy"
+							+ "（" + boardNoteWhenNull + "）· 请检查 ACPI\\PNP0C14\\MIFS_0 与 root\\WMI:MICommonInterface 是否可用");
+					}
+				}
+				catch
+				{
+				}
 				return null;
 			}
 
