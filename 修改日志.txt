@@ -1,75 +1,52 @@
-r78（2026-10-19 · **0.292.3 beta23.3**）★★ Logo 灯效对齐官方 + 键盘灯保存状态/开机闪修复（含自引入回归的记录）
+r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 + 键盘灯开机闪与关灯被拉亮 + 30 系每配置本地化 + APU 防缩缸记忆 + 安装器简化
 
-一、Logo 灯效（40 系同方）
-- 抓官方控制台 MQTT 报文确认：Logo 效果名为 ColorMarquee / Breathing / Wave / Impact / Raindrop，参数统一 isCircular=true、ColorBlocks=7、ColorBuffer 7 段、nv_save="0"。
-- 实现按官方报文下发；效果表改为 单色 / 彩虹(ColorMarquee) / 呼吸 / 波浪 / 冲击 / 流星。
-- 颜色分流：单色、流星=1 色；呼吸、彩虹=7 色；波浪、冲击=ColorBlocks=0（固件配色）。
-- 灯光编辑器新增「颜色」行：7 个色块 + 「默认」；颜色存配置（mixcolors=ARGB×7），重启保留。
-- 修复：Logo 彩虹「默认」按钮改回默认色不生效（改为显式写入官方 7 色，并在 [light] 下发日志里带 palette）。
-- 修复（宝龙达）：自定义档的功耗墙/温度墙按本档保存值回显（WMI 只写不读 ⇒ 以前新旧档显示同一套硬件值、温度墙开关不保存）。
-- 新增（同方 GCU 40 系）：启动时按 LM 本地保存的自定义档重放一次（保存的当前档=自定义时）；后续可简化安装器对 GCU UserPofiles/UserFanTables 的备份回灌。
-- 新增：灯带/Logo 灯光编辑器的「速度」由三档下拉改为 0~4 滑块（官方速度范围 0~4，配置保存允许 0）。
-- 新增（40 系同方灯带）：颜色按效果分流 —— 单色/流星=1 色，呼吸/冲击=7 色，波浪=固件配色；下发 ColorBlocks 与之一致。
-- 修复：GPU 功耗偶发显示 400W（首次采样脏值）—— 超过 NVML 功耗上限/TGP 上限的值视为无效并丢弃。
-- 新增：灯光编辑窗打开时，主设置窗切换灯效后编辑窗自动刷新（颜色行按新效果显隐、亮度/速度同步）。
-- 修复：导出/导入设置补齐 `logolight.cfg`、`lighting.user-configured`、`fan_curve_bd.cfg` 与 `baolongda_fancurve_*.cfg`（以前 Logo 设置与宝龙达每档风扇曲线不会被备份/还原）。
-- 新增（同方 GCU 40 系）：自定义档界面按 LM 本地保存值显示功耗墙/温度墙（与宝龙达同口径，逐步摆脱对 GCU 档位文件的依赖）。
-- 修复：两个自定义档来回切换时 GPU 超频开关不记忆（改为按本档保存值回显）。
-- 修复：自定义档「风扇转换灵敏度」开关与延迟按本档保存值回显（切档不记忆）。
-- 修复：自定义档的「Windows 电源模式 / 电源计划 / 睿频模式 / 风扇增强 / 屏幕刷新率」按本档持久化值回显（切档不再变回“不改变”）。
-- 新增（无界 APU）：按支持风扇曲线处理（能力位不再依赖 FanCurveSeen，实际保存仍用 GCU 通道确认）。
-- 新增（30 系 GCU）：接入 LM 本地配置权威 —— 启动按保存的自定义档重放一次，自定义档界面按本地保存值回显。
-- 修复：编辑自定义档时「模式」下拉只列自定义档（不再混入内置模式）。
-- 修复：不关闭自定义窗口、从狂暴切到自定义后，模式下拉仍显示内置档（改为每次绑定时重建下拉）。
-- 修复：30 系只有 2 档（安静/平衡）的机型不再显示狂暴（按能力位判定，下拉数量跟随机型）。
-- 新增（30 系）：每个「模式 × 配置」的参数改存 LM 本地（perf_fw{模式}p{配置}_*），编辑器优先按本地存档回显，启动时按各模式绑定的配置号重放一次；GCU UserPofiles 只作初始值/镜像。
-- 简化安装器升级流程：删除 GCU UserPofiles / UserFanTables 的备份-回灌（改由 LM 本地存档 + 启动重放恢复）；保留 LM 用户数据（%APPDATA%、ProgramData）与校色 ICC 的备份回灌。
-- 自定义 ICC 目录从 {app}\customICC 迁到 %APPDATA%\MechrevoLite\customICC（首次运行自动迁移旧文件）；安装器不再单独备份/回灌 ICC（随 LM 用户数据走）。
-- 导出/导入设置包含自定义 ICC（`customICC` 子目录下的 .icc/.icm）。
-- 修复：APU 防缩缸开关不记忆 —— 保存用户意图并在启动时恢复；状态改为 AC/DC 两套处理器性能提升模式都为 5（高效、积极且有保障）才算开启。
-- 安装器：静默卸载（升级触发）不再删除 LM 用户配置；只有用户亲自运行卸载器时才询问是否删除，且默认「保留」。
-- Logo 亮度改为 0~4 档（与官方一致）。
-- 50 系与宝龙达不进入该分支（判据：!UsesBaolongda && DgpuGeneration==Gen40）。
+一、灯效（40 系同方）
+- 抓官方控制台 MQTT 报文确认：Logo 效果名为 ColorMarquee / Breathing / Wave / Impact / Raindrop；参数统一 isCircular=true、ColorBlocks=7、ColorBuffer 7 段、nv_save="0"；官方默认 7 色末色为 139,0,255。
+- 按官方报文实现下发；Logo 效果表改为 单色 / 彩虹(ColorMarquee) / 呼吸 / 波浪 / 冲击 / 流星；灯带表保持 单色/呼吸/波浪/冲击/流星。
+- 颜色分流统一：单色、流星=1 色；呼吸、冲击、彩虹=7 色；波浪=ColorBlocks 0（固件配色）。
+- 灯光编辑器新增「颜色」行（7 色块 + 「默认」），颜色存配置 mixcolors=ARGB×7；「默认」改为显式写入官方 7 色并打印 palette 日志。
+- 修复：点「默认」不生效（原写 null 走兜底，改为显式写默认值）。
+- 修复：Logo 面板「默认」按钮右侧被裁切（色块 30→26px、按钮 64→52px）。
+- 新增：灯带/Logo 编辑器速度由三档下拉改为 0~4 滑块；配置解析允许 speed=0。
+- 新增：编辑器打开时随主设置窗效果切换自动刷新（500ms 轻量检测；回填控件时用 _refreshingUi 防重复下发）。
+- 修复（回归）：LightForm 构造时 row=-1 导致「编辑」按钮点不开（RowCount 未随 AddRow 更新）⇒ 捕获 colorRow。
+- 修复（回归）：Logo「混合」先被误删、又按 Mix 名实现；官方 Logo 无 Mix，最终改为 ColorMarquee。
 
 二、键盘灯
-- 开机/恢复严格按保存状态：保存为关 ⇒ 不点亮、不让硬件回写翻转保存值；亮度不再做 0 归一化（恢复保存值）。
-- 首次启动 HID 帧流延后 8 秒接管（避免启动竞争导致键盘灯一直闪）。
-- KbPowerSyncFromHardware：用户明确关灯后，硬件报 On 不再清掉 explicit-off、不再回写 KbPowerOn（修复关灯后又被硬件状态重申拉起）。
-- 开机 HID 连接后补 ReInitCustomMode 再 StartMode（与手动开关路径一致）。
+- 开机首次启动：HID 帧流延后 8 秒接管（等固件/GCU 稳定），修「一开机几秒就狂闪」。
+- HID 刚连接时补 ReInitCustomMode 再 StartMode（与手动开关路径一致）。
+- 恢复路径严格按保存状态：保存为关则不点亮；KbPowerSyncFromHardware 在用户明确关灯后不再被硬件 On 回写/清标记。
+- 移除亮度 0 归一化：恢复/启动使用保存的亮度（0 就是 0），不自动抬高。
+- 记录（回归）：亮度 0 归一化是上一版引入的行为，本版按机主要求移除。
 
-三、灯带
-- 非键盘通道：呼吸按多段循环（isCircular=true）下发；固件配色效果（Rainbow/Aurora/Gaming）不下发用户颜色。
+三、性能模式 / 自定义档
+- 30 系：每「模式×配置」参数存 LM 本地（perf_fw{视觉模式}p{配置号}_*）；编辑器优先按本地存档回显；启动按各模式绑定的配置号重放一次（`[perfmode] 30 系启动恢复`）。
+- 30 系：2 档机型（安静/平衡）不再提供狂暴（按能力位判定）。
+- 自定义档回显补齐：GPU 超频开关（perf_*_ocon）、风扇转换灵敏度开关/延迟（fsson/fss）、电源模式/电源计划/睿频/风扇增强/刷新率，均按本档持久化值回显。
+- 编辑自定义档时模式下拉只列自定义档；不关闭窗口从内置档切回时也重建下拉。
+- 同方 GCU 40 系：自定义档界面按 LM 本地保存值显示功耗墙/温度墙；启动按保存的自定义档重放一次。
+- 宝龙达/无界：恢复出厂走本地复位，界面强制回「未设置」；无界 SMU 功耗墙如实提示「运行时状态、重启回固件默认」。
+- 无界 APU：风扇曲线能力位先按支持处理（FanCurveSeen 不再作为唯一判据）。
+- 修复：宝龙达自定义档新旧档混在一起、温度墙开关不保存（WMI 只写不读 ⇒ 改为按本档保存值回显）。
+- 修复（回归）：恢复路径曾用硬件回写改写保存的开关/亮度 ⇒ 已移除，改为保存值优先。
 
-四、自引入回归与修复记录（更新日志不列）
-- 回归：LightForm 编辑按钮点不开（ArgumentOutOfRangeException: row=-1，RowCount 未随 AddRow 更新）⇒ 捕获 colorRow 修复。
-- 回归：Logo「混合」被误判为不支持，先删除选项后又按 Mix 名实现；实际官方无 Mix，改为 ColorMarquee。
-- 回归：Logo 通道曾统一发 ColorBlocks=0/1 导致灭灯；改为官方 7 段参数。
-- 回归：恢复路径曾做亮度 0 归一化并让硬件回写改保存值 ⇒ 移除（按用户要求严格保存状态）。
-- 诊断：新增 tools/gcu_light_capture.ps1（PowerShell 版，不依赖 Python）抓官方控制台灯效报文。
+四、监控
+- 修复：GPU 功耗偶发显示 400W 假值 —— 超过 NVML 功耗上限 +50W / TGP 上限 +100W 的值判无效丢弃（兜底 350W）；CPU 侧不变。
 
-五、版本/打包
-- AssemblyVersion/FileVersion 0.292.3；InformationalVersion 0.292.3-beta23.3。
-- iss：AppVerName=L-Mechrevo 0.292.3 beta23.3；包名 LM-0.292.3-beta23.3-setup.exe。
+五、设置/备份
+- 新增：自定义 ICC 目录迁到 %APPDATA%\MechrevoLite\customICC（旧 {app}\customICC 首次运行自动迁移）。
+- 导出/导入设置：白名单补 logolight.cfg、lighting.user-configured、fan_curve_bd.cfg，新增 baolongda_fancurve_*.cfg 通配；新增 customICC 子目录（.icc/.icm）导入导出。
+- APU 防缩缸：状态改为 AC/DC 两套处理器性能提升模式都为 5 才算开；用户意图存 apuboost，启动时 ApplyApuAntiDegradeOnStartup 恢复；关闭时分别还原 AC/DC 原值。
 
-r77（2026-10-19 · **0.292.2.1 beta23.2.1**）★★ GPU 偏移 UI 重做 + 同方 GCU 负偏移（核心 -95 / 显存 -1000 实测）+ 显存风控
-用户原话：「核心偏移有没有减频率的能力」「同方 GCU接受降低频率吗 可以先做一个试试」「可以生效 看看GCU的offset能不能-100也实验一下」「NVAPI保留但默认不用 然后滑块默认一半可+-500 旁边数字框则是可以填NV允许的」「注意是GCU机型默认不用」「显存+-2000吧 然后数字框也是可以填NV允许的范围 宝龙达同方都是 路径不一致但是逻辑一样」「显存超过+1000 红色字提示显存偏移过高有损坏硬件风险」「GCU最多是-900的显存 NV的范围允许是多少」「GCU可以写入最多是-1000 只是我们UI弹了-900」「滑块最低-1000吧 最高+2000 宝龙达那边也是数字范围就还是NV允许的显存范围」「可以 打包23.2.1」
-① ⭐ 实测结论（真机诊断包 14:02）：**同方 GCU 厂商字段原生支持负偏移** —— `GpuCoreClockOffsetOC=-95` 经原 `WriteFirmwareField` 链下发、`SetCustomDetail confirmed=True` 回读一致 ⇒ **不需要 NVAPI 绕路**；
-   显存负值固件可写到 **-1000**（机主实测；更负写不进去）。
-② ⭐ 路径矩阵（逻辑一致、通道不同）：
-   - 宝龙达（`UsesBaolongda`）⇒ **NVAPI P0 直写**（`NvapiPStates.TrySetP0Offsets` + 回读），⛔ 不受 `gpu_oc_nvapi_for_gcu` 影响；
-   - 同方 GCU（`!UsesBaolongda && NVIDIA`）⇒ 默认**厂商字段**（核心/显存 `WriteFirmwareField` + `SetCustomDetail` 回读 `confirmed`）；
-   - NVAPI 兜底保留：`gpu_oc_nvapi_for_gcu` 默认 **0**（设 1 才为 GCU 启用 NVAPI 写）；`gpu_oc_gcu_negative_field` 默认 0（GCU-first 实验段标记为死路径/未来兜底）；
-   - 切回 0/正值：GCU 字段与 NVAPI 两侧都清残留（NVAPI 清零不再受开关影响，只要上次由它接管过）。
-③ ⭐ UI 形态（两种模具共用）：核心滑块 **±500**；显存滑块 **-1000..+2000**（非对称，0 不强制居中）；数字框范围 = `max(驱动/厂商下限[, -1000]) .. min(上限, +2000)`
-   （宝龙达=NVAPI P0 范围；GCU 显存下限锁 -1000）；**数字框可超滑块**并保留真实值；**应用以数字框为准**（`_coreOcVal/_memOcVal`）。
-   同步统一走 `ApplyGpuOffsetUiRange` / `AddSliderRow(numericMinOverride…)`，先设 Min/Max 再赋值 ⇒ 不新增 `ArgumentOutOfRangeException`（此前踩过滑块崩溃）。
-④ ⭐ 风控提示：判据改为**数字框实际值** —— 显存 `> 1000` 红字（`VramOffsetRisk`）、核心 `> CoreOffsetWarnThreshold()`（50 系 200 / 其它 150）；滑块拖动/数字框输入/面板刷新都会重评（`SyncOcRiskVisuals`），日志 `[gpu-oc] 风险提示…`。
-⑤ ⭐ 路径自检日志（首次打开自定义模式、去重）：
-   `[gpu-oc] 路径自检：模具=… · 写入=NVAPI/厂商字段 · 开关 gpu_oc_nvapi_for_gcu=… · 数字框范围=… · 滑块=core±500 mem=-1000..2000`，判据与实现同源（`GpuOffsetUiRange` + `UsesBaolongda`）。
-⑥ ⭐ 只读探针：`--gpu-offset-probe`（`GpuOffsetProbe.cs`）打印 NVAPI P0 范围/当前值、厂商字段范围、UI 采用范围，写桌面 `lm-gpu-offset-probe-*.txt`；⛔ 无任何 Set（用于排查“频率没变化”与确认驱动/固件边界）。
-⑦ ⭐ 回归/无伤害记录：本次仅改 GPU 偏移 UI 与实验路由；GCU 其它字段（TGP/DynamicBoost/风扇/PL…）与宝龙达能力位未动；宝龙达 NVAPI 路径保持原样；
-   新增文案均走资源键（中/英），未硬编码；`CustomModeForm`/`PerfModeBackend` 纯 LF。
-⑧ ⭐ 版本：0.292.2.1 / beta23.2.1；包名 `LM-0.292.2.1-beta23.2.1-setup.exe`。
+六、安装器
+- 删除升级时 GCU UserPofiles / UserFanTables 的备份-回灌（改由 LM 本地存档 + 启动重放恢复）。
+- 删除 customICC 的专项备份/回灌（已随 LM 用户数据目录）。
+- 静默卸载（升级触发）不再删除 LM 用户配置；仅交互卸载时询问，默认「保留」。
+- 版本：AssemblyVersion/FileVersion 0.292.3，InformationalVersion 0.292.3-beta23.3；包名 LM-0.292.3-beta23.3-setup.exe。
+
+七、文档（内部参考）
+- docs/notes/GCU反编译与上游源码清点-20261020.md：50 系 GCU（1.2.0.0）完整反编译、40 系部分反编译、30 系无完整反编译的版本对照与目录清点。
+- docs/notes/GCU50-静音与性能档实现-20261020.md：档位×配置模型、ProfileIndex、WhisperMode；并记录 40 系不支持「静音狂暴」子模式、不尝试换装 50 系 GCU 的决定。
 
 r76（2026-10-19 · **0.292.2 beta23.2**）★★ 休眠唤醒弹窗 + 设置页启动/响应优化 + 板号识别增强（含两处自引入回归的修复记录）
 用户原话：「设页启动慢问题存在好几个版本了 看看能不能优化」「速度区别不大,但是页面不会未响应了」「那先这样 有机主反应就是机器休眠(会关机的睡眠那个) 再启动后LM会弹出UI主界面 就算之前关闭了也会」「依旧会」「可以 没有弹了」「打包 beta23.2 写修改日志 更新日志(回归问题不写更新日志 但是要记录修改)」
