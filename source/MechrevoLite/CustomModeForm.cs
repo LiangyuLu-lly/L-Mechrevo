@@ -995,6 +995,24 @@ public class CustomModeForm : RForm
 		// ⭐⭐ 2026-10-19（机主定稿 UI 形态）：滑块固定 ±500（默认 0 居中）；数字框允许 **NV 范围**
 		//   （NVAPI P0 → 厂商 → 兜底 -900..2000）；应用以数字框为准 ✅
 		(int coreMin, int coreMax, int memMin, int memMax) = GpuOffsetUiRange(hw);
+		// ⭐⭐ 2026-10-19（机主：两种模具功能不要修坏）：路径自检（默认可见、去重一次）
+		//   判据与实现同源：宝龙达 ⇒ NVAPI（⛔ 不受开关影响）；!宝龙达 && NVIDIA ⇒ 厂商字段（开关=1 ⇒ NVAPI 兜底）；其它不进入 ✅
+		if (hw != null)
+		{
+			bool pathBaolongda = hw.UsesBaolongda;
+			bool pathNvidia = hw.DgpuGeneration != DgpuGenerationKind.NoDgpu;
+			int pathSwitch = AppConfig.Get("gpu_oc_nvapi_for_gcu", 0);
+			string pathMold = pathBaolongda ? "宝龙达" : (pathNvidia ? "同方GCU" : "其它");
+			string pathWrite = pathBaolongda ? "NVAPI" : (pathNvidia ? ((pathSwitch != 0) ? "NVAPI兜底" : "厂商字段") : "不进入");
+			string pathLog = "[gpu-oc] 路径自检：模具=" + pathMold + " · 写入=" + pathWrite
+				+ " · 开关 gpu_oc_nvapi_for_gcu=" + pathSwitch
+				+ " · 数字框范围=core=" + coreMin + ".." + coreMax + " mem=" + memMin + ".." + memMax
+				+ " · 滑块=±500";
+			if (Logger.TryMarkChanged("gpu-oc-path-selfcheck", pathLog))
+			{
+				Logger.WriteError(pathLog);
+			}
+		}
 		int coreCurrent = hw?.EffectiveGpuCoreClockOffset ?? 0;
 		int memCurrent = hw?.EffectiveGpuMemoryClockOffset ?? 0;
 		(int, int, int, bool) tuple13 = DeviceRange(-500, 500, coreCurrent, allowNegative: true);

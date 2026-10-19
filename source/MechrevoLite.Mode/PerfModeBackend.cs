@@ -353,7 +353,9 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			Logger.WriteError("[gpu-oc] 实验：从 GCU 负偏移切回（core=" + core + " mem=" + memory + "）⇒ GCU 字段按本次请求写 0/正值");
 			_gcuNegativeFieldActive = false;
 		}
-		if (nvapiExperiment && _gcuNvapiNegativeActive)
+		// ⭐⭐ 2026-10-19（一致性：切回 0/正值时清 NVAPI 残留）—— ⛔ 不受 gpu_oc_nvapi_for_gcu 开关影响，
+		//   只要上次负偏移由 NVAPI 接管过就清零；GCU 字段 0/正值由下面原路径写 ✅
+		if (_gcuNvapiNegativeActive)
 		{
 			// ⭐ 从负值切回 0/正值：先用 NVAPI 写 0 清残留降频，再走原 GCU 字段路径 ✅
 			Logger.WriteError("[gpu-oc] 实验：从负偏移切回 ⇒ 先 NVAPI 写 0 清残留（core=0 mem=0），再走 GCU 字段");
