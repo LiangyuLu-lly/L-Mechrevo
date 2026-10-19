@@ -1246,7 +1246,7 @@ public class CustomModeForm : RForm
 		int num3 = 0;
 		using (Graphics dc = CreateGraphics())
 		{
-			using Font font = UiVisualStyle.Font(9.5f);
+			using Font font = UiVisualStyle.TempFont(9.5f);
 			foreach (string rowLabel in _rowLabels)
 			{
 				num3 = Math.Max(num3, TextRenderer.MeasureText(dc, rowLabel, font, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width);

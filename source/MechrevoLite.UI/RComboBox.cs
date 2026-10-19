@@ -516,7 +516,7 @@ public class RComboBox : ComboBox
 	/// </summary>
 	private static int FamilyFontHeight(int dpi)
 	{
-		using Font reference = UiVisualStyle.Font(9f);
+		using Font reference = UiVisualStyle.TempFont(9f);
 		return (int)Math.Ceiling(reference.GetHeight(dpi)) + 2;
 	}
 

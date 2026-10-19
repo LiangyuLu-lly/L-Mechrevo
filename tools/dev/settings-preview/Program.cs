@@ -23,6 +23,15 @@ internal static class Program
     private static void Main(string[] args)
     {
         Application.EnableVisualStyles();
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += delegate (object s, System.Threading.ThreadExceptionEventArgs e)
+        {
+            Console.WriteLine("thread-ex: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
+        };
+        AppDomain.CurrentDomain.UnhandledException += delegate (object s, UnhandledExceptionEventArgs e)
+        {
+            Console.WriteLine("domain-ex: " + e.ExceptionObject);
+        };
         string outPath = args.Length > 0 ? args[0] : Path.Combine(Environment.CurrentDirectory, "settings.png");
         bool injectBattery = true;
         foreach (string a in args)
@@ -80,6 +89,10 @@ internal static class Program
             Application.DoEvents();
             try
             {
+                f.Activate();
+                Application.DoEvents();
+                System.Threading.Thread.Sleep(300);
+                Application.DoEvents();
                 Bitmap bmp = new Bitmap(Math.Max(1, f.Width), Math.Max(1, f.Height));
                 f.DrawToBitmap(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height));
                 bmp.Save(outPath, ImageFormat.Png);

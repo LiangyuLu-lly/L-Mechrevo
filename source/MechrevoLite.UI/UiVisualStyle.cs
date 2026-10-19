@@ -859,6 +859,17 @@ private static void LoadEmbeddedFonts()
 		return Font(size, style, GraphicsUnit.Point);
 	}
 
+	/// <summary>
+	/// ⭐ 2026-10-19（字体缓存配套）：需要**用完即弃**的字体时用它 —— 返回全新实例、可安全 Dispose。
+	/// <para>⛔ 不要 Dispose <see cref="Font(float, FontStyle)" /> / <see cref="Font(float, FontStyle, GraphicsUnit)" />
+	/// 的返回值：那是**进程级共享缓存**，Dispose 掉之后所有控件再画字都会抛
+	/// <c>ArgumentException: Parameter is not valid</c>（真机已复现）⚠️</para>
+	/// </summary>
+	internal static Font TempFont(float size, FontStyle style = FontStyle.Regular)
+	{
+		return new Font(FontFamilyOrDefault(), size, style);
+	}
+
 	internal static Font Font(float size, FontStyle style, GraphicsUnit unit)
 	{
 		// ⭐ 2026-10-19（设置窗启动慢 · 字体缓存）：同 (字号,字重,单位) 只构造一次 GDI+ Font。

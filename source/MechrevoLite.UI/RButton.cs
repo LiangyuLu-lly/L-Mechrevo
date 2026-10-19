@@ -800,7 +800,7 @@ public class RButton : Button
 				}
 			}
 		}
-		Font font = (activated ? UiVisualStyle.Font(Font.Size, FontStyle.Bold) : Font);
+		Font font = (activated ? UiVisualStyle.TempFont(Font.Size, FontStyle.Bold) : Font);
 		TextRenderer.DrawText(pevent.Graphics, Text, font, clientRectangle, foreColor, TextFormatFlags.EndEllipsis | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 		if (activated && font != Font)
 		{

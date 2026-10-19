@@ -5152,7 +5152,7 @@ public class SettingsForm : RForm
 		int num = ResponsiveLayout.LogicalToDevice(this, QuickTileLogicalGap);
 		for (int i = 0; i < QuickTileFontSizes.Length; i++)
 		{
-			using (Font font = UiVisualStyle.Font(QuickTileFontSizes[i]))
+			using (Font font = UiVisualStyle.TempFont(QuickTileFontSizes[i]))
 			{
 				if (QuickTileRowWidthFor(ComputeQuickTileCellWidths(keys, font), num) <= availableDevice)
 				{
@@ -5173,7 +5173,7 @@ public class SettingsForm : RForm
 	{
 		int num = ResponsiveLayout.LogicalToDevice(this, QuickTileLogicalGap);
 		_quickTileFontSize = ChooseQuickTileFontSize(_quickTileKeys, QuickTileRowMinDeviceWidth());
-		using (Font font = UiVisualStyle.Font(_quickTileFontSize))
+		using (Font font = UiVisualStyle.TempFont(_quickTileFontSize))
 		{
 			_quickTileCellDesired = ComputeQuickTileCellWidths(_quickTileKeys, font);
 		}
