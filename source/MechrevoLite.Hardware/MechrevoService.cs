@@ -4902,7 +4902,9 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			}
 			Dictionary<string, object> value = dictionary;
 			bool isLogoLightbar = string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal);
-			if (isLogoLightbar)
+			// 官方 Logo 协议先只用于 40 系同方（50 系保持原逻辑）
+			bool applyOfficialLogo = isLogoLightbar && !_hw.UsesBaolongda && _hw.DgpuGeneration == DgpuGenerationKind.Gen40;
+			if (applyOfficialLogo)
 			{
 				// Logo 通道：所有效果都按 7 段颜色、多段循环下发
 				dictionary["isCircular"] = true;
@@ -4937,7 +4939,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				["effect"] = effect,
 				["direction"] = direction,
 				// 官方控制台 Logo 通道发 "0"（不写 NVRAM）
-				["nv_save"] = (isLogoLightbar ? "0" : (save ? "SAVE" : "NOT_SAVE")),
+				["nv_save"] = (applyOfficialLogo ? "0" : (save ? "SAVE" : "NOT_SAVE")),
 				["color"] = value
 			};
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))

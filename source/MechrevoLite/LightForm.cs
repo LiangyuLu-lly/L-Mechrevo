@@ -123,17 +123,22 @@ public class LightForm : RForm
 			_effectUpdateTimer.Stop();
 			await SendAsync();
 		};
+		bool logoGrade = string.Equals(_topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal)
+			&& Program.hw != null && !Program.hw.UsesBaolongda
+			&& Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
 		RSlider sliderLight = new RSlider
 		{
 			Minimum = 0,
-			Maximum = 100,
-			Value = _light * 25,
+			Maximum = logoGrade ? 4 : 100,
+			Value = logoGrade ? Math.Clamp(_light, 0, 4) : _light * 25,
 			MinimumSize = new Size(104, 20),
 			Height = 28
 		};
 		sliderLight.ValueChanged += (object? _, EventArgs _) =>
 		{
-			_light = Math.Clamp(sliderLight.Value * 4 / 100, 0, Program.hw?.UsesBaolongda == true ? 3 : 4);
+			_light = logoGrade
+				? Math.Clamp(sliderLight.Value, 0, 4)
+				: Math.Clamp(sliderLight.Value * 4 / 100, 0, Program.hw?.UsesBaolongda == true ? 3 : 4);
 			ScheduleEffectUpdate();
 		};
 		AddRow(Strings.Brightness + (Program.hw?.UsesBaolongda == true ? "（设为 0 即关闭键盘灯）" : ""), sliderLight);
