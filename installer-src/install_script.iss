@@ -2154,11 +2154,7 @@ begin
   else
     Log('LM-UPDATE: 旧版 GCU 变体 = ' + OldVariant);
   // 2.1/2.2) GCU 自定义模式档 / 风扇表不再备份：LM 本地存档 + 启动重放已覆盖
-  // 2.5) Back up custom ICC profiles (old version is still in {app} at ssInstall).
-  if CopyDirContents(ExpandConstant('{app}\customICC'), BackupRoot + '\customICC') then
-    Log('LM-UPDATE: 自定义校色 ICC 已备份')
-  else
-    Log('LM-UPDATE: 备份自定义校色 ICC 失败（继续升级）');
+  // 2.5) 自定义 ICC 已改存用户数据目录（%APPDATA%\MechrevoLite\customICC），随 LM 用户数据一并备份
   // 2.6) 2026-10-09（升级保留修复）：LM 自己的两处用户数据也必须在调用旧卸载器【之前】备份。
   //      背景：升级正是用 `/VERYSILENT` 调【旧卸载器】，而本版卸载器在静默时 = 先备份再删除
   //      %APPDATA%\MechrevoLite 与 C:\ProgramData\MechrevoLite（见 HandleUninstallUserData）；
