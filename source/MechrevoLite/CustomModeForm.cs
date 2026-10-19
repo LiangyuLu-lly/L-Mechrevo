@@ -4702,22 +4702,50 @@ public class CustomModeForm : RForm
 				if ((hw.UsesBaolongda || gcuGen40) && !keepPending)
 				{
 					PerfModeSettings persisted = PerfModeStore.LoadSettings(_modeId);
-					ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, persisted.Pl1 ?? hw.Pl1);
-					ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, persisted.Pl2 ?? hw.Pl2);
-					ApplyRange(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, persisted.Pl4 ?? hw.Pl4);
-					if (persisted.TccOn.HasValue)
+					bool localUnset = persisted.IsUntouched && (hw.UsesBaolongda || hw.WujieSmuApu);
+					if (localUnset)
 					{
-						_tccChk.Checked = persisted.TccOn.Value;
-						_tcc.Enabled = persisted.TccOn.Value & flag;
+						// 空白本地自定义档显示「未设置」，不沿用上一次应用后的实时硬件值
+						ResetPowerWallRowVisual(_pl1, _pl1Val, _pl1Label, Strings.CpuPl1);
+						ResetPowerWallRowVisual(_pl2, _pl2Val, _pl2Label, Strings.CpuPl2);
+						ResetPowerWallRowVisual(_tcc, _tccVal, _tccLabel, Strings.TempWallValue);
+						_tccChk.Checked = false;
+						if (_tcc != null)
+						{
+							_tcc.Enabled = false;
+						}
 					}
-					ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, persisted.TccTarget ?? hw.TccTarget);
+					else
+					{
+						ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, persisted.Pl1 ?? hw.Pl1);
+						ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, persisted.Pl2 ?? hw.Pl2);
+						ApplyRange(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, persisted.Pl4 ?? hw.Pl4);
+						if (persisted.TccOn.HasValue)
+						{
+							_tccChk.Checked = persisted.TccOn.Value;
+							_tcc.Enabled = persisted.TccOn.Value & flag;
+						}
+						ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, persisted.TccTarget ?? hw.TccTarget);
+					}
 				}
 				_ocChk.Checked = flag3 & flag4;
 				// 宝龙达/同方 GCU 40 系：GPU 超频开关按本档保存值回显
 				if ((hw.UsesBaolongda || gcuGen40) && !keepPending)
 				{
 					PerfModeSettings persistedOc = PerfModeStore.LoadSettings(_modeId);
-					if (persistedOc.GpuOverclockOn.HasValue)
+					if (persistedOc.IsUntouched && (hw.UsesBaolongda || hw.WujieSmuApu))
+					{
+						_ocChk.Checked = false;
+						if (_coreOc != null)
+						{
+							ApplyRange(_coreOc, _coreOcVal, _coreOc.Minimum, _coreOc.Maximum, 0, allowNegative: true);
+						}
+						if (_memOc != null)
+						{
+							ApplyRange(_memOc, _memOcVal, _memOc.Minimum, _memOc.Maximum, 0, allowNegative: true);
+						}
+					}
+					else if (persistedOc.GpuOverclockOn.HasValue)
 					{
 						_ocChk.Checked = persistedOc.GpuOverclockOn.Value;
 					}
