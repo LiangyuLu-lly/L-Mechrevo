@@ -4662,7 +4662,8 @@ public class CustomModeForm : RForm
 				_tccChk.Enabled = flag;
 				_tcc.Enabled = hw.TccSwitch & flag;
 				// 宝龙达只写不读；同方 GCU 以 LM 本地保存值为准（更新/GCU 重装后不依赖 GCU 里的档位文件）
-				bool gcuGen40 = hw.IsGcuConnected && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+				bool gcuGen40 = hw.IsGcuConnected && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
+					|| hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30);
 				if ((hw.UsesBaolongda || gcuGen40) && !keepPending)
 				{
 					PerfModeSettings persisted = PerfModeStore.LoadSettings(_modeId);

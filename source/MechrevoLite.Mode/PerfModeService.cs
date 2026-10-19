@@ -1119,8 +1119,8 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
-		// 同方 GCU（40 系）也按 LM 本地保存的自定义档恢复（更新/重装 GCU 后不丢配置）
-		bool gen40Gcu = hw.IsGcuConnected && hw.DgpuGeneration == DgpuGenerationKind.Gen40;
+		// 同方 GCU（30/40 系）按 LM 本地保存的自定义档恢复（更新/重装 GCU 后不丢配置）
+		bool gen40Gcu = hw.IsGcuConnected && (hw.DgpuGeneration == DgpuGenerationKind.Gen40 || hw.DgpuGeneration == DgpuGenerationKind.Gen30);
 		if (!hw.WujieSmuApu && !hw.UsesBaolongda && !gen40Gcu)
 		{
 			return;
