@@ -1941,6 +1941,7 @@ public class CustomModeForm : RForm
 			}
 			UpdateRouteHint(mode);
 			LoadAppSide(mode.Settings);
+			ApplyPersistedComboOverrides(mode.Id);
 			// 2026-10-09：换模式/档位后屏幕上已是另一份（已保存的）值 ⇒ 未应用的改动作废（不下发、不静默应用）。
 			DiscardPendingChanges();
 		}
@@ -2173,6 +2174,43 @@ public class CustomModeForm : RForm
 		}
 		selectedIndex2 = 0;
 		goto IL_0076;
+	}
+
+	/// <summary>按持久化档值回显模式下拉（电源模式/电源计划/睿频/风扇增强/刷新率）。</summary>
+	private void ApplyPersistedComboOverrides(string modeId)
+	{
+		PerfModeSettings persisted = PerfModeStore.LoadSettings(modeId);
+		bool syncingModes = _syncingModes;
+		_syncingModes = true;
+		try
+		{
+			int? power = persisted.WindowsPowerMode;
+			if (power.HasValue && power.Value >= 0 && power.Value <= 2 && _powerModeCombo.Items.Count > power.Value + 1)
+			{
+				_powerModeCombo.SelectedIndex = power.Value + 1;
+			}
+			if (!string.IsNullOrWhiteSpace(persisted.PowerPlanGuid))
+			{
+				SelectPlan(persisted.PowerPlanGuid);
+			}
+			int? boost = persisted.CpuBoost;
+			if (boost.HasValue && boost.Value + 1 < _boostCombo.Items.Count)
+			{
+				_boostCombo.SelectedIndex = boost.Value + 1;
+			}
+			if (persisted.FanBoost.HasValue)
+			{
+				_fanBoostCombo.SelectedIndex = (persisted.FanBoost.Value ? 1 : 2);
+			}
+			if (persisted.RefreshHz.HasValue)
+			{
+				RebuildRefreshItems(persisted.RefreshHz);
+			}
+		}
+		finally
+		{
+			_syncingModes = syncingModes;
+		}
 	}
 
 	private void SelectPlan(string? guid)
