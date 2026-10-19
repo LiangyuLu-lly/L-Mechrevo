@@ -2938,26 +2938,32 @@ internal static class Program
 		{
 			return; // ⭐ 幂等：已在跑，不重复启动 ✅
 		}
-		if (!mechrevoHw.TryReadKeyboardLightingViaBackend(out bool hardwareOn, out int _, out int brightness18, out string _))
+		// ⭐⭐ 机主硬约束：**只有保存效果严格=彩虹才进入本逻辑**；其它效果一律保持原只读行为
+		//   （⛔ 不读/不写 16/17/18、⛔ 不启动刷色循环、⛔ 不猜默认值）✅
+		if (!LightingSettingsStore.TryLoad("Keyboard/Ctrl", out LightChannelSettings settings))
 		{
-			LogBaolongdaRainbowSkip(reason, "硬件状态读不到");
+			LogBaolongdaRainbowSkip(reason, "跳过原因=保存效果读不到（⛔ 不猜）");
 			return;
 		}
-		if (!hardwareOn)
+		if (!string.Equals(settings.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase))
 		{
-			LogBaolongdaRainbowSkip(reason, "硬件灭");
+			LogBaolongdaRainbowSkip(reason, $"跳过原因=非彩虹（保存效果={settings.Effect}）");
 			return;
 		}
 		KeyboardRgb keyboardRgb = rgb;
 		if (keyboardRgb != null && keyboardRgb.KbPowerExplicitOff)
 		{
-			LogBaolongdaRainbowSkip(reason, "用户显式关灯（kbPower=0）");
+			LogBaolongdaRainbowSkip(reason, "跳过原因=用户显式关灯（kbPower=0）");
 			return;
 		}
-		if (!LightingSettingsStore.TryLoad("Keyboard/Ctrl", out LightChannelSettings settings)
-			|| !string.Equals(settings.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase))
+		if (!mechrevoHw.TryReadKeyboardLightingViaBackend(out bool hardwareOn, out int _, out int brightness18, out string _))
 		{
-			LogBaolongdaRainbowSkip(reason, "未保存彩虹效果/保存值读不到");
+			LogBaolongdaRainbowSkip(reason, "跳过原因=硬件状态读不到");
+			return;
+		}
+		if (!hardwareOn)
+		{
+			LogBaolongdaRainbowSkip(reason, "跳过原因=硬件灭");
 			return;
 		}
 		int brightness = brightness18;
