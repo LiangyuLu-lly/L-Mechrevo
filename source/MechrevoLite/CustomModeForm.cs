@@ -38,6 +38,9 @@ public class CustomModeForm : RForm
 	/// <summary>2026-10-09：GPU 显存偏移风险阈值（全代际同一档）为 +1000。</summary>
 	internal const int VramOffsetWarn = 1000;
 
+	/// <summary>⭐⭐ 2026-10-19（机主实测）：GCU 固件显存负偏移下限 = -1000（更负写不进去）；宝龙达同口径 ✅</summary>
+	internal const int VramOffsetNegativeFloor = -1000;
+
 	/// <summary>2026-10-09：核心偏移滑块「细拖」的一个刻度 = 5 MHz。</summary>
 	private const int CoreOffsetDragStep = 5;
 
@@ -4397,14 +4400,14 @@ public class CustomModeForm : RForm
 		//   ⚠️ 滑块本身固定 -500..500（见构造点），数字框可超出 ±500 并保留真实值 ✅
 		int coreMin = -900;
 		int coreMax = 2000;
-		int memMin = -900;
+		int memMin = VramOffsetNegativeFloor;
 		int memMax = 2000;
 		string source = "兜底";
 		if (NvapiPStates.TryGetP0OffsetRange(out int nvCoreMin, out int nvCoreMax, out int nvMemMin, out int nvMemMax))
 		{
 			coreMin = Math.Max(nvCoreMin, -900);
 			coreMax = Math.Min(nvCoreMax, 2000);
-			memMin = Math.Max(nvMemMin, -900);
+			memMin = Math.Max(nvMemMin, VramOffsetNegativeFloor);
 			memMax = Math.Min(nvMemMax, 2000);
 			source = "NVAPI";
 		}
@@ -4422,7 +4425,7 @@ public class CustomModeForm : RForm
 			}
 			if (vendorMemMax > vendorMemMin)
 			{
-				memMin = Math.Max(vendorMemMin, -900);
+				memMin = Math.Max(vendorMemMin, VramOffsetNegativeFloor);
 				memMax = Math.Min(vendorMemMax, 2000);
 			}
 		}
@@ -4433,8 +4436,13 @@ public class CustomModeForm : RForm
 		}
 		if (memMax <= memMin)
 		{
-			memMin = -900;
+			memMin = VramOffsetNegativeFloor;
 			memMax = 2000;
+		}
+		string floorLog = "[gpu-oc] 显存偏移下限：" + VramOffsetNegativeFloor + "（GCU 固件实测边界；超过写不进去）";
+		if (Logger.TryMarkChanged("gpu-oc-vram-negative-floor", floorLog))
+		{
+			Logger.WriteError(floorLog);
 		}
 		string uiLog = "[gpu-oc] 偏移 UI：slider=-500..500 · numeric=core=" + coreMin + ".." + coreMax
 			+ " mem=" + memMin + ".." + memMax + "（来源=" + source + "）";
