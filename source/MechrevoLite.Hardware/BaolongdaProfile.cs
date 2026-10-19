@@ -59,7 +59,7 @@ internal static class BaolongdaProfile
 	/// ⭐⭐ 2026-10-18（机主新决定 · 30 系风扇基准）：⭐ 百分比**分母按代际** ——
 	/// **30 系 = 4900 RPM · 40 系 = 6000 RPM** ✅。
 	/// <para>⭐ 依据：⭐ <b>机主实测：30 系 3500 RPM 压不住；原厂上限约 140%（4900 RPM）
-	/// ⇒ 以其为 100% 基准</b> ✅（⭐ 3500 只是旧版原厂控制台的 ÷35 显示口径，⛔ 不代表散热需求）。</para>
+	/// ⇒ 以其为 100% 基准</b> ✅（⭐ 3500 只是旧版固件的 ÷35 显示口径，⛔ 不代表散热需求）。</para>
 	/// <para>⚠️ 本函数是**纯函数**（⛔ 不读硬件）；⭐ 非宝龙达由调用方先判 <c>UsesBaolongda</c> ✅。</para>
 	/// </summary>
 	internal static int FanPercentDenominatorRpmFor(DgpuGenerationKind generation)
@@ -133,14 +133,7 @@ internal static class BaolongdaProfile
 
 	/// <summary>⭐ "这一项未设置"（⭐ 传 ≤0 表示跳过 · ⛔ 不拿编造值凑满三项 ✅）。</summary>
 	internal const int Unset = 0;
-
-	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗**时间窗**）：
-	//   30 系没有 WMI 功能号 23 ⇒ PL/温度墙/时间窗都走 SMU（`RyzenSmuService.SetStapmTimeSeconds`）。
-	//   ⚠️ 这两个常数只是 **UI 可操作区间 + 下发前校验区间**（同一来源，避免"UI 能拖、校验却拒"），
-	//      ⛔ **不是** SMU 协议限制（协议没有公开范围）。
-	//   ⚠️ 下限取 1 秒：0 秒的语义未验证（可能被固件当成"立即生效/非法"）⇒ ⛔ 不提供 0。
-	//   ⚠️ 上限取 600 秒：覆盖常见的 STAPM 时间窗（RyzenAdj 档默认写在 280 秒这一档）；
-	//      该上限只约束**界面/校验**，不在服务层夹取（服务层原样下发、由调用方负责取值合理）。
+	// 该上限只约束**界面/校验**，不在服务层夹取（服务层原样下发、由调用方负责取值合理）。
 	internal const int StapmTimeMinSeconds = 1;
 
 	/// <summary>⭐ 30 系「功耗时间窗（STAPM）」的 UI/校验上限（秒）—— ⚠️ 见上面注释：不是协议限制。</summary>

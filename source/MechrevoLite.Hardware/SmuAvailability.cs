@@ -1,15 +1,4 @@
-// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制）：**SMU 通路可用性**的唯一探测点（进程内缓存一次）。
-//
-// 为什么单独一个文件：机主明确要求「『持续功耗 STAPM』这一行只在**当前自定义档实际走 SMU 下发**时显示」，
-// 而不是按"机型是 30 系"这种静态判据。真实下发分支（MechrevoService.ApplyPowerLimitViaSmu）最先检查
-// `ModeControl.SharedSmu != null`；界面若只按机型判，就会出现"显示了但 SMU 不可用 ⇒ 点了必然失败"的
-// 错位（违反 §9.14「能力位 || 本机实现」与"⛔ 不给能点但没用的控件"）。
-//
-// ⚠️ 纪律：
-//   * **只探测一次**（成功/失败都缓存，进程内）—— ⛔ 每次开自定义模式窗口都去读 SMU（那会每次 ~0.4 s）；
-//   * 探测本身是**轻量**的：`RyzenSmuService.IsPawnInstalled()`（打开 PawnIO 设备判断"装没装/有没有权限"）
-//     + `ModeControl.SharedSmu` 一次初始化（已初始化则直接复用；与 UV/FMax 通路同一个单例）；
-//   * ⛔ 不在这里读写 PL/温度墙，也不读 PM 表 —— 只回答"SMU 通路在不在"。
+// （30 系 · SMU 功耗控制）：**SMU 通路可用性**的唯一探测点（进程内缓存一次）。
 using System;
 using System.Threading;
 
@@ -32,13 +21,7 @@ internal static class SmuAvailability
 			return EnsureProbed(force: false);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-	/// ⭐ **只读缓存值**（未探测过 = false，⛔ **不触发探测**）—— 给"开设置窗/构建行/算能力位"这类
-	/// 不该做 SMU 探测的路径用 ✅。真正需要 SMU 的入口（打开自定义模式窗口、STAPM 行、下发）仍用
-	/// <see cref="IsReady" />（首次访问才探测一次，已缓存）✅。
-	/// </summary>
+	// **只读缓存值**（未探测过 = false， **不触发探测**）—— 给"开设置窗/构建行/算能力位"这类
 	internal static bool IsReadyCached
 	{
 		get

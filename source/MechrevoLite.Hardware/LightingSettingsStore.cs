@@ -294,9 +294,7 @@ internal static class LightingSettingsStore
 			}
 			case "powerexplicit":
 			{
-				// ⭐⭐ 2026-10-19（机主：启动自动点亮 Logo 灯）：
-				//   ⭐ 只有用户真的点过开关才有 powerexplicit=1；旧配置没有该键 ⇒ 视为"没设过"
-				//   ⇒ 启动恢复**不点灯**（⛔ 不再因为 power=1 就无条件点亮）✅
+				// ⇒ 启动恢复**不点灯**（ 不再因为 power=1 就无条件点亮）
 				explicitPower = int.TryParse(text2, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ef) && ef != 0;
 				break;
 			}

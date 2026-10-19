@@ -1597,33 +1597,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	public string KeyboardSolution { get; private set; } = "";
 
 	public long KeyboardStatusVersion => Interlocked.Read(in _keyboardStatusVersion);
-
-	// ══════════════════════════════════════════════════════════════════════
-	// ⭐⭐ 2026-10-19（宝龙达键盘灯「最大亮度不能用」）：
-	//    ⭐ **运行时自校准** —— ⛔ 不再猜"40 系 = 4 档"这类常量
-	//    ⭐ 探测一次、结果缓存；UI 只读 `KeyboardLightingCaps` 决定亮度滑块范围 ✅
-	//    ⚠️ 彩虹**不走**这里：它已改为软件刷色（见下方 `StartKeyboardRainbow`）✅
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>⭐ 自校准结果的**单次缓存**（<c>null</c> = 还没探测过）。⚠️ 只由 <see cref="EnsureKeyboardLightingCalibration" /> 写。</summary>
+	// 探测一次、结果缓存；UI 只读 KeyboardLightingCaps 决定亮度滑块范围
 	private KeyboardLightingCalibration _kbdCaps;
 
 	/// <summary>⭐ 保证"同一时刻只有一个线程在探测"（WMI 写 + 回读必须串行）。</summary>
 	private readonly object _kbdCapsGate = new object();
-
-	/// <summary>
-	/// ⭐ 2026-10-19（30 系只读诊断）：raw OutData 一次性探测状态（0=未探 / 1=探测中 / 2=完成）。
-	/// <para>⚠️ 全程**只读**（只发 Get），⛔ 不写任何字节；每进程一次 ✅。</para>
-	/// </summary>
+	// （30 系只读诊断）：raw OutData 一次性探测状态（0=未探 / 1=探测中 / 2=完成）。
 	private static int _kbdRawProbeState;
-
-	/// <summary>
-	/// ⭐ 2026-10-19（机主：开灯后过一会自己变关）：最近一次**用户灯效动作**的时间戳（TickCount64）。
-	/// <para>⚠️ 自动关灯 tick 在最近 5s 内有过用户动作时**不触发**（防止刚开灯就被误判为空闲而关掉）✅。</para>
-	/// </summary>
+	// （机主：开灯后过一会自己变关）：最近一次**用户灯效动作**的时间戳（TickCount64）。
 	private long _kbdLastUserActionTick;
-
-	/// <summary>⭐ 2026-10-19：自动关灯的“最近用户动作”保护窗口（毫秒）✅。</summary>
+	// <summary> 自动关灯的“最近用户动作”保护窗口（毫秒）。</summary>
 	private const int KeyboardAutoOffUserActionGuardMs = 5000;
 
 	/// <summary>
@@ -1631,15 +1614,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <para>⭐ UI 用它决定：亮度滑块上限（<see cref="KeyboardLightingCalibration.BrightnessMax" />）✅。</para>
 	/// </summary>
 	internal KeyboardLightingCalibration KeyboardLightingCaps => Volatile.Read(ref _kbdCaps);
-
-	// ══════════════════════════════════════════════════════════════════════
-	// ⭐⭐ 2026-10-19（机主批准「软件彩虹」）：
-	//    本机固件的「模式 16=1（AutoCyclic）」**实际无效** ⇒ 彩虹改由本类**后台刷色**实现：
-	//    ⭐ 先写 16=2（固定色）+ 亮度，然后每 ~50ms 写一次功能号 17（hue 0→360，步进 3°）✅
-	//    ⛔ 不允许后台常驻：Dispose / 关灯 / 切单色 都会 Stop（见 `StopKeyboardRainbow`）✅
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>⭐ 软件彩虹的状态锁（启动 / 停止 / 亮度更新的唯一串行点）。</summary>
+	// <summary> 软件彩虹的状态锁（启动 / 停止 / 亮度更新的唯一串行点）。</summary>
 	private readonly object _rainbowGate = new object();
 
 	/// <summary>⭐ 当前软件彩虹的取消源（<c>null</c> = 没在跑）。</summary>
@@ -1659,17 +1634,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>⭐ 软件彩虹是否正在后台刷色（只读；⛔ 不触发任何写入）。</summary>
 	internal bool IsKeyboardRainbowRunning => _rainbowRunning;
-
-	// ══════════════════════════════════════════════════════════════════════
-	// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」· 软件实现）：
-	//    硬件 WMI 没有该功能号 ⇒ 由本类用**系统输入空闲时间**（GetLastInputInfo）判定 ✅
-	//    ⭐ 每 5s 只读检查：`GetLastInputInfo` + `BaolongdaState` 状态缓存
-	//      ⛔ 不写 16/17/18、⛔ 不重启彩虹、⛔ 不下发效果、⛔ 不重建 UI（红线）✅
-	//    ⭐ 只有**真正超时**才写一次亮度 0；只有**检测到新输入**才恢复一次原状态 ✅
-	//    ⚠️ 默认关闭（配置 = 0）⇒ **不创建计时器**、不写灯、无额外检查开销 ✅
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>⭐ 自动关灯计时器（5s tick；<c>null</c> = 功能关闭 ⇒ 不建/已停）。</summary>
+	// 每 5s 只读检查：GetLastInputInfo + BaolongdaState 状态缓存
 	private System.Threading.Timer _kbdAutoOffTimer;
 
 	/// <summary>⭐ 自动关灯状态锁（应用/恢复/手动清除的唯一串行点）。</summary>
@@ -2508,24 +2473,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		return currentMode;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：无界之前支持强冷 ⇒ 这是回归）：
-	/// 强冷可见性 = 旧判据（GCU 能力位 / 宝龙达）**或** 无界 APU（GCU 后端；入口恢复，避免能力位刷新前被永久隐藏）✅。
-	/// <para>⚠️ 下发仍走原 `SwitchQuick("fanboost")`：宝龙达=本机 EC；GCU/无界=GCU MQTT 话题（未改）✅</para>
-	/// </summary>
-	/// <summary>⭐ 2026-10-19（快捷开关防回归自检）：SupportsQuickSwitch 的全部键（新增键必须同步到这里）✅</summary>
+	// 强冷可见性 = 旧判据（GCU 能力位 / 宝龙达）**或** 无界 APU（GCU 后端；入口恢复，避免能力位刷新前被永久隐藏）。
 	internal static readonly string[] QuickSwitchKeys = new string[26]
 	{
 		"touchpad", "wifi", "bt", "webcam", "winkey", "fnkey", "capslock", "numpad", "osd", "usb",
 		"deepsleep", "copilot", "acrecovery", "highperf", "fanboost", "apuboost", "lightbar", "logolight",
 		"touchpadtoggle", "singlecolorkb", "uni", "omni", "powerlight", "batterylogo", "gamewhitelist", "cpuadvperf"
 	};
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（防回归）：某快捷键**是否有处理分支**（特殊分支 ∪ SwitchQuick action 表）。
-	/// <para>⚠️ 与 `SwitchQuick` 实现同源维护；`FunctionVerifier` 自检用它找「可见但静默失败」的缺口 ✅</para>
-	/// </summary>
+	// <para> 与 SwitchQuick 实现同源维护；FunctionVerifier 自检用它找「可见但静默失败」的缺口 </para>
 	internal static bool HasQuickSwitchDispatch(string key)
 	{
 		switch (key)
@@ -2585,18 +2540,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"touchpad" => true, 
 			"wifi" => WifiSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Wifi)), 
 			"bt" => BluetoothSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Bluetooth)), 
-			// ⭐⭐ 2026-10-18（摄像头开关 · 系统级 PnP 禁用/启用 · 机主已批准）：
-			//   ⭐ 宝龙达没有 GCU/摄像头功能号 ⇒ 原来的 `WEBCAM_ON/OFF`（厂商 MQTT）必然无效；
-			//   ⭐ 现改为 **SetupAPI 直接禁用/启用摄像头设备**（通用，见 `CameraPnpControl` ✅）
-			//   ⇒ 能力位 = "本机有可控制的摄像头设备"；⛔ 无摄像头设备时才退回旧隐私键兜底（保功能）
-			//   ⚠️ GCU / 同方机型仍按 `WebcamSeen`（厂商 `WebCamEnable`）判 ⇒ **逐位不变** ✅
-			// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-			//   ⭐ `webcam` 能力位原来直接调 `CameraPnpControl.HasCamera`（首次会做 SetupAPI 枚举）
-			//      ⇒ 打开设置/构建快捷开关行时就在 UI 线程枚举摄像头设备 ❌。
-			//   ⭐ 现在只读**缓存值**（`HasCameraCached`，未探测 = false，⛔ 不枚举）；
-			//      探测由启动后空闲后台预热（`Program.ScheduleIdleBackendWarmup`）做一次并缓存，
-			//      完成后异步 `RefreshDeviceCapabilities()` 把这一行补上 ✅
-			//   ⚠️ GCU 机型仍先看 `WebcamSeen`（能力位判据不变）✅
+			// 现在只读**缓存值**（HasCameraCached，未探测 = false， 不枚举）；
 			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCameraCached || CameraPrivacy.Available)),
 			"winkey" => WinKeySeen, 
 			"fnkey" => FnKeySeen || UsesBaolongda, 
@@ -2622,18 +2566,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"deepsleep" => DeepSleepSeen, 
 			"copilot" => CopilotSeen, 
 			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen, 
-			// ⭐⭐ 2026-10-19（「高性能电源」完全解耦）：⭐ 它是**纯配置开关** ——
-			//   打开 = 切档时 LM 用 **Windows API**（powrprof overlay）设电源模式，⛔ 不需要任何硬件能力位。
-			//   ⚠️ 原来 `HighPerformanceSeen || UsesBaolongda` ⇒ 这台 GCU 机器上报值为假 ⇒
-			//      ⭐ `SwitchQuick` 开头的 `if (!SupportsQuickSwitch(key)) return false;` 直接拒掉
-			//      ⇒ 界面显示"下发被拒、已回滚"（机主日志 `[QS-apply] 键=highperf 下发结果=False`）✅
+			// ⇒ 界面显示"下发被拒、已回滚"（机主日志 [QS-apply] 键=highperf 下发结果=False）
 			"highperf" => true, 
-			// ⭐ 2026-10-19（风扇强冷 · 无 GCU）：宝龙达用本机通道（EC 目标档/掩码 + 13 回读）✅
-			// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 宝龙达**恒 true**，强冷入口直接出现 ✅
-		// ⭐⭐ 2026-10-19（机主：无界强冷是回归，不是该隐藏）：⭐ 无界（GCU 后端）恢复强冷入口 ✅
-		//   ⚠️ 旧判据只看 GCU 能力位；后台初始化分离后，设置窗可能先于 GCU 连接/能力刷新构建 ⇒ caps.FanBoost=false ⇒ 永久隐藏（回归）
+			// （风扇强冷 · 无 GCU）：宝龙达用本机通道（EC 目标档/掩码 + 13 回读）
 		"fanboost" => SupportsFanBoostQuickSwitch,
-		// ⭐ 2026-10-19（APU 防缩缸）：⭐ 纯 Windows 电源策略 ⇒ 所有机型可用 ✅
+		// （APU 防缩缸）： 纯 Windows 电源策略 ⇒ 所有机型可用
 		"apuboost" => true, 
 			"lightbar" => SupportsLightbar, 
 			"logolight" => SupportsLogoLight, 
@@ -2877,8 +2814,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private async Task ApplyLegacyBackendAsync(LegacyMifsWmi legacy)
 	{
 		_activeBackend = MechrevoBackendKind.LegacyMifs;
-		// ⭐⭐ 2026-10-19（机主：宝龙达专属周期任务不能在 GCU/同方机器上空转）：
-		//   ⭐ 启动时**只打一行**（去重）说明本机是"非宝龙达 ⇒ 这些周期任务全部跳过"✅
+		// 启动时**只打一行**（去重）说明本机是"非宝龙达 ⇒ 这些周期任务全部跳过"
 		LogNonBaolongdaPeriodicGateOnce("LegacyMifs");
 		// ⚠️ 最小能力集：老机型没有 GCU 那套 ItemSupport，凡"靠上报才知道"的能力一律保持 false
 		// ⇒ 风扇曲线/灯效/液冷/校色等页签照旧判"不支持"（⛔ 不假装可写）。对照 A-22 第 5 条。
@@ -2895,12 +2831,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_legacyTimer = new Timer(delegate
 		{
 			_ = RefreshLegacyModeAsync();
-			// ⭐⭐ 2026-10-19（机主：宝龙达专属轮询不能在 GCU/同方机器上空转）：
-			//   ⭐ 本 3 s tick 在**非宝龙达**分支里也会走到（老同方/无 GCU 的 legacy 后端）——
-			//     旧实现每 3 s 都**调用**这 3 个宝龙达方法（它们内部再 `_baolongda == null` 早退，
-			//     但仍是纯空转调用，其中 `ApplyBaolongdaFanCurveStep` 还会打"未验证"日志 ⚠️）
-			//   ⭐ 现在用**单一判据** `UsesBaolongda` 直接不调用 ⇒ 非宝龙达零开销、零日志 ✅
-			//   ⚠️ GCU / 同方侧行为逐位不变（本来就走不到宝龙达写路径）✅
+			// 但仍是纯空转调用，其中 ApplyBaolongdaFanCurveStep 还会打"未验证"日志 ）
 			if (UsesBaolongda)
 			{
 				RefreshBaolongdaSensors();
@@ -3188,8 +3119,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				{
 					return false; // ⭐ 理论上不会发生（宝龙达在管事）⇒ 交回原路更安全 ✅
 				}
-				// ⭐⭐ 2026-10-19（30 系）：开关镜像只认 EC 0x1807；读不到就保留上一次（⛔ 不凭 WMI16 恢复 ON）✅
-				// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，但 EC 0x1807 含义不同）✅
+				// （30 系）：开关镜像只认 EC 0x1807；读不到就保留上一次（ 不凭 WMI16 恢复 ON）
 				if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 				{
 					if (TryReadKeyboardPowerFromEc(out bool ecOff, out int ecOffValue))
@@ -3205,7 +3135,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 						Logger.WriteError("[kbd] 30 系关灯后 EC 0x1807 读不到 ⇒ 保留上一次开关状态（⛔ 不凭 WMI16 改）");
 					}
 				}
-				// ⭐⭐ 2026-10-19（40 系）：开关镜像只认 WMI18；读不到保留上一次（⛔ 不凭 WMI16）✅
+				// （40 系）：开关镜像只认 WMI18；读不到保留上一次（ 不凭 WMI16）
 				if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
 				{
 					if (TryReadKeyboardPowerFromWmi18(out bool wmi18Off, out int wmi18OffLevel))
@@ -3230,10 +3160,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				LightChannelSettings stored = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
 				int defaultArgb = stored.EffectiveColorArgb();
 				int defaultBrightness = Math.Clamp(Math.Max(1, stored.Light), 1, EffectiveKeyboardBrightnessMax());
-				// ⭐⭐ 2026-10-19（软件彩虹生命周期）：⭐ 重新开灯时**延续用户已选的效果** ✅
-				//   ⚠️ 原来固定按单色（模式 2）开灯 ⇒ 下拉显示"彩虹"、实际却是单色，
-				//      而且会把正在跑的软件彩虹停掉 ❌（机主会看到"开关一开一关，彩虹就没了"）
-				//   ⭐ 现在：已保存效果 → 模式；彩虹（1）⇒ 统一写入入口会启动**软件刷色** ✅
+				// 现在：已保存效果 → 模式；彩虹（1）⇒ 统一写入入口会启动**软件刷色**
 				byte powerOnMode = 2;
 				if (TryMapBaolongdaKeyboardMode(stored.Effect, out byte mappedMode) && mappedMode != 0)
 				{
@@ -3250,20 +3177,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// ⭐ 这里**刻意不提前 return** —— ⭐ 继续走下面的「功能号 16 真实模式回读」✅
 				//   （⭐ 只有那样才会把 `KeyboardPower` 镜像写成真值 ✅ ⇒ `ConfirmLightPower` 才不会再发 MQTT ✅）
 			}
-			// ⭐⭐ 2026-10-16（宝龙达 · 灯光「关了又开」BUGFIX）：
-			//   ⚠️ 根因（⭐ 机主诊断包实证）：本方法原来用【功能号 10 能不能读到】当"回读确认"⚠️
-			//      ⇒ 那只证明"接口活着"，⛔ 不证明"模式真的切过去了"❌；而且**本类从不更新
-			//      `KeyboardPower`**（⭐ 它只在 GCU payload 解析里被赋值 ✅）⇒ 宝龙达下它**恒为默认 true** ❌
-			//      ⇒ `MechrevoService.ConfirmLightPower` 的 `IsConfirmed()` 恒假 ⇒ 它去发 MQTT
-			//      ⇒ 「ConfirmLightPower fail: …MQTT 未连接」⇒ `SetLightPower` 返回 **false**
-			//      ⇒ ⭐ **界面把开关拨回去 = 用户看到的「关了又开」** ✅
-			//   ⇒ 改为【用功能号 16 的真实模式值】判开/关 ✅，⭐ 并如实回写 `KeyboardPower` 镜像 ✅：
-			//      ⭐ 口径依据（⭐ 参考 `_refs\JiaolongControl` · MIT · ⭐ 只取协议事实 ✅ ——
-			//      `SysEnums.cs` 的 `RGBKeyboardMode`）：⭐ `Mode_Off = 0` · ⭐ `Mode_RGBFixedMode = 2` ·
-			//      ⭐ `Unknow = 255` ⇒ ⭐ **「开」＝ 模式 ≠ 0** ✅ · ⭐ **「关」＝ 模式 0** ✅
-			//      （⭐ 本方法下发时正是这么写的：⭐ 关 ⇒ 模式 0 ✅ · ⭐ 开 ⇒ 模式 2 ✅）。
-			// ⭐⭐ 2026-10-19（30 系）：开关镜像只认 EC 0x1807（WMI16 仍是 2，不能拿来判「开」）✅
-			// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，⛔ 不进 EC）✅
+			// 根因（ 机主诊断包实证）：本方法原来用【功能号 10 能不能读到】当"回读确认"
 			if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 			{
 				if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
@@ -3279,7 +3193,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteError("[kbd] 30 系开关确认：EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
 				return true;
 			}
-			// ⭐⭐ 2026-10-19（40 系）：开关镜像只认 WMI18（WMI16 恒 2，不能拿来判「开」）✅
+			// （40 系）：开关镜像只认 WMI18（WMI16 恒 2，不能拿来判「开」）
 			if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
 			{
 				if (TryReadKeyboardPowerFromWmi18(out bool wmi18On, out int wmi18Level))
@@ -3348,8 +3262,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
 			{
-				// ⭐⭐ 2026-10-19（30 系）：开关确认只认 EC 0x1807（WMI16 仍是 2，不能拿来判「开」）✅
-				// ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，⛔ 不进 EC）✅
+				// 门控：**必须同时是宝龙达**（同方 30 系也 Gen30， 不进 EC）
 				if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 				{
 					if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
@@ -3365,7 +3278,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Logger.WriteError("[kbd] 30 系开关确认（topic）：EC 0x1807 读不到 ⇒ 保留上一次状态（⛔ 不凭 WMI16 改）");
 					return true;
 				}
-				// ⭐⭐ 2026-10-19（40 系）：开关确认只认 WMI18（WMI16 恒 2，不能判「开」）✅
+				// （40 系）：开关确认只认 WMI18（WMI16 恒 2，不能判「开」）
 				if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
 				{
 					if (TryReadKeyboardPowerFromWmi18(out bool wmi18On, out int wmi18Level))
@@ -3629,7 +3542,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			detail = "宝龙达后端不可用";
 			return false;
 		}
-		// ⭐ 2026-10-19（机主：状态=亮度仅限 30 系宝龙达）：首次进入时明确判据来源 ✅
+		// （机主：状态=亮度仅限 30 系宝龙达）：首次进入时明确判据来源
 		if (UsesBaolongda && DgpuGeneration == DgpuGenerationKind.Gen30)
 		{
 			string ecStateMessage = "[kbd] 30 系宝龙达：开关状态=亮度（EC 0x1807）";
@@ -3648,10 +3561,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			// ⭐⭐ 2026-10-19（机主：30 系关灯后开关自己跳回「开」）：
-			//   ⚠️ 30 系关灯写的是 **EC 0x1807=0x00**；WMI 16 仍是 2（固定色）/18 也可能不更新
-			//   ⇒ 开关状态**只认 EC 0x1807**：0x00 ⇒ OFF；!=0 ⇒ ON；⛔ 不再用 WMI 16/18 判开关 ✅
-			//   ⚠️ EC 读不到 ⇒ 返回 false（调用方保留上一次状态；⛔ 绝不凭 WMI16 恢复 ON）✅
+			// EC 读不到 ⇒ 返回 false（调用方保留上一次状态； 绝不凭 WMI16 恢复 ON）
 			if (TryReadKeyboardPowerFromEc(out bool ecOn, out int ecValue))
 			{
 				on = ecOn;
@@ -3701,11 +3611,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			return false;
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「30 系关灯后开关又跳回开」）：⭐ **追踪 KeyboardPower 的每个写入点** ✅。
-	/// <para>日志格式：`[kbd-trace] KeyboardPower=True ← 来源=… · 调用链=类型.方法 ← …`（⛔ 只截前 3 帧，不打整栈）✅。</para>
-	/// </summary>
+	// <para>日志格式：[kbd-trace] KeyboardPower=True ← 来源=… · 调用链=类型.方法 ← …（ 只截前 3 帧，不打整栈）。</para>
 	private void TraceKeyboardPowerWrite(bool value, string source)
 	{
 		// ⚠️ 只在宝龙达 30/40 系才打（否则其它机型会被追踪日志刷屏）✅
@@ -3715,8 +3621,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				+ $" ← 来源={source} · 调用链={DescribeCallChain(3)}");
 		}
 	}
-
-	/// <summary>⭐ 2026-10-19：截前 N 帧调用链（类型.方法 ← …），⛔ 不打完整栈 ✅。</summary>
+	// <summary> 截前 N 帧调用链（类型.方法 ← …）， 不打完整栈 。</summary>
 	private static string DescribeCallChain(int maxFrames)
 	{
 		try
@@ -3744,11 +3649,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			return "n/a";
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（宝龙达 40 系：状态=亮度）：WMI18 是唯一状态源；`!=0 ⇒ ON`、`==0 ⇒ OFF` ✅。
-	/// <para>⛔ 40 系不再用 WMI16 判开关（16 恒 2）；读失败返回 false（调用方保留上一次状态）✅。</para>
-	/// </summary>
+	// <para> 40 系不再用 WMI16 判开关（16 恒 2）；读失败返回 false（调用方保留上一次状态）。</para>
 	private bool TryReadKeyboardPowerFromWmi18(out bool on, out int brightness)
 	{
 		on = false;
@@ -3775,12 +3676,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		return true;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系「关灯后开关自己跳回开」）：⭐ **开关状态以 EC 0x1807 为准** ✅。
-	/// <para>0x00 ⇒ OFF；!=0 ⇒ ON；读失败返回 <c>false</c>（调用方保留上一次状态；⛔ 不凭 WMI16/18 恢复 ON）✅。</para>
-	/// <para>⚠️ 仅 Gen30；其它机型返回 false（继续走原 WMI 判据）✅。</para>
-	/// </summary>
+	// <para>0x00 ⇒ OFF；!=0 ⇒ ON；读失败返回 <c>false</c>（调用方保留上一次状态； 不凭 WMI16/18 恢复 ON）。</para>
 	internal bool TryReadKeyboardPowerFromEc(out bool on, out int ecValue)
 	{
 		on = false;
@@ -3865,50 +3761,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	{
 		return TrySetKeyboardLightingViaBackend(on, colorArgb, brightness0to3, 2, out confirmed);
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯「关不掉 / 亮度不对」第二轮修正）：
-	/// ⭐ 键盘灯下发的**唯一实现** ✅（⭐ 固定色顺序：模式 16 ⇒ 500ms ⇒ 颜色 17 ⇒ 亮度 18 ✅）。
-	///
-	/// <para>⭐⭐ 2026-10-19（机主批准「软件彩虹」）：⭐ 本机固件的「模式 16=1（AutoCyclic）」**实际无效** ⚠️
-	/// ⇒ 彩虹改为**软件刷色**：
-	/// ⭐ 这里拦截 <c>mode == 1</c> ⇒ 调 <see cref="StartKeyboardRainbow" />：
-	/// 先写 <c>16=2</c>（固定色）＋ 亮度，然后由后台**每 ~50ms** 写一次 <c>17=RGB</c>
-	/// （hue 0→360、步进 3°；HSB→RGB 本仓自写换算）✅。
-	/// ⭐ 停止（关灯 / 切单色 / <c>Dispose</c>）⇒ <see cref="StopKeyboardRainbow" /> 恢复「模式 2 + 用户颜色/亮度」✅。
-	/// ⭐ 单色（<c>mode == 2</c>）**保持原行为**（16 → 500ms → 17 → 18 ＋ 复位序列）✅。</para>
-	///
-	/// <para>⭐ <b>本轮两处关键修正</b>：
-	/// <list type="number">
-	/// <item>⭐ <b>关灯不再写「模式 0」</b> —— ⭐ 改为 <b>写亮度（功能号 18）= 0</b> ✅。
-	/// 依据：⭐ 参考实现（⭐ `JiaolongControl` 的 `KeyBoard.vue` · MIT · ⭐ 只取事实 ✅）界面原文
-	/// 「<c>背光亮度设置为 0 时将关闭键盘灯光</c>」✅；⭐ 且斗战者**全仓没有独立的关灯操作**、
-	/// 其背光值域就是 <c>0~3</c>（⭐ 0 ＝ 灭 ✅）。
-	/// ⚠️ 而旧的两条路线（⭐ A：只写模式 0 · ⭐ B：模式 0 ＋ 颜色黑）**已被真机否定** ——
-	/// 0.291.9.4 诊断包实测：⭐ 写模式 0 后**回读恒为 2** ⇒ ⭐ 固件不接受模式 0 ❌。</item>
-	/// <item>⭐ <b>亮度值不再把「想要最暗」映射成「关灯」</b> ✅ —— ⭐ 统一由
-	/// <see cref="BaolongdaBrightnessFromUi" /> 换算（⭐ 0 ⇒ 0 ＝ 灭；⭐ 正数 ⇒ 夹到 1~3 ✅）。</item>
-	/// </list></para>
-	///
-	/// <para>⭐⭐ <b>三层诚实边界（⭐ 日志逐层分开写 ✅）</b>：
-	/// ① ⭐ <b>写成功</b> ＝ WMI 调用没抛异常；
-	/// ② ⭐ <b>回读一致</b> ＝ 寄存器读回来的值**精确等于**我们写的值（⭐ 模式逐值比、亮度逐值比 ✅）；
-	/// ③ ⭐ <b>灯效/亮度是否真的变了</b> ＝ ⚠️ <b>我们测不到</b> ⇒ ⭐ 只能由机主目视确认 ✅。
-	/// ⇒ ⛔ 本方法**绝不**把 ② 说成 ③（⭐ 历史教训：⭐ "回读变了 ≠ 灯真的变了" ⚠️）。</para>
-	///
-	/// <para>⚠️ <b>模式值 1 ／ 3 的来源定性（⭐ 必须写准 ⚠️）</b>：⭐ <c>0</c>／<c>2</c> 是**官方原版**枚举
-	/// （⭐ 官方蛟龙控制台只有单色 ✅）；⚠️ <c>1</c>／<c>3</c> 来自**基于官方修改的第三方版本**
-	/// （⭐ 第三方 `JiaoLong7.3` 只是把**原厂未使用的入口**暴露到界面 ✅）⇒ ⭐ 属**未验证项**
-	/// ⇒ ⭐ **必须真机确认**（⛔ 不得当作"官方支持四种" ⚠️）。</para>
-	/// </summary>
-	/// <param name="on">⭐ <c>false</c> ⇒ ⭐ 关灯（⭐ 写亮度 0 ✅）。</param>
-	/// <param name="colorArgb">⭐ 单色 ARGB（⭐ 只在 <paramref name="on" /> 为真时用 ✅）。</param>
-	/// <param name="brightness0to3">⭐ 硬件亮度级 <c>0~3</c>（⭐ 0 ＝ 灭 ✅）—— ⚠️ 请用
-	/// <see cref="BaolongdaBrightnessFromUi" /> 从界面口径换算，⛔ 不要自己减 1 ✅。</param>
-	/// <param name="mode">⭐ 功能号 16 的模式值（⭐ 来自 <see cref="TryMapBaolongdaKeyboardMode" /> ✅）。
-	/// ⚠️ <c>1</c> = 彩虹哨兵 ⇒ **拦截为软件刷色**（⛔ 不写硬件 16=1）；<c>2</c> = 固定色 ⇒ 写 16/17/18 ✅。</param>
-	/// <param name="confirmed">⭐ <b>回读一致</b>（⭐ ② 层 ✅）—— ⛔ 不代表灯真的变了（⭐ ③ 层测不到 ⚠️）。
-	/// ⚠️ 彩虹时表示「软件彩虹已启动/已更新」（真正的逐帧变色只能目视确认）✅。</param>
+	// 键盘灯下发的**唯一实现** （ 固定色顺序：模式 16 ⇒ 500ms ⇒ 颜色 17 ⇒ 亮度 18 ）。
 	internal bool TrySetKeyboardLightingViaBackend(bool on, int colorArgb, int brightness0to3, byte mode, out bool confirmed)
 	{
 		confirmed = false;
@@ -3917,23 +3770,22 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return false;
 		}
-		// ⭐ 2026-10-19（30 系只读诊断）：每进程一次 raw OutData 探测（⛔ 不写任何字节）✅
+		// （30 系只读诊断）：每进程一次 raw OutData 探测（ 不写任何字节）
 		ProbeKeyboardRawOnce(wmi);
-		// ⭐ 2026-10-19（追踪「谁把开关/亮度改回开」）：只在宝龙达 30/40 系才打（⛔ 不刷别的机型）✅
+		// （追踪「谁把开关/亮度改回开」）：只在宝龙达 30/40 系才打（ 不刷别的机型）
 		if (UsesBaolongda && (DgpuGeneration == DgpuGenerationKind.Gen30 || DgpuGeneration == DgpuGenerationKind.Gen40))
 		{
 			Logger.WriteError($"[kbd-trace] TrySetKeyboardLightingViaBackend(on={on} · level={brightness0to3} · mode={mode})"
 				+ $" · 电源镜像={(KeyboardPower ? "开" : "关")} ← 调用链={DescribeCallChain(3)}");
 		}
-		// ⭐ 2026-10-19：记录「最近用户灯效动作」时间（自动关灯 tick 据此 5s 内不触发）✅
+		// 记录「最近用户灯效动作」时间（自动关灯 tick 据此 5s 内不触发）
 		if (Volatile.Read(ref _kbdAutoOffRestoring) == 0)
 		{
 			Interlocked.Exchange(ref _kbdLastUserActionTick, Environment.TickCount64);
 		}
 		try
 		{
-			// ⭐⭐ 2026-10-19（自动关灯）：任何**非恢复**的键盘灯写入都视为"用户手动改灯"
-			//   ⇒ 清"自动关灯已应用"标记（⛔ 之后绝不误恢复用户手动关掉的灯）✅
+			// （自动关灯）：任何**非恢复**的键盘灯写入都视为"用户手动改灯"
 			if (Volatile.Read(ref _kbdAutoOffRestoring) == 0)
 			{
 				ClearKeyboardAutoOffApplied("键盘灯写入");
@@ -3950,14 +3802,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			_ = status;
 			if (!on)
 			{
-				// ⭐⭐ 2026-10-19（软件彩虹生命周期）：⭐ 关灯 ⇒ **先停掉后台刷色** ✅
-				//   （否则刷色循环会在关灯后继续写 17，表现为"关不掉/自己又亮" ❌）
+				// （软件彩虹生命周期）： 关灯 ⇒ **先停掉后台刷色**
 				StopKeyboardRainbow();
-				// ⭐⭐ 2026-10-19（机主：30 系「关灯不行」）：关灯也走 **EC 0x1807=0x00**
-				//   ⚠️ 之前保留 WMI `18=0` 是因为"关灯曾经成功过"，但实测证明它不稳定/固件忽略
-				//   ⇒ 30 系统一走 EC（与档位 1/2/3 同一套：读→写→回读→失败再试 LPC→不重试）✅
-				//   ⚠️ 40 系/其它机型仍走下面的原 WMI `18=0` 路径，⛔ 不进 EC 分支 ✅
-				//   ⚠️ 门控：**必须同时是宝龙达**（同方 30 系也 Gen30，⛔ 不进 EC）✅
+				// ⇒ 30 系统一走 EC（与档位 1/2/3 同一套：读→写→回读→失败再试 LPC→不重试）
 				if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
 				{
 					LogKeyboardLightingState(wmi, "关灯前");
@@ -3982,7 +3829,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				}
 				if (DgpuGeneration == DgpuGenerationKind.Gen40 && UsesBaolongda)
 				{
-					// ⭐⭐ 2026-10-19（宝龙达 40 系：状态=亮度）：关灯 = WMI18=0；先记忆关灯前档位 ✅
+					// （宝龙达 40 系：状态=亮度）：关灯 = WMI18=0；先记忆关灯前档位
 					int priorLevel = -1;
 					if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte prior18) && prior18 != 255 && prior18 > 0)
 					{
@@ -4022,10 +3869,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					LogKeyboardLightingState(wmi, "关灯失败后");
 					return true;
 				}
-				// ⭐ 2026-10-19（只读诊断）：写 18=0 后连续读 5 次 raw（看是否滞后/是否夹回）✅
+				// （只读诊断）：写 18=0 后连续读 5 次 raw（看是否滞后/是否夹回）
 				LogKeyboardRawAfterBrightnessWrite(wmi, 0);
 				confirmed = TryConfirmKeyboardBrightness(wmi, 0);
-				// ⭐⭐ 2026-10-19：⭐ 记录**回读到的实际值**（⭐ UI 显示实际生效值，⛔ 不显示用户拖到的值）✅
+				// 记录**回读到的实际值**（ UI 显示实际生效值， 不显示用户拖到的值）
 				RecordAppliedKeyboardBrightness(wmi, requestedLevel: 0);
 				if (confirmed)
 				{
@@ -4042,10 +3889,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				LogKeyboardLightingState(wmi, "关灯后");
 				return true;
 			}
-			// ⭐⭐ 2026-10-19（机主批准「软件彩虹」）：⭐ **拦截 mode==1** —— ⛔ 不再写硬件 16=1 ✅
-			//   ⭐ 7.3 的彩虹是**软件刷色**，不是固件 AutoCyclic：
-			//     写 16=2（固定色）+ 亮度，然后后台每 ~50ms 写一次 17 颜色（hue 0→360 步进 3°）✅
-			//   ⚠️ 本机固件对 16=1 **无效**（上一轮真机已确认）⇒ 必须由我们自己刷色 ✅
+			// （机主批准「软件彩虹」）： **拦截 mode==1** ——  不再写硬件 16=1
 			if (mode == 1)
 			{
 				// ⭐ 开灯状态下亮度不允许是 0（0 ＝ 灭）⇒ 彩虹至少给 1 档 ✅
@@ -4105,10 +3949,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			int g = (colorArgb >> 8) & 0xFF;
 			int b = colorArgb & 0xFF;
 			bool colorOk = wmi.TrySetKeyboardColor((byte)r, (byte)g, (byte)b);
-			// ⭐ ④ 亮度（功能号 18）—— **只在变化时写**（改颜色时不再重写亮度 ✅）
-			//   ⭐⭐ 2026-10-19（机主实测纠正 + 自校准）：⭐ 本机上限 = **探测值**
-			//     （探测失败才退回声明值）；⛔ 不再按 GPU 代数猜 4/3 ——
-			//     40 系实测只有 0~3，界面拖到 4 会被固件夹回/变成灭灯 ❌
+			// （机主实测纠正 + 自校准）： 本机上限 = **探测值**
 			byte level = (byte)Math.Clamp(brightness0to3, 0, EffectiveKeyboardBrightnessMax());
 			// ⭐⭐ 2026-10-18（机主：「键盘灯打开得手动调一下亮度才能开」）：
 			//   ⚠️ 亮了但亮度=0 ⇒ 看起来就是"没开"；用户必须再拖一下亮度才有光 ❌
@@ -4130,13 +3971,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			int ecBrightnessWmi18 = -1;
 			if (kbGen == DgpuGenerationKind.Gen30 && UsesBaolongda)
 			{
-				// ⭐⭐ 2026-10-19（机主 WMI18↔EC 24/24 关联确认）：30 系亮度 = **EC 0x1807**（4 档 PWM）
-				//   ⇒ 档位 1/2/3 走 EC 白名单写（0x00/0x66/0xB3/0xFF）；⛔ 不再依赖 WMI 18（该机 18 只读/不稳）
-				//   ⚠️ 关灯（档位 0）仍走上面 !on 分支的原有 `18=0` 路径，**未改**；
-				//   ⚠️ 40 系/其它机型不进这里（继续原 WMI 18 写法）✅
+				// 关灯（档位 0）仍走上面 !on 分支的原有 18=0 路径，**未改**；
 				ecBrightnessUsed = true;
-				// ⭐⭐ 2026-10-19（机主：开关直接跟亮度走 + 关灯记忆上次亮度）：
-				//   若当前 EC 0x1807==0（关灯）⇒ 开灯时用 `kbd_last_brightness`（默认 3）✅
+				// （机主：开关直接跟亮度走 + 关灯记忆上次亮度）
 				if (EcPortIo.TryReadByte(KeyboardEcBrightness.RegisterAddress, out int currentPwm) && currentPwm == 0)
 				{
 					int rememberedLevel = KeyboardEcBrightness.GetLastLevel();
@@ -4150,7 +3987,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				ecBrightnessOk = KeyboardEcBrightness.TrySetLevel(level, wmi, out ecBrightnessReadback, out ecBrightnessWmi18,
 					"亮度下发(固定色) · TrySetKeyboardLightingViaBackend(on=true)");
 				brightOk = ecBrightnessOk;
-				// ⭐ 2026-10-19（单源状态机）：电源镜像**只由 EC 回读推导**（⛔ 不用请求值）✅
+				// （单源状态机）：电源镜像**只由 EC 回读推导**（ 不用请求值）
 				if (ecBrightnessOk && TryReadKeyboardPowerFromEc(out bool ecOnAfter, out int _))
 				{
 					TraceKeyboardPowerWrite(ecOnAfter, "亮度路径后-EC回读");
@@ -4163,8 +4000,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			else if (kbGen == DgpuGenerationKind.Gen40 && UsesBaolongda)
 			{
-				// ⭐⭐ 2026-10-19（宝龙达 40 系：状态=亮度）：WMI18 是唯一状态源；
-				//   当前 18==0（关灯）⇒ 用 `kbd_last_brightness`（默认 3，clamp 到本机上限）开灯 ✅
+				// （宝龙达 40 系：状态=亮度）：WMI18 是唯一状态源；
 				wmi18BrightnessUsed = true;
 				int targetLevel = level;
 				if (wmi.TryReadByte(BaolongdaWmi.Function.RgbKeyboardBrightness, out byte current18) && current18 == 0)
@@ -4205,11 +4041,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				}
 				else
 				{
-					// ⭐⭐ 2026-10-19（机主：「参照 7.3 的实现，另外的灯效」）：
-					//   ⭐ 第三方 7.3 设亮度用的是**复位序列**：先写满(4) → 再写 0 → 最后写目标值 ✅
-					//   ⭐ 我们原来"只写变化项、直接写目标" ⇒ 固件可能不认（真机上亮度/灯效常不生效）⚠️
-					//   ⚠️ 中间那次 0 会让灯瞬灭 ~120ms（7.3 同样如此）✅
-					//   ⭐⭐ 2026-10-19：⭐ 复位序列的"写满"也取**本机探测上限**（⛔ 不写超过上限的值）✅
+					// 复位序列的"写满"也取**本机探测上限**（ 不写超过上限的值）
 					byte maxLevel = (byte)EffectiveKeyboardBrightnessMax();
 					wmi.TrySetKeyboardBrightness(maxLevel);
 					Thread.Sleep(120);
@@ -4218,7 +4050,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					brightOk = wmi.TrySetKeyboardBrightness(level);
 					Logger.WriteLine($"[kbd] 亮度复位序列：{maxLevel} → 0 → {level}（7.3 做法）⇒ ok={brightOk}");
 				}
-				// ⭐ 2026-10-19（只读诊断）：真的写了 18 之后连续读 5 次 raw（看滞后/夹回）✅
+				// （只读诊断）：真的写了 18 之后连续读 5 次 raw（看滞后/夹回）
 				if (needBright)
 				{
 					LogKeyboardRawAfterBrightnessWrite(wmi, level);
@@ -4230,9 +4062,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				? ecBrightnessOk
 				: (wmi18BrightnessUsed ? wmi18BrightnessOk : TryConfirmKeyboardBrightness(wmi, level));
 			confirmed = modeMatch && brightMatch;
-			// ⭐⭐ 2026-10-19（机主：「拖到最大没反应/回弹」）：
-			//   ⭐ 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
-			//     UI 必须显示**实际生效值**、并记一条 `[kbd-cal]` 日志（⛔ 不拿用户拖到的值骗人）✅
+			// 亮度写 4/5（或超过本机上限的值）时若**回读被夹回** ⇒
 			if (ecBrightnessUsed && ecBrightnessOk)
 			{
 				// ⭐ 30 系 EC 写成功：UI 直接显示目标档位（EC 回读已校验，⛔ 不用 WMI18 的旧值冒充）✅
@@ -4296,13 +4126,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		return false;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「最大亮度不能用 / 拖到最大会回弹」）：
-	/// ⭐ 亮度写入后**立刻回读**，把【请求值 / 实际值】都记下来，并在被固件夹回时记一条 `[kbd-cal]` 日志 ✅。
-	/// <para>⚠️ 诚实边界：⭐ 回读只是**寄存器口径**（② 层），⛔ 不代表灯真的变亮了（③ 层测不到）⚠️。</para>
-	/// <para>⭐ 触发 <see cref="KeyboardBrightnessApplied" />：UI 据此把滑块显示成**实际生效值** ✅。</para>
-	/// </summary>
+	// 亮度写入后**立刻回读**，把【请求值 / 实际值】都记下来，并在被固件夹回时记一条 [kbd-cal] 日志 。
 	private void RecordAppliedKeyboardBrightness(BaolongdaWmi wmi, int requestedLevel)
 	{
 		LastKeyboardBrightnessRequested = requestedLevel;
@@ -4338,11 +4162,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			Logger.WriteLine("[kbd-cal] 亮度实际值通知 UI 时异常（已吞掉）：" + ex.Message);
 		}
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（30 系 EC 亮度）：EC 0x1807 写成功且回读已校验 ⇒ 直接把**目标档位**作为实际生效值
-	/// 通知 UI（⛔ 不用该机不稳定的 WMI18 旧值冒充）✅。
-	/// </summary>
+	// （30 系 EC 亮度）：EC 0x1807 写成功且回读已校验 ⇒ 直接把**目标档位**作为实际生效值
 	private void RecordKeyboardBrightnessApplied(int appliedLevel)
 	{
 		LastKeyboardBrightnessRequested = appliedLevel;
@@ -4361,11 +4181,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			Logger.WriteLine("[kbd-cal] 亮度实际值通知 UI 时异常（已吞掉）：" + ex.Message);
 		}
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（机主：开关跟亮度走/统一两条路径）：写亮度档位的统一入口 ——
-	/// Gen30+宝龙达 ⇒ EC 0x1807（同时记忆 `kbd_last_brightness`）；其它机型 ⇒ 原 WMI 18 ✅。
-	/// </summary>
+	// （机主：开关跟亮度走/统一两条路径）：写亮度档位的统一入口 ——
 	private bool TryApplyKeyboardBrightnessLevel(BaolongdaWmi wmi, byte level, string source)
 	{
 		if (DgpuGeneration == DgpuGenerationKind.Gen30 && UsesBaolongda)
@@ -4374,12 +4190,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		return wmi.TrySetKeyboardBrightness(level);
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系只读诊断）：⭐ **每进程一次**，连续 5 次读 16/17/18 的**完整 OutData**，
-	/// 用来核对"我们读 17/18 的偏移是否正确"（颜色明明变了但回读 0 ⇒ 很可能读错字节）✅。
-	/// <para>⚠️ 全程只发 Get；⛔ 不写任何字节、⛔ 不改任何状态（仅 30 系跑）✅。</para>
-	/// </summary>
+	// （30 系只读诊断）： **每进程一次**，连续 5 次读 16/17/18 的**完整 OutData**
 	private void ProbeKeyboardRawOnce(BaolongdaWmi wmi)
 	{
 		if (DgpuGeneration != DgpuGenerationKind.Gen30)
@@ -4428,11 +4239,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		return "raw(OutData[2.." + end + "])=" + text + " (len=" + data.Length + ")";
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（30 系只读诊断）：写 18=N 后**连续读 5 次** raw，看固件是否"滞后"
-	/// （写完立刻读是旧值、稍后读才对）✅。⚠️ 只读；⛔ 不改写入顺序/不重试写入 ✅。
-	/// </summary>
+	// （写完立刻读是旧值、稍后读才对）。 只读； 不改写入顺序/不重试写入 。
 	private void LogKeyboardRawAfterBrightnessWrite(BaolongdaWmi wmi, int requestedLevel)
 	{
 		if (DgpuGeneration != DgpuGenerationKind.Gen30)
@@ -4483,9 +4290,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		if (effect.Equals("Rainbow", StringComparison.OrdinalIgnoreCase))
 		{
-			// ⭐⭐ 2026-10-19（软件彩虹）：⭐ 模式 1 是**本仓的哨兵值** ——
-			//   ⛔ 不是固件 AutoCyclic（本机固件对 16=1 无效，真机已确认）⚠️
-			//   ⇒ ⭐ 由 `TrySetKeyboardLightingViaBackend` 拦截并转成**软件刷色**（50ms/帧）✅
+			// （软件彩虹）： 模式 1 是**本仓的哨兵值** ——
 			mode = 1;
 			return true;
 		}
@@ -4510,19 +4315,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return 0;
 		}
-		// ⭐⭐ 2026-10-19（机主实测纠正）：⭐ 上限不再按 GPU 代数猜 ——
-		//   40 系实测 **只有 0/1/2/3 四档**（最大 3），旧常量给 Gen40 返回 4
-		//   ⇒ 界面能拖到「4」但固件不支持 ⇒ 表现为「最大亮度不能用」❌
-		//   ⭐ 现在上限 = **运行时自校准值**（探测失败才退回声明常量，当前声明值也是 3）✅
+		// 现在上限 = **运行时自校准值**（探测失败才退回声明常量，当前声明值也是 3）
 		return (byte)Math.Clamp(ui0to4, 1, EffectiveKeyboardBrightnessMax());
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19：⭐ 本机键盘灯亮度**上限**（硬件级）—— UI 滑块与所有下发夹取**共用这一个来源** ✅。
-	/// <para>⭐ 顺序：⭐ ① 已自校准且亮度探测成功 ⇒ 用探测值 ✅；
-	/// ② 否则 ⇒ 用声明值 <see cref="BaolongdaProfile.BrightnessMax" />（现在是全系 3）。</para>
-	/// <para>⚠️ 非宝龙达也返回声明值（3），但**只有宝龙达路径会用它**；非宝龙达 UI 的 0~4 逐位不变 ✅。</para>
-	/// </summary>
+	// 本机键盘灯亮度**上限**（硬件级）—— UI 滑块与所有下发夹取**共用这一个来源** 。
 	internal static int EffectiveKeyboardBrightnessMax()
 	{
 		MechrevoHw hw = Program.hw;
@@ -4533,21 +4329,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		return Math.Max(1, BaolongdaProfile.BrightnessMax(hw?.DgpuGeneration ?? DgpuGenerationKind.Unknown));
 	}
-
-	// ══════════════════════════════════════════════════════════════════════
-	// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：
-	//    键盘灯**亮度上限探测** —— 打开键盘灯设置时调用一次，结果缓存。
-	//    · 亮度上限：记录原值 → 依次写 k = 1..声明上限 → 回读，能写进去的最大 k 即上限
-	//    ⚠️ 探测**必须** try/finally 恢复原始亮度（失败也要恢复）——
-	//       ⛔ 绝不允许把键盘留在探测状态 ✅
-	//    ⚠️ 彩虹**不在这里探测**：它已改为软件刷色（见 `StartKeyboardRainbow`），与固件模式无关 ✅
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>
-	/// ⭐ 探测入口：**只跑一次**，结果缓存（并发调用会串行化并复用同一份结果）✅。
-	/// <para>⚠️ 会写 WMI（只写亮度），带 try/finally 恢复；⛔ 调用方应在**后台线程**调它，
-	/// 探测耗时约 &lt; 1s（3 档亮度 × 回读重试），⛔ 不要阻塞 UI ✅。</para>
-	/// </summary>
+	// 键盘灯**亮度上限探测** —— 打开键盘灯设置时调用一次，结果缓存。
 	internal KeyboardLightingCalibration EnsureKeyboardLightingCalibration()
 	{
 		KeyboardLightingCalibration cached = Volatile.Read(ref _kbdCaps);
@@ -4716,23 +4498,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			+ $" · 18 亮度={(ok18 ? v18.ToString() : "读不到")}"
 			+ "（⭐ 判据用 16：0=关 · 非0=开；⚠️ 10 恒 0 故不作判据 ⚠️）");
 	}
-
-	// ══════════════════════════════════════════════════════════════════════
-	// ⭐⭐ 2026-10-19（机主批准「软件彩虹」）：**彩虹刷色器**（本仓自写实现）
-	//
-	//   依据（第三方 7.3  · ⭐ 只取**做法**，⛔ 未复制其代码）：
-	//     7.3 的彩虹 = **软件刷色**：写 16=2（固定色）+ 亮度，然后循环
-	//     「hue 0→360 步进 3° → HSB2RGB → 写 17 颜色 → 等 50ms」；停止时取消循环 + 写亮度 0。
-	//   ⇒ ⭐ 本机固件的「模式 16=1（AutoCyclic）」实际无效 ⇒ 彩虹只能由我们自己刷 ✅
-	//
-	//   ⚠️ 纪律：
-	//     ① 每帧**只写一个功能号**（17），约 2~5ms ⇒ 50ms 间隔 CPU 占用可忽略 ✅
-	//     ② 用 `Stopwatch` **绝对时刻**调度（⛔ 不用"写完再 Delay(50)"），避免累积漂移 ✅
-	//     ③ 每帧检查取消；**任何异常一律吞掉并停止**（⛔ 不让异常穿透后台 Task，防卡死）✅
-	//     ④ 停止后**再无周期性 WMI 写入**：Stop 先取消、等循环退出，再恢复单色 ✅
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>⭐ 软件彩虹：每帧色相步进（度）✅。</summary>
+	// ④ 停止后**再无周期性 WMI 写入**：Stop 先取消、等循环退出，再恢复单色
 	private const double RainbowHueStepDegrees = 3.0;
 
 	/// <summary>⭐ 软件彩虹：基础帧间隔（毫秒）✅。</summary>
@@ -4743,18 +4509,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>⭐ 软件彩虹：放慢后的帧间隔（毫秒）✅。</summary>
 	private const int RainbowSlowFrameIntervalMs = 80;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主批准「软件彩虹」）：**启动软件彩虹刷色** ✅
-	/// <para>⭐ 步骤（依据 7.3 的**做法**，⛔ 未复制代码）：
-	/// ① 先写 <c>16=2</c>（固定色模式）＋ 亮度（用 <see cref="EffectiveKeyboardBrightnessMax" /> 夹取）；
-	/// ② 起一个后台循环：每 ~50ms 写一次 <c>17=RGB</c>，hue 从 0 递增、步进 3°（HSB→RGB 见
-	/// <see cref="HsbToRgb" />）✅。</para>
-	/// <para>⚠️ 生命周期：<see cref="StopKeyboardRainbow" /> 取消；<c>Dispose</c>/关灯/切单色都会停
-	/// ⇒ 停止后**再无周期性 WMI 写入** ✅。</para>
-	/// </summary>
-	/// <param name="brightness">硬件亮度级（1~本机上限；0 会被抬到 1 —— 开灯不能是灭灯状态）✅</param>
-	/// <param name="token">外部取消令牌（可为 <c>default</c>；Stop 另建 linked token 取消）✅</param>
+	// （机主批准「软件彩虹」）：**启动软件彩虹刷色**
 	internal void StartKeyboardRainbow(byte brightness, CancellationToken token)
 	{
 		BaolongdaWmi wmi = _baolongda?.Wmi;
@@ -4781,12 +4536,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		Logger.WriteError($"[kbd] 软件彩虹：启动（{RainbowFrameIntervalMs}ms/帧 · 色相步进 {RainbowHueStepDegrees:0}° · 亮度={level}）"
 			+ $"（起始 16=2 {(modeOk ? "ok" : "失败")} · 18 {(brightOk ? "ok" : "失败")}）");
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主批准「软件彩虹」）：**停止软件彩虹** ✅
-	/// <para>⭐ 取消后台循环 → 等它真正退出（最多 500ms）→ 恢复「模式 2 + 用户当前颜色/亮度」✅。</para>
-	/// <para>⛔ 未在跑时**什么都不做**（幂等；不会重复写 WMI）✅。</para>
-	/// </summary>
+	// <para> 取消后台循环 → 等它真正退出（最多 500ms）→ 恢复「模式 2 + 用户当前颜色/亮度」。</para>
 	internal void StopKeyboardRainbow()
 	{
 		StopKeyboardRainbowCore(restoreSingleColor: true);
@@ -4992,17 +4742,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			(byte)Math.Round(g * 255.0),
 			(byte)Math.Round(b * 255.0));
 	}
-
-	// ══════════════════════════════════════════════════════════════════════
-	// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」· 软件实现）：
-	//    硬件 WMI 没有该功能号 ⇒ 用**系统输入空闲时间**判定（覆盖键鼠）✅
-	//    ⭐ 选项：关（默认）/ 10 秒 / 5 分钟 / 10 分钟 / 30 分钟（配置统一存**秒**）✅
-	//    ⭐ 红线：5s 检查**只读**（GetLastInputInfo + BaolongdaState 缓存）；
-	//      ⛔ 不写 16/17/18、⛔ 不重启彩虹循环、⛔ 不下发效果、⛔ 不重建 UI；日志去重不刷屏 ✅
-	//    ⭐ 只有超时那一刻写一次关灯；只有检测到新输入那一刻恢复一次 ✅
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>⭐ Win32 `LASTINPUTINFO`（本类自用；⛔ 不改 `NativeMethods` 的既有实现）✅。</summary>
+	// 红线：5s 检查**只读**（GetLastInputInfo + BaolongdaState 缓存）；
 	[StructLayout(LayoutKind.Sequential)]
 	private struct KeyboardAutoOffLastInputInfo
 	{
@@ -5194,8 +4934,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Volatile.Write(ref _kbdAutoOffSuppressUntilInput, 0);
 				return; // ⭐ 未超时 ⇒ 纯只读返回 ✅
 			}
-			// ⭐⭐ 2026-10-19（机主：开灯后过一会自己变关）：最近 5s 有过**用户灯效动作** ⇒ 不触发自动关
-			//   （防止刚开灯/刚拖亮度就被空闲计时器误判为空闲而关掉）✅
+			// （机主：开灯后过一会自己变关）：最近 5s 有过**用户灯效动作** ⇒ 不触发自动关
 			long lastUserAction = Interlocked.Read(ref _kbdLastUserActionTick);
 			if (lastUserAction != 0 && Environment.TickCount64 - lastUserAction < KeyboardAutoOffUserActionGuardMs)
 			{
@@ -5637,13 +5376,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return false;
 			}
-			// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-			//   ⭐ **getter 只读缓存/配置文件，⛔ 不触发 EC 验证**（原实现在这里调 `EnsureFanCurveLazyInit()`，
-			//      ⇒ 打开设置/构建行（`SupportsQuickSwitch("fanboost")` 读它）就会跑 EC 只读验证 + WMI 探测 ❌）。
-			//   ⭐ 真正需要风扇能力时显式调 `EnsureFanCurveReady()`：
-			//      · 用户开风扇曲线窗口 / 点强冷（`TrySetFanBoostViaBackend` on 分支）；
-			//      · 启动后空闲的后台预热（`RunDeferredFanStartupCleanup`，见 Program.ScheduleIdleBackendWarmup）✅
-			//   ⚠️ 未验证前返回 false（UI 隐藏入口）—— 与改动前**语义一致**，只是"何时探测"变了 ✅
+			// **getter 只读缓存/配置文件， 不触发 EC 验证**（原实现在这里调 EnsureFanCurveLazyInit()
 			if (DgpuGeneration == DgpuGenerationKind.Gen30)
 			{
 				return _fanCurveVerifiedGen30 ?? FanEcVerifyStore.Load(is30Series: true);
@@ -5651,12 +5384,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			return _fanCurveVerifiedGen40 ?? FanEcVerifyStore.Load(is30Series: false);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-	/// ⭐ **显式**确保风扇闸门只读验证已跑过（进程内缓存一次；⛔ 不发 WMI 写、⛔ 不写 EC）✅。
-	/// <para>调用点只允许"真正要用风扇能力"的地方：风扇曲线窗口 / 强冷开启 / 启动后空闲后台预热。</para>
-	/// </summary>
+	// **显式**确保风扇闸门只读验证已跑过（进程内缓存一次； 不发 WMI 写、 不写 EC）。
 	internal void EnsureFanCurveReady()
 	{
 		EnsureFanCurveLazyInit();
@@ -5711,12 +5439,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		RestoreBaolongdaFanFirmwareControl();
 		Logger.WriteLine("[init] 首次打开设置 ⇒ 初始化风扇闸门/清理（耗时 " + (Environment.TickCount64 - start) + " ms，已缓存）");
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主拍板：无界系列 + AMD APU 直接开放 SMU 自定义）：
-	/// ⭐ 本机是否满足「无界 APU」判据（机型名含无界/WUJIE/WJXY · CpuVendor.IsAmd · 无 NVIDIA 独显）✅。
-	/// <para>⚠️ 只读；SMU 是否真的可用另判 `SmuAvailability.IsReady`（与 PerfModeCapabilities 同源）。</para>
-	/// </summary>
+	// <para> 只读；SMU 是否真的可用另判 SmuAvailability.IsReady（与 PerfModeCapabilities 同源）。</para>
 	internal bool WujieSmuApu
 	{
 		get
@@ -5740,17 +5463,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	internal static string FanCurveVerifyNote => _fanCurveVerifyNote;
 
 	internal static bool FanBoostActive => _fanBoostActive;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达无 GCU）：⭐ 用**本机通道**实现"强冷"——
-	/// ① 暂停软件曲线闭环（避免两个逻辑抢写）
-	/// ② ⭐ **按通道先开手动接管（功能号 20 = [fanType,1]）再写满转目标（功能号 21 = [fanType,x100RPM]）**
-	/// ③ 读功能号 13 **回读确认转速真的上去了**（⭐ 给风扇起转时间，多次采样）④ 关闭时恢复强冷前的曲线并重启闭环 ✅
-	/// <para>⚠️⚠️ 2026-10-18 修正：⭐ 之前功能号 20 只写了一个字节（⭐ 见 <c>BaolongdaWmi.TrySetFanManualSwitch</c> 的历史 bug），
-	/// ⇒ ⭐ 手动接管**从来没有真正开启** ⇒ ⭐ 写下去的 21 满转被固件忽略 ⇒ 机主反馈「强冷了不狂转」✅</para>
-	/// <para>⚠️ 非宝龙达恒 false（走原来的 `FanBoost` MQTT 路径，逐位不变）✅</para>
-	/// <para>⛔ 不假装成功：写成功但转速没上去 ⇒ `confirmed=false`，界面按未确认处理 ✅</para>
-	/// </summary>
+	// ③ 读功能号 13 **回读确认转速真的上去了**（ 给风扇起转时间，多次采样）④ 关闭时恢复强冷前的曲线并重启闭环
 	internal bool TrySetFanBoostViaBackend(bool on, out bool confirmed)
 	{
 		confirmed = false;
@@ -5970,12 +5683,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private int _baolongdaMemPl1;
 	private int _baolongdaMemPl2;
 	private int _baolongdaMemTempWall;
-
-	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：30 系的 SMU **能读**当前 limits/tctl/时间窗 ⇒
-	// 不再全靠"本地记忆"猜；下面三项只在本机是「宝龙达 30 系」时由 `RefreshBaolongda30SeriesSmuPower` 填。
-	//   * `_baolongdaSmuSnapshot`  = 最近一次**只读** PM 表采样（null = 还没读/读不到）；
-	//   * `BaolongdaStapmTimeSeconds` = 当前 STAPM 时间窗（秒；0 = 读不到 ⇒ UI **不建**「功耗时间窗」那一行）；
-	//   * 板号/代际缓存 = 静态判据只读一次注册表。
+	// * 板号/代际缓存 = 静态判据只读一次注册表。
 	private PawnIO.SmuPowerSnapshot _baolongdaSmuSnapshot;
 	private DateTime _baolongdaSmuSnapshotAt = DateTime.MinValue;
 	private int _baolongda30SeriesCache = -1;
@@ -6018,19 +5726,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>⭐ 同 <see cref="BaolongdaPl1Unset" />：⭐ 温度墙是否**未设置** ✅。</summary>
 	public bool BaolongdaTempWallUnset => UsesBaolongda && _baolongdaMemTempWall <= BaolongdaUnset;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：本机是不是「**宝龙达 30 系**」—— 蛟龙16 / 裸板号 <c>MRID6</c> /
-	/// 6800H（Rembrandt）。
-	/// <para>⭐ <b>判据（两条并集，任一为真即算）</b>：
-	/// ① 显卡代际 <see cref="DgpuGenerationKind.Gen30" />（3070Ti 等 30 系独显；宝龙达 30 系真机就是这一形态）；
-	/// ② 主板型号 <c>BaseBoardProduct</c> **精确等于** <c>MRID6</c>（⚠️ <c>MRID6-23</c> = 40 系，**不算**；
-	///    <c>MRID6-*</c> 变体也**不算** 30 系 ⇒ 交给 ① 的独显代际判据）。</para>
-	/// <para>⚠️ 为什么必须先要求 <see cref="UsesBaolongda" />：同方 30 系（<c>GM5*</c> 等）**有 GCU**、
-	/// 功耗墙走固件槽，⛔ 不走 SMU —— 它们一个字节都不该受影响。</para>
-	/// <para>⚠️ 为什么 30 系要单独判：30 系原厂 WMI 方法表**只到 18**、没有功能号 23
-	/// ⇒ PL1/PL2/温度墙**只能走 SMU**；40 系（<c>MRID6-23</c>）有功能号 23 ⇒ 保持原 WMI 路径不变。</para>
-	/// </summary>
+	// ⇒ PL1/PL2/温度墙**只能走 SMU**；40 系（<c>MRID6-23</c>）有功能号 23 ⇒ 保持原 WMI 路径不变。</para>
 	internal bool IsBaolongda30Series
 	{
 		get
@@ -6048,38 +5744,19 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return cached == 1;
 			}
-			// ⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 板号统一走多来源取证（reg/WMI），判据仍是精确 `MRID6` ✅
+			// （机主：宝龙达被判成同方）： 板号统一走多来源取证（reg/WMI），判据仍是精确 MRID6
 			string board = BoardWhitelist.ReadBoardProduct();
 			bool match = string.Equals(board, "MRID6", StringComparison.OrdinalIgnoreCase);
 			Volatile.Write(ref _baolongda30SeriesCache, match ? 1 : 0);
 			return match;
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：当前 **STAPM 时间窗（秒）**；
-	/// <c>0</c> = 读不到 / 读数不稳定。
-	/// <para>⭐ UI 语义（2026-10-19 机主定）：只要「自定义档真的走 SMU」（判据
-	/// <c>PerfModeCapabilities.UsesSmuForCustomPower</c>）这一行就**照建**；本值为 0 时标题显示
-	/// 「（未设置）」—— ⛔ 不再因为读不到就隐藏整行（那看起来像"没这个功能"）。</para>
-	/// <para>⚠️ 只在 <see cref="IsBaolongda30Series" /> 且 <see cref="RefreshBaolongda30SeriesSmuPower" />
-	/// 成功过之后才有值。</para>
-	/// </summary>
+	// （机主：「是持续功耗时间（STAPM time）」）：当前 **STAPM 时间窗（秒）**；
 	internal int BaolongdaStapmTimeSeconds { get; private set; }
 
 	/// <summary>最近一次 30 系 SMU **只读**采样（null = 还没读/读不到；仅供日志与 UI 判断，不参与下发）。</summary>
 	internal PawnIO.SmuPowerSnapshot BaolongdaSmuSnapshot => _baolongdaSmuSnapshot;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**只读**刷新「当前功耗墙 / 温度墙 / STAPM 时间窗」，
-	/// 并把读得到的值填进本地记忆（<c>_baolongdaMem*</c> / <c>Pl1</c> / <c>Pl2</c> / <c>TccTarget</c>）。
-	/// <para>⭐ 为什么要填：30 系**能读** ⇒ 界面显示机器上的真实值（不再是「（未设置）」），
-	/// 而且"只改一项"时下发基线是真实当前值（⛔ 不再拿 0/编造值去凑）。</para>
-	/// <para>⚠️ 39 系/40 系/非宝龙达：本方法**直接返回 false**，一个寄存器不读、一个属性不动。</para>
-	/// <para>⚠️ 只读：只走 PM 表 resolve/transfer/read，⛔ 不发任何 SMU 写命令。</para>
-	/// <para>⚠️ 失败方向：PawnIO 不可用 / 非 AMD / 读表失败 ⇒ 返回 false + 日志；调用方必须如实处理
-	/// （UI = STAPM 时间窗行**照建**、值显示「未设置」；下发 = 如实报失败/未确认，⛔ 不假装成功）。</para>
-	/// </summary>
+	// <para> 失败方向：PawnIO 不可用 / 非 AMD / 读表失败 ⇒ 返回 false + 日志；调用方必须如实处理
 	internal bool RefreshBaolongda30SeriesSmuPower(bool force = false, bool requireStableStapmTime = false)
 	{
 		if (!IsBaolongda30Series)
@@ -6106,11 +5783,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			_baolongdaSmuSnapshot = snapshot;
 			_baolongdaSmuSnapshotAt = DateTime.UtcNow;
-			// ⭐⭐ STAPM 时间窗：**只有读数稳定才认**（真机教训：本机 Phoenix / PM 表 0x4C0009 的
-			//   0x918 字段连续两次读数会在 25~67 之间跳 ⇒ 不是"用户可设置的当前值"）。
-			//   * UI 打开时传 `requireStableStapmTime: true` ⇒ 再读一次，两次差 >1 就按"读不到"处理
-			//     ⇒ UI 行**照建**、显示「（未设置）」（机主 2026-10-19：⛔ 不再因为读不到就隐藏整行）；
-			//   * 下发基线/回读确认不需要它时传 false（省一次 ~0.4 s 的 PM 表读）。
+			// * 下发基线/回读确认不需要它时传 false（省一次 ~0.4 s 的 PM 表读）。
 			int stapmTimeSeconds = snapshot.StapmTimeSeconds ?? 0;
 			if (requireStableStapmTime && stapmTimeSeconds > 0)
 			{
@@ -6163,15 +5836,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			return (int)Math.Round(value, MidpointRounding.AwayFromZero);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效）：⭐ **清空宝龙达功耗墙的"本地记忆"** ✅。
-	/// <para>⭐ 用途：⭐ 自定义档「恢复出厂」时，40 系已写 <c>功能号 23 = 0</c>（关闭自定义 ⇒ 固件回到默认功耗墙），
-	/// 30 系 SMU 没有"恢复默认"命令 ⇒ 至少把**本地记忆**清成"未设置"，让界面如实显示"本次运行未下发过"、
-	/// 并让后续 reconcile/应用不再拿旧值当基线 ✅。</para>
-	/// <para>⚠️ 只清本地记忆与属性，⛔ **不写任何硬件**（硬件侧动作由调用方决定，见
-	/// <c>MechrevoService.TryApplyCpuPowerLimitViaBackend(enable:false,…)</c>）✅。</para>
-	/// </summary>
+	// 30 系 SMU 没有"恢复默认"命令 ⇒ 至少把**本地记忆**清成"未设置"，让界面如实显示"本次运行未下发过"
 	internal void ClearBaolongdaPowerLimitMemory()
 	{
 		_baolongdaMemPl1 = 0;
@@ -6185,11 +5850,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_baolongdaSmuSnapshot = null;
 		_baolongdaSmuSnapshotAt = DateTime.MinValue;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：某几项 **SMU 写成功**后更新"本地记忆"与只读快照
-	/// （传 0 的项 = 本次没写，保持原样）。⛔ 只在 SMU 返回 <c>OK</c> 之后由调用方调用。
-	/// </summary>
+	// （30 系 · SMU 功耗墙）：某几项 **SMU 写成功**后更新"本地记忆"与只读快照
 	internal void NoteBaolongdaSmuLimitsApplied(int pl1Watts, int pl2Watts, int tempWallC)
 	{
 		if (pl1Watts > 0)
@@ -6220,10 +5881,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			_baolongdaSmuSnapshotAt = DateTime.UtcNow;
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：STAPM 时间窗 **SMU 写成功**后更新本地记忆/快照（单位：秒）。
-	/// </summary>
+	// （30 系 · SMU 功耗墙）：STAPM 时间窗 **SMU 写成功**后更新本地记忆/快照（单位：秒）。
 	internal void NoteBaolongdaSmuStapmTimeApplied(int seconds)
 	{
 		if (seconds <= 0)
@@ -6299,12 +5957,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private const int BaolongdaCurveReassertMs = 30000;
 
 	private long _baolongdaCurveLastWriteTick;
-
-	// ⭐⭐ 2026-10-19（温度平滑 · 参考自 开源蛟龙(MIT) `AutoFanControl` 的 AlphaUp/AlphaDown 做法，
-	//   ⛔ 未复制代码）：⭐ 上升快（散热优先）、⭐ 下降慢（防抖、护噪音）✅
-	//   引用标注：参考自 斗战者(GPL-3.0)/开源蛟龙(MIT)，仅取数值形状与算法思路，未复制代码 ✅
-	//   ⚠️ 每通道一个**静态**平滑值（本进程只有一台机器 ⇒ 不需要实例化）✅
-	//   ⚠️ `double.NaN` = "还没初始化" ⇒ 第一次读到有效温度时**直接取原值**（⛔ 不从 0 慢慢爬）✅
+	// （温度平滑 · 参考自 开源蛟龙(MIT) AutoFanControl 的 AlphaUp/AlphaDown 做法
 	private const double BaolongdaFanCurveAlphaUp = 0.5;
 
 	private const double BaolongdaFanCurveAlphaDown = 0.2;
@@ -6615,9 +6268,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return false;
 		}
-		// ⭐⭐ 2026-10-19（机主要求 · 强冷核对 c）：⭐ 强冷 = "直接满转" ⇒ **必须在温度平滑/联动之前短路** ✅
-		//   ⚠️ 强冷开启时存档 Enabled 已被 `TrySetFanBoostViaBackend` 置 false（曲线本来就会在下面返回）✅
-		//   ⭐ 这里再显式兜一层：⛔ 绝不让平滑/联动改写强冷写下去的满转 ✅
+		// （机主要求 · 强冷核对 c）： 强冷 = "直接满转" ⇒ **必须在温度平滑/联动之前短路**
 		if (_fanBoostActive)
 		{
 			Logger.WriteLineIfChanged("baolongda-fancurve-boost",
@@ -6635,13 +6286,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
-			// ⭐⭐ 2026-10-19：⭐ 把**本机满转**传进存储层（40 系 6000 / 30 系 4900）⇒ 新装机默认曲线按代际校准 ✅
+			// 把**本机满转**传进存储层（40 系 6000 / 30 系 4900）⇒ 新装机默认曲线按代际校准
 			BaolongdaFanCurveSettings settings = LoadBaolongdaFanCurve();
 			if (!settings.Enabled)
 			{
-				// ⭐⭐ 2026-10-19（机主：风扇曲线不生效，且日志里**一条曲线行都没有**）：
-				//   ⭐ 这里原来**静默 return** ⇒ 无法区分"没启用"还是"根本没进来" ❌
-				//   ⭐ 现在每次状态变化都记一行（去重，不刷屏）✅
+				// （机主：风扇曲线不生效，且日志里**一条曲线行都没有**）
 				Logger.WriteLineIfChanged("baolongda-fancurve-disabled",
 					$"宝龙达风扇曲线：⭐ 未启用（Enabled=false）⇒ 本轮不写任何字节 · 曲线源={settings.Channel0Temperatures.Length}点/ch0 · 归档可读={!settings.IsUnreadableArchive}");
 				return false;
@@ -6656,8 +6305,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteLineIfChanged("baolongda-fancurve-notemp", "宝龙达风扇曲线：⚠️ 两个温度都没有有效值 ⇒ 本轮跳过（⛔ 不瞎写风扇 ✅）");
 				return false;
 			}
-			// ⭐⭐ 2026-10-19（温度平滑）：⭐ 先平滑再查曲线 ⇒ 避免温度毛刺让转速一跳一跳 ✅
-			//   ⚠️ 平滑值用**整数℃**进决策器（回差/日志都是整数 ✅）；保留 double 状态供下一轮迭代 ✅
+			// 平滑值用**整数℃**进决策器（回差/日志都是整数 ）；保留 double 状态供下一轮迭代
 			int gpuTempSmooth = SmoothBaolongdaFanCurveTemp(ref _baolongdaFanCurveSmoothedGpuTemp, gpuTemp);
 			int cpuTempSmooth = SmoothBaolongdaFanCurveTemp(ref _baolongdaFanCurveSmoothedCpuTemp, cpuTemp);
 			// ⭐⭐ 2026-10-16（第 1 步）：⭐ 曲线改 **RPM** ✅ ⇒ ⭐ 不再有「⭐ 占空比 × ⭐ max RPM ÷ 100」这一步 ✅
@@ -6682,11 +6330,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   必须等**下发档位也到目标**之后才允许跳（⭐ 否则第一 tick 之后斜坡就永远停住 ⚠️）✅
 			int channel0Rpm = decided0 ?? _baolongdaCurveDecider0.LastRpm;
 			int channel1Rpm = decided1 ?? _baolongdaCurveDecider1.LastRpm;
-			// ⭐⭐ 2026-10-19（双风扇 0.85 联动 · 参考自 开源蛟龙(MIT) `AutoFanControl` 的
-			//   `SharedHeatPipeSyncRatio` **做法/系数**，⛔ 未复制代码）：
-			//   ⭐ 共用热管 ⇒ 两路按 `max(自己, (int)(对方 × 0.85))` 互相带动，避免"一侧过热、另一侧低速"✅
-			//   ⭐ 开关来自曲线存档 `SyncEnabled`（默认 true；旧存档缺字段按 true）✅
-			//   ⚠️ 关掉 ⇒ 两路**各算各的**（逐位等于联动前的行为）✅
+			// （双风扇 0.85 联动 · 参考自 开源蛟龙(MIT) AutoFanControl 的
 			int channel0RpmBeforeSync = channel0Rpm;
 			int channel1RpmBeforeSync = channel1Rpm;
 			if (settings.SyncEnabled)
@@ -6725,11 +6369,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return false;
 			}
-			// ⚠️ 通道顺序必须与 `TrySetFanManualViaBackend(enable, ch0, ch1, ...)` 的约定一致 ✅
-			//    ⭐ ch0 = `FanType 0`（GPU）· ⭐ ch1 = `FanType 1`（CPU）✅
-			// ⭐⭐ 2026-10-19（机主要求：减少写入次数）：⭐ **差异比较** —— 下发档位与上次已写相同、
-			//   且手动开关仍为「开」⇒ ⭐ 本轮**不写**（只读一次功能号 20 确认状态，然后 return）✅
-			//   ⚠️ 每 30 秒**强制重写一次**（防固件静默丢状态）；⚠️ 强冷/开关变化会清空缓存 ⇒ 下一轮必写 ✅
+			// 每 30 秒**强制重写一次**（防固件静默丢状态）； 强冷/开关变化会清空缓存 ⇒ 下一轮必写
 			bool sameAsLast = _fanCurveLastCh0 == sentUnits0 && _fanCurveLastCh1 == sentUnits1;
 			long curveTick = Environment.TickCount64;
 			bool forceRewrite = curveTick - _fanCurveLastWriteTick >= FanCurveForceRewriteMs;
@@ -6806,9 +6446,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Thread.Sleep(300);
 				rpmReadOk = TryReadFanSpeedsViaBackend(out nowFirstRpm, out nowSecondRpm);
 			}
-			// ⭐⭐ 2026-10-19（机主要求 · 日志格式 + 如实回读）：
-			//   `[fan] 曲线：cpu=..℃/gpu=..℃ → rpm cpu=.. gpu=..（联动后..）→ 写 ok=..`
-			//   ⚠️ `ok=` 用的是 `TrySetFanManualViaBackend` 的**回读确认**（⛔ 不是"调用没抛异常"）✅
+			// （机主要求 · 日志格式 + 如实回读）
 			Logger.WriteLineIfChanged("baolongda-fancurve-step",
 				$"[fan] 曲线：cpu={cpuTemp}℃/gpu={gpuTemp}℃（平滑 cpu={cpuTempSmooth}/gpu={gpuTempSmooth}）"
 				+ $" → rpm cpu={channel1RpmBeforeSync} gpu={channel0RpmBeforeSync}"
@@ -6864,7 +6502,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// ⭐ 交回固件后**下一次启用必须重写**（⛔ 不能因为"目标没变"就跳过首写）✅
 		_baolongdaCurveDecider0.Reset();
 		_baolongdaCurveDecider1.Reset();
-		// ⭐ 2026-10-19：同时清零温度平滑 ⇒ 重新启用时从真实温度重新收敛（⛔ 不在旧平滑值上慢慢爬）✅
+		// 同时清零温度平滑 ⇒ 重新启用时从真实温度重新收敛（ 不在旧平滑值上慢慢爬）
 		ResetBaolongdaFanCurveSmoothing();
 		_baolongdaCurveLastWriteTick = 0;
 		try
@@ -7312,9 +6950,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private async Task ApplyBaolongdaBackendAsync(BaolongdaBackend backend)
 	{
 		_activeBackend = MechrevoBackendKind.Baolongda;
-		// ⭐⭐ 2026-10-19（自动关灯平台互斥）：宝龙达只用本类的 5s 软件计时
-		//   ⇒ 立刻停掉 Program 里同方/GCU 的 2s 空闲计时器（若已建/已动作则恢复），
-		//   保证同一进程内不会有两个自动关灯计时器同时生效（平台判定单一来源 `UsesBaolongda`）✅
+		// ⇒ 立刻停掉 Program 里同方/GCU 的 2s 空闲计时器（若已建/已动作则恢复）
 		Program.StopVendorLightingIdleMonitorForBaolongda();
 		// ⭐⭐ 2026-10-16：⭐ 能力位**只认一个来源** —— <see cref="BaolongdaBackend.BuildCapabilities" /> ✅
 		//    ⚠️ 起因：⭐ 我先前在两个地方各写了一份（⭐ 这里 ＋ ⭐ `BuildCapabilities`）⇒ ⭐ **必然有一天只改一处** ⚠️
@@ -7470,7 +7106,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Logger.WriteLine($"宝龙达状态回读：⭐ highperf ⇒ {(hiOn ? "开" : "关")}（⭐ 来源：LM 配置 bd_power_overlay）");
 				}
 			}
-			// ⭐ 2026-10-19（APU 防缩缸）：⭐ 状态直接读 Windows 策略（boost mode == 5）✅
+			// （APU 防缩缸）： 状态直接读 Windows 策略（boost mode == 5）
 			{
 				bool apuOn = MechrevoLite.Mode.PerfModeService.Instance?.ApuAntiDegradeEnabled ?? false;
 				if (!QuickSwitches.TryGetValue("apuboost", out bool apuCur) || apuCur != apuOn)
@@ -7712,7 +7348,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// 没探到老接口（或 GCU 服务已装、直接优先 GCU）⇒ 落到 GCU（默认后端）。
 				// ⛔ 这一档不碰任何既有字段：行为与改动前逐项一致。
 				_activeBackend = MechrevoBackendKind.Gcu;
-				// ⭐⭐ 2026-10-19（机主：宝龙达专属周期任务不能在 GCU 机器上空转）：启动只打一行"跳过 N 项"✅
+				// （机主：宝龙达专属周期任务不能在 GCU 机器上空转）：启动只打一行"跳过 N 项"
 				LogNonBaolongdaPeriodicGateOnce("Gcu");
 				// ⭐ 2026-10-15：**两条分支都要留痕**（原来只有老接口那条有日志）——诊断「GCU 连不上」时必须能
 				// 区分"被误判成老机型"与"确实走的是 GCU 通路、连不上另有原因"。
@@ -8078,12 +7714,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		Logger.WriteLine($"mqtt clientId 回退: {text2} -> {text} (原因: {reason})");
 		return true;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：宝龙达专属功能/轮询不能在同方（GCU）机器上跑）：
-	/// ⭐ **周期任务平台门控**的启动留痕 —— 非宝龙达机器只打**一行**（去重），说明跳过了哪些宝龙达周期任务 ✅。
-	/// <para>⚠️ 纯日志：⛔ 不改变任何行为；`UsesBaolongda` 才是唯一门控判据（⛔ 不用板号猜测）✅。</para>
-	/// </summary>
+	// **周期任务平台门控**的启动留痕 —— 非宝龙达机器只打**一行**（去重），说明跳过了哪些宝龙达周期任务 。
 	private static void LogNonBaolongdaPeriodicGateOnce(string backend)
 	{
 		string msg = "[gate] 非宝龙达（backend=" + backend + "）⇒ 跳过 6 项宝龙达周期任务"
@@ -9058,8 +8689,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text6 = o["powerStatus"]?.ToString();
 		if (text6 != null)
 		{
-			// ⭐ 2026-10-19（单源状态机）：宝龙达 30/40 系的电源镜像**只允许**由亮度回读/用户显式开关写入；
-			//   ⛔ GCU payload（powerStatus）不得再改它 ✅
+			// （单源状态机）：宝龙达 30/40 系的电源镜像**只允许**由亮度回读/用户显式开关写入；
 			if (!(UsesBaolongda && (DgpuGeneration == DgpuGenerationKind.Gen30 || DgpuGeneration == DgpuGenerationKind.Gen40)))
 			{
 				bool gcuKeyboardOn = text6 == "On";
@@ -9614,8 +9244,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text16 = o["HighPerformancePowerModeSwitch"]?.ToString();
 		if (text16 != null)
 		{
-			// ⭐ 2026-10-19（解耦 GCU）：⭐ 状态一律以 LM 自己的开关为准（AppConfig bd_power_overlay），
-			//   ⛔ 不再看 GCU 回包 `HighPerformancePowerModeSwitch`（那只是"厂商也设过"的痕迹）✅
+			// （解耦 GCU）： 状态一律以 LM 自己的开关为准（AppConfig bd_power_overlay）
 			bool hiOn = MechrevoLite.Mode.PerfModeService.Instance?.WindowsPowerOverlayEnabled ?? true;
 			QuickSwitches["highperf"] = hiOn;
 			HighPerformanceSeen = true;
@@ -11374,10 +11003,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-19（软件彩虹生命周期 · 机主第 3 条）：⭐ 程序退出前**先停掉后台刷色**
-		//   （取消循环 + 恢复用户单色）⇒ ⛔ 退出后不再有任何周期性 WMI 写入 ✅
+		// （取消循环 + 恢复用户单色）⇒  退出后不再有任何周期性 WMI 写入
 		StopKeyboardRainbow();
-		// ⭐⭐ 2026-10-19（自动关灯）：退出时停计时器 + 清内存标记（⛔ 不写灯；下次启动按配置正常）✅
+		// （自动关灯）：退出时停计时器 + 清内存标记（ 不写灯；下次启动按配置正常）
 		StopKeyboardAutoOffTimer();
 		lock (_kbdAutoOffGate)
 		{

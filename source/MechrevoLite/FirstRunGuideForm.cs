@@ -91,16 +91,7 @@ public sealed class FirstRunGuideForm : RForm
 	/// </param>
 	public FirstRunGuideForm(bool igpuOnlyStepOnly)
 	{
-		// ⭐⭐ 2026-10-17（用户要求 · 宝龙达没有核显模式）：
-		//   完整引导里**跳过第 4 步**（「你的电脑有「集显模式」这一档吗?」）。
-		//   ⚠️ 单问模式（igpuOnlyStepOnly=true）不适用 —— 那个窗口存在的唯一目的就是问这一问，
-		//     而它在宝龙达下压根不会被打开（SettingsForm.ShowIgpuOnlyGuideIfNeeded 已挡掉）。
-		//   ⚠️ Program.hw 为 null（后端未就绪）时按非宝龙达处理（保守：维持原行为）。
-		// ⭐⭐ 2026-10-19（机主实测：宝龙达仍被问「有没有集显模式」）：
-		//   ⚠️ 首次引导弹出的时刻 `Program.hw` 往往**还是 null**（后端探测尚未完成）⇒ `?? false` ⇒ 照问 ❌
-		//   ⭐ 现在按三级判据：hw 已就绪 ⇒ 用它的结论；hw 没有但 service 在 ⇒ 用 service 的；
-		//      ⭐ 两者都没有（完全不确定）⇒ **不问**（这一问不是必需项，设置页 `igpu_only_ui` 随时可改，
-		//      问错机器比不问更糟）✅
+		// 完整引导里**跳过第 4 步**（「你的电脑有「集显模式」这一档吗?」）。
 		bool bdKnown = Program.hw?.UsesBaolongda ?? false;
 		bool bdUnknown = Program.hw == null;
 		_skipIgpuOnlyStep = !igpuOnlyStepOnly && (bdKnown || bdUnknown);

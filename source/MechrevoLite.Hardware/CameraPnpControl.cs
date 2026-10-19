@@ -122,7 +122,7 @@ internal static class CameraPnpControl
 	{
 		get
 		{
-			// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：首次调用才探测（并缓存），之后只读缓存 ✅
+			// （机主：后端初始化不要挂在设置窗打开路径上）：首次调用才探测（并缓存），之后只读缓存
 			return (Volatile.Read(ref _hasCameraProbed) == 1) ? _hasCameraCached : ProbeHasCamera();
 		}
 	}
@@ -130,11 +130,7 @@ internal static class CameraPnpControl
 	private static int _hasCameraProbed;
 
 	private static bool _hasCameraCached;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-	/// ⭐ **只读缓存**（未探测过 = false，⛔ **不做 SetupAPI 枚举**）—— 给"打开设置/构建行/算能力位"用 ✅
-	/// </summary>
+	// **只读缓存**（未探测过 = false， **不做 SetupAPI 枚举**）—— 给"打开设置/构建行/算能力位"用
 	internal static bool HasCameraCached
 	{
 		get

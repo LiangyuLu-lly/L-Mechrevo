@@ -29,7 +29,7 @@ internal static class DiagnosticDisplayInfo
 			AppendVideoControllers(stringBuilder);
 			AppendMonitorEdid(stringBuilder);
 			AppendGcuRefresh(stringBuilder);
-			// ⭐⭐ 2026-10-19（机主：亮度调节延迟 / 外部变化不同步）：诊断包补「屏幕亮度」一节
+			// （机主：亮度调节延迟 / 外部变化不同步）：诊断包补「屏幕亮度」一节
 			AppendBrightnessState(stringBuilder);
 		}
 		catch (Exception ex)

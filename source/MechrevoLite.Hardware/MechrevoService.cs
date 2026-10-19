@@ -882,23 +882,13 @@ public class MechrevoService
 
 	public async Task<bool> SetCustomDetail(Dictionary<string, string> fields)
 	{
-		// ⭐⭐ 2026-10-19（机主：「PL2 / PL4 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
-		//   ⭐ **校验层兜底** —— 下发前先把这一批里的 PL1/PL2/PL4 规范成 **PL1 ≤ PL2 ≤ PL4**：
-		//     · 用户降 PL2 到低于 PL1 ⇒ 把 PL1 一起降下来；
-		//     · 用户抬 PL1 超过 PL2 ⇒ 把 PL2（以及 PL4）一起抬高；
-		//     · 无 PL4 的机型（宝龙达没有 PL4）自动忽略 PL4；
-		//     · 历史非法存档回放（多字段同批）⇒ 优先往下压（安全方向）。
-		//   ⛔ **绝不允许把违反关系的组合发出去**；⛔ 不改 WMI 功能号 23 的写入协议（子命令 2/3/4 不变）。
-		//   ⚠️ 规则本体在 `PowerLimitOrder`（⭐ 与 CustomModeForm 的界面联动**同一份口径**）✅。
+		// **校验层兜底** —— 下发前先把这一批里的 PL1/PL2/PL4 规范成 **PL1 ≤ PL2 ≤ PL4**
 		if (!NormalizePowerLimitOrder(fields))
 		{
 			Logger.WriteError("SetCustomDetail rejected: PL1 ≤ PL2 ≤ PL4 无法满足（硬件范围互相冲突）⇒ 本批不下发");
 			return false;
 		}
-		// ⭐⭐ 2026-10-19（机主：PL1/PL2 不可调 · 日志 `WriteFirmwareField:PL1=120 -> Failed`）：
-		//   ⭐ 宝龙达没有 GCU ⇒ 这几个键**先**走本机 WMI 功能号 23（`TryApplyPowerLimitViaBackend`），
-		//      剩下的字段才发给 MQTT ✅
-		//   ⚠️ 非宝龙达：`UsesBaolongda` 假 ⇒ 整段跳过，逐位不变 ✅
+		// （机主：PL1/PL2 不可调 · 日志 WriteFirmwareField:PL1=120 -> Failed）
 		if (_hw != null && (_hw.UsesBaolongda || _hw.WujieSmuApu) && fields != null && fields.Count > 0)
 		{
 			List<string> consumedKeys = new List<string>();
@@ -1239,18 +1229,7 @@ public class MechrevoService
 			requestCts.Dispose();
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「PL2 / PL4 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
-	/// ⭐ **PL1 ≤ PL2 ≤ PL4 的校验层兜底** —— 就地规范化 <paramref name="fields" /> 里的 PL 三项。
-	/// <para>⭐ 规则本体在 <see cref="PowerLimitOrder.TryLink" />（⭐ 与界面联动同一份口径）。
-	/// 本方法只负责：① 把"待下发值 + 硬件当前值"凑成三元组；② 把联动结果写回字段表（⭐ 被联动的
-	/// 那一项即使不在本批里也会被**补进去**，⇒ 它会被真正写到硬件上）；③ 打机主要求的那一行日志 ✅。</para>
-	/// <para>⚠️ 非宝龙达的 GCU 机型同样生效（⭐ PL4 也在范围内）⇒ 只在"确实违反关系"时才多写字段，
-	/// 合法组合**一个字段都不改** ✅。</para>
-	/// <para>⚠️ 返回 <c>false</c> = 硬件范围互相冲突、无法同时满足关系 ⇒ 调用方必须**放弃本批**，
-	/// ⛔ 不许把违规组合发出去 ✅。</para>
-	/// </summary>
+	// 本方法只负责：① 把"待下发值 + 硬件当前值"凑成三元组；② 把联动结果写回字段表（ 被联动的
 	private bool NormalizePowerLimitOrder(Dictionary<string, string> fields)
 	{
 		MechrevoHw hw = _hw;
@@ -1331,11 +1310,7 @@ public class MechrevoService
 		}
 		fields[key] = linked.Value.ToString(CultureInfo.InvariantCulture);
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（宝龙达 · GPU 偏移校验范围）：与 <c>CustomModeForm.GpuOffsetUiRange</c> **同源**
-	/// = NVAPI P0 驱动范围 ∩ <c>-900..+2000 MHz</c>。非宝龙达恒返回 false（调用方保持原判据）。
-	/// </summary>
+	// （宝龙达 · GPU 偏移校验范围）：与 <c>CustomModeForm.GpuOffsetUiRange</c> **同源**
 	private bool TryGetBaolongdaGpuOffsetUiRange(bool core, out int minimum, out int maximum)
 	{
 		minimum = 0;
@@ -1381,8 +1356,7 @@ public class MechrevoService
 			return _hw.SupportsFanSwitchSpeed && InRange(result, _hw.FanSwitchSpeedMinimum, _hw.FanSwitchSpeedMaximum);
 		case "CpuTccOffset":
 			return _hw.TccAdjustable && InRange(result, _hw.TccMinimum, _hw.TccMaximum);
-		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间」）：范围与 UI 同源（BaolongdaProfile 常量），
-		//   ⚠️ 只对「自定义档真的走 SMU」的机器有效（与 UI 显示、下发分支**同一判据**）。
+		// （机主：「是持续功耗时间」）：范围与 UI 同源（BaolongdaProfile 常量）
 		case "SmuStapmTimeSeconds":
 			return PerfModeCapabilities.UsesSmuForCustomPower(_hw.UsesBaolongda, _hw.IsBaolongda30Series, SmuAvailability.IsReady)
 				&& InRange(result, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds);
@@ -1392,10 +1366,7 @@ public class MechrevoService
 			return _hw.GpuDynamicBoostAdjustable && InRange(result, _hw.GpuDbMinimum, _hw.GpuDbMaximum);
 		case "GpuCoreClockOffsetOC":
 		{
-			// ⭐⭐ 2026-10-19（宝龙达 · GPU 偏移）：宝龙达的可用范围来自 NVAPI P0（与 CustomModeForm 的
-			//   GpuOffsetUiRange 同源：驱动范围 ∩ -900..+2000）。这里必须同口径，否则 UI 能拖到 +600、
-			//   校验却按 hw 的 ±500 拒掉，用户看到的就是"应用后又被弹回 0"。
-			//   ⚠️ 非宝龙达：helper 直接返回 false，判定与改动前逐字一致。
+			// （宝龙达 · GPU 偏移）：宝龙达的可用范围来自 NVAPI P0（与 CustomModeForm 的
 			if (TryGetBaolongdaGpuOffsetUiRange(core: true, out int coreMin, out int coreMax))
 			{
 				return InOffsetRange(result, coreMin, coreMax);
@@ -1475,7 +1446,7 @@ public class MechrevoService
 			"FanSwitchSpeedEnabled" => _hw.FanSwitchSpeedEnabled == (result == 1), 
 			"FanSwitchSpeed" => _hw.FanSwitchSpeed == _hw.QuantiseFanSwitchSpeed(result), 
 			"CpuTccOffset" => _hw.TccTarget == result, 
-			// ⭐⭐ 2026-10-19（30 系 · SMU 时间窗）：本地记忆（写成功后更新）与下发值一致
+			// （30 系 · SMU 时间窗）：本地记忆（写成功后更新）与下发值一致
 			"SmuStapmTimeSeconds" => _hw.BaolongdaStapmTimeSeconds == result, 
 			"GpuConfigurableTGPTarget" => _hw.GpuTgp == result, 
 			"GpuDynamicBoost" => _hw.GpuDb == result, 
@@ -3019,10 +2990,7 @@ public class MechrevoService
 				Logger.WriteLine($"SwitchQuick({key},{on})：⚠️ 本地 Radio 不可用（未探测到或无访问权限）⇒ 不下发");
 				return false;
 			}
-			// ⭐⭐ 2026-10-17（「高性能电源」解耦 GCU）：⭐ 无 GCU 时不再发注定失败的 MQTT，
-			//   改成"跟着性能档位设 Windows 电源模式"（powrprof overlay；狂暴=最佳性能/平衡=平衡/安静=最佳能效）✅
-			// ⭐ 2026-10-19（用户：「GCU 也解耦，走 Windows 替换我的客户端」）⇒ **所有机型**都走 Windows，
-			//   不再限定宝龙达；GCU 的 HIGHPERFORMANCEPOWERMODE_ON/OFF 那条 MQTT 分支不再被用到 ✅
+			// 2026-10-17（「高性能电源」解耦 GCU）： 无 GCU 时不再发注定失败的 MQTT
 			if (string.Equals(key, "highperf", StringComparison.Ordinal))
 			{
 				MechrevoLite.Mode.PerfModeService perf = MechrevoLite.Mode.PerfModeService.Instance;
@@ -3035,8 +3003,7 @@ public class MechrevoService
 				Logger.WriteLine($"SwitchQuick(highperf,{on}) ⭐ 走**Windows 电源模式联动**（不依赖 GCU）");
 				return true;
 			}
-			// ⭐⭐ 2026-10-19（APU 防缩缸）：⭐ 纯 Windows 电源策略（处理器性能提升模式 → 5）
-			//   ⚠️ 所有机型都走这里（与 GCU 无关）✅
+			// （APU 防缩缸）： 纯 Windows 电源策略（处理器性能提升模式 → 5）
 			if (string.Equals(key, "apuboost", StringComparison.Ordinal))
 			{
 				MechrevoLite.Mode.PerfModeService perfBoost = MechrevoLite.Mode.PerfModeService.Instance;
@@ -3049,7 +3016,7 @@ public class MechrevoService
 				Logger.WriteLine($"SwitchQuick(apuboost,{on}) ⭐ 走 Windows 电源策略（boost mode=5）");
 				return true;
 			}
-			// ⭐⭐ 2026-10-19（风扇强冷 · 宝龙达）：⭐ 没有 GCU ⇒ 本机通道：暂停曲线闭环 + 两路满转 + 回读校验
+			// （风扇强冷 · 宝龙达）： 没有 GCU ⇒ 本机通道：暂停曲线闭环 + 两路满转 + 回读校验
 			if (_hw.UsesBaolongda && string.Equals(key, "fanboost", StringComparison.Ordinal))
 			{
 				// ⭐⭐ 2026-10-18（机主 UI 体验 · 乐观更新）：⭐ 强冷确认窗口最长 10 s（每 500ms 读 13）⇒
@@ -3065,8 +3032,7 @@ public class MechrevoService
 					return bdConfirmed;
 				}
 			}
-			// ⭐⭐ 2026-10-19（机主：强冷同类缺口统一修）：这些键的 UI 有独立 handler，但统一入口 SwitchQuick 也必须能处理，
-			//   ⛔ 不再落入 action==null 静默失败 ✅
+			// 不再落入 action==null 静默失败
 			if (string.Equals(key, "usb", StringComparison.Ordinal))
 			{
 				return await SwitchUsbCharger(on).ConfigureAwait(continueOnCapturedContext: false);
@@ -3189,7 +3155,7 @@ public class MechrevoService
 			};
 			if (action == null)
 			{
-				// ⭐⭐ 2026-10-19（防回归）：⛔ 不再静默 —— 缺动作映射必须默认可见地记 error ✅
+				// （防回归）： 不再静默 —— 缺动作映射必须默认可见地记 error
 				Logger.WriteError("[quick] ⛔ SwitchQuick(" + key + ") 无下发动作映射 ⇒ 已返回 false（这会被 UI 当成失败）");
 				return false;
 			}
@@ -4051,8 +4017,7 @@ public class MechrevoService
 		bool isPl1 = string.Equals(key, "PL1", StringComparison.Ordinal);
 		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
 		bool isTempWall = string.Equals(key, "CpuTccOffset", StringComparison.Ordinal);
-		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗）：新增键 `SmuStapmTimeSeconds`（单位**秒**）。
-		//   ⚠️ 只有 30 系 UI 会发出它（40 系不建那一行）; ⛔ 名字里带 Seconds 是为了在调用点一眼看清单位。
+		// （30 系 · SMU 功耗时间窗）：新增键 SmuStapmTimeSeconds（单位**秒**）。
 		bool isStapmTime = string.Equals(key, "SmuStapmTimeSeconds", StringComparison.Ordinal);
 		if (!isPl1 && !isPl2 && !isTempWall && !isStapmTime)
 		{
@@ -4063,14 +4028,10 @@ public class MechrevoService
 			Logger.WriteLine($"宝龙达 功耗墙：⭐ 键 {key} 的值 \"{rawValue}\" 不是整数 ⇒ 跳过 ⚠️");
 			return true; // ⭐ 已接管 ⇒ ⛔ 不让它走 GCU ✅
 		}
-		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：30 系**没有** WMI 功能号 23（原厂方法表只到 18）
-		//   ⇒ ⭐ PL1 / PL2 / 温度墙 / STAPM 时间窗**只能走 SMU** ✅
-		//   ⚠️ 40 系（宝龙达 `MRID6-23`）有功能号 23 ⇒ ⭐ 继续走下面的原 WMI 路径，**行为不变** ✅
+		// 40 系（宝龙达 MRID6-23）有功能号 23 ⇒  继续走下面的原 WMI 路径，**行为不变**
 		if (hw.IsBaolongda30Series || hw.WujieSmuApu)
 		{
-			// ⭐⭐ 2026-10-19（机主 · 与 UI 同源）：只有「本机自定义档的功耗**真的**走 SMU」时才走 SMU。
-			//   判据 = `PerfModeCapabilities.UsesSmuForCustomPower`（宝龙达 && 30 系 && SMU 通路可用；缓存）。
-			//   ⚠️ 不可用 ⇒ 如实 false + 日志（30 系**没有** WMI 23 可退回，⛔ 不假装成功）。
+			// 不可用 ⇒ 如实 false + 日志（30 系**没有** WMI 23 可退回， 不假装成功）。
 			if (!PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady, hw.WujieSmuApu))
 			{
 				Logger.WriteError("[smu] 不可用 ⇒ 30 系功耗墙**未下发**（原因：" + SmuAvailability.Reason + "）⇒ 如实失败");
@@ -4108,9 +4069,7 @@ public class MechrevoService
 			int max = (hw.TccMaximum > 0) ? hw.TccMaximum : 105;
 			tempWallC = (result <= 0) ? max : Math.Max(60, Math.Min(max, result));
 		}
-		// ⭐⭐ 2026-10-19（机主：PL2 / PL4 不应低于 PL1）：⭐ **最后一道兜底** ——
-		//   即使本方法被"单键"调用（⭐ `PerfModeService` 的逐字段下发就是这种）、
-		//   也⛔ 不会写出 PL1 &gt; PL2 的组合 ✅（⭐ 正常路径已在 `SetCustomDetail` 开头按整批规范化过）✅
+		// 即使本方法被"单键"调用（ PerfModeService 的逐字段下发就是这种）
 		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
 		// ⭐⭐ 2026-10-16（"未设置" · 用户指导「⭐ 开源的都有方案的不是吗」）：
 		//   ⛔ **删掉了原来的"保守默认 45/65/95"** —— ⭐ 那是**我们自己编的**（⭐ 依据：⭐ 开源里
@@ -4128,14 +4087,7 @@ public class MechrevoService
 			+ $" · ⭐ 写成功={confirmed}（⚠️ ⛔ 非「数值已生效」）⇒ ⭐ 该项未发 MQTT ✅");
 		return true;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「PL2 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
-	/// ⭐ **单键写入路径的 PL1/PL2 联动兜底**（⭐ WMI 23 与 SMU 两条路径共用）。
-	/// <para>⭐ 方向：用户抬 PL1 / 非 PL 项触发 ⇒ 把 PL2 抬到 PL1（受 PL2 上限约束，顶不上去就把 PL1 压下来）；
-	/// 用户降 PL2 ⇒ 把 PL1 一起降下来 ✅。</para>
-	/// <para>⚠️ 只改"已知且已违反"的组合（<c>&gt; 0</c>）；未设置（≤0）的项原样不动 ✅。</para>
-	/// </summary>
+	// **单键写入路径的 PL1/PL2 联动兜底**（ WMI 23 与 SMU 两条路径共用）。
 	private static void LinkPowerLimitPair(MechrevoHw hw, bool isPl1, bool isPl2, ref int pl1, ref int pl2)
 	{
 		if (pl1 <= 0 || pl2 <= 0 || pl1 <= pl2)
@@ -4176,23 +4128,7 @@ public class MechrevoService
 		}
 		Logger.WriteError($"[pl] 联动：{detail}（{reason}）");
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：把 PL1 / PL2 / 温度墙 / STAPM 时间窗下发到 **SMU**。
-	/// <para>⭐ 为什么 30 系必须走这里：30 系原厂 WMI 方法表**只到 18** ⇒ **没有**功能号 23
-	/// （`CPUPower`）⇒ 40 系那条 `TryApplyCpuPowerLimitViaBackend`（WMI）在 30 系上**根本不存在**。</para>
-	/// <para>⭐ 映射（与任务书一致）：<c>PL1 → slow limit + stapm limit（同值）</c> ·
-	/// <c>PL2 → fast limit</c> · <c>CpuTccOffset（温度墙）→ tctl_temp</c>。</para>
-	/// <para>⭐⭐ 2026-10-19（机主：「是持续功耗**时间**（STAPM time），不是 STAPM 功耗上限」）：
-	/// <c>SmuStapmTimeSeconds</c> 是**独立的一条命令**（MP1 0x18 `stapm_time`，单位**秒**）⇒ 走下面的
-	/// 独立分支：只写这一条，⛔ 不碰 PL1/PL2/温度墙；回读语义为"已下发 / 已确认 / 未确认"（该 PM 字段
-	/// 在部分表版本上读数不稳定），⛔ 不把"未确认"写成"成功"。</para>
-	/// <para>⚠️ <b>先读再写</b>：30 系 SMU **能读**当前值（PM 表）⇒ 下发前先 <see cref="MechrevoHw.RefreshBaolongda30SeriesSmuPower" />
-	/// 把"没被这次改动的另外两项"填成真实当前值，⛔ 不拿 0/编造值去凑（也就避免把另一项意外写坏）。</para>
-	/// <para>⚠️ <b>失败方向（如实）</b>：PawnIO/SMU 不可用、读不到基线、任何一条命令非 <c>OK</c> ⇒
-	/// 写日志 + 返回 <c>false</c>（调用方会显示「未生效」，⛔ 不假装成功）。</para>
-	/// <para>⚠️ 只读/只写本机 SMU；⛔ 不发 MQTT、⛔ 不碰 EC。</para>
-	/// </summary>
+	// 独立分支：只写这一条， 不碰 PL1/PL2/温度墙；回读语义为"已下发 / 已确认 / 未确认"（该 PM 字段
 	private bool ApplyPowerLimitViaSmu(MechrevoHw hw, bool isPl1, bool isPl2, bool isTempWall, bool isStapmTime, int result)
 	{
 		PawnIO.RyzenSmuService smu = MechrevoLite.Mode.ModeControl.SharedSmu;
@@ -4201,12 +4137,7 @@ public class MechrevoService
 			Logger.WriteError("[smu-30] 30 系功耗墙**未下发**：PawnIO/SMU 不可用（需要管理员权限、AMD 平台）⇒ 如实失败");
 			return false;
 		}
-		// ⭐⭐ 2026-10-19（机主：「是持续功耗时间，不是 STAPM 功耗上限」）：
-		//   `SmuStapmTimeSeconds`（单位**秒**）是**独立的一条命令**（MP1 0x18 `stapm_time`）
-		//   ⇒ ⭐ 单独分支处理：只写这一条，⛔ 不碰 PL1/PL2/温度墙（避免"改时间窗顺手改功耗"）。
-		//   回读：该字段在部分 PM 表版本上**读数不稳定**（本机 Phoenix/0x4C0009 实测 25~67s 跳）。
-		//   ⭐ 语义：命令被 SMU 接受 = 已下发；回读**一致**才写"已确认"；不稳定/读不到 ⇒ 如实记「未确认」，
-		//      ⛔ 不假装成功（也⛔不因为"读不到"就把已经下发的命令报成失败——那同样不诚实）。
+		// 语义：命令被 SMU 接受 = 已下发；回读**一致**才写"已确认"；不稳定/读不到 ⇒ 如实记「未确认」
 		if (isStapmTime)
 		{
 			if (result < BaolongdaProfile.StapmTimeMinSeconds || result > BaolongdaProfile.StapmTimeMaxSeconds)
@@ -4249,8 +4180,7 @@ public class MechrevoService
 		int pl1 = isPl1 ? result : hw.Pl1;
 		int pl2 = isPl2 ? result : hw.Pl2;
 		int tempWallC = isTempWall ? ((result <= 0) ? 0 : result) : ((hw.TccTarget > 0) ? hw.TccTarget : 0);
-		// ⭐⭐ 2026-10-19（机主：PL2 不应低于 PL1）：⭐ SMU 这条路径同样**最后兜底**一次
-		//   （⭐ 正常路径已在 `SetCustomDetail` 开头按整批规范化过）⇒ ⛔ 不写出 PL1 > PL2 的组合 ✅
+		// （机主：PL2 不应低于 PL1）： SMU 这条路径同样**最后兜底**一次
 		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
 		// ② 取值夹取（与 WMI 路径同一组范围；⛔ 不写 0 = "未设置"）
 		// ⭐⭐ 无界 APU（机主口径）：PL1/PL2 上限 = 90W（下限沿用现有 SMU 常量 15W）；宝龙达 30 系保持原范围 ✅
@@ -4269,8 +4199,7 @@ public class MechrevoService
 		{
 			tempWallC = Math.Clamp(tempWallC, BaolongdaProfile.TccMinCelsius, BaolongdaProfile.TccMaxCelsius);
 		}
-		// ⭐⭐ 2026-10-19（机主真机：只拉 PL2 不生效；必须同步 fPPT=fast；fast < slow 会被固件忽略）：
-		//   Wujie：fast(PL2) < slow(PL1) ⇒ 自动把 fast 抬到 slow（记日志提示）✅
+		// Wujie：fast(PL2) < slow(PL1) ⇒ 自动把 fast 抬到 slow（记日志提示）
 		if (hw.WujieSmuApu && pl1 > 0 && pl2 > 0 && pl2 < pl1)
 		{
 			Logger.WriteError("[smu] Wujie 应用：PL2(" + pl2 + ") < PL1(" + pl1 + ") ⇒ fast 自动抬到 slow=" + pl1 + "（固件要求 fast ≥ slow 才不被忽略）");
@@ -4310,8 +4239,7 @@ public class MechrevoService
 			}
 			if (pl2 > 0)
 			{
-				// ⭐⭐ 2026-10-19（机主真机：只拉 PL2 不生效 ⇒ fPPT=fast 是唯一生效限值）：
-				//   ⭐ 只改 PL2（PL1 未设置）时，若当前 slow/stapm > fast ⇒ 同步压到 fast（保持 slow/stapm ≤ fast）✅
+				// （机主真机：只拉 PL2 不生效 ⇒ fPPT=fast 是唯一生效限值）
 				if (pl1 <= 0)
 				{
 					try
@@ -4433,8 +4361,7 @@ public class MechrevoService
 			verified = VerifyBaolongdaSmuPower(hw, wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0,
 				wroteWall ? tempWallC : 0, out verifyDetail);
 		}
-		// ⭐⭐ 2026-10-19（机主真机：只拉 PL2 不生效 / 必须同步 fPPT=fast）：
-		//   Wujie：显式打印三档写入与回读（PL1→stapm/slow；PL2→fast/fPPT）；fast 回读≠目标 ⇒ 如实失败、不重试 ✅
+		// Wujie：显式打印三档写入与回读（PL1→stapm/slow；PL2→fast/fPPT）；fast 回读≠目标 ⇒ 如实失败、不重试
 		if (hw.WujieSmuApu)
 		{
 			int rbStapm = -1;
@@ -4474,19 +4401,7 @@ public class MechrevoService
 			+ (ok && verified ? "" : " ⇒ ⚠️ 如实返回 false"));
 		return ok && verified;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time），不是 STAPM 功耗上限」）：
-	/// **STAPM 时间窗（MP1 0x18，单位秒）的回读确认**（best-effort）。
-	/// <para>⚠️ 为什么不是硬失败：该字段在部分 PM 表版本上**读数是动态的**（本机 Phoenix/0x4C0009 实测
-	/// 25~67s 跳变）⇒ 回读"对不上"可能只是字段不稳定，而不是命令没生效。语义分三种：</para>
-	/// <list type="bullet">
-	/// <item>两次读数彼此一致（±1）且 ≈ 目标 ⇒ <c>confirmed=true</c>（回读一致）；</item>
-	/// <item>两次读数彼此不一致 ⇒ <c>confirmed=false</c>，<c>readback</c> 写明"字段不稳定"；</item>
-	/// <item>读不到 ⇒ <c>confirmed=false</c>，<c>readback</c> 写明"读不到"。</item>
-	/// </list>
-	/// <para>⚠️ 只读（两次 PM 表刷新）；⛔ 不写任何东西。</para>
-	/// </summary>
+	// （机主：「是持续功耗时间（STAPM time），不是 STAPM 功耗上限」）
 	private bool TryVerifyStapmTimeWindow(PawnIO.RyzenSmuService smu, int targetSeconds, out string readback)
 	{
 		readback = "读不到";
@@ -4515,15 +4430,7 @@ public class MechrevoService
 		readback = $"{firstTime.Value}s";
 		return Math.Abs(firstTime.Value - targetSeconds) <= 1;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**写入后回读确认** —— 重新读 PM 表，逐项比对刚下发的值
-	/// （容差 ±1；PL1↔slow、PL2↔fast、温度墙↔tctl）。
-	/// <para>⚠️ 只读：一次 PM 表刷新；⛔ 不再写任何东西。</para>
-	/// <para>⚠️ 回读失败（PawnIO/PM 表读不到）或对不上 ⇒ 返回 false（调用方如实报"未生效"）。</para>
-	/// <para>⚠️ STAPM 时间窗（0x18）**不走这里**：该字段读数不稳定，单独走
-	/// <see cref="TryVerifyStapmTimeWindow" /> 的"已下发 / 未确认"语义。</para>
-	/// </summary>
+	// （30 系 · SMU 功耗墙）：**写入后回读确认** —— 重新读 PM 表，逐项比对刚下发的值
 	private bool VerifyBaolongdaSmuPower(MechrevoHw hw, int pl1, int pl2, int tempWallC, out string detail)
 	{
 		detail = string.Empty;
@@ -4662,8 +4569,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardBrightnessPreservingEffect(int level0to4)
 	{
-		// ⭐⭐ 2026-10-19（机主：调亮度后再关灯，按钮会自己开）：宝龙达 30/40 系且**当前=关** ⇒
-		//   ⛔ 直接跳过（不写亮度、⛔ 不把亮度写成非 0、⛔ 不改电源镜像）✅
+		// 直接跳过（不写亮度、 不把亮度写成非 0、 不改电源镜像）
 		if (_hw != null && _hw.UsesBaolongda
 			&& (_hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
 				|| _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40))
@@ -5121,7 +5027,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				}
 				else
 				{
-					// 2026-10-09（① 通用 per-key 分支补 ID，按作者 0.290.6 对齐）：作者 SetLightEffect 对
+					// 2026-10-09（① 通用 per-key 分支补 ID， 对齐）：作者 SetLightEffect 对
 					// **所有主题、每一项**都构造 ["ID"]=i（顺序 ID,R,G,B，取值来源＝该项在 ColorBuffer 中的序号，
 					// 0-based）。我们原先只有 40 系分支（上方，产物一字未动）与单分区分支带 ID，非 40 系的
 					// per-key 键盘（单键 RGB 机型 HID 掉线后回落 MQTT）落到这里 ⇒ 无 ID ⇒ 按我们自己的诊断口径
@@ -5146,7 +5052,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			// 2026-10-09（灯带 bisect 开关）：外面再套 LightbarIdFixEnabled（默认 true）。
 			// ⚠️ 该开关为 false 时**整块不执行** ⇒ 这些主题一个字段都不改，仍发通用 7 段
 			// 「无 ID」ColorBuffer 帧（键只有 R/G/B）＝与 18.6 逐字一致，且不再打 lightbar payload 行。
-			// 2026-10-09（③ 扩展到铰链 / 同步，按作者 0.290.6 核对）：作者 SetLightEffect 对这四个灯条主题
+			// 2026-10-09（③ 扩展到铰链 / 同步， 核对）：作者 SetLightEffect 对这四个灯条主题
 			// **一视同仁**都带 ID（没有主题白名单），且他的 SupportsLightTopic 认 hingelight/synclight；
 			// 我们原先只补了灯带/Logo，且 SupportsLightTopic 直接拒收 Hinge/Sync ⇒ 这两行连报文都发不出去。
 			// 现把补 ID 扩到 4 个主题；主题可达性见下方 SupportsLightTopic/LightTopicToQuickSwitchKey。
@@ -5190,8 +5096,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda` 恒 false ⇒ 下面原来的两行**逐字不变** ✅
 		if (_hw != null && _hw.UsesBaolongda)
 		{
-			// ⭐⭐ 2026-10-19（机主：开关直接跟亮度走 + 关灯记忆上次亮度）：
-			//   宝龙达 30/40 开灯 ⇒ 用 `kbd_last_brightness`（默认 3）；关灯 ⇒ 0 ✅
+			// （机主：开关直接跟亮度走 + 关灯记忆上次亮度）
 			bool baolongdaBrightnessModel = _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
 				|| _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
 			int powerOnLight = baolongdaBrightnessModel ? KeyboardEcBrightness.GetLastLevel() : 4;
@@ -5679,7 +5584,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		{
 			return _hw.SupportsKeyboard;
 		}
-		// 2026-10-09（③，按作者 0.290.6 对齐）：作者对四个灯条主题分别判各自的 Supports*，
+		// 2026-10-09（③， 对齐）：作者对四个灯条主题分别判各自的 Supports*
 		// 我们原先只认 logolight/lightbar ⇒ HidLightbar_Hinge/Ctrl 与 HidLightbar_Sync/Ctrl 被
 		// 整条拒收（SetLightPower/SetLightEffect 都返回 false）＝这两行**开关和效果都发不出去**，
 		// 不只是"能开关不能改效果"。现补上 hinge/sync 两个键与能力位。
@@ -5700,7 +5605,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		{
 			return "logolight";
 		}
-		// 2026-10-09（③，按作者 0.290.6 LightTopicToQuickSwitchKey 的顺序：Logo → Hinge → _Sync → HidLightbar）
+		// 2026-10-09（③， LightTopicToQuickSwitchKey 的顺序：Logo → Hinge → _Sync → HidLightbar
 		if (topic.Contains("Hinge", StringComparison.OrdinalIgnoreCase))
 		{
 			return "hingelight";

@@ -4,11 +4,7 @@ using System.Text;
 using System.Threading;
 
 namespace MechrevoLite.Hardware;
-
-/// <summary>
-/// 键盘灯 WMI 探针（用主程序自己的 BaolongdaWmi 通道）。
-/// 2026-10-19 修正：先建桌面文件写表头、再逐行 Append ⇒ 即使中途异常也留得下内容。
-/// </summary>
+// 键盘灯 WMI 探针（用主程序自己的 BaolongdaWmi 通道）。
 internal static class KeyboardWmiProbe
 {
 	internal static string Run()
@@ -41,8 +37,7 @@ internal static class KeyboardWmiProbe
 				+ " 16=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardMode)
 				+ " 17=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardColor)
 				+ " 18=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness));
-			// ⭐⭐ 2026-10-19（机主实测 30 系）：原顺序 mode→color→brightness 下，18 回读恒 0（灯不亮）
-			//   ⇒ 改成原厂顺序：**先亮度 → 再模式 → 再颜色** ✅
+			// （机主实测 30 系）：原顺序 mode→color→brightness 下，18 回读恒 0（灯不亮）
 			bool w0 = wmi.TryWriteByte(BaolongdaWmi.Function.RgbKeyboardBrightness, 3);
 			Thread.Sleep(400);
 			L("写 18=3 (ok=" + w0 + ") => 回读 18=" + R(wmi, BaolongdaWmi.Function.RgbKeyboardBrightness));
@@ -87,12 +82,7 @@ internal static class KeyboardWmiProbe
 		}
 		return path;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系「亮度只有 FN 能调」只读诊断）：
-	/// `--kbd-fn-probe [秒]` —— 周期**只读**采样 16/17/18 的完整 OutData，raw 变化才记一行 ✅。
-	/// <para>⚠️ 全程只发 Get；⛔ 不写任何字节。机主在此期间按 Fn 调亮/调暗，看哪个字节跟着变 ✅。</para>
-	/// </summary>
+	// （30 系「亮度只有 FN 能调」只读诊断）
 	internal static string RunFnProbe(int seconds)
 	{
 		string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),

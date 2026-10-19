@@ -12,13 +12,7 @@ public sealed record PerfModeSettings
 	public int? Pl4 { get; init; }
 
 	public int? GpuTgp { get; init; }
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机字段）：⭐ 宝龙达没有 GCU 的 `GpuConfigurableTGPTarget`，
-	/// 但能通过 **NVML** 写 `nvmlDeviceSetPowerManagementLimit`（毫瓦）✅
-	/// <para>⚠️ 与 <see cref="GpuTgp" /> 的区别：那个是**厂商固件字段**（GCU 语义），这个是**本机 NVML** 语义。</para>
-	/// <para>⚠️ 只在能读到有效约束的机器上由 UI 显示；落盘仍是 `mode_tune_*`（结构不变）✅</para>
-	/// </summary>
+	// （显卡功耗上限 · 本机字段）： 宝龙达没有 GCU 的 GpuConfigurableTGPTarget
 	public int? GpuPowerLimitW { get; init; }
 
 	public bool? GpuDynamicBoostOn { get; init; }
@@ -32,17 +26,7 @@ public sealed record PerfModeSettings
 	public bool? TccOn { get; init; }
 
 	public int? TccTarget { get; init; }
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「是持续功耗时间（STAPM time）」）：STAPM（按机壳温度约束的持续功耗）的
-	/// **平均时间窗**，单位**秒**，对应 SMU MP1 **0x18 `stapm_time`**。
-	/// <para>⭐ 显示/下发条件 = **本自定义档真的走 SMU**（`PerfModeCapabilities.UsesSmuForCustomPower`：
-	/// 宝龙达 && 30 系 && SMU 通路可用）；40 系（有 WMI 23）/ GCU / PawnIO 不可用 ⇒ 字段保持 null、不写。</para>
-	/// <para>⚠️ <c>null</c> = **未设置**（旧配置缺省）⇒ 不生成这一步、不写任何东西（旧行为）。
-	/// UI 在值读不到/不稳定时显示「（未设置）」但仍建行（不隐藏）。</para>
-	/// <para>⚠️ 与 <c>slow_time</c>（slow limit 的时间常数，本仓库暂未暴露）是两个不同的时间窗；
-	/// 也⛔ 不是"PL2 生效时间"（PL2/fast 是瞬时限值、没有时间参数）。</para>
-	/// </summary>
+	// <para> 显示/下发条件 = **本自定义档真的走 SMU**（PerfModeCapabilities.UsesSmuForCustomPower
 	public int? StapmTimeSeconds { get; init; }
 
 	public bool? GpuOverclockOn { get; set; }

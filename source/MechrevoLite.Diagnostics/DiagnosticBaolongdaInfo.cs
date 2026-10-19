@@ -76,7 +76,7 @@ internal static class DiagnosticBaolongdaInfo
 	{
 		sb.AppendLine();
 		sb.AppendLine("── ① 机型白名单（⭐ 判宝龙达**只看板号** ⛔ 不看是不是蛟龙、⛔ 不看 30/40 系）──");
-		// ⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 四来源板号取证 + 命中来源，诊断包直接可判 ✅
+		// （机主：宝龙达被判成同方）： 四来源板号取证 + 命中来源，诊断包直接可判
 		BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
 		string board = evidence.Product;
 		bool hit = BoardWhitelist.Matches(board);

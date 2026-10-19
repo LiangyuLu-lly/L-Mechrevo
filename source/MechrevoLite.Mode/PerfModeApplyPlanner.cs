@@ -166,13 +166,7 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("PL2", settings.Pl2.Value, PerfApplyVerify.CpuPackagePower));
 			}
-			// ⭐⭐ 2026-10-19（机主 UI 顺序：PL1 → PL2 → 功耗时间窗（STAPM，秒）→ 温度墙）：
-			//   ⭐ 步骤顺序与 UI 行顺序一致（日志/执行顺序一眼可对照）✅
-			//   ⚠️ **不新增 FPPT 步骤**：SMU 只有 stapm/slow/fast 三档功率限制，
-			//      `fast limit`（MP1 0x15）**就是 fPPT**，而本映射里 PL2 已经写 fast（`SetFastLimit`）
-			//      ⇒ 再生成一条 FPPT 会重复写同一条命令（详见 CustomModeForm PL2 行注释）✅
-			//   ⚠️ 单位 = **秒**（MP1 0x18 `stapm_time`）；未设置（null）⇒ 不生成、不写（旧行为）✅
-			//   条件：`SupportsSmuPowerControls` = 宝龙达 && 30 系 && SMU 通路可用；默认 false ⇒ 既有后端逐位不变。
+			// 步骤顺序与 UI 行顺序一致（日志/执行顺序一眼可对照）
 			if (caps.SupportsSmuPowerControls && settings.StapmTimeSeconds.HasValue)
 			{
 				list.Add(Field("SmuStapmTimeSeconds", settings.StapmTimeSeconds.Value));
@@ -198,24 +192,12 @@ public static class PerfModeApplyPlanner
 				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: false, settings.GpuFanDuty, PerfApplyVerify.FanDuty));
 			}
 		}
-		// ⭐⭐ 2026-10-19（显卡功耗上限 · 本机 NVML）：⭐ 只有"能写厂商 WMI 的本机后端"（宝龙达）才生成该步 ✅
-		//   ⚠️ `SupportsWmiPowerFields` 默认 false ⇒ GCU/老接口逐位不变 ✅
+		// （显卡功耗上限 · 本机 NVML）： 只有"能写厂商 WMI 的本机后端"（宝龙达）才生成该步
 		if (!caps.WujieSmuLocalOnly && caps.SupportsWmiPowerFields && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite && settings.GpuPowerLimitW.HasValue)
 		{
 			list.Add(new PerfApplyStep(PerfApplyStepKind.ApplyGpuPowerLimit, null, null, settings.GpuPowerLimitW.Value, IsCpuCurve: false, null, PerfApplyVerify.ServiceEcho));
 		}
-		// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」· 根因）：⭐ 宝龙达没有 GCU ⇒ GPU 核心/显存偏移
-		//   ⭐ 走本机 **NVAPI P-States 20（P0）**（`PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支，
-		//     写后**回读确认**）✅ —— 但原来这一步**只在 BuiltIn 路由**生成，而自定义档**永远是 FirmwareSlot**
-		//     ⇒ 自定义模式窗口里的「GPU 超频」开关 + 核心/显存滑块只是存进了 `PerfModeSettings`，
-		//     **一个字节都没走到 NVAPI** ❌（⛔ 这就是"没用"的根因）✅。
-		//   ⭐ 现在：能走本机直写的后端（宝龙达 ⇒ `SupportsDirectGpuOverclock = true`）在 **FirmwareSlot 路由**
-		//     下也生成这一步 ⇒ 与 WMI 功耗墙/风扇曲线那几步同一条自定义档下发链 ✅。
-		//   ⚠️ 默认 false ⇒ GCU / 老接口的步骤列表【逐位不变】✅（它们仍走原来的固件字段/内置档分支）。
-		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
-		//   ⭐ 规划结果（生成/未生成 + 原因）由 **PerfModeService**（唯一有 route/slotPlan/日志上下文的地方）
-		//      在 Build 之后统一落一行默认可见日志 —— 见 `LogGpuOverclockPlan` ✅
-		//   ⚠️ 规划器本身保持**纯函数**（不引日志依赖）⇒ `perf-fix-selftest` 可直接 Link 本文件 ✅
+		// 规划结果（生成/未生成 + 原因）由 **PerfModeService**（唯一有 route/slotPlan/日志上下文的地方）
 		if (caps.SupportsDirectGpuOverclock && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite
 			&& (settings.GpuOverclockOn.HasValue || settings.GpuCoreOffset.HasValue || settings.GpuMemoryOffset.HasValue))
 		{

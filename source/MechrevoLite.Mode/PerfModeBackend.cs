@@ -25,12 +25,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		_service = service ?? throw new ArgumentNullException("service");
 		_hw = hw ?? throw new ArgumentNullException("hw");
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主定稿）：无界 APU + 当前 ActiiveModeId 为自定义档 ⇒
-	/// **整条调用链都不发**性能档位/固件档命令（SwitchBuiltIn/SwitchFirmwareSlot/SwitchTurboSubMode/GCU 字段）✅。
-	/// <para>⭐ 每次抑制落一行去重日志；宝龙达/GCU/同方（WujieSmuApu=false）不进入 ✅</para>
-	/// </summary>
+	// <para> 每次抑制落一行去重日志；宝龙达/GCU/同方（WujieSmuApu=false）不进入 </para>
 	private bool SuppressWujieModeSwitch(string source)
 	{
 		if (_hw == null || !_hw.WujieSmuApu)
@@ -52,18 +47,9 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 	public static PerfModeCapabilities CapabilitiesFrom(MechrevoHw hw)
 	{
 		ArgumentNullException.ThrowIfNull(hw, "hw");
-		// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制）：先按**静态判据短路**，再问 SMU 通路是否可用 ——
-		//   `SmuAvailability.IsReady` 会做一次 PawnIO 探测（进程内缓存）；⛔ 不能让 GCU/40 系机器也白跑一次。
-		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-		//   ⭐ 这里改成 **只读缓存值** `IsReadyCached`（⛔ 不触发探测）——
-		//      能力位/规划器可能在"打开设置/构建行"时被调用，SMU 探测必须留到真正打开自定义模式窗口
-		//      （`CustomModeForm` 里显式 `SmuAvailability.IsReady`）或真正需要 STAPM 时 ✅
-		//   ⚠️ 未探测前 `SupportsSmuPowerControls=false` ⇒ 规划器不生成 SMU 步骤；
-		//      自定义模式窗口打开后会重新算能力位，语义不变 ✅
+		// 这里改成 **只读缓存值** IsReadyCached（ 不触发探测）——
 		bool wujieApu = hw.WujieSmuApu;
-		// ⭐⭐ 2026-10-19（机主：Wujie 规划器误生成固件字段步）：Wujie 必须**主动探测一次** SMU（进程内缓存），
-		//   否则 `IsReadyCached=false` ⇒ `SupportsSmuPowerControls=false` ⇒ 回放/应用误判 ✅
-		//   ⚠️ 宝龙达 30 系保持原「只读缓存」口径（行为逐位不变）✅
+		// 宝龙达 30 系保持原「只读缓存」口径（行为逐位不变）
 		bool smuReady = (hw.IsBaolongda30Series && SmuAvailability.IsReadyCached) || (wujieApu && SmuAvailability.IsReady);
 		return new PerfModeCapabilities
 		{
@@ -93,24 +79,11 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//      ⇒ ⭐ 不再出现"注定失败"的档位步（⭐ 它会让 Runner 提前 break、把后面所有步骤一起废掉 ❌）✅
 			//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda == false` ⇒ true ⇒ ⭐ 步骤列表【一个字节都不变】✅
 			SupportsFirmwareSlot = !hw.UsesBaolongda && !hw.WujieSmuApu,
-			// ⭐⭐ 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）：⭐ 功耗墙三项（PL1 / PL2 / 温度墙）
-			//   ⭐ 在宝龙达上【不走固件槽】、而是走 WMI 功能号 23 ✅
-			//      （⭐ 通路：⭐ `PerfModeBackend.WriteDetailFieldAsync` ⇒ `MechrevoService.SetCustomDetail`
-			//        ⇒ 它开头那个 `TryApplyPowerLimitViaBackend` ⇒ `TryApplyCpuPowerLimitViaBackend` ✅）
-			//   ⇒ ⭐ 所以单独申报：⭐ 宝龙达 ⇒ true ⇒ ⭐ 规划器额外生成那三步 ✅
-			//   ⚠️ 非宝龙达 ⇒ false ⇒ ⭐ 那三步仍留在原固件字段块里 ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			// ⭐⭐ 2026-10-19（无界 APU）：功耗墙走本机 SMU ⇒ 与宝龙达同样单独生成 PL/温度墙步骤 ✅
+			// 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）： 功耗墙三项（PL1 / PL2 / 温度墙）
 			SupportsWmiPowerFields = hw.UsesBaolongda || hw.WujieSmuApu,
-			// ⭐⭐ 2026-10-19（30 系 · SMU 功耗控制 · 机主「持续功耗 STAPM 能不能放进去」）：
-			//   ⭐ 本后端自定义档的功耗**到底走不走 SMU** —— 唯一判据 `PerfModeCapabilities.UsesSmuForCustomPower`
-			//      （宝龙达 + 30 系 + SMU 通路真的可用；`SmuAvailability.IsReady` 进程内只探测一次）✅
-			//   ⭐ 规划器据此生成 `StapmLimitW` / `SmuStapmTimeSeconds` 两步；UI 也只用同一个函数决定建不建行
-			//      （⛔ 不再只按"机型是 Gen30"这种静态判据）✅
-			//   ⚠️ 40 系 / GCU / 老接口 / SMU 不可用 ⇒ false ⇒ ⭐ 步骤列表【一个字节都不变】✅
+			// 本后端自定义档的功耗**到底走不走 SMU** —— 唯一判据 PerfModeCapabilities.UsesSmuForCustomPower
 			SupportsSmuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, smuReady, wujieApu),
-			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 宝龙达没有 GCU ⇒ GPU 偏移只能走本机 NVAPI P0
-			//   （⭐ `PerfModeBackend.ApplyGpuOverclockAsync` 的宝龙达分支）。
-			//   ⚠️ 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** ✅（GCU 机型那条 `WriteFirmwareField` 路径照旧）。
+			// 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** （GCU 机型那条 WriteFirmwareField 路径照旧）。
 			WujieSmuLocalOnly = hw.WujieSmuApu,
 			SupportsDirectGpuOverclock = hw.UsesBaolongda
 		};
@@ -207,7 +180,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		{
 			Enabled = true,
 			FormatVersion = current.FormatVersion,
-			// ⭐ 2026-10-19：双风扇联动开关随曲线一起保存（⛔ 写档位曲线不能顺手把它改回默认）✅
+			// 双风扇联动开关随曲线一起保存（ 写档位曲线不能顺手把它改回默认）
 			SyncEnabled = current.SyncEnabled,
 			HysteresisC = current.HysteresisC,
 			IntervalMs = current.IntervalMs,
@@ -224,12 +197,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		Logger.WriteLine($"[fan] 宝龙达本地曲线已保存（档位={modeId} · {(cpu ? "CPU/ch1" : "GPU/ch0")} · {min}~{max} RPM · enabled=true）⇒ ok={ok}");
 		return ok;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（显卡功耗上限）：⭐ 走本机 **NVML**（`nvmlDeviceSetPowerManagementLimit`），
-	/// 由 <c>NvmlHelper</c> 负责"读约束→钳制→写→回读"✅
-	/// <para>⚠️ 只对"本机后端"有意义；GCU 机型仍走厂商字段 `GpuConfigurableTGPTarget`（不在本方法里）✅</para>
-	/// </summary>
+	// （显卡功耗上限）： 走本机 **NVML**（nvmlDeviceSetPowerManagementLimit）
 	public Task<bool> ApplyGpuPowerLimitAsync(int watts, CancellationToken ct)
 	{
 		bool ok = NvmlHelper.TrySetPowerLimitWatts(watts, out int applied);
@@ -239,24 +207,15 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 
 	public async Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct)
 	{
-		// ⭐⭐ 2026-10-19（宝龙达 · GPU 偏移真正生效）：宝龙达没有 GCU ⇒ 原来的 `ApplyGcuGpuOverclock`
-		//   走的是厂商 MQTT `LCHWOC` 字段，必然失败（机主实测：核心滑块值恒 0）。
-		//   这里改走 NVAPI P-States 20 的 P0 时钟偏移（core + mem 一起写、写完回读、不一致如实报失败）。
-		//   ⚠️ 非宝龙达仍走原来的 `ApplyGcuGpuOverclock`，调用与参数**逐字不变**。
+		// 走的是厂商 MQTT LCHWOC 字段，必然失败（机主实测：核心滑块值恒 0）。
 		if (_hw.UsesBaolongda)
 		{
 			int targetCore = (on ? core : 0);
 			int targetMemory = (on ? memory : 0);
-			// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性②）：
-			//   ⭐ **执行入口**先落一行（默认级别可见）：请求值 = 规划步骤真正传下来的值 ✅
+			// （机主：「显卡超频设置了但频率没变化」· 可观测性②）
 			Logger.WriteError("[gpu-oc] 应用入口（宝龙达 ⇒ NVAPI P0）：on=" + on + " · 请求 core=" + core + " mem=" + memory + "MHz"
 				+ " ⇒ 目标 core=" + targetCore + " mem=" + targetMemory + "MHz");
-			// ⭐⭐ 2026-10-19（机主：「显卡超频貌似没用」）：⭐ 先把**驱动回读后端**准备好 ——
-			//   ① 写后校验（`VerifyAsync` ⇒ `DriverGpuOverclockFieldMatches`）只在
-			//      `DirectGpuOverclockBackendPresent` 时才会去回读；② 自定义模式窗口显示的
-			//      `EffectiveGpuCoreClockOffset` 也走同一条回读。⇒ 不先 Ensure 的话，
-			//      真机日志里会出现"写成功但验证读不到"的假象（⛔ 不是写失败，是回读后端没起）。
-			//   ⚠️ 本方法失败也不影响真正的写：下面是独立的 NVAPI P0 通路；异常都在 Ensure 内部吞掉 ✅
+			// 真机日志里会出现"写成功但验证读不到"的假象（ 不是写失败，是回读后端没起）。
 			bool readbackReady = _hw.EnsureDirectGpuOverclock();
 			if (!readbackReady)
 			{
@@ -280,9 +239,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			}
 			return confirmed;
 		}
-			// ⭐⭐ 2026-10-19（机主：同方 GCU 先试"负的核心/显存偏移"）：实验特性 —— 仅 GCU + NVIDIA + NVAPI 可用 + 配置开关 ✅
-		//   ⭐ 负值走 NVAPI P0 直写（两项都写 core/mem），回读校验；⛔ 不影响宝龙达/非 NVIDIA/无 NVAPI ✅
-		// ⭐⭐ 2026-10-19（机主：看看 GCU 厂商字段本身能不能写负值）：先打印厂商范围（只读、去重）✅
+			// （机主：看看 GCU 厂商字段本身能不能写负值）：先打印厂商范围（只读、去重）
 		if (!_hw.UsesBaolongda && _hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu)
 		{
 			string vendorRange = "[gpu-oc] 厂商字段范围：core=" + _hw.GpuCoreOffsetMinimum + ".." + _hw.GpuCoreOffsetMaximum
@@ -301,7 +258,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			&& _hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu
 			&& NvapiPStates.TryGetP0OffsetRange(out expCoreMin, out expCoreMax, out expMemMin, out expMemMax);
 		bool negativeRequest = on && (core < 0 || memory < 0);
-		// ⭐⭐ 2026-10-19（实验：GCU 厂商字段直写负值）：⚠️ **当前 GCU 机型负值走 `WriteFirmwareField` 原路径（14:02 实测 -95 Confirmed）**，本段是**死路径/未来兜底**，默认关闭（`gpu_oc_gcu_negative_field=0`）；若回读被夹回/忽略 ⇒ 自动回退 NVAPI ✅
+		// （实验：GCU 厂商字段直写负值）： **当前 GCU 机型负值走 WriteFirmwareField 原路径（14:02 实测 -95 Confirmed）**，本段是**死路径/未来兜底**，默认关闭（gpu_oc_gcu_negat
 		bool gcuNegativeFieldExperiment = AppConfig.Get("gpu_oc_gcu_negative_field", 0) != 0
 			&& !_hw.UsesBaolongda
 			&& _hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu;
@@ -353,8 +310,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			Logger.WriteError("[gpu-oc] 实验：从 GCU 负偏移切回（core=" + core + " mem=" + memory + "）⇒ GCU 字段按本次请求写 0/正值");
 			_gcuNegativeFieldActive = false;
 		}
-		// ⭐⭐ 2026-10-19（一致性：切回 0/正值时清 NVAPI 残留）—— ⛔ 不受 gpu_oc_nvapi_for_gcu 开关影响，
-		//   只要上次负偏移由 NVAPI 接管过就清零；GCU 字段 0/正值由下面原路径写 ✅
+		// 只要上次负偏移由 NVAPI 接管过就清零；GCU 字段 0/正值由下面原路径写
 		if (_gcuNvapiNegativeActive)
 		{
 			// ⭐ 从负值切回 0/正值：先用 NVAPI 写 0 清残留降频，再走原 GCU 字段路径 ✅

@@ -803,10 +803,7 @@ public static class HardwareControl
 			//   ⭐ 来源顺序：⭐ 宝龙达 40 系功能号 22 ⇒ ⭐ LHM ⇒ ⭐ ACPI 热区（⭐ 见 RefreshCpuTempFromLocalSources ✅）
 			//   ⚠️ 三源都没值 ⇒ 保持原值且**不更新时间戳** ⇒ ⭐ 上层（悬浮窗）判「过期」显示「—」⛔ 不显示陈旧值 ✅
 			RefreshCpuTempFromLocalSources();
-			// ⭐⭐ 2026-10-19（机主：「4070 显卡温度读取」才是要修的）：⭐⭐ 之前泵里**只**调了
-			//   `SampleLocalPowerCore` ⇒ ⭐ 只刷功耗、**不刷 GPU 温度时间戳** ⚠️
-			//   ⇒ 温度仍会在 6 s（`FanInfoMaximumAge`）后被显示闸门画成「—」❌
-			//   ⇒ ⭐ 现在先补一次 NVML 温度写入（厂商有值则内部直接 return，⛔ 不覆盖厂商值）✅
+			// （机主：「4070 显卡温度读取」才是要修的）： 之前泵里**只**调了
 			RefreshGpuTempFromNvmlWhenNoVendor();
 			// ⭐ `includeAuxiliary:false`：⛔ 不刷供电/电池（那些仍由主界面既有的 2 s 刷新负责 ✅）
 			SampleLocalPowerCore(includeAuxiliary: false);
@@ -2432,10 +2429,9 @@ public static class HardwareControl
 		}
 		cpuPower = ResolveCpuPower(num, fallbackCpuPower);
 		gpuPower = ResolveGpuPower(num2, IsUsablePower(num2) ? ((float?)null) : gpuPowerViaNvml);
-		// ⭐⭐ 2026-10-19（机主：无界 14X 核显功耗不随负载变化；GCU Monitor 能读到 2.0W）：
-		//   ⭐ AMD 核显（无 NVIDIA 独显）⇒ **ADL PMLog 优先于 LHM**（只读；NVIDIA 机型一律不进）✅
+		// AMD 核显（无 NVIDIA 独显）⇒ **ADL PMLog 优先于 LHM**（只读；NVIDIA 机型一律不进）
 		bool amdIgpu = CpuVendor.IsAmd && Program.hw != null && Program.hw.DgpuGeneration == DgpuGenerationKind.NoDgpu;
-		// ⭐⭐ 2026-10-19（机主更正：LHM 在 APU 上能读到核显功耗）：ADL 改为**仅当 LHM 没给值时的兜底** ✅
+		// （机主更正：LHM 在 APU 上能读到核显功耗）：ADL 改为**仅当 LHM 没给值时的兜底**
 		if (amdIgpu && !gpuPower.HasValue && AdlPowerReader.Available)
 		{
 			if (AdlPowerReader.TryRead(out float adlPower, out string adlSource))
@@ -2453,9 +2449,7 @@ public static class HardwareControl
 				gpuPower = null;
 			}
 		}
-		// ⭐⭐ 2026-10-19（机主：「4070 功耗也不对」）：⭐ 只读诊断 —— 把**原始来源**打出来（同值去重，不刷屏）✅
-		//   ⭐ 目的：下次诊断包能一眼分清"读数错"还是"口径不同（读到的是上限/别的值）"✅
-		//   ⚠️ 纯日志：⛔ 不改任何换算、⛔ 不参与显示判据 ✅
+		// （机主：「4070 功耗也不对」）： 只读诊断 —— 把**原始来源**打出来（同值去重，不刷屏）
 		Logger.WriteLineIfChanged("gpu-power-raw",
 			$"[gpu-power] vendor={num2:F1}W · nvml={(gpuPowerViaNvml.HasValue ? gpuPowerViaNvml.Value.ToString("F1") : "null")}W · resolved={(gpuPower.HasValue ? gpuPower.Value.ToString("F1") : "null")}W");
 		// ⭐⭐ 2026-10-17：⭐ 功耗字段**真的被刷新**了 ⇒ 打时间戳（⭐ 界面新鲜度判据只看这个 ✅）

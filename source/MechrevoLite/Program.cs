@@ -136,20 +136,13 @@ internal static class Program
 	private const int KeyboardEffectProtectWindowMs = 3000;
 
 	private static int _resumeKeyboardRestorePending;
-
-	/// <summary>
-	/// ⭐ 2026-10-19（同方单键 RGB 开机闪）：硬件状态重申的最后一次执行时间（TickCount64；用于 3s 防抖）✅。
-	/// </summary>
+	// （同方单键 RGB 开机闪）：硬件状态重申的最后一次执行时间（TickCount64；用于 3s 防抖）。
 	private static long _lastReassertKeyboardCustomModeTick;
 
 	private static System.Threading.Timer? _lightingIdleTimer;
 
 	private static int _lightingIdleSuspended;
-
-	/// <summary>
-	/// ⭐ 2026-10-19（平台互斥）：同方/GCU 的「自动关灯：已启用」日志只打一次（去重；关闭后重置）。
-	/// <para>⚠️ 宝龙达不使用本计时器（走 `MechrevoHw` 的 5s tick）⇒ 平台判定单一来源 `UsesBaolongda` ✅。</para>
-	/// </summary>
+	// （平台互斥）：同方/GCU 的「自动关灯：已启用」日志只打一次（去重；关闭后重置）。
 	private static int _lightingAutoOffEnableLogged;
 
 	private static int _keyboardPowerTemporarilySuspended;
@@ -307,9 +300,7 @@ internal static class Program
 		}
 		switch (text)
 		{
-		// ⭐⭐ 2026-10-19（机主要求「直接调 LM 接口」）：⭐ 键盘灯 WMI 探针走**主程序自己的通道**
-		//   ⛔ 不再依赖 PowerShell（PS 5.1 对 WMI 的封送反复出问题）
-		//   ⭐ 用法：L-Mechrevo.exe --kbd-probe      （结果写 %APPDATA%\MechrevoLite\log.txt，并另存一份到桌面）
+		// （机主要求「直接调 LM 接口」）： 键盘灯 WMI 探针走**主程序自己的通道**
 		case "--kbd-probe":
 		{
 			string probeLog = KeyboardWmiProbe.Run();
@@ -317,10 +308,7 @@ internal static class Program
 			Logger.WriteLine("[kbd-probe] " + probeLog);
 			return;
 		}
-		// ⭐⭐ 2026-10-19（30 系「亮度只有 FN 能调」只读诊断）：
-		//   ⭐ 用法：L-Mechrevo.exe --kbd-fn-probe [秒数，默认 60]
-		//   ⭐ 期间**只读**采样 16/17/18 的完整 OutData（每 200ms；raw 变化才记一行）
-		//   ⇒ 请机主在这段时间内按 Fn 调亮/调暗各几次 —— 看**哪个字节跟着变** ✅
+		// （30 系「亮度只有 FN 能调」只读诊断）
 		case "--kbd-fn-probe":
 		{
 			int fnProbeSeconds = 60;
@@ -334,12 +322,7 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-19（30 系「FN 调亮度」· EC 取证工具 v3：ACPI/LPC 双通道）：
-		//   用法：L-Mechrevo.exe --kbd-ec-probe [秒数，默认 60] [--lpc]
-		//   ⭐ **只读**扫描 EC RAM（0x0790–0x07FF / 0x1800–0x18FF / 0x8300–0x83BF），
-		//     默认 ACPI（0x92）；`--lpc` 走 LPC（EcLpcIo · 0x4E/0x4F），打开失败自动回退 ACPI；
-		//   ⭐ 先测速（32 次采样）；LPC >5ms/B ⇒ 提示“LPC 也跟不上”并提前结束；
-		//   ⭐ 发现变化 ⇒ 专注模式（50ms 盯变化地址）；⛔ 0 写入、⛔ 不碰 WMI 写；仅宝龙达 30/40 系 ✅
+		// **只读**扫描 EC RAM（0x0790–0x07FF / 0x1800–0x18FF / 0x8300–0x83BF）
 		case "--kbd-ec-probe":
 		{
 			int ecProbeSeconds = 60;
@@ -361,10 +344,7 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-19（宝龙达 · GPU 核心/显存偏移）：NVAPI P-States 20 真机探针。
-		//   用法：L-Mechrevo.exe --gpu-oc-probe
-		//   读 P0 基线 → 核心/显存各 +50 → 回读 → 各 +100 → 回读 → 归零 → 回读；
-		//   结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-gpu-oc-probe-*.txt。
+		// 读 P0 基线 → 核心/显存各 +50 → 回读 → 各 +100 → 回读 → 归零 → 回读；
 		case "--gpu-oc-probe":
 		{
 			string probeLog = GpuOcProbe.Run();
@@ -373,9 +353,7 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-19（机主：GCU 最多 -900 显存？NV 范围到底多少）：**只读** 偏移范围探针。
-		//   用法：L-Mechrevo.exe --gpu-offset-probe [输出文件，可选]
-		//   ⛔ 不调用任何 Set、不改配置；结果写桌面 lm-gpu-offset-probe-<时间>.txt。
+		// （机主：GCU 最多 -900 显存？NV 范围到底多少）：**只读** 偏移范围探针。
 		case "--gpu-offset-probe":
 		{
 			string offsetPath = GpuOffsetProbe.Run((args.Length > 1) ? args[1] : null);
@@ -384,10 +362,7 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-19（30 系 · SMU 只读探针）：先确认 PawnIO/SMU 能否读，再决定 PL/温度墙是否改走 SMU。
-		//   用法：L-Mechrevo.exe --smu-probe
-		//   ⛔ 只读：不发任何 SMU 写命令；结果写 %APPDATA%\MechrevoLite\log.txt 与桌面 lm-smu-probe-*.txt。
-		//   ⚠️ 主程序清单是 requireAdministrator ⇒ 非管理员运行时 PawnIO 会回 AccessDenied（预期，报告会如实写）。
+		// （30 系 · SMU 只读探针）：先确认 PawnIO/SMU 能否读，再决定 PL/温度墙是否改走 SMU。
 		case "--smu-probe":
 		{
 			string probeLog = SmuProbe.Run();
@@ -396,10 +371,7 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-19（机主：无界系列 + AMD APU 要能用 SMU 自定义）：
-		//   **只读**探测命令 `--wujie-smu-probe`（0 写入；桌面报告 + 日志）。
-		//   内容：机型名/板号/CPU/CpuVendor/APU 判据 · SMU 代号/家族/版本 · 当前 PL1/PL2/STAPM 读数 ·
-		//        可写命令支持情况 · 判据结论（逐条列哪一条不满足）。
+		// **只读**探测命令 --wujie-smu-probe（0 写入；桌面报告 + 日志）。
 		case "--wujie-smu-probe":
 		{
 			string probeLog = WujieSmuProbe.Run();
@@ -500,10 +472,7 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// ⭐⭐ 2026-10-19（30 系 · SMU **保守写 + 回读** 实测，供开发机 HawkPoint 近似验证）：
-		//   用法：L-Mechrevo.exe --smu-write-test          只读（打印当前快照，不写）
-		//         L-Mechrevo.exe --smu-write-test --yes    保守写 + 每次回读 + finally 恢复快照并确认
-		//   ⚠️ 边界写死在 SmuWriteTest 里：温度墙只往 ≥85℃ 方向、PL 只往下 5W 内、stapm_time 只写回当前值。
+		// L-Mechrevo.exe --smu-write-test --yes    保守写 + 每次回读 + finally 恢复快照并确认
 		case "--smu-write-test":
 			Environment.ExitCode = SmuWriteTest.Run(args.Skip(1).ToArray());
 			Logger.Close();
@@ -722,10 +691,7 @@ internal static class Program
 				return;
 			}
 		}
-		// ⭐⭐ 2026-10-19（机主：休眠/睡眠唤醒后 LM 会自己弹出主界面）：⭐
-		//   根因 —— 开机自启任务带 `startup` 参数；休眠（S4）/睡眠唤醒时 Windows 可能触发"登录"类触发器
-		//   再次拉起 LM ⇒ 走到下面「已有实例」分支 ⇒ **无条件敲 ShowMain 门** ⇒ 旧实例把主窗弹出来 ❌
-		//   正解 —— **自启拉起（startup）只做「让位退出」，⛔ 不敲唤醒门**；只有用户手动双击/托盘才唤起 ✅
+		// （机主：休眠/睡眠唤醒后 LM 会自己弹出主界面）
 		bool isStartupLaunchArg = IsStartupLaunch(text);
 		if (!createdNew)
 		{
@@ -1211,11 +1177,7 @@ internal static class Program
 						ShowDuplicateInstanceNotice();
 						continue;
 					}
-					// ⭐⭐ 2026-10-19（机主：休眠/睡眠唤醒后仍会自己弹主界面）：
-					//   ⭐ 唤醒后一段时间内，**来自第二实例的「唤起」一律不显示主窗** ——
-					//      这类唤醒多半是 Windows 的「登录触发器 / 重启应用」把 LM 又拉起一次（命令行可能不带 startup），
-					//      不能因此把用户已经关掉的主界面弹出来 ✅
-					//   ⚠️ 只抑制第二实例唤起的这一条通道；托盘单击/双击、用户手动点「设置」不受影响 ✅
+					// （机主：休眠/睡眠唤醒后仍会自己弹主界面）
 					if (IsInResumeShowSuppression())
 					{
 						Logger.WriteLine("唤醒抑制窗口内收到第二实例的唤起请求 ⇒ ⛔ 不显示主界面（用户此前已关闭/最小化）");
@@ -1296,8 +1258,7 @@ internal static class Program
 				hardwareOverlay?.StartOverlay();
 			}
 			GpuRestartVerifier.RunAfterBootAsync(TimeSpan.FromSeconds(8L));
-			// ⭐⭐ 2026-10-19（机主：后端初始化不是设置窗口的功能）：
-			//   ⭐ 启动后空闲再跑（单个后台任务、串行、⛔ 不阻塞 UI、⛔ 不挂在设置窗打开路径）✅
+			// 启动后空闲再跑（单个后台任务、串行、 不阻塞 UI、 不挂在设置窗打开路径）
 			ScheduleIdleBackendWarmup();
 		};
 		Application.Idle += deferredInitialization;
@@ -1329,14 +1290,7 @@ internal static class Program
 	{
 		return action?.Equals("startup", StringComparison.OrdinalIgnoreCase) ?? false;
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（机主：休眠/睡眠唤醒后仍会自己弹主界面）：
-	/// 唤醒后的一小段时间内，**第二实例发来的「唤起主窗」请求一律忽略**。
-	/// <para>⚠️ 背景：Windows 在休眠唤醒（S4）/登录恢复时可能通过「登录触发器 / 重启应用」把 LM 再拉起一次，
-	/// 该实例的命令行未必带 <c>startup</c> ⇒ 会敲 ShowMain ⇒ 把用户已关闭的主界面弹出来 ❌</para>
-	/// <para>⭐ 只抑制「第二实例唤起」这一条通道：托盘点击、用户点「设置」、程序自身逻辑全部照旧 ✅</para>
-	/// </summary>
+	// <para> 背景：Windows 在休眠唤醒（S4）/登录恢复时可能通过「登录触发器 / 重启应用」把 LM 再拉起一次
 	private static long _resumeShowSuppressUntil;
 
 	/// <summary>⭐ 唤醒后抑制第二实例唤起主窗的时长（秒）。考虑到登录恢复可能晚几秒到几十秒。</summary>
@@ -1928,9 +1882,7 @@ internal static class Program
 
 	private static void StartLightingIdleMonitor()
 	{
-		// ⭐⭐ 2026-10-19（平台互斥）：宝龙达**只用** `MechrevoHw` 的 5s 软件计时；
-		//   ⛔ 不再启动/保留同方厂商空闲计时器（平台判定单一来源 `UsesBaolongda`）✅
-		//   ⚠️ 启动时后端可能还没探测完 ⇒ 下面的 tick 里还会再判一次并自停（见 EvaluateLightingIdleAsync）✅
+		// 不再启动/保留同方厂商空闲计时器（平台判定单一来源 UsesBaolongda）
 		if (!UiAuditMode && _lightingIdleTimer == null && hw?.UsesBaolongda != true)
 		{
 			_lightingIdleTimer = new System.Threading.Timer((object? _) =>
@@ -1939,12 +1891,7 @@ internal static class Program
 			}, null, TimeSpan.FromSeconds(2L), TimeSpan.FromSeconds(2L));
 		}
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（自动关灯**平台互斥**）：宝龙达检测到时立刻调用 ——
-	/// 停掉同方/GCU 的 2s 空闲计时器；若它已把灯按"空闲"熄掉过（`_lightingIdleSuspended`），恢复一次并清标记 ✅。
-	/// <para>⚠️ 保证同一进程内**只有一个平台**的自动关灯计时器在动作（平台判定单一来源 `UsesBaolongda`）✅。</para>
-	/// </summary>
+	// 停掉同方/GCU 的 2s 空闲计时器；若它已把灯按"空闲"熄掉过（_lightingIdleSuspended），恢复一次并清标记 。
 	internal static void StopVendorLightingIdleMonitorForBaolongda()
 	{
 		System.Threading.Timer vendorTimer = Interlocked.Exchange(ref _lightingIdleTimer, null);
@@ -2055,10 +2002,7 @@ internal static class Program
 		reassert();
 		return true;
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（同方单键 RGB 开机闪烁诊断）：开机灯光时序日志（默认可见、带进程启动毫秒数）✅。
-	/// </summary>
+	// （同方单键 RGB 开机闪烁诊断）：开机灯光时序日志（默认可见、带进程启动毫秒数）。
 	private static void LogLightBoot(string message)
 	{
 		try
@@ -2079,8 +2023,7 @@ internal static class Program
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-19（同方单键 RGB 开机闪 · 低风险防御）：只对 per-key 键盘生效
-		//   （KeyboardType 非 0 且不属于 GCU 分区族；如耀世 KeyboardType=7）✅
+		// （同方单键 RGB 开机闪 · 低风险防御）：只对 per-key 键盘生效
 		int keyboardType = hw?.Capabilities?.KeyboardType ?? 0;
 		if (keyboardType > 0 && !KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(keyboardType))
 		{
@@ -2225,9 +2168,7 @@ internal static class Program
 	internal static Task<LightingIdleAction> EvaluateLightingIdleAsync()
 	{
 		int timeoutSeconds = AppConfig.Get("lighting_idle_seconds", Math.Max(0, rgb?.CloseTimerMinutes ?? 0) * 60);
-		// ⭐⭐ 2026-10-19（平台互斥 · 平台判定**单一来源** `UsesBaolongda`）：
-		//   宝龙达**只用** `MechrevoHw` 的 5s 软件计时 ⇒ ⛔ 同方/GCU 这条空闲计时器**自停**，
-		//   保证同一时刻只有一个平台的自动关灯计时器在动作（不会两个计时器同时生效）✅
+		// （平台互斥 · 平台判定**单一来源** UsesBaolongda）
 		if (hw?.UsesBaolongda == true)
 		{
 			StopVendorLightingIdleMonitorForBaolongda();
@@ -2245,8 +2186,7 @@ internal static class Program
 		}
 		return EvaluateLightingIdleAsync(timeoutSeconds, Math.Max(0L, (long)NativeMethods.GetIdleTime().TotalMilliseconds));
 	}
-
-	/// <summary>⭐ 2026-10-19：自动关灯日志用的人读时长（10 秒 / N 分钟 / N 小时）✅。</summary>
+	// <summary> 自动关灯日志用的人读时长（10 秒 / N 分钟 / N 小时）。</summary>
 	private static string DescribeAutoOffSeconds(int seconds)
 	{
 		if (seconds == 10)
@@ -2321,7 +2261,7 @@ internal static class Program
 			MechrevoHw restoreHw = hw;
 			if (restoreHw != null && restoreHw.UsesBaolongda && !BaolongdaWantsStartupLightWrite())
 			{
-				// ⭐ 2026-10-19（机主：关灯后又自己开）：明确记录「恢复判定=只读」
+				// （机主：关灯后又自己开）：明确记录「恢复判定=只读」
 				string decisionMessage = "[light] 恢复判定：BaolongdaWantsStartupLightWrite()=False ⇒ 只读同步（不写）";
 				if (Logger.TryMarkChanged("light-restore-readonly-decision", decisionMessage))
 				{
@@ -2894,9 +2834,7 @@ internal static class Program
 					}
 				}
 			}
-			// ⭐⭐ 2026-10-19（机主：启动自动点亮 Logo 灯）：⭐ 宝龙达下只有**用户显式点过开关**
-			//   （`PowerExplicit`）才在启动/恢复时点亮；旧配置没有该标记 ⇒ ⛔ 不点灯 ✅
-			//   ⚠️ 非宝龙达（GCU/同方）保持原判据，逐位不变 ✅
+			// （PowerExplicit）才在启动/恢复时点亮；旧配置没有该标记 ⇒  不点灯
 			bool savedPowerOn = hasSavedSettings
 				? (settings.PowerOn && (settings.PowerExplicit || !(Program.hw?.UsesBaolongda ?? false)))
 				: (flag == true);
@@ -2976,13 +2914,7 @@ internal static class Program
 		}
 		return (AllIssued: !attempted | allSucceeded, Attempted: attempted, IssuedSummary: string.Join(' ', issuedSummary));
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（宝龙达：开机/重启后软件彩虹不继续）：**只在硬件当前亮着**时恢复进程内刷色循环 ✅。
-	/// <para>⚠️ 前置：UsesBaolongda；硬件真实状态必须 on（⛔ 不主动点亮）；保存效果必须是 Rainbow；
-	/// 有可靠的"用户显式关灯"标记（`KbPowerExplicitOff` / kbPower=0）⇒ 跳过 ✅。</para>
-	/// <para>⚠️ 幂等：`IsKeyboardRainbowRunning` 已跑 ⇒ 直接返回；非宝龙达/非彩虹/硬件灭 ⇒ 只记 skip 日志 ✅。</para>
-	/// </summary>
+	// （宝龙达：开机/重启后软件彩虹不继续）：**只在硬件当前亮着**时恢复进程内刷色循环 。
 	private static void TryResumeBaolongdaSoftwareRainbow(string reason)
 	{
 		MechrevoHw mechrevoHw = hw;
@@ -3163,7 +3095,7 @@ internal static class Program
 			}
 			mechrevoHw = hw;
 			// 2026-10-12（窄化 GCU 分流 gate）：这道门只管"发不发这条电源"，⛔ 不再整体跳过本段 ——
-			// 单键机型按作者 UI 的既有语义只在固件电源报 Off 时补发 on（HID 帧才可见）；
+			// 单键机型 的既有语义只在固件电源报 Off 时补发 on（HID 帧才可见
 			// ArmKeyboardEffectProtect() 与 PublishKeyboardCloseTimer(0) 照旧（非单键机型逐格不变）。
 			// 2026-10-15（C-1 第 2 步分类 ①）：发 Keyboard/Ctrl 电源（GCU 通道）⇒ 真正需要 GCU。
 			if (mechrevoHw != null && mechrevoHw.IsGcuConnected && service != null)
@@ -3290,7 +3222,7 @@ internal static class Program
 		if (e.Reason == SessionSwitchReason.SessionLogon || e.Reason == SessionSwitchReason.SessionUnlock || e.Reason == SessionSwitchReason.ConsoleConnect)
 		{
 			Logger.WriteLine("Session:" + e.Reason);
-			// ⭐ 2026-10-19：休眠恢复 / 登录恢复时 Windows 可能把 LM 再拉起一次 ⇒ 抑制「第二实例唤起主窗」✅
+			// 休眠恢复 / 登录恢复时 Windows 可能把 LM 再拉起一次 ⇒ 抑制「第二实例唤起主窗」
 			MarkResumeShowSuppression("SessionSwitch:" + e.Reason);
 			ProcessHelper.KillSmartDisplayControl();
 			bool sessionLock = Aura.sessionLock;
@@ -3600,7 +3532,7 @@ internal static class Program
 		}
 		if (e.Mode == PowerModes.Resume)
 		{
-			// ⭐ 2026-10-19：唤醒后一段时间内抑制「第二实例唤起主窗」（修「休眠唤醒自动弹主界面」）✅
+			// 唤醒后一段时间内抑制「第二实例唤起主窗」（修「休眠唤醒自动弹主界面」）
 			MarkResumeShowSuppression("PowerModes.Resume");
 			ScheduleKeyboardLightingRestoreAfterResume();
 		}
@@ -3674,10 +3606,7 @@ internal static class Program
 		}
 		Screen screen = Screen.FromRectangle(settingsForm.Bounds);
 		settingsForm.WindowState = FormWindowState.Normal;
-		// ⭐⭐ 2026-10-19（机主：后端初始化不要挂在设置窗打开路径上）：
-		//   ⭐ `RunDeferredFanStartupCleanup`（风扇闸门只读验证 + 启动风扇清理）**已移出**本方法 ⇒
-		//      改为启动后空闲的后台预热（见 `ScheduleIdleBackendWarmup` / `deferredInitialization`）✅
-		//   ⭐ 打开设置只做与界面直接相关的事：构建行、读亮度、按能力位显隐 ✅
+		// RunDeferredFanStartupCleanup（风扇闸门只读验证 + 启动风扇清理）**已移出**本方法 ⇒
 		long openStartTick = Environment.TickCount64;
 		settingsForm.VisualiseGPUMode();
 		settingsForm.ShowAll(screen.WorkingArea);
@@ -3701,13 +3630,7 @@ internal static class Program
 	private static int _backendWarmupScheduled;
 
 	private static readonly CancellationTokenSource _backendWarmupCts = new CancellationTokenSource();
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主定稿：后端初始化留在「启动后空闲预热」，设置窗只管设置）✅。
-	/// ⭐ 主窗显示后 **Application.Idle + 2.5s** 起**单个**后台任务（串行、可取消）：
-	/// ⭐ ① 风扇闸门只读验证 + 启动风扇清理；② 摄像头 PnP 枚举；完成后回 UI 线程刷新对应行。
-	/// <para>⛔ 不在 UI 线程同步执行、⛔ 不挂在设置窗打开路径；每步独立 try/catch，失败只记日志并**标记失败、不重试** ✅</para>
-	/// </summary>
+	// <para> 不在 UI 线程同步执行、 不挂在设置窗打开路径；每步独立 try/catch，失败只记日志并**标记失败、不重试** </para>
 	internal static void ScheduleIdleBackendWarmup()
 	{
 		if (Interlocked.Exchange(ref _backendWarmupScheduled, 1) != 0)
@@ -3727,7 +3650,7 @@ internal static class Program
 				{
 					return;
 				}
-				// ⭐⭐ 2026-10-19（门控审计）：启动自检一行，明确本机启用了哪些机型相关分支 ✅
+				// （门控审计）：启动自检一行，明确本机启用了哪些机型相关分支
 				try
 				{
 					bool gen30 = warmHw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
@@ -3735,7 +3658,7 @@ internal static class Program
 					bool noDgpu = warmHw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu;
 					bool nvidia = !noDgpu && warmHw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.Unknown;
 					bool igpuPower = amd && noDgpu;
-					// ⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ gate 行加入板号与命中来源 ✅
+					// （机主：宝龙达被判成同方）： gate 行加入板号与命中来源
 				MechrevoLite.Hardware.BoardWhitelist.BoardProductEvidence gateBoard = MechrevoLite.Hardware.BoardWhitelist.GetBoardProductEvidence();
 				MechrevoLite.Hardware.BoardWhitelist.LogEvidence(gateBoard, warmHw.UsesBaolongda);
 				Logger.WriteError("[gate] 机型分类：board=" + (gateBoard.Product.Length == 0 ? "(读不到)" : gateBoard.Product)
@@ -3788,8 +3711,7 @@ internal static class Program
 					}
 					Logger.WriteError("[init] 后台初始化：摄像头枚举 ok=" + cameraFound + "（耗时 " + (Environment.TickCount64 - camStart) + " ms）");
 				}
-				// ⭐⭐ 2026-10-19（机主定稿：无界重放必须排在 GCU 各项之后）：③ 能力刷新 → ④ 模式对账 → ⑤ 无界重放 ✅
-				//   ⛔ 每步失败只记日志、继续后续；尤其不能因 GCU 未连接跳过重放 ✅
+				// 每步失败只记日志、继续后续；尤其不能因 GCU 未连接跳过重放
 				SettingsForm warmForm = settingsForm;
 				if (warmForm != null && !warmForm.IsDisposed && warmForm.IsHandleCreated)
 				{
@@ -3824,7 +3746,7 @@ internal static class Program
 					{
 						Logger.WriteError("[perfmode] 无界 APU 启动恢复异常（已吞掉、不重试）：" + ex.Message);
 					}
-					// ⭐⭐ 2026-10-19（机主：重启后高亮回平衡）：重放后**显式**刷一次性能模式行/上下文菜单（UI 线程）✅
+					// （机主：重启后高亮回平衡）：重放后**显式**刷一次性能模式行/上下文菜单（UI 线程）
 					try
 					{
 						SettingsForm refreshForm = settingsForm;
@@ -3928,7 +3850,7 @@ internal static class Program
 	{
 		if (Interlocked.Exchange(ref _exitStarted, 1) == 0)
 		{
-			// ⭐⭐ 2026-10-19（机主定稿 · 启动空闲预热可取消）：退出时取消仍在排队的预热（幂等）✅
+			// （机主定稿 · 启动空闲预热可取消）：退出时取消仍在排队的预热（幂等）
 			try
 			{
 				_backendWarmupCts.Cancel();

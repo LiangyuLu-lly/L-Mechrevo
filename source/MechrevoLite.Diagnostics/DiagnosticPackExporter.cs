@@ -28,22 +28,14 @@ internal static class DiagnosticPackExporter
 
 	/// <summary>2026-10-12 logfix2：日志文件的原始编码是 UTF-8 无 BOM，加进去的打码副本也保持一致。</summary>
 	private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-
-	/// <summary>
-	/// ⭐ 2026-10-19（机主：诊断包文件名后面附上机型）：格式
-	/// <c>L-Mechrevo-诊断包-{版本}-{时间戳}-{机型}.zip</c>。
-	/// <para>⭐ 机型取自 <c>HKLM\HARDWARE\DESCRIPTION\System\BIOS : SystemProductName</c>（纯只读）；
-	/// ⭐ 非法文件名字符替换为 <c>-</c>、连续分隔符合并、长度截断到 28 字符；
-	/// ⚠️ 读不到/为空 ⇒ **省略机型**（保持旧格式，⛔ 不出现尾部孤零零的 <c>-</c>）✅。</para>
-	/// </summary>
+	// <para> 机型取自 <c>HKLM\HARDWARE\DESCRIPTION\System\BIOS : SystemProductName</c>（纯只读）；
 	internal static string BuildFileName(string version, DateTime timestamp)
 	{
 		string model = ReadModelSlug();
 		string suffix = (model.Length == 0) ? string.Empty : "-" + model;
 		return $"L-Mechrevo-诊断包-{version}-{timestamp:yyyyMMdd-HHmmss}{suffix}.zip";
 	}
-
-	/// <summary>⭐ 2026-10-19：把机型名变成安全的文件名片段（只读注册表，⛔ 不写任何东西）✅。</summary>
+	// <summary> 把机型名变成安全的文件名片段（只读注册表， 不写任何东西）。</summary>
 	private static string ReadModelSlug()
 	{
 		string raw = string.Empty;

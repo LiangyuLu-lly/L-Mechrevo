@@ -352,8 +352,7 @@ internal static class EcLpcIo
 	{
 		return address == Fan1TargetAddress || address == Fan2TargetAddress || address == FanManualMaskAddress;
 	}
-
-	/// <summary>⭐ 2026-10-19（30 系键盘背光亮度）：EC 亮度寄存器 0x1807（值 = PWM：0x00/0x66/0xB3/0xFF）✅。</summary>
+	// <summary> （30 系键盘背光亮度）：EC 亮度寄存器 0x1807（值 = PWM：0x00/0x66/0xB3/0xFF）。</summary>
 	internal const int KeyboardBrightnessAddress = 0x1807;
 
 	/// <summary>⭐ 0x1807 **只允许的 4 个值**（档位 0/1/2/3 ⇒ 0x00/0x66/0xB3/0xFF）✅。</summary>
@@ -448,13 +447,7 @@ internal static class EcLpcIo
 			+ " · 0xC411 " + verNote + "（" + (verValid ? "非 0 ✅" : "无效 ⚠️") + "）";
 		return idValid && verValid;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主批准）：⭐ **白名单写一个 EC 字节**（风扇 0xC83C/0xC83D/0xB20，
-	/// 以及 2026-10-19 起键盘背光亮度 <c>0x1807</c> 的 4 个 PWM 值）+ **立刻回读比对** ✅。
-	/// <para>⚠️ 任何失败/超时按本类既有策略处理；⛔ 不抛出；⛔ 非白名单地址直接拒绝并中毒 ✅</para>
-	/// <para>⚠️ 2026-10-19：<c>0x1807</c> 只允许 <c>0x00/0x66/0xB3/0xFF</c>；⛔ 其它值一律拒绝（不写）✅</para>
-	/// </summary>
+	// 以及 起键盘背光亮度 <c>0x1807</c> 的 4 个 PWM 值）+ **立刻回读比对** 。
 	internal static bool TryWriteByte(int address, byte value, out int readBack)
 	{
 		readBack = -1;

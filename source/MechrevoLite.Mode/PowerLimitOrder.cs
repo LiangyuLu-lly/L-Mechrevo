@@ -4,34 +4,7 @@ using System.Globalization;
 using System.Text;
 
 namespace MechrevoLite.Mode;
-
-/// <summary>
-/// ⭐⭐ 2026-10-19（机主：「PL2 / PL4 不应低于 PL1；如果低了，应该联动把 PL1 调整」）：
-/// ⭐ **PL1 ≤ PL2 ≤ PL4 联动约束的唯一事实来源**（⭐ 纯函数：⛔ 不读硬件、⛔ 不打日志、⛔ 无副作用）✅。
-/// <para>⭐ 用法有两种（⭐ 两个调用点共用这一份口径 ⇒ 界面与下发层不可能各自算错）：
-/// <list type="number">
-/// <item>⭐ **界面联动**（<c>CustomModeForm</c>）：用户拖动/输入某一项后，把它与另外两项一起传进来，
-/// 再按返回的 <c>linked*</c> 把被联动的那几个滑块一起改掉 ✅；</item>
-/// <item>⭐ **校验层兜底**（<c>MechrevoService.SetCustomDetail</c>）：下发前把整批字段传进来，
-/// 若组合违反关系 ⇒ 就地改/补字段，⛔ **绝不允许把违反关系的组合发出去** ✅。</item>
-/// </list></para>
-///
-/// <para>⭐⭐ <b>联动方向（按"用户这一次改的是哪一项"决定，⛔ 不是无脑取 min/max）</b>：
-/// <list type="bullet">
-/// <item>改 <b>PL2</b> 到低于 PL1 ⇒ ⭐ **把 PL1 一起降**到 PL2（⛔ 不抬 PL2 —— 用户明确在降）✅；</item>
-/// <item>改 <b>PL1</b> 到高于 PL2 ⇒ ⭐ **把 PL2（以及 PL4）一起抬高**到 PL1 ✅；</item>
-/// <item>改 <b>PL4</b> 到低于 PL2 ⇒ ⭐ **把 PL2 一起降**到 PL4，再按关系把 PL1 一起降（⭐ 级联）✅；</item>
-/// <item><c>changed = null</c>（⭐ 多字段同批 / 历史非法存档回放）⇒ ⭐ **优先往下压**（⭐ 安全方向），
-/// 即把 PL1 压到 PL2、把 PL2 压到 PL4 ✅。</item>
-/// </list></para>
-///
-/// <para>⚠️ <b>未知值（<c>null</c>）一律不参与比较</b>：⭐ 宝龙达 40 系的 PL 协议**只写不读** ⇒
-/// 本次运行还没下发过时 PL1/PL2 就是"未知"（⛔ 不能拿界面钳出来的下限当成真值去联动）✅；
-/// 无 PL4 的机型（⭐ 宝龙达没有 PL4）直接传 <c>null</c> ⇒ 自动忽略 PL4 ✅。</para>
-///
-/// <para>⚠️ 范围（<see cref="Range" />）只在"抬高"时用于夹住：⭐ 被联动项顶到硬件上限仍不够 ⇒
-/// 反过来把发起项压到上限（⭐ 保证最终组合仍满足关系；⛔ 不留"看起来联动过、其实仍违规"的状态）✅。</para>
-/// </summary>
+// **PL1 ≤ PL2 ≤ PL4 联动约束的唯一事实来源**（ 纯函数： 不读硬件、 不打日志、 无副作用）。
 internal static class PowerLimitOrder
 {
 	/// <summary>⭐ 参与约束的三项（⭐ 名字与下发字段同名，便于日志/字段映射）✅。</summary>

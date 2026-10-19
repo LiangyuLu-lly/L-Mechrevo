@@ -50,8 +50,7 @@ internal static class VirtualDisplayBlank
 	private static bool _active;
 
 	private static bool _restoring;
-
-	// ⭐⭐ 2026-10-19（机主：息屏永久卡「an earlier blank session…」）：恢复开始时刻 —— 用于识别残留会话 ✅
+	// （机主：息屏永久卡「an earlier blank session…」）：恢复开始时刻 —— 用于识别残留会话
 	private static DateTime _restoreStartedUtc;
 
 	private static DateTime _blankStartedUtc;
@@ -148,8 +147,7 @@ internal static class VirtualDisplayBlank
 		{
 			if (_active || _restoring)
 			{
-				// ⭐⭐ 2026-10-19（机主：息屏永久卡英文提示）：先判断**残留会话**并自愈 ✅
-				//   active > 120s 或 restoring > 30s ⇒ 视为残留（线程异常/睡眠打断）⇒ 强制复位后继续本次息屏
+				// active > 120s 或 restoring > 30s ⇒ 视为残留（线程异常/睡眠打断）⇒ 强制复位后继续本次息屏
 				DateTime now = DateTime.UtcNow;
 				double activeAge = _active ? (now - _blankStartedUtc).TotalSeconds : 0.0;
 				double restoreAge = _restoring ? (now - _restoreStartedUtc).TotalSeconds : 0.0;

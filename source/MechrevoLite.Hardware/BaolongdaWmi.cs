@@ -2,7 +2,7 @@
 // 目标机型：**机械革命 蛟龙16Pro（2022 / 2023 / 2024 年款）** 以及其它宝龙达（Baolongda）模具机型。
 //
 // ⭐ 协议来源（⭐ 三份独立实现交叉验证，⭐ 详见 docs\notes\宝龙达接口-从开源实现读出的事实.md）：
-//   ① GaoXanSheng/JiaolongControl（⭐ **蛟龙16Pro 本体**）· ② Aveare/BellatorFanControl（官方控制台逆向）
+// ① GaoXanSheng/JiaolongControl（⭐ **蛟龙16Pro 本体**）· ② Aveare/BellatorFanControl（官方控制台
 //   ③ KanzakiK/DOUZHANZHE-Control。
 //   三份在**核心协议上完全一致**：
 //     · 命名空间/类   : root\WMI : MICommonInterface
@@ -24,7 +24,7 @@
 //
 // ⚠️ 安全边界：
 //   · 本类**只做 WMI**（⭐ 官方控制台也只用 WMI —— Bellator README 原话：
-//     「原厂控制台通过 WMI 调用厂商 ACPI 接口，**不是直接写 EC 端口**」）⇒ ⛔ **不碰 EC**、⛔ 不装驱动 ✅
+// 「固件通过 WMI 调用厂商 ACPI 接口，**不是直接写 EC 端口**」）⇒ ⛔ **不碰 EC**、⛔ 不装驱动 ✅
 //   · `TryCreate()` **全程只读**（⭐ 只发 Get）⇒ 可在任何机器上安全探测 ✅
 //   · 写入方法一律**显式命名**（TrySet*），⭐ 调用方按能力位决定要不要调 ✅
 //
@@ -537,15 +537,7 @@ internal sealed class BaolongdaWmi : IDisposable
 			return outParams?["OutData"] as byte[];
 		}
 	}
-
-	// ══════════════════════════════════════════════════════════════════════
-	//  通用读 / 写
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系只读诊断）：读一次功能号的**完整 OutData**（原始字节；失败返回 <c>false</c>）✅。
-	/// <para>⚠️ 只发 Get（250），⛔ 不写任何字节 —— 供 raw 探针核对"我们取值的偏移是否正确"✅。</para>
-	/// </summary>
+	// （30 系只读诊断）：读一次功能号的**完整 OutData**（原始字节；失败返回 <c>false</c>）。
 	internal bool TryReadRawOutData(Function function, out byte[] outData)
 	{
 		outData = null;
@@ -668,9 +660,7 @@ internal sealed class BaolongdaWmi : IDisposable
 			return false;
 		}
 	}
-
-	/// <summary>写两个字节（<c>InData[4]=第一、[5]=第二</c>）—— ⭐ 用于风扇（FanType + 值）与 CPUPower（子命令 + 值）。</summary>
-	/// <summary>⭐ 2026-10-19（探针用）：⭐ 写功能号 17 的 3 字节 RGB ✅</summary>
+	// <summary> （探针用）： 写功能号 17 的 3 字节 RGB </summary>
 	internal bool TryWriteColor(byte red, byte green, byte blue)
 	{
 		try
@@ -907,7 +897,7 @@ internal sealed class BaolongdaWmi : IDisposable
 	/// <c>(fanType=1, enable=0)</c> ⇒ **永远只是把小扇的手动开关关掉**，
 	/// ⛔ 从来没有真正开启过手动接管 ⇒ ⭐ 功能号 21 写的转速目标被固件忽略
 	/// ⇒ ⭐ 「风扇曲线不跟随温度」「风扇强冷不狂转」✅</para>
-	/// <para>⭐ 正确顺序（⭐ 参考实现 BellatorFanControl 与官方控制台逆向一致）：
+	/// <para>⭐ 正确顺序（⭐ 参考实现 BellatorFanControl 与官方控制台一致
 	/// ⭐ **先开该通道的手动开关（20=[fanType,1]）→ 再写目标转速（21=[fanType,x100RPM]）** ✅</para>
 	/// </summary>
 	internal bool TrySetFanManualSwitch(byte fanType, bool on)
@@ -1049,30 +1039,13 @@ internal sealed class BaolongdaWmi : IDisposable
 			return false;
 		}
 	}
-
-	// ══════════════════════════════════════════════════════════════════════
-	//  ③ CPU 温度
-	// ══════════════════════════════════════════════════════════════════════
-
-	/// <summary>
-	/// 读 CPU 温度（功能号 22，⭐ <c>OutData[4]</c> 摄氏度）。
-	/// <para>⭐ **上界校验**（⭐ 取自 Bellator 的做法）：⭐ <c>0</c> 与 <c>255</c> 都视为**无效**（⭐ 免得把无效读数当 0℃）✅</para>
-	/// </summary>
-	/// <summary>
-	/// ⭐⭐ 2026-10-19：⭐ **厂商温度通道是否不可用**（30 系 = true）。
-	/// <para>⭐ 由 <c>BaolongdaBackend.TryCreate</c> 按**板号**置位（裸 `MRID6` = 30 系 ⇒ true）✅</para>
-	/// <para>⚠️ 只影响"要不要读功能号 22/温度"，⛔ 不影响风扇/键盘灯/功耗墙等其它功能 ✅</para>
-	/// </summary>
+	// ③ CPU 温度
 	internal static bool VendorTemperatureUnsupported { get; set; }
 
 	internal bool TryReadCpuTemperature(out int celsius)
 	{
 		celsius = -1;
-		// ⭐⭐ 2026-10-19（30 系真机事故 · 诊断包 0.291.9.9-203933）：
-		//   ⚠️ 30 系（裸板号 `MRID6`）被误判成宝龙达后端，而它的**功能号 22 恒返回 0**
-		//   ⇒ 温度「读不到」（风扇功能号 13 有值，所以看着像"只有温度坏了"）。
-		//   ⭐ 处理：30 系**不读**功能号 22，直接返回 false ⇒ 调用方回落到 LHM/NVML ✅
-		//   ⚠️ 40 系（`MRID6-23`）不受影响 ✅
+		// （30 系真机事故 · 诊断包 0.291.9.9-203933）
 		if (VendorTemperatureUnsupported)
 		{
 			return false;

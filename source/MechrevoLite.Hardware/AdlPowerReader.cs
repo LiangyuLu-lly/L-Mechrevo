@@ -1,8 +1,4 @@
-// ⭐⭐ 2026-10-19（机主：无界 14X 核显「显卡功耗」不随负载变化；GCU Monitor 能显示 2.0W）：
-//   ⭐ **只读** ADL PMLog 读取器（atiadlxx.dll → ADL2_New_QueryPMLogData_Get）——
-//   把 ADL 能读到的 PMLog 传感器**全量**打印一次（名/ID/值），并选一个「核显功耗」。
-//   ⛔ 不调用任何 Overdrive 写接口、⛔ 不写注册表/EC、⛔ 不碰 NVML。
-//   ⚠️ NVIDIA 机型（有 dGPU）不会调用本类（调用点已按 CpuVendor.IsAmd + NoDgpu 门控）。
+// NVIDIA 机型（有 dGPU）不会调用本类（调用点已按 CpuVendor.IsAmd + NoDgpu 门控）。
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;

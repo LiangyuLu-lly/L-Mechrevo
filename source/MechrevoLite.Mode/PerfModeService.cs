@@ -185,10 +185,7 @@ internal sealed class PerfModeService
 		try
 		{
 			perfApplyOutcome = await PerfModeRunner.RunAsync(modeId, steps, _backend, ct).ConfigureAwait(continueOnCapturedContext: false);
-			// ⭐⭐ 2026-10-17（宝龙达 · 自定义档本地化）：⭐ 无固件槽的后端**不会**有 SwitchFirmwareSlot 步骤，
-			//   但 PL1/PL2/温度墙会走 WMI 23 真下发 ⇒ 标记 LocalApply，让 ModeSwitched 按"字段全成功"判定 ✅
-			//   ⚠️ 非宝龙达（GCU/老接口）不置位 ⇒ 行为逐位不变 ✅
-			// ⭐⭐ 2026-10-19（无界 APU）：与宝龙达同为"本机配置"⇒ 无固件档切换步骤时 ModeSwitched 按字段全成功判定 ✅
+			// 但 PL1/PL2/温度墙会走 WMI 23 真下发 ⇒ 标记 LocalApply，让 ModeSwitched 按"字段全成功"判定
 			if (_hw != null && (_hw.UsesBaolongda || _hw.WujieSmuApu))
 			{
 				perfApplyOutcome = perfApplyOutcome with { LocalApply = true };
@@ -440,30 +437,7 @@ internal sealed class PerfModeService
 		ApplyWindowsPowerOverlay(modeId);
 		return await ActivateIfCurrentAsync(modeId, reason, forceParameters, null).ConfigureAwait(continueOnCapturedContext: false);
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-17（「高性能电源」· **GCU 解耦**）：⭐ 按档位把 Windows **电源模式 overlay** 设成
-	/// 最佳性能 / 平衡 / 最佳能效 —— 这与厂商无关，就是 Windows 自己的三档：
-	/// <list type="bullet">
-	/// <item><c>0</c> = 平衡 <c>00000000-0000-0000-0000-000000000000</c></item>
-	/// <item><c>1</c> = 最佳性能 <c>ded574b5-45a0-4f42-8737-46345c09c238</c></item>
-	/// <item><c>2</c> = 最佳能效 <c>961cc777-2547-4f9d-8174-7d86181b8a7a</c></item>
-	/// </list>
-	/// <para>默认映射：安静 ⇒ 2、平衡 ⇒ 0、狂暴/静音狂暴 ⇒ 1；自定义档按其 <see cref="PerfModeSettings.WindowsPowerMode" />（设了才动）。</para>
-	/// <para>⭐ **所有机型都执行**（含 GCU）—— 用户要求"走 Windows 替换厂商客户端"，不再看能力位。</para>
-	/// <para>⚠️ 开关：AppConfig <c>bd_power_overlay</c>（默认 1 = 开；设 0 即关闭本行为）。</para>
-	/// </summary>
-	/// <summary>
-	/// ⭐ 2026-10-17（「高性能电源」开关）：⭐ 是否"跟着性能档位改 Windows 电源模式"（默认 **开**）。
-	/// <para>⚠️ 由「更多开关」里的 <c>highperf</c> 控制；无 GCU 时走 Windows API（见 <see cref="ApplyWindowsPowerOverlay" />）✅</para>
-	/// </summary>
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主要求）：「APU 防缩缸」—— ⭐ 把 Windows「处理器性能提升模式」
-	/// （GUID `be337238-0d82-4146-a960-4f3749d470c7`）设成 **5 = 高效、积极且有保障**
-	/// （AC + DC 同时改，`PowerNative.SetCPUBoost` 内部就是两路都写）✅
-	/// <para>⭐ 打开时把**原值**记到 `apuboost_prev`，关闭时原样还原（⛔ 不写死 0）✅</para>
-	/// <para>⚠️ 纯 Windows 电源策略，与厂商/GCU 无关 ✅</para>
-	/// </summary>
+	// <para>默认映射：安静 ⇒ 2、平衡 ⇒ 0、狂暴/静音狂暴 ⇒ 1；自定义档按其 <see cref="PerfModeSettings.WindowsPowerMode" />（设了才动）。</para>
 	public bool ApuAntiDegradeEnabled
 	{
 		get
@@ -511,12 +485,7 @@ internal sealed class PerfModeService
 			}
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（UI 切档联动）：⭐ 主界面/托盘切模式时**直接**按模式设 Windows 电源模式
-	/// （GCU 机型走的是 `SwitchMode` → MQTT，**不会**经过 <see cref="ActivateAsync" /> ⇒ 需要单独一个入口 ✅）
-	/// <para>映射：2=静音 ⇒ 最佳能效 · 0=平衡 ⇒ 平衡 · 1=狂暴/静音狂暴 ⇒ 最佳性能</para>
-	/// </summary>
+	// <para>映射：2=静音 ⇒ 最佳能效 · 0=平衡 ⇒ 平衡 · 1=狂暴/静音狂暴 ⇒ 最佳性能</para>
 	public void ApplyWindowsPowerOverlayForUiMode(int mode, bool silentTurbo)
 	{
 		if (!WindowsPowerOverlayEnabled)
@@ -541,10 +510,7 @@ internal sealed class PerfModeService
 	/// <summary>⭐ 把 Windows 电源模式设成给定 overlay（0=平衡 / 1=最佳性能 / 2=最佳能效），失败只记日志。</summary>
 	private void ApplyWindowsPowerOverlayValue(int overlay)
 	{
-		// ⭐⭐ 2026-10-19（机主口径：「代码顺序 —— 直接跟着 GCU 发命令同时，不要等回读」）：
-		//   ⭐ 只在**同一时刻**把 Windows 电源模式发出去，⛔ 不等回读、⛔ 不重试、⛔ 不 sleep ✅
-		//   ⭐ 理由：回读要等 350ms×N，既慢又会被厂商随后写入覆盖（越等越乱）——
-		//      ⭐ 发出去即可，Windows 自己生效；谁最后写由时序决定，这里只保证**不落后** ✅
+		// （机主口径：「代码顺序 —— 直接跟着 GCU 发命令同时，不要等回读」）
 		string name = (overlay == 1) ? "最佳性能" : ((overlay == 2) ? "最佳能效" : "平衡");
 		try
 		{
@@ -688,7 +654,7 @@ internal sealed class PerfModeService
 		}
 		PerfModeSettings expectedSettings = mode.Settings;
 		MechrevoHw hw = _hw;
-		// ⭐⭐ 2026-10-19（无界 APU）：无 GCU 也可走本机 SMU 应用/启动恢复 ⇒ 连接判据放宽（其它机型不变）✅
+		// （无界 APU）：无 GCU 也可走本机 SMU 应用/启动恢复 ⇒ 连接判据放宽（其它机型不变）
 		if (hw == null || (!hw.IsConnected && !hw.WujieSmuApu))
 		{
 			Logger.WriteLine("PerfModes: activate(" + modeId + ") refused, GCU not connected");
@@ -705,7 +671,7 @@ internal sealed class PerfModeService
 			RaiseApplied(perfApplyOutcome);
 			return perfApplyOutcome;
 		}
-		// ⭐⭐ 2026-10-19（机主定稿）：无界 + 当前自定义档 ⇒ 明确记录"跳过性能档位下发"（来源=应用/对账）✅
+		// （机主定稿）：无界 + 当前自定义档 ⇒ 明确记录"跳过性能档位下发"（来源=应用/对账）
 		if (hw.WujieSmuApu && mode.IsCustom)
 		{
 			string suppressLog = "[perfmode] 无界 APU：当前为自定义档 ⇒ 跳过性能档位下发（来源=应用/对账）";
@@ -729,9 +695,7 @@ internal sealed class PerfModeService
 				};
 			}
 		}
-		// ⭐⭐ 2026-10-19（机主：无界 APU 应用自定义时不要再发 GCU 性能模式命令）：
-		//   ⭐ 纯本机 SMU 路径：规划器不生成任何 GCU 模式/固件档步骤；这里落一行去重日志（默认可见）✅
-		//   ⚠️ 其它后端（宝龙达/GCU/同方）`WujieSmuLocalOnly` 恒 false ⇒ 不进入本日志分支，行为逐位不变 ✅
+		// 纯本机 SMU 路径：规划器不生成任何 GCU 模式/固件档步骤；这里落一行去重日志（默认可见）
 		if (caps.WujieSmuLocalOnly)
 		{
 			string wujieLog = "[perfmode] 无界 APU：应用自定义 ⇒ 跳过 GCU 性能模式下发（仅本机 SMU：PL1="
@@ -742,8 +706,7 @@ internal sealed class PerfModeService
 				Logger.WriteError(wujieLog);
 			}
 		}		IReadOnlyList<PerfApplyStep> readOnlyList = PerfModeApplyPlanner.Build(mode, plan, caps);
-		// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
-		//   ⭐ 规划结果（生成/未生成 + 原因）默认级别可见 ✅
+		// （机主：「显卡超频设置了但频率没变化」· 可观测性①）
 		LogGpuOverclockPlan(mode, plan, caps, readOnlyList);
 		Logger.WriteLine($"PerfModes: activate {mode.Id} ({reason}) route={mode.Route} slot={plan?.SlotIndex.ToString() ?? "-"} write={plan?.NeedsParameterWrite.ToString() ?? "-"} steps={readOnlyList.Count}");
 		Stopwatch elapsed = Stopwatch.StartNew();
@@ -773,7 +736,7 @@ internal sealed class PerfModeService
 			// 会**重试自定义档**，不会再拿老键里的内置档（静音/平衡）把它顶掉。
 			Logger.WriteLine($"PerfModes: {mode.Id} 未切换成功（reason={reason} route={mode.Route}）→ ActiveModeId 仍为 {ActiveModeId}；档位意图保持用户选择，等下一次重试。失败/未确认项：{outcome.Describe()}");
 		}
-		// ⭐⭐ 2026-10-19（机主：Wujie 规划器误生成固件字段步/ActiveModeId 回退）：本机 SMU 应用成功的判据日志 ✅
+		// （机主：Wujie 规划器误生成固件字段步/ActiveModeId 回退）：本机 SMU 应用成功的判据日志
 		if (caps.WujieSmuLocalOnly && mode.IsCustom)
 		{
 			string wujieApplyLog = "[perfmode] 无界 APU 本机应用：步骤=SMU(stapm/slow/fast/tctl) · 无固件字段步 · ModeSwitched=" + outcome.ModeSwitched;
@@ -1001,12 +964,7 @@ internal sealed class PerfModeService
 			return false;
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：
-	/// ⭐ **规划结果一行日志**（默认级别可见、去重）：`[gpu-oc] 规划：supports=… · enabled=… · core=… mem=… ⇒ 生成步骤=是/否（原因=…）` ✅
-	/// <para>⚠️ 只在"宝龙达本机直写可用"或"该档确实设了 GPU 超频字段"时打 ⇒ GCU 机型不刷屏 ✅</para>
-	/// </summary>
+	// **规划结果一行日志**（默认级别可见、去重）：[gpu-oc] 规划：supports=… · enabled=… · core=… mem=… ⇒ 生成步骤=是/否（原因=…）
 	private static void LogGpuOverclockPlan(PerfModeDefinition mode, FirmwareSlotPlan plan, PerfModeCapabilities caps, IReadOnlyList<PerfApplyStep> steps)
 	{
 		PerfModeSettings settings = mode.Settings;
@@ -1128,13 +1086,7 @@ internal sealed class PerfModeService
 		var (perfApplyOutcome, _) = tuple;
 		return (!tuple.Item2) ? perfApplyOutcome : (await ActivateIfCurrentAsync(modeId, "route changed by edit", forceParameters: true, request).ConfigureAwait(continueOnCapturedContext: false));
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：无界 APU 点自定义后模式仍显示「平衡」）：
-	/// ⭐ **本机自定义档激活**（无界 APU；与宝龙达同款语义）—— 直接把 ActiveModeId 指向该档并持久化，
-	/// ⛔ 不尝试固件自定义档、⛔ 不发 GCU 模式命令 ✅。
-	/// <para>⚠️ 只允许无界 APU 调用（调用点/CustomModeForm 已判 hw.WujieSmuApu）；其它机型行为不变 ✅</para>
-	/// </summary>
+	// （机主：无界 APU 点自定义后模式仍显示「平衡」）
 	internal void ActivateLocalProfile(string modeId)
 	{
 		PerfModeDefinition mode = Find(modeId);
@@ -1154,27 +1106,12 @@ internal sealed class PerfModeService
 		}
 		RaiseActiveChanged();
 	}
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：无界 APU 改好功耗后重启不会自动应用）：
-	/// ⭐ **启动/开窗核对并重放当前激活自定义档的本机 SMU 步骤**（PL1/PL2/温度墙/STAPM）——
-	/// 走现有本机应用路径（`WujieSmuLocalOnly`，⛔ 不发任何 GCU 命令）✅。
-	/// <para>⭐ 幂等：先读 SMU 当前值，与配置一致 ⇒ 不写、只记一行 skip 日志 ✅</para>
-	/// <para>⚠️ 只对无界 APU 生效；宝龙达/GCU/同方不进入（调用点判据 + 本方法再判一次）✅</para>
-	/// <para>⚠️ 失败不重试、只记日志、由后台线程调用（⛔ 不阻塞 UI）✅</para>
-	/// </summary>
-	/// <summary>⭐⭐ 2026-10-19（启动预热顺序）：④ 模式对账（串行 await；Wujie 已有“不被固件覆盖”门控）✅</summary>
+	// <summary> （启动预热顺序）：④ 模式对账（串行 await；Wujie 已有“不被固件覆盖”门控）</summary>
 	internal Task ReconcileForStartupAsync()
 	{
 		return ReconcileAsync("startup warmup");
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：宝龙达「自定义模式」重启不记忆）：启动重放**泛化**到宝龙达 + 无界 ✅
-	/// <para>⭐ 宝龙达：重放 `ActivateAsync(id, "baolongda startup replay", forceParameters:true)` ⇒ 走 WMI 本机字段
-	/// （`SupportsFirmwareSlot=false` 已保证不生成固件档步骤）✅</para>
-	/// <para>⭐ 无界：走本机 SMU（原逻辑保留）✅</para>
-	/// <para>⚠️ 幂等：先读当前值，与配置一致 ⇒ 跳过；失败不重试、只记日志 ✅</para>
-	/// </summary>
+	// <para> 幂等：先读当前值，与配置一致 ⇒ 跳过；失败不重试、只记日志 </para>
 	internal async Task ReplayLocalProfileOnStartupAsync()
 	{
 		MechrevoHw hw = _hw;
@@ -1197,9 +1134,7 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-19（机主：「宝龙达模具 开机自动切自定义 无论之前是哪个模式 矫枉过正了」）：
-		//   ⛔ 原来在 ActiveModeId 不是自定义时会**回退到 LastCustomId 并强行切到自定义** ⇒ 开机永远变自定义 ❌
-		//   ⇒ 现在**只恢复「保存的当前档位本身就是自定义」的情况**；其它档位一律不动 ✅
+		// ⇒ 现在**只恢复「保存的当前档位本身就是自定义」的情况**；其它档位一律不动
 		PerfModeDefinition mode = Find(ActiveModeId);
 		if ((object)mode == null || !mode.IsCustom)
 		{
@@ -1223,10 +1158,7 @@ internal sealed class PerfModeService
 		}
 
 		PerfModeSettings settings = mode.Settings;
-		// 幂等先读后比：无界用 SMU；宝龙达用 WMI 本机值（Pl1/Pl2/TccTarget，未设置/读不到视为不一致 ⇒ 重放）✅
-		// ⭐⭐ 2026-10-19（机主：「记得参数也要应用一次 无论30 40」）：
-		//   ⚠️ 宝龙达重启后固件参数可能已被复位，但 WMI 回读可能仍是**缓存/默认值**恰好与配置相同 ⇒ 用「一致就跳过」会漏应用 ❌
-		//   ⇒ 宝龙达分支**每次启动强制应用一次**（⛔ 不再按“一致”跳过）；无界保持原「一致就跳过」✅
+		// 宝龙达重启后固件参数可能已被复位，但 WMI 回读可能仍是**缓存/默认值**恰好与配置相同 ⇒ 用「一致就跳过」会漏应用 ❌
 		bool match;
 		if (isWujie)
 		{
@@ -1405,17 +1337,7 @@ internal sealed class PerfModeService
 				}
 				_editCts = editCts;
 			}
-			// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 根因②）：
-			//   ⭐ 宝龙达**没有固件自定义档** ⇒ 自定义档**永远成不了 `ActiveModeId`**
-			//      （编辑器里选「自定义 N」只切换"正在编辑哪份本机配置"，不切档 ——
-			//       见 CustomModeForm.SelectModeAsync 的宝龙达分支 ⚠️）
-			//   ⭐ 而这里原来只在 `ActiveModeId == mode.Id` 时才走硬件下发 ⇒
-			//      用户点【应用】只把配置存进 `mode_tune_*`、**GPU 超频/PL 等步骤一步都没执行** ❌
-			//      （诊断包实证：日志只有「模式下拉切到 custom1」，grep `gpu-oc` 零命中）
-			//   ⭐ 现在：宝龙达 + 自定义档 ⇒ 即使不是"当前激活档"，`applyHardware=true` 也走下去：
-			//      下面的 `route/flag` 判据会返回 `NeedsActivation=true` ⇒ `UpdateAsync` 转 `ActivateAsync`
-			//      做**本机全量下发**（PL1/PL2/温度墙 → WMI 23；GPU 超频 → NVAPI P0；曲线 → 20/21）✅
-			//   ⚠️ 非宝龙达（GCU / 老接口）⇒ `PerfApplyGate` 恒等价旧口径 ⇒ 条件**逐位不变** ✅
+			// 而这里原来只在 ActiveModeId == mode.Id 时才走硬件下发 ⇒
 			bool isActiveMode = string.Equals(ActiveModeId, mode.Id, StringComparison.Ordinal);
 			bool localCustomApply = PerfApplyGate.ShouldApplyLocalCustom(_hw != null && _hw.UsesBaolongda, mode.IsCustom, isActiveMode, _hw != null && _hw.WujieSmuApu);
 			if (localCustomApply)
@@ -1448,7 +1370,7 @@ internal sealed class PerfModeService
 					{
 						Settings = settings2
 					}, plan, Capabilities(), includeSwitch: false, perfModeDefinition.Route);
-					// ⭐⭐ 2026-10-19（机主：「显卡超频设置了但频率没变化」· 可观测性①）：编辑路径同样落规划结果 ✅
+					// （机主：「显卡超频设置了但频率没变化」· 可观测性①）：编辑路径同样落规划结果
 					LogGpuOverclockPlan(perfModeDefinition with
 					{
 						Settings = settings2
@@ -1600,13 +1522,7 @@ internal sealed class PerfModeService
 			MechrevoHw hw = _hw;
 			if (hw != null && hw.IsConnected)
 			{
-				// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30/40 系宝龙达）：
-				//   ⭐ 宝龙达**没有 GCU** ⇒ 下面那条 `RestoreVendorProfileAsync()`（纯 MQTT 的 `RESTORE_*`）
-				//     必然失败；而它在 `catch` 里只写一行日志、返回 false ⇒ 结果：
-				//     ① 界面把「恢复出厂」显示成**失败**；② 硬件侧**一个字节都没动**（PL/温度墙/GPU 超频/NVML 功耗上限）
-				//     ⇒ 机主看到的就是「不重置」❌
-				//   ⭐ 现在：自定义档 + 宝龙达 ⇒ 走**本机后端**的恢复路径（SMU / WMI 23 / NVAPI / NVML）✅
-				//   ⚠️ 非自定义档 / GCU 机型 ⇒ 下面原有分支【逐位不变】✅
+				// ① 界面把「恢复出厂」显示成**失败**；② 硬件侧**一个字节都没动**（PL/温度墙/GPU 超频/NVML 功耗上限）
 				if (mode.IsCustom && hw.UsesBaolongda)
 				{
 					return ResetBaolongdaCustomLocally(hw);
@@ -1631,23 +1547,7 @@ internal sealed class PerfModeService
 		}
 		return true;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」不生效 · 30/40 系宝龙达）：
-	/// ⭐ **自定义档「恢复出厂」的本机后端实现**（⛔ 不走 GCU 的 MQTT `RESTORE_*`）✅。
-	/// <para>⭐ 顺序：
-	/// ① 本机配置已由 <see cref="ResetAsync" /> 开头 `PerfModeStore.ResetSettings` 清除并落盘（`AppConfig.Flush`）✅；
-	/// ② 40 系：写 <c>功能号 23 = 0</c>（关闭自定义功耗墙）⇒ **固件回到默认 PL1/PL2/温度墙** ✅；
-	///    30 系：原厂 WMI 方法表没有功能号 23、SMU 也没有"恢复默认"命令 ⇒ ⛔ 不编造默认值、一条写命令都不发，
-	///    只清本地记忆并**如实记日志**（SMU 写入是运行时状态，重启后回固件默认）✅；
-	/// ③ 清空功耗墙本地记忆（界面因此显示「未设置」，⛔ 不拿"上次我们写的值"冒充当前值）✅；
-	/// ④ GPU 超频：NVAPI P0 偏移写 <c>0/0</c>（真恢复默认）＋ 清 `gpu_oc` 与直写记录（防下次切档又推回去）✅；
-	/// ⑤ 显卡功耗上限：NVML 写回**出厂默认值**（`nvmlDeviceGetPowerManagementDefaultLimit`，⛔ 不拿 max 冒充默认）✅。
-	/// </para>
-	/// <para>⚠️ 只对**活动档**执行（调用方已判 `active`）⇒ ⛔ 不会把别的档正在用的硬件状态改掉 ✅。</para>
-	/// <para>⚠️ 返回 <c>false</c> 只在"该动硬件却真的失败"时（如 40 系功能号 23 关闭写不进去）——
-	/// 界面据此显示「恢复没有得到确认」，⛔ 不假装成功 ✅。</para>
-	/// </summary>
+	// （机主：「恢复出厂设置」不生效 · 30/40 系宝龙达）
 	private bool ResetBaolongdaCustomLocally(MechrevoHw hw)
 	{
 		bool is30 = hw.IsBaolongda30Series;
@@ -1697,26 +1597,7 @@ internal sealed class PerfModeService
 				: $" · WMI 23 关闭自定义 写成功={powerLimitReleased} · 回读确认={powerLimitConfirmed}"));
 		return powerLimitResetOk;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「恢复出厂设置」风扇转速/曲线表没恢复 · 强冷也要复位）：
-	/// ⭐ **把宝龙达风扇整体恢复默认**（⛔ 不修改 <c>MechrevoHw</c> 的风扇段实现，只调用现有 API）✅。
-	/// <para>⭐ 顺序（⭐ 与机主要求一致）：
-	/// <list type="number">
-	/// <item>⭐ <b>强冷</b>：若正开着 ⇒ 先走既有「关闭」流程
-	///   （`TrySetFanBoostViaBackend(false)`：交回固件 + 恢复强冷前快照 + `FanBoostActive=false` + 清临时状态）✅；</item>
-	/// <item>⭐ <b>曲线表回默认</b>：`BaolongdaFanCurveSettings.CreateDefault(...)`
-	///   ⇒ 当前代际默认 16 点（40 系满转 **6000** / 30 系 **4900** —— 用现有常量
-	///   `FullRpm40Series/FullRpm30Series`，⛔ 不临时改基准），默认 `Enabled=false` ⇒ ⭐ **闭环停用**，
-	///   再 `SaveBaolongdaFanCurve` 落盘 ✅；</item>
-	/// <item>⭐ <b>交回固件</b>：`FanWriter.TryReleaseToFirmware()` ⇒ EC 目标写 0 + 清 `0xB20` 的 `0x02|0x08`，
-	///   ⭐ 每一步**写后回读比对**（成功与否以回读为准）✅；</item>
-	/// <item>⭐ <b>再读一次 EC</b>（`0xC83C/0xC83D/0xB20`）⇒ 日志证明「目标=0、接管位已清」✅。</item>
-	/// </list></para>
-	/// <para>⚠️ 闸门：`FanCurveVerified` 未放开 ⇒ UI 仍隐藏/禁用（由 UI 自己读闸门判断），
-	/// 但 **EC 复位照做**（清掉可能残留的接管位 —— 机主明确要求）✅。</para>
-	/// <para>⚠️ 所有步骤都有日志（默认级别可见）；失败如实写 `false`，⛔ 不假装成功、⛔ 不抛异常 ✅。</para>
-	/// </summary>
+	// （机主：「恢复出厂设置」风扇转速/曲线表没恢复 · 强冷也要复位）
 	internal void ResetBaolongdaFanToFirmwareDefault()
 	{
 		MechrevoHw hw = _hw;
@@ -1921,11 +1802,7 @@ internal sealed class PerfModeService
 			{
 				return;
 			}
-			// ⭐⭐ 2026-10-19（机主：无界 14X 重启后模式跳回「平衡」）：
-			//   ⭐ 无界 APU 的本机自定义档**优先于固件回读**（无固件档语义）——
-			//      若配置里的 ActiveModeId 指向一个自定义档，⛔ 不被固件读回的「平衡/其它」覆盖 ✅
-			//   ⚠️ 宝龙达/GCU/同方不变（WujieSmuApu 恒 false；宝龙达仍按既有 reconcile 语义）✅
-			// ⭐⭐ 2026-10-19（宝龙达重启不记忆）：宝龙达与无界一样，持久化自定义档优先于固件回读 ✅
+			// 无界 APU 的本机自定义档**优先于固件回读**（无固件档语义）——
 			if (hw.WujieSmuApu || hw.UsesBaolongda)
 			{
 				PerfModeDefinition persisted = Find(ActiveModeId);

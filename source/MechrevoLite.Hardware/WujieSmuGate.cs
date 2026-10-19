@@ -1,16 +1,4 @@
-// ⭐⭐ 2026-10-19（机主：无界系列 + AMD APU（8745H/8845H/H255/Ryzen AI 365/AI 400 等）
-//   要能用「SMU 自定义」= PL/温度墙/曲线那套，与宝龙达 30 系同源）：
-//
-//   **无界 APU 判据**（唯一判据，探测命令与 UI 共用；本文件**只读**）。
-//
-// 判据（三条全真才允许 SMU 自定义）：
-//   ① 机型名 = SystemProductName（BIOS 注册表）包含「无界」/ WUJIE / WJXY（大小写不敏感）；
-//      ⛔ 不用 BaseBoardProduct（那是模具号）。
-//   ② APU = CPU 厂商确认为 AMD（CpuVendor == Amd，真硬件事实）且**没有 NVIDIA 独显**（注册表适配器枚举；
-//      AMD 内置显卡 ⇒ 不命中 NVIDIA ⇒ ApuOk=true）。
-//   ③ SMU 通路真的可读：SmuAvailability.IsReady（PawnIO 探测，进程内缓存一次）。
-//
-// ⛔ 只读：不写 EC/SMU/注册表/配置；任何一条读不到 ⇒ 按"不成立"处理（⛔ 绝不默认放行）。
+// **无界 APU 判据**（唯一判据，探测命令与 UI 共用；本文件**只读**）。
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -58,18 +46,12 @@ internal sealed record WujieSmuVerdict(
 		}
 	}
 }
-
-/// <summary>
-/// ⭐⭐ 2026-10-19（机主：无界 APU 要能用 SMU 自定义）：**只读判据 + 默认可见日志** ✅。
-/// <para>⚠️ 本类只做判据/日志，⛔ 不做任何写入；探测命令 <c>--wujie-smu-probe</c> 与本类同一口径。</para>
-/// </summary>
+// （机主：无界 APU 要能用 SMU 自定义）：**只读判据 + 默认可见日志** 。
 internal static class WujieSmuGate
 {
 	/// <summary>机型名关键字（⛔ 不含模具号；大小写不敏感）。</summary>
 	private static readonly string[] WujieModelKeywords = new string[3] { "无界", "WUJIE", "WJXY" };
-
-	// ⭐⭐ 2026-10-19（机主拍板：无界 APU 直接开放 SMU 自定义，CPU 功耗最大 90W）：
-	//   ⭐ 范围常量（UI/写入**同一口径**）：PL1/PL2 = [15, 90]W；温度墙沿用 60–105℃。
+	// 范围常量（UI/写入**同一口径**）：PL1/PL2 = [15, 90]W；温度墙沿用 60–105℃。
 	internal const int PlMinWatts = 15;
 
 	internal const int PlMaxWatts = 90;
@@ -124,12 +106,7 @@ internal static class WujieSmuGate
 			Logger.WriteLine("[smu-ui] 无界 APU 允许日志异常（已吞掉）：" + ex.Message);
 		}
 	}
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：无界还有 15X 系列，判据不能判太死）：
-	/// **无界机型判据** = 下列任一字段含「无界」/ WUJIE（忽略大小写与空格；⛔ 不写死具体型号）：
-	/// ① SystemProductName(Model) ② SystemFamily ③ SystemSku ④ BaseBoardProduct ✅。
-	/// <para>⭐ 返回命中字段/值（供日志：15X 上来时一眼看出靠哪个字段命中）。</para>
-	/// </summary>
+	// <para> 返回命中字段/值（供日志：15X 上来时一眼看出靠哪个字段命中）。</para>
 	internal static bool IsWujieMachine(string model, string family, string sku, string board, out string hitField, out string hitValue)
 	{
 		string[] fields = new string[4] { "Name", "Family", "SKU", "Board" };

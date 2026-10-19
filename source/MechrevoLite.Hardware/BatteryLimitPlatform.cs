@@ -18,7 +18,7 @@ internal static class BatteryLimitPlatform
 	/// <summary>⭐ 本机板号（读注册表 BIOS/BaseBoardProduct；失败返回空）✅。</summary>
 	internal static string BoardProduct()
 	{
-		// ⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 与后端/诊断共用多来源取证（reg BaseBoardProduct / WMI BaseBoard）✅
+		// （机主：宝龙达被判成同方）： 与后端/诊断共用多来源取证（reg BaseBoardProduct / WMI BaseBoard）
 		return BoardWhitelist.ReadBoardProduct();
 	}
 

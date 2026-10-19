@@ -62,8 +62,7 @@ internal static class BoardWhitelist
 		}
 		return false;
 	}
-
-	/// <summary>⭐⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 板号取证结果（四来源 + 最终采用值/来源）✅</summary>
+	// <summary> （机主：宝龙达被判成同方）： 板号取证结果（四来源 + 最终采用值/来源）</summary>
 	internal readonly record struct BoardProductEvidence(string RegBaseBoard, string WmiBaseBoard, string RegSystemProduct, string WmiModel, string Product, string Source);
 
 	private static BoardProductEvidence _cachedEvidence;

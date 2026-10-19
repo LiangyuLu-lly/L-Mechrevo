@@ -42,7 +42,7 @@ internal static class LightCompatibilitySwitches
 	internal const bool EnablePerKeyColorBufferIdFix = true;
 
 	/// <summary>
-	/// 2026-10-09（② 键盘类型判据按作者 0.290.6 对齐）：ordinal→名称→kind。
+	/// 2026-10-09（② 键盘类型判据 对齐）：ordinal→名称→kind。
 	/// on（默认）= ordinal=1 才是单分区，FourZone(2) 走它自己的 6 项灯效表与通用分支；
 	/// off = 回到 0.291.2 旧判据（KeyboardType∈{1,2} 都当单分区）。
 	/// </summary>

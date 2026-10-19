@@ -4,7 +4,7 @@ namespace MechrevoLite.Hardware;
 
 /// <summary>
 /// 键盘灯效表 + 键盘类型判据。
-/// 2026-10-09（按作者 0.290.6 对齐单键 RGB）：判据改为作者的 ordinal→名称→kind 模型，
+/// 2026-10-09（ 对齐单键 RGB）：判据改为作者的 ordinal→名称→kind 模型
 /// 只移植「单键 RGB 必需」的那一部分 —— Keymap 帧层、rgb.cfg、主题名不动；整套
 /// LightingChannelSet/LightingEvidence/HID 接口分类（LightingChannelDetector 的其余部分）不移植
 /// （我们分支没有这套模型，风险大且与本轮三处修复无关）。

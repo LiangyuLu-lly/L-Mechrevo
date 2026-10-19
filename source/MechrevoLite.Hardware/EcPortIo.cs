@@ -324,16 +324,7 @@ internal static class EcPortIo
 		}
 		return allOk;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（30 系 FN EC 取证专用）：**快速单次读**（只用于探针）✅。
-	/// <para>⚠️ 与 <see cref="TryReadByte" /> 的区别：**单次事务、不重试、不做稳定性多次采样**；
-	/// 读失败就返回 false（⛔ 不重试、⛔ 不污染正常读写路径的失败计数/中毒判定）✅。</para>
-	/// <para>⚠️ 仍走同一条只读协议（0x92 · 端口 0x62/0x66），并受端口白名单约束 ✅。</para>
-	/// </summary>
-	/// <param name="address">XRAM 地址（与 <see cref="TryReadByte" /> 相同口径）✅。</param>
-	/// <param name="value">读到的字节；失败为 -1 ✅。</param>
-	/// <param name="timeoutMs">单步等待超时（默认 4ms；探针要快 ⇒ 失败立即下一个地址）✅。</param>
+	// 读失败就返回 false（ 不重试、 不污染正常读写路径的失败计数/中毒判定）。</para>
 	internal static bool TryReadByteFast(int address, out int value, int timeoutMs = 4)
 	{
 		value = -1;

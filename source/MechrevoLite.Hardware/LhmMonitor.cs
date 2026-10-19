@@ -55,9 +55,7 @@ public class LhmMonitor : IDisposable
 	public float? CpuClockMhz { get; private set; }
 
 	public float? GpuPower { get; private set; }
-
-	// ⭐⭐ 2026-10-19（机主：无界 780M 核显「显卡功耗」不随负载变化）：
-	//   ⭐ AMD APU 核显功耗源/冻结判据（只读；NVIDIA 路径不变）✅
+	// AMD APU 核显功耗源/冻结判据（只读；NVIDIA 路径不变）
 	private static int _gpuPowerStableCount;
 
 	private static float _gpuPowerLastValue = float.NaN;
@@ -65,8 +63,7 @@ public class LhmMonitor : IDisposable
 	private static int _gpuPowerChangeCount;
 
 	private static bool _gpuPowerFrozen;
-
-	// ⭐ 2026-10-19（机主：待机恒定属正常，不能只凭"6 次相同"判冻结）：⭐ 必须看到 load/temp 在变而功率不动才判冻结 ✅
+	// （机主：待机恒定属正常，不能只凭"6 次相同"判冻结）： 必须看到 load/temp 在变而功率不动才判冻结
 	private static bool _gpuPowerMovementSeen;
 
 	private static int? _gpuPowerLastLoad;
@@ -609,8 +606,7 @@ public class LhmMonitor : IDisposable
 							else if (IsGpuHardwareType(item.HardwareType))
 							{
 								gpuPowerSensors.Add((item.HardwareType, item.Name, sensor.Name, sensor.Value.Value));
-								// ⭐⭐ 2026-10-19（门控审计：NVIDIA 路径逐位不变）：NVIDIA 仍用**原窄判据**；
-								//   AMD 才用放宽后的 GPU*Power（APU 核显必需）✅
+								// （门控审计：NVIDIA 路径逐位不变）：NVIDIA 仍用**原窄判据**；
 								if (item.HardwareType == HardwareType.GpuNvidia ? IsGpuPowerSensorNameLegacy(sensor.Name) : IsGpuPowerSensorName(sensor.Name))
 								{
 									switch (item.HardwareType)
@@ -685,7 +681,7 @@ public class LhmMonitor : IDisposable
 				// ⭐⭐ 2026-10-18（机主：CPU 温度 80℃ 不动）：⭐ 本轮 CPU 温度选源（⭐ 在全部传感器里按档位选 ✅）
 				CpuHardwareCount = cpuHardwareCount;
 				SelectCpuTemperature(cpuTempReadings, tickCount);
-				// ⭐⭐ 2026-10-19（机主：无界 780M 核显功耗不随负载变化）：AMD 核显优先选源 + 全量诊断日志 + 冻结判据 ✅
+				// （机主：无界 780M 核显功耗不随负载变化）：AMD 核显优先选源 + 全量诊断日志 + 冻结判据
 				bool gcuStylePower = false;
 				if (ContainsAmdGpuHardware())
 				{
@@ -860,14 +856,7 @@ public class LhmMonitor : IDisposable
 		}
 		return true;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（AMD APU 核显）：⭐ 选源规则 ——
-	/// ① 优先 `GPU SoC Power` / `GPU Core Power`，两者同时存在 ⇒ **相加**（并说明）；
-	/// ② 否则 `GPU Package Power` / `GPU Power`；⛔ 排除名字含 Limit/Capacity/TDP 的（上限类，不是实时功耗）✅。
-	/// <para>⚠️ 只读；只影响 AMD 核显，NVIDIA 机型仍走 NVML/原路径 ✅</para>
-	/// </summary>
-	/// <summary>⭐ 递归判断本机是否存在 AMD GPU 硬件（含 SubHardware）✅</summary>
+	// <para> 只读；只影响 AMD 核显，NVIDIA 机型仍走 NVML/原路径 </para>
 	private bool ContainsAmdGpuHardware()
 	{
 		foreach (IHardware hardware in _computer.Hardware)
@@ -894,13 +883,7 @@ public class LhmMonitor : IDisposable
 			return false;
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐⭐ 2026-10-19（机主：直接参照 GCU Monitor `igpu_w()`）：
-	/// **递归 SubHardware**，用「硬件名|传感器名」组合键取 AMD 核显功耗/温度/占用：
-	/// 功耗 = 组合键含 `GPU Core` 或 `GPU SoC` 的 Power 传感器**相加**；温度 = 含 `VR SoC`；占用 = 含 `GPU Core`。
-	/// <para>⭐ 每个分量先过我们额外加的合理性/尖峰过滤（GCU Monitor 没有这层）✅</para>
-	/// </summary>
+	// （机主：直接参照 GCU Monitor igpu_w()）
 	private (float? Power, float? Temp, int? Load, string Detail, string TempDetail) ReadAmdIgpuByGcuStyle()
 	{
 		List<(string Key, float Value)> powers = new List<(string, float)>();
@@ -984,12 +967,7 @@ public class LhmMonitor : IDisposable
 	private static readonly List<float> _igpuRecentWatts = new List<float>();
 
 	private static int _igpuAbnormalStreak;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：核显功耗偶发 400W）：
-	/// 单个分量的**合理性与尖峰过滤** —— 硬上限 120W；软尖峰：> 近 5 次中位数×5 且 >50W ⇒ 丢弃；
-	/// 丢弃时保留该分量上一次有效值（没有则跳过该分量）；连续异常计数给上层（≥5 ⇒ 显示—）✅。
-	/// </summary>
+	// 丢弃时保留该分量上一次有效值（没有则跳过该分量）；连续异常计数给上层（≥5 ⇒ 显示—）。
 	private static float? ValidateIgpuComponent(string name, float value)
 	{
 		string reason = null;
@@ -1042,8 +1020,6 @@ public class LhmMonitor : IDisposable
 			return (null, "");
 		}
 		// ① SoC + Core 同时存在 ⇒ 相加（板载 iGPU 的两段真实功耗）
-		//   ⭐⭐ 2026-10-19（机主实测：LHM 在 780M 上名字是 `GPU Core` / `GPU SoC`，**不带 Power 后缀**）：
-		//   匹配同时认 SoC/Core（是否带 Power 都行）；每个分量先过**合理性与尖峰过滤**再相加 ✅
 		bool hasSoc = false;
 		bool hasCore = false;
 		float sum = 0f;
@@ -1238,9 +1214,7 @@ public class LhmMonitor : IDisposable
 		{
 			return false;
 		}
-		// ⭐⭐ 2026-10-19（机主更正：LHM 在 APU 上能读出核显功耗）：⭐ 不再只认精确名 ——
-		//   任何含 GPU + Power 的传感器都接受（GPU Core Power / GPU SoC Power / GPU Package Power / GPU Power…）✅
-		//   ⚠️ 上限/容量类已在上面排除；⛔ 不改变 NVIDIA 路径（NVML 仍优先）✅
+		// 上限/容量类已在上面排除； 不改变 NVIDIA 路径（NVML 仍优先）
 		if (text.Contains("GPU", StringComparison.OrdinalIgnoreCase) && text.Contains("Power", StringComparison.OrdinalIgnoreCase))
 		{
 			return true;

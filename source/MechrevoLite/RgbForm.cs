@@ -57,31 +57,20 @@ public class RgbForm : RForm
 	private int _teardownDone;
 
 	private RSlider _brightSlider;
-
-	/// <summary>⭐ 2026-10-19（亮度显示**实际生效值**）：滑块右侧的「值/上限」标签（重建面板时一起换）。</summary>
+	// <summary> （亮度显示**实际生效值**）：滑块右侧的「值/上限」标签（重建面板时一起换）。</summary>
 	private Label _brightValueLabel;
-
-	/// <summary>⭐ 2026-10-19：亮度滑块下限/上限（宝龙达 = 1..探测上限；非宝龙达 = 0..4 逐位不变）。</summary>
+	// <summary> 亮度滑块下限/上限（宝龙达 = 1..探测上限；非宝龙达 = 0..4 逐位不变）。</summary>
 	private int _brightMinimum;
 
 	private int _brightMaximum = 4;
 
 	/// <summary>⭐ 程序化回写滑块（显示实际生效值）时置位 ⇒ ⛔ 不再触发一次下发（防回环）。</summary>
 	private bool _syncingBrightnessUi;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色 ⇒ 颜色无意义，但**亮度必须保留**）：
-	/// 颜色选择区的显隐状态（-1=未知 / 0=显示 / 1=隐藏）—— 只用于**状态变化时**打一行日志 ✅。
-	/// </summary>
+	// （机主：彩虹=软件刷色 ⇒ 颜色无意义，但**亮度必须保留**）
 	private int _kbdColorUiHiddenState = -1;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（运行时自校准）：本窗是否已排过键盘灯能力探测（0/1）。
-	/// <para>⚠️ 只防重复排队；"只跑一次"由 <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 缓存保证 ✅。</para>
-	/// </summary>
+	// <para> 只防重复排队；"只跑一次"由 <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 缓存保证 。</para>
 	private int _kbdCalibrationQueued;
-
-	/// <summary>⭐ 2026-10-19：亮度实际值事件来源（关闭时退订，防泄漏）。</summary>
+	// <summary> 亮度实际值事件来源（关闭时退订，防泄漏）。</summary>
 	private MechrevoHw _brightnessSource;
 
 	private System.Windows.Forms.Timer? _modeSyncTimer;
@@ -249,15 +238,13 @@ public class RgbForm : RForm
 			_modeSyncTimer.Start();
 		}
 		_rgb.DeviceLost += OnRgbDeviceLost;
-		// ⭐⭐ 2026-10-19（机主：「拖到最大没反应/回弹」）：订阅亮度**回读实际值**事件 ⇒
-		//   写入被固件夹回时，本窗滑块显示实际生效值（⛔ 不显示用户拖到的值）✅
+		// （机主：「拖到最大没反应/回弹」）：订阅亮度**回读实际值**事件 ⇒
 		_brightnessSource = Program.hw;
 		if (_brightnessSource != null)
 		{
 			_brightnessSource.KeyboardBrightnessApplied += OnKeyboardBrightnessApplied;
 		}
-		// ⭐⭐ 2026-10-19（运行时自校准）：打开键盘灯设置 ⇒ **排队一次**亮度上限探测
-		//   （后台线程；完成后重建面板 ⇒ 亮度滑块范围 1..实测上限）✅
+		// （后台线程；完成后重建面板 ⇒ 亮度滑块范围 1..实测上限）
 		KickKeyboardCalibration();
 		FormClosing += (object? _, FormClosingEventArgs e) =>
 		{
@@ -275,7 +262,7 @@ public class RgbForm : RForm
 				_modeSyncTimer?.Stop();
 				_modeSyncTimer?.Dispose();
 				_rgb.DeviceLost -= OnRgbDeviceLost;
-				// ⭐ 2026-10-19：退订亮度实际值事件（静态 hw 活得比本窗久 ⇒ 必须退订防泄漏）
+				// 退订亮度实际值事件（静态 hw 活得比本窗久 ⇒ 必须退订防泄漏）
 				if (_brightnessSource != null)
 				{
 					_brightnessSource.KeyboardBrightnessApplied -= OnKeyboardBrightnessApplied;
@@ -360,15 +347,7 @@ public class RgbForm : RForm
 	{
 		_hidPanel.Enabled = enabled;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准，别再靠猜常量」）：
-	/// 打开键盘灯设置（本窗）时**排队一次**宝龙达键盘灯**亮度上限**探测 ✅。
-	/// <para>⭐ 探测本体（写 WMI 18 + 回读 + try/finally 恢复）在
-	/// <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 里**只跑一次并缓存**；
-	/// 本方法只负责"后台线程触发 + 完成后回 UI 重建面板"（亮度滑块范围随之收敛）✅。</para>
-	/// <para>⚠️ 必须后台线程：探测含多次 WMI 往返（约 &lt; 1s），⛔ 不阻塞窗口 ✅。</para>
-	/// </summary>
+	// <para> 探测本体（写 WMI 18 + 回读 + try/finally 恢复）在
 	private void KickKeyboardCalibration()
 	{
 		MechrevoHw hw = Program.hw;
@@ -408,13 +387,7 @@ public class RgbForm : RForm
 			}
 		});
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色 ⇒ 颜色无意义、亮度保留）：
-	/// 效果被**外部入口**（设置界面的键盘效果下拉）切换后，**立刻**刷新本窗参数面板 ✅。
-	/// <para>⭐ 用途：彩虹 ⇒ 颜色区折叠 + 日志；切回单色 ⇒ 颜色区恢复（颜色值从配置读回，不丢）✅。</para>
-	/// <para>⚠️ 只重建 UI（<see cref="BuildGcuFirmwareParams" />），⛔ 不写任何硬件 ✅。</para>
-	/// </summary>
+	// <para> 用途：彩虹 ⇒ 颜色区折叠 + 日志；切回单色 ⇒ 颜色区恢复（颜色值从配置读回，不丢）。</para>
 	internal void RefreshKeyboardLightEffectUi()
 	{
 		if (IsDisposed || Disposing)
@@ -442,11 +415,7 @@ public class RgbForm : RForm
 		_hidPanel.PerformLayout();
 		_updateClientHeight?.Invoke();
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：「亮度拖到最大没反应/回弹」）：硬件**回读到的实际亮度**到达 ✅。
-	/// <para>⚠️ 事件可能来自后台线程 ⇒ 必须 <c>BeginInvoke</c> 回 UI 线程再动控件 ✅。</para>
-	/// </summary>
+	// （机主：「亮度拖到最大没反应/回弹」）：硬件**回读到的实际亮度**到达 。
 	private void OnKeyboardBrightnessApplied(int actualLevel)
 	{
 		if (IsDisposed || Disposing || !IsHandleCreated)
@@ -682,18 +651,9 @@ public class RgbForm : RForm
 		table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, (_paramLabelCol > 0) ? _paramLabelCol : D(96)));
 		table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 		int row = 0;
-		// ⭐⭐ 2026-10-19（机主要求「运行时自校准」+ 机主实测纠正）：
-		//   ⭐ 宝龙达键盘亮度**只有 0/1/2/3 四档**（最大 3）；旧代码按 Gen40 给到 4
-		//     ⇒ 滑块能拖到第 5 档、但固件不支持 ⇒ 表现为「最大亮度不能用」❌
-		//   ⭐ 现在范围 = **1..本机探测上限**（探测失败退回声明值 3；⛔ 不再写死 3/4）——
-		//     下限取 1：硬件 0 = 灭（开/关由设置界面的开关负责），⛔ 不让"调暗"变成"关灯"。
-		//   ⚠️ 非宝龙达（GCU）仍是 0~4 ⇒ 逐位不变 ✅
+		// 现在范围 = **1..本机探测上限**（探测失败退回声明值 3； 不再写死 3/4）——
 		bool baolongda = Program.hw?.UsesBaolongda ?? false;
-		// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色）：⭐ 彩虹模式下**整体隐藏颜色选择区**
-		//   （29 色预设色板 / 自定义颜色按钮 / 它们对应的标签都**不建** ⇒ 面板自动折叠）✅
-		//   ⚠️ **只隐藏颜色**：亮度滑块 / 亮度数值 / 亮度标签**始终保留可用** ——
-		//      软件彩虹每帧只写功能号 17（颜色），亮度是**独立写入**，用户必须能调 ✅
-		//   ⚠️ 仅宝龙达：其它机型（GCU/同方）行为逐位不变 ✅
+		// **只隐藏颜色**：亮度滑块 / 亮度数值 / 亮度标签**始终保留可用** ——
 		bool rainbowEffect = string.Equals(lightChannelSettings.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase);
 		bool hideColorBlock = baolongda && rainbowEffect;
 		if (baolongda && _kbdColorUiHiddenState != (hideColorBlock ? 1 : 0))
@@ -904,13 +864,7 @@ public class RgbForm : RForm
 				&& !(KeyboardFirmwareEffects.IsSingleZoneRgb(Program.hw?.Capabilities.KeyboardType ?? 0)
 					&& string.Equals(lightChannelSettings.Effect, "Rainbow", StringComparison.Ordinal)))
 			{
-				// 2026-10-15（用户原话「因为彩虹灯效不能编辑颜色」「先就改单分区的」）：
-				// 单分区键盘的**彩虹**灯效由固件按渐变自行取色，用户改不了颜色 ⇒ 这一档下
-				// 「预设颜色」29 色板与「自定义颜色」两个入口都无意义，整块不建。
-				// ⚠️ 只对**单分区**生效（IsSingleZoneRgb）；四分区机型保持原样（其彩虹行为未验证，不动）。
-				// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色）：宝龙达下**所有**机型在彩虹模式都整块不建
-				//   （见上方 `hideColorBlock`）；切回单色由 BuildGcuFirmwareParams() 重建自动恢复，
-				//   且用户上次选的颜色存在配置里 ⇒ 高亮/选中随之恢复（⛔ 彩虹期间不丢颜色值）✅
+				// （见上方 hideColorBlock）；切回单色由 BuildGcuFirmwareParams() 重建自动恢复
 				RColorButton customColorBtn = new RColorButton
 				{
 					Size = new Size(D(46), D(24)),
@@ -1010,7 +964,7 @@ public class RgbForm : RForm
 		_hidPanel.Controls.Add(table);
 		FitParameterTable(_hidPanel);
 		UiVisualStyle.ApplySection(_hidPanel);
-		// ⭐ 2026-10-19：彩虹隐藏颜色块后**重新布局**（AutoSize 面板 + 窗口高度跟随，避免留空白/跳动）✅
+		// 彩虹隐藏颜色块后**重新布局**（AutoSize 面板 + 窗口高度跟随，避免留空白/跳动）
 		_hidPanel.PerformLayout();
 		table.PerformLayout();
 		_updateClientHeight?.Invoke();

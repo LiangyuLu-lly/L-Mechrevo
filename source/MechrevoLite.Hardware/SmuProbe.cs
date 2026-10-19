@@ -1,18 +1,4 @@
-// ⭐⭐ 2026-10-19（30 系 · SMU **只读**探针）：
-// 目的：在真机（30 系 蛟龙16 / MRID6 / 6800H）上先确认「SMU 通路到底能不能读」，
-//       再决定要不要把自定义模式的 PL1/PL2/温度墙改走 SMU（它们的 WMI 功能号 23 在 30 系不存在）。
-//
-// ⛔ 本探针**只读**：一条 SMU 写命令都不发（不调用 SetStapm/SetFast/SetSlow/SetStmTime/SetTctlTemp/
-//    SetCoAll...），只走 `ioctl_get_code_name` / `ioctl_get_smu_version` / PM 表
-//    `resolve + update + read` 这三类**读路径** IOCTL。**一个字节的设置都不写。**
-//
-// 输出：
-//   * 桌面 `lm-smu-probe-<时间戳>.txt`（主报告）；
-//   * `%APPDATA%\MechrevoLite\log.txt`（每行前缀 `[smu-probe]`，与 `--kbd-probe` / `--gpu-oc-probe` 同款）。
-//
-// 用法：`L-Mechrevo.exe --smu-probe`
-// ⚠️ 主程序清单是 requireAdministrator ⇒ 双击/直接运行会提权（UAC）。**普通权限**运行也能跑，
-//    但 PawnIO 会回 AccessDenied —— 那是**预期**行为，报告里会如实写「需要管理员才能读 SMU」。
+// （30 系 · SMU **只读**探针）
 using System;
 using System.IO;
 using System.Reflection;

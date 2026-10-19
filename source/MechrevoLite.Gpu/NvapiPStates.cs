@@ -4,19 +4,10 @@ using System.Text;
 using System.Threading;
 
 namespace MechrevoLite.Gpu;
-
-/// <summary>
-/// 2026-10-19（宝龙达 · 无 GCU 的 GPU 频率偏移）：NVAPI P-States 20 的 P0 时钟偏移封装。
-/// <para>⭐ 为什么不用厂商 GCU：宝龙达机型没有 GCU，厂商的 <c>LCHWOC</c> / <c>GpuCoreClockOffsetOC</c>
-/// 字段下发必然失败。NVAPI 的 <c>NvAPI_GPU_SetPstates20</c> 是驱动级接口，**不依赖 GCU**。</para>
-/// <para>⭐ 单位：NVAPI 结构里的 <c>freqDelta_kHz</c> 是 **kHz**；本类对外全部用 **MHz**
-/// （与 UI 滑块、厂商 7.3 参考实现的 <c>ChangePstatesLevel0Settings</c> 口径一致）。</para>
-/// <para>⭐ 安全：所有入口都 try/catch，失败只返回 false 并写 <see cref="LastError" />，⛔ 不把异常抛给 UI。</para>
-/// </summary>
+// 字段下发必然失败。NVAPI 的 <c>NvAPI_GPU_SetPstates20</c> 是驱动级接口，**不依赖 GCU**。</para>
 internal static class NvapiPStates
 {
-	// ⭐⭐ 2026-10-19（UI 范围）：宝龙达下 UI 取「驱动读到的范围」与这个区间的**交集**。
-	// 来源（只取数值语义，⛔ 未复制任何实现）：第三方 7.3 的 MinCoreOffset=-900 / MaxCoreOffset=2000。
+	// （UI 范围）：宝龙达下 UI 取「驱动读到的范围」与这个区间的**交集**。
 	internal const int UiOffsetMinimumMhz = -900;
 
 	internal const int UiOffsetMaximumMhz = 2000;

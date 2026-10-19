@@ -20,10 +20,7 @@ public class LightForm : RForm
 		("Impact", Strings.EffectImpact),
 		("Raindrop", Strings.EffectMeteor)
 	};
-
-	// ⭐ 2026-10-19（机主：耀世16super 的 Logo 有固件原生彩虹）：按官方 GCU 组件行为对照，
-	//   其效果枚举包含 Rainbow（现有 Single/Breathing/Mix 同样使用官方枚举名）⇒ Logo 表补第 4 项。
-	//   ⚠️ 只补 Logo；灯带/铰链/同步的效果表保持不变。
+	// 机主：耀世16super 的 Logo 有固件原生彩虹）：按 组件行为对照
 	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[4]
 	{
 		("Single", Strings.EffectSingle),
@@ -32,7 +29,7 @@ public class LightForm : RForm
 		("Rainbow", Strings.EffectRainbow)
 	};
 
-    // 2026-10-09（③，按作者 0.290.6 对齐）：铰链 = 作者 Lighbar4(biosProjectId) 的 5 项
+    // 2026-10-09（③， 对齐）：铰链 = 作者 Lighbar4(biosProjectId) 的 5 项
     // （Single/Breathing/Wave/Impact/Raindrop，与灯条行同一张表；作者对 biosProjectId=="ID5" 会缩到 3 项，
     //  我们分支没有 ID5 模型，故固定 5 项 —— 见报告"未确定项"）。
     public static readonly (string Effect, string Name)[] HingeEffects = new (string, string)[5]
@@ -44,7 +41,7 @@ public class LightForm : RForm
         ("Raindrop", Strings.EffectMeteor)
     };
 
-    // 2026-10-09（③，按作者 0.290.6 对齐）：同步 = 作者 Sync() 的 2 项（Single/Dawn，Dawn 新加资源串）。
+    // 2026-10-09（③， 对齐）：同步 = 作者 Sync() 的 2 项（Single/Dawn，Dawn 新加资源串）。
     public static readonly (string Effect, string Name)[] SyncEffects = new (string, string)[2]
     {
         ("Single", Strings.EffectSingle),
@@ -179,7 +176,7 @@ public class LightForm : RForm
 			rColorPicker.ShowDialog(this);
 		};
 		AddRow(Strings.SingleColor, colorBtn);
-		// ⭐ 2026-10-19（Logo 固件原生彩虹）：彩虹效果下颜色无意义 ⇒ 颜色行隐藏/置灰（不启动任何软件刷色）✅
+		// （Logo 固件原生彩虹）：彩虹效果下颜色无意义 ⇒ 颜色行隐藏/置灰（不启动任何软件刷色）
 		Label colorLabel = table.GetControlFromPosition(0, table.RowCount - 1) as Label;
 		UpdateChannelEnabled();
 		Controls.Add(table);

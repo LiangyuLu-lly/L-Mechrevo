@@ -121,11 +121,7 @@ public sealed class RyzenSmuService : IDisposable
 		fast = SetFast(fastW);
 		slow = SetSlow(slowW);
 	}
-
-	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗墙）：**单项**入口 —— 与 `SetAllLimits` 是同一套私有实现
-	// （`SetStapm` / `SetFast` / `SetSlow`，含同一道白名单闸），只是把"三项一起发"拆开。
-	// 用途：30 系上如果"另一项"读不到（PM 表失败）⇒ 只下发用户真正改过的那一项，
-	//      ⛔ 不拿 0/编造值把另一项覆盖掉（`SetAllLimits` 做不到这一点：它三项都会发）。
+	// 用途：30 系上如果"另一项"读不到（PM 表失败）⇒ 只下发用户真正改过的那一项
 	public SmuStatus SetStapmLimit(int watts)
 	{
 		return SetStapm(watts);
@@ -709,41 +705,7 @@ public sealed class RyzenSmuService : IDisposable
 			return SmuStatus.Failed;
 		}
 	}
-
-	// ==========================================================================================
-	// ⭐⭐ 2026-10-19（30 系 · SMU 功耗时间窗 / 温度墙）：
-	//
-	// 背景：30 系（蛟龙16 / 板号 MRID6 / 6800H＝Rembrandt）的原厂控制台 WMI 方法表**只到 18**，
-	//       没有功能号 23（`CPUPower`）⇒ PL1/PL2/温度墙**没有** WMI 通路，只能走 SMU。
-	//       本机同为 AMD（8845H/HawkPoint）⇒ 同一组 APU 命令；30 系的 Family 是 `CpuFamily.Mobile`。
-	//
-	// 命令号语义（⭐ **只取事实**，不复制任何实现代码；两个独立开源实现逐条一致）：
-	//   * FlyGoat/RyzenAdj `lib/api.c`（LGPL-3.0）· set_slow_time / set_stapm_time / set_tctl_temp；
-	//   * HorizonUnix/ZenMaster `zenmaster/runner.py`（独立 Python 实现）· slow-time / stapm-time / tctl-temp。
-	//   本文件的命令号**不是**从参考实现抄下来的代码，而是"事实表"的重写；许可与来源说明见文件头。
-	//   组内代号（Renoir/Lucienne/Cezanne/VanGogh/Rembrandt/Mendocino/Phoenix/Phoenix2/HawkPoint/
-	//   KrackanPoint/StrixPoint/StrixHalo）：
-	//       slow_time  = MP1 0x17 · stapm_time = MP1 0x18 · tctl_temp = MP1 0x19
-	//   Raven/Picasso/Dali：0x1D / 0x1E / 0x1F
-	//   DragonRange/FireRange（本仓库 `CpuFamily.Raphael` 档）：0x60 / 0x4E / 0x3F
-	//   Zen1 桌面（SummitRidge…）与 Matisse/Vermeer（Zen2 桌面）：参考实现**没有**这三条命令
-	//   ⇒ ⭐ 不下发、返回 `SmuStatus.NotSupported`（⛔ 不猜命令号）。
-	//
-	// ⚠️ **命令号的两种时间窗**（都不是"PL2 生效时间"）：
-	//   * STAPM（Skin Temperature-Aware Power Management）：按**机壳（表面）温度**约束持续功耗；
-	//     `stapm_time` 是它的**平均时间窗**（单位：秒）；
-	//   * `slow_time` 是 slow limit（平均功耗上限）的时间常数（单位：秒）；
-	//   * fast limit（PL2）是**瞬时限值**，没有时间参数 —— ⛔ 本服务**不提供** `SetFastTime`
-	//     （两个独立开源实现里都没有 fast-time 这条命令；只有"STAPM 时间窗"与"slow 时间窗"）。
-	//
-	// 单位：参考实现的 `--stapm-time` / `--slow-time` 都是**秒**（u32）⇒ 本服务入参也用**秒**，
-	//       ⛔ 不做毫秒换算（名字里带 Seconds 就是为了让调用点一眼看清单位）。
-	//
-	// 安全护栏（与 SetStapm/SetFast/SetSlow/SetThm 同一把尺子）：
-	//   * 先过 `LegacyFamilyCommandsApproved` 白名单（名单外：**一条命令都不发**）；
-	//   * 家族未知/无依据 ⇒ `SmuStatus.NotSupported`（L-Mechrevo 私有状态，不是固件返回值）；
-	//   * 只有 SMU 回 `OK` 才算成功；⛔ 不把"发出去了"当成"生效了"。
-	// ==========================================================================================
+	// ⇒  不下发、返回 SmuStatus.NotSupported（ 不猜命令号）。
 	public SmuStatus SetSlowTimeSeconds(int seconds)
 	{
 		if (!LegacyFamilyCommandsApproved(_cpu))
@@ -905,21 +867,7 @@ public sealed class RyzenSmuService : IDisposable
 			_smuMutex.ReleaseMutex();
 		}
 	}
-
-	// ==========================================================================================
-	// ⭐⭐ 2026-10-19（30 系 · SMU 只读快照）：一次 PM 表读取拿全「当前 limits + 两个时间窗」。
-	//
-	// 为什么单独一个方法（**不改** `GetPowerLimits`）：
-	//   * `GetPowerLimits` 只读 64 个 qword（= 256 个 float = 0x200 字节），足够 limits/tctl，
-	//     但**不够**读时间窗 —— 参考实现里这些字段在 0x564~0x9C0（见 `GetPmTimeOffset`）；
-	//   * ⚠️ PawnIO 模块的 `ioctl_read_pm_table` 上限 = 一页（`PAGE_SIZE / 8` = 512 个 qword，4096 B）
-	//     ⇒ 本方法按 **512 qword** 取（不是把表无限放大；内核侧自己会按页夹住）。
-	//   * `GetPowerLimits` 的时序/日志是对外可核对的（`ModeControl.ReadRyzenLimits` 依赖它），
-	//     所以**一字未动**；本方法只读一行摘要日志（不打印 512 个 float，避免刷屏）。
-	//
-	// ⚠️ 只读：除了 `ioctl_resolve_pm_table` / `ioctl_update_pm_table`（= 让 SMU 把 PM 表刷进内存）
-	//    与 `ioctl_read_pm_table` 这三条**读路径** ioctl 外，**不写任何东西**（⛔ 一条 SMU 写命令都不发）。
-	// ==========================================================================================
+	// 所以**一字未动**；本方法只读一行摘要日志（不打印 512 个 float，避免刷屏）。
 	private const int PM_TABLE_SNAPSHOT_QWORDS = 512;
 
 	// ⚠️ 返回 null = 读不到（⛔ 不编默认值）；本工程未开 #nullable ⇒ 故意不写 `?` 注解（避免新增 CS8632 告警）。

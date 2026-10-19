@@ -46,11 +46,7 @@ internal static class BatteryLimitWriter
 		detail = "0x83A1=" + Fmt(high) + " · 0x83A2=" + Fmt(low) + " · 0x83C0=" + Fmt(mode);
 		return h && l && m;
 	}
-
-	/// <summary>
-	/// ⭐ 启用限充。<para>⚠️ 2026-10-19（机主批准 · 恢复开源默认）：⭐ `SOC >= high` 时**默认阻断**（0 字节、给可操作原因）；
-	/// 只有显式「允许初次放电」才允许（固件会先放电到起充值附近，可能掉电）✅</para>
-	/// </summary>
+	// 启用限充。<para> （机主批准 · 恢复开源默认）： SOC >= high 时**默认阻断**（0 字节、给可操作原因）；
 	internal static bool TryEnable(int low, int high, out string detail)
 	{
 		return TryEnable(low, high, allowInitialDischarge: false, out detail);

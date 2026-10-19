@@ -71,9 +71,7 @@ internal sealed class BaolongdaBackend : IDisposable
 			wmi = BaolongdaWmi.TryCreate();
 			if (wmi == null)
 			{
-				// ⭐ 2026-10-19（机型识别排障）：⭐ 非宝龙达机型每次启动都会走到这里 ⇒ 平时静默；
-				//   ⭐ 但**板号命中白名单却探不到接口**是真异常 ⇒ 必须留一行 error 证据 ✅
-				//   （真机案例：MRID6-23 诊断包里白名单命中、运行期却 backend=Gcu，原因不可见）
+				// （机型识别排障）： 非宝龙达机型每次启动都会走到这里 ⇒ 平时静默；
 				try
 				{
 					if (IsBaolongdaModelWhitelisted(out string boardNoteWhenNull))
@@ -102,9 +100,7 @@ internal sealed class BaolongdaBackend : IDisposable
 			{
 				guidNote = "⚠️ 与老同方那份**不同** ⇒ ⭐ 这正是 LegacyMifsWmi（硬校验 GUID）**探不到**的原因";
 			}
-			// ⭐⭐ 2026-10-19（30 系事故）：⭐ 按板号决定"厂商温度通道"是否可用 ——
-			//   裸 `MRID6` = 30 系（6800H+3070Ti）⇒ 功能号 22 恒 0 ⇒ 关掉该通道，让温度回落 LHM/NVML ✅
-			//   ⚠️ `MRID6-23` = 40 系 ⇒ 保持可用 ✅
+			// （30 系事故）： 按板号决定"厂商温度通道"是否可用 ——
 			try
 			{
 				IsBaolongdaModelWhitelisted(out string boardForTemp);
@@ -223,8 +219,7 @@ internal sealed class BaolongdaBackend : IDisposable
 	/// </summary>
 	internal static bool IsBaolongdaModelWhitelisted(out string note)
 	{
-		// ⭐⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 多来源板号取证（reg.BaseBoardProduct / wmi.BaseBoard.Product /
-		//   SystemProductName / Model；首个白名单命中）—— 白名单判据**不变**（MRID6 精确 / MRID6-23 / MRID6- 前缀）✅
+		// （机主：宝龙达被判成同方）： 多来源板号取证（reg.BaseBoardProduct / wmi.BaseBoard.Product /
 		BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
 		bool match = BoardWhitelist.Matches(evidence.Product);
 		BoardWhitelist.LogEvidence(evidence, match);

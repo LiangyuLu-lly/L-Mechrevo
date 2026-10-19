@@ -91,14 +91,9 @@ private static void LoadEmbeddedFonts()
 		_embeddedFamily = null;
 	}
 }
-
-	/// <summary>⭐ 2026-10-19（设置窗启动慢 · 缓存）：回退字体族只创建一次（GDI+ 的 FontFamily 构造不便宜，
-	/// 以前每次 <see cref="Font(float, FontStyle)" /> 都会 new 一个）✅。</summary>
+	// <summary> （设置窗启动慢 · 缓存）：回退字体族只创建一次（GDI+ 的 FontFamily 构造不便宜
 	private static readonly FontFamily _fallbackFamily = new FontFamily("Microsoft YaHei UI");
-
-	/// <summary>⭐ 2026-10-19（设置窗启动慢 · 缓存）：同一个 (字号/字重/单位) 复用同一个 Font 实例。
-	/// <para>⚠️ Font 不可变 ⇒ 共享安全；Control.Font 只是引用，控件 Dispose **不会**释放共享 Font ✅。
-	/// ⭐ 目的：设置窗 236 个控件、上百次取字体 ⇒ 省掉大量 <c>new Font</c> 的 GDI+ 开销 ✅</para></summary>
+	// <summary> （设置窗启动慢 · 缓存）：同一个 (字号/字重/单位) 复用同一个 Font 实例。
 	private static readonly Dictionary<(int SizeKey, FontStyle Style, GraphicsUnit Unit), Font> _fontCache = new();
 
 	private static readonly object _fontCacheLock = new();
@@ -858,13 +853,7 @@ private static void LoadEmbeddedFonts()
 	{
 		return Font(size, style, GraphicsUnit.Point);
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（字体缓存配套）：需要**用完即弃**的字体时用它 —— 返回全新实例、可安全 Dispose。
-	/// <para>⛔ 不要 Dispose <see cref="Font(float, FontStyle)" /> / <see cref="Font(float, FontStyle, GraphicsUnit)" />
-	/// 的返回值：那是**进程级共享缓存**，Dispose 掉之后所有控件再画字都会抛
-	/// <c>ArgumentException: Parameter is not valid</c>（真机已复现）⚠️</para>
-	/// </summary>
+	// （字体缓存配套）：需要**用完即弃**的字体时用它 —— 返回全新实例、可安全 Dispose。
 	internal static Font TempFont(float size, FontStyle style = FontStyle.Regular)
 	{
 		return new Font(FontFamilyOrDefault(), size, style);
@@ -872,8 +861,7 @@ private static void LoadEmbeddedFonts()
 
 	internal static Font Font(float size, FontStyle style, GraphicsUnit unit)
 	{
-		// ⭐ 2026-10-19（设置窗启动慢 · 字体缓存）：同 (字号,字重,单位) 只构造一次 GDI+ Font。
-		//   以 0.1pt 为键（四舍五入）—— UI 里所有字号都是 0.5pt 的整数倍，不存在精度歧义 ✅
+		// （设置窗启动慢 · 字体缓存）：同 (字号,字重,单位) 只构造一次 GDI+ Font。
 		int sizeKey = (int)Math.Round(size * 10f);
 		var key = (sizeKey, style, unit);
 		lock (_fontCacheLock)

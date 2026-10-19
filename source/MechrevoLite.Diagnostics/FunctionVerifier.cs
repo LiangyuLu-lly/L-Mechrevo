@@ -12,11 +12,7 @@ namespace MechrevoLite.Diagnostics;
 internal static class FunctionVerifier
 {
 	private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(1600L);
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：强冷同类缺口统一修 · 防回归自检）：
-	/// 遍历所有快捷开关键，检查「可见 ⇔ 有处理分支」，不一致 ⇒ 记 issue 并打印清单 ✅
-	/// </summary>
+	// （机主：强冷同类缺口统一修 · 防回归自检）
 	private static void LogQuickSwitchCoverage(MechrevoHw hw)
 	{
 		List<string> supported = new List<string>();

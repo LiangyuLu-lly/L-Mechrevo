@@ -1,14 +1,4 @@
-// ⭐⭐ 2026-10-19（机主：无界系列 + AMD APU（8745H / 8845H / H255 / Ryzen AI 365 / AI 400 等）
-//   要能用「SMU 自定义」，与宝龙达 30 系同源）：
-//
-//   **只读探测命令** `--wujie-smu-probe`（0 写入）。
-//
-// 目的：先在无界真机上拿到「机型名 / 板号 / CPU / CpuVendor / APU 判据 / SMU 代号/家族/版本 /
-//       当前 PL1(SPL)/PL2(sPPT)/STAPM 读数 / 可写命令支持情况」的真实数据，
-//       再决定 ②放开判据 ③UI 行 ④PL 范围（本探针**不写任何东西**）。
-//
-// ⛔ 只读：不调任何 SMU Set*（不写 EC / 不写 SMU / 不写注册表/配置）。
-// 输出：桌面 `lm-wujie-smu-probe-<时间戳>.txt` + `%APPDATA%\MechrevoLite\log.txt`（前缀 `[wujie-smu-probe]`）。
+// **只读探测命令** --wujie-smu-probe（0 写入）。
 using System;
 using System.IO;
 using System.Text;

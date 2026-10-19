@@ -1,25 +1,4 @@
-// ⭐⭐ 2026-10-19（30 系 · SMU **保守写 + 回读** 实测工具）：
-//
-// 用途：在没有 30 系真机时，用本机（AMD 8845H / HawkPoint，与 30 系 6800H 同属 APU 命令组）
-//       验证我们新接的 SMU 写通路到底能不能写、写完能不能读回：
-//         * PL1 → slow limit（`SetSlowLimit`，Renoir/APU 组 MP1 0x16）
-//         * PL2 → fast limit（`SetFastLimit`，MP1 0x15）
-//         * 温度墙 → tctl（`SetTctlTemp`，MP1 0x19）
-//         * 功耗时间窗 → stapm_time（`SetStapmTimeSeconds`，MP1 0x18）
-//
-// ⚠️⚠️ **边界（机主/Lead 明确要求，代码里写死，不给参数覆盖）**：
-//   1. **先读后写**：写之前必须能读到 PM 表快照（PL1/PL2/SPL/tctl/stapm_time），读不到 ⇒ 一条写命令都不发；
-//   2. **只动一项、改完立刻回读**；
-//   3. 温度墙**只往 ≥85℃ 方向**改（例：当前 95 ⇒ 试 90，立刻回读，再还原）；
-//   4. slow/fast（PL1/PL2）**只在当前值往下 5W 内**动，⛔ 绝不加高；
-//   5. stapm_time **只写回当前值**（验证写入通路，⛔ 不改大/改小）；
-//   6. `finally` 里**必须**把 PL1/PL2/SPL/tctl/stapm_time **全部写回快照**，然后回读确认（容差 ±1）；
-//      恢复失败 ⇒ 立刻再试一次，并在报告里用 ERROR 级别写明（这比测试结果重要）。
-//
-// ⛔ 不带 `--yes` 时**只读**（只打印快照，不写任何东西）。
-//
-// 输出：桌面 `lm-smu-write-test-<时间戳>.txt` + `%APPDATA%\MechrevoLite\log.txt`（前缀 `[smu-write-test]`）。
-// 用法：`L-Mechrevo.exe --smu-write-test [--yes]`（需要管理员；主程序清单本身就是 requireAdministrator）
+// 恢复失败 ⇒ 立刻再试一次，并在报告里用 ERROR 级别写明（这比测试结果重要）。
 using System;
 using System.IO;
 using System.Linq;

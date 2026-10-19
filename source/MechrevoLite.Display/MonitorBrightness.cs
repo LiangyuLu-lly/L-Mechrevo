@@ -1,15 +1,4 @@
-// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
-//   **只读备选来源** —— Win32 `dxva2.dll` 的 `GetMonitorBrightness`。
-//
-// ⭐ 为什么需要它：首选来源是 WMI `root\wmi:WmiMonitorBrightness.CurrentBrightness`
-//    （见 `ScreenBrightness.TryGet`，笔记本内屏通用）；个别驱动/机型上 WMI 读不到、
-//    但 DDC/CI 亮度接口可用 ⇒ 用它补一条只读路径（读不到就是 false，⛔ 不猜）。
-//
-// ⭐ 诚实边界：
-//   · 本类**只读**：⛔ 不调用 `SetMonitorBrightness`、⛔ 不写注册表/EC/驱动；
-//   · 只作"显示系统真实亮度"用 —— 写入永远只走现有 `ScreenBrightness.Set`（WMI），
-//     ⛔ 不会因为本类可读就改用别的写入通道；
-//   · 无内屏 / 外接屏 / 驱动不支持时 `GetMonitorBrightness` 直接返回 false ⇒ 调用方按"读不到"处理。
+// （机主：启动时屏幕亮度滑块没有读取一次系统真实状态）
 using System;
 using System.Runtime.InteropServices;
 

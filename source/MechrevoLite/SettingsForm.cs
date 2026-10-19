@@ -163,7 +163,7 @@ public class SettingsForm : RForm
 	{
 		(Strings.QuickGroupInput, new string[7] { "touchpad", "touchpadtoggle", "wifi", "bt", "webcam", "micmute", "numpad" }),
 		(Strings.QuickGroupKeyboard, new string[5] { "winkey", "fnkey", "copilot", "osd", "capslock" }),
-		// ⭐ 2026-10-19（机主要求）：`apuboost`（APU 防缩缸）归到「电源与系统」组，紧挨 `highperf` ✅
+		// （机主要求）：apuboost（APU 防缩缸）归到「电源与系统」组，紧挨 highperf
 		(Strings.QuickGroupPower, new string[13]
 		{
 			"usb", "highperf", "apuboost", "fanboost", "acrecovery", "cpuadvperf", "gamewhitelist", "taskbarautohide", "transparency", "darktheme", "deepsleep",
@@ -205,7 +205,7 @@ public class SettingsForm : RForm
 		("copilot", Strings.QuickCopilot),
 		("acrecovery", Strings.QuickAcRecovery),
 		("highperf", Strings.QuickHighPerf),
-		// ⭐ 2026-10-19（机主要求）：APU 防缩缸（处理器性能提升模式 → 高效、积极且有保障）
+		// （机主要求）：APU 防缩缸（处理器性能提升模式 → 高效、积极且有保障）
 		("apuboost", Strings.ApuAntiDegrade),
 		("fanboost", Strings.FanBoostStrong),
 		("deepsleep", Strings.QuickDeepSleep),
@@ -562,13 +562,7 @@ public class SettingsForm : RForm
 	private ComboBox? _syncEffectCombo;
 
 	private ComboBox? _kbEffectCombo;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右 —— 第 3 次修复）：
-	/// 宝龙达**非键盘灯行**（灯带 / Logo / 铰链 / 同步）的「记录」（行 + 开关 + 日志名）。
-	/// ⚠️ 该表在**刷新期**由 <see cref="ApplyBaolongdaLightRowLayout" /> 每次更新
-	/// （建行期 hw 可能还没就绪 ⇒ 不能只在建行期记录）✅。
-	/// </summary>
+	// 宝龙达**非键盘灯行**（灯带 / Logo / 铰链 / 同步）的「记录」（行 + 开关 + 日志名）。
 	private readonly List<(TableLayoutPanel Row, RCheckBox Switch, string Label)> _baolongdaCollapsedLightRows = new List<(TableLayoutPanel, RCheckBox, string)>();
 
 	/// <summary>防止 <see cref="ApplyBaolongdaLightRowLayout" /> 在 Layout 事件里递归重入 / 反复重排 ✅。</summary>
@@ -581,39 +575,9 @@ public class SettingsForm : RForm
 	private Label? _lblKeyboardControllerStatus;
 
 	private bool _syncingEffectCombos;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（运行时自校准）：键盘灯能力探测是否已在**本界面**排过队（0/1）。
-	/// <para>⚠️ 只防重复排队；真正的"只跑一次"由 <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c>
-	/// 的缓存保证 ✅。</para>
-	/// </summary>
+	// 的缓存保证 。</para>
 	private int _kbdCalibrationQueued;
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-16（宝龙达 · 键盘灯效表）：
-	/// ⭐ 宝龙达键盘灯的**可写模式表 ＝ 三项** ✅（⭐ 下拉、⭐ 索引→Id 映射、
-	/// ⭐ 点进 LightForm 那扇窗、⭐ 以及下发时的 Id→模式映射 ⭐ **四处共用** ✅）。
-	///
-	/// <para>⭐⭐ <b>为什么没有「自定义颜色（Manual）」</b>：
-	/// ⭐ 原厂枚举里模式 <c>3</c> 只定义、从不写入 ⚠️；⭐ 40 系真机（MRID6-23）实测
-	/// **写 3 后回读仍为 2** ⇒ ⭐ 本平台固件**不接受模式 3** ❌
-	/// ⇒ ⭐ 按能力位铁律**不放进界面**（⛔ 不假装支持 ✅）。
-	/// ⭐ 单色统一走 <c>Single</c>（模式 <c>2</c>）＋ 功能号 <c>17</c> 的真实 RGB ✅。</para>
-	///
-	/// <para>⭐ 三项对应 <c>MechrevoHw.TryMapBaolongdaKeyboardMode</c> 的 0／2／1 ✅；
-	/// ⭐ 关灯**不走本表**：⭐ 关灯 ＝ ⭐ <b>写亮度（功能号 18）＝ 0</b> ✅
-	/// （⭐ 见 <c>MechrevoHw.TrySetKeyboardLightingViaBackend</c> ✅）。</para>
-	/// </summary>
-	// ⭐⭐ 2026-10-19（机主：「键盘下拉里面的关和左边开关功能重复」）：⭐ 下拉里**去掉「关」** ✅
-	//   ⭐ 开/关由左边那颗开关负责（写亮度 0），下拉只选"开着的时候是什么效果" ✅
-	//   ⚠️ 顺序保持 Single(2) → Rainbow(1)，与 `MechrevoHw.TryMapBaolongdaKeyboardMode` 一致 ✅
-	// ⭐⭐ 2026-10-19 第二轮（机主：「先不禁用，参照 7.3 的实现」）：
-	//   ⭐ 恢复「彩虹」，并按第三方 7.3 的做法（**同一套 WMI 16/17/18**）补写入细节：
-	//     · 7.3 设亮度是「先 4 → 再 0 → 再目标值」的**复位序列**（我们的"只写变化项"可能因此被固件忽略）
-	//     · 7.3 设彩虹 = `RGBKeyboardMode = Mode_RGBAutoCyclic(1)`，固定色 = 2 + 颜色(17)
-	// ⭐⭐ 2026-10-19 第三轮（机主批准「软件彩虹」）：
-	//   ⭐ 真机确认本机固件「模式 16=1」无效 ⇒ 彩虹改为**软件刷色**（16=2 + 每 50ms 写 17）✅
-	//   ⇒ 界面**始终保留**这两项（⛔ 不再按"彩虹可用性"隐藏）✅
+	// 点进 LightForm 那扇窗、 以及下发时的 Id→模式映射  **四处共用** ）。
 	private static readonly (string Effect, string Name)[] BaolongdaLightEffects = new (string, string)[2]
 	{
 		("Single", Strings.EffectSingle),
@@ -632,11 +596,7 @@ public class SettingsForm : RForm
 	private RCheckBox? _lightOffOnBatteryChk;
 
 	private RComboBox? _lightSleepCombo;
-
-	/// <summary>
-	/// ⭐ 2026-10-19（「自动关闭时间」复用头部下拉）：当前填充的平台（-1=未填 / 0=其它机型厂商逻辑 / 1=宝龙达软件实现）。
-	/// <para>⚠️ 只在**平台切换**时重填选项，⛔ 不每次刷新都清空重建 ✅。</para>
-	/// </summary>
+	// （「自动关闭时间」复用头部下拉）：当前填充的平台（-1=未填 / 0=其它机型厂商逻辑 / 1=宝龙达软件实现）。
 	private int _lightAutoOffComboPlatform = -1;
 
 	private bool _syncingLightHeader;
@@ -836,11 +796,7 @@ public class SettingsForm : RForm
 	private int _deepSleepPendingValue = -1;
 
 	private bool _syncingDisplay;
-
-	// ⭐⭐ 2026-10-19（机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）：
-	//   设置窗**构建分段计时**（只打一次；默认级别可见）—— 先量再改 ✅
-	//   · `_uiBuildPerfMs` / `_uiBuildLightMs` 由 BuildDashboardLayout 内部累加（性能组 / 灯光组）；
-	//   · `_uiBuildLogOnce` 保证同一进程只落一行（多实例/重入不刷屏）。
+	// （机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）
 	private long _uiBuildPerfMs;
 
 	private long _uiBuildLightMs;
@@ -856,13 +812,7 @@ public class SettingsForm : RForm
 	private long _uiBuildLayoutCount;
 
 	private bool _uiBuildProfiling;
-
-	// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
-	//   构造期这两个控件是**局部变量**（定时器靠闭包访问）⇒ 现在提到字段，供「只读同步」复用。
-	//   · `_brightnessSlider` / `_brightnessValueLabel`：滑块与百分比标签；
-	//   · `_lastBrightnessSystemSyncTick`：低频只读轮询节流（5 s，且只在设置页可见时跑）；
-	//   · `_brightnessUnsupportedShown`：读不到系统亮度 ⇒ 滑块置灰 + 标注（只改 UI，⛔ 不写硬件）；
-	//   · `_brightnessRowVisible`：亮度行当前是否被既有能力闸门放行（恢复显隐时保持闸门语义）。
+	// （机主：启动时屏幕亮度滑块没有读取一次系统真实状态）
 	private const int BrightnessSystemPollMs = 5000;
 
 	private RSlider _brightnessSlider;
@@ -916,11 +866,7 @@ public class SettingsForm : RForm
 	private int _performanceRequest;
 
 	private readonly BrightnessCommitQueue _brightnessCommitQueue;
-
-	// ⭐⭐ 2026-10-19（机主：亮度调节有延迟 / 外部改亮度 LM 不同步）：
-	//   · `_brightnessMergedSubmits`：上一轮实际写之前合并了多少次拖动/输入（写日志用）；
-	//   · `_brightnessLastThrottleFlushTick`：拖动期的**节流写**时间戳（~120ms 合并一次）；
-	//   · `_brightnessReadInFlight`：只读回读的"在飞"标记（回读放到后台线程，⛔ 不阻塞 UI）。
+	// · _brightnessReadInFlight：只读回读的"在飞"标记（回读放到后台线程， 不阻塞 UI）。
 	private int _brightnessMergedSubmits;
 
 	private long _brightnessLastThrottleFlushTick;
@@ -1406,12 +1352,7 @@ public class SettingsForm : RForm
 		(Strings.IdleOff1Hour, 60, 3600),
 		(Strings.IdleOff2Hour, 120, 7200)
 	};
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」· 宝龙达软件实现）：
-	/// 选项 = 关（默认）/ 10 秒 / 5 分钟 / 10 分钟 / 30 分钟；**配置统一按秒存**（`light_autooff_seconds`）✅。
-	/// <para>⚠️ 只有宝龙达显示本设置行；其它机型逐位不变 ✅。</para>
-	/// </summary>
+	// （机主批准「灯光自动关闭时间」· 宝龙达软件实现）
 	internal static readonly (string Label, int Seconds)[] KeyboardAutoOffOptions = new (string, int)[5]
 	{
 		(Strings.Off, 0),
@@ -1657,8 +1598,7 @@ public class SettingsForm : RForm
 		pictureScreen.Visible = false;
 		ApplyRowSkins();
 		RefreshThemeButtons();
-		// ⭐⭐ 2026-10-19（机主：新增行/主题按钮配色错乱）：⭐ 显式重刷「官方控制台 + PawnIO」卡片与
-		//   界面外观卡片（ApplyWindow 对自绘 RButton/自定义卡片不一定覆盖），并打覆盖自检日志 ✅
+		// 界面外观卡片（ApplyWindow 对自绘 RButton/自定义卡片不一定覆盖），并打覆盖自检日志
 		ApplyOfficialConsoleCardTheme();
 		LogSettingsThemeCoverage();
 		LogSettingsCardButtonFits();
@@ -1776,15 +1716,7 @@ public class SettingsForm : RForm
 			Logger.WriteLine($"SetThemeButtonState {button.Name} selected={selected} outline={outline} face={UiVisualStyle.ButtonFace} rbutton={(button is RButton)}");
 		}
 	}
-
-	/// <summary>
-	/// 2026-10-10（修用户反馈「禁用Windows更新开关打不开」）：快捷开关动作的返回值从 bool 换成
-	/// 带明细的结果 —— 只有 winupdate 需要区分「必需项失败」与「可选项跳过」，其余开关沿用 bool 语义。
-	/// </summary>
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：浅色/深色按钮渲染错乱）：⭐ 主题切换控件**专用**样式，⛔ 不与其它卡片按钮混用：
-	/// 未选中 = 卡片底 + 1px 描边 + 次要文字；选中 = Accent 填充 + AccentText（浅/深色均同一套语义）✅
-	/// </summary>
+	// 带明细的结果 —— 只有 winupdate 需要区分「必需项失败」与「可选项跳过」，其余开关沿用 bool 语义。
 	private static void SetThemeModeButtonState(Button button, bool night, bool selected)
 	{
 		if (button == null)
@@ -1820,11 +1752,7 @@ public class SettingsForm : RForm
 		}
 		button.Invalidate();
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：配色必须可验证）：⭐ 主题按钮自检 —— 打印实际 bg/fg、选中态与对比度；
-	/// 对比度低或前景=背景 ⇒ `Logger.WriteError` FAIL ✅
-	/// </summary>
+	// （机主：配色必须可验证）： 主题按钮自检 —— 打印实际 bg/fg、选中态与对比度；
 	private void LogThemeButtonStyles(bool isNightMode)
 	{
 		try
@@ -1846,7 +1774,7 @@ public class SettingsForm : RForm
 			{
 				Logger.WriteError("[settings-ui] ⛔ 主题按钮对比度 FAIL：" + message);
 			}
-			// ⭐ 2026-10-19（机主：按钮巨大且被裁）：⭐ 尺寸实测 —— 960/1250/1500% DPI 下验证固定尺寸未叠加缩放 ✅
+			// （机主：按钮巨大且被裁）： 尺寸实测 —— 960/1250/1500% DPI 下验证固定尺寸未叠加缩放
 			Size daySize = _dayModeButton?.Size ?? Size.Empty;
 			Size nightSize = _nightModeButton?.Size ?? Size.Empty;
 			TableLayoutPanel themeTable = _themeModePanel?.Controls.Count > 0 ? _themeModePanel.Controls[0] as TableLayoutPanel : null;
@@ -1965,8 +1893,7 @@ public class SettingsForm : RForm
 
 	private void OpenRgbForm()
 	{
-		// ⭐⭐ 2026-10-19（运行时自校准）：机主打开**键盘灯设置窗口** ⇒ 排队一次亮度上限探测 ✅
-		//   （后台线程、结果缓存；供 RgbForm 的亮度滑块范围使用）
+		// （后台线程、结果缓存；供 RgbForm 的亮度滑块范围使用）
 		EnsureBaolongdaKeyboardCalibrationQueued();
 		if (rgbForm == null || rgbForm.IsDisposed)
 		{
@@ -2121,7 +2048,7 @@ public class SettingsForm : RForm
 				groupGrids[key] = flowLayoutPanel;
 			}
 		}
-		// ⭐ 2026-10-19（机主：tile=210ms）：⭐ 逐个 Add 会触发 FlowLayoutPanel 立即重排 ⇒ 先全部挂起，构建完再恢复 ✅
+		// （机主：tile=210ms）： 逐个 Add 会触发 FlowLayoutPanel 立即重排 ⇒ 先全部挂起，构建完再恢复
 		foreach (FlowLayoutPanel groupFlow in groupGrids.Values.Distinct())
 		{
 			groupFlow.SuspendLayout();
@@ -2175,9 +2102,7 @@ public class SettingsForm : RForm
 			else if (key2 == "fanboost")
 			{
 				_fanBoostBox = cb;
-				// ⭐ 2026-10-19（强冷核对 ②）：**建控件时**就按真实状态给勾选态（宝龙达没有 GCU ⇒
-				//   状态在 `FanBoostActive`）。⚠️ 必须在 `CheckedChanged +=` **之前**赋值，
-				//   否则会被当成一次用户点击触发下发（⛔ 启动时不该写风扇）✅
+				// 否则会被当成一次用户点击触发下发（ 启动时不该写风扇）
 				MechrevoHw hwFanBoostInit = Program.hw;
 				cb.Checked = ((hwFanBoostInit != null && hwFanBoostInit.UsesBaolongda)
 					? MechrevoHw.FanBoostActive
@@ -2192,8 +2117,7 @@ public class SettingsForm : RForm
 						_fanBoostOptimisticUntil = DateTime.Now.AddSeconds(12);
 						_fanBoostOptimisticValue = cb.Checked;
 						Logger.WriteLine("[fan] 强冷：UI 先乐观置" + (cb.Checked ? "开" : "关") + "（等待确认）");
-						// ⭐⭐ 2026-10-19（机主：宝龙达强冷点开无反应）：宝龙达 EC 写入依赖 PawnIO ⇒
-						//   缺失时**弹确认框**引导安装（复用 PawnIOInstaller，同一入口；⛔ 不静默安装）✅
+						// 缺失时**弹确认框**引导安装（复用 PawnIOInstaller，同一入口； 不静默安装）
 						if (cb.Checked && (Program.hw?.UsesBaolongda ?? false) && !PawnIO.RyzenSmuService.IsPawnInstalled())
 						{
 							Logger.WriteError("[fan] 强冷：PawnIO 缺失 ⇒ 弹安装提示");
@@ -2235,13 +2159,7 @@ public class SettingsForm : RForm
 							MechrevoHw hw = Program.hw;
 							if (hw != null && hw.IsConnected)
 							{
-								// ⭐⭐ 2026-10-19（机主：「风扇强冷不可点击」）：⭐ 这里原来**直接**调
-								//   `SwitchFanBoost`（GCU/MQTT 专用）⇒ 宝龙达上必然失败，表现为"点了没反应" ❌
-								//   ⭐ 改走统一入口 `SwitchQuick("fanboost", on)`：宝龙达分支会走本机通道
-								//      （暂停曲线闭环 + 功能号 21 满转 + 13 回读）✅
-								//   ⚠️ GCU 机型：`SwitchQuick` 内部对 fanboost 的判据与原来等价（同样发 MQTT）✅
-								// ⭐⭐ 2026-10-19（机主：无界强冷是回归）：SwitchQuick 没有 fanboost 的 MQTT action（会恒 false）⇒
-								//   ⭐ GCU/无界 走原 SwitchFanBoost（Fan/Control 话题）；宝龙达仍走本机 EC 的 SwitchQuick 分支 ✅
+								// SwitchFanBoost（GCU/MQTT 专用）⇒ 宝龙达上必然失败，表现为"点了没反应" ❌
 								await ApplyQuickSwitchAsync(cb, (bool on) => (Program.hw?.UsesBaolongda ?? false)
 									? Program.service.SwitchQuick("fanboost", on)
 									: Program.service.SwitchFanBoost(on));
@@ -2674,7 +2592,7 @@ public class SettingsForm : RForm
 			Margin = Padding.Empty,
 			BackColor = bufferedPanel.BackColor
 		};
-		// ⭐⭐ 2026-10-19（机主：启动时亮度滑块没读系统真值）：提到字段，供「只读同步」复用 ✅
+		// （机主：启动时亮度滑块没读系统真值）：提到字段，供「只读同步」复用
 		_brightnessSlider = brightSlider;
 		_brightnessValueLabel = brightPercent;
 		brightSlider.ValueChanged += (object? _, EventArgs _) =>
@@ -2692,7 +2610,7 @@ public class SettingsForm : RForm
 		};
 		brightSlider.KeyUp += (object? _, KeyEventArgs _) =>
 		{
-			// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：松手/按键结束 ⇒ **补一次最终值**（立即写，不等防抖）
+			// （机主：亮度调节有延迟）：松手/按键结束 ⇒ **补一次最终值**（立即写，不等防抖）
 			_brightnessLastThrottleFlushTick = 0;
 			_brightnessCommitQueue.Flush();
 		};
@@ -3851,12 +3769,7 @@ public class SettingsForm : RForm
 			try
 			{
 				MechrevoHw hw = Program.hw;
-				// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
-				//   ⭐ 旧实现这里只读 **GCU 上报**的 `hw.ScreenBrightness` —— 无 GCU 机型（宝龙达）恒为 -1
-				//      ⇒ 周期回读**从来不跑**，滑块一直停在构造默认值 ❌
-				//   ⭐ 现在统一走 `SyncBrightnessFromSystemReadOnly`：WMI `WmiMonitorBrightness`（首选）
-				//      → dxva2 `GetMonitorBrightness`（备选）→ GCU 字段（旧路径兼容）；
-				//      ⭐ 只更新滑块/数值，⛔ 不写硬件；低频（5 s）且只在设置页可见时跑 ✅
+				// （机主：启动时屏幕亮度滑块没有读取一次系统真实状态）
 				SyncBrightnessFromSystemReadOnly(force: false);
 				// ⚠️⚠️ 2026-10-15（用户反馈「刷新率的回读有问题 走 Windows API 的，我点了 60 切过去还是显示 180
 				// 或者说状态刷新不及时」）：`SyncHzButtons()` 原来被包在**上面那个「亮度可读」条件里** ——
@@ -3964,9 +3877,7 @@ public class SettingsForm : RForm
 		{
 			_displayStatusTimer.Start();
 		}
-		// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
-		//   ⭐ 首次打开设置页 ⇒ **只读同步一次**系统亮度（WMI 优先 / dxva2 备选），
-		//      ⛔ 不写硬件（不调 `ScreenBrightness.Set`）、⛔ 不动 `_lastBrightnessUi`（那是用户拖动的时间戳）✅
+		// （机主：启动时屏幕亮度滑块没有读取一次系统真实状态）
 		Shown += (object? _, EventArgs _) =>
 		{
 			if (!Program.UiAuditMode)
@@ -4655,13 +4566,7 @@ public class SettingsForm : RForm
 			}
 			if (_fanBoostBox != null && Program.hw != null)
 			{
-				// ⭐ 2026-10-19（强冷核对 ① 可见 + ② 状态真实）：宝龙达的强冷状态在
-				//   `MechrevoHw.FanBoostActive`（本机通道：功能号 21 满转 + 13 回读）；
-				//   `hw.FanBoost`（GCU 上报字段）在宝龙达上**恒 false** ⇒ 原来 12 秒宽限一过
-				//   定时器就把开关拨回去（用户看到的"点了又弹回"）✅
-				//   ⚠️ 非宝龙达逐位不变（仍读 hw.FanBoost）✅
-				// ⭐⭐ 2026-10-18（机主 UI 体验）：⭐ 强冷确认窗口（最多 10 s）内保持**乐观置**的勾选态，
-				//   ⛔ 不被周期刷新拨回；最终失败路径会显式回滚并清乐观窗口 ✅
+				// 不被周期刷新拨回；最终失败路径会显式回滚并清乐观窗口
 				if (DateTime.Now < _fanBoostOptimisticUntil)
 				{
 					_fanBoostBox.Checked = _fanBoostOptimisticValue;
@@ -5046,7 +4951,7 @@ public class SettingsForm : RForm
 	/// </summary>
 	private bool StaticQuick(string key)
 	{
-		// ⭐ 2026-10-19（APU 防缩缸）：纯 Windows 电源策略，任何机型都可用 ⇒ 恒显示 ✅
+		// （APU 防缩缸）：纯 Windows 电源策略，任何机型都可用 ⇒ 恒显示
 		if (string.Equals(key, "apuboost", StringComparison.OrdinalIgnoreCase))
 		{
 			return true;
@@ -5805,11 +5710,7 @@ public class SettingsForm : RForm
 		{
 			if (key == "fanboost")
 			{
-				// ⭐ 2026-10-19（强冷核对 ②）：宝龙达没有 GCU ⇒ `hw.SupportsFanBoost` 恒 false、
-				//   `hw.FanBoost` 也不会被本机通道更新 ⇒ 读**静态** `FanBoostActive`（与写入侧同源）✅
-				//   ⚠️ 非宝龙达逐位不变 ✅
-				// ⭐⭐ 2026-10-18（机主 UI 体验）：⭐ 确认窗口内返回**乐观置**的值 ⇒ 磁贴与更多开关
-				//   立刻高亮且 12 s 内不被回读拨回；最终失败会清窗口并回滚 ✅
+				// 立刻高亮且 12 s 内不被回读拨回；最终失败会清窗口并回滚
 				if (DateTime.Now < _fanBoostOptimisticUntil)
 				{
 					return new bool?(_fanBoostOptimisticValue);
@@ -5847,7 +5748,7 @@ public class SettingsForm : RForm
 
 	public SettingsForm()
 	{
-		// ⭐⭐ 2026-10-19（机主：设置窗加载太多）：构建分段计时（先量再改；只打一次）✅
+		// （机主：设置窗加载太多）：构建分段计时（先量再改；只打一次）
 		Stopwatch uiBuildTotal = Stopwatch.StartNew();
 		_uiBuildProfiling = true;
 		long uiBuildInitMs = 0L;
@@ -5865,10 +5766,9 @@ public class SettingsForm : RForm
 		InitializeComponent();
 		uiBuildInitMs = uiBuildPhase.ElapsedMilliseconds;
 		uiBuildPhase.Restart();
-		// ⭐ 2026-10-19（机主：设置页启动慢）：⭐ 整窗构建期挂起布局，结束前只做一次 Resume+PerformLayout ✅
+		// （机主：设置页启动慢）： 整窗构建期挂起布局，结束前只做一次 Resume+PerformLayout
 		SuspendLayout();
-		// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：写入改成**节流合并**（拖动期 ~120ms 一次 + 松手补最终值）；
-		//   写后回读在后台线程执行 ⇒ ⛔ 不阻塞 UI。日志：`[brightness] 写（节流合并 n 次）请求=… ⇒ 实际=…`
+		// 写后回读在后台线程执行 ⇒  不阻塞 UI。日志：[brightness] 写（节流合并 n 次）请求=… ⇒ 实际=…
 		_brightnessCommitQueue = new BrightnessCommitQueue(WriteBrightnessValueAsync, TimeSpan.FromMilliseconds(120L), (Exception ex) =>
 		{
 			Logger.WriteLine("Screen brightness update failed: " + ex.Message);
@@ -6329,8 +6229,7 @@ public class SettingsForm : RForm
 		uiBuildPhase.Restart();
 		BuildOfficialConsolePanel();
 		uiBuildDisplayMs += uiBuildPhase.ElapsedMilliseconds;
-		// ⭐⭐ 2026-10-19（机主：判据为假连控件都不建）：核显模式三选行 / 灯光额外两行延后到
-		//   `EnsureSettingsDialogBuilt()`（此时 Program.hw 已就绪 ⇒ 判据可判、且不构建不存在的行）✅
+		// （机主：判据为假连控件都不建）：核显模式三选行 / 灯光额外两行延后到
 		uiBuildPhase.Restart();
 		BuildDashboardLayout();
 		uiBuildOtherMs += uiBuildPhase.ElapsedMilliseconds;
@@ -6358,10 +6257,7 @@ public class SettingsForm : RForm
 			RefreshDeviceCapabilities();
 			uiBuildDisplayMs += uiBuildPhase.ElapsedMilliseconds;
 		}
-		// ⭐⭐ 2026-10-19（机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）：
-		//   ⭐ 分段耗时日志（**只打一次**、默认级别可见）—— 先拿证据再改，⛔ 不猜 ✅
-		//   · 基础 = 总计 − 灯光组 − 性能 − 显示/核显；外设电量在构建阶段**不执行**（后台刷新）。
-		// ⭐ 全部构建完成：只做一次最终布局 ✅
+		// 分段耗时日志（**只打一次**、默认级别可见）—— 先拿证据再改， 不猜
 		ResumeLayout(true);
 		PerformLayout();
 		uiBuildTotal.Stop();
@@ -6391,10 +6287,7 @@ public class SettingsForm : RForm
 
 	private void BuildOfficialConsolePanel()
 	{
-		// ⭐⭐ 2026-10-19（机主：官方控制台卡片错乱）：⭐ 改成 **AutoSize + 2 列**（左信息 / 右按钮列）：
-		//   · 左侧信息区 = 标题 + 状态**上下两行**（状态 AutoEllipsis，⛔ 不会钻到按钮下面）；
-		//   · 右侧按钮列 **Absolute D(170)**，按钮自身 MinimumSize ≥ D(150) + Anchor=Right；
-		//   · 行高全部 AutoSize ⇒ 卡片随内容增高，⛔ 不再有固定坐标/固定高度导致的覆盖与裁切 ✅
+		// （机主：官方控制台卡片错乱）： 改成 **AutoSize + 2 列**（左信息 / 右按钮列）
 		_officialConsolePanel = new BufferedPanel
 		{
 			Name = "panelOfficialConsole",
@@ -6553,11 +6446,7 @@ public class SettingsForm : RForm
 		info.Controls.Add(status, 0, 1);
 		return info;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：官方控制台卡片错乱）：⭐ 实测自检 —— 卡片 / 左信息 / 右按钮列尺寸 +
-	/// 是否重叠/越界；发生问题时 `Logger.WriteError` 标 FAIL（去重）✅
-	/// </summary>
+	// （机主：官方控制台卡片错乱）： 实测自检 —— 卡片 / 左信息 / 右按钮列尺寸 +
 	private void LogOfficialConsoleCardLayout()
 	{
 		try
@@ -6586,10 +6475,7 @@ public class SettingsForm : RForm
 			Logger.WriteLine("[settings-ui] 官方控制台卡片自检失败：" + ex.Message);
 		}
 	}
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：主题错乱）：⭐ 显式刷新「官方控制台 / PawnIO」卡片（标签、状态、按钮、提示）
-	/// + 界面外观卡片底色；浅/深色都用 UiVisualStyle 同一套语义 ✅
-	/// </summary>
+	// （机主：主题错乱）： 显式刷新「官方控制台 / PawnIO」卡片（标签、状态、按钮、提示）
 	private void ApplyOfficialConsoleCardTheme()
 	{
 		try
@@ -6649,10 +6535,7 @@ public class SettingsForm : RForm
 		button.BorderColor = UiVisualStyle.Border;
 		button.Invalidate();
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：必须发现漏配色）：⭐ 主题应用自检 —— 列出未被主题覆盖的控件（应为空）✅
-	/// </summary>
+	// （机主：必须发现漏配色）： 主题应用自检 —— 列出未被主题覆盖的控件（应为空）
 	private void LogSettingsThemeCoverage()
 	{
 		try
@@ -6680,12 +6563,7 @@ public class SettingsForm : RForm
 			Logger.WriteLine("[settings-ui] 主题覆盖自检失败：" + ex.GetType().Name + " " + ex.Message);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：不管哪个按钮四边都被裁）：⭐ 设置对话框卡片内 RButton/Button 的**四边余量**自检：
-	/// 下边余量 = 行底 − (按钮底 + margin.Bottom)；左边余量 = 按钮左 − margin.Left − 父 Padding.Left；
-	/// 判据：⛔ 不 Dock=Fill，下边余量 ≥ 0，左边余量 ≥ 2 逻辑像素 ✅
-	/// </summary>
+	// （机主：不管哪个按钮四边都被裁）： 设置对话框卡片内 RButton/Button 的**四边余量**自检
 	private void LogSettingsCardButtonFits()
 	{
 		try
@@ -7706,7 +7584,7 @@ public class SettingsForm : RForm
 		{
 			UpdateDashboardWindowHeight();
 			UpdateDashboardScroll();
-			// ⭐ 2026-10-19（机主：Logo 开关跑到最右）：展开/折叠灯光组后立即按平台重排（幂等；body.Layout 也会兜一次）✅
+			// （机主：Logo 开关跑到最右）：展开/折叠灯光组后立即按平台重排（幂等；body.Layout 也会兜一次）
 			ApplyBaolongdaLightRowLayout(Program.hw);
 		};
 		// ⭐ 分段计时：灯光组（键盘/灯带/Logo/铰链/同步行）
@@ -7975,7 +7853,7 @@ public class SettingsForm : RForm
 				Padding = Padding.Empty,
 				BackColor = _themeModePanel.BackColor
 			};
-			// ⭐ 2026-10-19（机主：浅/深按钮巨大且被裁）：⭐ 固定尺寸 + 右对齐；右列按两按钮宽 + 间距，⛔ 不再 Percent 拉满 ✅
+			// （机主：浅/深按钮巨大且被裁）： 固定尺寸 + 右对齐；右列按两按钮宽 + 间距， 不再 Percent 拉满
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
@@ -8594,17 +8472,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			host.Controls.Add(valueLabel, 2, row);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-18（机主定 · 充电阈值产品接线）：⭐ 在电池页追加「起充/停充 + 启用开关」区域 ✅。
-	/// <para>⭐ 能力判据：`UsesBaolongda` + 板号以 `MRID6` 开头 + EC 可读 ⇒ 才构建；
-	/// ⛔ 非宝龙达 / 其它板号 / EC 读不到 ⇒ **不构建**（非宝龙达逐位不变）✅</para>
-	/// </summary>
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：电池卡片上下空白 / 先量再说）：⭐ 完整布局实测日志：
-	/// 宿主表逐行（含控件 bounds/visible）、panelBattery 属性、面板内部 grid、隐藏但仍占高的行、
-	/// 空白来源判定；发现隐藏行占高或 panel 超出 content ⇒ WriteError 标 FAIL ✅
-	/// </summary>
+	// （机主：电池卡片上下空白 / 先量再说）： 完整布局实测日志
 	private void LogBatteryCardLayout(TableLayoutPanel host, BatteryLimitPanel panel)
 	{
 		try
@@ -8742,7 +8610,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			host.SetColumnSpan(panel, 3);
 			RecalculateBatteryTableHeight();
 			host.PerformLayout();
-			// ⭐ 2026-10-19（机主：紧凑布局）：⭐ PerformLayout 后再量一次内容高度（+2 余量，⛔ 不再 +8）✅
+			// （机主：紧凑布局）： PerformLayout 后再量一次内容高度（+2 余量， 不再 +8）
 			panel.PerformLayout();
 			int measuredPanelHeight = Math.Max(80, panel.GetPreferredSize(new Size(panelWidth, 0)).Height + ResponsiveLayout.LogicalToDevice(this, 2));
 			if (measuredPanelHeight != panelHeight)
@@ -9789,9 +9657,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			_igpuOnlyUiPanel.Visible = igpuRow;
 		}
 		string text = string.Join('|', new object[10] { true, true, true, true, flag21, flag23, true, flag14, flag9, flag3 }) + "|" + string.Join('|', list) + $"|{flag4}|{flag5}|{flag6}|{flag6b}|{flag6c}|{flag7}|{flag15}|{flag16}|{flag17}|{flag18}|{flag19}|{flag22}|{flag}|{flag24}|igpuRow={igpuRow}";
-		// ⭐⭐ 2026-10-19（机主：宝龙达 Logo 开关跑到最右）：能力刷新也是布局修正的触发点之一
-		//   ⚠️ 必须放在下面 `text == _lastCapabilityLayout` 早退**之前**（否则能力没变化就永远不重排）；
-		//      方法内部幂等 + 仅宝龙达生效 + 行未布局时自动跳过 ⇒ 其它机型逐位不变 ✅
+		// 方法内部幂等 + 仅宝龙达生效 + 行未布局时自动跳过 ⇒ 其它机型逐位不变
 		ApplyBaolongdaLightRowLayout(hw);
 		if (text == _lastCapabilityLayout)
 		{
@@ -9901,11 +9767,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			SetScreenRowVisible(4, hw?.DisplayEffectOn.HasValue ?? false, new string[1] { "rowDisplayEffect" });
 		}
 		SetScreenRowVisible(2, flag10, new string[3] { "labelScreenBrightness", "sliderScreenBrightness", "labelScreenBrightnessValue" });
-		// ⭐⭐ 2026-10-19（机主：读不到系统亮度时滑块置灰/隐藏并标注）：
-		//   ⭐ 记录**既有能力闸门**对亮度行的放行结果；随后按"是否读得到系统亮度"补一次 UI 状态：
-		//      · 读得到 ⇒ 滑块恢复可用、数值 = 真实百分比；
-		//      · 读不到 ⇒ 滑块置灰，数值位显示「本机不支持软件调亮度」（⛔ 不显示假值）；
-		//      ⛔ 这里只改 UI，不写硬件、也不改闸门判据（闸门说隐藏就仍然隐藏）✅
+		// · 读得到 ⇒ 滑块恢复可用、数值 = 真实百分比；
 		_brightnessRowVisible = flag10;
 		ApplyBrightnessVisualState();
 		if (_hzSegTable != null)
@@ -10267,7 +10129,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		ApplyChargeLimitStageEnablement();
 		// ⭐⭐ 2026-10-18（机主：面板行被裁）：⭐ 所有行高调整结束后**统一重算一次**（单一来源）✅
 		RecalculateBatteryTableHeight();
-		// ⭐ 2026-10-19（机主：电池卡片空白）：⭐ 门控全部跑完后再量一次（隐藏行已收 0），并自动收 0 可疑空白行 ✅
+		// （机主：电池卡片空白）： 门控全部跑完后再量一次（隐藏行已收 0），并自动收 0 可疑空白行
 		if (baolongdaRaw && _chargeLimitHostTable != null)
 		{
 			BatteryLimitPanel bdPanel = Controls.Find(BatteryLimitPanel.PanelControlName, searchAllChildren: true).OfType<BatteryLimitPanel>().FirstOrDefault();
@@ -11550,29 +11412,14 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			labelCharge.Text = Strings.BatteryHealth + ": " + Math.Round(HardwareControl.batteryHealth, 1) + "%";
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
-	/// ⭐ **只读**同步系统亮度到滑块/数值标签 —— ⛔ 不写硬件（绝不调 <c>ScreenBrightness.Set</c>）✅。
-	/// <para>⭐ 触发时机：
-	/// ① 启动 / 首次打开设置页（`Shown`）；② 页面重新打开（`VisibleChanged` → Visible）；
-	/// ③ 显示器变化（`OnDisplaySettingsChanged`）；④ 设置页可见时每 <see cref="BrightnessSystemPollMs" /> 毫秒一次低频校验。</para>
-	/// <para>⭐ 读取来源：WMI <c>root\wmi:WmiMonitorBrightness.CurrentBrightness</c>（首选）
-	/// → Win32 <c>dxva2.GetMonitorBrightness</c>（备选）→ GCU 上报字段（旧路径兼容）。</para>
-	/// <para>⚠️ 用户正在拖滑块 / 刚拖过 3 秒内 / 有写入在飞 ⇒ **跳过**本次回读（⛔ 不覆盖用户刚设的值）；
-	/// 读不到 ⇒ 滑块置灰 + 数值位标注「本机不支持软件调亮度」（⛔ 不显示假值）✅。</para>
-	/// <para>⚠️ 日志去重：同一值/同一失败原因只落一行（`Logger.TryMarkChanged`），⛔ 不刷屏 ✅。</para>
-	/// </summary>
-	/// <param name="force">⭐ true = 打开/显示变化等事件触发（忽略 5 s 节流，但仍避开用户拖动窗口）。</param>
+	// <para> 用户正在拖滑块 / 刚拖过 3 秒内 / 有写入在飞 ⇒ **跳过**本次回读（ 不覆盖用户刚设的值）；
 	private void SyncBrightnessFromSystemReadOnly(bool force)
 	{
 		if (Program.UiAuditMode || IsDisposed || _brightnessSlider == null || _brightnessValueLabel == null)
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-19（机主：外部改亮度 LM 不同步 / 调节防回环）：
-		//   ⭐ 用户正在拖 / 刚写入 **2 秒内** / 还有写入在飞 ⇒ **跳过本次同步**（以用户输入为准）；
-		//      ⛔ 不写硬件、⛔ 不覆盖用户刚设的值 ✅
+		// 用户正在拖 / 刚写入 **2 秒内** / 还有写入在飞 ⇒ **跳过本次同步**（以用户输入为准）；
 		if (_brightnessCommitQueue.HasPendingOrRunning || (DateTime.UtcNow - _lastBrightnessUi).TotalSeconds < 2.0)
 		{
 			return;
@@ -11597,8 +11444,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			return;
 		}
-		// ⭐⭐ 2026-10-19（机主：回读校验不要阻塞 UI）：读 WMI 放**后台线程**，结果再回 UI 线程；
-		//   ⛔ 不用任何新定时器 —— 触发源仍是既有 tick / 打开页 / 显示器变化 ✅
+		// （机主：回读校验不要阻塞 UI）：读 WMI 放**后台线程**，结果再回 UI 线程；
 		Task.Run(() =>
 		{
 			bool ok;
@@ -11648,11 +11494,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			}
 		});
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：外部改亮度 LM 不同步）：⭐ 把**后台只读回读**的结果应用到 UI（主线程）✅。
-	/// <para>⚠️ 应用前再查一次"用户正在拖 / 刚写入 2 秒内" ⇒ 有就丢弃本次结果（⛔ 不与用户输入打架）。</para>
-	/// </summary>
+	// （机主：外部改亮度 LM 不同步）： 把**后台只读回读**的结果应用到 UI（主线程）。
 	private void ApplyBrightnessReadResult(bool ok, int value, string source, string reason, bool firstSync)
 	{
 		if (IsDisposed || _brightnessSlider == null || _brightnessValueLabel == null)
@@ -11720,12 +11562,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			Logger.WriteError(okMsg);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：⭐ **拖动期节流写**（~120ms 合并一次；首个输入立即写）。
-	/// <para>⚠️ 仍只在用户亲手拖动/点按时调用（`ValueChanged` 且 `_syncingDisplay == false`）；
-	/// 回读同步改 UI 时 `_syncingDisplay = true` ⇒ ⛔ 不会走到这里、⛔ 不会写硬件 ✅。</para>
-	/// </summary>
+	// 回读同步改 UI 时 _syncingDisplay = true ⇒  不会走到这里、 不会写硬件 。</para>
 	private void RequestBrightnessWrite(int value)
 	{
 		Interlocked.Increment(ref _brightnessMergedSubmits);
@@ -11738,12 +11575,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			_brightnessCommitQueue.Flush();
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：亮度调节有延迟 / 回读校验不要阻塞 UI）：
-	/// ⭐ 实际写亮度（后台线程）—— 写后**异步回读**并落一行机主要求的日志 ✅。
-	/// <para>日志：`[brightness] 写（节流合并 n 次）请求=… ⇒ 实际=…`（默认级别可见）✅</para>
-	/// </summary>
+	// 实际写亮度（后台线程）—— 写后**异步回读**并落一行机主要求的日志 。
 	private Task WriteBrightnessValueAsync(int requested, CancellationToken token)
 	{
 		return Task.Run(() =>
@@ -11782,13 +11614,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				+ " · 写成功=" + ok + "（回读在后台线程，⛔ 不阻塞 UI）");
 		}, token);
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
-	/// ⭐ **读取系统亮度**（只读）—— 返回 false 时 <paramref name="reason" /> 给出可读原因 ✅。
-	/// <para>顺序：① WMI <c>WmiMonitorBrightness</c>（首选）→ ② dxva2 <c>GetMonitorBrightness</c>（备选）
-	/// → ③ GCU 上报字段（仅 ≥0 的旧路径兼容；无 GCU 机型恒 -1 ⇒ 不会走到）✅</para>
-	/// </summary>
+	// （机主：启动时屏幕亮度滑块没有读取一次系统真实状态）
 	private static bool TryReadSystemBrightness(out int percent, out string source, out string reason)
 	{
 		percent = -1;
@@ -11827,13 +11653,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		return false;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：读不到系统亮度时滑块置灰/隐藏并标注）：
-	/// ⭐ 按 <see cref="_brightnessUnsupportedShown" /> 切换亮度行 UI —— ⛔ 只改控件显示，不写硬件、不改闸门判据 ✅。
-	/// <para>⚠️ 标注「本机不支持软件调亮度」比数值列宽 ⇒ 只在**闸门放行（行可见）**时隐藏滑块、
-	/// 让标注跨「滑块 + 数值」两列；闸门说隐藏时保持原样 ✅。</para>
-	/// </summary>
+	// （机主：读不到系统亮度时滑块置灰/隐藏并标注）
 	private void ApplyBrightnessVisualState()
 	{
 		if (_brightnessSlider == null || _brightnessValueLabel == null)
@@ -11870,12 +11690,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			_brightnessSlider.Visible = true;
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：界面刷新计时器关闭 UI 后应停止）：⭐ 可见性启停日志（去重，低调）✅。
-	/// <para>⚠️ 只记 `_displayStatusTimer` / `_quickSwitchStatusTimer` 两个**界面刷新** tick；
-	/// ⛔ 不涉及常驻传感器泵、风扇闭环、灯光自动关闭、强冷轮询等后台定时器（它们不受可见性影响）✅</para>
-	/// </summary>
+	// （机主：界面刷新计时器关闭 UI 后应停止）： 可见性启停日志（去重，低调）。
 	private static void LogUiRefreshTimerLifecycle(bool visible)
 	{
 		string msg = "[ui] 刷新计时器随可见性启停 ⇒ Visible=" + (visible ? "true" : "false");
@@ -11884,10 +11699,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			Logger.WriteError(msg);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主批准：设置窗布局性能优化）：构建期**布局耗时/次数**统计（含嵌套；仅首次构建开启）✅。
-	/// </summary>
+	// （机主批准：设置窗布局性能优化）：构建期**布局耗时/次数**统计（含嵌套；仅首次构建开启）。
 	protected override void OnLayout(LayoutEventArgs levent)
 	{
 		if (!_uiBuildProfiling)
@@ -11925,21 +11737,15 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			if (!IsDisposed)
 			{
 				_displayStatusTimer.Enabled = Visible;
-				// ⭐⭐ 2026-10-19（机主：界面刷新在关闭 UI 后应停止）：
-				//   ⭐ `_quickSwitchStatusTimer` 改成与 `_displayStatusTimer` **同款**随可见性启停；
-				//      ⛔ 不影响常驻传感器泵 / 风扇闭环 / 灯光自动关闭 / 强冷轮询等后台独立定时器 ✅
+				// （机主：界面刷新在关闭 UI 后应停止）
 				_quickSwitchStatusTimer.Enabled = Visible;
 				LogUiRefreshTimerLifecycle(Visible);
 			}
 			if (Visible)
 			{
-				// ⭐⭐ 2026-10-19（机主：启动时屏幕亮度滑块没有读取一次系统真实状态）：
-				//   ⭐ **重新打开设置页**（ShowAll → Visible=true）⇒ 立刻只读同步一次系统亮度；
-				//      ⛔ 不写硬件；值没变时只更新 UI 不刷日志（去重在同步方法内）✅
+				// （机主：启动时屏幕亮度滑块没有读取一次系统真实状态）
 				SyncBrightnessFromSystemReadOnly(force: true);
-				// ⭐⭐ 2026-10-19（机主：宝龙达 Logo 开关跑到最右 —— 第 3 次修复）：
-				//   ⭐ 窗口显示后**立即排队**一次灯光行重排（BeginInvoke 落在本次布局完成之后 ⇒ 键盘行已有真实像素列宽）；
-				//      覆盖"建行时 hw 还没就绪 / 面板刚建好还没布局"的时序；幂等、仅宝龙达生效 ✅
+				// （机主：宝龙达 Logo 开关跑到最右 —— 第 3 次修复）
 				if (IsHandleCreated)
 				{
 					BeginInvoke(() =>
@@ -11956,9 +11762,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 					RefreshThemeButtons();
 					RefreshBatteryModeButtons();
 				}
-				// ⭐⭐ 2026-10-19（机主：外设电量不是打开设置窗的功能）：
-				//   ⭐ 原来窗口一显示就 `Task.Run(RefreshPeripheralsBattery)`（HID/外设电量查询）；
-				//      现在改为**显示后延迟后台**做：⛔ 不阻塞打开、⛔ 不在构建路径 ✅
+				// 现在改为**显示后延迟后台**做： 不阻塞打开、 不在构建路径
 				_ = Task.Run(async () =>
 				{
 					try
@@ -13075,11 +12879,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			MessageBox.Show(Strings.GpuModeUnsupported, "L-Mechrevo", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			return;
 		}
-		// ⭐⭐ 2026-10-19（机主：切走再切回同一模式仍显示黄色高亮）：
-		//   ⭐ 判据 = **选择 == 当前生效模式**（取源与原逻辑一致：`ResolveHighlightedGpuMode(-1)`
-		//      = 能力位/厂商回显；宝龙达没有 GCU 时按当前实际路由判定）⇒ **蓝色（无待应用）** ✅
-		//   ⭐ 切走再切回（等于原模式）⇒ 清掉 pending ⇒ 恢复蓝色，⛔ 不再误显示黄色待重启 ✅
-		//   ⚠️ 仅宝龙达分支（GCU/同方路径逐位不变）✅
+		// 切走再切回（等于原模式）⇒ 清掉 pending ⇒ 恢复蓝色， 不再误显示黄色待重启
 		int currentEffective = ResolveHighlightedGpuMode(-1);
 		if (currentEffective == targetMode)
 		{
@@ -13193,11 +12993,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	{
 		return GpuRestartVerifier.HasPendingThisBoot();
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：切走再切回同一模式仍显示黄色高亮）：⭐ GPU 模式高亮的**判据日志**（去重）✅。
-	/// <para>判据：`选中 == 当前生效` ⇒ **蓝色**（无待应用）；不等 ⇒ 黄色（待应用/待重启）。</para>
-	/// </summary>
+	// （机主：切走再切回同一模式仍显示黄色高亮）： GPU 模式高亮的**判据日志**（去重）。
 	private static void LogGpuModeHighlight(int selectedMode, int currentMode, bool pending)
 	{
 		string selectedName = ((selectedMode >= 0) ? GpuRestartVerifier.ModeName(selectedMode) : "未知");
@@ -13633,12 +13429,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			VisualiseMode(mode);
 		}
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：无界重启后高亮回平衡）：⭐ 高亮数据源修正 ——
-	/// 无界 APU 且 ActiveModeId 指向自定义档 ⇒ **优先 ActiveModeId**（高亮=自定义=4），⛔ 不被固件回读（平衡=0）覆盖 ✅。
-	/// <para>⚠️ 宝龙达/GCU/同方：`WujieSmuApu=false` ⇒ 原样返回固件模式（行为逐位不变）✅</para>
-	/// </summary>
+	// 无界 APU 且 ActiveModeId 指向自定义档 ⇒ **优先 ActiveModeId**（高亮=自定义=4）， 不被固件回读（平衡=0）覆盖 。
 	private int ResolveVisualMode(int firmwareMode)
 	{
 		MechrevoHw hwResolve = Program.hw;
@@ -13879,10 +13670,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			int pendingTarget = GpuRestartVerifier.PendingTarget;
 			if (pendingTarget >= 0)
 			{
-				// ⭐⭐ 2026-10-19（机主：切走再切回同一模式仍显示黄色高亮）：
-				//   ⭐ 若"待生效目标" == **当前生效模式**（取源同上，⛔ 不受 hint 影响）⇒ 等于没变化 ⇒
-				//      清掉 pending、**恢复蓝色**（⛔ 不再误显示黄色待重启）✅
-				//   ⚠️ 只对宝龙达生效（GCU/同方待重启语义逐位不变）✅
+				// 清掉 pending、**恢复蓝色**（ 不再误显示黄色待重启）
 				int currentEffectiveMode = ResolveHighlightedGpuMode(-1);
 				if ((Program.hw?.UsesBaolongda ?? false) && pendingTarget == currentEffectiveMode)
 				{
@@ -14541,10 +14329,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			buttonTurbo.Activated = silentTurbo != true;
 		}
 		SetContextMenu();
-		// ⭐⭐ 2026-10-19（「高性能电源」· **与切档同时下发**）：⭐ 机主口径「代码顺序 —— 直接跟着 GCU 发命令同时，不要等回读」
-		//   ⭐ 因此在 `SwitchMode`（GCU/MQTT）**之前**就把 Windows 电源模式发出去，两边"同时"到 ✅
-		//   ⚠️ 不阻塞：内部只调一次 powrprof，不等回读、不重试、不 sleep ✅
-		//   ⚠️ 只在开关打开时生效（`WindowsPowerOverlayEnabled` 内部判）；失败只记日志、不影响切档 ✅
+		// （「高性能电源」· **与切档同时下发**）： 机主口径「代码顺序 —— 直接跟着 GCU 发命令同时，不要等回读」
 		try
 		{
 			MechrevoLite.Mode.PerfModeService.Instance?.ApplyWindowsPowerOverlayForUiMode(mode, silentTurbo == true);
@@ -14604,12 +14389,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 
 	private void InitQuickSwitchRefresh()
 	{
-		// ⭐ 2026-10-19（回归修复）：tile 构建**必须留在 ctor** —— BuildDashboardLayout 依赖 panelQuickSwitch；
-		//   只有「状态读取」后移到 Shown（见 RefreshQuickStatesAfterShown）✅
+		// 只有「状态读取」后移到 Shown（见 RefreshQuickStatesAfterShown）
 		buttonBatteryFull.Visible = false;
 		Stopwatch quickTileWatch = Stopwatch.StartNew();
-		// ⭐ 2026-10-19：tile 构建太贵（~203ms）⇒ ctor 只放轻量占位 panel（BuildDashboardLayout 需要它），
-		//   真正 tile 在 Shown 后一个 BeginInvoke 构建，然后重排仪表盘 ✅
+		// 真正 tile 在 Shown 后一个 BeginInvoke 构建，然后重排仪表盘
 		BuildQuickSwitchPanel();
 		Control quickPanel = Controls["panelQuickSwitch"];
 		if (quickPanel != null)
@@ -14635,18 +14418,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			UpdateQuickSwitches();
 			SyncDisplayEffectRow();
 			MechrevoHw hw = Program.hw;
-			// ⭐⭐ 2026-10-18（宝龙达 Logo 灯「UI 与硬件状态不同步」根因②：界面没有周期消费）：
-			//   `_quickSwitches` 里**没有** logolight —— LOGO 开关在「灯光」折叠组（`_logoPowerSw`），
-			//   它的状态只由 `SyncLightRows()` 从 `hw.QuickSwitches["logolight"]` 读；而 `SyncLightRows`
-			//   原来**只有** `RefreshDeviceCapabilities` 的能力布局发生变化时才会被调用 ⚠️
-			//   ⇒ 启动「灯效恢复」点亮 LOGO 后，界面**没有任何路径**再把它拉回真值 ⇒ 一直显示"关"❌
-			//   ⇒ ⭐ 这里按与「更多开关」**同一把尺子**（12 秒宽限）周期收敛 ✅：
-			//     用户刚点过（宽限内）就不抢，宽限一过才按真值回拨（与 UpdateQuickSwitches 语义一致 ✅）。
-			//   ⚠️ **只在宝龙达启用**：GCU / 同方的灯光行继续保持"仅能力刷新时同步"的既有行为
-			//      （⛔ 不在本轮顺手改其它机型）✅
-			// ⭐⭐ 2026-10-19（机主：宝龙达专属轮询不能在 GCU/同方机器上空转）：
-			//   ⭐ 这一行是**周期任务门控**的唯一入口：`UsesBaolongda` 为假 ⇒ 连 `SyncLightRows()` 都不调用
-			//      （⛔ 不读宝龙达 WMI、⛔ 不刷宝龙达日志）✅
+			// ⇒ 启动「灯效恢复」点亮 LOGO 后，界面**没有任何路径**再把它拉回真值 ⇒ 一直显示"关"❌
 			if ((hw?.UsesBaolongda ?? false) && (DateTime.Now - _lastQuickSwitchUi).TotalSeconds >= 12.0)
 			{
 				SyncLightRows();
@@ -14659,22 +14431,14 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		};
 		if (!Program.UiAuditMode)
 		{
-			// ⭐⭐ 2026-10-19（机主：界面刷新在关闭 UI 后应停止）：
-			//   ⭐ 原来这里无条件 Start() ⇒ 隐藏到托盘后仍在跑（含 SyncLightRows/电池标题）
-			//   ⭐ 改为**随可见性启停**：可见才启动，隐藏由 `SettingsForm_VisibleChanged` 统一 Stop ✅
+			// 改为**随可见性启停**：可见才启动，隐藏由 SettingsForm_VisibleChanged 统一 Stop
 			if (Visible)
 			{
 				_quickSwitchStatusTimer.Start();
 			}
 		}
 	}
-
-	/// <summary>
-	/// ⭐ 2026-10-19（回归修复）：⭐ tile 构建**必须在 ctor 内**完成 ——
-	/// <c>BuildDashboardLayout()</c> 依赖 <c>panelQuickSwitch</c>（找不到会整套布局直接 return，界面会错乱）。
-	/// <para>⇒ 只把**状态读取**（UpdateQuickSwitches / 电池标题）后移到 Shown 后一个消息循环；
-	/// ⛔ 不再延后 tile 构建本身 ✅</para>
-	/// </summary>
+	// （回归修复）： tile 构建**必须在 ctor 内**完成 ——
 	private void RefreshQuickStatesAfterShown()
 	{
 		try
@@ -15193,9 +14957,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				// screen_max / max_frequency / frequency 是否被别的屏污染；只在能确定 eDP 内屏时才纠正。
 				MechrevoLite.Display.ScreenControl.ReconcileScreenMetrics("DisplaySettingsChanged");
 				SyncHzButtons();
-				// ⭐⭐ 2026-10-19（机主：显示器变化后亮度也要刷新）：
-				//   ⭐ 显示配置变化（内屏/外接屏接入、MUX/分辨率切换）后**只读**重读一次系统亮度；
-				//      ⛔ 不写硬件、不影响刷新率那条逻辑 ✅
+				// 显示配置变化（内屏/外接屏接入、MUX/分辨率切换）后**只读**重读一次系统亮度；
 				SyncBrightnessFromSystemReadOnly(force: true);
 			}));
 		}
@@ -17849,8 +17611,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		_kbPowerSw = sw;
 		_kbEffectCombo = effectCombo;
 		FillKeyboardEffectCombo(effectCombo);
-		// ⭐⭐ 2026-10-19（运行时自校准）：机主**打开键盘灯效果下拉**（= 打开键盘灯设置）时排队一次亮度上限探测 ✅
-		//   ⚠️ 后台线程 + 结果缓存；结果供 RgbForm 的亮度滑块范围使用（彩虹已改软件刷色，与校准无关）✅
+		// 后台线程 + 结果缓存；结果供 RgbForm 的亮度滑块范围使用（彩虹已改软件刷色，与校准无关）
 		effectCombo.DropDown += delegate
 		{
 			EnsureBaolongdaKeyboardCalibrationQueued();
@@ -17873,11 +17634,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 						if (selectedIndex < array2.Length)
 						{
 							string id = array2[selectedIndex].Item1;
-							// ⭐⭐ 2026-10-19（机主：「彩虹=软件刷色，颜色无意义、亮度必须保留」）：
-							//   ⭐ 本控件是**旧 Aura 遗留**（启动时 InitAura 已隐藏），这里保留原有"禁用"防御；
-							//      用户真正能看到的颜色区在 `RgbForm`（编辑窗）——那里在彩虹模式下**整体隐藏**，
-							//      亮度滑块/数值/标签**始终保留可用**（见 RgbForm.RefreshKeyboardLightEffectUi）✅
-							//   ⚠️ 仅宝龙达（GCU 的彩虹档沿用原逻辑）✅
+							// 本控件是**旧 Aura 遗留**（启动时 InitAura 已隐藏），这里保留原有"禁用"防御；
 							if (Program.hw?.UsesBaolongda == true && buttonKeyboardColor != null && !buttonKeyboardColor.IsDisposed)
 							{
 								bool rainbow = string.Equals(id, "Rainbow", StringComparison.OrdinalIgnoreCase);
@@ -17960,9 +17717,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 							}
 						}
 					}
-					// ⭐⭐ 2026-10-19（机主：彩虹=软件刷色 ⇒ 颜色无意义、亮度保留）：
-					//   ⭐ 效果下拉切换后**立刻**刷新键盘灯编辑窗（彩虹⇒折叠颜色区，单色⇒恢复；亮度始终保留）✅
-					//   ⚠️ 只刷新 UI，⛔ 不写硬件；窗口没开/已释放时是空操作；⚠️ 仅宝龙达 ⇒ 其它机型逐位不变 ✅
+					// 效果下拉切换后**立刻**刷新键盘灯编辑窗（彩虹⇒折叠颜色区，单色⇒恢复；亮度始终保留）
 					if (Program.hw?.UsesBaolongda == true)
 					{
 						rgbForm?.RefreshKeyboardLightEffectUi();
@@ -17984,7 +17739,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 					Program.rgb.KbPowerOn = requested;
 					if (!requested)
 					{
-						// ⭐ 2026-10-19（机主：关灯后又自己开）：明确记录「用户意图已落盘为关」
+						// （机主：关灯后又自己开）：明确记录「用户意图已落盘为关」
 						Logger.WriteError("[light] 键盘关灯：写入意图 keyboard_power=0 · 清除 PowerExplicit · 后续恢复不会自动点亮");
 						KeyboardRgb rgb = Program.rgb;
 						int stopGen = gen;
@@ -18124,8 +17879,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			_logoPowerSw = logoPowerSw;
 			_logoEffectCombo = logoEffectCombo;
-			// ⭐ 2026-10-19：显隐/收列结论改在**刷新期** `ApplyBaolongdaLightRowLayout` 做
-			//   （建行时 hw 往往还没就绪 ⇒ 原来这里判断恒 false，正是前两次修复失效的原因）✅
+			// 显隐/收列结论改在**刷新期** ApplyBaolongdaLightRowLayout 做
 		});		BuildLightChannelRow("rowHinge", Strings.LightChannelHinge, "HidLightbar_Hinge/Ctrl", Strings.LightHingeTitle, LightForm.HingeEffects, 3, (RCheckBox hingePowerSw, ComboBox hingeEffectCombo) =>
 		{
 			_hingePowerSw = hingePowerSw;
@@ -18202,11 +17956,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		// 而兄弟是 40。实测：只钉控件 Height/MaximumSize、以及只改行高 D(32)→D(29)，**都压不住**（仍是 217x48）；
 		// 把字体对齐后高度才会落到族标准。
 		sleepCombo.Font = UiStyleBody();
-		// ⭐⭐ 2026-10-19（机主截 bug：不允许两个"自动关闭时间"入口）：
-		//   ⭐ **复用头部这颗已有下拉**（⛔ 不再新增独立行）；平台分支在 SelectedIndexChanged 里按 hw 判定：
-		//     · 宝龙达 ⇒ 软件实现（light_autooff_seconds：关/10秒/5分钟/10分钟/30分钟）✅
-		//     · 其它机型 ⇒ 原厂商逻辑（lighting_idle_seconds）**逐位不变** ✅
-		//   ⚠️ 构建时 hw 可能还没就绪 ⇒ 先按厂商选项填充；平台确定后 FillLightingAutoOffCombo() 切换 ✅
+		// （机主截 bug：不允许两个"自动关闭时间"入口）
 		sleepCombo.SelectedIndexChanged += async (object? _, EventArgs _) =>
 		{
 			if (_syncingLightHeader)
@@ -18368,19 +18118,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			//      LightForm 那扇窗的列表**都用这张收敛后的表 ✅ —— ⭐ 三处口径必然一致 ✅。
 			//   ⭐ 非宝龙达 ⇒ **原样返回** ⇒ ⭐ 逐位不变 ✅。
 			effects = EffectsForCurrentBackend(effects);
-			// ⭐⭐ 2026-10-17（真机反馈「氛围灯有颜色设置但无效」）：⭐ 宝龙达的 LOGO 灯**只有【开／关】** ⚠️
-			//   ⭐ 依据：协议里它只有一个字节功能号 15（AmbientLight，0/1）—— ⛔ 没有颜色、⛔ 没有效果、
-			//      ⛔ 没有亮度/帧率/角度/速度（BaolongdaWmi.TrySetLogoLight(on) / TryReadLogoLight(out on) 可证 ✅）。
-			//   ⚠️ 而 EffectsForCurrentBackend 对**所有**灯光行都返回同一张 3 项表
-			//      ⇒ ⭐ LOGO 行会露出这 3 项 ⇒ ⭐ 点了不会有效果（违反能力位铁律）❌
-			//   ⇒ ⭐ 宝龙达下 **LOGO 行不显示效果下拉**（只保留开/关开关）✅；非宝龙达 ⭐ 逐位不变 ✅。
-			// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右 —— 第 3 次修复）：
-			//   ⚠️ 前两次失效的根因：宝龙达非键盘灯行（灯带/Logo/铰链/同步）的「隐藏效果列 + 隐藏编辑按钮 +
-			//      开关对齐」原来在**建行那一刻**按 `Program.hw?.UsesBaolongda` 做一次；而启动懒加载 +
-			//      后端探测异步 ⇒ 建行时它往往还是 false ⇒ 建行分支不成立（也没记录行）❌
-			//   ⭐ 现在统一挪到**每次灯光同步**的 `ApplyBaolongdaLightRowLayout`（幂等；非宝龙达门控直接 return）✅
-			//   行本身**保留**（LightExtraRowAvailable() 恒 true 是刻意的"判据判错时的后路"，
-			//   用户还能改 light_strip_ui / light_logo_ui —— 这条设计不动 ✅）
+			// ⇒  宝龙达下 **LOGO 行不显示效果下拉**（只保留开/关开关）；非宝龙达  逐位不变 。
 			TableLayoutPanel tableLayoutPanel3 = MakeRow(rowName);
 			FillRow(tableLayoutPanel3, label, out var sw2, out var effectCombo2, () =>
 			{
@@ -18454,13 +18192,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 								//   ⭐ **只有这里（用户亲手点灯光开关）才允许置 powerexplicit=1** ✅
 								//   ⛔ 任何自动路径（启动恢复/亮度/效果/开关幂等回写）都不许调 SavePower
 								LightingSettingsStore.SavePower(topic, requested, "用户点击「灯光」开关");
-								// ⭐⭐ 2026-10-19（机主实测「Logo 灯开→显示关」）：⭐ 这里原来会再调一次
-								//   `ApplyLightChannelEffectAsync` ⇒ 它内部**又**按旧快照的 `PowerOn` 发一次
-								//   `PublishLightPower(..., false)`（诊断包日志：on=True 与 on=False 只隔 0.55 s）❌
-								//   ⭐ LOGO 通道只有「开 / 关」（功能号 15），**没有效果字段可应用**
-								//   （日志原文：「界面给的效果 Single／亮度 4 没有对应字段 ⇒ 已忽略」）
-								//   ⇒ ⭐ 非键盘通道**不再走效果应用**，杜绝第二次下发 ✅
-								//   ⚠️ 键盘通道保持原样（它确实需要写效果/颜色）✅
+								// （日志原文：「界面给的效果 Single／亮度 4 没有对应字段 ⇒ 已忽略」）
 								bool isKeyboardChannel = string.Equals(topic, "Keyboard/Ctrl", StringComparison.OrdinalIgnoreCase);
 								if (requested && isKeyboardChannel)
 								{
@@ -18585,26 +18317,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			int height = TextRenderer.MeasureText(lblKeyboardControllerStatus.Text, lblKeyboardControllerStatus.Font, new Size(width, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding).Height;
 			lblKeyboardControllerStatus.Height = height + 4;
 		}
-		// ⭐⭐ 2026-10-19（机主：Logo 开关跑到最右 —— 第 3 次修复）：
-		//   布局修正的**补充触发点**（主触发 = 每次 `SyncLightRows`；这里保证窗口缩放 / DPI 变化 /
-		//   「灯光」组展开后立即重排；⚠️ 非宝龙达 ⇒ 方法内 `UsesBaolongda` 门控直接 return，其它机型逐位不变 ✅）
+		// 「灯光」组展开后立即重排； 非宝龙达 ⇒ 方法内 UsesBaolongda 门控直接 return，其它机型逐位不变 ）
 		body.Layout += (object _, LayoutEventArgs _) => ApplyBaolongdaLightRowLayout(Program.hw);
 		body.SizeChanged += (object _, EventArgs _) => ApplyBaolongdaLightRowLayout(Program.hw);
 		ApplyBaolongdaLightRowLayout(Program.hw);
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关跑到最右 —— 第 3 次修复，先做代码级 UI 审查）：
-	/// ⭐ **宝龙达非键盘灯行（灯带 / Logo / 铰链 / 同步）的「按平台收列 + 开关对齐」唯一入口** ✅
-	/// <para>⭐ 每次 <see cref="SyncLightRows" /> / <see cref="RefreshDeviceCapabilities" /> / 窗口缩放 /
-	/// 「灯光」组展开都会调用（**幂等**，可重复进）：
-	/// ① 隐藏效果下拉（col2）与「编辑」按钮（col3）；② 开关钉在 col1；
-	/// ③ 列宽 = 键盘行**当前实际像素列宽**（col0/col1），col2/col3 = 0 ⇒ 开关 x 与键盘行逐像素相同。</para>
-	/// <para>⚠️ 为什么必须在刷新期做而不是建行期：启动懒加载 + 后端探测异步 ⇒ 建行时
-	/// <c>Program.hw?.UsesBaolongda</c> 往往还是 false（建行分支不成立）；运行期老实现又把列宽写回
-	/// 80%/20%/0/0 ⇒ 开关被推到最右（机主截图）。本方法每次同步都重新判定平台并重排，不依赖建行时刻 ✅</para>
-	/// <para>⛔ 非宝龙达：入口 `UsesBaolongda` 门控直接 return ⇒ GCU/同方布局逐位不变 ✅</para>
-	/// </summary>
+	// **宝龙达非键盘灯行（灯带 / Logo / 铰链 / 同步）的「按平台收列 + 开关对齐」唯一入口**
 	private void ApplyBaolongdaLightRowLayout(MechrevoHw hw)
 	{
 		if (hw == null || !hw.UsesBaolongda || IsDisposed || _applyingCollapsedLightRowLayout)
@@ -18758,12 +18476,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		row.ColumnStyles[3] = new ColumnStyle(SizeType.Absolute, 0f);
 		return true;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主：必须做代码级 UI 审查，别再"算了应该行"）：⭐ **读真实运行值**并打日志；
-	/// 若 <c>switchX != kbSwitchX</c> ⇒ 直接标 <c>FAIL</c>（默认日志级别可见）并**继续尝试修正**（最多 3 次）✅
-	/// <para>日志：<c>[light][UI审查] 行=Logo · col=1 · switchX=111 · kbSwitchX=111 · kb列宽=[111,50,283,56] · rowW=506 · kbRowW=506 · 列宽=[111,50,0,345] ⇒ 对齐=True（x差=0px）</c></para>
-	/// </summary>
+	// （机主：必须做代码级 UI 审查，别再"算了应该行"）： **读真实运行值**并打日志；
 	private void AuditBaolongdaLightRowLayout(TableLayoutPanel row, RCheckBox powerSwitch, string rowLabel,
 		TableLayoutPanel keyboardRow, int col0Width, int col1Width)
 	{
@@ -18933,15 +18646,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	{
 		return Program.hw?.Capabilities.KeyboardType ?? 0;
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主要求「运行时自校准」）：打开/刷新键盘灯设置时**排队一次**亮度上限探测 ✅。
-	/// <para>⭐ 探测本体（写 WMI 18 + 回读 + try/finally 恢复）在
-	/// <c>MechrevoHw.EnsureKeyboardLightingCalibration()</c> 里**只跑一次并缓存**；
-	/// 本方法只负责"后台线程触发"（结果供 <c>RgbForm</c> 的亮度滑块范围使用）✅。</para>
-	/// <para>⚠️ 必须后台线程：探测含多次 WMI 往返（约 &lt; 1s），⛔ 不阻塞设置界面 ✅。</para>
-	/// <para>⚠️ 彩虹**不参与校准**：它已改为软件刷色 ⇒ 界面始终显示「单色 + 彩虹」✅。</para>
-	/// </summary>
+	// <para> 探测本体（写 WMI 18 + 回读 + try/finally 恢复）在
 	private void EnsureBaolongdaKeyboardCalibrationQueued()
 	{
 		if (Program.hw?.UsesBaolongda != true)
@@ -18982,7 +18687,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		if (Program.hw?.UsesBaolongda == true)
 		{
 			flag = true;
-			// ⭐⭐ 2026-10-19（软件彩虹）：彩虹始终可用（软件刷色）⇒ 固定用「单色 + 彩虹」两项 ✅
+			// （软件彩虹）：彩虹始终可用（软件刷色）⇒ 固定用「单色 + 彩虹」两项
 			array = BaolongdaLightEffects;
 		}
 		(int, string)[] array2 = RgbForm.VisibleHidEffects(keyboardType);
@@ -19142,14 +18847,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		int width = Math.Max(narrowed, floor);
 		return Math.Max(1, Math.Min(width, maxWidth));
 	}
-
-	/// <summary>
-	/// ⭐⭐ 2026-10-19（机主截 bug：自动关闭时间做成两个入口）：
-	/// **唯一入口** = 灯光区头部已有的「自动关闭时间」下拉 ✅。
-	/// <para>⭐ 平台分支：宝龙达 ⇒ 软件实现选项（关/10 秒/5 分钟/10 分钟/30 分钟，`light_autooff_seconds`）；
-	/// 其它机型 ⇒ 原厂商选项（`lighting_idle_seconds`）**逐位不变** ✅。</para>
-	/// <para>⚠️ 只在平台切换时重填（⛔ 不每次刷新清空重建）；hw 未就绪时先按厂商表填充 ✅。</para>
-	/// </summary>
+	// **唯一入口** = 灯光区头部已有的「自动关闭时间」下拉 。
 	private void FillLightingAutoOffCombo()
 	{
 		RComboBox combo = _lightSleepCombo;
@@ -19202,18 +18900,9 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	private void SyncLightRows()
 	{
 		MechrevoHw hw = Program.hw;
-		// ⭐⭐ 2026-10-19（机主：宝龙达「Logo 灯」开关依旧跑到最右 —— 这次先做代码级 UI 审查）：
-		//   ⚠️ 前两次失效根因（与「Logo 特效下拉每次同步隐藏」同一个坑）：
-		//     1) 建行时 `Program.hw?.UsesBaolongda` 往往还是 false（启动懒加载 + 后端探测异步）
-		//        ⇒ 建行时的"收列 + 记录行"没发生；
-		//     2) 运行期老实现（下面这段）只在"编辑按钮可见"那一次写列宽，而且写的是 **80%/20%/0/0**
-		//        ⇒ 开关被推到最右 ❌（正是机主截图）
-		//   ⭐ 现在把「按平台收列 + 开关对齐 + [UI审查]」整体挪到
-		//      `ApplyBaolongdaLightRowLayout(hw)`：每次灯光同步都跑（RefreshDeviceCapabilities /
-		//      3 s 灯光轮询 / 「灯光」组展开 都会进这里），不再依赖建行时刻 ✅
+		// 1) 建行时 Program.hw?.UsesBaolongda 往往还是 false（启动懒加载 + 后端探测异步）
 		ApplyBaolongdaLightRowLayout(hw);
-		// ⭐⭐ 2026-10-19（机主批准「灯光自动关闭时间」）：每次刷新灯光行时确保计时器与配置一致
-		//   （默认 0 = 关闭 ⇒ 不创建任何计时器、无额外检查开销；幂等）✅
+		// （机主批准「灯光自动关闭时间」）：每次刷新灯光行时确保计时器与配置一致
 		Program.hw?.ApplyKeyboardAutoOffSetting();
 		// ⭐ 「自动关闭时间」**唯一入口**：按平台填充/回填同一下拉（宝龙达软件实现 / 其它厂商逻辑）✅
 		FillLightingAutoOffCombo();
@@ -19310,8 +18999,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				_lightOffOnBatteryChk.Checked = flag4;
 				_syncingLightHeader = false;
 			}
-			// ⭐ 2026-10-19：「自动关闭时间」下拉在**其它机型**仍回填原厂商配置；
-			//   ⚠️ 宝龙达走上面的软件实现分支（light_autooff_seconds）⇒ 这里不碰 ✅
+			// 「自动关闭时间」下拉在**其它机型**仍回填原厂商配置；
 			if (Program.hw?.UsesBaolongda != true)
 			{
 				int idleSeconds = AppConfig.Get("lighting_idle_seconds", Math.Max(0, Program.rgb?.CloseTimerMinutes ?? 0) * 60);
@@ -19725,20 +19413,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	{
 		if ((_settingsDialog == null || _settingsDialog.IsDisposed) && _themeModePanel != null && _officialConsolePanel != null)
 		{
-			// 2026-10-09（igpugate）：30 系与无独显机型不显示「核显模式显示」三选行（其余世代显示，
-			// 见 IgpuOnlyUiRowAvailable）；直接不把这一行交给对话框，TableLayoutPanel 就不会为它建行。
-			// 2026-10-09（lightmerge / lightfix2 / lightsplit）：「额外灯光项」那一块**总是**交给对话框
-			// （lightfix2 起可见性恒为 true；lightsplit 起已细分为**两行** —— 灯带行 / Logo 灯行），
-			// 见 LightExtraRowAvailable —— 它们是判据判错时的后路，不许由判据自己关掉；
 			// 可见性仍交给 SetLightExtraRowAvailable 动态下发，这样能力晚到也不会像构造期一次性判定那样
-			// 把后门永久关掉。
-			// 2026-10-09（settingswarm）：本段从 OpenSettingsDialog 内联搬到本方法（内容一字未改），
-			// 好让预热与点击走**同一段**构建代码 —— 预热没做完/失败时，点击自己会再走一遍。
-			// ⭐⭐ 2026-10-19（机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）：
-			//   ⭐ **判据为假 ⇒ 连控件都不创建**（⛔ 不再"先 new 再 Visible=false"）：
-			//      · 核显模式三选行：只有 `IgpuOnlyUiRowAvailable()` 为真才构建（宝龙达/30 系/无独显 ⇒ 不建）；
-			//      · 灯光额外两行（灯带行/Logo 行显示）：承载"判据判错时的后路"，语义不变（LightExtraRowAvailable 恒 true）⇒ 构建；
-			//      · 构建时机 = 打开设置对话框时（此时 Program.hw 已就绪），⛔ 不在主窗构造函数里白建 ✅
 			bool igpuRow = IgpuOnlyUiRowAvailable();
 			if (igpuRow && _igpuOnlyUiPanel == null)
 			{
