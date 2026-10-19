@@ -4744,7 +4744,8 @@ public class SettingsForm : RForm
 				if (startError != null)
 				{
 					Logger.WriteLine("SCREEN_BLANK_FAILED: " + startError);
-					screenBlankNotice = Strings.ScreenBlankFailed + startError;
+					// Start() 返回的已经是完整原因（恢复中/驱动缺失），不再套「无法关闭显示器」的通用前缀
+					screenBlankNotice = startError;
 				}
 			}
 			catch (Exception ex)
