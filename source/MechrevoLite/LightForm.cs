@@ -175,9 +175,10 @@ public class LightForm : RForm
 			};
 			rColorPicker.ShowDialog(this);
 		};
+		int colorRow = row;
 		AddRow(Strings.SingleColor, colorBtn);
-		// （Logo 固件原生彩虹）：彩虹效果下颜色无意义 ⇒ 颜色行隐藏/置灰（不启动任何软件刷色）
-		Label colorLabel = table.GetControlFromPosition(0, table.RowCount - 1) as Label;
+		// 彩虹下颜色无意义 ⇒ 颜色行隐藏/置灰
+		Label colorLabel = table.GetControlFromPosition(0, colorRow) as Label;
 		UpdateChannelEnabled();
 		Controls.Add(table);
 		Shown += async (object? _, EventArgs _) =>
