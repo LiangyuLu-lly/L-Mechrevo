@@ -1115,12 +1115,19 @@ internal sealed class PerfModeService
 	internal async Task ReplayLocalProfileOnStartupAsync()
 	{
 		MechrevoHw hw = _hw;
-		if (hw == null || (!hw.WujieSmuApu && !hw.UsesBaolongda))
+		if (hw == null)
+		{
+			return;
+		}
+		// 同方 GCU（40 系）也按 LM 本地保存的自定义档恢复（更新/重装 GCU 后不丢配置）
+		bool gen40Gcu = hw.IsGcuConnected && hw.DgpuGeneration == DgpuGenerationKind.Gen40;
+		if (!hw.WujieSmuApu && !hw.UsesBaolongda && !gen40Gcu)
 		{
 			return;
 		}
 		bool isWujie = hw.WujieSmuApu;
 		bool isBaolongda = !isWujie && hw.UsesBaolongda;
+		bool isGcu = !isWujie && !isBaolongda;
 		if (isBaolongda)
 		{
 			string stateLog = "[perfmode] 宝龙达启动：PerfModeStore.ActiveModeId=" + PerfModeStore.ActiveModeId
@@ -1148,7 +1155,7 @@ internal sealed class PerfModeService
 		}
 		// ⭐ 把当前模式设为该档（持久化 + RaiseActiveChanged）✅
 		ActivateLocalProfile(mode.Id);
-		string backendLabel = isWujie ? "无界 APU" : "宝龙达";
+		string backendLabel = isWujie ? "无界 APU" : (isBaolongda ? "宝龙达" : "同方 GCU");
 		string modeLog = isWujie
 			? "[perfmode] 无界 APU 启动恢复（晚于 GCU 各项）：ActiveModeId=" + mode.Id + " ⇒ 重放 SMU"
 			: "[perfmode] 宝龙达启动恢复：ActiveModeId=" + mode.Id + " ⇒ 模式=自定义";
@@ -1165,13 +1172,18 @@ internal sealed class PerfModeService
 			match = TryReadWujieSmuCurrent(out int curPl1, out int curPl2, out int curTctl)
 				&& WujieSmuValuesMatch(settings, curPl1, curPl2, curTctl);
 		}
-		else
+		else if (isBaolongda)
 		{
 			match = BaolongdaLocalValuesMatch(settings, hw);
 			if (match)
 			{
 				Logger.WriteLine("[perfmode] 宝龙达启动恢复：回读与配置一致，但按机主要求仍**强制应用一次**（30/40 系通用）");
 			}
+			match = false;
+		}
+		else
+		{
+			// 同方 GCU：以 LM 本地配置为准，启动强制应用一次
 			match = false;
 		}
 		if (match)
@@ -1186,7 +1198,7 @@ internal sealed class PerfModeService
 		string replay = isWujie
 			? "[perfmode] 无界 APU 启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机 SMU（PL1="
 				+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）"
-			: "[perfmode] 宝龙达启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机参数（PL1="
+			: "[perfmode] " + backendLabel + " 启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机参数（PL1="
 				+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）";
 		if (Logger.TryMarkChanged("local-startup-replay-" + backendLabel, replay))
 		{
@@ -1194,7 +1206,7 @@ internal sealed class PerfModeService
 		}
 		try
 		{
-			await ActivateAsync(mode.Id, isWujie ? "wujie startup replay" : "baolongda startup replay", forceParameters: true).ConfigureAwait(continueOnCapturedContext: false);
+			await ActivateAsync(mode.Id, isWujie ? "wujie startup replay" : (isBaolongda ? "baolongda startup replay" : "gcu startup replay"), forceParameters: true).ConfigureAwait(continueOnCapturedContext: false);
 		}
 		catch (Exception ex)
 		{
