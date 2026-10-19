@@ -20,13 +20,14 @@ public class LightForm : RForm
 		("Impact", Strings.EffectImpact),
 		("Raindrop", Strings.EffectMeteor)
 	};
-	// Logo：单色 / 呼吸 / 混色 / 彩虹
-	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[4]
+	// Logo：与官方控制台一致的五项效果
+	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[5]
 	{
-		("Single", Strings.EffectSingle),
+		("ColorMarquee", Strings.EffectMix),
 		("Breathing", Strings.EffectBreathing),
-		("Mix", Strings.EffectMix),
-		("Rainbow", Strings.EffectRainbow)
+		("Wave", Strings.EffectWave),
+		("Impact", Strings.EffectImpact),
+		("Raindrop", Strings.EffectMeteor)
 	};
 
     // 2026-10-09（③， 对齐）：铰链 = 作者 Lighbar4(biosProjectId) 的 5 项

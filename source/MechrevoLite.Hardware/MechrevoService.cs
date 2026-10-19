@@ -4901,6 +4901,23 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				}
 			}
 			Dictionary<string, object> value = dictionary;
+			bool isLogoLightbar = string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal);
+			if (isLogoLightbar)
+			{
+				// Logo 通道：所有效果都按 7 段颜色、多段循环下发
+				dictionary["isCircular"] = true;
+				dictionary["ColorBlocks"] = 7;
+				dictionary["ColorBuffer"] = new object[7]
+				{
+					new Dictionary<string, object> { ["R"] = 255, ["G"] = 0, ["B"] = 0 },
+					new Dictionary<string, object> { ["R"] = 255, ["G"] = 165, ["B"] = 0 },
+					new Dictionary<string, object> { ["R"] = 255, ["G"] = 255, ["B"] = 0 },
+					new Dictionary<string, object> { ["R"] = 0, ["G"] = 255, ["B"] = 0 },
+					new Dictionary<string, object> { ["R"] = 0, ["G"] = 255, ["B"] = 255 },
+					new Dictionary<string, object> { ["R"] = 0, ["G"] = 0, ["B"] = 255 },
+					new Dictionary<string, object> { ["R"] = 255, ["G"] = 0, ["B"] = 255 }
+				};
+			}
 			if (!string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
 			{
 				string payloadLog = $"[light] 下发 topic={topic} effect={effect} light={light} speed={speed}"
@@ -4919,7 +4936,8 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				["light"] = light.ToString(),
 				["effect"] = effect,
 				["direction"] = direction,
-				["nv_save"] = (save ? "SAVE" : "NOT_SAVE"),
+				// 官方控制台 Logo 通道发 "0"（不写 NVRAM）
+				["nv_save"] = (isLogoLightbar ? "0" : (save ? "SAVE" : "NOT_SAVE")),
 				["color"] = value
 			};
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
