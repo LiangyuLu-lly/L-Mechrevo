@@ -1780,7 +1780,8 @@ public class CustomModeForm : RForm
 		return mode.Kind switch
 		{
 			PerfModeKind.SilentTurbo => hw.Capabilities.SilentTurboAvailability == FeatureAvailability.Supported, 
-			PerfModeKind.Turbo => hw.Capabilities.TurboMode || hw.FanStatusSeen, 
+			// 30 系按能力位判定：只有 2 档（安静/平衡）的机器不显示狂暴
+			PerfModeKind.Turbo => hw.Capabilities.TurboMode || (hw.FanStatusSeen && hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.Gen30), 
 			_ => true, 
 		};
 	}
