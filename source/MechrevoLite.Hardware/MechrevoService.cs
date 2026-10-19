@@ -4765,6 +4765,12 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		return result;
 	}
 
+	/// <summary>固件自带配色的灯效：不主动下发用户颜色。</summary>
+	private static bool IsFirmwareColoredEffect(string effect)
+	{
+		return effect is "Rainbow" or "Mix" or "Aurora" or "Gaming";
+	}
+
 	public async Task<bool> SetLightEffect(string topic, string effect, int light = 4, int speed = 1, string direction = "None", Color? singleColor = null, bool save = true)
 	{
 		try
@@ -4859,7 +4865,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 						}
 					});
 				}
-				else if (singleColor.HasValue)
+				else if (singleColor.HasValue && !IsFirmwareColoredEffect(effect))
 				{
 					dictionary["ColorBlocks"] = 1;
 					dictionary["ColorBuffer"] = new object[1]

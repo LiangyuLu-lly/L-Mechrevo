@@ -304,7 +304,9 @@ public class LightForm : RForm
 		}
 		void UpdateChannelEnabled()
 		{
-			bool powerOn = LightingSettingsStore.Load(_topic, _effects[0].Effect).PowerOn;
+			// 通道开着就能调；保存值可能滞后于硬件开关
+			bool powerOn = LightingSettingsStore.Load(_topic, _effects[0].Effect).PowerOn
+				|| Program.IsExternalLightChannelOn(_topic);
 			bool colorMeaningful = KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
 			sliderLight.Enabled = powerOn;
 			comboSpeed.Enabled = powerOn;

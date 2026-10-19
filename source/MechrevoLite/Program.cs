@@ -183,6 +183,19 @@ internal static class Program
 
 	private const int KeyboardPowerSettleMs = 120;
 
+	/// <summary>外部灯光通道当前是否点亮（按界面回读的开关状态）。</summary>
+	internal static bool IsExternalLightChannelOn(string topic)
+	{
+		foreach (var channel in ExternalLightChannels)
+		{
+			if (string.Equals(channel.Topic, topic, StringComparison.Ordinal))
+			{
+				return hw != null && hw.QuickSwitches.TryGetValue(channel.SwitchKey, out bool on) && on;
+			}
+		}
+		return false;
+	}
+
 	public static PowerSource? lastObservedSource;
 
 	/// <summary>⭐ 2026-10-15（真机回归修复）：**自动刷新率专用的"上次据以应用过的电源来源"**。
