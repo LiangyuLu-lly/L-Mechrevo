@@ -1195,6 +1195,16 @@ internal static class Program
 						ShowDuplicateInstanceNotice();
 						continue;
 					}
+					// ⭐⭐ 2026-10-19（机主：休眠/睡眠唤醒后仍会自己弹主界面）：
+					//   ⭐ 唤醒后一段时间内，**来自第二实例的「唤起」一律不显示主窗** ——
+					//      这类唤醒多半是 Windows 的「登录触发器 / 重启应用」把 LM 又拉起一次（命令行可能不带 startup），
+					//      不能因此把用户已经关掉的主界面弹出来 ✅
+					//   ⚠️ 只抑制第二实例唤起的这一条通道；托盘单击/双击、用户手动点「设置」不受影响 ✅
+					if (IsInResumeShowSuppression())
+					{
+						Logger.WriteLine("唤醒抑制窗口内收到第二实例的唤起请求 ⇒ ⛔ 不显示主界面（用户此前已关闭/最小化）");
+						continue;
+					}
 					SettingsToggle(checkForFocus: true);
 				}
 				catch (Exception)
@@ -1302,6 +1312,30 @@ internal static class Program
 	internal static bool IsStartupLaunch(string? action)
 	{
 		return action?.Equals("startup", StringComparison.OrdinalIgnoreCase) ?? false;
+	}
+
+	/// <summary>
+	/// ⭐ 2026-10-19（机主：休眠/睡眠唤醒后仍会自己弹主界面）：
+	/// 唤醒后的一小段时间内，**第二实例发来的「唤起主窗」请求一律忽略**。
+	/// <para>⚠️ 背景：Windows 在休眠唤醒（S4）/登录恢复时可能通过「登录触发器 / 重启应用」把 LM 再拉起一次，
+	/// 该实例的命令行未必带 <c>startup</c> ⇒ 会敲 ShowMain ⇒ 把用户已关闭的主界面弹出来 ❌</para>
+	/// <para>⭐ 只抑制「第二实例唤起」这一条通道：托盘点击、用户点「设置」、程序自身逻辑全部照旧 ✅</para>
+	/// </summary>
+	private static long _resumeShowSuppressUntil;
+
+	/// <summary>⭐ 唤醒后抑制第二实例唤起主窗的时长（秒）。考虑到登录恢复可能晚几秒到几十秒。</summary>
+	private const int ResumeShowSuppressSeconds = 90;
+
+	internal static void MarkResumeShowSuppression(string why)
+	{
+		Interlocked.Exchange(ref _resumeShowSuppressUntil, Environment.TickCount64 + ResumeShowSuppressSeconds * 1000L);
+		Logger.WriteLine("[power] 唤醒后 " + ResumeShowSuppressSeconds + " 秒内抑制「第二实例唤起主界面」（来源=" + why + "）");
+	}
+
+	private static bool IsInResumeShowSuppression()
+	{
+		long until = Interlocked.Read(ref _resumeShowSuppressUntil);
+		return until != 0L && Environment.TickCount64 < until;
 	}
 
 	/// <summary>
@@ -3097,6 +3131,8 @@ internal static class Program
 		if (e.Reason == SessionSwitchReason.SessionLogon || e.Reason == SessionSwitchReason.SessionUnlock || e.Reason == SessionSwitchReason.ConsoleConnect)
 		{
 			Logger.WriteLine("Session:" + e.Reason);
+			// ⭐ 2026-10-19：休眠恢复 / 登录恢复时 Windows 可能把 LM 再拉起一次 ⇒ 抑制「第二实例唤起主窗」✅
+			MarkResumeShowSuppression("SessionSwitch:" + e.Reason);
 			ProcessHelper.KillSmartDisplayControl();
 			bool sessionLock = Aura.sessionLock;
 			Aura.sessionLock = false;
@@ -3405,6 +3441,8 @@ internal static class Program
 		}
 		if (e.Mode == PowerModes.Resume)
 		{
+			// ⭐ 2026-10-19：唤醒后一段时间内抑制「第二实例唤起主窗」（修「休眠唤醒自动弹主界面」）✅
+			MarkResumeShowSuppression("PowerModes.Resume");
 			ScheduleKeyboardLightingRestoreAfterResume();
 		}
 		SchedulePowerCheck();
