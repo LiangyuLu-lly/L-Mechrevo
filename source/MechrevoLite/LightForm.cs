@@ -42,11 +42,18 @@ public class LightForm : RForm
 	internal static (string Effect, string Name)[] CurrentLogoEffects()
 	{
 		MechrevoHw hw = Program.hw;
-		if (hw != null && !hw.UsesBaolongda && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40)
+		bool gen40;
+		if (hw != null)
 		{
-			return LogoEffectsGen40;
+			gen40 = !hw.UsesBaolongda && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
 		}
-		return LogoEffects;
+		else
+		{
+			// 设置窗早于 hw 创建：按板号 + 上次记录的平台代际判定
+			gen40 = !MechrevoLite.Hardware.BaolongdaBackend.IsBaolongdaModelWhitelisted(out _)
+				&& string.Equals(AppConfig.GetString("dgpu_generation", null), "Gen40", StringComparison.OrdinalIgnoreCase);
+		}
+		return gen40 ? LogoEffectsGen40 : LogoEffects;
 	}
 
     // 2026-10-09（③， 对齐）：铰链 = 作者 Lighbar4(biosProjectId) 的 5 项
