@@ -13,6 +13,9 @@ namespace MechrevoLite.Hardware;
 
 public class KeyboardRgb : IDisposable
 {
+	/// <summary>⭐ 2026-10-19（同方单键 RGB 开机闪烁诊断）：进程启动时刻（只在前 15s 打 HID 时序日志）✅。</summary>
+	private static readonly long BootTick = Environment.TickCount64;
+
 	private record KeyEntry(string Name, int Offset, int Row, int Col);
 
 	private enum ConnectOutcome
@@ -1042,12 +1045,53 @@ public class KeyboardRgb : IDisposable
 		return k.Col;
 	}
 
+	/// <summary>
+	/// ⭐ 2026-10-19（同方单键 RGB 开机闪烁诊断）：HID 帧流 start/stop 时序日志（仅开机前 15s、非宝龙达）✅。
+	/// </summary>
+	private static void LogBootHid(string message)
+	{
+		if (Environment.TickCount64 - BootTick > 15000)
+		{
+			return;
+		}
+		MechrevoHw mechrevoHw = Program.hw;
+		if (mechrevoHw != null && mechrevoHw.UsesBaolongda)
+		{
+			return; // ⛔ 宝龙达不走 HID 帧流路径（彩虹/只读另有日志）
+		}
+		try
+		{
+			System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace(2, fNeedFileInfo: false);
+			string chain = "";
+			int count = Math.Min(3, stackTrace.FrameCount);
+			for (int i = 0; i < count; i++)
+			{
+				var method = stackTrace.GetFrame(i)?.GetMethod();
+				if (method == null)
+				{
+					continue;
+				}
+				if (chain.Length > 0)
+				{
+					chain += " ← ";
+				}
+				chain += method.DeclaringType?.Name + "." + method.Name;
+			}
+			Logger.WriteError($"[light-boot] HID 帧流：{message} · 调用链={chain}");
+		}
+		catch
+		{
+			Logger.WriteError("[light-boot] HID 帧流：" + message);
+		}
+	}
+
 	public void StartMode(int mode)
 	{
 		lock (_startLock)
 		{
 			if (ShouldRestartEffect(mode, _activeMode, _stop, _effectThread?.IsAlive ?? false))
 			{
+				LogBootHid($"start(mode={mode} · activeMode={_activeMode} · stopping={_stop} · threadAlive={_effectThread?.IsAlive ?? false})");
 				StopCurrentEffect();
 				int gen = Interlocked.Increment(ref _generation);
 				_activeMode = mode;
@@ -1108,6 +1152,7 @@ public class KeyboardRgb : IDisposable
 
 	public void StopCurrentEffect()
 	{
+		LogBootHid($"stop(stream={(this._stream != null ? "connected" : "null")} · activeMode={_activeMode} · threadAlive={_effectThread?.IsAlive ?? false})");
 		_stop = true;
 		_effectThread?.Join(500);
 		_effectThread = null;

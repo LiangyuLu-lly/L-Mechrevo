@@ -2051,11 +2051,28 @@ internal static class Program
 		return true;
 	}
 
+	/// <summary>
+	/// ⭐ 2026-10-19（同方单键 RGB 开机闪烁诊断）：开机灯光时序日志（默认可见、带进程启动毫秒数）✅。
+	/// </summary>
+	private static void LogLightBoot(string message)
+	{
+		try
+		{
+			long milliseconds = (long)(DateTime.Now - Process.GetCurrentProcess().StartTime).TotalMilliseconds;
+			Logger.WriteError($"[light-boot] t={milliseconds}ms {message}");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[light-boot] " + message + "（计时失败：" + ex.Message + "）");
+		}
+	}
+
 	private static void ReassertKeyboardCustomMode()
 	{
 		KeyboardRgb keyboardRgb = rgb;
 		if (keyboardRgb != null && keyboardRgb.KbPowerOn)
 		{
+			LogLightBoot($"HID 帧流：ReInitCustomMode + StartMode(mode={keyboardRgb.KbHidMode})（来源=硬件状态重申）");
 			keyboardRgb.ReInitCustomMode();
 			keyboardRgb.StartMode(keyboardRgb.KbHidMode);
 			Logger.WriteLine($"RGB 固件接管，立即重申自定义帧模式：mode={keyboardRgb.KbHidMode}");
@@ -2226,6 +2243,7 @@ internal static class Program
 				if (Interlocked.Exchange(ref _lightingIdleSuspended, 1) == 0)
 				{
 					Logger.WriteLine($"灯效空闲休眠：{timeoutSeconds} 秒");
+					LogLightBoot($"自动关灯：suspend（timeout={timeoutSeconds}s · idle={idleMilliseconds}ms）");
 					await ReconcileLightingPowerAsync().ConfigureAwait(continueOnCapturedContext: false);
 				}
 				break;
@@ -2233,6 +2251,7 @@ internal static class Program
 				if (Interlocked.Exchange(ref _lightingIdleSuspended, 0) != 0)
 				{
 					Logger.WriteLine("灯效空闲恢复：检测到用户输入");
+					LogLightBoot($"自动关灯：resume（idle={idleMilliseconds}ms）");
 					await RestoreLightingWithRetryAsync(force: true).ConfigureAwait(continueOnCapturedContext: false);
 				}
 				break;
@@ -2299,6 +2318,7 @@ internal static class Program
 
 	private static async Task SuspendLightingTemporarilyAsync()
 	{
+		LogLightBoot("自动关灯/临时熄灭：suspend 开始（来源=空闲/离电）");
 		Interlocked.Increment(ref _lightingRestoreRequestId);
 		Interlocked.Exchange(ref _keyboardEffectProtectArmed, 0);
 		rgb.StopCurrentEffect();
@@ -3006,6 +3026,9 @@ internal static class Program
 			{
 				return false;
 			}
+			LogLightBoot($"键盘恢复开始：KbPowerOn={rgb.KbPowerOn} · KbPowerExplicitOff={rgb.KbPowerExplicitOff}"
+				+ $" · hw.KeyboardPower={hw?.KeyboardPower} · hw.IsConnected={hw?.IsConnected}"
+				+ $" · rgb.IsConnected={rgb.IsConnected} · force={force}");
 			// ⭐⭐ 2026-10-18（机主：启动灯光策略「只读」）：⭐ 宝龙达键盘灯启动/恢复**一个字节都不写**
 			//   （⛔ 不发"关灯"、⛔ 不写功能号 16/17/18、⛔ 不启动 HID 帧流）⇒ 只回读真实状态 + 同步 UI/镜像 ✅
 			//   ⭐ 判据：16 != 0 且 18 > 0 才算「亮着」（⛔ 不用功能号 10）；显式关也只读 ✅
@@ -3056,6 +3079,7 @@ internal static class Program
 			bool useGcuKeyboardPower = ShouldUseGcuKeyboardPowerChannel();
 			if (!rgb.KbPowerOn)
 			{
+				LogLightBoot("HID 帧流：stop（来源=恢复判定 KbPowerOn=false）");
 				rgb.StopCurrentEffect();
 				// 2026-10-12（分流泄漏修复）：⛔ 单键 RGB 机型不发这条 GCU 电源 —— 停掉 HID 帧流就是"关"。
 				// 2026-10-12（关灯方向）：唯一的例外是 **HID 侧不可用** —— 那时 StopCurrentEffect() 等于
@@ -3072,7 +3096,9 @@ internal static class Program
 				{
 					return false;
 				}
+				LogLightBoot("键盘电源 off 下发（来源=恢复判定关闭 · GCU Keyboard/Ctrl）");
 				bool flag2 = await service.IssueLightPower("Keyboard/Ctrl", on: false).ConfigureAwait(continueOnCapturedContext: false);
+				LogLightBoot($"键盘电源 off 结果={flag2}");
 				if (flag2)
 				{
 					Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
@@ -3109,7 +3135,9 @@ internal static class Program
 				if (!appliedThisCycle && LightingState.ShouldIssueKeyboardPowerOn(useGcuKeyboardPower, rgb.KbPowerOn, flag, mechrevoHw.KeyboardPower))
 				{
 					ArmKeyboardEffectProtect();
+					LogLightBoot("键盘电源 on 下发（来源=恢复 · GCU Keyboard/Ctrl）");
 					bool flag3 = await service.IssueLightPower("Keyboard/Ctrl", on: true).ConfigureAwait(continueOnCapturedContext: false);
+					LogLightBoot($"键盘电源 on 结果={flag3}");
 					powerJustIssued = flag3;
 					if (flag3)
 					{
@@ -3170,6 +3198,8 @@ internal static class Program
 				return true;
 			}
 			bool isConnected = rgb.IsConnected;
+			LogLightBoot($"HID 帧流准备：IsConnected={isConnected} · forceEffectRestore={forceEffectRestore}"
+				+ $" · powerJustIssued={powerJustIssued}（来源=恢复）");
 			if (!isConnected && !rgb.Connect())
 			{
 				return false;
@@ -3180,10 +3210,12 @@ internal static class Program
 			}
 			if (forceEffectRestore)
 			{
+				LogLightBoot($"HID 帧流：StartModeForced(mode={rgb.KbHidMode})（来源=恢复 forceEffectRestore）");
 				rgb.StartModeForced(rgb.KbHidMode);
 			}
 			else
 			{
+				LogLightBoot($"HID 帧流：StartMode(mode={rgb.KbHidMode})（来源=恢复）");
 				rgb.StartMode(rgb.KbHidMode);
 			}
 			MarkKeyboardCustomStatusBaseline();
