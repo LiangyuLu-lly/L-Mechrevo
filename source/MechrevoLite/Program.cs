@@ -153,6 +153,8 @@ internal static class Program
 
 	private static int _keyboardRestoreAppliedRequestId = int.MinValue;
 
+	private static int _keyboardFirstHidStartPending = 1;
+
 	private static readonly Dictionary<string, bool> _externalPowerBeforeTemporarySuspend = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
 	/// <summary>⭐ 启动 Logo 恢复判断只记一次（0=未记 · 1=已记）；⛔ 避免恢复重试时刷屏 ✅</summary>
@@ -3168,6 +3170,16 @@ internal static class Program
 					? "RGB 自动恢复：50 系单分区键盘按 UI 归属走 MQTT，HID 分支跳过（官方通道已下发电源）"
 					: "RGB 自动恢复：控制器不支持软件灯效，HID 分支跳过（官方通道已下发电源）");
 				return true;
+			}
+			bool bootDelay = Interlocked.Exchange(ref _keyboardFirstHidStartPending, 0) == 1 && !force && !powerJustIssued;
+			if (bootDelay)
+			{
+				LogLightBoot("首次启动：HID 帧流延后 8 秒启动（等固件/GCU 稳定后再接管）");
+				await Task.Delay(8000).ConfigureAwait(continueOnCapturedContext: false);
+				if (Volatile.Read(in _exitStarted) != 0 || rgb == null)
+				{
+					return false;
+				}
 			}
 			bool isConnected = rgb.IsConnected;
 			LogLightBoot($"HID 帧流准备：IsConnected={isConnected} · forceEffectRestore={forceEffectRestore}"
