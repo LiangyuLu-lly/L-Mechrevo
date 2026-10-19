@@ -1002,6 +1002,18 @@ public class CustomModeForm : RForm
 		// 2026-10-09：文案改为「核心偏移过高，有损坏硬件的风险」——不再带占位符，故去掉 string.Format
 		// （阈值不写进提示，避免窄窗口长句折行；阈值判定逻辑一字未动，见 CoreOffsetWarnThreshold/SyncOcRiskVisuals）。
 		_coreOcRiskRow = MakeOcRiskRow(Strings.GpuCoreOffsetRisk);
+		// ⭐⭐ 2026-10-19（实验）：仅负偏移实验生效时显示一行小字提示（资源键，⛔ 不硬编码）✅
+		if (AppConfig.Get("gpu_oc_nvapi_for_gcu", 1) != 0 && hw != null
+			&& hw.DgpuGeneration != DgpuGenerationKind.NoDgpu && !(hw.UsesBaolongda))
+		{
+			_coreOcRiskRow.Controls.Add(new RLabel
+			{
+				Text = Strings.GpuOcNvapiExperimentHint,
+				ForeColor = UiVisualStyle.Warn,
+				AutoSize = true,
+				Margin = new Padding(0, D(2), 0, 0)
+			});
+		}
 		(int, int, int, bool) tuple14 = DeviceRange(memMin, memMax, hw?.EffectiveGpuMemoryClockOffset ?? 0, allowNegative: true);
 		(_memOc, _memOcVal) = AddSliderRow(Strings.MemoryOffset, tuple14.Item1, tuple14.Item2, tuple14.Item3, (int v) =>
 		{
@@ -4342,6 +4354,35 @@ public class CustomModeForm : RForm
 		int memMax = hw?.GpuMemoryOffsetUserMaximum ?? (-1);
 		if (!(hw?.UsesBaolongda ?? false))
 		{
+			// ⭐⭐ 2026-10-19（机主：同方 GCU 先试负偏移）：实验特性 —— 仅 NVIDIA + 配置开关 + NVAPI 范围可用时，
+			//   把**负区间**并进 UI（负值走 NVAPI P0；正区间仍以厂商字段为准，上限 ≤ +200/驱动上限）✅
+			//   ⚠️ 拉不到 NVAPI 范围 ⇒ 完全保持现状（不改 GCU 行为）✅
+			bool gcuNvapiExperiment = AppConfig.Get("gpu_oc_nvapi_for_gcu", 1) != 0
+				&& hw != null
+				&& hw.DgpuGeneration != DgpuGenerationKind.NoDgpu;
+			if (gcuNvapiExperiment
+				&& NvapiPStates.TryGetP0OffsetRange(out int nvCoreMin, out int nvCoreMax, out int nvMemMin, out int nvMemMax))
+			{
+				int uiCoreNegMin = Math.Max(nvCoreMin, -900);
+				int uiMemNegMin = Math.Max(nvMemMin, -900);
+				int uiCoreMax = Math.Min(Math.Max(coreMax, nvCoreMax), 200);
+				int uiMemMax = Math.Min(Math.Max(memMax, nvMemMax), 200);
+				if (uiCoreNegMin < 0)
+				{
+					coreMin = Math.Min(coreMin > 0 ? coreMin : uiCoreNegMin, uiCoreNegMin);
+					coreMax = uiCoreMax;
+				}
+				if (uiMemNegMin < 0)
+				{
+					memMin = Math.Min(memMin > 0 ? memMin : uiMemNegMin, uiMemNegMin);
+					memMax = uiMemMax;
+				}
+				string rangeLog = "[gpu-oc] 实验：GCU UI 范围 core=" + coreMin + ".." + coreMax + " · mem=" + memMin + ".." + memMax;
+				if (Logger.TryMarkChanged("gpu-oc-gcu-nvapi-range", rangeLog))
+				{
+					Logger.WriteError(rangeLog);
+				}
+			}
 			return (CoreMin: coreMin, CoreMax: coreMax, MemMin: memMin, MemMax: memMax);
 		}
 		if (NvapiPStates.TryGetP0OffsetRange(out int driverCoreMin, out int driverCoreMax, out int driverMemMin, out int driverMemMax))

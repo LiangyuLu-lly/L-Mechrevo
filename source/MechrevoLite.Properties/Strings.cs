@@ -1710,6 +1710,8 @@ internal class Strings
 	/// <summary>2026-10-09：自定义性能模式 GPU 核心偏移风险提示（无占位符，2026-10-09 改为「核心偏移过高，有损坏硬件的风险」，调用处不再 string.Format）。</summary>
 	internal static string GpuCoreOffsetRisk => ResourceManager.GetString("GpuCoreOffsetRisk", resourceCulture);
 
+	internal static string GpuOcNvapiExperimentHint => ResourceManager.GetString("GpuOcNvapiExperimentHint", resourceCulture);
+
 	/// <summary>2026-10-09：自定义性能模式显存偏移风险提示（无占位符，2026-10-09 改为「显存偏移过高，有损坏硬件的风险」，调用处不再 string.Format）。</summary>
 	internal static string VramOffsetRisk => ResourceManager.GetString("VramOffsetRisk", resourceCulture);
 

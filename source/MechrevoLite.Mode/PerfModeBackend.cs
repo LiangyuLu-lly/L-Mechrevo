@@ -14,6 +14,9 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 
 	private readonly MechrevoHw _hw;
 
+	// ⭐ 实验（GCU 负偏移）：上一次是否由 NVAPI 负偏移接管（切回时先写 0 清残留）✅
+	private bool _gcuNvapiNegativeActive;
+
 	public PerfModeBackend(MechrevoService service, MechrevoHw hw)
 	{
 		_service = service ?? throw new ArgumentNullException("service");
@@ -231,7 +234,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		return Task.FromResult(ok);
 	}
 
-	public Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct)
+	public async Task<bool> ApplyGpuOverclockAsync(bool on, int core, int memory, CancellationToken ct)
 	{
 		// ⭐⭐ 2026-10-19（宝龙达 · GPU 偏移真正生效）：宝龙达没有 GCU ⇒ 原来的 `ApplyGcuGpuOverclock`
 		//   走的是厂商 MQTT `LCHWOC` 字段，必然失败（机主实测：核心滑块值恒 0）。
@@ -272,9 +275,49 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 				Logger.WriteError($"[gpu-oc] ⚠️ 驱动接受了写入，但回读与目标不一致：目标 core={targetCore} mem={targetMemory}"
 					+ $" · 回读 core={appliedCore} mem={appliedMemory} MHz ⇒ 如实按失败处理");
 			}
-			return Task.FromResult(confirmed);
+			return confirmed;
 		}
-		return _service.ApplyGcuGpuOverclock(on, core, memory);
+			// ⭐⭐ 2026-10-19（机主：同方 GCU 先试"负的核心/显存偏移"）：实验特性 —— 仅 GCU + NVIDIA + NVAPI 可用 + 配置开关 ✅
+		//   ⭐ 负值走 NVAPI P0 直写（两项都写 core/mem），回读校验；⛔ 不影响宝龙达/非 NVIDIA/无 NVAPI ✅
+		int expCoreMin = 0;
+		int expCoreMax = 0;
+		int expMemMin = 0;
+		int expMemMax = 0;
+		bool nvapiExperiment = AppConfig.Get("gpu_oc_nvapi_for_gcu", 1) != 0
+			&& !_hw.UsesBaolongda
+			&& _hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu
+			&& NvapiPStates.TryGetP0OffsetRange(out expCoreMin, out expCoreMax, out expMemMin, out expMemMax);
+		bool negativeRequest = on && (core < 0 || memory < 0);
+		if (nvapiExperiment && negativeRequest)
+		{
+			Logger.WriteError("[gpu-oc] 实验：同方 GCU 机型启用 NVAPI 负偏移（范围 core=" + expCoreMin + ".." + expCoreMax
+				+ " · mem=" + expMemMin + ".." + expMemMax + " · 写路径=NVAPI）");
+			List<KeyValuePair<string, string>> nvapiFields = new List<KeyValuePair<string, string>>(2)
+			{
+				new KeyValuePair<string, string>("GpuCoreClockOffsetOC", core.ToString()),
+				new KeyValuePair<string, string>("GpuMemoryClockOffsetOC", memory.ToString())
+			};
+			bool nvapiOk = await _hw.ApplyGpuOverclockAsync(nvapiFields, ct).ConfigureAwait(continueOnCapturedContext: false);
+			_hw.EnsureDirectGpuOverclock();
+			_hw.TryGetDirectGpuOverclockReadback(out int rbCore, out int rbMem);
+			Logger.WriteError("[gpu-oc] 实验：负偏移下发 core=" + core + " mem=" + memory + " ⇒ NVAPI 回读 core=" + rbCore
+				+ " mem=" + rbMem + (nvapiOk ? " ✅" : " ❌（如实报失败）"));
+			_gcuNvapiNegativeActive = nvapiOk;
+			return nvapiOk;
+		}
+		if (nvapiExperiment && _gcuNvapiNegativeActive)
+		{
+			// ⭐ 从负值切回 0/正值：先用 NVAPI 写 0 清残留降频，再走原 GCU 字段路径 ✅
+			Logger.WriteError("[gpu-oc] 实验：从负偏移切回 ⇒ 先 NVAPI 写 0 清残留（core=0 mem=0），再走 GCU 字段");
+			List<KeyValuePair<string, string>> clearFields = new List<KeyValuePair<string, string>>(2)
+			{
+				new KeyValuePair<string, string>("GpuCoreClockOffsetOC", "0"),
+				new KeyValuePair<string, string>("GpuMemoryClockOffsetOC", "0")
+			};
+			await _hw.ApplyGpuOverclockAsync(clearFields, ct).ConfigureAwait(continueOnCapturedContext: false);
+			_gcuNvapiNegativeActive = false;
+		}
+		return await _service.ApplyGcuGpuOverclock(on, core, memory).ConfigureAwait(continueOnCapturedContext: false);
 	}
 
 	public Task<bool> SetSlotNameAsync(string name, CancellationToken ct)
