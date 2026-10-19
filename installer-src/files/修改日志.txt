@@ -1,3 +1,29 @@
+r76（2026-10-19 · **0.292.1.1 beta23.2**）★★ 休眠唤醒弹窗 + 设置页启动/响应优化 + 板号识别增强（含两处自引入回归的修复记录）
+用户原话：「设页启动慢问题存在好几个版本了 看看能不能优化」「速度区别不大,但是页面不会未响应了」「那先这样 有机主反应就是机器休眠(会关机的睡眠那个) 再启动后LM会弹出UI主界面 就算之前关闭了也会」「依旧会」「可以 没有弹了」「打包 beta23.2 写修改日志 更新日志(回归问题不写更新日志 但是要记录修改)」
+① ⭐ 休眠唤醒弹主界面：两层修法 ——
+   (a) 第二实例分支：命令行带 `startup`（开机自启任务 `/Startup.cs:431`）⇒ 只让位退出，⛔ 不敲 ShowMain（`f497197`）；
+   (b) 唤醒/解锁后 **90 秒抑制窗**：`MarkResumeShowSuppression()` 在 `PowerModes.Resume` 与 `SessionSwitch(SessionLogon/Unlock/ConsoleConnect)` 处置位；
+       `_showMainEvent` 监视线程命中抑制窗 ⇒ 忽略唤起并记日志（`d91b80c`）。托盘点击/用户点设置/程序内部逻辑不受影响。
+   背景：Windows 休眠恢复（S4）/登录恢复可能通过登录触发器或「重启应用」再拉起 LM，命令行未必带 startup ⇒ 会敲 ShowMain 弹出用户已关闭的主界面。
+② ⭐ 设置页启动优化（真机基线 830~1264 ms）：
+   - 字体：`UiVisualStyle.Font()` 原每次 `new Font` + 回退字体族每次 `new FontFamily` ⇒ 改为按 (字号,字重,单位) 静态缓存、回退字体族只建一次（`9c940fd`）；
+   - 布局：ctor `SuspendLayout` + 结束一次 `ResumeLayout(true)+PerformLayout` ⇒ 布局 55 次/85 ms → **3 次/26 ms**；新增「基础细分」分段日志（`90e57d2`）；
+   - 状态读取后移：快捷开关构建期跳过硬件状态读取（`95882d4`）+ Shown 后 `RefreshQuickStatesAfterShown` 回填；
+   - ⛔ 未做（已回滚）：快捷开关 tile 骨架拆分 / 首帧后构建 —— 见 ⑧。
+③ ⭐ 板号多来源识别（修「宝龙达被判成同方」）：`BoardWhitelist.GetBoardProductEvidence()` 依次取证
+   reg.BaseBoardProduct → WMI Win32_BaseBoard.Product → reg.SystemProductName / WMI ComputerSystem.Model（仅兜底且需含 MRID6）；
+   白名单判据不变（MRID6 精确 / MRID6-23 / MRID6- 前缀）⇒ GM5* 等同方永不命中；消费方统一（backend/电池面板/诊断包/CLI 平台闸/[gate] 行）（`ee3461f`）。
+④ ⭐ 板号命中但探不到接口的取证：`BaolongdaBackend.TryCreate` 在 wmi==null 且板号命中白名单时记 error（含检查项），
+   用于解释真机「诊断包白名单命中、运行期 backend=Gcu」的矛盾（`7f698b0`）。
+⑤ ⭐ 诊断包文件名附带机型：`DiagnosticPackExporter.BuildFileName` 增加 `SystemProductName` slug（非法字符替换、长度 28 截断、读不到则省略），日志同步（`44fa39e`）。
+⑥ ⭐ 回归记录 A（骨架拆分导致仪表盘顺序错乱）：尝试把 `BuildQuickSwitchPanel` 拆成「ctor 骨架 + Shown 后建 tile」，
+   因 `BuildDashboardLayout` 依赖 `panelQuickSwitch` 的真实结构，真机出现卡片顺序错乱/快捷开关位置异常（`c50efbd`、`361e904`）⇒ **已整体回退**（`2e8fa59`）。教训：该布局的“稳定顺序”应先重构为按名排序，再动延迟构建。
+⑦ ⭐ 回归记录 B（字体缓存被 Dispose 导致 GDI+ 崩溃）：字体缓存共享 Font 实例，但仓库有 5 处 `using Font = UiVisualStyle.Font(...)` / `RButton` 激活态 `font.Dispose()` 释放了共享实例 ⇒
+   后续 `MeasureString`/绘制抛 `ArgumentException: Parameter is not valid`，表现为文字/布局崩坏、图标红叉、界面“未响应”（`ed5c283` 引入，同提交内发现并修）。
+   修法：新增 `UiVisualStyle.TempFont()`（全新实例、可安全 Dispose），5 处释放点改用 TempFont；共享缓存只读（`172184a` 顺带修复 UiVisualStyle/RComboBox 的 CRLF 行尾）。
+⑧ ⭐ 代码行尾教训：用 python 文本模式批量替换会把 CRLF 文件写成 LF，产生整文件 diff ⇒ 改前先确认目标文件行尾，按原样写回。
+⑨ ⭐ 验证：Rebuild 0 错误 / 1459 警告；`tools/dev/settings-preview` 离线渲染确认面板顺序与控件完整；真机确认 30 系键盘 0/1/2/3、休眠唤醒不再弹窗；未打包期间的诊断包已归档 `docs/diag-packs/`。
+
 r75（2026-10-19 · **0.292.1.1 beta23.1.1**）★★ 宝龙达键盘灯「状态=亮度 + 记忆上次亮度」+ 设置界面布局/主题/按钮尺寸修复
 用户原话：「OK 改为0.292.1.1 beta23.1.1 宝龙达键盘灯光开关直接跟着亮度来行不行 亮度不等于0就是开 等于0就是关 然后关闭再打开的话就记忆上次置0前的亮度给它恢复」「不要误伤同方GCU的键盘」「「开关跟亮度走 + 记忆上次亮度」对宝龙达生效 30 40都没有独立开关的」「深色浅色也错乱」「是按钮巨大被裁切了 大小问题」「设置错乱了」「搞完打包」
 ① ⭐ 键盘灯「状态=亮度」：`KeyboardPower` 只由亮度回读推导（取消独立电源意图）⇒ 从根上消除「开关自己跳」；
