@@ -21,11 +21,15 @@ public class LightForm : RForm
 		("Raindrop", Strings.EffectMeteor)
 	};
 
-	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[3]
+	// ⭐ 2026-10-19（机主：耀世16super 的 Logo 有固件原生彩虹）：按官方 GCU 组件行为对照，
+	//   其效果枚举包含 Rainbow（现有 Single/Breathing/Mix 同样使用官方枚举名）⇒ Logo 表补第 4 项。
+	//   ⚠️ 只补 Logo；灯带/铰链/同步的效果表保持不变。
+	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[4]
 	{
 		("Single", Strings.EffectSingle),
 		("Breathing", Strings.EffectBreathing),
-		("Mix", Strings.EffectMix)
+		("Mix", Strings.EffectMix),
+		("Rainbow", Strings.EffectRainbow)
 	};
 
     // 2026-10-09（③，按作者 0.290.6 对齐）：铰链 = 作者 Lighbar4(biosProjectId) 的 5 项
@@ -175,6 +179,8 @@ public class LightForm : RForm
 			rColorPicker.ShowDialog(this);
 		};
 		AddRow(Strings.SingleColor, colorBtn);
+		// ⭐ 2026-10-19（Logo 固件原生彩虹）：彩虹效果下颜色无意义 ⇒ 颜色行隐藏/置灰（不启动任何软件刷色）✅
+		Label colorLabel = table.GetControlFromPosition(0, table.RowCount - 1) as Label;
 		UpdateChannelEnabled();
 		Controls.Add(table);
 		Shown += async (object? _, EventArgs _) =>
@@ -301,9 +307,15 @@ public class LightForm : RForm
 		void UpdateChannelEnabled()
 		{
 			bool powerOn = LightingSettingsStore.Load(_topic, _effects[0].Effect).PowerOn;
+			bool colorMeaningful = KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
 			sliderLight.Enabled = powerOn;
 			comboSpeed.Enabled = powerOn;
-			colorBtn.Enabled = powerOn;
+			colorBtn.Enabled = powerOn && colorMeaningful;
+			colorBtn.Visible = colorMeaningful;
+			if (colorLabel != null)
+			{
+				colorLabel.Visible = colorMeaningful;
+			}
 		}
 	}
 

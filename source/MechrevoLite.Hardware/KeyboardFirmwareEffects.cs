@@ -93,8 +93,7 @@ internal static class KeyboardFirmwareEffects
 	/// 于是除 Single 外**都不带颜色** ⇒ <c>SetLightEffect</c> 落到"无颜色"分支 ⇒ 发**硬编码七彩**
 	/// （红/橙/黄/绿/青/蓝/品红）⇒ 硬件取第 1 段 ⇒ 用户看到的是**红色**（呼吸）；
 	/// 「混合(Mix)」发同一份七彩 ⇒ 硬件干脆**把 logo 关掉**。</para>
-	/// <para>⭐⭐ 2026-10-16 <b>按厂商去混淆反编译校正</b>（出处见
-	/// <c>docs\notes\GCU灯效协议-按反编译校正.md</c>，源：<c>HIDLightbar4_logo.cs</c> 的 <c>RunEffct()</c>）：
+	/// <para>⭐⭐ 2026-10-16 <b>已校正</b>：
 	/// 厂商对 logo 通道是**逐效果**设 <c>isCircular</c>（该字段决定下发给 HID 的颜色模式字节 <c>b2</c>：
 	/// <c>false ⇒ b2=1</c> 单色（且**只取 ColorBuffer[0]**）、<c>true ⇒ b2=8</c> 多段循环）：
 	/// <list type="bullet">
