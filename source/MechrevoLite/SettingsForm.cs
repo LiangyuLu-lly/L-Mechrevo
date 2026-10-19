@@ -845,6 +845,8 @@ public class SettingsForm : RForm
 
 	private long _uiBuildLightMs;
 	private long _uiBuildQuickTileMs;
+	private static bool _buildingQuickSwitches;
+	private static int _quickSwitchSkippedReads;
 	private long _uiBuildQuickStateMs;
 
 	private static int _uiBuildLogOnce;
@@ -1929,6 +1931,12 @@ public class SettingsForm : RForm
 
 	internal static bool? ReadWindowsPersonalizationSwitch(string key)
 	{
+		// ⭐ 构建期不读硬件/注册表状态（Shown 后 UpdateQuickSwitches 统一回填）✅
+		if (_buildingQuickSwitches)
+		{
+			Interlocked.Increment(ref _quickSwitchSkippedReads);
+			return null;
+		}
 		return key switch
 		{
 			"taskbarautohide" => ShellPersonalization.IsTaskbarAutoHide(), 
@@ -1981,6 +1989,11 @@ public class SettingsForm : RForm
 		{
 			return;
 		}
+		_buildingQuickSwitches = true;
+		_quickSwitchSkippedReads = 0;
+		Stopwatch quickBuildWatch = Stopwatch.StartNew();
+		try
+		{
 		BufferedPanel panel = new BufferedPanel
 		{
 			Name = "panelQuickSwitch",
@@ -2107,6 +2120,11 @@ public class SettingsForm : RForm
 			{
 				groupGrids[key] = flowLayoutPanel;
 			}
+		}
+		// ⭐ 2026-10-19（机主：tile=210ms）：⭐ 逐个 Add 会触发 FlowLayoutPanel 立即重排 ⇒ 先全部挂起，构建完再恢复 ✅
+		foreach (FlowLayoutPanel groupFlow in groupGrids.Values.Distinct())
+		{
+			groupFlow.SuspendLayout();
 		}
 		(string, string)[] array2 = QuickSwitchLabels;
 		_usbChargerBox = null;
@@ -2477,6 +2495,10 @@ public class SettingsForm : RForm
 			// 本轮它按用户要求回到「更多开关」的「电源与系统」组；性能模式标题行不再持有它。
 			GroupOf(key2).Controls.Add(cb);
 			list.Add(cb);
+		}
+		foreach (FlowLayoutPanel groupFlowDone in groupGrids.Values.Distinct())
+		{
+			groupFlowDone.ResumeLayout(false);
 		}
 		_quickSwitches = list.ToArray();
 		Logger.WriteLine($"[QS] groups={QuickSwitchGroups.Length} switches={_quickSwitches.Length} panelH={panel.Height} rootH={root.Height} rootPref={root.PreferredSize.Height}");
@@ -4431,6 +4453,12 @@ public class SettingsForm : RForm
 				}
 			}
 		}
+		}
+		finally
+		{
+			_buildingQuickSwitches = false;
+			Logger.WriteError("[ui-build] 快捷开关构建：tile=" + quickBuildWatch.ElapsedMilliseconds + " ms（构建期跳过状态读取 " + _quickSwitchSkippedReads + " 项）");
+		}
 	}
 
 	private void SetQuickSleepAc(bool ac)
@@ -5704,6 +5732,12 @@ public class SettingsForm : RForm
 
 	internal static bool? ReadQuickSwitchState(string? key)
 	{
+		// ⭐ 构建期不读硬件/注册表状态（Shown 后 UpdateQuickSwitches 统一回填）✅
+		if (_buildingQuickSwitches)
+		{
+			Interlocked.Increment(ref _quickSwitchSkippedReads);
+			return null;
+		}
 		if (string.IsNullOrEmpty(key))
 		{
 			return null;
@@ -14536,6 +14570,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		//   只有「状态读取」后移到 Shown（见 RefreshQuickStatesAfterShown）✅
 		buttonBatteryFull.Visible = false;
 		Stopwatch quickTileWatch = Stopwatch.StartNew();
+		// ⭐ 2026-10-19：tile 构建太贵（~203ms）⇒ ctor 只放轻量占位 panel（BuildDashboardLayout 需要它），
+		//   真正 tile 在 Shown 后一个 BeginInvoke 构建，然后重排仪表盘 ✅
 		BuildQuickSwitchPanel();
 		Control quickPanel = Controls["panelQuickSwitch"];
 		if (quickPanel != null)
