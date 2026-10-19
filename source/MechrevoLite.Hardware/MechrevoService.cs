@@ -4877,6 +4877,16 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				}
 			}
 			Dictionary<string, object> value = dictionary;
+			if (!string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+			{
+				string payloadLog = $"[light] 下发 topic={topic} effect={effect} light={light} speed={speed}"
+					+ $" ColorBlocks={dictionary["ColorBlocks"]} isCircular={dictionary["isCircular"]}"
+					+ $" singleColor={(singleColor.HasValue ? singleColor.Value.ToArgb().ToString("X6") : "null")}";
+				if (Logger.TryMarkChanged("light-payload-" + topic, payloadLog))
+				{
+					Logger.WriteError(payloadLog);
+				}
+			}
 			Dictionary<string, object> payload = new Dictionary<string, object>
 			{
 				["function"] = "SetEffectALL",
