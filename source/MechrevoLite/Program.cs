@@ -3033,29 +3033,20 @@ internal static class Program
 				Logger.WriteLine("灯效恢复：无已保存灯效配置，跳过键盘灯效（不发 Keyboard/Ctrl 电源、不启动 HID 帧流）");
 				return true;
 			}
-			// 2026-10-12（根因① 后半句）：恢复路径先做一次「硬件赢就回写 LM 状态」，
-			// 这样下面 `!rgb.KbPowerOn` 那条"按用户设置保持关闭 / 发 off"的分支就不会把**别人点亮的灯压回去**。
-			// ⚠️ 2026-10-12（用户拍板「键盘灯光也修复」）：这里**不再**被"用户明确关过"提前挡住 ——
-			// 那个标记只在**硬件也报 Off** 时才算数（见 SyncKbPowerFromHardwareIfDiverged 的说明），
-			// 所以硬件报 On 时它会在此处被清掉、`rgb.KbPowerOn` 回写成开 ⇒ 下面不会发 off。
-			// ⛔ 反例保护仍然成立：用户明确关灯 **且硬件也报 Off** 时本方法什么都不做 ⇒ 照旧保持关闭。
-			SyncKbPowerFromHardwareIfDiverged();
+			// 用户保存的状态优先：保存为关 ⇒ 不因硬件状态改写保存值（下面走按保存值关闭的分支）
+			bool savedPowerOff = rgb.KbPowerExplicitOff || !rgb.KbPowerOn;
+			if (savedPowerOff)
+			{
+				LogLightBoot($"键盘恢复：保存状态为关闭（KbPowerExplicitOff={rgb.KbPowerExplicitOff}）⇒ 按保存值关闭");
+			}
+			else
+			{
+				SyncKbPowerFromHardwareIfDiverged();
+			}
 			bool flag = Volatile.Read(in _keyboardPowerTemporarilySuspended) != 0;
 			bool forceEffectRestore = force | flag;
-			// 2026-10-12（机主原话「亮度是0，所以打开关闭没有变化，把亮度拉高就好了」）：**先判有效电源
-			// （含 explicitOff 只在硬件也报 Off 时才算数），再做亮度 0 归一化** —— 顺序就是用户要求的那条。
-			// 「开着却不亮」不该存在：亮度 0 ⇒ 抬回上一次非 0 的亮度（没历史则 50%）。
-			// ⚠️ 只改 LM 侧的缓存（滑块读同一个值），⛔ 此刻还不发任何帧（HID 帧在下方的 StartMode 才出去）。
-			int effectiveBrightness = ResolveEffectiveKbBrightness();
-			if (rgb.KbPowerOn && effectiveBrightness != rgb.Brightness)
-			{
-				Logger.WriteLine($"键盘灯亮度 0 归一化：{rgb.Brightness}% -> {effectiveBrightness}%（电源有效为 On；历史非 0 亮度={rgb.KbLastNonZeroBrightness}）");
-				int priorBrightness = rgb.Brightness;
-				rgb.Brightness = effectiveBrightness;
-				rgb.QueueSaveConfig();
-				// 2026-10-12（UI 诚实）：抬了亮度就说一句（同类 15 秒内只一次），⛔ 不静默。
-				KeyboardLightingDecision.NotifyBrightnessRestored(effectiveBrightness, $"恢复路径：{priorBrightness}% -> {effectiveBrightness}%");
-			}
+			// 亮度按保存值恢复，不做 0 归一化
+			int effectiveBrightness = Math.Clamp(rgb.Brightness, 0, 100);
 			MechrevoHw mechrevoHw;
 			bool useGcuKeyboardPower = ShouldUseGcuKeyboardPowerChannel();
 			if (!rgb.KbPowerOn)
