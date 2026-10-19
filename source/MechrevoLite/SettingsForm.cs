@@ -5779,11 +5779,20 @@ public class SettingsForm : RForm
 		long uiBuildInitMs = 0L;
 		long uiBuildDisplayMs = 0L;
 		long uiBuildOtherMs = 0L;
+		long uiBuildThemeMs = 0L;
+		long uiBuildHooksMs = 0L;
+		long uiBuildBatteryMs = 0L;
+		long uiBuildQuickMs = 0L;
+		long uiBuildSettingsEntryMs = 0L;
+		long uiBuildTopMs = 0L;
+		long uiBuildPerfCardMs = 0L;
 		Stopwatch uiBuildPhase = Stopwatch.StartNew();
 		BackColor = UiVisualStyle.Window;
 		InitializeComponent();
 		uiBuildInitMs = uiBuildPhase.ElapsedMilliseconds;
 		uiBuildPhase.Restart();
+		// ⭐ 2026-10-19（机主：设置页启动慢）：⭐ 整窗构建期挂起布局，结束前只做一次 Resume+PerformLayout ✅
+		SuspendLayout();
 		// ⭐⭐ 2026-10-19（机主：亮度调节有延迟）：写入改成**节流合并**（拖动期 ~120ms 一次 + 松手补最终值）；
 		//   写后回读在后台线程执行 ⇒ ⛔ 不阻塞 UI。日志：`[brightness] 写（节流合并 n 次）请求=… ⇒ 实际=…`
 		_brightnessCommitQueue = new BrightnessCommitQueue(WriteBrightnessValueAsync, TimeSpan.FromMilliseconds(120L), (Exception ex) =>
@@ -5792,6 +5801,8 @@ public class SettingsForm : RForm
 		});
 		labelVersion.Text = (Program.ReleaseLabel == Program.ReleaseVersion) ? Program.ReleaseLabel : Program.ReleaseVersion + " " + Program.ReleaseLabel;
 		InitTheme(setDPI: true);
+		uiBuildThemeMs += uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 		// 2026-10-09（多显示器刷新率修复）：外接屏接入/断开、切换显示配置时都要重算刷新率行。
 		Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -5838,6 +5849,8 @@ public class SettingsForm : RForm
 		buttonKeyboard.AccessibleName = Strings.ExtraSettings;
 		buttonKeyboardColor.AccessibleName = Strings.LaptopKeyboard + " " + Strings.Color;
 		comboKeyboard.AccessibleName = Strings.LaptopBacklight;
+		uiBuildTopMs += uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		FormClosing += SettingsForm_FormClosing;
 		Deactivate += SettingsForm_LostFocus;
 		Activated += SettingsForm_Focused;
@@ -6042,6 +6055,8 @@ public class SettingsForm : RForm
 		button120Hz.MouseLeave += ButtonScreen_MouseLeave;
 		buttonFHD.MouseMove += ButtonFHD_MouseHover;
 		buttonFHD.MouseLeave += ButtonScreen_MouseLeave;
+		uiBuildPerfCardMs += uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		panelBatteryTitle.Controls.Clear();
 		labelBattery.ForeColor = UiVisualStyle.Muted;
 		labelBattery.Font = UiStyleCaptionFont();
@@ -6211,6 +6226,8 @@ public class SettingsForm : RForm
 			_sensorTimer.Start();
 		}
 		InitQuickSwitchRefresh();
+		uiBuildQuickMs += uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		labelCharge.MouseEnter += PanelBattery_MouseEnter;
 		labelCharge.MouseLeave += PanelBattery_MouseLeave;
 		labelBattery.Click += LabelBattery_Click;
@@ -6227,9 +6244,10 @@ public class SettingsForm : RForm
 		donateControl.Init();
 		labelBacklight.ForeColor = RForm.colorStandard;
 		labelBacklight.Click += LabelBacklight_Click;
+		uiBuildBatteryMs += uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		// ⭐ 布局批处理（性能优化）：整段构建只触发一次最终布局（⛔ 不在每个 Add 后级联重排）
 		// ⚠️ 通用路径（⛔ 不按平台分支）：宝龙达 / GCU / 同方都走这同一段 ⇒ 布局优化对所有机型生效 ✅
-		SuspendLayout();
 		uiBuildPhase.Restart();
 		BuildOfficialConsolePanel();
 		uiBuildDisplayMs += uiBuildPhase.ElapsedMilliseconds;
@@ -6238,8 +6256,6 @@ public class SettingsForm : RForm
 		uiBuildPhase.Restart();
 		BuildDashboardLayout();
 		uiBuildOtherMs += uiBuildPhase.ElapsedMilliseconds;
-		ResumeLayout(false);
-		PerformLayout();
 		// 2026-10-09（UI 打磨③，用户原话「这种长条的能不能拆成和Ghelper一样独立的呢」）：
 		// BuildDashboardLayout 里的 MakeCompactModeButton 会把性能/显卡两行按钮的 Margin 清成 Empty
 		// （那是"拼成一条长条"时代的写法），会把上面下发过的拆条 Margin 抹掉；而运行时那两次
@@ -6267,6 +6283,9 @@ public class SettingsForm : RForm
 		// ⭐⭐ 2026-10-19（机主：「设置窗口里根本没有这些功能，为什么要加载这么多？」）：
 		//   ⭐ 分段耗时日志（**只打一次**、默认级别可见）—— 先拿证据再改，⛔ 不猜 ✅
 		//   · 基础 = 总计 − 灯光组 − 性能 − 显示/核显；外设电量在构建阶段**不执行**（后台刷新）。
+		// ⭐ 全部构建完成：只做一次最终布局 ✅
+		ResumeLayout(true);
+		PerformLayout();
 		uiBuildTotal.Stop();
 		_uiBuildProfiling = false;
 		long uiBuildLayoutMs = (long)(_uiBuildLayoutTicks * 1000.0 / Stopwatch.Frequency);
@@ -6278,6 +6297,12 @@ public class SettingsForm : RForm
 		if (Interlocked.Exchange(ref _uiBuildLogOnce, 1) == 0)
 		{
 			int uiBuildControlCount = CountAllControls(this);
+			long uiBuildBaseAccounted = uiBuildThemeMs + uiBuildHooksMs + uiBuildBatteryMs + uiBuildQuickMs + uiBuildTopMs + uiBuildPerfCardMs;
+			long uiBuildBaseOther = Math.Max(0L, uiBuildBaseMs - uiBuildBaseAccounted);
+			Logger.WriteError("[ui-build] 基础细分：顶部=" + uiBuildTopMs + " ms · 性能模式卡=" + uiBuildPerfCardMs + " ms · 快捷开关=" + uiBuildQuickMs
+				+ " ms · 屏幕卡=0 ms（含顶部） · 电池卡=" + uiBuildBatteryMs + " ms · 系统/设置入口=" + uiBuildSettingsEntryMs
+				+ " ms · 页脚=0 ms（含其它） · 主题应用=" + uiBuildThemeMs + " ms · 事件挂钩=" + uiBuildHooksMs
+				+ " ms · 其它=" + uiBuildBaseOther + " ms");
 			Logger.WriteError($"[ui-build] 分段耗时：基础={uiBuildBaseMs} ms · 灯光组={uiBuildLightMs} ms · 性能={uiBuildPerfMs} ms"
 				+ $" · 外设电量=0 ms（构建阶段不执行，已改后台） · 显示/核显={uiBuildDisplayMs} ms · 总计={uiBuildTotalMs} ms"
 				+ $"（InitializeComponent={uiBuildInitMs} ms · 其它构建={uiBuildOtherMs} ms · 来源=设置窗构造）");
