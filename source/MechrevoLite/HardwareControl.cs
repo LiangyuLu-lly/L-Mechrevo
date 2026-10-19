@@ -2630,14 +2630,30 @@ public static class HardwareControl
 
 	internal static float? ResolveGpuPower(float? localPower, float? fallbackPower)
 	{
-		return SelectUsablePower(localPower, fallbackPower);
+		float upperBound = GpuPowerUpperBound();
+		return SelectUsablePower(localPower, fallbackPower, upperBound);
 	}
 
-	private static float? SelectUsablePower(float? localPower, float? fallbackPower)
+	/// <summary>GPU 功耗合理上限（NVML 功耗上限优先，其次 TGP 上限；笔记本兜底 350W）。</summary>
+	private static float GpuPowerUpperBound()
 	{
-		if (!IsUsablePower(localPower))
+		if (NvmlHelper.TryGetPowerLimitBounds(out int _, out int nvmlMaxW, out int _) && nvmlMaxW > 0)
 		{
-			if (!IsUsablePower(fallbackPower))
+			return nvmlMaxW + 50f;
+		}
+		int tgpMax = Program.hw?.GpuTgpMaximum ?? (-1);
+		if (tgpMax > 0)
+		{
+			return tgpMax + 100f;
+		}
+		return 350f;
+	}
+
+	private static float? SelectUsablePower(float? localPower, float? fallbackPower, float upperBound = float.MaxValue)
+	{
+		if (!IsUsablePower(localPower, upperBound))
+		{
+			if (!IsUsablePower(fallbackPower, upperBound))
 			{
 				return null;
 			}
@@ -2646,9 +2662,9 @@ public static class HardwareControl
 		return localPower;
 	}
 
-	private static bool IsUsablePower(float? power)
+	private static bool IsUsablePower(float? power, float upperBound = float.MaxValue)
 	{
-		if (power.HasValue && power.GetValueOrDefault() > 0f)
+		if (power.HasValue && power.GetValueOrDefault() > 0f && power.GetValueOrDefault() <= upperBound)
 		{
 			return float.IsFinite(power.Value);
 		}
