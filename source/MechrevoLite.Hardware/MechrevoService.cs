@@ -4909,16 +4909,19 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				// Logo 通道：所有效果都按 7 段颜色、多段循环下发
 				dictionary["isCircular"] = true;
 				dictionary["ColorBlocks"] = 7;
-				dictionary["ColorBuffer"] = new object[7]
+				int[] mixPalette = LightingSettingsStore.Load(topic, "ColorMarquee").MixColors ?? LightChannelSettings.DefaultMixColors;
+				object[] mixBuffer = new object[7];
+				for (int mi = 0; mi < 7; mi++)
 				{
-					new Dictionary<string, object> { ["R"] = 255, ["G"] = 0, ["B"] = 0 },
-					new Dictionary<string, object> { ["R"] = 255, ["G"] = 165, ["B"] = 0 },
-					new Dictionary<string, object> { ["R"] = 255, ["G"] = 255, ["B"] = 0 },
-					new Dictionary<string, object> { ["R"] = 0, ["G"] = 255, ["B"] = 0 },
-					new Dictionary<string, object> { ["R"] = 0, ["G"] = 255, ["B"] = 255 },
-					new Dictionary<string, object> { ["R"] = 0, ["G"] = 0, ["B"] = 255 },
-					new Dictionary<string, object> { ["R"] = 255, ["G"] = 0, ["B"] = 255 }
-				};
+					int argbValue = (mi < mixPalette.Length) ? mixPalette[mi] : LightChannelSettings.DefaultMixColors[mi];
+					mixBuffer[mi] = new Dictionary<string, object>
+					{
+						["R"] = (argbValue >> 16) & 0xFF,
+						["G"] = (argbValue >> 8) & 0xFF,
+						["B"] = argbValue & 0xFF
+					};
+				}
+				dictionary["ColorBuffer"] = mixBuffer;
 			}
 			if (!string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
 			{

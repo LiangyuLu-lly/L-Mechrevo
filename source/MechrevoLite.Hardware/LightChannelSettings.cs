@@ -1,8 +1,20 @@
 namespace MechrevoLite.Hardware;
 
-internal readonly record struct LightChannelSettings(string Effect, int Light, int Speed, int ColorArgb, bool PowerOn, int[]? ManualIndexes = null, int BreathingIndex = 1, int MonochromeIndex = 4, bool UsePresetColor = false, bool PowerExplicit = false)
+internal readonly record struct LightChannelSettings(string Effect, int Light, int Speed, int ColorArgb, bool PowerOn, int[]? ManualIndexes = null, int BreathingIndex = 1, int MonochromeIndex = 4, bool UsePresetColor = false, bool PowerExplicit = false, int[] MixColors = null)
 {
 	internal static readonly int[] DefaultManualIndexes = new int[6] { 1, 5, 9, 13, 21, 25 };
+
+	// Logo 多彩默认 7 色
+	internal static readonly int[] DefaultMixColors = new int[7]
+	{
+		System.Drawing.Color.FromArgb(255, 0, 0).ToArgb(),
+		System.Drawing.Color.FromArgb(255, 165, 0).ToArgb(),
+		System.Drawing.Color.FromArgb(255, 255, 0).ToArgb(),
+		System.Drawing.Color.FromArgb(0, 255, 0).ToArgb(),
+		System.Drawing.Color.FromArgb(0, 255, 255).ToArgb(),
+		System.Drawing.Color.FromArgb(0, 0, 255).ToArgb(),
+		System.Drawing.Color.FromArgb(255, 0, 255).ToArgb()
+	};
 
 	internal static readonly int[] BreathingPalette = new int[4]
 	{

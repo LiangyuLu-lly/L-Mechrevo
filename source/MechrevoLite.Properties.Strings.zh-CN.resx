@@ -5684,4 +5684,7 @@
   <data name="FanBoostNeedsPawnIOHint" xml:space="preserve">
     <value>强冷需要 PawnIO 驱动，可在「CPU 调节」页安装</value>
   </data>
+  <data name="EffectColors" xml:space="preserve">
+    <value>颜色</value>
+  </data>
 </root>

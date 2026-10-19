@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace MechrevoLite.Hardware;
@@ -240,6 +241,7 @@ internal static class LightingSettingsStore
 		bool powerOn = false;
 		bool explicitPower = false;
 		int[]? manualIndexes = null;
+		int[] mixColors = null;
 		int breathingIndex = 1;
 		int monoIndex = 4;
 		bool usePreset = false;
@@ -331,6 +333,31 @@ internal static class LightingSettingsStore
 				}
 				break;
 			}
+			case "mixcolors":
+			{
+				if (!string.IsNullOrWhiteSpace(text2))
+				{
+					string[] mixParts = text2.Split(',');
+					if (mixParts.Length >= 7)
+					{
+						int[] mixArr = new int[7];
+						bool mixOk = true;
+						for (int i = 0; i < 7; i++)
+						{
+							if (!int.TryParse(mixParts[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out mixArr[i]))
+							{
+								mixOk = false;
+								break;
+							}
+						}
+						if (mixOk)
+						{
+							mixColors = mixArr;
+						}
+					}
+				}
+				break;
+			}
 			case "usepreset":
 			{
 				usePreset = (text2 == "1");
@@ -346,7 +373,7 @@ internal static class LightingSettingsStore
 			}
 		}
 		}
-		return new LightChannelSettings(effect, light, speed, colorArgb, powerOn && explicitPower, manualIndexes, breathingIndex, monoIndex, usePreset, explicitPower);
+		return new LightChannelSettings(effect, light, speed, colorArgb, powerOn && explicitPower, manualIndexes, breathingIndex, monoIndex, usePreset, explicitPower, mixColors);
 	}
 
 	private static string Serialize(LightChannelSettings settings)
@@ -361,7 +388,7 @@ internal static class LightingSettingsStore
 			}
 			stringBuilder.Append(colors[i].ToString(CultureInfo.InvariantCulture));
 		}
-		return string.Join('\n', new string[11]
+		return string.Join('\n', new string[12]
 		{
 			"effect=" + settings.Effect,
 			"light=" + settings.Light.ToString(CultureInfo.InvariantCulture),
@@ -372,6 +399,7 @@ internal static class LightingSettingsStore
 			"breathingindex=" + settings.BreathingIndex.ToString(CultureInfo.InvariantCulture),
 			"monoindex=" + settings.MonochromeIndex.ToString(CultureInfo.InvariantCulture),
 			"usepreset=" + (settings.UsePresetColor ? "1" : "0"),
+			"mixcolors=" + string.Join(",", (settings.MixColors ?? LightChannelSettings.DefaultMixColors).Select(c => c.ToString(CultureInfo.InvariantCulture))),
 			stringBuilder.ToString(),
 			string.Empty
 		});

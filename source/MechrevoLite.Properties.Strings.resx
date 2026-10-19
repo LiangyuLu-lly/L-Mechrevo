@@ -5701,4 +5701,7 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
   <data name="FanBoostNeedsPawnIOHint" xml:space="preserve">
     <value>Fan boost needs the PawnIO driver. You can install it on the CPU Tuning page.</value>
   </data>
+  <data name="EffectColors" xml:space="preserve">
+    <value>Colors</value>
+  </data>
 </root>

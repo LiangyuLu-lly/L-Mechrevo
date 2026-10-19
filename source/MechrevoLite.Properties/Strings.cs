@@ -558,6 +558,8 @@ internal class Strings
 
 	internal static string EffectMix => ResourceManager.GetString("EffectMix", resourceCulture);
 
+	internal static string EffectColors => ResourceManager.GetString("EffectColors", resourceCulture);
+
 	internal static string EffectRainbow => ResourceManager.GetString("EffectRainbow", resourceCulture);
 
 	internal static string EffectRainbowWheel => ResourceManager.GetString("EffectRainbowWheel", resourceCulture);

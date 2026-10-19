@@ -211,6 +211,69 @@ public class LightForm : RForm
 		AddRow(Strings.SingleColor, colorBtn);
 		// 彩虹下颜色无意义 ⇒ 颜色行隐藏/置灰
 		Label colorLabel = table.GetControlFromPosition(0, colorRow) as Label;
+		FlowLayoutPanel mixPanel = null;
+		int[] mixColors = null;
+		if (logoGrade)
+		{
+			LightChannelSettings savedMix = LightingSettingsStore.Load(_topic, "ColorMarquee");
+			mixColors = (int[])(savedMix.MixColors != null ? savedMix.MixColors.Clone() : LightChannelSettings.DefaultMixColors.Clone());
+			mixPanel = new FlowLayoutPanel
+			{
+				FlowDirection = FlowDirection.LeftToRight,
+				WrapContents = false,
+				AutoSize = true,
+				AutoSizeMode = AutoSizeMode.GrowAndShrink
+			};
+			for (int mi = 0; mi < 7; mi++)
+			{
+				int swatchIndex = mi;
+				RColorButton swatch = new RColorButton
+				{
+					Size = new Size(30, 22),
+					BackColor = UiVisualStyle.Input,
+					BorderColor = UiVisualStyle.Border,
+					SwatchColor = Color.FromArgb(mixColors[mi]),
+					Cursor = Cursors.Hand,
+					Margin = new Padding(3, 0, 0, 0)
+				};
+				swatch.Click += (object _, EventArgs _) =>
+				{
+					using RColorPicker picker = new RColorPicker(Color.FromArgb(mixColors[swatchIndex]));
+					picker.ColorChanged += (Color c) =>
+					{
+						mixColors[swatchIndex] = c.ToArgb();
+						swatch.SwatchColor = c;
+						LightChannelSettings current = LightingSettingsStore.Load(_topic, _effects[0].Effect);
+						LightingSettingsStore.Save(_topic, current with { MixColors = (int[])mixColors.Clone() });
+						ScheduleEffectUpdate();
+					};
+					picker.ShowDialog(this);
+				};
+				mixPanel.Controls.Add(swatch);
+			}
+			RButton resetMix = new RButton
+			{
+				Text = Strings.Default,
+				Size = new Size(64, 22),
+				Margin = new Padding(8, 0, 0, 0)
+			};
+			resetMix.Click += (object _, EventArgs _) =>
+			{
+				LightChannelSettings current = LightingSettingsStore.Load(_topic, _effects[0].Effect);
+				LightingSettingsStore.Save(_topic, current with { MixColors = null });
+				mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
+				for (int si = 0; si < mixPanel.Controls.Count; si++)
+				{
+					if (mixPanel.Controls[si] is RColorButton btn)
+					{
+						btn.SwatchColor = Color.FromArgb(mixColors[si]);
+					}
+				}
+				ScheduleEffectUpdate();
+			};
+			mixPanel.Controls.Add(resetMix);
+			AddRow(Strings.EffectColors, mixPanel);
+		}
 		UpdateChannelEnabled();
 		Controls.Add(table);
 		Shown += async (object? _, EventArgs _) =>
@@ -281,7 +344,15 @@ public class LightForm : RForm
 		}
 		void SaveSettings()
 		{
-			LightingSettingsStore.Save(_topic, new LightChannelSettings(_effect, _light, _speed, _singleColor.ToArgb(), _powerOn));
+			LightChannelSettings current = LightingSettingsStore.Load(_topic, _effects[0].Effect);
+			LightingSettingsStore.Save(_topic, current with
+			{
+				Effect = _effect,
+				Light = _light,
+				Speed = _speed,
+				ColorArgb = _singleColor.ToArgb(),
+				PowerOn = _powerOn
+			});
 		}
 		void ScheduleEffectUpdate()
 		{
@@ -344,9 +415,13 @@ public class LightForm : RForm
 			// 通道开着就能调；保存值可能滞后于硬件开关
 			bool powerOn = LightingSettingsStore.Load(_topic, _effects[0].Effect).PowerOn
 				|| Program.IsExternalLightChannelOn(_topic);
-			bool colorMeaningful = KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
+			bool colorMeaningful = !logoGrade && KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
 			sliderLight.Enabled = powerOn;
 			comboSpeed.Enabled = powerOn;
+			if (mixPanel != null)
+			{
+				mixPanel.Enabled = powerOn;
+			}
 			colorBtn.Enabled = powerOn && colorMeaningful;
 			colorBtn.Visible = colorMeaningful;
 			if (colorLabel != null)
