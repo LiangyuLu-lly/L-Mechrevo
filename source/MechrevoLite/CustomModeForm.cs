@@ -1010,7 +1010,7 @@ public class CustomModeForm : RForm
 			string pathLog = "[gpu-oc] 路径自检：模具=" + pathMold + " · 写入=" + pathWrite
 				+ " · 开关 gpu_oc_nvapi_for_gcu=" + pathSwitch
 				+ " · 数字框范围=core=" + coreMin + ".." + coreMax + " mem=" + memMin + ".." + memMax
-				+ " · 滑块=core±500 mem±2000";
+				+ " · 滑块=core±500 mem=-1000..2000";
 			if (Logger.TryMarkChanged("gpu-oc-path-selfcheck", pathLog))
 			{
 				Logger.WriteError(pathLog);
@@ -1043,7 +1043,8 @@ public class CustomModeForm : RForm
 			});
 		}
 		// ⭐⭐ 2026-10-19（机主定稿）：显存滑块 ±2000（核心仍 ±500）；数字框两者都允许 NV 范围 ✅
-		(int, int, int, bool) tuple14 = DeviceRange(-2000, 2000, memCurrent, allowNegative: true);
+		// ⭐⭐ 2026-10-19（机主定稿）：显存滑块 -1000..+2000（不再对称 ±2000；0 不强制居中）✅
+		(int, int, int, bool) tuple14 = DeviceRange(-1000, 2000, memCurrent, allowNegative: true);
 		(_memOc, _memOcVal) = AddSliderRow(Strings.MemoryOffset, tuple14.Item1, tuple14.Item2, tuple14.Item3, (int v) =>
 		{
 			// 2026-10-09：同上 —— 显存偏移也只在点「应用」时下发。
@@ -4801,7 +4802,7 @@ public class CustomModeForm : RForm
 					{
 						(int refreshCoreMin, int refreshCoreMax, int refreshMemMin, int refreshMemMax) = GpuOffsetUiRange(hw);
 						_gpuOcCoreAdjustable = ApplyGpuOffsetUiRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset, -500, 500);
-						_gpuOcMemoryAdjustable = ApplyGpuOffsetUiRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset, -2000, 2000);
+						_gpuOcMemoryAdjustable = ApplyGpuOffsetUiRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset, -1000, 2000);
 						// ⭐ 面板刷新后也要重新评估风险提示（数字框值可能已被更新）✅
 						SyncOcRiskVisuals();
 					}
