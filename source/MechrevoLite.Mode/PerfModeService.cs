@@ -1197,16 +1197,18 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
-		// ⭐ 优先 ActiveModeId；宝龙达若 ActiveModeId 非自定义但 LastCustomId 指向自定义 ⇒ 用 LastCustomId ✅
+		// ⭐⭐ 2026-10-19（机主：「宝龙达模具 开机自动切自定义 无论之前是哪个模式 矫枉过正了」）：
+		//   ⛔ 原来在 ActiveModeId 不是自定义时会**回退到 LastCustomId 并强行切到自定义** ⇒ 开机永远变自定义 ❌
+		//   ⇒ 现在**只恢复「保存的当前档位本身就是自定义」的情况**；其它档位一律不动 ✅
 		PerfModeDefinition mode = Find(ActiveModeId);
 		if ((object)mode == null || !mode.IsCustom)
 		{
-			mode = ((object)Find(PerfModeStore.LastCustomId ?? "") is PerfModeDefinition lastCustom && lastCustom.IsCustom)
-				? lastCustom
-				: null;
-		}
-		if ((object)mode == null)
-		{
+			string skipLog = "[perfmode] 启动恢复：保存的当前档不是自定义（ActiveModeId=" + ActiveModeId
+				+ "）⇒ 不切模式、不重放自定义参数";
+			if (Logger.TryMarkChanged("local-startup-skip-notcustom", skipLog))
+			{
+				Logger.WriteError(skipLog);
+			}
 			return;
 		}
 		// ⭐ 把当前模式设为该档（持久化 + RaiseActiveChanged）✅
