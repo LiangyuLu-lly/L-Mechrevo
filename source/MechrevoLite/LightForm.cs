@@ -113,9 +113,17 @@ public class LightForm : RForm
 		Interval = 180
 	};
 
+	// 主设置窗切换灯效后，编辑窗跟随刷新
+	private readonly System.Windows.Forms.Timer _refreshTimer = new System.Windows.Forms.Timer
+	{
+		Interval = 500
+	};
+
 	private int _sendGeneration;
 
 	private int _disposed;
+
+	private bool _refreshingUi;
 
 	internal static void NotifyApplyOutcome(bool accepted, bool cancelled)
 	{
@@ -180,6 +188,10 @@ public class LightForm : RForm
 		};
 		sliderLight.ValueChanged += (object? _, EventArgs _) =>
 		{
+			if (_refreshingUi)
+			{
+				return;
+			}
 			_light = logoGrade
 				? Math.Clamp(sliderLight.Value, 0, 4)
 				: Math.Clamp(sliderLight.Value * 4 / 100, 0, Program.hw?.UsesBaolongda == true ? 3 : 4);
@@ -196,6 +208,10 @@ public class LightForm : RForm
 		};
 		sliderSpeed.ValueChanged += (object? _, EventArgs _) =>
 		{
+			if (_refreshingUi)
+			{
+				return;
+			}
 			_speed = Math.Clamp(sliderSpeed.Value, 0, 4);
 			ScheduleEffectUpdate();
 		};
@@ -231,8 +247,10 @@ public class LightForm : RForm
 		Label colorLabel = table.GetControlFromPosition(0, colorRow) as Label;
 		int logoColorMode = (logoGrade || lightbarGrade) ? LightEffectColorMode(_effect) : (-1);
 		FlowLayoutPanel mixPanel = null;
+		Label mixLabel = null;
+		RColorButton[] mixSwatches = new RColorButton[7];
 		int[] mixColors = null;
-		if (logoColorMode == 7)
+		if (logoGrade || lightbarGrade)
 		{
 			LightChannelSettings savedMix = LightingSettingsStore.Load(_topic, "ColorMarquee");
 			mixColors = (int[])(savedMix.MixColors != null ? savedMix.MixColors.Clone() : LightChannelSettings.DefaultMixColors.Clone());
@@ -268,6 +286,7 @@ public class LightForm : RForm
 					};
 					picker.ShowDialog(this);
 				};
+				mixSwatches[mi] = swatch;
 				mixPanel.Controls.Add(swatch);
 			}
 			RButton resetMix = new RButton
@@ -293,9 +312,12 @@ public class LightForm : RForm
 				ScheduleEffectUpdate();
 			};
 			mixPanel.Controls.Add(resetMix);
+			int mixRow = row;
 			AddRow(Strings.EffectColors, mixPanel);
+			mixLabel = table.GetControlFromPosition(0, mixRow) as Label;
 		}
 		UpdateChannelEnabled();
+		_refreshTimer.Tick += (object _, EventArgs _) => RefreshEffectFromStore();
 		Controls.Add(table);
 		Shown += async (object? _, EventArgs _) =>
 		{
@@ -441,7 +463,12 @@ public class LightForm : RForm
 			sliderSpeed.Enabled = powerOn;
 			if (mixPanel != null)
 			{
+				mixPanel.Visible = logoColorMode == 7;
 				mixPanel.Enabled = powerOn;
+			}
+			if (mixLabel != null)
+			{
+				mixLabel.Visible = logoColorMode == 7;
 			}
 			colorBtn.Enabled = powerOn && colorMeaningful;
 			colorBtn.Visible = colorMeaningful;
@@ -450,11 +477,52 @@ public class LightForm : RForm
 				colorLabel.Visible = colorMeaningful;
 			}
 		}
+		void RefreshEffectFromStore()
+		{
+			LightChannelSettings saved = LightingSettingsStore.Load(_topic, _effects[0].Effect);
+			if (string.Equals(saved.Effect, _effect, StringComparison.Ordinal))
+			{
+				return;
+			}
+			_effect = saved.Effect;
+			if (Array.FindIndex(_effects, e => e.Effect == _effect) < 0)
+			{
+				_effect = _effects[0].Effect;
+			}
+			_light = saved.Light;
+			_speed = saved.Speed;
+			_singleColor = Color.FromArgb(saved.ColorArgb);
+			_powerOn = saved.PowerOn;
+			logoColorMode = (logoGrade || lightbarGrade) ? LightEffectColorMode(_effect) : (-1);
+			_refreshingUi = true;
+			try
+			{
+				sliderLight.Value = logoGrade ? Math.Clamp(_light, 0, 4) : Math.Clamp(_light * 25, 0, 100);
+				sliderSpeed.Value = Math.Clamp(_speed, 0, 4);
+			}
+			finally
+			{
+				_refreshingUi = false;
+			}
+			colorBtn.SwatchColor = _singleColor;
+			if (mixSwatches[0] != null)
+			{
+				int[] palette = saved.MixColors ?? LightChannelSettings.DefaultMixColors;
+				mixColors = (int[])palette.Clone();
+				for (int i = 0; i < mixSwatches.Length; i++)
+				{
+					mixSwatches[i].SwatchColor = Color.FromArgb(palette[i]);
+				}
+			}
+			UpdateChannelEnabled();
+			ClientSize = new Size(Math.Max(420, ClientSize.Width), table.Height);
+		}
 	}
 
 	protected override void OnShown(EventArgs e)
 	{
 		base.OnShown(e);
+		_refreshTimer.Start();
 		TableLayoutPanel tableLayoutPanel = Controls.OfType<TableLayoutPanel>().FirstOrDefault();
 		if (tableLayoutPanel != null)
 		{
@@ -469,6 +537,8 @@ public class LightForm : RForm
 			Interlocked.Increment(ref _sendGeneration);
 			_effectUpdateTimer.Stop();
 			_effectUpdateTimer.Dispose();
+			_refreshTimer.Stop();
+			_refreshTimer.Dispose();
 			_disposeCts.Cancel();
 			if (_sendLock.Wait(1000))
 			{
