@@ -4768,7 +4768,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 	/// <summary>固件自带配色的灯效：不主动下发用户颜色。</summary>
 	private static bool IsFirmwareColoredEffect(string effect)
 	{
-		return effect is "Rainbow" or "Mix" or "Aurora" or "Gaming";
+		return effect is "Rainbow" or "Aurora" or "Gaming";
 	}
 
 	public async Task<bool> SetLightEffect(string topic, string effect, int light = 4, int speed = 1, string direction = "None", Color? singleColor = null, bool save = true)
@@ -4802,9 +4802,10 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			//   ⇒ ⭐ 下面这套新口径**只对非键盘主题生效**；⭐ `Keyboard/Ctrl` 一律**逐字保持原样**
 			//   （`isCircular = true` + 无颜色时那份七彩）⇒ ⭐ 键盘行为零回归 ✅
 			bool isKeyboardTopic = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
-			// 呼吸=多段循环（灯带/Logo 通道）
+			// 呼吸=多段循环；混色=多段彩色（需 7 段调色板），两者都按循环下发
 			bool isBreathingEffect = string.Equals(effect, "Breathing", StringComparison.OrdinalIgnoreCase);
-			dictionary["isCircular"] = isKeyboardTopic || isBreathingEffect;
+			bool isMixEffect = string.Equals(effect, "Mix", StringComparison.OrdinalIgnoreCase);
+			dictionary["isCircular"] = isKeyboardTopic || isBreathingEffect || isMixEffect;
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal) && string.Equals(effect, "Manual", StringComparison.Ordinal))
 			{
 				int[] manualIndexes = LightChannelSettings.DefaultManualIndexes;
@@ -4864,6 +4865,21 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 							["B"] = (int)singleColor.Value.B
 						}
 					});
+				}
+				else if (isMixEffect)
+				{
+					// 混色：固件按多段调色板轮转，不发单色
+					dictionary["ColorBlocks"] = 7;
+					dictionary["ColorBuffer"] = new object[7]
+					{
+						new Dictionary<string, object> { ["R"] = 255, ["G"] = 0, ["B"] = 0 },
+						new Dictionary<string, object> { ["R"] = 255, ["G"] = 165, ["B"] = 0 },
+						new Dictionary<string, object> { ["R"] = 255, ["G"] = 255, ["B"] = 0 },
+						new Dictionary<string, object> { ["R"] = 0, ["G"] = 255, ["B"] = 0 },
+						new Dictionary<string, object> { ["R"] = 0, ["G"] = 255, ["B"] = 255 },
+						new Dictionary<string, object> { ["R"] = 0, ["G"] = 0, ["B"] = 255 },
+						new Dictionary<string, object> { ["R"] = 255, ["G"] = 0, ["B"] = 255 }
+					};
 				}
 				else if (singleColor.HasValue && !IsFirmwareColoredEffect(effect))
 				{

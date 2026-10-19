@@ -20,11 +20,12 @@ public class LightForm : RForm
 		("Impact", Strings.EffectImpact),
 		("Raindrop", Strings.EffectMeteor)
 	};
-	// Logo：单色 / 呼吸 / 彩虹（该通道不支持混色）
-	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[3]
+	// Logo：单色 / 呼吸 / 混色 / 彩虹
+	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[4]
 	{
 		("Single", Strings.EffectSingle),
 		("Breathing", Strings.EffectBreathing),
+		("Mix", Strings.EffectMix),
 		("Rainbow", Strings.EffectRainbow)
 	};
 
