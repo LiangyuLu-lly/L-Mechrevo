@@ -72,7 +72,8 @@ internal static class MechrevoBackendOrder
 	/// </summary>
 	internal static readonly MechrevoBackendProbe[] Candidates = new MechrevoBackendProbe[4]
 	{
-		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => MechrevoHw.IsGcuServiceInstalled ? MechrevoHw.GcuBackendMarker : null),
+		// 板号命中宝龙达白名单 ⇒ 即使装了 GCU 服务也先交给宝龙达后端（否则会被 GCU 抢先，表现为「GCU 未连接」）
+		new MechrevoBackendProbe(MechrevoBackendKind.Gcu, () => (MechrevoHw.IsGcuServiceInstalled && !BaolongdaBackend.IsBaolongdaModelWhitelisted(out _)) ? MechrevoHw.GcuBackendMarker : null),
 		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配第 3 步）：⭐ **提到老接口【之前】** ✅
 		//   ⭐ 理由（⭐ 真机实测得出 ⚠️）：⭐ 宝龙达机型的 `MICommonInterface` **类 GUID 与老同方那份完全一致**
 		//     （⭐ `b60bfb48-3e5b-49e4-a0e9-8cffe1b3434b` ✅）⇒ ⭐ 老接口的 GUID 校验**也会通过** ⚠️
