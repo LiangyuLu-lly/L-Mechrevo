@@ -4796,7 +4796,9 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			//   ⇒ ⭐ 下面这套新口径**只对非键盘主题生效**；⭐ `Keyboard/Ctrl` 一律**逐字保持原样**
 			//   （`isCircular = true` + 无颜色时那份七彩）⇒ ⭐ 键盘行为零回归 ✅
 			bool isKeyboardTopic = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
-			dictionary["isCircular"] = isKeyboardTopic;
+			// 呼吸=多段循环（灯带/Logo 通道）
+			bool isBreathingEffect = string.Equals(effect, "Breathing", StringComparison.OrdinalIgnoreCase);
+			dictionary["isCircular"] = isKeyboardTopic || isBreathingEffect;
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal) && string.Equals(effect, "Manual", StringComparison.Ordinal))
 			{
 				int[] manualIndexes = LightChannelSettings.DefaultManualIndexes;
