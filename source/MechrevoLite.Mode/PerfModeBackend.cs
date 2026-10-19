@@ -61,7 +61,8 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			SupportsTgp = hw.GpuTgpAdjustable,
 			SupportsDynamicBoost = hw.GpuDynamicBoostAdjustable,
 			SupportsGpuOverclock = hw.SupportsGpuOverclock,
-			SupportsFanCurve = hw.FanCurveSeen,
+			// 无界 APU：强冷走 GCU 同通道 ⇒ 先按支持处理（曲线窗口再用 IsGcuConnected 兜底）
+			SupportsFanCurve = hw.FanCurveSeen || hw.WujieSmuApu,
 			SupportsFanBoost = hw.SupportsFanBoost,
 			SupportsFanSwitchSpeed = hw.SupportsFanSwitchSpeed,
 			// 2026-10-15（用户拍板：刷新率这条**整个改走 Windows API**，不再依赖 GCU）：
