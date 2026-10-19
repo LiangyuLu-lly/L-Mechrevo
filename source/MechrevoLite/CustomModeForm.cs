@@ -1007,7 +1007,7 @@ public class CustomModeForm : RForm
 			string pathLog = "[gpu-oc] 路径自检：模具=" + pathMold + " · 写入=" + pathWrite
 				+ " · 开关 gpu_oc_nvapi_for_gcu=" + pathSwitch
 				+ " · 数字框范围=core=" + coreMin + ".." + coreMax + " mem=" + memMin + ".." + memMax
-				+ " · 滑块=±500";
+				+ " · 滑块=core±500 mem±2000";
 			if (Logger.TryMarkChanged("gpu-oc-path-selfcheck", pathLog))
 			{
 				Logger.WriteError(pathLog);
@@ -1039,7 +1039,8 @@ public class CustomModeForm : RForm
 				Margin = new Padding(0, D(2), 0, 0)
 			});
 		}
-		(int, int, int, bool) tuple14 = DeviceRange(-500, 500, memCurrent, allowNegative: true);
+		// ⭐⭐ 2026-10-19（机主定稿）：显存滑块 ±2000（核心仍 ±500）；数字框两者都允许 NV 范围 ✅
+		(int, int, int, bool) tuple14 = DeviceRange(-2000, 2000, memCurrent, allowNegative: true);
 		(_memOc, _memOcVal) = AddSliderRow(Strings.MemoryOffset, tuple14.Item1, tuple14.Item2, tuple14.Item3, (int v) =>
 		{
 			// 2026-10-09：同上 —— 显存偏移也只在点「应用」时下发。
@@ -4445,10 +4446,10 @@ public class CustomModeForm : RForm
 	}
 
 	/// <summary>⭐ 刷新时应用 GPU 偏移 UI 范围：滑块固定 ±500，数字框用 NV 范围，各自 clamp（⛔ 不互相覆盖真实值）✅</summary>
-	private static bool ApplyGpuOffsetUiRange(RSlider bar, RNumericUpDown valueInput, int numericMin, int numericMax, int current)
+	private static bool ApplyGpuOffsetUiRange(RSlider bar, RNumericUpDown valueInput, int numericMin, int numericMax, int current, int sliderMin, int sliderMax)
 	{
-		bar.Minimum = -500;
-		bar.Maximum = 500;
+		bar.Minimum = sliderMin;
+		bar.Maximum = sliderMax;
 		valueInput.Minimum = numericMin;
 		valueInput.Maximum = numericMax;
 		int real = Math.Clamp(current, numericMin, numericMax);
@@ -4777,8 +4778,8 @@ public class CustomModeForm : RForm
 					if (!_gpuOcDirty)
 					{
 						(int refreshCoreMin, int refreshCoreMax, int refreshMemMin, int refreshMemMax) = GpuOffsetUiRange(hw);
-						_gpuOcCoreAdjustable = ApplyGpuOffsetUiRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset);
-						_gpuOcMemoryAdjustable = ApplyGpuOffsetUiRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset);
+						_gpuOcCoreAdjustable = ApplyGpuOffsetUiRange(_coreOc, _coreOcVal, refreshCoreMin, refreshCoreMax, hw.EffectiveGpuCoreClockOffset, -500, 500);
+						_gpuOcMemoryAdjustable = ApplyGpuOffsetUiRange(_memOc, _memOcVal, refreshMemMin, refreshMemMax, hw.EffectiveGpuMemoryClockOffset, -2000, 2000);
 					}
 				}
 				else if (_gpuOcArmed & supportsGpuOverclock)
