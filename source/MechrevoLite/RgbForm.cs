@@ -1025,12 +1025,44 @@ public class RgbForm : RForm
 
 	private async Task SendGcuBrightnessAsync(int gen)
 	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null)
+		{
+			return;
+		}
+		if (hw.UsesBaolongda)
+		{
+			int brightness = KeyboardRgb.MapSoftwareBrightnessToHardwareLevel(_rgb.Brightness);
+			bool rainbow = hw.IsKeyboardRainbowRunning;
+			bool ok;
+			if (rainbow)
+			{
+				hw.UpdateKeyboardRainbowBrightness((byte)brightness);
+				ok = true;
+			}
+			else
+			{
+				LightChannelSettings settings = LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
+				byte mode = 2;
+				if (MechrevoHw.TryMapBaolongdaKeyboardMode(settings.Effect, out byte mapped) && mapped != 0)
+				{
+					mode = mapped;
+				}
+				int level = Math.Clamp(brightness, 1, Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()));
+				ok = hw.TrySetKeyboardLightingViaBackend(true, settings.EffectiveColorArgb(), level, mode, out bool _);
+			}
+			string message = $"[kbd] 宝龙达亮度下发：rainbow={rainbow} level={brightness} ⇒ ok={ok}";
+			if (Logger.TryMarkChanged("kbd-baolongda-brightness", message))
+			{
+				Logger.WriteError(message);
+			}
+			return;
+		}
 		if (Program.service == null)
 		{
 			return;
 		}
-		MechrevoHw hw = Program.hw;
-		if (hw == null || !hw.IsConnected || !IsGcuKeyboardFallback())
+		if (!hw.IsConnected || !IsGcuKeyboardFallback())
 		{
 			return;
 		}
