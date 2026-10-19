@@ -1539,6 +1539,10 @@ internal sealed class PerfModeService
 				{
 					return ResetBaolongdaCustomLocally(hw);
 				}
+				if (mode.IsCustom && hw.WujieSmuApu)
+				{
+					return ResetWujieCustomLocally(hw);
+				}
 				if (!mode.IsCustom)
 				{
 					PerfApplyOutcome perfApplyOutcome = await ActivateAsync(mode.Id, "reset").ConfigureAwait(continueOnCapturedContext: false);
@@ -1609,6 +1613,19 @@ internal sealed class PerfModeService
 				: $" · WMI 23 关闭自定义 写成功={powerLimitReleased} · 回读确认={powerLimitConfirmed}"));
 		return powerLimitResetOk;
 	}
+	/// <summary>无界 APU 自定义档恢复：清本地档位配置 + GPU 超频归零；SMU 功耗墙无恢复命令，重启后回固件默认。</summary>
+	private bool ResetWujieCustomLocally(MechrevoHw hw)
+	{
+		bool gpuOcReset = NvapiPStates.TrySetP0Offsets(0, 0, out int appliedCore, out int appliedMem);
+		hw.SelectGcuGpuOverclockBackend();
+		AppConfig.Set("gpu_oc", 0);
+		AppConfig.Flush();
+		MechrevoService.GpuOverclockEnabled = false;
+		Logger.WriteError($"[reset] 无界 APU 自定义档：本地配置已清 · GPU 超频=关（写成功={gpuOcReset} · 回读 core={appliedCore} mem={appliedMem} MHz）"
+			+ " · SMU 功耗墙为运行时状态、无「恢复默认」命令 ⇒ 重启后回固件默认");
+		return true;
+	}
+
 	// （机主：「恢复出厂设置」风扇转速/曲线表没恢复 · 强冷也要复位）
 	internal void ResetBaolongdaFanToFirmwareDefault()
 	{

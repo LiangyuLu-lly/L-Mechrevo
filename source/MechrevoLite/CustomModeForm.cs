@@ -2741,7 +2741,7 @@ public class CustomModeForm : RForm
 			//   ⚠️ 只在**恢复确认成功**（`flag`）时压回：40 系功能号 23 关闭写若未被固件接受，
 			//      界面仍显示硬件真实值（⛔ 不拿"看起来已重置"骗人），状态行红字如实说明 ✅
 			//   ⚠️ 非宝龙达（GCU）⇒ 不调用 ⇒ 行为逐位不变 ✅
-			if (hw.UsesBaolongda && flag)
+			if ((hw.UsesBaolongda || hw.WujieSmuApu) && flag)
 			{
 				ApplyBaolongdaResetVisuals(hw);
 			}
@@ -2764,7 +2764,7 @@ public class CustomModeForm : RForm
 	// （机主：「恢复出厂设置」不生效）： 恢复出厂后**显式重置界面控件** 。
 	private void ApplyBaolongdaResetVisuals(MechrevoHw hw)
 	{
-		if (hw == null || !hw.UsesBaolongda)
+		if (hw == null || !(hw.UsesBaolongda || hw.WujieSmuApu))
 		{
 			return;
 		}
