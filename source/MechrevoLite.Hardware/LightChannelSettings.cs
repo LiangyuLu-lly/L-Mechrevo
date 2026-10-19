@@ -13,7 +13,7 @@ internal readonly record struct LightChannelSettings(string Effect, int Light, i
 		System.Drawing.Color.FromArgb(0, 255, 0).ToArgb(),
 		System.Drawing.Color.FromArgb(0, 255, 255).ToArgb(),
 		System.Drawing.Color.FromArgb(0, 0, 255).ToArgb(),
-		System.Drawing.Color.FromArgb(255, 0, 255).ToArgb()
+		System.Drawing.Color.FromArgb(139, 0, 255).ToArgb()
 	};
 
 	internal static readonly int[] BreathingPalette = new int[4]
