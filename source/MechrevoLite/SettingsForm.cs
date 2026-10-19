@@ -846,6 +846,7 @@ public class SettingsForm : RForm
 	private long _uiBuildLightMs;
 	private long _uiBuildQuickTileMs;
 	private static bool _buildingQuickSwitches;
+	private bool _quickTilesBuilt;
 	private static int _quickSwitchSkippedReads;
 	private long _uiBuildQuickStateMs;
 
@@ -6072,7 +6073,11 @@ public class SettingsForm : RForm
 			// ⭐ 电池标题状态读取后移（构建期只搭 UI，⛔ 不读硬件）✅
 			try { VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent()); } catch { }
 			// ⭐ 快捷开关**状态同步**后移（tile 构建仍在 ctor，布局依赖它）✅
-			BeginInvoke(new Action(RefreshQuickStatesAfterShown));
+			BeginInvoke(new Action(() =>
+			{
+				RebuildQuickSwitchPanelAfterShown();
+				RefreshQuickStatesAfterShown();
+			}));
 			if (!Program.UiAuditMode)
 			{
 				RefreshStartupStatusAsync();
@@ -14572,17 +14577,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		Stopwatch quickTileWatch = Stopwatch.StartNew();
 		// ⭐ 2026-10-19：tile 构建太贵（~203ms）⇒ ctor 只放轻量占位 panel（BuildDashboardLayout 需要它），
 		//   真正 tile 在 Shown 后一个 BeginInvoke 构建，然后重排仪表盘 ✅
-		BuildQuickSwitchPanel();
-		Control quickPanel = Controls["panelQuickSwitch"];
-		if (quickPanel != null)
-		{
-			Controls.SetChildIndex(panelPerformance, 9);
-			Controls.SetChildIndex(Controls["panelLc"], 8);
-			Controls.SetChildIndex(panelGPU, 7);
-			Controls.SetChildIndex(quickPanel, 6);
-			Controls.SetChildIndex(panelBattery, 5);
-			Controls.SetChildIndex(Controls["panelBrightness"], 3);
-		}
+		BuildQuickSwitchSkeleton();
+		// ⭐ 骨架阶段不做 SetChildIndex（此时部分 panel 可能尚未加入窗体；BuildDashboardLayout 负责最终顺序）
 		_uiBuildQuickTileMs += quickTileWatch.ElapsedMilliseconds;
 		panelStartup.Controls.Remove(checkStartup);
 		labelVersion.Dock = DockStyle.Left;
@@ -14654,6 +14650,130 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		catch (Exception ex)
 		{
 			Logger.WriteLine("[ui-build] 快捷开关状态同步失败（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+	/// <summary>
+	/// ⭐ 2026-10-19（机主：tile 构建 190ms 移出首帧）：⭐ ctor 只建骨架 —— panelQuickSwitch / quickSwitchRoot /
+	/// 四个分组 FlowLayoutPanel / 标题；BuildDashboardLayout 只依赖这些名字，不依赖 tile ✅
+	/// </summary>
+	private void BuildQuickSwitchSkeleton()
+	{
+		if (Controls.ContainsKey("panelQuickSwitch"))
+		{
+			return;
+		}
+		BufferedPanel panel = new BufferedPanel
+		{
+			Name = "panelQuickSwitch",
+			Dock = DockStyle.Top,
+			CardStyle = true,
+			BackColor = UiVisualStyle.Surface,
+			Padding = new Padding(16, 12, 16, 12)
+		};
+		TableLayoutPanel root = new TableLayoutPanel
+		{
+			Name = "quickSwitchRoot",
+			Dock = DockStyle.Top,
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			GrowStyle = TableLayoutPanelGrowStyle.AddRows,
+			ColumnCount = 1,
+			Margin = Padding.Empty,
+			Padding = Padding.Empty,
+			BackColor = panel.BackColor
+		};
+		root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+		panel.Controls.Add(root);
+		_quickGroupContainers.Clear();
+		int num = 0;
+		foreach (var group in QuickSwitchGroups)
+		{
+			string title = group.Item1;
+			string[] keys = group.Item2;
+			Label header = new Label
+			{
+				Name = "labelQuickGroup_" + keys[0],
+				Text = title,
+				Font = UiVisualStyle.Font(8.5f),
+				ForeColor = UiVisualStyle.Muted,
+				AutoSize = true,
+				Margin = new Padding(0, (num != 1) ? 12 : 0, 0, 4)
+			};
+			root.Controls.Add(header, 0, num++);
+			FlowLayoutPanel grid = new FlowLayoutPanel
+			{
+				Name = "quickGroup_" + keys[0],
+				FlowDirection = FlowDirection.LeftToRight,
+				WrapContents = true,
+				AutoScroll = false,
+				Margin = Padding.Empty,
+				Padding = Padding.Empty,
+				BackColor = panel.BackColor
+			};
+			root.Controls.Add(grid, 0, num++);
+			_quickGroupContainers[title] = (header, grid);
+		}
+		Controls.Add(panel);
+	}
+
+	/// <summary>⭐ Shown 后：用真实 BuildQuickSwitchPanel 替换骨架，再显式重排/回填状态；异常⇒同步回退 ✅</summary>
+	private void RebuildQuickSwitchPanelAfterShown()
+	{
+		try
+		{
+			if (IsDisposed || _quickTilesBuilt)
+			{
+				return;
+			}
+			_quickTilesBuilt = true;
+			Control oldPanel = Controls.Find("panelQuickSwitch", searchAllChildren: true).FirstOrDefault();
+			if (oldPanel != null)
+			{
+				Control oldParent = oldPanel.Parent;
+				if (oldParent != null)
+				{
+					oldParent.Controls.Remove(oldPanel);
+				}
+				else
+				{
+					Controls.Remove(oldPanel);
+				}
+				oldPanel.Dispose();
+			}
+			Stopwatch quickWatch = Stopwatch.StartNew();
+			BuildQuickSwitchPanel();
+			Control quickPanel = Controls.Find("panelQuickSwitch", searchAllChildren: true).FirstOrDefault();
+			if (quickPanel != null && _quickGroup != null)
+			{
+				quickPanel.Dock = DockStyle.Top;
+				_quickGroup.SetContent(quickPanel);
+			}
+			_fitQuickCards?.Invoke();
+			UpdateDashboardWindowHeight();
+			UpdateDashboardScroll();
+			UpdateQuickSwitches();
+			Logger.WriteError("[ui-build] 快捷开关 tile 延后构建：tile=" + quickWatch.ElapsedMilliseconds + " ms（触发=Shown）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[ui-build] 快捷开关延后构建失败 ⇒ 回退到同步构建：" + ex.GetType().Name + " " + ex.Message);
+			try
+			{
+				BuildQuickSwitchPanel();
+				Control fallback = Controls.Find("panelQuickSwitch", searchAllChildren: true).FirstOrDefault();
+				if (fallback != null && _quickGroup != null)
+				{
+					fallback.Dock = DockStyle.Top;
+					_quickGroup.SetContent(fallback);
+				}
+				_fitQuickCards?.Invoke();
+				UpdateDashboardWindowHeight();
+				UpdateDashboardScroll();
+			}
+			catch (Exception ex2)
+			{
+				Logger.WriteError("[ui-build] 快捷开关同步回退仍失败：" + ex2.GetType().Name + " " + ex2.Message);
+			}
 		}
 	}
 	public void VisualiseBatteryTitle(int limit)
