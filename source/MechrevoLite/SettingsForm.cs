@@ -17875,7 +17875,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			_lbPowerSw = lbPowerSw;
 			_lbEffectCombo = lbEffectCombo;
 		});
-		BuildLightChannelRow("rowLogo", Strings.Logo, "HidLightbar_Logo/Ctrl", Strings.LogoEffect, LightForm.LogoEffects, 2, (RCheckBox logoPowerSw, ComboBox logoEffectCombo) =>
+		BuildLightChannelRow("rowLogo", Strings.Logo, "HidLightbar_Logo/Ctrl", Strings.LogoEffect, LightForm.CurrentLogoEffects(), 2, (RCheckBox logoPowerSw, ComboBox logoEffectCombo) =>
 		{
 			_logoPowerSw = logoPowerSw;
 			_logoEffectCombo = logoEffectCombo;
@@ -18134,7 +18134,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			string saved = LightingSettingsStore.Load(topic, effects[0].Effect).Effect;
 			int num4 = Array.FindIndex(effects, ((string Effect, string Name) e) => e.Effect == saved);
 			effectCombo2.SelectedIndex = ((num4 >= 0) ? num4 : 0);
-			if (num4 < 0)
+			// 仅 40 系同方做旧值迁移，50 系保持原样
+			bool migrateUnsupportedEffect = Program.hw != null && !Program.hw.UsesBaolongda
+				&& Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+			if (num4 < 0 && migrateUnsupportedEffect)
 			{
 				// 旧保存值该通道已不支持 ⇒ 迁移到第一项，避免启动恢复继续下发
 				LightChannelSettings migrated = LightingSettingsStore.Load(topic, effects[0].Effect);

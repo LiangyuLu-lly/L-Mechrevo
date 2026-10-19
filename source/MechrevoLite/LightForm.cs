@@ -20,8 +20,16 @@ public class LightForm : RForm
 		("Impact", Strings.EffectImpact),
 		("Raindrop", Strings.EffectMeteor)
 	};
-	// Logo：与官方控制台一致的五项效果
-	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[5]
+	// Logo（50 系/其它）：保持原有三项
+	public static readonly (string Effect, string Name)[] LogoEffects = new (string, string)[3]
+	{
+		("Single", Strings.EffectSingle),
+		("Breathing", Strings.EffectBreathing),
+		("Mix", Strings.EffectMix)
+	};
+
+	// Logo（40 系同方）：官方控制台五项
+	public static readonly (string Effect, string Name)[] LogoEffectsGen40 = new (string, string)[5]
 	{
 		("ColorMarquee", Strings.EffectRainbow),
 		("Breathing", Strings.EffectBreathing),
@@ -29,6 +37,17 @@ public class LightForm : RForm
 		("Impact", Strings.EffectImpact),
 		("Raindrop", Strings.EffectMeteor)
 	};
+
+	/// <summary>当前机型该用哪张 Logo 效果表。</summary>
+	internal static (string Effect, string Name)[] CurrentLogoEffects()
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw != null && !hw.UsesBaolongda && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40)
+		{
+			return LogoEffectsGen40;
+		}
+		return LogoEffects;
+	}
 
     // 2026-10-09（③， 对齐）：铰链 = 作者 Lighbar4(biosProjectId) 的 5 项
     // （Single/Breathing/Wave/Impact/Raindrop，与灯条行同一张表；作者对 biosProjectId=="ID5" 会缩到 3 项，
