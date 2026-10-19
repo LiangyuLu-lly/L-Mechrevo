@@ -844,6 +844,8 @@ public class SettingsForm : RForm
 	private long _uiBuildPerfMs;
 
 	private long _uiBuildLightMs;
+	private long _uiBuildQuickTileMs;
+	private long _uiBuildQuickStateMs;
 
 	private static int _uiBuildLogOnce;
 
@@ -6033,6 +6035,10 @@ public class SettingsForm : RForm
 		checkStartup.Click += CheckStartup_Click;
 		Shown += (object? _, EventArgs _) =>
 		{
+			// ⭐ 电池标题状态读取后移（构建期只搭 UI，⛔ 不读硬件）✅
+			try { VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent()); } catch { }
+			// ⭐ 快捷开关 tile 构建后移（204ms → 首帧后一个 BeginInvoke）✅
+			BeginInvoke(new Action(EnsureQuickSwitchPanelBuilt));
 			if (!Program.UiAuditMode)
 			{
 				RefreshStartupStatusAsync();
@@ -6225,6 +6231,8 @@ public class SettingsForm : RForm
 		{
 			_sensorTimer.Start();
 		}
+		uiBuildBatteryMs += uiBuildPhase.ElapsedMilliseconds;
+		uiBuildPhase.Restart();
 		InitQuickSwitchRefresh();
 		uiBuildQuickMs += uiBuildPhase.ElapsedMilliseconds;
 		uiBuildPhase.Restart();
@@ -6244,8 +6252,6 @@ public class SettingsForm : RForm
 		donateControl.Init();
 		labelBacklight.ForeColor = RForm.colorStandard;
 		labelBacklight.Click += LabelBacklight_Click;
-		uiBuildBatteryMs += uiBuildPhase.ElapsedMilliseconds;
-		uiBuildPhase.Restart();
 		// ⭐ 布局批处理（性能优化）：整段构建只触发一次最终布局（⛔ 不在每个 Add 后级联重排）
 		// ⚠️ 通用路径（⛔ 不按平台分支）：宝龙达 / GCU / 同方都走这同一段 ⇒ 布局优化对所有机型生效 ✅
 		uiBuildPhase.Restart();
@@ -6299,7 +6305,7 @@ public class SettingsForm : RForm
 			int uiBuildControlCount = CountAllControls(this);
 			long uiBuildBaseAccounted = uiBuildThemeMs + uiBuildHooksMs + uiBuildBatteryMs + uiBuildQuickMs + uiBuildTopMs + uiBuildPerfCardMs;
 			long uiBuildBaseOther = Math.Max(0L, uiBuildBaseMs - uiBuildBaseAccounted);
-			Logger.WriteError("[ui-build] 基础细分：顶部=" + uiBuildTopMs + " ms · 性能模式卡=" + uiBuildPerfCardMs + " ms · 快捷开关=" + uiBuildQuickMs
+			Logger.WriteError("[ui-build] 基础细分：顶部=" + uiBuildTopMs + " ms · 性能模式卡=" + uiBuildPerfCardMs + " ms · 快捷开关=" + uiBuildQuickMs + " ms（tile=" + _uiBuildQuickTileMs + " · 状态=" + _uiBuildQuickStateMs + "）"
 				+ " ms · 屏幕卡=0 ms（含顶部） · 电池卡=" + uiBuildBatteryMs + " ms · 系统/设置入口=" + uiBuildSettingsEntryMs
 				+ " ms · 页脚=0 ms（含其它） · 主题应用=" + uiBuildThemeMs + " ms · 事件挂钩=" + uiBuildHooksMs
 				+ " ms · 其它=" + uiBuildBaseOther + " ms");
@@ -14526,19 +14532,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 
 	private void InitQuickSwitchRefresh()
 	{
-		BuildQuickSwitchPanel();
-		VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent());
+		// ⭐ 2026-10-19（机主：快捷开关=240ms）：⭐ tile 构建 / 状态读取分开计时；状态读取后移到 Shown ✅
+		// ⭐ 2026-10-19（机主：快捷开关=204ms）：⭐ tile 构建后移到 Shown 后的第一个消息循环
+		//   （ctor 只挂延后动作；最终 UI 与顺序不变，仅晚一个 BeginInvoke）✅
 		buttonBatteryFull.Visible = false;
-		Control control = Controls["panelQuickSwitch"];
-		if (control != null)
-		{
-			Controls.SetChildIndex(panelPerformance, 9);
-			Controls.SetChildIndex(Controls["panelLc"], 8);
-			Controls.SetChildIndex(panelGPU, 7);
-			Controls.SetChildIndex(control, 6);
-			Controls.SetChildIndex(panelBattery, 5);
-			Controls.SetChildIndex(Controls["panelBrightness"], 3);
-		}
 		panelStartup.Controls.Remove(checkStartup);
 		labelVersion.Dock = DockStyle.Left;
 		labelVersion.AutoSize = false;
@@ -14586,6 +14583,44 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 	}
 
+	/// <summary>
+	/// ⭐ 2026-10-19（机主：设置页启动慢）：⭐ 快捷开关 tile 构建/状态读取延后到显示后第一个消息循环；
+	/// 构建完成后恢复原来的子控件顺序，并做一次状态同步（最终 UI 与 ctor 内构建一致）✅
+	/// </summary>
+	private void EnsureQuickSwitchPanelBuilt()
+	{
+		try
+		{
+			if (IsDisposed || Controls.ContainsKey("panelQuickSwitch"))
+			{
+				return;
+			}
+			Stopwatch quickWatch = Stopwatch.StartNew();
+			BuildQuickSwitchPanel();
+			long quickTileMs = quickWatch.ElapsedMilliseconds;
+			_uiBuildQuickTileMs += quickTileMs;
+			quickWatch.Restart();
+			Control control = Controls["panelQuickSwitch"];
+			if (control != null)
+			{
+				Controls.SetChildIndex(panelPerformance, 9);
+				Controls.SetChildIndex(Controls["panelLc"], 8);
+				Controls.SetChildIndex(panelGPU, 7);
+				Controls.SetChildIndex(control, 6);
+				Controls.SetChildIndex(panelBattery, 5);
+				Controls.SetChildIndex(Controls["panelBrightness"], 3);
+			}
+			UpdateQuickSwitches();
+			VisualiseBatteryTitle(BatteryControl.ResolveDisplayLimitPercent());
+			long quickStateMs = quickWatch.ElapsedMilliseconds;
+			_uiBuildQuickStateMs += quickStateMs;
+			Logger.WriteError("[ui-build] 快捷开关延后构建（Shown 后）：tile=" + quickTileMs + " ms · 状态=" + quickStateMs + " ms");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[ui-build] 快捷开关延后构建失败（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
 	public void VisualiseBatteryTitle(int limit)
 	{
 		labelBatteryTitle.Text = Strings.Battery;
