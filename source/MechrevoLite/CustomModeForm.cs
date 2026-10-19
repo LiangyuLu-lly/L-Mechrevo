@@ -2531,7 +2531,9 @@ public class CustomModeForm : RForm
 		{
 			PerfModeDefinition perfModeDefinition = FindMode(_modeId);
 			string arg = (((object)perfModeDefinition != null) ? PerfModeText.Name(perfModeDefinition) : "");
-			PerfModeDefinition perfModeDefinition2 = instance.AddCustom(_modeId);
+			// 宝龙达：新建不继承当前档数据（否则连续新建会一路复制成第一个自定义档的样子）
+			string seedFrom = (Program.hw?.UsesBaolongda == true) ? null : _modeId;
+			PerfModeDefinition perfModeDefinition2 = instance.AddCustom(seedFrom);
 			if ((object)perfModeDefinition2 == null)
 			{
 				_status.Text = string.Format(Strings.PerfModeLimitReached, 12);
