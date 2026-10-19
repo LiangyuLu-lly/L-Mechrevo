@@ -1970,6 +1970,12 @@ public class CustomModeForm : RForm
 	/// visualMode uses LM numbering (0=balanced/gaming, 1=turbo, 2=silent/office).
 	/// Read-only for now: commits are suppressed until the MQTT write path lands.
 	/// </summary>
+	/// <summary>30 系「模式 × 配置」在 LM 侧的存储 id（perf_fw{视觉模式}p{配置号}_*）。</summary>
+	private static string FirmwareProfileStoreId(int visualMode, int profileIndex)
+	{
+		return "fw" + visualMode.ToString() + "p" + profileIndex.ToString();
+	}
+
 	internal void BindFirmwareProfile(int visualMode, int profileIndex)
 	{
 		if (_bindingFirmwareProfile)
@@ -2003,7 +2009,10 @@ public class CustomModeForm : RForm
 			// 2026-10-05: name comes from LM's own store, not from the profile JSON.
 			_firmwareProfileName = ModeProfileConfig.GetName(_firmwareVisualMode, _firmwareProfileIndex);
 			UpdateFirmwareTitle();
-			LoadAppSide(VendorModeDefaults.ComposeProfile(kind, Program.hw, _firmwareProfileIndex));
+			PerfModeSettings storedProfile = PerfModeStore.LoadSettings(FirmwareProfileStoreId(_firmwareVisualMode, _firmwareProfileIndex));
+			LoadAppSide(storedProfile.IsUntouched
+				? VendorModeDefaults.ComposeProfile(kind, Program.hw, _firmwareProfileIndex)
+				: storedProfile);
 			// 2026-10-09：固件档位切换同样作废未应用的改动（不下发）。
 			DiscardPendingChanges();
 		}
@@ -3182,7 +3191,13 @@ public class CustomModeForm : RForm
 					{
 						_status.Text = Strings.ModeTuneApplying;
 						_status.ForeColor = UiVisualStyle.Muted;
+						PerfModeSettings storedBase = PerfModeStore.LoadSettings(FirmwareProfileStoreId(_firmwareVisualMode, _firmwareProfileIndex));
+						if (!storedBase.IsUntouched)
+						{
+							PerfModeStore.SaveSettings(_modeId, storedBase);
+						}
 						outcome = await perf.UpdateAsync(_modeId, (PerfModeSettings s) => ApplyEdits(s, edits), "editor");
+						PerfModeStore.SaveSettings(FirmwareProfileStoreId(_firmwareVisualMode, _firmwareProfileIndex), PerfModeStore.LoadSettings(_modeId));
 						applied = true;
 					}
 					MechrevoService? service = Program.service;

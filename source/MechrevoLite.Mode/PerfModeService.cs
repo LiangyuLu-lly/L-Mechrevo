@@ -1141,8 +1141,35 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
-		// ⇒ 现在**只恢复「保存的当前档位本身就是自定义」的情况**；其它档位一律不动
 		PerfModeDefinition mode = Find(ActiveModeId);
+		// 30 系内置档：按「模式 × 配置号」用 LM 存档重放一次
+		if ((object)mode != null && !mode.IsCustom && hw.IsGcuConnected && hw.DgpuGeneration == DgpuGenerationKind.Gen30)
+		{
+			int visualMode30 = mode.Kind switch
+			{
+				PerfModeKind.Turbo => 1,
+				PerfModeKind.Silent => 2,
+				_ => 0
+			};
+			int profileIndex30 = ModeProfileConfig.Get(visualMode30);
+			PerfModeSettings storedProfile30 = PerfModeStore.LoadSettings("fw" + visualMode30.ToString() + "p" + profileIndex30.ToString());
+			if (!storedProfile30.IsUntouched)
+			{
+				PerfModeStore.SaveSettings(mode.Id, storedProfile30);
+				ActivateLocalProfile(mode.Id);
+				try
+				{
+					await ActivateAsync(mode.Id, "30 series profile replay", forceParameters: true).ConfigureAwait(continueOnCapturedContext: false);
+					Logger.WriteError($"[perfmode] 30 系启动恢复：模式={visualMode30} 配置={profileIndex30 + 1} ⇒ 按 LM 存档重放一次");
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteError("[perfmode] 30 系配置重放失败（已吞掉）：" + ex.Message);
+				}
+			}
+			return;
+		}
+		// ⇒ 其它档位只恢复「保存的当前档位本身就是自定义」的情况
 		if ((object)mode == null || !mode.IsCustom)
 		{
 			string skipLog = "[perfmode] 启动恢复：保存的当前档不是自定义（ActiveModeId=" + ActiveModeId
