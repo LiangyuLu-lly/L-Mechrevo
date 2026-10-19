@@ -2153,42 +2153,7 @@ begin
     Log('LM-UPDATE: 旧版 GCU 变体标记缺失（HKLM\SOFTWARE\L-Mechrevo\GcuVariant）→ 本次不回灌自定义模式档')
   else
     Log('LM-UPDATE: 旧版 GCU 变体 = ' + OldVariant);
-  // 2.1) 备份自定义模式档：优先取运行目录（GCU 服务实际读写的那份，2026-10-06 本机实测
-  //      该目录里的文件是当天被服务改写的，而 base 暂存树里那份还是 2025-09-12 的出厂文件），
-  //      运行目录不存在时回退到 base 暂存树（保持改动前的行为）。
-  if DirExists(LiveRoot + '\UserPofiles') then
-    UserSource := LiveRoot + '\UserPofiles'
-  else
-    UserSource := GcuRoot + '\UserPofiles';
-  if not CopyDirContents(UserSource, BackupRoot + '\UserPofiles') then
-  begin
-    Log('LM-UPDATE: 备份自定义模式档失败: ' + UserSource);
-    MsgBox('备份自定义模式档失败，已中止升级。', mbError, MB_OK);
-    Abort();
-  end;
-  Log('LM-UPDATE: 自定义模式档已备份: ' + UserSource);
-  // 2.2) ⭐ 2026-10-14（升级保留修复 / owner 原话「如果升级的话那保留自定义性能设置和曲线」）：
-  //      UserFanTables（风扇曲线表）**必须**跟 UserPofiles 一样备份 —— 上一版这里明写"跳过"，
-  //      依据是 2026-10-06 的一句用户说明（"风扇表一般写在 EC 里"），但那只解释了 EC 里的那份；
-  //      {app}\GCU\payload\GCU\AiStoneService\MyControlCenter\UserFanTables\ 里确实有 23 个
-  //      随载荷铺下来的文件，而下面第 3 步会调旧卸载器把 {app}\GCU\AiStoneService\ 整目录删掉，
-  //      不备份就真丢。Install-Gcu.ps1:1436 自己也是把 UserFanTables **无条件**放进 $preserveDirs 的
-  //      （只有 UserPofiles 才受"变体是否一致"门控）—— 本处对齐该口径：变体无关、始终备份/回灌。
-  //      运行目录优先、回退到 base 暂存树，口径与上面 UserPofiles 完全一致。
-  if DirExists(LiveRoot + '\UserFanTables') then
-    UserFanSource := LiveRoot + '\UserFanTables'
-  else
-    UserFanSource := GcuRoot + '\UserFanTables';
-  if not CopyDirContents(UserFanSource, BackupRoot + '\UserFanTables') then
-  begin
-    Log('LM-UPDATE: 备份风扇曲线表失败: ' + UserFanSource);
-    MsgBox('备份风扇曲线表失败，已中止升级。' + #13#10 +
-           '本次没有删除任何数据，旧版仍可正常使用。' + #13#10 + #13#10 +
-           'Failed to back up the fan curve tables; the upgrade was aborted before anything' + #13#10 +
-           'was deleted.', mbError, MB_OK);
-    Abort();
-  end;
-  Log('LM-UPDATE: 风扇曲线表已备份: ' + UserFanSource);
+  // 2.1/2.2) GCU 自定义模式档 / 风扇表不再备份：LM 本地存档 + 启动重放已覆盖
   // 2.5) Back up custom ICC profiles (old version is still in {app} at ssInstall).
   if CopyDirContents(ExpandConstant('{app}\customICC'), BackupRoot + '\customICC') then
     Log('LM-UPDATE: 自定义校色 ICC 已备份')
@@ -2290,50 +2255,9 @@ begin
     if DirExists(BackupRoot) then
     begin
       RestoreFail := 0;
-      GcuRoot := ExpandConstant(GcuUserRoot);
-      OldVariant := ReadVariantFile(BackupRoot + '\previous-variant.txt');
-      IncomingVariant := ResolveIncomingGcuVariant(BackupRoot + '\incoming-variant.txt');
-      Log('LM-UPDATE: GCU 变体对照 旧=' + OldVariant + ' 新=' + IncomingVariant);
-      // 2026-10-09（#9）：这个「变体一致」判断在下面的「清备份」那一步还要再用一次，先算进 VariantSame。
-      VariantSame := (OldVariant <> '') and (IncomingVariant <> '') and (CompareText(OldVariant, IncomingVariant) = 0);
-      if VariantSame then
-      begin
-        if not CopyDirContentsLenient(BackupRoot + '\UserPofiles', GcuRoot + '\UserPofiles') then
-          RestoreFail := RestoreFail + 1;
-        // 30 系在 payload\30 里有自己的 UserPofiles 覆盖 base（40/50 没有那份），
-        // 必须同时回灌到该变体自己的目录，否则会被 overlay 的默认值盖掉。
-        // ⭐ 2026-10-14（7z 载荷化）：旧写法在「升级回灌」这一步里写 payload\<变体>\…\UserPofiles。
-        //   但 7z 的解压 + 规整发生在 [Run] 的 Install-Gcu.ps1 里，**晚于** ssPostInstall 这一步，
-        //   所以这里再写 payload\<变体>\ 只会打到「上一轮遗留的旧树」甚至根本不存在 => 失去意义。
-        //   现在的口径：回灌只写运行目录 {app}\GCU\AiStoneService\MyControlCenter\UserPofiles，
-        //   Install-Gcu.ps1 解压/覆盖时自己会把 preserveDirs（UserPofiles / UserFanTables）备份后
-        //   再回灌（见该脚本 [3/8] 同名逻辑），两边不会互相覆盖。
-        //   ⚠️ 顺序保证（关键）：Install-Gcu.ps1 里「备份 -> 解压/覆盖 -> 回灌」，
-        //      所以 7z 里的默认表覆盖不到用户曲线 —— 这正是本轮必须保住的行为。
-        Log('LM-UPDATE: 变体级 UserPofiles 回灌已改由 Install-Gcu.ps1 解压步骤承担（7z 解压晚于本步）；本次只回灌运行目录');
-        Log('LM-UPDATE: GCU 变体一致（' + IncomingVariant + '），自定义模式档已回灌');
-      end
-      else
-        Log('LM-UPDATE: GCU 变体不一致或未知（旧=' + OldVariant + '，新=' + IncomingVariant + '），跳过自定义模式档回灌以避免混档');
-      // ⭐ 2026-10-14：UserFanTables（风扇曲线）无条件回灌 —— 与 Install-Gcu.ps1:1436 同口径
-      //   （它也是把 UserFanTables 无条件放进 $preserveDirs，只有 UserPofiles 受变体门控）。
-      //   放在变体判断之外是刻意的：风扇曲线与 GCU 变体无关，跨变体也必须保住。
-      //   覆盖语义同下：xcopy /Y 让备份里的文件胜出。
-      if not CopyDirContentsLenient(BackupRoot + '\UserFanTables', GcuRoot + '\UserFanTables') then
-        RestoreFail := RestoreFail + 1;
-      // 30/40/50 各变体若有自己的 UserFanTables 目录，同样回灌（口径同 UserPofiles 的变体目录）。
-      // ⭐ 2026-10-14（7z 载荷化）：变体级 UserFanTables 的回灌已改由 Install-Gcu.ps1 的解压步骤
-      //    承担（preserveDirs 无条件preserve）—— 7z 的解压发生在 [Run] 里，晚于 ssPostInstall 这一步，
-      //    在这里写 payload\<变体>\…\UserFanTables 只会打到「上一轮遗留的旧树」甚至打空。
-      //    ⚠️ 运行目录那一份（上面那条 CopyDirContentsLenient）保持不变：风扇曲线与变体无关，必须保住。
-      Log('LM-UPDATE: 变体级 UserFanTables 回灌已改由 Install-Gcu.ps1 解压步骤承担；本次只回灌运行目录（风扇曲线与变体无关）');
-      Log('LM-UPDATE: GCU 风扇曲线表已回灌（无条件，与变体无关）');
-      // 校色 ICC 与 GCU 变体无关，始终恢复。
-      if not CopyDirContentsLenient(BackupRoot + '\customICC', ExpandConstant('{app}\customICC')) then
-        RestoreFail := RestoreFail + 1;
-      // ⭐ 2026-10-14：UserFanTables 现已备份+回灌（见上面的无条件回灌块），此日志口径同步更新。
-      Log('LM-UPDATE: GCU 用户数据恢复步骤完成（ICC + 风扇曲线表已恢复，风扇表无条件恢复）');
-      // LM 自己的两处用户数据回灌。与卸载侧同一对"原目录 <- 备份叶子名"口径：
+      // GCU 自定义模式档不再回灌（由 LM 本地存档 + 启动重放恢复）
+  // GCU 风扇表不再回灌（同上）
+  // LM 自己的两处用户数据回灌。与卸载侧同一对"原目录 <- 备份叶子名"口径：
       //   roaming-MechrevoLite     -> %APPDATA%\MechrevoLite
       //   programdata-MechrevoLite -> C:\ProgramData\MechrevoLite
       // 覆盖语义：xcopy /Y 让备份里的文件胜出（升级不重置用户设置）。升级前不存在的目录
@@ -2360,10 +2284,10 @@ begin
       // 2026-10-09（#9 保守修法）：清备份的条件从「仅 RestoreFail = 0」改成「RestoreFail = 0 且变体一致」。
       //   原因：变体不一致时上面的 UserPofiles 回灌是按设计跳过的，若仍照旧删掉 upgrade-backup-*，
       //   旧 GCU 的自定义模式档就被静默永久丢失（不同变体布局不同，不能混灌，但也不能删）。
-      if (RestoreFail = 0) and VariantSame then
+      if RestoreFail = 0 then
       begin
         if DelTree(BackupRoot, True, True, True) then
-          Log('LM-UPDATE: 升级回灌全部成功且变体一致 -> 升级备份目录已清理: ' + BackupRoot)
+          Log('LM-UPDATE: 升级回灌全部成功 -> 升级备份目录已清理: ' + BackupRoot)
         else
           Log('LM-UPDATE: 升级回灌成功但备份目录清理失败（无害，可手工删除）: ' + BackupRoot);
       end
@@ -2379,23 +2303,7 @@ begin
                'above (copy roaming-/programdata-MechrevoLite back to their original locations).',
                mbError, MB_OK);
       end
-      else
-      begin
-        Log('LM-UPDATE: GCU 变体不一致（旧=' + OldVariant + '，新=' + IncomingVariant + '）-> 变体不一致，保留备份目录（本次不清理 upgrade-backup-*）: ' + BackupRoot);
-        // 取舍：这里只给「非静默安装」一次性提示；静默安装（/SILENT、/VERYSILENT）绝不弹窗，
-        //   以免卡住无人值守升级 —— 静默时靠上面那行日志 + 保留下来的备份目录追查。
-        // ⚠️ 旧标记缺失（老版本没写 HKLM\...\GcuVariant）是常见的历史遗留路径，弹窗会是误报，
-        //   所以只有「旧变体与新变体都已知且不同」才提示（该情况备份同样保留、日志照样写）。
-        if (OldVariant <> '') and (IncomingVariant <> '') and (not WizardSilent()) then
-          MsgBox('本次升级前后的 GCU 变体不同（旧：' + OldVariant + ' / 新：' + IncomingVariant + '）。' + #13#10 +
-                 '为避免混档，你之前的自定义模式档没有自动回灌；升级备份目录已保留，里面的 UserPofiles 就是旧的自定义模式档。' + #13#10 +
-                 BackupRoot + #13#10 + #13#10 +
-                 'The GCU variant changed in this upgrade (old: ' + OldVariant + ' / new: ' + IncomingVariant + ').' + #13#10 +
-                 'Your previous custom mode profiles were not restored (to avoid mixing); a full backup is kept at' + #13#10 +
-                 'the folder above (UserPofiles inside it).',
-                 mbInformation, MB_OK);
-      end;
-    end
+        end
     else
       Log('LM-UPDATE: 无备份可恢复（全新安装）');
     // Keep the full setup log next to the app for troubleshooting.
