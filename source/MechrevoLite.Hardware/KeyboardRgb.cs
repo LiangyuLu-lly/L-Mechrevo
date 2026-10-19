@@ -316,19 +316,16 @@ public class KeyboardRgb : IDisposable
 	/// </summary>
 	internal void KbPowerSyncFromHardware(bool on)
 	{
-		if (_kbPowerOn == on && !(on && KbPowerExplicitOff))
+		// 用户明确关过 ⇒ 硬件报 On 不改写（否则"关灯后又被硬件状态拉起"）
+		if (on && KbPowerExplicitOff)
+		{
+			return;
+		}
+		if (_kbPowerOn == on)
 		{
 			return;
 		}
 		_kbPowerOn = on;
-		// 2026-10-12（用户拍板「键盘灯光也修复」）：硬件报 On 时**顺手清掉**那条"用户明确关过"标记
-		// —— 硬件说它现在是 On，那条标记就是陈旧的（见 KbPowerExplicitOff 的说明）。
-		// ⚠️ 幂等：标记本来就没置位时这一行是空操作，所以 `_kbPowerOn` 已为 true 而只有标记陈旧时
-		// 也一定会走到这里把标记清掉（这正是"陈旧标记"那一幕）。
-		if (on)
-		{
-			KbPowerExplicitOff = false;
-		}
 		QueueSaveConfig();
 	}
 
