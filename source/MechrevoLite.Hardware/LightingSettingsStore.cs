@@ -274,7 +274,7 @@ internal static class LightingSettingsStore
 			{
 				if (int.TryParse(text2, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result4))
 				{
-					speed = Math.Clamp(result4, 1, 10);
+					speed = Math.Clamp(result4, 0, 10);
 				}
 				break;
 			}

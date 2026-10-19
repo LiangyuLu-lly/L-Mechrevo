@@ -183,20 +183,20 @@ public class LightForm : RForm
 			ScheduleEffectUpdate();
 		};
 		AddRow(Strings.Brightness + (Program.hw?.UsesBaolongda == true ? "（设为 0 即关闭键盘灯）" : ""), sliderLight);
-		RComboBox comboSpeed = new RComboBox
+		RSlider sliderSpeed = new RSlider
 		{
-			DropDownStyle = ComboBoxStyle.DropDownList
+			Minimum = 0,
+			Maximum = 4,
+			Value = Math.Clamp(_speed, 0, 4),
+			MinimumSize = new Size(104, 20),
+			Height = 28
 		};
-		ComboBox.ObjectCollection items = comboSpeed.Items;
-		object[] items2 = new string[3] { Strings.SpeedSlow, Strings.SpeedMedium, Strings.SpeedFast };
-		items.AddRange(items2);
-		comboSpeed.SelectedIndex = Math.Clamp(_speed - 1, 0, 2);
-		comboSpeed.SelectedIndexChanged += (object? _, EventArgs _) =>
+		sliderSpeed.ValueChanged += (object? _, EventArgs _) =>
 		{
-			_speed = comboSpeed.SelectedIndex + 1;
+			_speed = Math.Clamp(sliderSpeed.Value, 0, 4);
 			ScheduleEffectUpdate();
 		};
-		AddRow(Strings.Speed, comboSpeed);
+		AddRow(Strings.Speed, sliderSpeed);
 		RColorButton colorBtn = new RColorButton
 		{
 			Size = new Size(36, 24),
@@ -276,8 +276,10 @@ public class LightForm : RForm
 			resetMix.Click += (object _, EventArgs _) =>
 			{
 				LightChannelSettings current = LightingSettingsStore.Load(_topic, _effects[0].Effect);
-				LightingSettingsStore.Save(_topic, current with { MixColors = null });
-				mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
+				int[] defaultPalette = (int[])LightChannelSettings.DefaultMixColors.Clone();
+				LightingSettingsStore.Save(_topic, current with { MixColors = defaultPalette });
+				Logger.WriteError("[light] 混色默认：已写入默认 7 色 " + string.Join(",", defaultPalette));
+				mixColors = defaultPalette;
 				for (int si = 0; si < mixPanel.Controls.Count; si++)
 				{
 					if (mixPanel.Controls[si] is RColorButton btn)
@@ -433,7 +435,7 @@ public class LightForm : RForm
 				|| Program.IsExternalLightChannelOn(_topic);
 			bool colorMeaningful = logoGrade ? (logoColorMode == 1) : KeyboardFirmwareEffects.IsSingleColorEffect(_effect);
 			sliderLight.Enabled = powerOn;
-			comboSpeed.Enabled = powerOn;
+			sliderSpeed.Enabled = powerOn;
 			if (mixPanel != null)
 			{
 				mixPanel.Enabled = powerOn;
