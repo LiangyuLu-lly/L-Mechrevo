@@ -847,6 +847,9 @@ public class SettingsForm : RForm
 	private long _uiBuildQuickTileMs;
 	private static bool _buildingQuickSwitches;
 	private bool _quickTilesBuilt;
+	private bool _deferredQuickBatch;
+	private int _quickBatchIndex;
+	private Stopwatch _quickBatchWatch = Stopwatch.StartNew();
 	private static int _quickSwitchSkippedReads;
 	private long _uiBuildQuickStateMs;
 
@@ -2496,6 +2499,14 @@ public class SettingsForm : RForm
 			// 本轮它按用户要求回到「更多开关」的「电源与系统」组；性能模式标题行不再持有它。
 			GroupOf(key2).Controls.Add(cb);
 			list.Add(cb);
+			// ⭐ 2026-10-19：延后构建按 6 个 tile 一批，批间 DoEvents 让 UI 喘气 ✅
+			if (_deferredQuickBatch && list.Count % 6 == 0)
+			{
+				Application.DoEvents();
+				_quickBatchIndex++;
+				Logger.WriteError("[ui-build] 快捷开关延后构建：batch=" + _quickBatchIndex + "/" + ((QuickSwitchLabels.Length + 5) / 6) + " tile=" + _quickBatchWatch.ElapsedMilliseconds + " ms");
+				_quickBatchWatch.Restart();
+			}
 		}
 		foreach (FlowLayoutPanel groupFlowDone in groupGrids.Values.Distinct())
 		{
@@ -7654,6 +7665,11 @@ public class SettingsForm : RForm
 			if (_quickGroup.Expanded)
 			{
 				_fitQuickCards?.Invoke();
+				// ⭐ 若 tile 因折叠被跳过/未建，展开时补建（幂等）✅
+				if (!_quickTilesBuilt)
+				{
+					BeginInvoke(new Action(RebuildQuickSwitchPanelAfterShown));
+				}
 			}
 			UpdateDashboardScroll();
 			TableLayoutPanel? qsRoot = control2.Controls["quickSwitchRoot"] as TableLayoutPanel;
@@ -14725,6 +14741,11 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			{
 				return;
 			}
+			// ⭐ 折叠状态：完全不建 tile，等展开再建（最理想路径）✅
+			if (_quickGroup != null && !_quickGroup.Expanded && !Program.UiAuditMode)
+			{
+				return;
+			}
 			_quickTilesBuilt = true;
 			Control oldPanel = Controls.Find("panelQuickSwitch", searchAllChildren: true).FirstOrDefault();
 			if (oldPanel != null)
@@ -14741,7 +14762,17 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				oldPanel.Dispose();
 			}
 			Stopwatch quickWatch = Stopwatch.StartNew();
-			BuildQuickSwitchPanel();
+			_deferredQuickBatch = true;
+			_quickBatchIndex = 0;
+			_quickBatchWatch.Restart();
+			try
+			{
+				BuildQuickSwitchPanel();
+			}
+			finally
+			{
+				_deferredQuickBatch = false;
+			}
 			Control quickPanel = Controls.Find("panelQuickSwitch", searchAllChildren: true).FirstOrDefault();
 			if (quickPanel != null && _quickGroup != null)
 			{
@@ -14752,7 +14783,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			UpdateDashboardWindowHeight();
 			UpdateDashboardScroll();
 			UpdateQuickSwitches();
-			Logger.WriteError("[ui-build] 快捷开关 tile 延后构建：tile=" + quickWatch.ElapsedMilliseconds + " ms（触发=Shown）");
+			Logger.WriteError("[ui-build] 快捷开关延后构建：batch=" + _quickBatchIndex + "/" + ((QuickSwitchLabels.Length + 5) / 6) + " · 合计=" + quickWatch.ElapsedMilliseconds + " ms（触发=Shown）");
 		}
 		catch (Exception ex)
 		{
