@@ -1,4 +1,4 @@
-r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 + 键盘灯开机闪与关灯被拉亮 + 30 系每配置本地化 + APU 防缩缸记忆 + 安装器简化
+r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 + 键盘灯开机闪与关灯被拉亮 + 30 系每配置本地化 + APU 防缩缸记忆 + 安装器简化 + 宝龙达机型识别/多档修复
 
 一、灯效（40 系同方）
 - 抓官方控制台 MQTT 报文确认：Logo 效果名为 ColorMarquee / Breathing / Wave / Impact / Raindrop；参数统一 isCircular=true、ColorBlocks=7、ColorBuffer 7 段、nv_save="0"；官方默认 7 色末色为 139,0,255。
@@ -28,6 +28,9 @@ r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 
 - 宝龙达/无界：恢复出厂走本地复位，界面强制回「未设置」；无界 SMU 功耗墙如实提示「运行时状态、重启回固件默认」。
 - 无界 APU：风扇曲线能力位先按支持处理（FanCurveSeen 不再作为唯一判据）。
 - 修复：宝龙达自定义档新旧档混在一起、温度墙开关不保存（WMI 只写不读 ⇒ 改为按本档保存值回显）。
+- 修复（宝龙达）：新建自定义档不再继承当前档数据（AddCustomModeAsync 在宝龙达传 null 种子）——以前连续新建会一路复制成第一个自定义档的参数。
+- 修复（宝龙达）：下拉选中自定义档时同步 ActivateLocalProfile(id)；以前保存/刷新/ActiveChanged 回调会按旧 ActiveModeId 绑回第一个自定义档（表现为“点哪个都一样”）。
+- 链路核对：PerfModeService.AddCustom → PerfModeStore.SaveSettings(perf_<id>_*) 各自独立；UpdateCoreAsync 存本档 + Invalidate；BindMode 按本档 LoadSettings 回显。
 - 修复（回归）：恢复路径曾用硬件回写改写保存的开关/亮度 ⇒ 已移除，改为保存值优先。
 
 四、监控
@@ -38,21 +41,26 @@ r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 
 - 导出/导入设置：白名单补 logolight.cfg、lighting.user-configured、fan_curve_bd.cfg，新增 baolongda_fancurve_*.cfg 通配；新增 customICC 子目录（.icc/.icm）导入导出。
 - APU 防缩缸：状态改为 AC/DC 两套处理器性能提升模式都为 5 才算开；用户意图存 apuboost，启动时 ApplyApuAntiDegradeOnStartup 恢复；关闭时分别还原 AC/DC 原值。
 
-六、安装器
+六、机型识别（宝龙达）
+- 现象（0.292.3 真机诊断包）：板号 MRID6-23 命中白名单 ✅，但运行日志 [gate] baolongda=False、backend=Gcu，界面「GCU 未连接」。
+- 根因：MechrevoBackendOrder.Candidates 是命令式候选表，GCU 排第一、判据只有“装了 GCU 服务”；蛟龙同时装了 GCU 载荷 ⇒ GCU 抢先 ⇒ 宝龙达后端没轮到。
+- 修复：GCU 候选增加“板号未命中宝龙达白名单”条件 ⇒ 宝龙达机型先走宝龙达后端；同方机型行为不变。
+- 验收：修好后 [gate] 机型分类 显示 baolongda=True，并出现“宝龙达后端：⭐ 机型白名单通过”；真机复测机型识别已正常。
+
+七、息屏
+- 修复：SettingsForm 不再给 VirtualDisplayBlank.Start() 返回的原因套 ScreenBlankFailed 前缀；恢复中/驱动缺失直接显示真实原因。
+- 说明：残留会话自愈（active>120s / restoring>30s 自动复位）此前版本已存在，本版只改提示语。
+
+八、安装器
 - 删除升级时 GCU UserPofiles / UserFanTables 的备份-回灌（改由 LM 本地存档 + 启动重放恢复）。
 - 删除 customICC 的专项备份/回灌（已随 LM 用户数据目录）。
 - 静默卸载（升级触发）不再删除 LM 用户配置；仅交互卸载时询问，默认「保留」。
-- 版本：AssemblyVersion/FileVersion 0.292.3，InformationalVersion 0.292.3-beta23.3；包名 LM-0.292.3-beta23.3-setup.exe。
+- 版本：AssemblyVersion/FileVersion 0.292.3，InformationalVersion 0.292.3-beta23.3；包名 LM-0.292.3-beta23.3-setup.exe（版本号不变，重新打包）。
 
-七、文档（内部参考）
+九、文档（内部参考）
 - docs/notes/GCU反编译与上游源码清点-20261020.md：50 系 GCU（1.2.0.0）完整反编译、40 系部分反编译、30 系无完整反编译的版本对照与目录清点。
 - docs/notes/GCU50-静音与性能档实现-20261020.md：档位×配置模型、ProfileIndex、WhisperMode；并记录 40 系不支持「静音狂暴」子模式、不尝试换装 50 系 GCU 的决定。
-
-八、待下版本合并（本包未包含）
-- 修复（宝龙达）：下拉选择某自定义档后没有同步「当前档」，保存/刷新会按旧 ActiveModeId 绑回第一个自定义档（表现为点哪个都一样）；现在选中即切换当前档。
-- 修复（宝龙达）：新建自定义档不再复制当前档数据（以前连续新建会一路继承成第一个自定义档的参数）；新建档从默认（未设置）开始。
-- 修复：蛟龙（宝龙达，板号 MRID6-23）被识别成 GCU 机型、显示「GCU 未连接」—— 后端候选表中 GCU 在已安装时抢先；改为板号命中宝龙达白名单时先走宝龙达后端。
-- 息屏提示语修复：息屏被拒时不再套「无法关闭显示器（系统未接受关屏指令）」通用前缀，直接显示真实原因（恢复中/驱动缺失）；代码已提交，按机主要求留到下个版本并入。
+- docs/notes/后端匹配-声明式架构-设计-20261020.md：未来目标（先验机型 → 声明式路由）；未实现，不进本版功能。
 
 r76（2026-10-19 · **0.292.2 beta23.2**）★★ 休眠唤醒弹窗 + 设置页启动/响应优化 + 板号识别增强（含两处自引入回归的修复记录）
 用户原话：「设页启动慢问题存在好几个版本了 看看能不能优化」「速度区别不大,但是页面不会未响应了」「那先这样 有机主反应就是机器休眠(会关机的睡眠那个) 再启动后LM会弹出UI主界面 就算之前关闭了也会」「依旧会」「可以 没有弹了」「打包 beta23.2 写修改日志 更新日志(回归问题不写更新日志 但是要记录修改)」
