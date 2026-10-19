@@ -706,8 +706,19 @@ internal static class Program
 				return;
 			}
 		}
+		// ⭐⭐ 2026-10-19（机主：休眠/睡眠唤醒后 LM 会自己弹出主界面）：⭐
+		//   根因 —— 开机自启任务带 `startup` 参数；休眠（S4）/睡眠唤醒时 Windows 可能触发"登录"类触发器
+		//   再次拉起 LM ⇒ 走到下面「已有实例」分支 ⇒ **无条件敲 ShowMain 门** ⇒ 旧实例把主窗弹出来 ❌
+		//   正解 —— **自启拉起（startup）只做「让位退出」，⛔ 不敲唤醒门**；只有用户手动双击/托盘才唤起 ✅
+		bool isStartupLaunchArg = IsStartupLaunch(text);
 		if (!createdNew)
 		{
+			if (isStartupLaunchArg)
+			{
+				Logger.WriteLine("另一个实例已在运行；本次为「开机自启」拉起（startup）⇒ 只让位退出，⛔ 不唤起主界面（修「休眠唤醒后自动弹窗」）");
+				Logger.Close();
+				return;
+			}
 			// 2026-10-09（dupfeedback，用户原话「双击没反应」）：本进程只用**唤起 + 敲一下通知门**两件事，
 			// 唤起旧窗的既有行为一字不改；气泡由**已有那个实例**用它的托盘图标弹（见 ShowDuplicateInstanceNotice），
 			// 这样本进程可以立刻退出 —— 不留"看起来像两个实例"的 4 秒尾巴，也不依赖本进程有没有托盘。
