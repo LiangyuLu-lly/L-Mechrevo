@@ -2465,6 +2465,9 @@ public class CustomModeForm : RForm
 		// （它必然失败并把界面回弹到别的档，用户看到"选了又跳回去"）
 		if (Program.hw?.UsesBaolongda ?? false)
 		{
+			// 选中哪一档就把「当前档」切到哪一档（否则后续刷新会按 ActiveModeId 绑回第一个自定义档）
+			PerfModeService perfBd = PerfModeService.Instance;
+			perfBd?.ActivateLocalProfile(id);
 			_status.Text = Strings.PerfModeLocalProfileSwitched;
 			_status.ForeColor = UiVisualStyle.Muted;
 			Logger.WriteLine("[perfmode] 宝龙达：模式下拉切到 " + id + "（本机配置，无固件档可切）");
