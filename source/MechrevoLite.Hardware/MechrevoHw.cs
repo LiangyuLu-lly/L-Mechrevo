@@ -6048,20 +6048,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return cached == 1;
 			}
-			bool match = false;
-			try
-			{
-				using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine
-					.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
-				string board = ((key?.GetValue("BaseBoardProduct") as string) ?? string.Empty).Trim();
-				// 裸 `MRID6` = 30 系（2026-10-17 真机：蛟龙16 · 6800H＋3070Ti）；
-				// `MRID6-23` = 40 系 ⇒ 下面这条**故意**用精确比较，不匹配 `MRID6-` 前缀。
-				match = string.Equals(board, "MRID6", StringComparison.OrdinalIgnoreCase);
-			}
-			catch (Exception ex)
-			{
-				Logger.WriteLine("IsBaolongda30Series: 读主板型号失败（按非 30 系处理，安全方向）：" + ex.Message);
-			}
+			// ⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 板号统一走多来源取证（reg/WMI），判据仍是精确 `MRID6` ✅
+			string board = BoardWhitelist.ReadBoardProduct();
+			bool match = string.Equals(board, "MRID6", StringComparison.OrdinalIgnoreCase);
 			Volatile.Write(ref _baolongda30SeriesCache, match ? 1 : 0);
 			return match;
 		}

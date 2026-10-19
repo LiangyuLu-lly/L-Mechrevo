@@ -76,9 +76,19 @@ internal static class DiagnosticBaolongdaInfo
 	{
 		sb.AppendLine();
 		sb.AppendLine("── ① 机型白名单（⭐ 判宝龙达**只看板号** ⛔ 不看是不是蛟龙、⛔ 不看 30/40 系）──");
-		string board = ReadBaseBoardProduct();
-		sb.AppendLine("主板型号 BaseBoardProduct = " + (board.Length == 0 ? "（读不到）" : board));
-		bool hit = BaolongdaBackend.IsBaolongdaModelWhitelisted(out string note);
+		// ⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 四来源板号取证 + 命中来源，诊断包直接可判 ✅
+		BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
+		string board = evidence.Product;
+		bool hit = BoardWhitelist.Matches(board);
+		BoardWhitelist.LogEvidence(evidence, hit);
+		sb.AppendLine("板号取证：reg.BaseBoardProduct=" + Shown(evidence.RegBaseBoard)
+			+ " · wmi.BaseBoard.Product=" + Shown(evidence.WmiBaseBoard)
+			+ " · SystemProductName=" + Shown(evidence.RegSystemProduct)
+			+ " · Model=" + Shown(evidence.WmiModel));
+		sb.AppendLine("最终采用板号 = " + (board.Length == 0 ? "（读不到）" : board) + " · 命中来源 = " + (evidence.Source.Length == 0 ? "(无)" : evidence.Source));
+		string note = hit
+			? "板号「" + board + "」⭐ 命中宝龙达白名单 ✅（来源=" + evidence.Source + "）"
+			: "板号「" + board + "」（来源=" + evidence.Source + "）⛔ 不在宝龙达白名单 ⇒ 按同方/GCU 处理 ✅";
 		sb.AppendLine("白名单判定 = " + (hit ? "✅ 命中 ⇒ 本机可认作宝龙达" : "⛔ 未命中 ⇒ 本机按同方/GCU 处理"));
 		sb.AppendLine("判定说明 = " + note);
 		sb.AppendLine("⭐ 判据依据：⭐ 宝龙达板号为 `MRID6`（⭐ 裸板号 · 2026-10-17 真机：蛟龙16 · 6800H＋3070Ti）、"
@@ -89,6 +99,11 @@ internal static class DiagnosticBaolongdaInfo
 			+ "（⭐ 现已修复：⭐ 裸 `MRID6` 精确命中 ✅）");
 		sb.AppendLine("⚠️ 仍待逐台证实的：⭐ `MRID6-*` 里**除 `MRID6` / `MRID6-23` 之外**的变体"
 			+ "（⭐ 这两个已真机证实 ✅）⇒ ⭐ 若某个变体其实是同方模具，⭐ 届时把它加进排除表 ✅");
+	}
+
+	private static string Shown(string value)
+	{
+		return value.Length == 0 ? "（空）" : value;
 	}
 
 	private static string ReadBaseBoardProduct()
@@ -1126,7 +1141,7 @@ internal static class DiagnosticBaolongdaInfo
 				sb.AppendLine("平台判据：UsesBaolongda = " + hw.UsesBaolongda
 					+ " · IsBaolongda30Series = " + hw.IsBaolongda30Series
 					+ " · DgpuGeneration = " + hw.DgpuGeneration
-					+ " · 板号 = " + (ReadBaseBoardProduct() is { Length: > 0 } board ? board : "（读不到）"));
+					+ " · 板号 = " + (BoardWhitelist.ReadBoardProduct() is { Length: > 0 } bd ? bd : "（读不到）"));
 				sb.AppendLine("闸门：FanCurveVerified = " + hw.FanCurveVerified
 					+ " · PreferredChannel = " + FanWriter.ChannelName(FanWriter.PreferredChannel));
 			}

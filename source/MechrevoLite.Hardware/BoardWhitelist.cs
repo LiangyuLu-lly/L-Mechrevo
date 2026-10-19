@@ -14,6 +14,8 @@
 //   与本项目「⭐ 宁可不认宝龙达，⭐ 也绝不误伤同方」的原则相悖 ❌。</para>
 
 using System;
+using System.Diagnostics;
+using System.Management;
 
 namespace MechrevoLite.Hardware;
 
@@ -59,5 +61,134 @@ internal static class BoardWhitelist
 			return true;
 		}
 		return false;
+	}
+
+	/// <summary>⭐⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 板号取证结果（四来源 + 最终采用值/来源）✅</summary>
+	internal readonly record struct BoardProductEvidence(string RegBaseBoard, string WmiBaseBoard, string RegSystemProduct, string WmiModel, string Product, string Source);
+
+	private static BoardProductEvidence _cachedEvidence;
+
+	private static bool _cached;
+
+	private static readonly object _cacheLock = new object();
+
+	/// <summary>⭐ 统一入口：首个**命中白名单**的来源；③④ 仅在 ①② 都读不到时作兜底（且必须含 MRID6）✅</summary>
+	internal static BoardProductEvidence GetBoardProductEvidence()
+	{
+		lock (_cacheLock)
+		{
+			if (_cached)
+			{
+				return _cachedEvidence;
+			}
+			string regBase = ReadRegistryValue("BaseBoardProduct");
+			string wmiBase = ReadWmiValue("Win32_BaseBoard", "Product");
+			string regSystem = ReadRegistryValue("SystemProductName");
+			string wmiModel = ReadWmiValue("Win32_ComputerSystem", "Model");
+			string product = string.Empty;
+			string source = string.Empty;
+			// ①②：按顺序找首个**白名单命中**（这样 reg 是 Standard、WMI 是 MRID6 时也能认对）
+			if (Matches(regBase))
+			{
+				product = regBase;
+				source = "reg.BaseBoardProduct";
+			}
+			else if (Matches(wmiBase))
+			{
+				product = wmiBase;
+				source = "wmi.BaseBoard.Product";
+			}
+			else if (regBase.Length == 0 && wmiBase.Length == 0)
+			{
+				// ③④：仅当 ①② 都读不到时才用；且必须含 "MRID6" 才认（⛔ 不误伤同方）✅
+				string fallback = regSystem.Length > 0 ? regSystem : wmiModel;
+				if (fallback.IndexOf("MRID6", StringComparison.OrdinalIgnoreCase) >= 0)
+				{
+					product = fallback;
+					source = regSystem.Length > 0 ? "reg.SystemProductName" : "wmi.ComputerSystem.Model";
+				}
+			}
+			if (product.Length == 0)
+			{
+				if (regBase.Length > 0)
+				{
+					product = regBase;
+					source = "reg.BaseBoardProduct";
+				}
+				else if (wmiBase.Length > 0)
+				{
+					product = wmiBase;
+					source = "wmi.BaseBoard.Product";
+				}
+			}
+			_cachedEvidence = new BoardProductEvidence(regBase, wmiBase, regSystem, wmiModel, product, source);
+			_cached = true;
+			return _cachedEvidence;
+		}
+	}
+
+	/// <summary>⭐ 最终采用的板号（空 = 读不到 ⇒ 安全方向按“不是宝龙达”）✅</summary>
+	internal static string ReadBoardProduct()
+	{
+		return GetBoardProductEvidence().Product;
+	}
+
+	/// <summary>⭐ 取证日志：四来源 + 命中来源/判定（默认可见，去重）✅</summary>
+	internal static void LogEvidence(BoardProductEvidence evidence, bool isBaolongda)
+	{
+		try
+		{
+			Logger.WriteLineIfChanged("board-evidence",
+				"[机型] 板号取证：reg.BaseBoardProduct=" + Show(evidence.RegBaseBoard)
+				+ " · wmi.BaseBoard.Product=" + Show(evidence.WmiBaseBoard)
+				+ " · SystemProductName=" + Show(evidence.RegSystemProduct)
+				+ " · Model=" + Show(evidence.WmiModel));
+			Logger.WriteLineIfChanged("board-decision",
+				"[机型] 判定：命中来源=" + (evidence.Source.Length == 0 ? "(无)" : evidence.Source)
+				+ "(" + Show(evidence.Product) + ") ⇒ 宝龙达=" + isBaolongda);
+		}
+		catch
+		{
+		}
+	}
+
+	private static string Show(string value)
+	{
+		return value.Length == 0 ? "(空)" : "「" + value + "」";
+	}
+
+	private static string ReadRegistryValue(string name)
+	{
+		try
+		{
+			using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine
+				.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
+			return (key?.GetValue(name) as string ?? string.Empty).Trim();
+		}
+		catch
+		{
+			return string.Empty;
+		}
+	}
+
+	private static string ReadWmiValue(string className, string property)
+	{
+		try
+		{
+			using ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT " + property + " FROM " + className);
+			foreach (ManagementObject item in searcher.Get())
+			{
+				object value = item[property];
+				if (value != null)
+				{
+					return value.ToString().Trim();
+				}
+			}
+		}
+		catch
+		{
+			// WMI 不可用（服务损坏/权限）⇒ 空值 ⇒ 安全方向
+		}
+		return string.Empty;
 	}
 }

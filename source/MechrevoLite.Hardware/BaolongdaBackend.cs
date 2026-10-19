@@ -210,32 +210,23 @@ internal sealed class BaolongdaBackend : IDisposable
 	/// </summary>
 	internal static bool IsBaolongdaModelWhitelisted(out string note)
 	{
-		note = string.Empty;
-		string board = string.Empty;
-		try
+		// ⭐⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 多来源板号取证（reg.BaseBoardProduct / wmi.BaseBoard.Product /
+		//   SystemProductName / Model；首个白名单命中）—— 白名单判据**不变**（MRID6 精确 / MRID6-23 / MRID6- 前缀）✅
+		BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
+		bool match = BoardWhitelist.Matches(evidence.Product);
+		BoardWhitelist.LogEvidence(evidence, match);
+		if (evidence.Product.Length == 0)
 		{
-			using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine
-				.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
-			board = (key?.GetValue("BaseBoardProduct") as string ?? string.Empty).Trim();
-		}
-		catch (Exception ex)
-		{
-			note = "⚠️ 读主板型号失败 ⇒ ⭐ **按「不是宝龙达」处理** ✅（⭐ 出错时走安全方向 ✅）：" + ex.Message;
+			note = "⚠️ 板号四来源都读不到 ⇒ ⭐ **按「不是宝龙达」处理** ✅（⭐ 安全方向 ✅）";
 			return false;
 		}
-		if (board.Length == 0)
+		if (match)
 		{
-			note = "⚠️ 主板型号读不到（⭐ 空值 ✅）⇒ ⭐ **按「不是宝龙达」处理** ✅（⭐ 安全方向 ✅）";
-			return false;
-		}
-		if (BoardWhitelist.Matches(board))
-		{
-			note = $"主板型号「{board}」⭐ 命中宝龙达白名单 ✅（⭐ `MRID6` 精确 / `MRID6-` 前缀 ✅）";
+			note = "板号「" + evidence.Product + "」⭐ 命中宝龙达白名单 ✅（来源=" + evidence.Source + "）";
 			return true;
 		}
-		// ⭐ ③ 其余一律**不认**（⭐ 含所有同方机型 ✅）
-		note = $"主板型号「{board}」⛔ **不在宝龙达白名单**（⭐ 已知宝龙达为 `MRID6` 精确 / `MRID6-` 前缀 ✅）"
-			+ " ⇒ ⭐ 按用户澄清「⭐ 其他蛟龙都是同方模具 ✅」⭐ 判定为**同方** ⇒ ⭐ 让它走老接口/GCU ✅";
+		note = "板号「" + evidence.Product + "」（来源=" + evidence.Source + "）⛔ **不在宝龙达白名单**"
+			+ "（已知宝龙达为 `MRID6` 精确 / `MRID6-` 前缀 ✅）⇒ 按用户澄清「其他蛟龙都是同方模具」判定为**同方** ⇒ 走老接口/GCU ✅";
 		return false;
 	}
 	private static bool IsDisabledByEnvVar()

@@ -284,7 +284,8 @@ internal sealed class BatteryLimitPanel : Panel
 			{
 				return false;
 			}
-			return BoardWhitelist.Matches(ReadBaseBoardProduct());
+			// ⭐ 2026-10-19：多来源板号取证（reg/WMI）统一入口 ✅
+			return BoardWhitelist.Matches(BoardWhitelist.ReadBoardProduct());
 		}
 		catch
 		{

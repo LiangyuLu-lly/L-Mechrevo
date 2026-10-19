@@ -18,28 +18,26 @@ internal static class BatteryLimitPlatform
 	/// <summary>⭐ 本机板号（读注册表 BIOS/BaseBoardProduct；失败返回空）✅。</summary>
 	internal static string BoardProduct()
 	{
-		try
-		{
-			using RegistryKey key = Registry.LocalMachine.OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS", writable: false);
-			return (key?.GetValue("BaseBoardProduct") as string ?? string.Empty).Trim();
-		}
-		catch
-		{
-			return string.Empty;
-		}
+		// ⭐ 2026-10-19（机主：宝龙达被判成同方）：⭐ 与后端/诊断共用多来源取证（reg BaseBoardProduct / WMI BaseBoard）✅
+		return BoardWhitelist.ReadBoardProduct();
 	}
 
 	/// <summary>⭐ 是否宝龙达模具（板号白名单）；⚠️ 非宝龙达 ⇒ 命令必须 0 读 0 写 ✅。</summary>
 	internal static bool IsBaolongdaMachine()
 	{
-		return BoardWhitelist.Matches(BoardProduct());
+		BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
+		bool match = BoardWhitelist.Matches(evidence.Product);
+		BoardWhitelist.LogEvidence(evidence, match);
+		return match;
 	}
 
 	/// <summary>⭐ 非宝龙达的统一拒绝日志（0 读 0 写）✅。</summary>
 	internal static void LogRejected(string command)
 	{
-		string board = BoardProduct();
+		BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
+		string board = evidence.Product;
 		string text = "[" + command + "] ⛔ 非宝龙达（board=" + (board.Length == 0 ? "(读不到)" : board)
+			+ " · src=" + (evidence.Source.Length == 0 ? "(无)" : evidence.Source)
 			+ "）⇒ **未做任何操作**（0 读 0 写；不碰 EC/PawnIO/驱动）";
 		try { Console.WriteLine(text); } catch { }
 		try { Logger.WriteLine(text); } catch { }
