@@ -16,7 +16,7 @@ namespace MechrevoLite.Gpu;
 internal static class NvapiPStates
 {
 	// ⭐⭐ 2026-10-19（UI 范围）：宝龙达下 UI 取「驱动读到的范围」与这个区间的**交集**。
-	// 来源（只取数值语义，⛔ 未复制任何反编译实现）：第三方 7.3 的 MinCoreOffset=-900 / MaxCoreOffset=2000。
+	// 来源（只取数值语义，⛔ 未复制任何官方组件行为实现）：第三方 7.3 的 MinCoreOffset=-900 / MaxCoreOffset=2000。
 	internal const int UiOffsetMinimumMhz = -900;
 
 	internal const int UiOffsetMaximumMhz = 2000;

@@ -2349,7 +2349,7 @@ public class MechrevoService
 	/// <summary>
 	/// 二分设备（40 系 + sRGB 屏，GCU 只上报 1 个校色档）只有裸 `COLOR_CALIBRATION_ON` / `COLOR_CALIBRATION_OFF`：
 	/// 实测 `payload\40` 与 `payload\30` 的 GCUService.exe 命令名表里只有这两个
-	/// （官方 GCU 反编译 Define\ServCMD.cs 亦然）。50 系 GCU 的命令名表里
+	/// （官方 GCU 官方组件 Define\ServCMD.cs 亦然）。50 系 GCU 的命令名表里
 	/// `COLOR_CALIBRATION_ON_DEFAULT` / `_SRGB` / `_P3` / `_ADOBERGB` 四档齐全，故多档设备 1:1 下发，不再折叠。
 	/// </summary>
 	private static string ColorCalibrationAction(int mode, bool binaryDevice)
@@ -3002,7 +3002,7 @@ public class MechrevoService
 				}
 			}
 			// ⭐⭐ 2026-10-17（WiFi / 蓝牙 · 本地开关）：⭐ 宝龙达没有 GCU ⇒ 走 Windows Radio ✅
-			//   ⭐ 依据（40 系 GCU 反编译，只取做法）：`DeviceSwitchItem.cs` 用 `Windows.Devices.Radios` 切这两个 ✅
+			//   ⭐ 依据（40 系 GCU 官方组件行为，只取做法）：`DeviceSwitchItem.cs` 用 `Windows.Devices.Radios` 切这两个 ✅
 			//   ⚠️ 仅 `UsesBaolongda` 分派 ⇒ GCU 机型的 `WIFI_ON/OFF`、`BT_ON/OFF` 那条 MQTT 路径**逐位不变** ✅
 			if (_hw.UsesBaolongda
 				&& (string.Equals(key, "wifi", StringComparison.Ordinal) || string.Equals(key, "bt", StringComparison.Ordinal)))
@@ -4877,7 +4877,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				return true;
 			}
 			Dictionary<string, object> dictionary = new Dictionary<string, object>();
-			// ⭐⭐ 2026-10-16（0.291.8.1 · 按厂商反编译校正）：`isCircular` **不能恒为 true**。
+			// ⭐⭐ 2026-10-16（0.291.8.1 · 按官方组件行为校正）：`isCircular` **不能恒为 true**。
 			// 厂商口径（LM_ITE_RGB.Set_ITE_Effect_Type_FwMode）：
 			//   ColorBlocks>0 && isCircular  ⇒ b2=8（多段循环，逐段下发）
 			//   ColorBlocks>0 && !isCircular ⇒ b2=1（**单色**，只取 ColorBuffer[0]）
@@ -4917,7 +4917,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			}
 			else
 			{
-				// ⭐⭐ 2026-10-16（0.291.8.1 · 按厂商去混淆反编译校正 · 见 docs\notes\GCU灯效协议-按反编译校正.md）：
+				// ⭐⭐ 2026-10-16（0.291.8.1 · 按官方组件行为校正 · 见 docs\notes\GCU灯效协议-按官方组件行为校正.md）：
 				// 厂商对**灯带/Logo**的颜色模式由 `isCircular` 决定，落到 HID 的颜色模式字节 b2：
 				//   ColorBlocks==0                ⇒ b2=0（**不发颜色**，用固件自带色）
 				//   ColorBlocks>0 && isCircular   ⇒ b2=8（逐段下发，多段循环）

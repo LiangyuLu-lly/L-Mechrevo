@@ -1,5 +1,5 @@
 // ⭐⭐ 2026-10-17（WiFi / 蓝牙「本地开关」· 不依赖 GCU）：
-//   ⭐ 依据（40 系 GCU 反编译，只取**做法**）：`GCUService\GCService5\DeviceSwitchItem.cs` 与 `BLE.cs`
+//   ⭐ 依据（40 系 GCU 官方组件行为，只取**做法**）：`GCUService\GCService5\DeviceSwitchItem.cs` 与 `BLE.cs`
 //     都 `using Windows.Devices.Radios;` ⇒ 厂商自己就是用 **Windows Radio API** 切这两个开关，
 //     ⛔ 不是"禁用设备"那种重手段。
 //

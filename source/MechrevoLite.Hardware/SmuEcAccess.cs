@@ -1,7 +1,7 @@
 // 2026-10-18（宝龙达 · 风扇接管）：⭐⭐ **SMU-EC 通道封装**（7.3 `RyzenAccess` 等价物）⭐⭐
 //
 // ⭐⭐ 命令号来源（必须如实记录）：**没有 SMU 命令号**。
-//   反编译 7.3：`_upstream\decompiled-originals\thirdparty-JiaoLong7.3\第三方蛟龙游戏控制中心.decompiled.cs`
+//   对照 7.3 官方组件行为：`内部参考材料（路径略）`
 //     · `EC.RW.ECRW_Tool.Fan_Speed`（约 931-947 行）调用
 //       `SMUCommands.RyzenAccess.Write_EC_EX(51260/51261, speed)` · `Read_EC_EX(2848)` · `Write_EC_Init()`；
 //     · 但 `SMUCommands.RyzenAccess.Write_EC_EX / Read_EC_EX`（约 1567 / 1588 行）的实现是

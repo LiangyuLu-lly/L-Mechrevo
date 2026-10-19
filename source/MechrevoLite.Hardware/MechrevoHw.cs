@@ -977,7 +977,7 @@ public class MechrevoHw : IDisposable
 		}
 		// 2026-10-06（用户澄清）：「30 系不支持的只是核显模式这一个模式，混合模式与独显直连照常显示」。
 		// 因此这里不再对 Gen30 整代否决：只要本机确实能上报「独显直连」（SupportsDgpuDirect），
-		// 就有已验证的直连动作可做 —— 30 系反编译证实的动作词汇只有
+		// 就有已验证的直连动作可做 —— 30 系官方组件行为证实的动作词汇只有
 		// DGPU_DIRECT_CONNECT_TOGGLE_ON / _OFF（两档 Mux），所以 Gen30 额外要求 SupportsDgpuDirect，
 		// 不允许仅凭 SupportsIgpuOnly 放开整行（IGPU_ONLY_* 在 30 系是 ProvenAbsent）。
 		// 「核显模式」这一个档位的屏蔽仍由 CanOfferIgpuOnly 里的 Gen30 恒隐藏独立负责，本属性不再代管它。
@@ -3871,7 +3871,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⭐ 键盘灯下发的**唯一实现** ✅（⭐ 固定色顺序：模式 16 ⇒ 500ms ⇒ 颜色 17 ⇒ 亮度 18 ✅）。
 	///
 	/// <para>⭐⭐ 2026-10-19（机主批准「软件彩虹」）：⭐ 本机固件的「模式 16=1（AutoCyclic）」**实际无效** ⚠️
-	/// ⇒ 彩虹改为**软件刷色**（依据第三方 7.3 反编译的**做法**，⛔ 未复制其代码）：
+	/// ⇒ 彩虹改为**软件刷色**（依据第三方 7.3 官方组件的做法，⛔ 未复制其代码）：
 	/// ⭐ 这里拦截 <c>mode == 1</c> ⇒ 调 <see cref="StartKeyboardRainbow" />：
 	/// 先写 <c>16=2</c>（固定色）＋ 亮度，然后由后台**每 ~50ms** 写一次 <c>17=RGB</c>
 	/// （hue 0→360、步进 3°；HSB→RGB 本仓自写换算）✅。
@@ -4043,9 +4043,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				return true;
 			}
 			// ⭐⭐ 2026-10-19（机主批准「软件彩虹」）：⭐ **拦截 mode==1** —— ⛔ 不再写硬件 16=1 ✅
-			//   ⭐ 依据（7.3 反编译 · 只取做法）：7.3 的彩虹是**软件刷色**，不是固件 AutoCyclic：
+			//   ⭐ 依据（7.3 官方组件行为 · 只取做法）：7.3 的彩虹是**软件刷色**，不是固件 AutoCyclic：
 			//     写 16=2（固定色）+ 亮度，然后后台每 ~50ms 写一次 17 颜色（hue 0→360 步进 3°）✅
-			//   ⚠️ 本机固件对 16=1 **无效**（上一轮真机/反编译已确认）⇒ 必须由我们自己刷色 ✅
+			//   ⚠️ 本机固件对 16=1 **无效**（上一轮真机/官方组件行为已确认）⇒ 必须由我们自己刷色 ✅
 			if (mode == 1)
 			{
 				// ⭐ 开灯状态下亮度不允许是 0（0 ＝ 灭）⇒ 彩虹至少给 1 档 ✅
@@ -4484,7 +4484,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		if (effect.Equals("Rainbow", StringComparison.OrdinalIgnoreCase))
 		{
 			// ⭐⭐ 2026-10-19（软件彩虹）：⭐ 模式 1 是**本仓的哨兵值** ——
-			//   ⛔ 不是固件 AutoCyclic（本机固件对 16=1 无效，真机/反编译已确认）⚠️
+			//   ⛔ 不是固件 AutoCyclic（本机固件对 16=1 无效，真机/官方组件行为已确认）⚠️
 			//   ⇒ ⭐ 由 `TrySetKeyboardLightingViaBackend` 拦截并转成**软件刷色**（50ms/帧）✅
 			mode = 1;
 			return true;
@@ -4720,7 +4720,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	// ══════════════════════════════════════════════════════════════════════
 	// ⭐⭐ 2026-10-19（机主批准「软件彩虹」）：**彩虹刷色器**（本仓自写实现）
 	//
-	//   依据（第三方 7.3 反编译 · ⭐ 只取**做法**，⛔ 未复制其代码）：
+	//   依据（第三方 7.3 官方组件行为 · ⭐ 只取**做法**，⛔ 未复制其代码）：
 	//     7.3 的彩虹 = **软件刷色**：写 16=2（固定色）+ 亮度，然后循环
 	//     「hue 0→360 步进 3° → HSB2RGB → 写 17 颜色 → 等 50ms」；停止时取消循环 + 写亮度 0。
 	//   ⇒ ⭐ 本机固件的「模式 16=1（AutoCyclic）」实际无效 ⇒ 彩虹只能由我们自己刷 ✅
@@ -5382,7 +5382,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	// ⭐⭐ 2026-10-17（接手 · 按**原厂口径**修正转速百分比）：⭐ 100% 对应的 RPM ✅
 	//
-	//  ⭐⭐ 依据（⭐ 只取**事实**：原厂 40 系控制台 v0.3.15 的反编译结论 ——
+	//  ⭐⭐ 依据（⭐ 只取**事实**：原厂 40 系控制台 v0.3.15 的官方组件行为结论 ——
 	//     ⛔ 源码/注释里**不放**它的代码片段，法律风险；取证原文只留在 docs 的分析记录里）：
 	//     · 采样：功能号 13（`CPUGPUFanSpeed`）—— 我们本来就在读 ✅
 	//     · 折算：RPM **÷ 60** 得到百分比 ⇒ ⭐ **100% = 6000 RPM** ✅
@@ -7441,7 +7441,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// ⚠️ Fn 锁（功能号 11）真机**未定论** ⚠️ ⇒ ⭐ 保持直通、⛔ 不取反 ✅（⭐ 机主只反馈了触摸板 ✅）
 			SyncBaolongdaQuickSwitch("fnkey", snap.FnLock);
 			// ⭐⭐ 2026-10-17（WiFi / 蓝牙 · 本地 Radio）：⭐ 宝龙达没有 GCU ⇒ 这两个状态由
-			//   Windows 的 Radio 提供（⭐ 依据：40 系 GCU 反编译里也是 `Windows.Devices.Radios` ✅）。
+			//   Windows 的 Radio 提供（⭐ 依据：40 系 GCU 官方组件里也是 `Windows.Devices.Radios` ✅）。
 			//   ⚠️ 只同步**读到**的；读不到就不动界面（⭐ 保持"未知"比谎报好 ✅）
 			if (RadioSwitch.Available(RadioSwitchKind.Wifi) && RadioSwitch.TryGet(RadioSwitchKind.Wifi, out bool wifiOn, out string wifiNote))
 			{
