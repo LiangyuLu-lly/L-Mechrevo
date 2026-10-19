@@ -42,7 +42,7 @@ public class LightForm : RForm
 	/// <summary>Logo 效果的颜色数：1=单色，7=七色，0=不支持自定义颜色。</summary>
 	internal static int LogoColorMode(string effect)
 	{
-		if (effect == "Single")
+		if (effect == "Single" || effect == "Raindrop")
 		{
 			return 1;
 		}
