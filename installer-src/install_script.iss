@@ -344,7 +344,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Check: ShouldRunGcuInst
 ;   只在该任务被勾选时执行；失败**不阻断安装**（命令末尾 exit 0 兜掉返回码）——
 ;     驱动装不上最坏只是 CPU 温度显示「—」，不该让整个安装失败
 ;   runhidden：脚本会下载 + 静默装，不需要黑窗；waituntilterminated 保证装完再启动 LM。
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: runhidden waituntilterminated; Tasks: pawnio; Check: ShouldInstallPawnIo
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: runhidden nowait; Tasks: pawnio; Check: ShouldInstallPawnIo
 ; 2026-10-18（机主：安装完自动在后台拉起 LM，不显示主界面）：
 ;   ⭐ 传 "startup" 参数 ⇒ 程序按「开机自启」路径启动 ⇒ 只驻留托盘、不显示主窗口（IsStartupLaunch）。
 ;   ⛔ 不再是 finish 页的勾选项（postinstall 已去掉）⇒ 静默/普通安装都会自动后台启动。

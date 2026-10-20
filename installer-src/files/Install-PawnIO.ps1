@@ -24,7 +24,12 @@ try {
         New-Item -ItemType Directory -Path $downloadDir | Out-Null
         $InstallerPath = Join-Path $downloadDir 'PawnIO_setup.exe'
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe' -OutFile $InstallerPath -TimeoutSec 120
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe' -OutFile $InstallerPath -TimeoutSec 60
+        } catch {
+            Write-Output 'PawnIO download failed/timed out; skipped (LM installation continues).'
+            exit 0
+        }
     }
     $InstallerPath = (Resolve-Path -LiteralPath $InstallerPath).Path
     if ((Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash -ne $expectedHash) {
@@ -55,7 +60,15 @@ try {
             exit 0
         }
     }
-    $process = Start-Process -FilePath $InstallerPath -ArgumentList '-install','-silent' -WindowStyle Hidden -Wait -PassThru
+    # 安装阶段超时保护：驱动安装器卡住（下载慢/UAC 等待/服务安装挂起）时不阻塞 LM 安装，直接跳过
+    $process = Start-Process -FilePath $InstallerPath -ArgumentList '-install','-silent' -WindowStyle Hidden -PassThru
+    $installTimeoutMs = 120000
+    if (-not $process.WaitForExit($installTimeoutMs)) {
+        try { if (-not $process.HasExited) { $process.Kill() } } catch { }
+        Write-Output ('PawnIO installer timed out after ' + [int]($installTimeoutMs / 1000) + 's; skipped (LM installation continues).')
+        exit 0
+    }
+    $process.WaitForExit()
     if ($process.ExitCode -eq 3010) { Write-Output 'PawnIO installed; restart required.'; exit 3010 }
     if ($process.ExitCode -ne 0) { throw ('PawnIO installer exit code: ' + $process.ExitCode) }
     $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'"
