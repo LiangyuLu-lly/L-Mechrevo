@@ -3993,10 +3993,11 @@ public class MechrevoService
 		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
 		bool isTempWall = string.Equals(key, "CpuTccOffset", StringComparison.Ordinal);
 		// （30 系 · SMU 功耗时间窗）：新增键 SmuStapmTimeSeconds（单位**秒**）。
-		bool isStapmTime = string.Equals(key, "SmuStapmTimeSeconds", StringComparison.Ordinal) || string.Equals(key, "SmuFastTimeSeconds", StringComparison.Ordinal);
+		bool isStapmTime = string.Equals(key, "SmuStapmTimeSeconds", StringComparison.Ordinal);
+			bool isFastTime = string.Equals(key, "SmuFastTimeSeconds", StringComparison.Ordinal);
 		bool isSlowLimit = string.Equals(key, "SmuSlowLimit", StringComparison.Ordinal);
 		bool isSlowTime = string.Equals(key, "SmuSlowTimeSeconds", StringComparison.Ordinal);
-		if (!isPl1 && !isPl2 && !isTempWall && !isStapmTime && !isSlowLimit && !isSlowTime)
+		if (!isPl1 && !isPl2 && !isTempWall && !isStapmTime && !isSlowLimit && !isSlowTime && !isFastTime)
 		{
 			return false; // ⭐ 别的键不归本方法管 ✅
 		}
@@ -4014,7 +4015,7 @@ public class MechrevoService
 				Logger.WriteError("[smu] 不可用 ⇒ 30 系功耗墙**未下发**（原因：" + SmuAvailability.Reason + "）⇒ 如实失败");
 				return false;
 			}
-			return ApplyPowerLimitViaSmu(hw, isPl1, isPl2, isTempWall, isStapmTime, isSlowLimit, isSlowTime, result);
+			return ApplyPowerLimitViaSmu(hw, isPl1, isPl2, isTempWall, isStapmTime, isSlowLimit, isSlowTime, isFastTime, result);
 		}
 		// ⭐ 三个值取"现值（⭐ 本地记忆 ✅）"，⭐ 只覆盖这次要改的那一个 ✅
 		int pl1 = hw.Pl1;
@@ -4106,7 +4107,7 @@ public class MechrevoService
 		Logger.WriteError($"[pl] 联动：{detail}（{reason}）");
 	}
 	// 独立分支：只写这一条， 不碰 PL1/PL2/温度墙；回读语义为"已下发 / 已确认 / 未确认"（该 PM 字段
-	private bool ApplyPowerLimitViaSmu(MechrevoHw hw, bool isPl1, bool isPl2, bool isTempWall, bool isStapmTime, bool isSlowLimit, bool isSlowTime, int result)
+	private bool ApplyPowerLimitViaSmu(MechrevoHw hw, bool isPl1, bool isPl2, bool isTempWall, bool isStapmTime, bool isSlowLimit, bool isSlowTime, bool isFastTime, int result)
 	{
 		PawnIO.RyzenSmuService smu = MechrevoLite.Mode.ModeControl.SharedSmu;
 		if (smu == null)
@@ -4115,6 +4116,13 @@ public class MechrevoService
 			return false;
 		}
 		// 语义：命令被 SMU 接受 = 已下发；回读**一致**才写"已确认"；不稳定/读不到 ⇒ 如实记「未确认」
+		if (isFastTime)
+		{
+			// 本平台 SMU 只有 stapm_time / slow_time 两条时间窗命令，没有 fast-time
+			// ⇒ 快速提升持续时间无法下发：如实记日志、不拿 stapm_time 冒充（不计失败）
+			Logger.WriteError("[smu] fast 提升持续时间=" + result + "s：本平台 SMU 无 fast-time 命令 ⇒ 未生效（不写 stapm_time 冒充）");
+			return true;
+		}
 		if (isSlowLimit)
 		{
 			int slowMin = (hw.WujieSmuApu ? WujieSmuGate.PlMinWatts : BaolongdaProfile.PlMinWatts);
