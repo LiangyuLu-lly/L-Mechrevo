@@ -823,6 +823,19 @@ public class CustomModeForm : RForm
 			});
 			_smuFastTime = tuple4.Item1;
 			_smuFastTimeVal = tuple4.Item2;
+			// 本平台 SMU 没有 fast-time 命令（UXTU 的 "Fast Boost Duration" 实际写的是 stapm_time）
+			// ⇒ 该行直接不显示，避免误导；控件对象保留（不在树上），其它方法访问不会 NRE。
+			try
+			{
+				if (_smuFastTime.Tag is Control fastRow && fastRow.Parent != null)
+				{
+					fastRow.Parent.Controls.Remove(fastRow);
+				}
+			}
+			catch (Exception exFast)
+			{
+				Logger.WriteLine("[custom-ui] 移除快速提升持续时间行失败（已吞掉）：" + exFast.Message);
+			}
 		}
 		// 之后：功耗时间窗（STAPM，秒）→ PL4/FPPT → 温度墙
 		if (smuPowerControls)
