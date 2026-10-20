@@ -24,10 +24,31 @@ try {
         New-Item -ItemType Directory -Path $downloadDir | Out-Null
         $InstallerPath = Join-Path $downloadDir 'PawnIO_setup.exe'
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        try {
-            Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe' -OutFile $InstallerPath -TimeoutSec 60
-        } catch {
-            Write-Output 'PawnIO download failed/timed out; skipped (LM installation continues).'
+        # 下载源：官方 GitHub 优先，失败后按顺序尝试公共镜像（下载后仍校验 SHA256 + 签名，镜像只做传输）
+        $officialUrl = 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe'
+        $downloadUrls = @(
+            $officialUrl,
+            ('https://gh-proxy.com/' + $officialUrl),
+            ('https://ghfast.top/' + $officialUrl),
+            ('https://hub.gitmirror.com/' + $officialUrl),
+            ('https://ghproxy.net/' + $officialUrl)
+        )
+        $downloaded = $false
+        foreach ($url in $downloadUrls) {
+            try {
+                Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $InstallerPath -TimeoutSec 60
+                if ((Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash -eq $expectedHash) {
+                    Write-Output ('PawnIO downloaded from: ' + (($url -split '/')[2]))
+                    $downloaded = $true
+                    break
+                }
+                Write-Output ('PawnIO mirror hash mismatch, trying next: ' + (($url -split '/')[2]))
+            } catch {
+                Write-Output ('PawnIO download failed, trying next: ' + (($url -split '/')[2]))
+            }
+        }
+        if (-not $downloaded) {
+            Write-Output 'PawnIO download failed/timed out on all sources; skipped (LM installation continues).'
             exit 0
         }
     }
