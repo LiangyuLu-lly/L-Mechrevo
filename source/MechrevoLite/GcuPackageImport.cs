@@ -180,6 +180,77 @@ internal static class GcuPackageImport
 
 
 
+	/// <summary>解压目录里任意层级的标准变体 7z（只认固定文件名，避免误收无关包）。</summary>
+	private static int StageNestedArchives(string root, string staging)
+	{
+		int found = 0;
+		foreach (string name in VariantArchives)
+		{
+			foreach (string path in Directory.EnumerateFiles(root, name, SearchOption.AllDirectories))
+			{
+				string dest = Path.Combine(staging, "payload", name);
+				if (!File.Exists(dest))
+				{
+					File.Copy(path, dest, overwrite: false);
+					found++;
+				}
+			}
+		}
+		return found;
+	}
+
+	/// <summary>当前机器需要的 GCU 变体（拿不到就返回 null，不猜）。</summary>
+	private static string ExpectedVariant()
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null)
+		{
+			return null;
+		}
+		return hw.DgpuGeneration switch
+		{
+			MechrevoLite.Gpu.DgpuGenerationKind.Gen50 => "50",
+			MechrevoLite.Gpu.DgpuGenerationKind.Gen40 => "40",
+			MechrevoLite.Gpu.DgpuGenerationKind.Gen30 => "30",
+			_ => null
+		};
+	}
+
+	/// <summary>安装脚本失败时的可读原因：读本次日志尾部的 FATAL 行。</summary>
+	private static string ReadInstallLogTail()
+	{
+		try
+		{
+			string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "L-Mechrevo", "logs");
+			FileInfo latest = null;
+			foreach (string file in Directory.EnumerateFiles(dir, "gcu-install-*.log"))
+			{
+				FileInfo info = new FileInfo(file);
+				if (latest == null || info.LastWriteTimeUtc > latest.LastWriteTimeUtc)
+				{
+					latest = info;
+				}
+			}
+			if (latest == null)
+			{
+				return string.Empty;
+			}
+			string[] lines = File.ReadAllLines(latest.FullName);
+			for (int i = lines.Length - 1; i >= Math.Max(0, lines.Length - 40); i--)
+			{
+				if (lines[i].Contains("FATAL", StringComparison.Ordinal))
+				{
+					return lines[i].Trim();
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[gcu-import] 读取安装日志失败：" + ex.Message);
+		}
+		return string.Empty;
+	}
+
 	/// <summary>取应用目录里的 7za.exe（随安装器装机，不再内嵌进 DLL）。</summary>
 	private static string ResolveSevenZip()
 	{
