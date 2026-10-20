@@ -177,16 +177,6 @@ internal static class GcuPackageImport
 					}
 				}
 			}
-			{
-				string stagedNames = string.Join("、", Directory.EnumerateFiles(Path.Combine(staging, "payload"))
-					.Select(f => Path.GetFileNameWithoutExtension(f) + " 系 GCU"));
-				if (MessageBox.Show(owner, "本机需要 " + expectedVariant + " 系 GCU，实际提供：" + stagedNames + Environment.NewLine + Environment.NewLine +
-					"仍然继续尝试安装吗？", Strings.GcuImportTitle,
-					MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-				{
-					return;
-				}
-			}
 			string script = Path.Combine(baseDir, "GCU", "Install-Gcu.ps1");
 			if (!File.Exists(script))
 			{
@@ -591,6 +581,7 @@ internal static class GcuPackageImport
 	{
 		string variantArg = (string.IsNullOrEmpty(variant) || string.Equals(variant, "Auto", StringComparison.OrdinalIgnoreCase)) ? string.Empty : " -Variant " + variant;
 		string arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\" -StagingRoot \"{staging}\" -TargetDir \"{targetDir}\"{variantArg}";
+		return RunProcess(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"), arguments, null);
 	}
 
 	private static int RunProcess(string fileName, string arguments, string workingDirectory)
