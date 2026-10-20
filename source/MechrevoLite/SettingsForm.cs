@@ -9498,7 +9498,9 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		bool ecSwitchEnabled = _chargeLimitStageBaseEnabled && !_chargeSliderEnabled;
 		bool ecSwitchOn = BatteryControl.LockEnabled();
 		bool gcuPathAvailable = GcuBatteryProtectionAvailable();
-		bool tierEnabled = !_chargeSliderEnabled && (_chargeLimitStageBaseEnabled || ecSwitchOn || gcuPathAvailable);
+		// 无极限充开启 = EC 直写传输 ⇒ 三档改走 EC 写；只要 EC 通道可用就保持可点（不再整体置灰）
+		bool tierEnabled = _chargeSliderEnabled ? _chargeLimitStageBaseEnabled
+			: (_chargeLimitStageBaseEnabled || ecSwitchOn || gcuPathAvailable);
 		if (_batteryModeButtons != null)
 		{
 			Logger.WriteLineIfChanged("charge-limit-tier-enable", $"[charge-limit] 三档 Enabled={tierEnabled}（EC 通道基准={_chargeLimitStageBaseEnabled}、EC 限充开关={ecSwitchOn}、GCU 电池保护可用={gcuPathAvailable}、无极限充滑块={_chargeSliderEnabled}）");
