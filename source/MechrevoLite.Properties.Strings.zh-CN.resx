@@ -4338,7 +4338,13 @@
     
   
   </data>
-<data name="BatteryLimitEnableFailed" xml:space="preserve">
+<data name="BatteryLimitDischargeAutoRestored" xml:space="preserve">
+    <value>⚠️ 检测到意外放电，已恢复默认充电</value>
+  </data>
+  <data name="BatteryLimitDischargeRestoreFailed" xml:space="preserve">
+    <value>⛔ 检测到意外放电，但恢复默认充电失败（详见日志）</value>
+  </data>
+  <data name="BatteryLimitEnableFailed" xml:space="preserve">
     
     
     <value>⛔ 启用失败（详见日志）</value>

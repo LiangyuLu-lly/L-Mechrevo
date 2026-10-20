@@ -17,6 +17,7 @@
 
 using System;
 using System.Drawing;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MechrevoLite.Hardware;
@@ -46,6 +47,8 @@ internal sealed class BatteryLimitPanel : Panel
 
 	// ⭐ 机主批准：高级开关（默认关；允许 SOC ≥ 停充阈值时启用，固件会先放电）✅
 	private readonly RCheckBox _allowInitialDischargeBox;
+
+	private CancellationTokenSource? _dischargeWatch;
 
 	private readonly Button _applyButton;
 
@@ -208,6 +211,10 @@ internal sealed class BatteryLimitPanel : Panel
 	/// <summary>⭐ Tooltip 是组件、不随 Panel 自动释放 ⇒ 手动释放 ✅</summary>
 	protected override void Dispose(bool disposing)
 	{
+		if (disposing)
+		{
+			CancelDischargeWatch();
+		}
 		if (disposing)
 		{
 			_toolTip.Dispose();
@@ -408,6 +415,75 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			SetBusy(false);
 		}
+	}
+
+	/// <summary>
+	/// 启用后 30 秒放电观察（对齐参考实现）：默认路径下若检测到意外放电 ⇒ 立即恢复默认充电并提示。
+	/// <para>只读轮询 0x8394 / 0x83A0 / 0x847C；不写任何寄存器，恢复动作走 TryDisable。</para>
+	/// </summary>
+	private void StartDischargeWatch(int high)
+	{
+		CancelDischargeWatch();
+		CancellationTokenSource cts = new CancellationTokenSource();
+		_dischargeWatch = cts;
+		CancellationToken token = cts.Token;
+		_ = Task.Run(async delegate
+		{
+			try
+			{
+				long deadline = Environment.TickCount64 + 30000;
+				while (!token.IsCancellationRequested && Environment.TickCount64 < deadline)
+				{
+					await Task.Delay(5000, token).ConfigureAwait(false);
+					if (token.IsCancellationRequested)
+					{
+						return;
+					}
+					bool discharging = EcPortIo.TryReadByteStable(0x8394, out int flags, out _, attempts: 1) && (flags & 8) != 0;
+					bool aboveHigh = EcPortIo.TryReadByteStable(0x83A0, out int substate, out _, attempts: 1) && substate == 1
+						&& EcPortIo.TryReadByteStable(0x847C, out int soc, out _, attempts: 1) && soc > high;
+					if (!discharging && !aboveHigh)
+					{
+						continue;
+					}
+					Logger.WriteLine("[battery] 启用后检测到意外放电（discharging=" + discharging + " · 83A0=" + substate + "）⇒ 恢复默认充电");
+					bool restored = BatteryLimitWriter.TryDisable(out string detail);
+					Logger.WriteLine("[battery] 意外放电自动恢复：ok=" + restored + "\n" + detail);
+					BatteryLimitRestore.SaveConfig(false, 0, 0);
+					if (!IsDisposed)
+					{
+						BeginInvoke(delegate
+						{
+							if (!IsDisposed)
+							{
+								SetStatus(restored ? Strings.BatteryLimitDischargeAutoRestored : Strings.BatteryLimitDischargeRestoreFailed, restored ? 3 : 1);
+								RefreshFromEc();
+							}
+						});
+					}
+					return;
+				}
+			}
+			catch (OperationCanceledException)
+			{
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[battery] 放电观察异常：" + ex.GetType().Name + " " + ex.Message);
+			}
+		});
+	}
+
+	private void CancelDischargeWatch()
+	{
+		try
+		{
+			_dischargeWatch?.Cancel();
+		}
+		catch
+		{
+		}
+		_dischargeWatch = null;
 	}
 
 	private async void ApplyButton_Click(object sender, EventArgs e)

@@ -1490,6 +1490,9 @@ internal class Strings
 	internal static string BatteryLimitTitleActiveFormat => ResourceManager.GetString("BatteryLimitTitleActiveFormat", resourceCulture);
 	internal static string BatteryLimitTitleInactive => ResourceManager.GetString("BatteryLimitTitleInactive", resourceCulture);
 	internal static string BatteryLimitEnableFailed => ResourceManager.GetString("BatteryLimitEnableFailed", resourceCulture);
+	internal static string BatteryLimitDischargeAutoRestored => ResourceManager.GetString("BatteryLimitDischargeAutoRestored", resourceCulture);
+
+	internal static string BatteryLimitDischargeRestoreFailed => ResourceManager.GetString("BatteryLimitDischargeRestoreFailed", resourceCulture);
 	internal static string BatteryLimitDisableFailed => ResourceManager.GetString("BatteryLimitDisableFailed", resourceCulture);
 	internal static string BatteryLimitOperationFailed => ResourceManager.GetString("BatteryLimitOperationFailed", resourceCulture);
 	internal static string BatteryLimitSaveFailed => ResourceManager.GetString("BatteryLimitSaveFailed", resourceCulture);
