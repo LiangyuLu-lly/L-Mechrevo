@@ -168,7 +168,12 @@ internal static class GcuPackageImport
 			{
 				// 单变体：仍做一次“本机需要 vs 实际提供”的校验提示（不阻止，用户确认后按所选变体安装）
 				string expectedSingle = ExpectedVariant();
-				if (expectedSingle != null && !string.Equals(expectedSingle, installVariant, StringComparison.OrdinalIgnoreCase))
+				// 40 系优先 40；只有缺 40 时才允许用 50（不再弹“变体不匹配”）
+				if (expectedSingle == "40" && string.Equals(installVariant, "50", StringComparison.OrdinalIgnoreCase))
+				{
+					Logger.WriteError("[gcu-import] 40 系未提供 40 包 ⇒ 退回 50 包（DB 由 GpuDbControl 补）");
+				}
+				else if (expectedSingle != null && !string.Equals(expectedSingle, installVariant, StringComparison.OrdinalIgnoreCase))
 				{
 					if (MessageBox.Show(owner, "本机需要 " + expectedSingle + " 系 GCU，实际提供：" + installVariant + " 系 GCU"
 						+ Environment.NewLine + Environment.NewLine + "仍要安装手动选择的 " + installVariant + " 系 GCU 吗？",
@@ -257,7 +262,7 @@ internal static class GcuPackageImport
 			{
 				MechrevoLite.Gpu.DgpuGenerationKind.Gen50 => "50",
 				// 40 系改用 50 包（DB 由 GpuDbControl 补）
-				MechrevoLite.Gpu.DgpuGenerationKind.Gen40 => "50",
+				MechrevoLite.Gpu.DgpuGenerationKind.Gen40 => "40",
 				MechrevoLite.Gpu.DgpuGenerationKind.Gen30 => "30",
 				_ => null
 			};

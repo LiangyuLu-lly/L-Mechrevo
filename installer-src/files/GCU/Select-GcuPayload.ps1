@@ -173,7 +173,7 @@ function Resolve-GcuVariant {
         switch ($gpuGen.Generation) {
             "GEN1020" { $forced = "1020"; $notes.Add("legacy 10/16/20-series machine -> 1020 payload") | Out-Null }
             "GEN30"   { $forced = "30";   $notes.Add("30-series -> 30 payload") | Out-Null }
-            "GEN40"   { $forced = "50";   $notes.Add("40-series -> 50 payload (owner decision 2026-10-20: 40-series uses the 50 package; DB handled by GpuDbControl)") | Out-Null }
+            "GEN40"   { $forced = "40";   $notes.Add("40-series -> 40 payload when available; caller falls back to 50 only if 40 is missing") | Out-Null }
             "GEN50"   { $forced = "50";   $notes.Add("50-series -> 50 payload") | Out-Null }
             default   { $forced = "50";   $notes.Add("GPU generation unresolved -> safety floor 50 payload (no silent guessing)") | Out-Null }
         }
