@@ -14,7 +14,11 @@ DefaultGroupName=L-Mechrevo
 #ifdef NOGCU
 OutputBaseFilename=LM-0.292.3-beta23.3-test-baolongda-setup
 #else
+#ifdef NOGCU_PAYLOAD
+OutputBaseFilename=LM-0.292.3-beta23.3-test-nogcupayload-setup
+#else
 OutputBaseFilename=LM-0.292.3-beta23.3-test-setup
+#endif
 #endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
@@ -226,11 +230,21 @@ Source: "files\GCU\shared\UWACPIDriver\UWACPIDriver.sys"; DestDir: "{app}\UWACPI
 ;      这是刻意的取舍：校验（Test-VendorPayloadSource）与落地都在同一个 setup 运行里完成。
 ; ============================================================================
 #ifndef NOGCU
+#ifndef NOGCU_PAYLOAD
 Source: "files\GCU\payload\1020.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+#endif
+#ifndef NOGCU_PAYLOAD
 Source: "files\GCU\payload\30.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+#endif
+#ifndef NOGCU_PAYLOAD
 Source: "files\GCU\payload\40.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+#endif
+#ifndef NOGCU_PAYLOAD
 Source: "files\GCU\payload\50.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+#endif
+#ifndef NOGCU_PAYLOAD
 Source: "files\GCU\payload\WJXY.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+#endif
 Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 ; --- shared\ 按【目的地】铺开（⛔ 不再整目录落 {app}\GCU\shared\；铺完 shared\ 这个层级就没有了）----
@@ -588,6 +602,11 @@ const
   // error box and installs nothing. The list now lives in NetTenInSharedFxKey as a real array.
   // 2026-10-13（r25）：启动壳常量 LmLauncherExe 已随启动壳一起移除（⛔ 包内不再有壳；
   //   程序本体 = {app}\L-Mechrevo.exe）。
+
+var
+  // 外置 GCU 包使用标记（ssPostInstall 里登记到注册表，便于诊断包识别）
+  GcuExternalUsed: Boolean;
+  GcuExternalNote: String;
 
 // .NET Desktop Runtime 10 (x64) presence check ---- 2026-10-13 修：版本敏感（必须真的是 10.x）。
 // 旧实现只看注册表键/目录「存在与否」：装过 6/8 也会判为真 -> 静默跳过 -> 装完启动时 apphost
@@ -2240,6 +2259,13 @@ begin
   end
   else if CurStep = ssPostInstall then
   begin
+    if GcuExternalUsed then
+    begin
+      RegWriteStringValue(HKLM, GcuVariantRegKey, 'GcuExternalSource', GcuExternalNote);
+      Log('LM-GCU-EXT: 外置 GCU 来源已登记 = ' + GcuExternalNote);
+    end
+    else
+      Log('LM-GCU-EXT: 本次使用内置 GCU 载荷');
     // 2026-10-06（三处修复 B）：回灌 GCU 用户数据，但只在 variant 未变时。
     // 旧变体从卸载前存下的 previous-variant.txt 读，新变体用 Select-GcuPayload.ps1 现算。
     // 2026-10-09（升级保留修复）：同一步里回灌 LM 自己的两处用户数据（%APPDATA%\MechrevoLite、
@@ -2564,7 +2590,11 @@ begin
         Found := Found + 1;
     end;
     if Found > 0 then
+    begin
+      GcuExternalUsed := True;
+      GcuExternalNote := 'sibling-GCU-folder';
       Log('LM-GCU-EXT: 同目录 GCU\ 文件夹载荷已就绪（' + IntToStr(Found) + ' 个变体）');
+    end;
   end;
   // ② 同目录 GCU.7z（或 GCU\ 文件夹里再套一个 GCU.7z）——用内置 7za 解出
   if (Found = 0) and not FileExists(ExtArchive) then
@@ -2586,7 +2616,11 @@ begin
           Found := Found + 1;
       end;
       if Found > 0 then
+      begin
+        GcuExternalUsed := True;
+        GcuExternalNote := 'sibling-GCU.7z';
         Log('LM-GCU-EXT: 同目录 GCU.7z 已解出外置载荷（' + IntToStr(Found) + ' 个变体）');
+      end;
     end
     else
       Log('LM-GCU-EXT: GCU.7z 解压失败（7za exit=' + IntToStr(ResultCode) + '）=> 回退内置载荷');
@@ -2602,7 +2636,11 @@ begin
         Found := Found + 1;
     end;
     if Found > 0 then
+    begin
+      GcuExternalUsed := True;
+      GcuExternalNote := 'sibling-variant-7z';
       Log('LM-GCU-EXT: 同目录单变体载荷已就绪（' + IntToStr(Found) + ' 个变体）');
+    end;
   end;
   if Found > 0 then
     Log('LM-GCU-EXT: 外置 GCU 载荷共 ' + IntToStr(Found) + ' 个变体；缺失变体稍后用内置载荷补齐');
@@ -2640,6 +2678,7 @@ begin
   end;
   // 外置 GCU 包优先（单变体也可用）
   StageExternalGcuPayloads();
+#ifndef NOGCU_PAYLOAD
   // 内置载荷补齐缺失变体
   for I := 0 to 4 do
   begin
@@ -2661,6 +2700,17 @@ begin
       end;
     end;
   end;
+#else
+  for I := 0 to 4 do
+  begin
+    Dest := ExpandConstant('{tmp}\payload\' + GcuStagingFiles[I]);
+    if not FileExists(Dest) then
+    begin
+      if Failed <> '' then Failed := Failed + ', ';
+      Failed := Failed + GcuStagingFiles[I];
+    end;
+  end;
+#endif
   if not FileExists(ExpandConstant('{tmp}\7za.exe')) then
   begin
     try
@@ -2671,9 +2721,16 @@ begin
     end;
   end;
   if Failed <> '' then
+#ifndef NOGCU_PAYLOAD
     Result := 'GCU 安装所需的载荷无法准备齐全（' + Failed + '）。' + #13#10 +
       '若使用外置 GCU 包，请确认包内含本机需要的变体；或改用含内置载荷的完整安装包。' + #13#10 + #13#10 +
       'Failed to prepare the GCU payload (' + Failed + ').';
+#else
+    Result := '本安装包不含内置 GCU 载荷（精简包）。' + #13#10 +
+      '请把外置 GCU 包放到安装包同目录：GCU\ 文件夹、GCU.7z，或本机变体的单个 .7z（如 40.7z）。' + #13#10 +
+      '缺少的变体：' + Failed + #13#10 + #13#10 +
+      'This setup ships without embedded GCU payloads. Put the external GCU package next to the setup.';
+#endif
 end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
