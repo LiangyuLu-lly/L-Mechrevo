@@ -8164,11 +8164,25 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// ⚠️ 唯一的拒绝条件是「无极限充（实验性）」滑块生效（它与档位互斥，用户既有偏好：滑块打开时三档置灰）——
 		// 闸门判据是**滑块开关** _chargeSliderEnabled，⛔ 不是「EC 限充」开关（EC 限充 ON 时按档位照常走 EC 直写）。
 		if (_chargeSliderEnabled)
+		if (_chargeSliderEnabled)
 		{
-			Logger.WriteLine($"限充方式互斥：无极限充（实验性）生效 ⇒ 三档点击被拒绝（档位 {limitPercent}% 不落地，滑块为唯一权威）");
+			// 无极限充（EC 直写传输）生效时：三档点击改走 EC 路，并把滑块同步到同一上限
+			Logger.WriteLine($"无极限充（EC 路）：档位 {limitPercent}% ⇒ 走 EC 直写 + 同步滑块");
+			if (!BatteryControl.CaptureChargeLimitGesture() || !BatteryControl.ApplyChargeLimitFromUserGesture(limitPercent))
+			{
+				ToastForm.ShowFailure(Strings.ChargeLimitUnconfirmed);
+				RefreshBatteryModeButtons();
+				await Task.CompletedTask;
+				return false;
+			}
+			BatteryControl.SetSelectedModePercent(limitPercent);
+			if (sliderBattery != null && !sliderBattery.IsDisposed && sliderBattery.Value != limitPercent)
+			{
+				sliderBattery.Value = limitPercent;
+			}
 			RefreshBatteryModeButtons();
 			await Task.CompletedTask;
-			return false;
+			return true;
 		}
 		BatteryControl.SetSelectedModePercent(limitPercent);
 		// 2026-10-15（隐藏规则 B · 三档按钮的**路**）：10/16/20/30 系上 EC 直写整体禁用 ⇒ 即使记忆里
@@ -9101,6 +9115,15 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		if (!flag)
 		{
 			await WriteBackFullChargeAfterSliderOffAsync();
+			// 交还 GCU：按当前档位重新下发一次官方档位（滑块关闭后的旧逻辑）
+			if (GcuBatteryProtectionAvailable())
+			{
+				int tierPercent = BatteryControl.SelectedModePercent();
+				int tierMode = ModeIndexForPercent(tierPercent);
+				bool tierConfirmed = await PublishTierToGcuAsync(tierMode, tierPercent, "关闭无极限充 ⇒ 交还 GCU（按当前档位）");
+				Logger.WriteLine($"无极限充关闭：交还 GCU 档位={tierPercent}% · mode={tierMode} · confirmed={tierConfirmed}");
+				RefreshBatteryModeButtons();
+			}
 		}
 		AppConfig.Flush();
 		ApplyChargeSliderVisibility();
