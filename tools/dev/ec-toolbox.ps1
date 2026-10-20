@@ -2,7 +2,9 @@
 #   1) 只读体检   2) 水冷高性能 开   3) 水冷高性能 关/还原   4) 监视   0) 退出
 #   自动提权；原值记录在 %TEMP%\ec-lc-hwoc-state.json；日志 %TEMP%\ec-toolbox.txt
 $ErrorActionPreference = 'Continue'
-$script:Log = Join-Path $env:TEMP 'ec-toolbox.txt'
+# 每次运行一个独立日志（桌面），方便机主把日志发回分析
+$script:Log = Join-Path ([Environment]::GetFolderPath('Desktop')) ('EC工具箱日志_' + (Get-Date -Format 'yyyyMMdd_HHmmss') + '.log')
+try { Add-Content -LiteralPath $script:Log -Value ('=== EC 水冷/功耗工具箱 ===  ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) -Encoding UTF8 } catch { }
 $script:State = Join-Path $env:TEMP 'ec-lc-hwoc-state.json'
 $ADDR_LC = 1991   # 0x7C7 bit1 = 水冷已连接
 $ADDR_DB = 0x746
@@ -115,6 +117,9 @@ function Watch($h, [int]$sec) {
 $h = [TbEc]::Open()
 if ($h -eq [IntPtr]::Zero -or $h.ToInt64() -eq -1) { WLog '打不开 ACPIDriver（需要管理员 + 已装 UWACPIDriver）'; Read-Host '回车退出' | Out-Null; exit 6 }
 try {
+    WLog ('主机=' + $env:COMPUTERNAME + ' · 用户=' + $env:USERNAME + ' · 时间=' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    WLog 'ACPIDriver=可用 · 模式=第三方水冷解锁实验（把 EC 0x7C7 bit1 置为“已连接水冷”，用于非官方水冷机主解锁 HWOC）'
+    WLog ('日志文件：' + $script:Log)
     while ($true) {
         Write-Host ''
         Write-Host '===== EC 水冷 / 功耗 工具箱 ====='
@@ -124,6 +129,7 @@ try {
         Write-Host ' 4) 只监视 30s（功耗/温度/0x7C7）'
         Write-Host ' 0) 退出'
         $c = Read-Host '输入数字后按回车'
+        WLog ('菜单选择=' + $c)
         switch ($c) {
             '1' { Health $h }
             '2' { LcOn $h; Watch $h 20; WLog '完成；如需恢复选 3（或重启自动还原）' }
@@ -134,5 +140,6 @@ try {
         }
         if ($c -eq '0') { break }
     }
+    WLog '工具箱退出'
 }
 finally { [TbEc]::Close($h) }
