@@ -336,6 +336,56 @@ internal static class GcuPackageImport
 		return string.Empty;
 	}
 
+	/// <summary>用本机已存在的 GCU 文件重新打包并调用安装脚本（重新注册服务/ACL/启动）。</summary>
+	private static async Task RepairFromInstalledAsync(IWin32Window owner, string baseDir, string serviceDir)
+	{
+		string staging = Path.Combine(Path.GetTempPath(), "lm-gcu-repair-" + Guid.NewGuid().ToString("N"));
+		try
+		{
+			Directory.CreateDirectory(Path.Combine(staging, "payload"));
+			string sevenZip = ResolveSevenZip();
+			if (RepackTree(sevenZip, serviceDir, staging) == 0)
+			{
+				MessageBox.Show(owner, "用现有 GCU 文件重打包失败，无法重新注册。", Strings.GcuImportTitle,
+					MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return;
+			}
+			string variant = Directory.EnumerateFiles(Path.Combine(staging, "payload"))
+				.Select(Path.GetFileNameWithoutExtension).FirstOrDefault() ?? "Auto";
+			File.Copy(sevenZip, Path.Combine(staging, "7za.exe"), overwrite: true);
+			string script = Path.Combine(baseDir, "GCU", "Install-Gcu.ps1");
+			if (!File.Exists(script))
+			{
+				MessageBox.Show(owner, "找不到 GCU 安装脚本（{app}\\GCU\\Install-Gcu.ps1）。", Strings.GcuImportTitle,
+					MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return;
+			}
+			int exitCode = await Task.Run(() => RunInstallScript(script, staging, Path.Combine(baseDir, "GCU"), variant));
+			Logger.WriteError($"[gcu-import] 用现有文件重新注册：variant={variant} exit={exitCode}");
+			if (exitCode == 0)
+			{
+				MessageBox.Show(owner, Strings.GcuImportDone, Strings.GcuImportTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+			}
+			else
+			{
+				string reason = ReadInstallLogTail();
+				MessageBox.Show(owner, string.Format(Strings.GcuImportFailed, exitCode)
+					+ (string.IsNullOrEmpty(reason) ? string.Empty : Environment.NewLine + Environment.NewLine + reason),
+					Strings.GcuImportTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[gcu-import] 用现有文件重新注册失败：" + ex);
+			MessageBox.Show(owner, string.Format(Strings.GcuImportFailed, ex.Message), Strings.GcuImportTitle,
+				MessageBoxButtons.OK, MessageBoxIcon.Error);
+		}
+		finally
+		{
+			TryDeleteDirectory(staging);
+		}
+	}
+
 	/// <summary>取应用目录里的 7za.exe（随安装器装机，不再内嵌进 DLL）。</summary>
 	private static string ResolveSevenZip()
 	{
