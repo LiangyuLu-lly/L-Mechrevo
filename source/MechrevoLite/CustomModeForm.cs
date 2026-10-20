@@ -780,17 +780,22 @@ public class CustomModeForm : RForm
 		_pl1Val = tuple4.Item2;
 		_pl1Label = RowLabelOf(_pl1);
 		AttachPowerWallUnsetHint(_pl1, _pl1Val, _pl1Label);
-		// ② 本文件 PM 表快照（SmuPowerSnapshot）也只读 Stapm/Fast/Slow 三个功率字段
-		tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+		// 本文件 PM 表快照（SmuPowerSnapshot）也只读 Stapm/Fast/Slow 三个功率字段
+		// 非 SMU 路径行顺序保持原样：PL1 → PL2
+		if (!smuPowerControls)
 		{
-			QueuePowerLimit("PL2", v);
-		});
-		_pl2 = tuple4.Item1;
-		_pl2Val = tuple4.Item2;
-		_pl2Label = RowLabelOf(_pl2);
-		AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
+			tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+			{
+				QueuePowerLimit("PL2", v);
+			});
+			_pl2 = tuple4.Item1;
+			_pl2Val = tuple4.Item2;
+			_pl2Label = RowLabelOf(_pl2);
+			AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
+		}
 		if (smuPowerControls)
 		{
+			// SMU 路径按参考工具的排列：STAPM（PL1）→ 慢速功率 → 慢速时长 → 快速功率（PL2）→ 快速时长
 			(int, int, int, bool) slowRange = DeviceRange((hw?.Pl1Minimum ?? 15), (hw?.Pl2Maximum ?? 120), hw?.Pl1 ?? 28);
 			tuple4 = AddSliderRow(Strings.SmuSlowLimitLabel, slowRange.Item1, slowRange.Item2, slowRange.Item3, (int v) =>
 			{
@@ -804,6 +809,14 @@ public class CustomModeForm : RForm
 			});
 			_smuSlowTime = tuple4.Item1;
 			_smuSlowTimeVal = tuple4.Item2;
+			tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+			{
+				QueuePowerLimit("PL2", v);
+			});
+			_pl2 = tuple4.Item1;
+			_pl2Val = tuple4.Item2;
+			_pl2Label = RowLabelOf(_pl2);
+			AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
 			tuple4 = AddSliderRow(Strings.SmuFastTimeLabel, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, 64, (int v) =>
 			{
 				Queue("SmuFastTimeSeconds", v.ToString());
@@ -811,7 +824,7 @@ public class CustomModeForm : RForm
 			_smuFastTime = tuple4.Item1;
 			_smuFastTimeVal = tuple4.Item2;
 		}
-		// （机主要求的行顺序）：PL1 → PL2 → **功耗时间窗（STAPM，秒）** → 温度墙
+		// 之后：功耗时间窗（STAPM，秒）→ PL4/FPPT → 温度墙
 		if (smuPowerControls)
 		{
 			int currentStapmTime = hw.BaolongdaStapmTimeSeconds;
