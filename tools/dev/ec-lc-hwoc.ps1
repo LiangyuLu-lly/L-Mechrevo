@@ -15,6 +15,23 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+# 自动提权：非管理员时用 RunAs 重新启动自己（保留全部参数），原进程退出
+$__me = [Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not (New-Object Security.Principal.WindowsPrincipal($__me)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    $argLine = '-NoProfile -ExecutionPolicy Bypass -File "' + $PSCommandPath + '"'
+    foreach ($k in $PSBoundParameters.Keys) {
+        $val = $PSBoundParameters[$k]
+        if ($val -is [switch]) { if ($val.IsPresent) { $argLine += ' -' + $k } }
+        else { $argLine += ' -' + $k + ' "' + $val + '"' }
+    }
+    try {
+        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -ArgumentList $argLine -Verb RunAs | Out-Null
+        Write-Host '已请求管理员权限（新窗口继续）…'
+    } catch {
+        Write-Host ('提权被拒绝：' + $_.Exception.Message)
+    }
+    exit 0
+}
 $script:LogFile = Join-Path $env:TEMP 'ec-lc-hwoc.txt'
 Remove-Item $script:LogFile -ErrorAction SilentlyContinue
 function Log([string]$m) {
