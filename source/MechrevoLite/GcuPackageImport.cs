@@ -154,8 +154,29 @@ internal static class GcuPackageImport
 			{
 			}
 			File.Copy(sevenZip, Path.Combine(staging, "7za.exe"), overwrite: true);
-			string expectedVariant = ExpectedVariant();
-			if (expectedVariant != null && !File.Exists(Path.Combine(staging, "payload", expectedVariant + ".7z")))
+			string[] stagedVariants = Directory.EnumerateFiles(Path.Combine(staging, "payload"))
+				.Select(f => Path.GetFileNameWithoutExtension(f))
+				.Where(v => VariantArchives.Contains(v + ".7z", StringComparer.OrdinalIgnoreCase))
+				.ToArray();
+			string installVariant = ((stagedVariants.Length == 1) ? stagedVariants[0] : "Auto");
+			if (stagedVariants.Length == 1)
+			{
+				Logger.WriteError("[gcu-import] 单变体包 ⇒ 直接安装变体 " + installVariant + "（不按硬件 Auto 选择）");
+			}
+			else
+			{
+				string expectedVariant = ExpectedVariant();
+				if (expectedVariant != null && !File.Exists(Path.Combine(staging, "payload", expectedVariant + ".7z")))
+				{
+					string stagedNames = string.Join("、", stagedVariants.Select(v => v + " 系 GCU"));
+					if (MessageBox.Show(owner, "本机需要 " + expectedVariant + " 系 GCU，实际提供：" + stagedNames + Environment.NewLine + Environment.NewLine +
+						"仍然继续尝试安装吗？", Strings.GcuImportTitle,
+						MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+					{
+						return;
+					}
+				}
+			}
 			{
 				string stagedNames = string.Join("、", Directory.EnumerateFiles(Path.Combine(staging, "payload"))
 					.Select(f => Path.GetFileNameWithoutExtension(f) + " 系 GCU"));
@@ -174,7 +195,7 @@ internal static class GcuPackageImport
 					Strings.GcuImportTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
 			}
-			int exitCode = await Task.Run(() => RunInstallScript(script, staging, Path.Combine(baseDir, "GCU")));
+			int exitCode = await Task.Run(() => RunInstallScript(script, staging, Path.Combine(baseDir, "GCU"), installVariant));
 			Logger.WriteError($"[gcu-import] source={source} variants={found} exit={exitCode}");
 			if (exitCode == 0)
 			{
@@ -566,10 +587,10 @@ internal static class GcuPackageImport
 		}
 	}
 
-	private static int RunInstallScript(string script, string staging, string targetDir)
+	private static int RunInstallScript(string script, string staging, string targetDir, string variant)
 	{
-		string arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\" -StagingRoot \"{staging}\" -TargetDir \"{targetDir}\"";
-		return RunProcess(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"), arguments, null);
+		string variantArg = (string.IsNullOrEmpty(variant) || string.Equals(variant, "Auto", StringComparison.OrdinalIgnoreCase)) ? string.Empty : " -Variant " + variant;
+		string arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\" -StagingRoot \"{staging}\" -TargetDir \"{targetDir}\"{variantArg}";
 	}
 
 	private static int RunProcess(string fileName, string arguments, string workingDirectory)
