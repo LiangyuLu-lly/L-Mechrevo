@@ -4339,10 +4339,10 @@
   
   </data>
 <data name="BatteryLimitDischargeAutoRestored" xml:space="preserve">
-    <value>⚠️ 检测到意外放电，已恢复默认充电</value>
+    <value>⚠️ 接电情况下电池仍在放电（低于停充阈值），已恢复默认充电</value>
   </data>
   <data name="BatteryLimitDischargeRestoreFailed" xml:space="preserve">
-    <value>⛔ 检测到意外放电，但恢复默认充电失败（详见日志）</value>
+    <value>⛔ 接电情况下电池仍在放电，但恢复默认充电失败（详见日志）</value>
   </data>
   <data name="BatteryLimitEnableFailed" xml:space="preserve">
     

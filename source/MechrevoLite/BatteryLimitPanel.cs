@@ -439,14 +439,17 @@ internal sealed class BatteryLimitPanel : Panel
 					{
 						return;
 					}
+					// 只有「接着电源、SOC 低于停充阈值却仍在放电」才算异常；
+					// SOC 高于停充阈值时固件放电到阈值属于限充的正常行为（尤其开了允许初始放电）。
+					bool onAc = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
 					bool discharging = EcPortIo.TryReadByteStable(0x8394, out int flags, out _, attempts: 1) && (flags & 8) != 0;
-					bool aboveHigh = EcPortIo.TryReadByteStable(0x83A0, out int substate, out _, attempts: 1) && substate == 1
-						&& EcPortIo.TryReadByteStable(0x847C, out int soc, out _, attempts: 1) && soc > high;
-					if (!discharging && !aboveHigh)
+					bool socKnown = EcPortIo.TryReadByteStable(0x847C, out int soc, out _, attempts: 1);
+					bool unexpected = onAc && discharging && socKnown && soc < high;
+					if (!unexpected)
 					{
 						continue;
 					}
-					Logger.WriteLine("[battery] 启用后检测到意外放电（discharging=" + discharging + " · 83A0=" + substate + "）⇒ 恢复默认充电");
+					Logger.WriteLine("[battery] 接电且 SOC<" + high + "% 仍在放电（0x8394=" + flags + " · SOC=" + soc + "）⇒ 恢复默认充电");
 					bool restored = BatteryLimitWriter.TryDisable(out string detail);
 					Logger.WriteLine("[battery] 意外放电自动恢复：ok=" + restored + "\n" + detail);
 					BatteryLimitRestore.SaveConfig(false, 0, 0);
