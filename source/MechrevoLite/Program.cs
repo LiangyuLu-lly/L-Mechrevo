@@ -461,6 +461,29 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// 2026-10-20（充电上限 · B 路写入测试）：`--charge-limit-wmi-test [--value 60] [--restore]`
+		//   写 0x087F（40..100）+ 回读校验；--restore 时按旧值还原；结果写桌面报告。
+		case "--charge-limit-wmi-test":
+		{
+			int testValue = 60;
+			bool restore = false;
+			string[] rest = args.Skip(1).ToArray();
+			for (int argIndex = 0; argIndex < rest.Length; argIndex++)
+			{
+				if (string.Equals(rest[argIndex], "--restore", StringComparison.OrdinalIgnoreCase))
+				{
+					restore = true;
+				}
+				else if (string.Equals(rest[argIndex], "--value", StringComparison.OrdinalIgnoreCase) && argIndex + 1 < rest.Length
+					&& int.TryParse(rest[argIndex + 1], out int parsed))
+				{
+					testValue = parsed;
+				}
+			}
+			Environment.ExitCode = WmiStoredLimitProbe.RunWrite(testValue, restore);
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值 · 阶段 2）：`--battery-limit-test [--low 60 --high 80] [--disable]`。
 		//   ⭐ 白名单写（仅 0x8153/0x8154/0x8151/0x8150）；严格时序；失败不重试、不做清理写；
 		//   ⭐ 结果写桌面 lm-battery-limit-test-*.txt + [battery-limit-test] 日志。

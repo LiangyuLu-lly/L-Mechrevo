@@ -119,6 +119,90 @@ internal static class WmiStoredLimitProbe
 		}
 	}
 
+	/// <summary>写入测试：写 0x087F（40..100）并回读；--restore 时按旧值还原。</summary>
+	internal static int RunWrite(int value, bool restore)
+	{
+		Report.Clear();
+		try
+		{
+			using ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM AcpiTest_MULong");
+			ManagementObject instance = null;
+			using (ManagementObjectCollection results = searcher.Get())
+			{
+				foreach (ManagementObject item in results)
+				{
+					instance = item;
+					break;
+				}
+			}
+			if (instance == null)
+			{
+				Print("AcpiTest_MULong 类不存在 ⇒ B 路不可用");
+				WriteReportFile();
+				return 2;
+			}
+			uint? probe = Read(instance, 0x0740);
+			if (!probe.HasValue || probe.Value == ErrorSentinel)
+			{
+				Print("mailbox 握手失败/超时 ⇒ 不写任何东西");
+				WriteReportFile();
+				return 2;
+			}
+			uint? oldValue = Read(instance, 0x087F);
+			int oldLimit = oldValue.HasValue ? (int)(oldValue.Value & 0x7F) : -1;
+			Print("mailbox[0x0740] = " + Hex(probe.Value) + "（项目号 0x" + (probe.Value & 0xFF).ToString("X2") + "）");
+			Print("写前 0x087F = " + (oldValue.HasValue ? Hex(oldValue.Value) : "读不到") + "（低7位=" + oldLimit + "）");
+			if (restore)
+			{
+				Print("restore 模式：把 0x087F 写回 0（= 取消存储上限/恢复默认充电）");
+				value = 0;
+			}
+			if (!restore && (value < 40 || value > 100))
+			{
+				Print("拒绝写入：值必须在 40..100（收到 " + value + "）");
+				WriteReportFile();
+				return 1;
+			}
+			uint? written = Write(instance, 0x087F, (byte)value);
+			Print("写入 0x087F=" + value + " ⇒ 返回 " + (written.HasValue ? Hex(written.Value) : "调用失败"));
+			uint? verify = Read(instance, 0x087F);
+			int verifyLimit = verify.HasValue ? (int)(verify.Value & 0x7F) : -1;
+			Print("回读 0x087F = " + (verify.HasValue ? Hex(verify.Value) : "读不到") + "（低7位=" + verifyLimit + "）");
+			bool ok = verifyLimit == value;
+			Print(ok ? "✅ 写入并回读一致：B 路写 0x087F 有效（是否跨重启持久需重启后再跑 --charge-limit-wmi-probe 确认）"
+				: "❌ 回读不一致：固件忽略 mailbox 写或不持久 ⇒ B 路不可靠，应退回 A 路");
+			WriteReportFile();
+			return ok ? 0 : 1;
+		}
+		catch (Exception ex)
+		{
+			Print("写入测试失败：" + ex.GetType().Name + " " + ex.Message);
+			WriteReportFile();
+			return 1;
+		}
+	}
+
+	private static uint? Write(ManagementObject instance, ushort address, byte value)
+	{
+		try
+		{
+			ulong data = ((ulong)value << 16) | address;
+			using ManagementBaseObject inParams = instance.GetMethodParameters("GetSetULong");
+			inParams["Data"] = data;
+			using ManagementBaseObject outParams = instance.InvokeMethod("GetSetULong", inParams, null);
+			if (outParams == null || outParams["Return"] == null)
+			{
+				return null;
+			}
+			return Convert.ToUInt32(outParams["Return"]);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[charge-limit] WMI mailbox 写 0x" + address.ToString("X4") + " 失败：" + ex.Message);
+			return null;
+		}
+	}
+
 	private static uint? Read(ManagementObject instance, ushort address)
 	{
 		try
