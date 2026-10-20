@@ -17555,6 +17555,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		_kbPowerSw = sw;
 		_kbEffectCombo = effectCombo;
 		FillKeyboardEffectCombo(effectCombo);
+		// 无界（本机配置 APU）：键盘灯只有开关 + 四档亮度，没有灯效/颜色 UI
+		if (Program.hw?.WujieSmuApu == true)
+		{
+			effectCombo.Visible = false;
+			effectCombo.Enabled = false;
+		}
 		// 后台线程 + 结果缓存；结果供 RgbForm 的亮度滑块范围使用（彩虹已改软件刷色，与校准无关）
 		effectCombo.DropDown += delegate
 		{

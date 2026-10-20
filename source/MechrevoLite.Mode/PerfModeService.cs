@@ -2033,6 +2033,13 @@ internal sealed class PerfModeService
 		if (powerSourceChanged)
 		{
 			target = Find(PerfModeStore.ActiveFor(powerKey));
+			// 无界 APU：插拔电源不自动跳到「按电源来源记住的自定义档」，保持当前档
+			if (_hw != null && _hw.WujieSmuApu && (object)target != null && target.IsCustom
+				&& !string.Equals(target.Id, ActiveModeId, StringComparison.Ordinal))
+			{
+				Logger.WriteLine("[perfmode] 无界 APU：电源变化 ⇒ 保持当前档，不自动跳自定义（" + target.Id + "）");
+				target = null;
+			}
 		}
 		if ((object)target == null)
 		{
