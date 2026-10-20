@@ -1,10 +1,11 @@
 using System;
-using MechrevoLite.Properties;using System.Diagnostics;
-using MechrevoLite.Properties;using System.Drawing;
-using MechrevoLite.Properties;using System.Threading.Tasks;
-using MechrevoLite.Properties;using System.Windows.Forms;
-using MechrevoLite.Properties;using MechrevoLite.UI;
+using System.Diagnostics;
+using System.Drawing;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 using MechrevoLite.Properties;
+using MechrevoLite.UI;
+
 namespace MechrevoLite.Update;
 
 internal sealed class UpdateForm : RForm
@@ -38,6 +39,9 @@ internal sealed class UpdateForm : RForm
 	private UpdateInfo? _info;
 
 	private bool _busy;
+
+	/// <summary>更新页与「更新」按钮临时屏蔽（改回 false 即恢复）。</summary>
+	internal const bool TemporarilyHidden = true;
 
 	internal UpdateForm(bool autoCheck)
 	{

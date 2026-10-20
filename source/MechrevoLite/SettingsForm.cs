@@ -5996,6 +5996,7 @@ public class SettingsForm : RForm
 		buttonHDRControl.Click += ButtonHDRControl_Click;
 		buttonQuit.Click += ButtonQuit_Click;
 		buttonUpdates.Text = Strings.CheckUpdates;
+		buttonUpdates.Visible = !UpdateForm.TemporarilyHidden;
 		buttonUpdates.Click += (object? _, EventArgs _) =>
 		{
 			ShowUpdateDialog();
@@ -12323,6 +12324,11 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 
 	private void ShowUpdateDialog()
 	{
+		if (UpdateForm.TemporarilyHidden)
+		{
+			Logger.WriteLine("更新页已临时屏蔽 ⇒ 不打开");
+			return;
+		}
 		try
 		{
 			using UpdateForm updateForm = new UpdateForm(autoCheck: false);
@@ -12337,6 +12343,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 
 	internal void MarkUpdateAvailable(UpdateInfo info)
 	{
+		if (UpdateForm.TemporarilyHidden)
+		{
+			return;
+		}
 		if (IsDisposed)
 		{
 			return;

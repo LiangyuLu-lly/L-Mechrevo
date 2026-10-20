@@ -1567,7 +1567,7 @@ internal static class Program
 
 	private static void StartSilentUpdateCheck()
 	{
-		if (UiAuditMode || !UpdateChecker.AutoCheckEnabled)
+		if (UiAuditMode || !UpdateChecker.AutoCheckEnabled || UpdateForm.TemporarilyHidden)
 		{
 			return;
 		}
