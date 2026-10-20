@@ -1081,7 +1081,8 @@ public class CustomModeForm : RForm
 		};
 		_fanBoostRow = AddComboRow(Strings.ModeTuneFanBoost, _fanBoostCombo);		// ⭐⭐ 2026-10-19（机主截图：无界 14X 自定义窗口暴露 GCU 专属行）：
 		// 控件对象保留为"不在树上的占位" ⇒ 其它方法（ApplyRange/Refresh*/Apply*）访问不会 NRE
-		if (Program.hw?.WujieSmuApu ?? false)
+		bool noDgpu = Program.hw != null && Program.hw.DgpuGeneration == DgpuGenerationKind.NoDgpu;
+		if ((Program.hw?.WujieSmuApu ?? false) || noDgpu)
 		{
 			void DetachRow(Control control)
 			{
@@ -1109,9 +1110,9 @@ public class CustomModeForm : RForm
 			DetachRow(_gpuOcAdminRow);
 			DetachRow(_coreOcRiskRow);
 			DetachRow(_memOcRiskRow);
-			if (Logger.TryMarkChanged("wujie-custom-ui-skip-gcu-rows", "[custom-ui] 无界 APU 本机模式：跳过创建/加入 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）"))
+			if (Logger.TryMarkChanged("wujie-custom-ui-skip-gcu-rows", "[custom-ui] 无独显机型（无界 APU/核显）：跳过 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）"))
 			{
-				Logger.WriteError("[custom-ui] 无界 APU 本机模式：跳过创建/加入 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）");
+				Logger.WriteError("[custom-ui] 无独显机型（无界 APU/核显）：跳过 GCU 专属行 5 项（fppt/fansens/fandelay/fanboost/gpuoc）");
 			}
 		}		_refreshCombo = new RComboBox
 		{
