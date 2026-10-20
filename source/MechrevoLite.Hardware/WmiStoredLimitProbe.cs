@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Management;
+using System.Text;
 
 namespace MechrevoLite.Hardware;
 
@@ -14,6 +16,8 @@ internal static class WmiStoredLimitProbe
 	private const ulong ReadFlag = 0x0100UL << 32;
 
 	private const uint ErrorSentinel = 0xFEFEFEFE;
+
+	private static readonly StringBuilder Report = new StringBuilder();
 
 	internal static int Run()
 	{
@@ -32,6 +36,7 @@ internal static class WmiStoredLimitProbe
 			if (instance == null)
 			{
 				Print("AcpiTest_MULong 类不存在 ⇒ 本机没有这条 WMI mailbox 通路（B 路不可用）");
+				WriteReportFile();
 				return 2;
 			}
 			Print("AcpiTest_MULong 类存在 ✅");
@@ -56,18 +61,21 @@ internal static class WmiStoredLimitProbe
 			if (!hasMethod)
 			{
 				Print("GetSetULong 方法不存在 ⇒ B 路不可用");
+				WriteReportFile();
 				return 2;
 			}
 			uint? probe = Read(instance, 0x0740);
 			if (!probe.HasValue)
 			{
 				Print("mailbox 读 0x0740 失败 ⇒ B 路不可用");
+				WriteReportFile();
 				return 2;
 			}
 			Print("mailbox[0x0740] = " + Hex(probe.Value) + "（项目号低字节 = 0x" + (probe.Value & 0xFF).ToString("X2") + "）");
 			if (probe.Value == ErrorSentinel)
 			{
 				Print("0xFEFEFEFE = mailbox 超时/未实现 ⇒ B 路不可用（不写任何东西）");
+				WriteReportFile();
 				return 2;
 			}
 			int[] addresses = { 0x087F, 0x07B9, 0x07C3, 0x0742, 0x0770 };
@@ -100,11 +108,13 @@ internal static class WmiStoredLimitProbe
 				Print("mailbox[0x" + addresses[i].ToString("X4") + "]（" + labels[i] + "） = " + Hex(value.Value) + note);
 			}
 			Print("只读探测完成：本机 WMI mailbox 可用；未写任何寄存器。");
+			WriteReportFile();
 			return 0;
 		}
 		catch (Exception ex)
 		{
 			Print("探测失败：" + ex.GetType().Name + " " + ex.Message);
+			WriteReportFile();
 			return 1;
 		}
 	}
@@ -137,6 +147,7 @@ internal static class WmiStoredLimitProbe
 
 	private static void Print(string text)
 	{
+		Report.AppendLine(text);
 		try
 		{
 			Console.WriteLine(text);
@@ -150,6 +161,24 @@ internal static class WmiStoredLimitProbe
 		}
 		catch
 		{
+		}
+	}
+
+	/// <summary>把探测结果写到桌面文件（WinForms 程序无控制台，用户需要可见结果）。</summary>
+	internal static string WriteReportFile()
+	{
+		try
+		{
+			string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+				"lm-charge-limit-wmi-probe-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt");
+			File.WriteAllText(path, "lm-charge-limit-wmi-probe " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\r\n\r\n" + Report, Encoding.UTF8);
+			Logger.WriteError("[charge-limit-wmi] 报告文件：" + path);
+			return path;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[charge-limit-wmi] 写报告文件失败：" + ex.Message);
+			return string.Empty;
 		}
 	}
 }
