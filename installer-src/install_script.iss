@@ -12,9 +12,9 @@ AppCopyright=Copyright (C) 2026 L-Mechrevo contributors. GPL-3.0-only.
 DefaultDirName={autopf}\L-Mechrevo
 DefaultGroupName=L-Mechrevo
 #ifdef NOGCU
-OutputBaseFilename=LM-0.292.3-beta23.3-baolongda-setup
+OutputBaseFilename=LM-0.292.3-beta23.3-test-baolongda-setup
 #else
-OutputBaseFilename=LM-0.292.3-beta23.3-setup
+OutputBaseFilename=LM-0.292.3-beta23.3-test-setup
 #endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico

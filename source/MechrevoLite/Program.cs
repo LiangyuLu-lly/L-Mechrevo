@@ -981,6 +981,7 @@ internal static class Program
 		});
 		acpi = new AsusACPI();
 		hw = new MechrevoHw();
+		MechrevoLite.Hardware.GcuIdentity.Prewarm();
 		service = new MechrevoService(hw);
 		PerfModeService.Create(service, hw);
 		hw.BatteryProtectionChanged += () =>

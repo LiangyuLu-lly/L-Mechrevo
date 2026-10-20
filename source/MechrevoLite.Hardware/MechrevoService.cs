@@ -3890,16 +3890,8 @@ public class MechrevoService
 		{
 			get
 			{
-				try
-				{
-					using RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\L-Mechrevo");
-					object v = key?.GetValue("GcuVariant");
-					return v != null && string.Equals(v.ToString(), "50", StringComparison.OrdinalIgnoreCase);
-				}
-				catch
-				{
-					return false;
-				}
+				// 登记缺失时用 GCU 包特征识别结果（见 GcuIdentity）
+			return string.Equals(GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase);
 			}
 		}
 		/// <summary>
@@ -3931,16 +3923,8 @@ public class MechrevoService
 			{
 				return true;
 			}
-			try
-			{
-				using RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\L-Mechrevo");
-				object v = key?.GetValue("GcuVariant");
-				return v != null && string.Equals(v.ToString(), "30", StringComparison.OrdinalIgnoreCase);
-			}
-			catch
-			{
-				return false;
-			}
+			// 登记缺失时用 GCU 包特征识别结果（见 GcuIdentity）
+		return string.Equals(GcuIdentity.Variant, "30", StringComparison.OrdinalIgnoreCase);
 		}
 	}
 
@@ -3968,17 +3952,8 @@ public class MechrevoService
 	{
 		get
 		{
-			try
-			{
-				using RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\L-Mechrevo");
-				object v = key?.GetValue("GcuVariant");
-				return IsGcu40Family(v?.ToString());
-			}
-			catch (Exception ex)
-			{
-				Logger.WriteLine("IsGcu40Keyboard read fail: " + ex.Message);
-				return false;
-			}
+			// 登记缺失时用 GCU 包特征识别结果（见 GcuIdentity）
+		return IsGcu40Family(GcuIdentity.Variant);
 		}
 	}
 	/// <summary>
