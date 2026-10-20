@@ -330,7 +330,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 ;     所以 {app}\GCU 下永远不会出现 payload\ 或 7za.exe。
 ;     ⚠️ -TargetDir 仍是 "{app}\GCU"，解压产物落 {app}\GCU\AiStoneService。
 #ifndef NOGCU
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\GCU\Install-Gcu.ps1"" -StagingRoot ""{tmp}"" -TargetDir ""{app}\GCU"" -Variant {code:GetGcuVariantParam} -InstallerVersion ""18.3"" -LogDir ""{commonappdata}\L-Mechrevo\logs"" -AppExe ""{app}\L-Mechrevo.exe"" {code:GetVendorConsoleParam}"; StatusMsg: "{cm:GcuStatus}"; Check: ShouldInstallGcu
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Check: ShouldRunGcuInstall; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\GCU\Install-Gcu.ps1"" -StagingRoot ""{tmp}"" -TargetDir ""{app}\GCU"" -Variant {code:GetGcuVariantParam} -InstallerVersion ""18.3"" -LogDir ""{commonappdata}\L-Mechrevo\logs"" -AppExe ""{app}\L-Mechrevo.exe"" {code:GetVendorConsoleParam}"; StatusMsg: "{cm:GcuStatus}"
 #endif
 ; ⚠️ 2026-10-13（本轮回退 Check）：⛔ 这里【不再】用 Check: IsNet10RuntimeReady 门控。
 ;    理由：门控 = 缺运行时时连壳都不启动 = 用户装完什么都看不到（用户原话：「不静默安装用户跳过了.net
@@ -607,6 +607,8 @@ var
   // 外置 GCU 包使用标记（ssPostInstall 里登记到注册表，便于诊断包识别）
   GcuExternalUsed: Boolean;
   GcuExternalNote: String;
+  // 本次安装是否已准备好可用的 GCU 载荷（精简包没外置包时为 False ⇒ 跳过 GCU 安装步骤）
+  GcuPayloadReady: Boolean;
 
 // .NET Desktop Runtime 10 (x64) presence check ---- 2026-10-13 修：版本敏感（必须真的是 10.x）。
 // 旧实现只看注册表键/目录「存在与否」：装过 6/8 也会判为真 -> 静默跳过 -> 装完启动时 apphost
@@ -1945,6 +1947,7 @@ function InitializeSetup(): Boolean;
 var
   OfficialUninst: String;
 begin
+  GcuPayloadReady := False;
   // 2026-10-05：旧版卸载项存在 = 覆盖升级 -> 保留用户数据；不存在 = 全新安装 -> 清残留使首次引导重现
   // 不能用 ExpandConstant('{app}...')：此刻 {app} 还没初始化，会抛内部错误。
   GFreshInstall := not IsLmAlreadyInstalled();
@@ -2533,6 +2536,21 @@ begin
   Result := not IsBaolongdaMold();
 end;
 
+// 精简包（/DNOGCU_PAYLOAD）没有可用 GCU 载荷时跳过 [Run] 的 GCU 安装步骤，但 LM 照常安装
+function ShouldRunGcuInstall(): Boolean;
+begin
+  if not ShouldInstallGcu() then
+  begin
+    Result := False;
+    Exit;
+  end;
+#ifdef NOGCU_PAYLOAD
+  Result := GcuPayloadReady;
+#else
+  Result := True;
+#endif
+end;
+
 function GcuArchiveName(Index: Integer): String;
 begin
   case Index of
@@ -2720,16 +2738,25 @@ begin
       Failed := Failed + '7za.exe';
     end;
   end;
+  GcuPayloadReady := (Failed = '');
   if Failed <> '' then
 #ifndef NOGCU_PAYLOAD
     Result := 'GCU 安装所需的载荷无法准备齐全（' + Failed + '）。' + #13#10 +
       '若使用外置 GCU 包，请确认包内含本机需要的变体；或改用含内置载荷的完整安装包。' + #13#10 + #13#10 +
       'Failed to prepare the GCU payload (' + Failed + ').';
 #else
-    Result := '本安装包不含内置 GCU 载荷（精简包）。' + #13#10 +
-      '请把外置 GCU 包放到安装包同目录：GCU\ 文件夹、GCU.7z，或本机变体的单个 .7z（如 40.7z）。' + #13#10 +
-      '缺少的变体：' + Failed + #13#10 + #13#10 +
-      'This setup ships without embedded GCU payloads. Put the external GCU package next to the setup.';
+  begin
+    // 精简包：只提示，不阻止 LM 安装（装完可在应用里点 GCU 状态导入）
+    Log('LM-GCU-EXT: 精简包未找到可用 GCU 载荷（' + Failed + '）⇒ 继续安装 LM，GCU 可在应用内导入');
+    if not UninstallSilent() then
+      MsgBox('本安装包不含内置 GCU 载荷（精简包）。' + #13#10 + #13#10 +
+        '缺少的变体：' + Failed + #13#10 + #13#10 +
+        '安装将继续：装好后打开 L-Mechrevo，点顶部的「GCU」状态即可导入外置 GCU 包并安装。' + #13#10 +
+        '（也可以把 GCU\ 文件夹或 GCU.7z 放到安装包同目录后重新运行安装器）' + #13#10 + #13#10 +
+        'This setup ships without embedded GCU payloads; installation will continue and GCU can be imported inside L-Mechrevo.',
+        mbInformation, MB_OK);
+    Result := '';
+  end;
 #endif
 end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
