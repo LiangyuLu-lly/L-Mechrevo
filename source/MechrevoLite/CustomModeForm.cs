@@ -2607,7 +2607,8 @@ public class CustomModeForm : RForm
 			_status.Text = Strings.PerfModeLocalProfileSwitched;
 			_status.ForeColor = UiVisualStyle.Muted;
 			Logger.WriteLine("[perfmode] 宝龙达：模式下拉切到 " + id + "（本机配置，无固件档可切；已重读配置并刷新界面）");
-			return true;
+			// 切回自定义档要真正按该档已保存值下发一次（否则只是界面切换，硬件/参数未应用）
+			return await ActivateModeAsync(id);
 		}
 		// （机主：无界 APU 点自定义后模式仍显示「平衡」+ 红字）：与宝龙达同款「本机配置」分支 ——
 		if (Program.hw?.WujieSmuApu ?? false)
@@ -2620,7 +2621,8 @@ public class CustomModeForm : RForm
 			_status.Text = Strings.PerfModeLocalProfileSwitched;
 			_status.ForeColor = UiVisualStyle.Muted;
 			Logger.WriteLine("[perfmode] 无界 APU：模式下拉切到 " + id + "（本机配置，无固件档可切；已重读配置并刷新界面）");
-			return true;
+			// 切回自定义档要真正按该档已保存值下发一次（否则只是界面切换，硬件/参数未应用）
+			return await ActivateModeAsync(id);
 		}
 		bool ok = await ActivateModeAsync(id);
 		if (ok)
