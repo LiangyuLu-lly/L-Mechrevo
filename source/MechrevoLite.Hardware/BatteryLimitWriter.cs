@@ -1,25 +1,18 @@
-// 2026-10-18（宝龙达 · 充电阈值）：⭐⭐ **限充启用/关闭**（ACPI EC 白名单写）⭐⭐
-//
-// ⭐ 协议事实来源：JiaoLong16Pro-Battery-threshold（BM5235 / 2023 款实测；⛔ 未复制代码）：
-//    · 常驻值：0x83A1 = 停充高 % · 0x83A2 = 起充低 % · 0x83C0 = 模式（0x00 正常 / 0x48 限充生效）
-//    · mailbox：0x8153 = 高参数 · 0x8154 = 低参数 · 0x8151 = 命令（0x0D 启用/0x0F 关闭）
-//                · 0x8150 = 触发（写 0x10）· 0x8152 = 结果（0x55 成功）
-//
-// ⭐ 启用顺序（严格）：身份 OK → 0x8150==0 → AC 在线 → 0<low<high<=100（SOC≥high 允许，参考 initial_discharge_allowed=true）
-//    → 写 0x8153=high → 0x8154=low（回读）→ 0x8151=0x0D → 0x8150=0x10
-//    → 轮询 0x8150 回 0（≤3 s）→ 校验 0x8152==0x55 && 0x83C0==0x48（+ 0x83A1/0x83A2）
-// ⭐ 关闭顺序：0x8151=0x0F → 0x8150=0x10 → 轮询 → 校验 0x8152==0x55 && 0x83C0==0x00
-// ⛔ 失败**不重试、不做清理写**；⛔ 只写 4 个白名单地址（见 EcPortIo.TryWriteBatteryByte）✅
-
 using System;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
-using MechrevoLite.Properties;
 
 namespace MechrevoLite.Hardware;
 
-/// <summary>⭐⭐ 宝龙达充电阈值启用/关闭（严格时序 · 失败不重试）✅。</summary>
+/// <summary>
+/// 宝龙达（MRID6 / BM5235）充电阈值：按参考实现的收发顺序操作 EC。
+/// <para>启用顺序：身份/AC/状态校验 → 必要时清理原生残留状态 → 写 0x8153=high、0x8154=low（回读一致）
+/// → 写 0x8151=0x0D → 触发 0x8150=0x10 → 轮询 0x8150 归 0 → 校验 0x8152=0x55、0x83C0=0x48、
+/// 0x83A1/0x83A2 与写入一致、0x83A0 已稳定。</para>
+/// <para>关闭顺序：0x8151=0x0F → 触发 → 轮询 → 校验 0x8152=0x55、0x83C0=0x00。</para>
+/// <para>失败不重试、不做清理写；只写 0x8150/0x8151/0x8153/0x8154 四个白名单地址。</para>
+/// </summary>
 internal static class BatteryLimitWriter
 {
 	internal const int HighRegister = 0x83A1;
@@ -30,31 +23,46 @@ internal static class BatteryLimitWriter
 
 	internal const int ResultRegister = 0x8152;
 
+	internal const int StateRegister = 0x8370;
+
+	internal const int SubstateRegister = 0x83A0;
+
+	internal const int FlagsRegister = 0x8394;
+
+	internal const int StateFlagsRegister = 0x8395;
+
+	internal const int SocRegister = 0x847C;
+
 	internal const int ModeActive = 0x48;
+
+	internal const int ModeNativeState = 0x32;
 
 	internal const int TimeoutMs = 3000;
 
-	/// <summary>⭐ 只读当前常驻状态：高/低/模式 ✅。</summary>
+	internal static readonly int[] NormalStates = { 0x01, 0x02, 0x04, 0x05, 0x10, 0x11, 0x12, 0x20 };
+
+	/// <summary>只读当前常驻状态：高/低/模式。</summary>
 	internal static bool TryReadState(out int high, out int low, out int mode, out string detail)
 	{
 		high = -1;
 		low = -1;
 		mode = -1;
-		bool h = ReadEc(HighRegister, out high);
-		bool l = ReadEc(LowRegister, out low);
-		bool m = ReadEc(ModeRegister, out mode);
+		bool highOk = ReadEc(HighRegister, out high);
+		bool lowOk = ReadEc(LowRegister, out low);
+		bool modeOk = ReadEc(ModeRegister, out mode);
 		detail = "0x83A1=" + Fmt(high) + " · 0x83A2=" + Fmt(low) + " · 0x83C0=" + Fmt(mode);
-		return h && l && m;
+		return highOk && lowOk && modeOk;
 	}
-	// 启用限充。<para> （机主批准 · 恢复开源默认）： SOC >= high 时**默认阻断**（0 字节、给可操作原因）；
+
+	/// <summary>启用限充（默认要求 SOC &lt; high）。</summary>
 	internal static bool TryEnable(int low, int high, out string detail)
 	{
 		return TryEnable(low, high, allowInitialDischarge: false, out detail);
 	}
 
 	/// <summary>
-	/// ⭐ 启用限充；<paramref name="allowInitialDischarge" /> = true 时允许 SOC ≥ high（参考 `initial_discharge_allowed=true`）。
-	/// <para>其它安全前置不变：身份 / 0x8150 空闲 / AC / 0&lt;low&lt;high≤100 / 白名单 / 失败不重试 ✅</para>
+	/// 启用限充；<paramref name="allowInitialDischarge" /> = true 时允许 SOC ≥ high
+	/// （初始化会先放电到阈值附近）。
 	/// </summary>
 	internal static bool TryEnable(int low, int high, bool allowInitialDischarge, out string detail)
 	{
@@ -66,7 +74,7 @@ internal static class BatteryLimitWriter
 				detail = "参数非法：要求 0 < low < high <= 100（收到 low=" + low + " high=" + high + "）";
 				return false;
 			}
-			log.AppendLine("参数检查：low=" + low + "% · high=" + high + "% ✅");
+			log.AppendLine("参数：low=" + low + "% · high=" + high + "%");
 
 			if (!EcPortIo.TryReadEcIdentityAcpi(out _, out _, out string idNote))
 			{
@@ -75,119 +83,112 @@ internal static class BatteryLimitWriter
 			}
 			log.AppendLine("EC 身份：" + idNote);
 
-			if (SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Online)
+			if (PowerState() != PowerLineStatus.Online)
 			{
-				detail = log + "⛔ AC 未在线 ⇒ 不启用（参考实现要求 AC 在线）";
+				detail = log + "⛔ AC 未在线 ⇒ 不启用";
 				return false;
 			}
-			log.AppendLine("AC = Online ✅");
+			log.AppendLine("AC = Online");
 
-			if (!ReadEc(EcPortIo.BatteryTriggerRegister, out int trigger) || trigger != 0)
+			Snapshot snapshot = ReadSnapshot();
+			log.AppendLine(snapshot.Describe());
+			if (!ValidateSnapshot(snapshot, log) || !GuardStart(snapshot, high, allowInitialDischarge, log))
 			{
-				detail = log + "⛔ 0x8150 触发=" + Fmt(trigger) + "（应为 0x00）⇒ 有未完成事务，不写";
-				return false;
-			}
-			log.AppendLine("0x8150 触发 = 0x00 ✅");
-
-			TryReadState(out int curHigh, out int curLow, out int curMode, out string stateDetail);
-			log.AppendLine("当前状态：" + stateDetail);
-			if (curMode != 0 && curMode != ModeActive)
-			{
-				detail = log + "⛔ 当前模式 " + Fmt(curMode) + " 非 0x00/0x48 ⇒ 不写（请先显式 --disable）";
+				detail = log.ToString();
 				return false;
 			}
 
-			// ⭐⭐ 2026-10-18（机主按 0.291.9.18 诊断包纠正）：⭐ **恢复参考实现的放电语义**：
-			//   SOC > high 时**直接写用户配置的 high/low**（⛔ 不做 effectiveHigh 提升、⛔ 不改配置、⛔ 不回填 SOC），
-			//   固件会放电到 high；只记一行说明 ✅
-			int batteryPercent = (int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
-			log.AppendLine("电池 SOC = " + batteryPercent + "%");
-			if (batteryPercent >= 0 && batteryPercent >= high)
+			// 同一套配置且已稳定 ⇒ 复用，不重置迟滞
+			if (snapshot.Mode == ModeActive && snapshot.High == high && snapshot.Low == low
+				&& (snapshot.Substate == 2 || snapshot.Substate == 3))
 			{
-				if (!allowInitialDischarge)
-				{
-					// ⭐ 机主批准（对齐参考 guard_start）：默认阻断，0 字节，给可操作原因 ✅
-					string blocked = string.Format(Strings.BatteryLimitAboveSocBlockedFormat, batteryPercent, high);
-					log.AppendLine(blocked);
-					Logger.WriteLine(blocked);
-					detail = log.ToString();
-					return false;
-				}
-				string note = "[battery] 启用：SOC(" + batteryPercent + "%) ≥ 停充阈值(" + high
-					+ "%) 且「允许初次放电」已开 ⇒ 固件会放电到起充值附近，可能掉电";
-				log.AppendLine(note);
-				Logger.WriteLine(note);
-			}
-
-			if (curMode == ModeActive && curHigh == high && curLow == low)
-			{
-				detail = log + "⭐ 已是目标配置（限充已生效）⇒ 本次无需写";
+				detail = log + "已是目标配置且已生效 ⇒ 无需重写";
 				return true;
 			}
-			if (curMode == ModeActive)
+
+			if (snapshot.Mode != 0)
 			{
-				log.AppendLine("当前限充生效但阈值不同 ⇒ 先关闭（0x8151=0x0F → 触发 → 校验 mode=0）");
-				if (!TryDisableCore(log))
+				log.AppendLine("当前非正常充电策略 ⇒ 先关闭（0x8151=0x0F → 触发 → 校验 mode=0）");
+				if (!DisableCore(log))
+				{
+					detail = log.ToString();
+					return false;
+				}
+				snapshot = ReadSnapshot();
+				log.AppendLine("关闭后：" + snapshot.Describe());
+			}
+			else if (!WaitNormal(requireClean: false, log))
+			{
+				detail = log.ToString();
+				return false;
+			}
+
+			snapshot = ReadSnapshot();
+			if (!NativeStateClean(snapshot))
+			{
+				log.AppendLine("原生初始化状态有残留 ⇒ 按参考顺序清理（10/0E → 触发 → 停止态确认 → 10/0F → 触发）");
+				if (!PrepareNativeState(snapshot, log))
 				{
 					detail = log.ToString();
 					return false;
 				}
 			}
 
-			log.AppendLine("① 写参数：0x8153=high(" + high + ") → 0x8154=low(" + low + ")");
-			if (!WriteVerified(EcPortIo.BatteryHighParamRegister, high, "0x8153=high", log) ||
-				!WriteVerified(EcPortIo.BatteryLowParamRegister, low, "0x8154=low", log))
+			snapshot = ReadSnapshot();
+			if (!GuardStart(snapshot, high, allowInitialDischarge, log) || !CheckMailbox(0, log))
 			{
 				detail = log.ToString();
 				return false;
 			}
-			bool rbHighOk = ReadEc(EcPortIo.BatteryHighParamRegister, out int rbHigh);
-			bool rbLowOk = ReadEc(EcPortIo.BatteryLowParamRegister, out int rbLow);
+
+			// 数据先写、子命令后写、主命令最后（不写 0x83A0 / 0x83C0）
+			log.AppendLine("写参数：0x8153=" + high + " → 0x8154=" + low);
+			if (!WriteParam(EcPortIo.BatteryHighParamRegister, high, "0x8153=high", log)
+				|| !WriteParam(EcPortIo.BatteryLowParamRegister, low, "0x8154=low", log))
+			{
+				detail = log.ToString();
+				return false;
+			}
+			int rbHigh = -1;
+			int rbLow = -1;
+			bool rbHighOk = ReadEc(HighRegister, out rbHigh);
+			bool rbLowOk = ReadEc(LowRegister, out rbLow);
 			if (!rbHighOk || !rbLowOk || rbHigh != high || rbLow != low)
 			{
-				detail = log + "⛔ 参数回读不一致（0x8153=" + Fmt(rbHigh) + " · 0x8154=" + Fmt(rbLow) + "）⇒ 不发启用触发";
+				log.AppendLine("⛔ 参数回读不一致（0x83A1=" + Fmt(rbHigh) + " · 0x83A2=" + Fmt(rbLow) + "）⇒ 不触发");
+				detail = log.ToString();
 				return false;
 			}
-			log.AppendLine("参数回读：0x8153=" + Fmt(rbHigh) + " · 0x8154=" + Fmt(rbLow) + " ✅");
+			log.AppendLine("参数回读：0x83A1=" + Fmt(rbHigh) + " · 0x83A2=" + Fmt(rbLow));
 
-			log.AppendLine("② 写命令 0x8151=0x0D → 检查 0x8150==0 → 触发 0x8150=0x10");
-			if (!WriteVerified(EcPortIo.BatteryCommandRegister, 0x0D, "0x8151=0x0D(启用)", log))
+			if (!CheckMailbox(0, log) || !WriteCommand(0x0D, "0x8151=0x0D(启用)", log))
 			{
 				detail = log.ToString();
 				return false;
 			}
-			if (!ReadEc(EcPortIo.BatteryTriggerRegister, out int triggerBefore) || triggerBefore != 0)
+			// 参数准备后再核对一次 SOC（参考实现同样二次核对）
+			if (!GuardStart(ReadSnapshot(), high, allowInitialDischarge, log) || !CheckMailbox(0, log))
 			{
-				detail = log + "⛔ 触发前 0x8150=" + Fmt(triggerBefore) + " ≠ 0 ⇒ 不触发";
+				detail = log.ToString();
 				return false;
 			}
-			if (!WriteTriggerPulse(log))
+			if (!TriggerAndWait(0, log))
 			{
 				detail = log.ToString();
 				return false;
 			}
 
-			log.AppendLine("③ 轮询 0x8150 回 0（≤" + TimeoutMs + " ms；⭐ 触发寄存器自清零，不校验回读==0x10）");
-			if (!WaitTriggerDone(log))
+			Snapshot after = ReadSnapshot();
+			log.AppendLine("启用后：" + after.Describe());
+			bool paramsOk = after.High == high && after.Low == low;
+			bool settled = after.State == ModeNativeState && (after.Substate == 2 || after.Substate == 3);
+			if (!paramsOk || !settled)
 			{
+				log.AppendLine("⛔ 启用后校验未通过（阈值一致=" + paramsOk + " · 已稳定=" + settled + "）⇒ 如实报失败，不重试");
 				detail = log.ToString();
 				return false;
 			}
-			log.AppendLine("④ 结果态校验（成功判据）：0x83C0==0x48 且 0x83A1==high 且 0x83A2==low 且 0x8152==0x55");
-			bool resultOk = ReadEc(ResultRegister, out int result) && result == 0x55;
-			bool modeOk = ReadEc(ModeRegister, out int modeAfter) && modeAfter == ModeActive;
-			bool highAfterOk = ReadEc(HighRegister, out int highAfter);
-			bool lowAfterOk = ReadEc(LowRegister, out int lowAfter);
-			bool thrOk = highAfterOk && lowAfterOk && highAfter == high && lowAfter == low;
-			log.AppendLine("0x8152=" + Fmt(result) + " · 0x83C0=" + Fmt(modeAfter)
-				+ " · 0x83A1=" + Fmt(highAfter) + " · 0x83A2=" + Fmt(lowAfter));
-			detail = log.ToString();
-			if (!(resultOk && modeOk && thrOk))
-			{
-				detail += "⛔ 启用结果校验未通过（result/mode/thresholds）⇒ 如实报失败，不重试、不做清理写";
-				return false;
-			}
-			detail += "✅ 限充已启用（mode=0x48 · 高=" + high + "% · 低=" + low + "%）";
+			detail = log + "✅ 限充已启用（mode=0x48 · 高=" + high + "% · 低=" + low + "%）";
 			return true;
 		}
 		catch (Exception ex)
@@ -197,7 +198,7 @@ internal static class BatteryLimitWriter
 		}
 	}
 
-	/// <summary>⭐ 关闭限充（恢复默认充电）；失败不重试 ✅。</summary>
+	/// <summary>关闭限充（恢复默认充电）；失败不重试。</summary>
 	internal static bool TryDisable(out string detail)
 	{
 		StringBuilder log = new StringBuilder();
@@ -209,23 +210,14 @@ internal static class BatteryLimitWriter
 				return false;
 			}
 			log.AppendLine("EC 身份：" + idNote);
-			if (!ReadEc(ModeRegister, out int modeBefore))
+			Snapshot snapshot = ReadSnapshot();
+			log.AppendLine("当前：" + snapshot.Describe());
+			if (snapshot.Mode == 0)
 			{
-				detail = log + "⛔ 读 0x83C0 失败";
-				return false;
-			}
-			log.AppendLine("当前 0x83C0=" + Fmt(modeBefore));
-			if (modeBefore == 0)
-			{
-				detail = log + "⭐ 当前已是正常模式（0x00）⇒ 无需关闭";
+				detail = log + "当前已是正常充电策略（mode=0x00）⇒ 无需关闭";
 				return true;
 			}
-			if (!ReadEc(EcPortIo.BatteryTriggerRegister, out int trigger) || trigger != 0)
-			{
-				detail = log + "⛔ 0x8150=" + Fmt(trigger) + " ≠ 0 ⇒ 有未完成事务，不写";
-				return false;
-			}
-			if (!TryDisableCore(log))
+			if (!DisableCore(log))
 			{
 				detail = log.ToString();
 				return false;
@@ -240,90 +232,280 @@ internal static class BatteryLimitWriter
 		}
 	}
 
-	private static bool TryDisableCore(StringBuilder log)
+	private static bool DisableCore(StringBuilder log)
 	{
-		if (!ReadEc(EcPortIo.BatteryTriggerRegister, out int trigger) || trigger != 0)
+		Snapshot before = ReadSnapshot();
+		if (before.Mode == 0)
 		{
-			log.AppendLine("⛔ 0x8150=" + Fmt(trigger) + " ≠ 0 ⇒ 不写关闭命令");
-			return false;
+			log.AppendLine("已是正常模式 ⇒ 不写");
+			return true;
 		}
-		if (!WriteVerified(EcPortIo.BatteryCommandRegister, 0x0F, "0x8151=0x0F(关闭)", log))
-		{
-			return false;
-		}
-		if (!ReadEc(EcPortIo.BatteryTriggerRegister, out int triggerBefore) || triggerBefore != 0)
-		{
-			log.AppendLine("⛔ 触发前 0x8150=" + Fmt(triggerBefore) + " ≠ 0 ⇒ 不触发");
-			return false;
-		}
-		if (!WriteTriggerPulse(log))
+		if (!CheckMailbox(before.Mode, log) || !WriteCommand(0x0F, "0x8151=0x0F(关闭)", log))
 		{
 			return false;
 		}
-		if (!WaitTriggerDone(log))
+		if (!TriggerAndWait(0, log))
 		{
 			return false;
 		}
-		bool resultOk = ReadEc(ResultRegister, out int result) && result == 0x55;
-		bool modeOk = ReadEc(ModeRegister, out int modeAfter) && modeAfter == 0;
-		log.AppendLine("0x8152=" + Fmt(result) + " · 0x83C0=" + Fmt(modeAfter));
-		if (!(resultOk && modeOk))
+		Snapshot after = ReadSnapshot();
+		log.AppendLine("关闭后：" + after.Describe());
+		if (!NormalPolicyActive(after))
 		{
-			log.AppendLine("⛔ 关闭结果校验未通过 ⇒ 如实报失败，不重试、不做清理写");
+			log.AppendLine("⛔ 关闭结果校验未通过（应 mode=0x00）⇒ 如实报失败，不重试");
 			return false;
 		}
-		log.AppendLine("✅ 已恢复默认充电（mode=0x00）");
+		log.AppendLine("已恢复默认充电");
 		return true;
 	}
 
-	private static bool WaitTriggerDone(StringBuilder log)
+	/// <summary>清理原生初始化残留状态（参考实现：10/0E 停止态 → 10/0F 正常态）。</summary>
+	private static bool PrepareNativeState(Snapshot snapshot, StringBuilder log)
 	{
+		if (NativeStateClean(snapshot))
+		{
+			return true;
+		}
+		if (!NormalPolicyActive(snapshot) || snapshot.Substate > 3)
+		{
+			log.AppendLine("⛔ 无法识别的残留状态（" + snapshot.Describe() + "）⇒ 不发清理命令");
+			return false;
+		}
+		if (!CheckMailbox(0, log) || !WriteCommand(0x0E, "0x8151=0x0E(停止)", log))
+		{
+			return false;
+		}
+		if (!TriggerAndWait(2, log))
+		{
+			return false;
+		}
+		long deadline = Environment.TickCount64 + 8000;
+		while (true)
+		{
+			Snapshot stopped = ReadSnapshot();
+			if (stopped.Mode == 2 && stopped.State == 0x31)
+			{
+				break;
+			}
+			if (Environment.TickCount64 >= deadline)
+			{
+				log.AppendLine("⛔ 停止态未确认（" + stopped.Describe() + "）⇒ 不继续");
+				return false;
+			}
+			Thread.Sleep(250);
+		}
+		if (!CheckMailbox(2, log) || !WriteCommand(0x0F, "0x8151=0x0F(恢复)", log))
+		{
+			return false;
+		}
+		if (!TriggerAndWait(0, log))
+		{
+			return false;
+		}
+		return WaitNormal(requireClean: true, log);
+	}
+
+	private static bool WaitNormal(bool requireClean, StringBuilder log)
+	{
+		long deadline = Environment.TickCount64 + 8000;
+		while (true)
+		{
+			Snapshot snapshot = ReadSnapshot();
+			if (NormalPolicyActive(snapshot) && (!requireClean || NativeStateClean(snapshot)))
+			{
+				log.AppendLine("正常充电策略已确认（" + snapshot.Describe() + "）");
+				return true;
+			}
+			if (Environment.TickCount64 >= deadline)
+			{
+				log.AppendLine("⛔ 未确认正常充电策略（" + snapshot.Describe() + "）⇒ 不继续");
+				return false;
+			}
+			Thread.Sleep(250);
+		}
+	}
+
+	private static bool GuardStart(Snapshot snapshot, int high, bool allowInitialDischarge, StringBuilder log)
+	{
+		int soc = Math.Max(snapshot.Soc,
+			(int)Math.Round(SystemInformation.PowerStatus.BatteryLifePercent * 100.0));
+		if (!allowInitialDischarge && soc >= high)
+		{
+			log.AppendLine("⛔ SOC(" + soc + "%) ≥ 停充阈值(" + high + "%)：默认要求 SOC < 阈值");
+			log.AppendLine("（初始化可能触发固件放电分支；确认要允许时请打开「允许初始放电」）");
+			return false;
+		}
+		if (allowInitialDischarge && soc >= high)
+		{
+			log.AppendLine("⚠️ SOC(" + soc + "%) ≥ 停充阈值(" + high + "%) 且已允许初始放电 ⇒ 固件会放电到阈值附近");
+		}
+		return true;
+	}
+
+	private static bool ValidateSnapshot(Snapshot snapshot, StringBuilder log)
+	{
+		if (snapshot.Mode == 0)
+		{
+			if (Array.IndexOf(NormalStates, snapshot.State) < 0)
+			{
+				log.AppendLine("⛔ 正常模式下 state=" + Fmt(snapshot.State) + " 不是已知状态");
+				return false;
+			}
+			return true;
+		}
+		if (snapshot.Mode == 2)
+		{
+			return true;
+		}
+		if (snapshot.Mode == ModeActive)
+		{
+			if (snapshot.State != ModeNativeState)
+			{
+				log.AppendLine("⛔ 限充模式下 state=" + Fmt(snapshot.State) + " 异常");
+				return false;
+			}
+			return true;
+		}
+		log.AppendLine("⛔ 当前模式=" + Fmt(snapshot.Mode) + " 不允许操作");
+		return false;
+	}
+
+	private static bool NormalPolicyActive(Snapshot snapshot)
+	{
+		return snapshot.Mode == 0 && Array.IndexOf(NormalStates, snapshot.State) >= 0 && snapshot.Flags == 0;
+	}
+
+	private static bool NativeStateClean(Snapshot snapshot)
+	{
+		return snapshot.Substate == 0 && (snapshot.StateFlags & 7) == 0;
+	}
+
+	private static bool CheckMailbox(int expectedMode, StringBuilder log)
+	{
+		if (!ReadEc(EcPortIo.BatteryTriggerRegister, out int trigger) || trigger != 0)
+		{
+			log.AppendLine("⛔ 0x8150=" + Fmt(trigger) + " ≠ 0 ⇒ 有未完成事务，不发命令");
+			return false;
+		}
+		if (!ReadEc(ModeRegister, out int mode) || mode != expectedMode)
+		{
+			log.AppendLine("⛔ 0x83C0=" + Fmt(mode) + " ≠ 期望 " + Fmt(expectedMode) + " ⇒ 不发命令");
+			return false;
+		}
+		return true;
+	}
+
+	private static bool TriggerAndWait(int expectedMode, StringBuilder log)
+	{
+		if (!CheckMailbox(expectedMode, log))
+		{
+			return false;
+		}
+		if (!EcPortIo.TryWriteBatteryTriggerPulse(out _))
+		{
+			log.AppendLine("⛔ 触发写 0x8150=0x10 失败");
+			return false;
+		}
 		long start = Environment.TickCount64;
 		int last = -1;
 		while (Environment.TickCount64 - start <= TimeoutMs)
 		{
-			if (!ReadEc(EcPortIo.BatteryTriggerRegister, out last))
+			if (ReadEc(EcPortIo.BatteryTriggerRegister, out last) && last == 0)
 			{
-				log.AppendLine("⚠️ 轮询中读 0x8150 失败");
-			}
-			else if (last == 0)
-			{
-				log.AppendLine("0x8150 已回 0（等待 " + (Environment.TickCount64 - start) + " ms）✅");
-				return true;
+				break;
 			}
 			Thread.Sleep(20);
 		}
-		log.AppendLine("⛔ 等待 0x8150 回 0 超时（最后=" + Fmt(last) + "，≤" + TimeoutMs + " ms）⇒ 不重试");
-		return false;
+		if (last != 0)
+		{
+			log.AppendLine("⛔ 等待 0x8150 归 0 超时（最后=" + Fmt(last) + "）⇒ 不重试");
+			return false;
+		}
+		if (!ReadEc(ResultRegister, out int result) || result != 0x55)
+		{
+			log.AppendLine("⛔ 命令结果 0x8152=" + Fmt(result) + "（应 0x55）");
+			return false;
+		}
+		if (!ReadEc(ModeRegister, out int mode) || mode != expectedMode)
+		{
+			log.AppendLine("⛔ 命令后 0x83C0=" + Fmt(mode) + "（应 " + Fmt(expectedMode) + "）");
+			return false;
+		}
+		log.AppendLine("命令完成：0x8152=0x55 · 0x83C0=" + Fmt(mode));
+		return true;
 	}
 
-	private static bool WriteTriggerPulse(StringBuilder log)
+	private static bool WriteParam(int address, int value, string label, StringBuilder log)
 	{
-		bool ok = EcPortIo.TryWriteBatteryTriggerPulse(out int readBack);
-		log.AppendLine("写 0x8150=0x10(触发) ⇒ "
-			+ (ok ? "已发送（自清零寄存器，不校验回读）" : "写入调用失败")
-			+ " · 立即回读=" + Fmt(readBack));
+		bool ok = EcPortIo.TryWriteBatteryByte(address, (byte)value, out int readBack);
+		log.AppendLine(label + " ⇒ " + (ok ? "回读 0x" + readBack.ToString("X2") : "失败"));
 		return ok;
 	}
 
-	private static bool WriteVerified(int address, int value, string label, StringBuilder log)
+	private static bool WriteCommand(int value, string label, StringBuilder log)
 	{
-		bool ok = EcPortIo.TryWriteBatteryByte(address, (byte)value, out int readBack);
-		log.AppendLine("写 " + label + " ⇒ ok=" + ok + " · 回读=" + Fmt(readBack));
-		return ok && readBack == value;
+		bool ok = EcPortIo.TryWriteBatteryByte(EcPortIo.BatteryCommandRegister, (byte)value, out int readBack);
+		log.AppendLine(label + " ⇒ " + (ok ? "回读 0x" + readBack.ToString("X2") : "失败"));
+		return ok;
 	}
 
 	private static bool ReadEc(int address, out int value)
 	{
-		if (EcPortIo.TryReadByteStable(address, out value, out _))
-		{
-			return true;
-		}
-		return EcLpcIo.TryReadByteStable(address, out value, out _);
+		return EcPortIo.TryReadByteStable(address, out value, out _, attempts: 3);
+	}
+
+	private static Snapshot ReadSnapshot()
+	{
+		Snapshot snapshot = default(Snapshot);
+		snapshot.High = ReadOrMinusOne(HighRegister);
+		snapshot.Low = ReadOrMinusOne(LowRegister);
+		snapshot.Mode = ReadOrMinusOne(ModeRegister);
+		snapshot.State = ReadOrMinusOne(StateRegister);
+		snapshot.Substate = ReadOrMinusOne(SubstateRegister);
+		snapshot.Flags = ReadOrMinusOne(FlagsRegister);
+		snapshot.StateFlags = ReadOrMinusOne(StateFlagsRegister);
+		snapshot.Soc = ReadOrMinusOne(SocRegister);
+		return snapshot;
+	}
+
+	private static int ReadOrMinusOne(int address)
+	{
+		return ReadEc(address, out int value) ? value : -1;
 	}
 
 	private static string Fmt(int value)
 	{
-		return value < 0 ? "读不到" : "0x" + value.ToString("X2");
+		return value < 0 ? "(读不到)" : "0x" + value.ToString("X2");
+	}
+
+	private static PowerLineStatus PowerState()
+	{
+		return SystemInformation.PowerStatus.PowerLineStatus;
+	}
+
+	private struct Snapshot
+	{
+		internal int High;
+
+		internal int Low;
+
+		internal int Mode;
+
+		internal int State;
+
+		internal int Substate;
+
+		internal int Flags;
+
+		internal int StateFlags;
+
+		internal int Soc;
+
+		internal readonly string Describe()
+		{
+			return "mode=" + Fmt(Mode) + " · state=" + Fmt(State) + " · 83A0=" + Fmt(Substate)
+				+ " · 8394=" + Fmt(Flags) + " · 8395=" + Fmt(StateFlags)
+				+ " · 83A1=" + Fmt(High) + " · 83A2=" + Fmt(Low) + " · SOC=" + Fmt(Soc);
+		}
 	}
 }
