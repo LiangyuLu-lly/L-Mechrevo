@@ -145,6 +145,14 @@ internal static class GcuPackageImport
 				MessageBox.Show(owner, Strings.GcuImportNoPackage, Strings.GcuImportTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
 				return;
 			}
+			try
+			{
+				string staged = string.Join(", ", Directory.EnumerateFiles(Path.Combine(staging, "payload")).Select(f => Path.GetFileName(f)));
+				Logger.WriteError($"[gcu-import] source={source} found={found} payload=[{staged}]");
+			}
+			catch
+			{
+			}
 			File.Copy(sevenZip, Path.Combine(staging, "7za.exe"), overwrite: true);
 			string expectedVariant = ExpectedVariant();
 			if (expectedVariant != null && !File.Exists(Path.Combine(staging, "payload", expectedVariant + ".7z")))
