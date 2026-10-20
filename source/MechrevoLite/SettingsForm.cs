@@ -9870,10 +9870,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		EnableSection(panelFooter, enabled: true);
 		Logger.WriteLineIfChanged("screen-gate", $"screen-gate: flag7={flag7} flag10={flag10} flag11={flag11} flag12={flag12} flag13={flag13} flag23={flag23} (panelBrightness 主体可见={flag23}) win32Max={ScreenGateProbe.Win32MaxRefreshRate()} wmiBright={ScreenGateProbe.WmiBrightnessReadable()} gcuDisplayRefresh={caps.DisplayRefresh} gcuHzList={hw?.SupportsDisplayRefresh ?? false} gcuBrightSeen={hw?.ScreenBrightnessSeen ?? false}");
 		ApplyUnsupportedModelNotice(flag, decision);
-		if (_unsupportedModelBanner != null && !_enabledDashboardSections.Contains(_unsupportedModelBanner))
-		{
-			_enabledDashboardSections.Add(_unsupportedModelBanner);
-		}
 		ApplyChargeLimitSliderGating(flag);
 		SyncHzButtons();
 		ArrangeDashboard();
@@ -9921,7 +9917,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		if (_unsupportedModelBanner != null)
 		{
-			_unsupportedModelBanner.Visible = flag;
+			// 按机主要求：不再显示「机型无法识别 / 已进入只读模式」横幅（只读判定仍保留）
+			_unsupportedModelBanner.Visible = false;
 		}
 		string[] writeEntryControlNames = WriteEntryControlNames;
 		foreach (string key in writeEntryControlNames)
