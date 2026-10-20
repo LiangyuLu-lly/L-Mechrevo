@@ -86,6 +86,18 @@ public static class PerfModeApplyPlanner
 			if (settings.Pl4.HasValue)
 			{
 				list.Add(Field("PL4", settings.Pl4.Value, PerfApplyVerify.CpuPackagePower));
+	if (settings.SmuSlowLimit.HasValue)
+	{
+		list.Add(Field("SmuSlowLimit", settings.SmuSlowLimit.Value, PerfApplyVerify.CpuPackagePower));
+	}
+	if (settings.SmuSlowTimeSeconds.HasValue)
+	{
+		list.Add(Field("SmuSlowTimeSeconds", settings.SmuSlowTimeSeconds.Value));
+	}
+	if (settings.SmuFastTimeSeconds.HasValue)
+	{
+		list.Add(Field("SmuFastTimeSeconds", settings.SmuFastTimeSeconds.Value));
+	}
 			}
 			if (!caps.SupportsWmiPowerFields && settings.TccTarget.HasValue)
 			{

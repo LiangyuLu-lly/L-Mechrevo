@@ -193,6 +193,12 @@ public class CustomModeForm : RForm
 	private RSlider _tcc;
 	// （判据 = PerfModeCapabilities.UsesSmuForCustomPower，与真实下发分支同源；见 ctor 注释）。
 	private RSlider _stapmTime;
+	private RSlider _smuSlowLimit;
+	private RNumericUpDown _smuSlowLimitVal;
+	private RSlider _smuSlowTime;
+	private RNumericUpDown _smuSlowTimeVal;
+	private RSlider _smuFastTime;
+	private RNumericUpDown _smuFastTimeVal;
 
 	private RNumericUpDown _stapmTimeVal;
 
@@ -783,6 +789,28 @@ public class CustomModeForm : RForm
 		_pl2Val = tuple4.Item2;
 		_pl2Label = RowLabelOf(_pl2);
 		AttachPowerWallUnsetHint(_pl2, _pl2Val, _pl2Label);
+		if (smuPowerControls)
+		{
+			(int, int, int, bool) slowRange = DeviceRange((hw?.Pl1Minimum ?? 15), (hw?.Pl2Maximum ?? 120), hw?.Pl1 ?? 28);
+			tuple4 = AddSliderRow(Strings.SmuSlowLimitLabel, slowRange.Item1, slowRange.Item2, slowRange.Item3, (int v) =>
+			{
+				Queue("SmuSlowLimit", v.ToString());
+			});
+			_smuSlowLimit = tuple4.Item1;
+			_smuSlowLimitVal = tuple4.Item2;
+			tuple4 = AddSliderRow(Strings.SmuSlowTimeLabel, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, 128, (int v) =>
+			{
+				Queue("SmuSlowTimeSeconds", v.ToString());
+			});
+			_smuSlowTime = tuple4.Item1;
+			_smuSlowTimeVal = tuple4.Item2;
+			tuple4 = AddSliderRow(Strings.SmuFastTimeLabel, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, 64, (int v) =>
+			{
+				Queue("SmuFastTimeSeconds", v.ToString());
+			});
+			_smuFastTime = tuple4.Item1;
+			_smuFastTimeVal = tuple4.Item2;
+		}
 		// （机主要求的行顺序）：PL1 → PL2 → **功耗时间窗（STAPM，秒）** → 温度墙
 		if (smuPowerControls)
 		{

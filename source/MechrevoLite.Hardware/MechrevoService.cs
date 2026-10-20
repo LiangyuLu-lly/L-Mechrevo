@@ -3993,8 +3993,10 @@ public class MechrevoService
 		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
 		bool isTempWall = string.Equals(key, "CpuTccOffset", StringComparison.Ordinal);
 		// （30 系 · SMU 功耗时间窗）：新增键 SmuStapmTimeSeconds（单位**秒**）。
-		bool isStapmTime = string.Equals(key, "SmuStapmTimeSeconds", StringComparison.Ordinal);
-		if (!isPl1 && !isPl2 && !isTempWall && !isStapmTime)
+		bool isStapmTime = string.Equals(key, "SmuStapmTimeSeconds", StringComparison.Ordinal) || string.Equals(key, "SmuFastTimeSeconds", StringComparison.Ordinal);
+		bool isSlowLimit = string.Equals(key, "SmuSlowLimit", StringComparison.Ordinal);
+		bool isSlowTime = string.Equals(key, "SmuSlowTimeSeconds", StringComparison.Ordinal);
+		if (!isPl1 && !isPl2 && !isTempWall && !isStapmTime && !isSlowLimit && !isSlowTime)
 		{
 			return false; // ⭐ 别的键不归本方法管 ✅
 		}
@@ -4012,7 +4014,7 @@ public class MechrevoService
 				Logger.WriteError("[smu] 不可用 ⇒ 30 系功耗墙**未下发**（原因：" + SmuAvailability.Reason + "）⇒ 如实失败");
 				return false;
 			}
-			return ApplyPowerLimitViaSmu(hw, isPl1, isPl2, isTempWall, isStapmTime, result);
+			return ApplyPowerLimitViaSmu(hw, isPl1, isPl2, isTempWall, isStapmTime, isSlowLimit, isSlowTime, result);
 		}
 		// ⭐ 三个值取"现值（⭐ 本地记忆 ✅）"，⭐ 只覆盖这次要改的那一个 ✅
 		int pl1 = hw.Pl1;
@@ -4104,7 +4106,7 @@ public class MechrevoService
 		Logger.WriteError($"[pl] 联动：{detail}（{reason}）");
 	}
 	// 独立分支：只写这一条， 不碰 PL1/PL2/温度墙；回读语义为"已下发 / 已确认 / 未确认"（该 PM 字段
-	private bool ApplyPowerLimitViaSmu(MechrevoHw hw, bool isPl1, bool isPl2, bool isTempWall, bool isStapmTime, int result)
+	private bool ApplyPowerLimitViaSmu(MechrevoHw hw, bool isPl1, bool isPl2, bool isTempWall, bool isStapmTime, bool isSlowLimit, bool isSlowTime, int result)
 	{
 		PawnIO.RyzenSmuService smu = MechrevoLite.Mode.ModeControl.SharedSmu;
 		if (smu == null)
@@ -4113,6 +4115,40 @@ public class MechrevoService
 			return false;
 		}
 		// 语义：命令被 SMU 接受 = 已下发；回读**一致**才写"已确认"；不稳定/读不到 ⇒ 如实记「未确认」
+		if (isSlowLimit)
+		{
+			int slowMin = (hw.WujieSmuApu ? WujieSmuGate.PlMinWatts : BaolongdaProfile.PlMinWatts);
+			int slowMax = (hw.WujieSmuApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl2MaxWatts);
+			if (result < slowMin || result > slowMax)
+			{
+				Logger.WriteError($"[smu] slow 限值拒绝下发：{result}W 不在 {slowMin}..{slowMax}W");
+				return false;
+			}
+			PawnIO.SmuStatus slowStatus = smu.SetSlowLimit(result);
+			if (slowStatus != PawnIO.SmuStatus.OK)
+			{
+				Logger.WriteError($"[smu] slow={result}W 下发失败={slowStatus}");
+				return false;
+			}
+			Logger.WriteError($"[smu] slow={result}W 下发=OK");
+			return true;
+		}
+		if (isSlowTime)
+		{
+			if (result < BaolongdaProfile.StapmTimeMinSeconds || result > BaolongdaProfile.StapmTimeMaxSeconds)
+			{
+				Logger.WriteError($"[smu] slow 时间窗拒绝下发：{result}s");
+				return false;
+			}
+			PawnIO.SmuStatus slowTimeStatus = smu.SetSlowTimeSeconds(result);
+			if (slowTimeStatus != PawnIO.SmuStatus.OK)
+			{
+				Logger.WriteError($"[smu] slow 时间窗={result}s 下发失败={slowTimeStatus}");
+				return false;
+			}
+			Logger.WriteError($"[smu] slow 时间窗={result}s 下发=OK");
+			return true;
+		}
 		if (isStapmTime)
 		{
 			if (result < BaolongdaProfile.StapmTimeMinSeconds || result > BaolongdaProfile.StapmTimeMaxSeconds)

@@ -172,6 +172,9 @@ public static class PerfModeStore
 			TccTarget = GetInt(id, "tcc"),
 			// （30 系 · SMU 功耗时间窗）：mode_tune_* 新键（秒）；缺失 = null（不显示该行）。
 			StapmTimeSeconds = GetInt(id, "stapmtime"),
+			SmuSlowLimit = GetInt(id, "smuslow"),
+			SmuSlowTimeSeconds = GetInt(id, "smuslowtime"),
+			SmuFastTimeSeconds = GetInt(id, "smufasttime"),
 			GpuOverclockOn = GetBool(id, "ocon"),
 			GpuCoreOffset = GetInt(id, "occore"),
 			GpuMemoryOffset = GetInt(id, "ocmem"),
@@ -201,6 +204,9 @@ public static class PerfModeStore
 		PutInt(id, "tcc", settings.TccTarget);
 		// （30 系 · SMU 功耗时间窗）：按档保存（秒）；null ⇒ 删除该键（旧配置自然保持兼容）。
 		PutInt(id, "stapmtime", settings.StapmTimeSeconds);
+		PutInt(id, "smuslow", settings.SmuSlowLimit);
+		PutInt(id, "smuslowtime", settings.SmuSlowTimeSeconds);
+		PutInt(id, "smufasttime", settings.SmuFastTimeSeconds);
 		PutBool(id, "ocon", settings.GpuOverclockOn);
 		PutInt(id, "occore", settings.GpuCoreOffset);
 		PutInt(id, "ocmem", settings.GpuMemoryOffset);

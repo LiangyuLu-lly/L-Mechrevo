@@ -5687,4 +5687,14 @@
   <data name="EffectColors" xml:space="preserve">
     <value>颜色</value>
   </data>
+
+  <data name="SmuSlowLimitLabel" xml:space="preserve">
+    <value>慢速功率限制（W）</value>
+  </data>
+  <data name="SmuSlowTimeLabel" xml:space="preserve">
+    <value>慢速提升持续时间（s）</value>
+  </data>
+  <data name="SmuFastTimeLabel" xml:space="preserve">
+    <value>快速提升持续时间（s）</value>
+  </data>
 </root>

@@ -120,7 +120,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 	public Task<bool> WriteDetailFieldAsync(string wireKey, string value, CancellationToken ct)
 	{
 		// ⭐ Wujie 自定义档：PL/温度墙/STAPM 走本机 SMU（由 SetCustomDetail 内部分派），其余固件字段一律不发 ✅
-		if (SuppressWujieModeSwitch("应用/固件字段") && wireKey != "PL1" && wireKey != "PL2" && wireKey != "CpuTccOffset" && wireKey != "SmuStapmTimeSeconds")
+		if (SuppressWujieModeSwitch("应用/固件字段") && wireKey != "PL1" && wireKey != "PL2" && wireKey != "CpuTccOffset" && wireKey != "SmuStapmTimeSeconds" && wireKey != "SmuSlowLimit" && wireKey != "SmuSlowTimeSeconds" && wireKey != "SmuFastTimeSeconds")
 		{
 			return Task.FromResult(result: true);
 		}

@@ -5704,4 +5704,14 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
   <data name="EffectColors" xml:space="preserve">
     <value>Colors</value>
   </data>
+
+  <data name="SmuSlowLimitLabel" xml:space="preserve">
+    <value>Slow Power Limit (W)</value>
+  </data>
+  <data name="SmuSlowTimeLabel" xml:space="preserve">
+    <value>Slow Boost Duration (s)</value>
+  </data>
+  <data name="SmuFastTimeLabel" xml:space="preserve">
+    <value>Fast Boost Duration (s)</value>
+  </data>
 </root>

@@ -29,6 +29,13 @@ public sealed record PerfModeSettings
 	// <para> 显示/下发条件 = **本自定义档真的走 SMU**（PerfModeCapabilities.UsesSmuForCustomPower
 	public int? StapmTimeSeconds { get; init; }
 
+	// SMU 路径：慢速/快速各自独立（与 STAPM 拆开）
+	public int? SmuSlowLimit { get; init; }
+
+	public int? SmuSlowTimeSeconds { get; init; }
+
+	public int? SmuFastTimeSeconds { get; init; }
+
 	public bool? GpuOverclockOn { get; set; }
 
 	public int? GpuCoreOffset { get; set; }
@@ -89,7 +96,8 @@ public sealed record PerfModeSettings
 	{
 		get
 		{
-			if (!WindowsPowerMode.HasValue && !CpuBoost.HasValue && string.IsNullOrEmpty(PowerPlanGuid))
+			if (!WindowsPowerMode.HasValue && !CpuBoost.HasValue && string.IsNullOrEmpty(PowerPlanGuid)
+			&& !SmuSlowLimit.HasValue && !SmuSlowTimeSeconds.HasValue && !SmuFastTimeSeconds.HasValue)
 			{
 				return RefreshHz.HasValue;
 			}
