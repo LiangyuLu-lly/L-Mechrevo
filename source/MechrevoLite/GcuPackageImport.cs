@@ -56,14 +56,31 @@ internal static class GcuPackageImport
 		{
 			using FolderBrowserDialog folderDialog = new FolderBrowserDialog
 			{
-				Description = Strings.GcuImportTitle + "：选择 GCU 包（.7z/.zip）或其所在文件夹",
+				Description = Strings.GcuImportTitle + "：请选择名为 GCU 的文件夹（内含 GCU 包或已解压的服务目录）",
 				ShowNewFolderButton = false
 			};
 			if (folderDialog.ShowDialog(owner) != DialogResult.OK)
 			{
 				return;
 			}
-			source = folderDialog.SelectedPath;
+			string selected = folderDialog.SelectedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+			string nested = Path.Combine(selected, "GCU");
+			if (string.Equals(Path.GetFileName(selected), "GCU", StringComparison.OrdinalIgnoreCase))
+			{
+				source = selected;
+			}
+			else if (Directory.Exists(nested))
+			{
+				source = nested;
+			}
+			else
+			{
+				MessageBox.Show(owner, "请把 GCU 包或已解压的 GCU 目录放进一个名为「GCU」的文件夹后再选它。" +
+					Environment.NewLine + Environment.NewLine +
+					"（直接选下载目录这类文件夹不会被扫描，避免误识别无关压缩包）",
+					Strings.GcuImportTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+				return;
+			}
 		}
 		if (MessageBox.Show(owner, Strings.GcuImportAsk + Environment.NewLine + Environment.NewLine + source,
 			Strings.GcuImportTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
@@ -243,7 +260,7 @@ internal static class GcuPackageImport
 		return null;
 	}
 
-	/// <summary>按 GCUService.exe 的特征判变体，然后把服务目录重打包成 &lt;变体&gt;.7z。</summary>
+	/// <summary>按 GCUService.exe 的特征判变体，然后按归档规范重打包成 &lt;变体&gt;.7z。</summary>
 	private static int RepackTree(string sevenZip, string serviceDir, string staging)
 	{
 		string exe = Path.Combine(serviceDir, "MyControlCenter", "GCUService.exe");
@@ -257,23 +274,50 @@ internal static class GcuPackageImport
 			Logger.WriteError("[gcu-import] 无法从 GCUService.exe 判断变体：" + exe);
 			return 0;
 		}
-		// Install-Gcu.ps1 认的归档布局 = 根下直接是 AiStoneService\（或旧 UniwillService\）；
-		// 7za a 时把工作目录设为父目录、只压服务目录，即可得到该布局。
-		string parent = Directory.GetParent(serviceDir)?.FullName;
-		if (parent == null)
+		// Install-Gcu.ps1 按变体表认归档布局：
+		//   1020 -> 20\UniwillService   30 -> 30\UniwillService
+		//   40   -> 40\AiStoneService   50 -> 50\AiStoneService   WJXY -> WJXY\AiStoneService
+		(string innerRoot, string serviceLeaf) = variant switch
 		{
-			return 0;
-		}
-		string archiveName = variant + ".7z";
-		string dest = Path.Combine(staging, "payload", archiveName);
-		int exitCode = RunProcess(sevenZip, $"a -t7z -mx=5 \"{dest}\" \"{serviceDir}\"", parent);
-		if (exitCode != 0)
+			"1020" => ("20", "UniwillService"),
+			"30" => ("30", "UniwillService"),
+			"WJXY" => ("WJXY", "AiStoneService"),
+			_ => (variant, "AiStoneService")
+		};
+		string packageRoot = Path.Combine(staging, "_pkg_" + Guid.NewGuid().ToString("N"));
+		string destination = Path.Combine(packageRoot, innerRoot, serviceLeaf);
+		try
 		{
-			Logger.WriteError($"[gcu-import] 重打包失败 exit={exitCode}：{serviceDir}");
-			return 0;
+			string innerDir = Path.Combine(packageRoot, innerRoot);
+			Directory.CreateDirectory(innerDir);
+			CopyDirectory(serviceDir, destination);
+			string dest = Path.Combine(staging, "payload", variant + ".7z");
+			int exitCode = RunProcess(sevenZip, $"a -t7z -mx=5 \"{dest}\" \".\\{innerRoot}\"", packageRoot);
+			if (exitCode != 0)
+			{
+				Logger.WriteError($"[gcu-import] 重打包失败 exit={exitCode}：{serviceDir}");
+				return 0;
+			}
+			Logger.WriteError($"[gcu-import] 内容识别：{Path.GetFileName(serviceDir)} ⇒ {variant}.7z（{innerRoot}\\{serviceLeaf}）");
+			return 1;
 		}
-		Logger.WriteError($"[gcu-import] 内容识别：{Path.GetFileName(serviceDir)} ⇒ {archiveName}");
-		return 1;
+		finally
+		{
+			TryDeleteDirectory(packageRoot);
+		}
+	}
+
+	private static void CopyDirectory(string source, string destination)
+	{
+		Directory.CreateDirectory(destination);
+		foreach (string file in Directory.EnumerateFiles(source))
+		{
+			File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), overwrite: true);
+		}
+		foreach (string directory in Directory.EnumerateDirectories(source))
+		{
+			CopyDirectory(directory, Path.Combine(destination, Path.GetFileName(directory)));
+		}
 	}
 
 	/// <summary>按版本/体积判变体（与安装器/应用内的 GCU 变体判定同口径）。</summary>
