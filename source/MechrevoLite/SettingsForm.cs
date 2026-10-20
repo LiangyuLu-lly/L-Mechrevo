@@ -14308,6 +14308,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			ShowMode(visualMode);
 			SetContextMenu();
 			Logger.WriteError("[perfmode] 本机配置机型：选择内置档 " + visualMode + " ⇒ 仅记录 ActiveModeId（不发固件档命令）");
+		MechrevoLite.Hardware.GpuDbControl.SyncForVisualMode(visualMode, "本机配置机型切档");
 			return;
 		}
 		int request = Interlocked.Increment(ref _performanceRequest);
@@ -14365,6 +14366,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 					// 映射逻辑抽到 NotifyPerfModeState()，与托盘右键菜单（SetContextMenu）共用同一处
 					// 编号约定，保证主界面与托盘两个切模式入口都会刷新 PerfModeStore.ActiveModeId。
 					NotifyPerfModeState(displayMode, silentTurbo);
+					MechrevoLite.Hardware.GpuDbControl.SyncForVisualMode(displayMode, "GCU 切档");
 				}
 			}
 		}

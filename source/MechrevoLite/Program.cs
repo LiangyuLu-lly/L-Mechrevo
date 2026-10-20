@@ -3797,6 +3797,15 @@ internal static class Program
 					{
 						await warmPerf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
 				warmPerf.ApplyApuAntiDegradeOnStartup();
+				try
+				{
+					int warmVisual = MechrevoService.ToVisualMode(Program.service?.CurrentMode ?? 0);
+					MechrevoLite.Hardware.GpuDbControl.SyncForVisualMode(warmVisual, "启动同步");
+				}
+				catch (Exception dbEx)
+				{
+					Logger.WriteLine("[db] 启动同步失败（已吞掉）：" + dbEx.Message);
+				}
 					}
 					catch (Exception ex)
 					{
