@@ -88,11 +88,27 @@ function LcOff($h) {
     }
 }
 function Watch($h, [int]$sec) {
-    $deadline = (Get-Date).AddSeconds($sec); $prev = ''
+    Write-Host '（监视中：按回车可跳过）'
+    $deadline = (Get-Date).AddSeconds($sec)
+    $prev = ''
+    $nextSample = Get-Date
     while ((Get-Date) -lt $deadline) {
-        $cur = (GpuLine) + (' · 0x7C7=0x{0:X2}' -f (ReadEc $h $ADDR_LC))
-        if ($cur -ne $prev) { WLog ('  ' + $cur); $prev = $cur }
-        Start-Sleep -Seconds 1
+        # 回车跳过：每 150ms 检查一次键盘，不必等满整段监视
+        try {
+            while ([Console]::KeyAvailable) {
+                $k = [Console]::ReadKey($true)
+                if ($k.Key -eq [ConsoleKey]::Enter) {
+                    WLog '用户按回车 ⇒ 跳过监视'
+                    return
+                }
+            }
+        } catch { }
+        if ((Get-Date) -ge $nextSample) {
+            $cur = (GpuLine) + (' · 0x7C7=0x{0:X2}' -f (ReadEc $h $ADDR_LC))
+            if ($cur -ne $prev) { WLog ('  ' + $cur); $prev = $cur }
+            $nextSample = (Get-Date).AddSeconds(1)
+        }
+        Start-Sleep -Milliseconds 150
     }
 }
 
