@@ -14307,9 +14307,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			NotifyPerfModeState(visualMode, silentTurbo);
 			ShowMode(visualMode);
 			SetContextMenu();
-			Logger.WriteError("[perfmode] 本机配置机型：选择内置档 " + visualMode + " ⇒ 仅记录 ActiveModeId（不发固件档命令）");
+			Logger.WriteError("[perfmode] 本机配置机型：选择内置档 " + visualMode + " ⇒ 记录 ActiveModeId 后继续走正常切档流程");
 		MechrevoLite.Hardware.GpuDbControl.SyncForVisualMode(visualMode, "本机配置机型切档");
-			return;
 		}
 		int request = Interlocked.Increment(ref _performanceRequest);
 		ShowMode(MechrevoService.ToVisualMode(mode));
