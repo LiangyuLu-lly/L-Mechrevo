@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace MechrevoLite.Diagnostics;
 
@@ -286,11 +287,56 @@ internal static class DiagnosticPackExporter
 		entries.Add(entryName);
 	}
 
-	private static void WriteText(ZipArchive zip, List<string> entries, string entryName, string text)
+	/// <summary>诊断包文本清洗：去掉表情符号，并丢弃带内部文档/逆向来源字样的开发备注行。</summary>
+private static readonly Regex EmojiPattern = new Regex("[\\u2600-\\u27BF\\u2B00-\\u2BFF\\uFE0F\\u200D\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+", RegexOptions.Compiled);
+
+private static readonly string[] InternalRefMarkers = new string[]
+{
+	"docs\\\\", "docs/", ".md", "反编译", "逆向", "作者版", "官方组件", "对比文档",
+	"notes\\\\", "THIRD-PARTY", "LICENSES\\\\", "原理文档", "见 docs", "设计文档", "开发规范"
+};
+
+private static bool IsInternalDevLine(string line)
+{
+	foreach (string marker in InternalRefMarkers)
+	{
+		if (line.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+private static string SanitizeLine(string line)
+{
+	return EmojiPattern.Replace(line, string.Empty).TrimEnd();
+}
+
+internal static string SanitizeText(string text)
+{
+	string[] lines = text.Split('\n');
+	StringBuilder stringBuilder = new StringBuilder(text.Length);
+	for (int i = 0; i < lines.Length; i++)
+	{
+		string text2 = lines[i].TrimEnd('\r');
+		string text3 = text2.TrimStart();
+		// 以表情开头的行基本都是开发备注/解释，整行丢弃
+		Match match = EmojiPattern.Match(text3);
+		if (!IsInternalDevLine(text2) && !(match.Success && match.Index == 0))
+		{
+			stringBuilder.Append(SanitizeLine(text2));
+			stringBuilder.Append('\n');
+		}
+	}
+	return stringBuilder.ToString();
+}
+
+private static void WriteText(ZipArchive zip, List<string> entries, string entryName, string text)
 	{
 		using Stream stream = zip.CreateEntry(entryName, CompressionLevel.Optimal).Open();
 		using StreamWriter streamWriter = new StreamWriter(stream, Utf8Bom);
-		streamWriter.Write(text);
+		streamWriter.Write(SanitizeText(text));
 		entries.Add(entryName);
 	}
 
@@ -315,7 +361,11 @@ internal static class DiagnosticPackExporter
 		string text;
 		while ((text = streamReader.ReadLine()) != null)
 		{
-			streamWriter.WriteLine(DiagnosticGcuEvidenceInfo.Mask(text));
+			string masked = DiagnosticGcuEvidenceInfo.Mask(text);
+			if (!IsInternalDevLine(masked))
+			{
+				streamWriter.WriteLine(SanitizeLine(masked));
+			}
 		}
 		entries.Add(file.EntryName);
 	}
