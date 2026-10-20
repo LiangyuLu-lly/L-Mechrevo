@@ -2006,10 +2006,6 @@ public class CustomModeForm : RForm
 			UpdateRouteHint(mode);
 			LoadAppSide(mode.Settings);
 			ApplyPersistedComboOverrides(mode.Id);
-			if (!mode.IsCustom)
-			{
-				ApplyBuiltInSmuReadback();
-			}
 			// 空白的本机自定义档（如刚新建）显示「未设置」，不沿用上一次应用后的实时值
 			if (mode.IsCustom && mode.Settings.IsUntouched
 				&& (Program.hw?.UsesBaolongda == true || Program.hw?.WujieSmuApu == true))
@@ -2207,74 +2203,6 @@ public class CustomModeForm : RForm
 		if (_routeHint.Text != text2)
 		{
 			_routeHint.Text = text2;
-		}
-	}
-
-	/// <summary>内置档：本机配置机型从 SMU 快照回填「慢速功率/慢速时长」；读不到显示 0。</summary>
-	private void ApplyBuiltInSmuReadback()
-	{
-		MechrevoHw hw = Program.hw;
-		if (hw == null || (!hw.WujieSmuApu && !hw.IsBaolongda30Series))
-		{
-			return;
-		}
-		try
-		{
-			hw.RefreshBaolongda30SeriesSmuPower(force: true);
-		}
-		catch
-		{
-		}
-		PawnIO.SmuPowerSnapshot snap = hw.BaolongdaSmuSnapshot;
-		if (snap == null && hw.WujieSmuApu)
-		{
-			try
-			{
-				snap = MechrevoLite.Mode.ModeControl.SharedSmu?.GetPowerSnapshot();
-			}
-			catch
-			{
-			}
-		}
-		bool syncing = _syncing;
-		_syncing = true;
-		try
-		{
-			ApplySmuSnapshotValue(_smuSlowLimit, _smuSlowLimitVal, snap?.Slow);
-			ApplySmuSnapshotValue(_smuSlowTime, _smuSlowTimeVal, snap?.SlowTimeSeconds);
-			Logger.WriteLine("[custom-ui] 内置档 SMU 回填：slow=" + (snap?.Slow.ToString("F1") ?? "读不到") + "W · slow_time=" + (snap?.SlowTimeSeconds?.ToString() ?? "读不到") + "s");
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("[custom-ui] SMU 回填失败（慢速行显示 0）：" + ex.Message);
-		}
-		finally
-		{
-			_syncing = syncing;
-		}
-	}
-
-	private static void ApplySmuSnapshotValue(RSlider slider, RNumericUpDown box, float? value)
-	{
-		if (slider == null)
-		{
-			return;
-		}
-		try
-		{
-			int v = (value.HasValue && value.Value > 0f) ? (int)Math.Round(value.Value) : 0;
-			int lo = (int)slider.Minimum;
-			int hi = (int)slider.Maximum;
-			int shown = Math.Min(hi, Math.Max(lo, v));
-			slider.Value = shown;
-			if (box != null)
-			{
-				decimal boxShown = Math.Min(box.Maximum, Math.Max(box.Minimum, (decimal)v));
-				box.Value = boxShown;
-			}
-		}
-		catch
-		{
 		}
 	}
 
@@ -3558,8 +3486,7 @@ public class CustomModeForm : RForm
 		string displayedModeId = instance.DisplayedModeId;
 		// 2026-10-05: in firmware-profile mode do not let a non-empty _pending batch swallow
 		// the mode-change refresh -- that is what made quick switching feel unresponsive.
-		bool localMachine = (Program.hw?.WujieSmuApu ?? false) || (Program.hw?.UsesBaolongda ?? false);
-		if (!string.Equals(displayedModeId, _modeId, StringComparison.Ordinal) && (_pending.Count == 0 || _firmwareMode || localMachine))
+		if (!string.Equals(displayedModeId, _modeId, StringComparison.Ordinal) && (_pending.Count == 0 || _firmwareMode))
 		{
 			BindMode(displayedModeId);
 			await RefreshHardwareStateAsync();
