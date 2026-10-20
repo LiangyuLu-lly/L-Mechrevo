@@ -9,6 +9,7 @@
 - 外置 GCU 来源登记：使用外置包时安装器写 `HKLM\SOFTWARE\L-Mechrevo\GcuExternalSource`（值=sibling-GCU-folder / sibling-GCU.7z / sibling-variant-7z），诊断包可查；用内置时写日志「本次使用内置 GCU 载荷」。
 - 精简测试包：`/DNOGCU_PAYLOAD` 编译去掉 5 个内置 payload（同目录外置 GCU 包才装 GCU，缺失时明确报错并中止，不装半成品）；输出名 `LM-0.292.3-beta23.3-test-nogcupayload-setup.exe`。
 - GCU 状态条点击：GCU 机型未连接/未安装时，可直接从外置 GCU 包（同目录 GCU.7z / GCU\ 或手选 .7z）导入并调用 Install-Gcu.ps1 安装；非 GCU 后端（宝龙达/老接口）不弹导入、只刷新状态。内置 7za 资源用于解包（LGPL-2.1）。
+- GCU 导入支持按内容识别：改名后的 .7z/.zip、以及已解压的 AiStoneService 目录树，都会按 GCUService.exe 版本/体积判变体并重打包成标准变体 7z（rar 不支持，7za 无 RAR 解码）。
 r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 + 键盘灯开机闪与关灯被拉亮 + 30 系每配置本地化 + APU 防缩缸记忆 + 安装器简化 + 宝龙达机型识别/多档修复
 
 一、灯效（40 系同方）
