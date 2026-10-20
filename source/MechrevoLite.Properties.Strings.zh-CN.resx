@@ -5697,4 +5697,20 @@
   <data name="SmuFastTimeLabel" xml:space="preserve">
     <value>快速提升持续时间（s）</value>
   </data>
+
+  <data name="GcuImportTitle" xml:space="preserve">
+    <value>导入 GCU</value>
+  </data>
+  <data name="GcuImportAsk" xml:space="preserve">
+    <value>检测到本机尚未安装/连接 GCU。是否从外置 GCU 包导入并安装？\n\n支持：与 L-Mechrevo 同目录的 GCU.7z 或 GCU 文件夹（也可手动选择）。</value>
+  </data>
+  <data name="GcuImportNoPackage" xml:space="preserve">
+    <value>所选位置没有可用的 GCU 变体包（.7z）。</value>
+  </data>
+  <data name="GcuImportDone" xml:space="preserve">
+    <value>GCU 安装完成。请重启 L-Mechrevo 以连接 GCU。</value>
+  </data>
+  <data name="GcuImportFailed" xml:space="preserve">
+    <value>GCU 安装失败（退出码 {0}）。请查看安装日志后再试。</value>
+  </data>
 </root>

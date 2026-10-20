@@ -7757,8 +7757,13 @@ public class SettingsForm : RForm
 			Cursor = Cursors.Hand,
 			
 		};
-		_labelGcuStatus.Click += (object? _, EventArgs _) =>
+		_labelGcuStatus.Click += async (object? _, EventArgs _) =>
 		{
+			// GCU 机型但未连接/未安装 ⇒ 提供外置包导入；非 GCU 机型只刷新状态
+			if (GcuPackageImport.ShouldOffer())
+			{
+				await GcuPackageImport.OfferAsync(this);
+			}
 			RefreshGcuStatus();
 		};
 		_panelGcuStatus.Controls.Add(_labelGcuStatus);

@@ -5714,4 +5714,20 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
   <data name="SmuFastTimeLabel" xml:space="preserve">
     <value>Fast Boost Duration (s)</value>
   </data>
+
+  <data name="GcuImportTitle" xml:space="preserve">
+    <value>Import GCU</value>
+  </data>
+  <data name="GcuImportAsk" xml:space="preserve">
+    <value>GCU is not installed/connected on this machine. Import and install an external GCU package now?\n\nSupported: GCU.7z or a GCU folder next to L-Mechrevo (you can also pick a file manually).</value>
+  </data>
+  <data name="GcuImportNoPackage" xml:space="preserve">
+    <value>No usable GCU variant package (.7z) found at the selected location.</value>
+  </data>
+  <data name="GcuImportDone" xml:space="preserve">
+    <value>GCU installation finished. Restart L-Mechrevo to connect to GCU.</value>
+  </data>
+  <data name="GcuImportFailed" xml:space="preserve">
+    <value>GCU installation failed (exit code {0}). Check the install logs and try again.</value>
+  </data>
 </root>
