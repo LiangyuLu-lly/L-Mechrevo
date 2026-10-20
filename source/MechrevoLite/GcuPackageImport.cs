@@ -161,6 +161,18 @@ internal static class GcuPackageImport
 			string installVariant = ((stagedVariants.Length == 1) ? stagedVariants[0] : "Auto");
 			if (stagedVariants.Length == 1)
 			{
+				// 单变体：仍做一次“本机需要 vs 实际提供”的校验提示（不阻止，用户确认后按所选变体安装）
+				string expectedSingle = ExpectedVariant();
+				if (expectedSingle != null && !string.Equals(expectedSingle, installVariant, StringComparison.OrdinalIgnoreCase))
+				{
+					if (MessageBox.Show(owner, "本机需要 " + expectedSingle + " 系 GCU，实际提供：" + installVariant + " 系 GCU"
+						+ Environment.NewLine + Environment.NewLine + "仍要安装手动选择的 " + installVariant + " 系 GCU 吗？",
+						Strings.GcuImportTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+					{
+						return;
+					}
+					Logger.WriteError("[gcu-import] 用户确认：按手动选择的变体安装 " + installVariant + "（本机需要 " + expectedSingle + "）");
+				}
 				Logger.WriteError("[gcu-import] 单变体包 ⇒ 直接安装变体 " + installVariant + "（不按硬件 Auto 选择）");
 			}
 			else
