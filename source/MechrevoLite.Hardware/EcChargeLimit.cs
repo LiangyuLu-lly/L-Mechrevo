@@ -414,19 +414,6 @@ internal static class EcChargeLimit
 			Logger.WriteLine($"限充写入被拒绝：本机 GcuVariant 属 10/16/20/30 系 ⇒ EC 直写方式整体禁用（可能损坏硬件，只保留 GCU 路）；请求 {percent}% 未下发，⛔ 未写任何寄存器");
 			return false;
 		}
-		// 优先走厂商 WMI mailbox 写存储上限 0x087F（写入即持久，无需临时开门）；
-		// 失败（无该类/无 mailbox/写入不落）⇒ 原样退回 0x07B9 + 临时门控路径，行为与改前一致。
-		if (WmiStoredLimitProbe.TryWriteStoredLimit(percent, out string bPathDetail))
-		{
-			appliedPercent = percent;
-			RecordVerdict(ChargeLimitVerdict.Verified);
-			Logger.WriteError("[charge-limit] B 路生效 ⇒ 不再走 0x07B9/门控（" + bPathDetail + "）");
-			return true;
-		}
-		if (!string.IsNullOrEmpty(bPathDetail))
-		{
-			Logger.WriteLineIfChanged("charge-limit-b-path-skip", "[charge-limit] B 路未生效，退回 0x07B9+门控：" + bPathDetail);
-		}
 		lock (Gate)
 		{
 			nint num = CreateFile("\\\\.\\ACPIDriver", 3221225472u, 3u, IntPtr.Zero, 3u, 0u, IntPtr.Zero);
@@ -507,8 +494,16 @@ internal static class EcChargeLimit
 					// 0x7D0 + 0x7B9 并整次返回 false）—— 多出一个本不该存在的失败模式，且 0x7D0 的语义
 					// 在不同机型上未必一致。现在：**0x7D0 只读、不写、不回滚**，上限成败只由 0x07B9
 					// （掩掉 bit7 后）决定；只读观察见 ScheduleLowerBoundObservation（2.5s 后等固件推完再看）。
-					appliedPercent = PercentFor(upperReadback);
-					return appliedPercent == PercentFor(num2);
+					bool applied = appliedPercent == PercentFor(num2);
+					if (applied)
+					{
+						// best-effort：把同一上限写进存储区 0x087F（不参与成败判定）
+						if (WmiStoredLimitProbe.TryWriteStoredLimit(percent, out string bPersistDetail))
+						{
+							Logger.WriteError("[charge-limit] 已将上限写入存储区 0x087F（持久化）：" + bPersistDetail);
+						}
+					}
+					return applied;
 				}
 				finally
 				{
