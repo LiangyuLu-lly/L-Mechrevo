@@ -40,8 +40,6 @@ internal static class GcuPackageImport
 		}
 		return !hw.IsConnected || !MechrevoHw.IsGcuServiceInstalled;
 	}
-		return !hw.IsConnected || !MechrevoHw.IsGcuServiceInstalled;
-	}
 
 	/// <summary>弹引导 → 选包 → 解出变体 payload → 调用安装脚本。</summary>
 	internal static async Task OfferAsync(IWin32Window owner)
