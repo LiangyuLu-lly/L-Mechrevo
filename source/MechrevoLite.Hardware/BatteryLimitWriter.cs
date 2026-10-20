@@ -47,6 +47,11 @@ internal static class BatteryLimitWriter
 		high = -1;
 		low = -1;
 		mode = -1;
+		if (!BatteryLimitPlatform.IsBaolongdaMachine())
+		{
+			detail = "非宝龙达机型 ⇒ 不读 EC（0 读 0 写）";
+			return false;
+		}
 		bool highOk = ReadEc(HighRegister, out high);
 		bool lowOk = ReadEc(LowRegister, out low);
 		bool modeOk = ReadEc(ModeRegister, out mode);
@@ -69,6 +74,11 @@ internal static class BatteryLimitWriter
 		StringBuilder log = new StringBuilder();
 		try
 		{
+			if (!BatteryLimitPlatform.IsBaolongdaMachine())
+			{
+				detail = "非宝龙达机型 ⇒ 不执行限充写入（0 读 0 写）";
+				return false;
+			}
 			if (!(low > 0 && low < high && high <= 100))
 			{
 				detail = "参数非法：要求 0 < low < high <= 100（收到 low=" + low + " high=" + high + "）";
@@ -204,6 +214,11 @@ internal static class BatteryLimitWriter
 		StringBuilder log = new StringBuilder();
 		try
 		{
+			if (!BatteryLimitPlatform.IsBaolongdaMachine())
+			{
+				detail = "非宝龙达机型 ⇒ 不执行限充写入（0 读 0 写）";
+				return false;
+			}
 			if (!EcPortIo.TryReadEcIdentityAcpi(out _, out _, out string idNote))
 			{
 				detail = "⛔ EC 身份未通过：" + idNote;
