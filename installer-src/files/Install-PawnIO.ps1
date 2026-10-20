@@ -30,13 +30,12 @@ try {
             $officialUrl,
             ('https://gh-proxy.com/' + $officialUrl),
             ('https://ghfast.top/' + $officialUrl),
-            ('https://hub.gitmirror.com/' + $officialUrl),
-            ('https://ghproxy.net/' + $officialUrl)
+            ('https://hub.gitmirror.com/' + $officialUrl)
         )
         $downloaded = $false
         foreach ($url in $downloadUrls) {
             try {
-                Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $InstallerPath -TimeoutSec 60
+                Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $InstallerPath -TimeoutSec 30
                 if ((Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash -eq $expectedHash) {
                     Write-Output ('PawnIO downloaded from: ' + (($url -split '/')[2]))
                     $downloaded = $true
