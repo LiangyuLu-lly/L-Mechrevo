@@ -63,9 +63,12 @@ internal static class GcuPackageImport
 			source = null;
 		}
 		{
+			MessageBox.Show(owner, "请把 GCU 包（.7z/.zip）或已解压的 GCU 目录放进一个名为「GCU」的文件夹，" +
+				Environment.NewLine + "然后在下一步选择该文件夹。", Strings.GcuImportTitle,
+				MessageBoxButtons.OK, MessageBoxIcon.Information);
 			using FolderBrowserDialog folderDialog = new FolderBrowserDialog
 			{
-				Description = Strings.GcuImportTitle + "：请选择名为 GCU 的文件夹（内含 GCU 包或已解压的服务目录）",
+				Description = "选择 GCU 文件夹",
 				ShowNewFolderButton = false,
 				SelectedPath = folder
 			};

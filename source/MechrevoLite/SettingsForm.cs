@@ -648,9 +648,7 @@ public class SettingsForm : RForm
 
 	private Label? _unsupportedModelLabel;
 
-	private RTextBox? _modelOverrideBox;
 
-	private Label? _modelOverrideStatus;
 
 	private static readonly string[] WriteEntryControlNames = new string[7] { "sliderBattery", "buttonEco", "buttonStandard", "buttonUltimate", "buttonTurbo", "buttonSilentTurbo", "buttonCustomMode" };
 
@@ -9940,10 +9938,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			CheckBox owner = FindQuickSwitch(tile.Tag as string);
 			tile.Enabled = ((owner == null) || owner.Enabled);
 		}
-		if (_modelOverrideBox != null)
-		{
-			_modelOverrideBox.Enabled = true;
-		}
 	}
 
 	// ============================================================================================
@@ -10171,7 +10165,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			Name = "tableUnsupportedModelNotice",
 			Dock = DockStyle.Fill,
 			ColumnCount = 1,
-			RowCount = 2,
+			RowCount = 1,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			ColumnStyles = 
@@ -10180,7 +10174,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			},
 			RowStyles = 
 			{
-				new RowStyle(SizeType.AutoSize),
 				new RowStyle(SizeType.AutoSize)
 			},
 			Controls = { 
@@ -10190,84 +10183,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				0
 			} }
 		};
-		TableLayoutPanel tableLayoutPanel2 = new TableLayoutPanel
-		{
-			Name = "rowModelOverride",
-			Dock = DockStyle.Fill,
-			ColumnCount = 5,
-			RowCount = 1,
-			AutoSize = true,
-			AutoSizeMode = AutoSizeMode.GrowAndShrink,
-			
-		};
-		tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(70)));
-		tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-		tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(64)));
-		tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(64)));
-		tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(120)));
-		Label control = new Label
-		{
-			Text = Strings.ManualModel,
-			Dock = DockStyle.Fill,
-			ForeColor = UiVisualStyle.Muted,
-			TextAlign = ContentAlignment.MiddleLeft,
-			AutoEllipsis = true,
-			Font = UiVisualStyle.Font(8.5f)
-		};
-		_modelOverrideBox = new RTextBox
-		{
-			Name = "textModelOverride",
-			Dock = DockStyle.Fill,
-			AutoSize = false,
-			Height = D(24),
-			Font = UiVisualStyle.Font(8.5f),
-			Text = (ModelOverrideStateMachine.ReadConfiguredManualModel() ?? "")
-		};
-		_modelOverrideStatus = new Label
-		{
-			Name = "labelModelOverrideStatus",
-			Dock = DockStyle.Fill,
-			ForeColor = UiVisualStyle.Muted,
-			TextAlign = ContentAlignment.MiddleLeft,
-			AutoEllipsis = true,
-			Font = UiVisualStyle.Font(8.5f)
-		};
-		RButton rButton = new RButton
-		{
-			Name = "buttonModelOverrideApply",
-			Text = Strings.Apply,
-			Dock = DockStyle.Fill,
-			AutoSize = true
-		};
-		RButton rButton2 = new RButton
-		{
-			Name = "buttonModelOverrideAuto",
-			Text = Strings.Auto,
-			Dock = DockStyle.Fill,
-			AutoSize = true
-		};
-		rButton.Click += (object? _, EventArgs _) =>
-		{
-			bool flag = ModelOverrideStateMachine.TrySetManual(_modelOverrideBox?.Text, out SupportDecision decision);
-			if (flag)
-			{
-				ModelOverrideStateMachine.SetMode(ModelOverrideMode.ManualPinned);
-			}
-			_modelOverrideStatus.Text = (flag ? Strings.ModelOverridePinned : string.Format(Strings.ModelOverrideInvalid, decision.Reason));
-			_modelOverrideStatus.ForeColor = (flag ? UiVisualStyle.Text : UiVisualStyle.Danger);
-		};
-		rButton2.Click += (object? _, EventArgs _) =>
-		{
-			ModelOverrideStateMachine.SetMode(ModelOverrideMode.Auto);
-			_modelOverrideStatus.Text = Strings.ModelOverrideAuto;
-			_modelOverrideStatus.ForeColor = UiVisualStyle.Muted;
-		};
-		tableLayoutPanel2.Controls.Add(control, 0, 0);
-		tableLayoutPanel2.Controls.Add(_modelOverrideBox, 1, 0);
-		tableLayoutPanel2.Controls.Add(rButton, 2, 0);
-		tableLayoutPanel2.Controls.Add(rButton2, 3, 0);
-		tableLayoutPanel2.Controls.Add(_modelOverrideStatus, 4, 0);
-		tableLayoutPanel.Controls.Add(tableLayoutPanel2, 0, 1);
 		return tableLayoutPanel;
 	}
 
