@@ -49,7 +49,14 @@ r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 
 - 导出/导入设置：白名单补 logolight.cfg、lighting.user-configured、fan_curve_bd.cfg，新增 baolongda_fancurve_*.cfg 通配；新增 customICC 子目录（.icc/.icm）导入导出。
 - APU 防缩缸：状态改为 AC/DC 两套处理器性能提升模式都为 5 才算开；用户意图存 apuboost，启动时 ApplyApuAntiDegradeOnStartup 恢复；关闭时分别还原 AC/DC 原值。
 
-六、机型识别（宝龙达）
+六、安装器（外置 GCU 包）
+- 新增外置 GCU 载荷识别（优先于内置载荷）：setup 同目录的 `GCU\` 文件夹、`GCU.7z`、或直接放的 `<变体>.7z`（1020/30/40/50/WJXY）。
+- `GCU.7z` 支持三种内部布局：根目录 / `GCU\` 子目录 / `payload\` 子目录；也支持 `GCU\GCU.7z`。
+- 外置包可只含单个变体（例如只放 40.7z）：命中本机变体即用它，未提供的变体才回退内置载荷。
+- 外置包解出后仍走原安装脚本（厂商签名校验、变体选择、清理临时文件逻辑不变）。
+- 全部走内置载荷时行为与之前完全一致。
+
+七、机型识别（宝龙达）
 - 现象（0.292.3 真机诊断包）：板号 MRID6-23 命中白名单 ✅，但运行日志 [gate] baolongda=False、backend=Gcu，界面「GCU 未连接」。
 - 根因：MechrevoBackendOrder.Candidates 是命令式候选表，GCU 排第一、判据只有“装了 GCU 服务”；蛟龙同时装了 GCU 载荷 ⇒ GCU 抢先 ⇒ 宝龙达后端没轮到。
 - 修复：GCU 候选增加“板号未命中宝龙达白名单”条件 ⇒ 宝龙达机型先走宝龙达后端；同方机型行为不变。

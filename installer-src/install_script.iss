@@ -2507,31 +2507,124 @@ begin
   Result := not IsBaolongdaMold();
 end;
 
+function GcuArchiveName(Index: Integer): String;
+begin
+  case Index of
+    0: Result := '1020.7z';
+    1: Result := '30.7z';
+    2: Result := '40.7z';
+    3: Result := '50.7z';
+    4: Result := 'WJXY.7z';
+  else
+    Result := '';
+  end;
+end;
+
+// 外置 GCU 包：在下面三种位置找 payload（只需含本机需要的变体即可）
+//   ① setup 同目录\GCU\<变体>.7z
+//   ② setup 同目录\GCU.7z（内含任意子集，扁平/GCU\/payload\ 三层布局都认）
+//   ③ setup 同目录直接放 <变体>.7z
+function FindStagedGcuFile(Root, Name: String): String;
+var
+  Candidates: TArrayOfString;
+  I: Integer;
+begin
+  Result := '';
+  SetArrayLength(Candidates, 3);
+  Candidates[0] := AddBackslash(Root) + Name;
+  Candidates[1] := AddBackslash(Root) + 'payload\' + Name;
+  Candidates[2] := AddBackslash(Root) + 'GCU\' + Name;
+  for I := 0 to GetArrayLength(Candidates) - 1 do
+    if FileExists(Candidates[I]) then
+    begin
+      Result := Candidates[I];
+      Exit;
+    end;
+end;
+
+function StageExternalGcuPayloads(): Boolean;
+var
+  BaseDir, ExtDir, ExtArchive, ExtractedDir, Src, Dest: String;
+  I, Found, ResultCode: Integer;
+begin
+  Result := False;
+  BaseDir := ExtractFileDir(ExpandConstant('{srcexe}'));
+  ExtDir := AddBackslash(BaseDir) + 'GCU';
+  ExtArchive := AddBackslash(BaseDir) + 'GCU.7z';
+  ForceDirectories(ExpandConstant('{tmp}\payload'));
+  Found := 0;
+  // ① 同目录 GCU\ 文件夹
+  if DirExists(ExtDir) then
+  begin
+    for I := 0 to 4 do
+    begin
+      Dest := ExpandConstant('{tmp}\payload\' + GcuArchiveName(I));
+      Src := AddBackslash(ExtDir) + GcuArchiveName(I);
+      if FileExists(Src) and CopyFile(Src, Dest, False) then
+        Found := Found + 1;
+    end;
+    if Found > 0 then
+      Log('LM-GCU-EXT: 同目录 GCU\ 文件夹载荷已就绪（' + IntToStr(Found) + ' 个变体）');
+  end;
+  // ② 同目录 GCU.7z（或 GCU\ 文件夹里再套一个 GCU.7z）——用内置 7za 解出
+  if (Found = 0) and not FileExists(ExtArchive) then
+  begin
+    if FileExists(AddBackslash(ExtDir) + 'GCU.7z') then
+      ExtArchive := AddBackslash(ExtDir) + 'GCU.7z';
+  end;
+  if (Found = 0) and FileExists(ExtArchive) and FileExists(ExpandConstant('{tmp}\7za.exe')) then
+  begin
+    ExtractedDir := ExpandConstant('{tmp}\gcu_ext');
+    if Exec(ExpandConstant('{tmp}\7za.exe'), 'x -y -o"' + ExtractedDir + '" "' + ExtArchive + '"',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      for I := 0 to 4 do
+      begin
+        Src := FindStagedGcuFile(ExtractedDir, GcuArchiveName(I));
+        Dest := ExpandConstant('{tmp}\payload\' + GcuArchiveName(I));
+        if (Src <> '') and CopyFile(Src, Dest, False) then
+          Found := Found + 1;
+      end;
+      if Found > 0 then
+        Log('LM-GCU-EXT: 同目录 GCU.7z 已解出外置载荷（' + IntToStr(Found) + ' 个变体）');
+    end
+    else
+      Log('LM-GCU-EXT: GCU.7z 解压失败（7za exit=' + IntToStr(ResultCode) + '）=> 回退内置载荷');
+  end;
+  // ③ 同目录直接放 <变体>.7z（单变体包）
+  if Found = 0 then
+  begin
+    for I := 0 to 4 do
+    begin
+      Src := AddBackslash(BaseDir) + GcuArchiveName(I);
+      Dest := ExpandConstant('{tmp}\payload\' + GcuArchiveName(I));
+      if FileExists(Src) and CopyFile(Src, Dest, False) then
+        Found := Found + 1;
+    end;
+    if Found > 0 then
+      Log('LM-GCU-EXT: 同目录单变体载荷已就绪（' + IntToStr(Found) + ' 个变体）');
+  end;
+  if Found > 0 then
+    Log('LM-GCU-EXT: 外置 GCU 载荷共 ' + IntToStr(Found) + ' 个变体；缺失变体稍后用内置载荷补齐');
+  Result := Found > 0;
+end;
+
 function ExtractGcuStagingTemporaries(): String;
 var
   I: Integer;
   Failed: String;
   GcuStagingFiles: TArrayOfString;
+  Dest, Src: String;
 begin
   Result := '';
-  // ⭐ 2026-10-16（GCU 分离包）：本包不含 GCU => 没有 dontcopy 载荷可解，直接返回空
   if NoGcuPackage() then begin Log('LM-GCU-SKIP: 本包不含 GCU（/DNOGCU）=> 不准备也不落地 GCU'); Exit; end;
   Failed := '';
-  // ⭐⭐ 2026-10-16（宝龙达适配）：⭐ **宝龙达机型必须在这里提前退出** ✅
-  //   ⚠️ 理由（⭐ 这是个**真会踩到的坑** ⚠️）：⭐ 上面那 6 件载荷在 [Files] 里带了
-  //      `Check: ShouldInstallGcu` ⇒ ⭐ 宝龙达机型上它们**不随安装包准备** ✅
-  //      ⇒ ⭐ 若还去 `ExtractTemporaryFile` ⇒ ⭐ **每一件都失败** ⇒ ⭐ `Failed` 非空
-  //      ⇒ ⭐ 返回非空 ⇒ ⭐ `PrepareToInstall` 会 `Exit` ⇒ ⭐ ⭐ **安装被中止** ❌❌
-  //   ⇒ ⭐ 所以这里必须**先判、先退出** ✅（⭐ 宝龙达本来就不装 GCU，⭐ 无需载荷 ✅）
   if IsBaolongdaMold() then
   begin
     Log('LM-GCU-SKIP: 宝龙达机型 => 跳过 GCU 载荷解压（本机不安装 GCU，无载荷需求）');
     Result := '';
     Exit;
   end;
-  // ⚠️ 用 TArrayOfString + SetArrayLength（本文件 [Code] 里既有的写法），⛔ 不用
-  //    「const <name>: array[0..5] of String = (...)」——Inno 的 Pascal Script 不接受
-  //    函数内 const 段里的定长数组字面量，会直接报 "'BEGIN' expected" 编译中止。
   SetArrayLength(GcuStagingFiles, 6);
   GcuStagingFiles[0] := '1020.7z';
   GcuStagingFiles[1] := '30.7z';
@@ -2539,50 +2632,49 @@ begin
   GcuStagingFiles[3] := '50.7z';
   GcuStagingFiles[4] := 'WJXY.7z';
   GcuStagingFiles[5] := '7za.exe';
-  for I := 0 to GetArrayLength(GcuStagingFiles) - 1 do
-  begin
-    try
-      ExtractTemporaryFile(GcuStagingFiles[I]);
-    except
-      Log('LM-GCU: 临时文件解出失败（dontcopy）: ' + GcuStagingFiles[I]);
-      if Failed <> '' then
-        Failed := Failed + ', ';
-      Failed := Failed + GcuStagingFiles[I];
-    end;
+  // 先解出 7za.exe（外置 GCU.7z 解压需要）
+  try
+    ExtractTemporaryFile('7za.exe');
+  except
+    Log('LM-GCU: 7za.exe 临时解出失败（若用外置 GCU.7z 将无法解压）');
   end;
-  // 2026-10-14 (r29 fix): ExtractTemporaryFile only accepts BARE file names - the [Files]
-  // entries put these files flat in {tmp}. Rebuild the payload\ sub-directory the install-time
-  // script expects: move the 5 archives into {tmp}\payload\ (7za.exe stays in the {tmp} root,
-  // which is exactly where Install-Gcu.ps1 looks for it: Join-Path  '7za.exe').
-  // Any move failure is fatal for the same reason the extraction above is: better abort than
-  // install without the GCU payload.
-  if Failed = '' then
+  // 外置 GCU 包优先（单变体也可用）
+  StageExternalGcuPayloads();
+  // 内置载荷补齐缺失变体
+  for I := 0 to 4 do
   begin
-    ForceDirectories(ExpandConstant('{tmp}\payload'));
-    for I := 0 to 4 do
+    Dest := ExpandConstant('{tmp}\payload\' + GcuStagingFiles[I]);
+    if not FileExists(Dest) then
     begin
-      if not RenameFile(ExpandConstant('{tmp}\' + GcuStagingFiles[I]),
-                        ExpandConstant('{tmp}\payload\' + GcuStagingFiles[I])) then
-      begin
-        Log('LM-GCU: temporary staging rearrange failed: ' + GcuStagingFiles[I]);
-        if Failed <> '' then
-          Failed := Failed + ', ';
+      try
+        ExtractTemporaryFile(GcuStagingFiles[I]);
+        Src := ExpandConstant('{tmp}\' + GcuStagingFiles[I]);
+        if not RenameFile(Src, Dest) then
+        begin
+          if Failed <> '' then Failed := Failed + ', ';
+          Failed := Failed + GcuStagingFiles[I];
+        end;
+      except
+        Log('LM-GCU: 临时文件解出失败（dontcopy）: ' + GcuStagingFiles[I]);
+        if Failed <> '' then Failed := Failed + ', ';
         Failed := Failed + GcuStagingFiles[I];
       end;
     end;
-    if Failed <> '' then
-      Result := 'GCU 安装所需的临时文件无法从安装包中解出（' + Failed + '）。' + #13#10 +
-                '安装已中止：继续下去只会得到一个没有 GCU 本体的安装目录。' + #13#10 + #13#10 +
-                'Failed to stage the GCU install-time temporary files (' + Failed + ').' + #13#10 +
-                'Setup was aborted rather than leaving an installation without the GCU payload.';
+  end;
+  if not FileExists(ExpandConstant('{tmp}\7za.exe')) then
+  begin
+    try
+      ExtractTemporaryFile('7za.exe');
+    except
+      if Failed <> '' then Failed := Failed + ', ';
+      Failed := Failed + '7za.exe';
+    end;
   end;
   if Failed <> '' then
-    Result := 'GCU 安装所需的临时文件无法从安装包中解出（' + Failed + '）。' + #13#10 +
-              '安装已中止：继续下去只会得到一个没有 GCU 本体的安装目录。' + #13#10 + #13#10 +
-              'Failed to extract the GCU install-time temporary files (' + Failed + ').' + #13#10 +
-              'Setup was aborted rather than leaving an installation without the GCU payload.';
+    Result := 'GCU 安装所需的载荷无法准备齐全（' + Failed + '）。' + #13#10 +
+      '若使用外置 GCU 包，请确认包内含本机需要的变体；或改用含内置载荷的完整安装包。' + #13#10 + #13#10 +
+      'Failed to prepare the GCU payload (' + Failed + ').';
 end;
-
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   GcuTarget: String;
