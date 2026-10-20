@@ -14298,6 +14298,18 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				return;
 			}
 		}
+		// 本机配置机型（宝龙达 / 无界 APU）：内置档位只记录到本机（没有可下发的固件档），
+		// 这样「上次选的是静音/平衡/狂暴」会持久化，重启不会自动跳回自定义档。
+		MechrevoHw modeHw = Program.hw;
+		if (modeHw != null && (modeHw.UsesBaolongda || modeHw.WujieSmuApu))
+		{
+			int visualMode = MechrevoService.ToVisualMode(mode);
+			NotifyPerfModeState(visualMode, silentTurbo);
+			ShowMode(visualMode);
+			SetContextMenu();
+			Logger.WriteError("[perfmode] 本机配置机型：选择内置档 " + visualMode + " ⇒ 仅记录 ActiveModeId（不发固件档命令）");
+			return;
+		}
 		int request = Interlocked.Increment(ref _performanceRequest);
 		ShowMode(MechrevoService.ToVisualMode(mode));
 		if (mode == 1 && buttonSilentTurbo != null)
