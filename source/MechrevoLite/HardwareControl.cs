@@ -2436,8 +2436,27 @@ public static class HardwareControl
 		{
 			if (AdlPowerReader.TryRead(out float adlPower, out string adlSource))
 			{
-				gpuPower = adlPower;
-				string adlSelected = "[gpu-power] AMD 核显功耗来源=" + adlSource + " ⇒ " + adlPower.ToString("F1") + "W（优先于 LHM）";
+				// 部分 ADL 版本在 APU 上按 0.1W 上报（例如 400 实为 40.0W）；核显功耗不可能 >200W
+				string adlUnitNote = "";
+				if (adlPower > 200f)
+				{
+					float converted = adlPower / 10f;
+					if (converted <= 200f)
+					{
+						adlUnitNote = "（原始值疑似 0.1W 单位 ⇒ 除以 10）";
+						adlPower = converted;
+					}
+					else
+					{
+						Logger.WriteLine("[gpu-power] ⛔ ADL 核显功耗读数不可信（" + adlPower.ToString("F1") + "W，超出核显合理上限）⇒ 丢弃");
+						adlPower = 0f;
+					}
+				}
+				if (adlPower > 0f)
+				{
+					gpuPower = adlPower;
+				}
+				string adlSelected = "[gpu-power] AMD 核显功耗来源=" + adlSource + " ⇒ " + adlPower.ToString("F1") + "W" + adlUnitNote + "（优先于 LHM）";
 				if (Logger.TryMarkChanged("gpu-power-adl-selected", adlSelected))
 				{
 					Logger.WriteError(adlSelected);

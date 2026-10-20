@@ -81,6 +81,12 @@ internal sealed class PerfModeService
 
 	public IReadOnlyList<PerfModeDefinition> Modes => _modes ?? (_modes = PerfModeStore.Load());
 
+	/// <summary>丢弃缓存、从存储重新读取全部档位（用于切档后强制刷新界面）。</summary>
+	internal void ReloadModesFromStore()
+	{
+		_modes = PerfModeStore.Load();
+	}
+
 	public string ActiveModeId => PerfModeStore.ActiveModeId;
 
 	public string? PendingModeId => Volatile.Read(in _pendingModeId);

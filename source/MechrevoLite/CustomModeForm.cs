@@ -2502,9 +2502,12 @@ public class CustomModeForm : RForm
 			// 选中哪一档就把「当前档」切到哪一档（否则后续刷新会按 ActiveModeId 绑回第一个自定义档）
 			PerfModeService perfBd = PerfModeService.Instance;
 			perfBd?.ActivateLocalProfile(id);
+			// 切档后强制从存储重读该档配置并刷新一次界面（避免界面停留在上一档的值）
+			perfBd?.ReloadModesFromStore();
+			BindMode(id);
 			_status.Text = Strings.PerfModeLocalProfileSwitched;
 			_status.ForeColor = UiVisualStyle.Muted;
-			Logger.WriteLine("[perfmode] 宝龙达：模式下拉切到 " + id + "（本机配置，无固件档可切）");
+			Logger.WriteLine("[perfmode] 宝龙达：模式下拉切到 " + id + "（本机配置，无固件档可切；已重读配置并刷新界面）");
 			return true;
 		}
 		// （机主：无界 APU 点自定义后模式仍显示「平衡」+ 红字）：与宝龙达同款「本机配置」分支 ——
@@ -2512,8 +2515,12 @@ public class CustomModeForm : RForm
 		{
 			PerfModeService perf = PerfModeService.Instance;
 			perf?.ActivateLocalProfile(id);
+			// 切档后强制从存储重读该档配置并刷新一次界面（避免界面停留在上一档的值）
+			perf?.ReloadModesFromStore();
+			BindMode(id);
 			_status.Text = Strings.PerfModeLocalProfileSwitched;
 			_status.ForeColor = UiVisualStyle.Muted;
+			Logger.WriteLine("[perfmode] 无界 APU：模式下拉切到 " + id + "（本机配置，无固件档可切；已重读配置并刷新界面）");
 			return true;
 		}
 		bool ok = await ActivateModeAsync(id);
