@@ -22,7 +22,6 @@ namespace MechrevoLite;
 /// </summary>
 internal static class GcuPackageImport
 {
-	private const string SevenZipResource = "L-Mechrevo.7za.exe";
 
 	private static readonly string[] VariantArchives = { "1020.7z", "30.7z", "40.7z", "50.7z", "WJXY.7z" };
 
@@ -52,58 +51,92 @@ internal static class GcuPackageImport
 		{
 			source = folder;
 		}
+		// 自动检测到包：确认；选「否」= 改手动选择
 		if (source != null)
 		{
-			// 自动检测到包时先确认；选「否」= 手动选别的位置
-			string ask = NormalizeNewlines(Strings.GcuImportAsk) + Environment.NewLine + Environment.NewLine + source;
-			if (MessageBox.Show(owner, ask, Strings.GcuImportTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+			string askAuto = NormalizeNewlines(Strings.GcuImportAsk) + Environment.NewLine + Environment.NewLine + source;
+			if (MessageBox.Show(owner, askAuto, Strings.GcuImportTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 			{
-				goto accepted;
+				goto confirmedWithoutGoto;
 			}
 			source = null;
 		}
+		if (source == null)
 		{
-			MessageBox.Show(owner, "请把 GCU 包（.7z/.zip）或已解压的 GCU 目录放进一个名为「GCU」的文件夹，" +
-				Environment.NewLine + "然后在下一步选择该文件夹。", Strings.GcuImportTitle,
-				MessageBoxButtons.OK, MessageBoxIcon.Information);
-			using FolderBrowserDialog folderDialog = new FolderBrowserDialog
-			{
-				Description = "选择 GCU 文件夹",
-				ShowNewFolderButton = false,
-				SelectedPath = folder
-			};
-			if (folderDialog.ShowDialog(owner) != DialogResult.OK)
+			DialogResult choice = MessageBox.Show(owner,
+				"请选择 GCU 包的形式：" + Environment.NewLine + Environment.NewLine +
+				"「是」= 选择压缩包文件（.7z / .zip，支持改过名字的）" + Environment.NewLine +
+				"「否」= 选择 GCU 文件夹（已解压目录，或把包放在名为 GCU 的文件夹里）" + Environment.NewLine +
+				"「取消」= 放弃导入",
+				Strings.GcuImportTitle, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+			if (choice == DialogResult.Cancel)
 			{
 				return;
 			}
-			string selected = folderDialog.SelectedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-			string nested = Path.Combine(selected, "GCU");
-			if (string.Equals(Path.GetFileName(selected), "GCU", StringComparison.OrdinalIgnoreCase))
+			if (choice == DialogResult.Yes)
 			{
-				source = selected;
-			}
-			else if (Directory.Exists(nested))
-			{
-				source = nested;
+				using OpenFileDialog fileDialog = new OpenFileDialog
+				{
+					Title = "选择 GCU 压缩包",
+					Filter = "GCU 包 (*.7z;*.zip)|*.7z;*.zip|所有文件 (*.*)|*.*",
+					CheckFileExists = true
+				};
+				if (fileDialog.ShowDialog(owner) != DialogResult.OK)
+				{
+					return;
+				}
+				source = fileDialog.FileName;
 			}
 			else
 			{
-				MessageBox.Show(owner, "请把 GCU 包或已解压的 GCU 目录放进一个名为「GCU」的文件夹后再选它。" +
-					Environment.NewLine + Environment.NewLine +
-					"（直接选下载目录这类文件夹不会被扫描，避免误识别无关压缩包）",
-					Strings.GcuImportTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-				return;
+				MessageBox.Show(owner, "请把 GCU 包（.7z/.zip）或已解压的 GCU 目录放进一个名为「GCU」的文件夹，" +
+					Environment.NewLine + "然后在下一步选择该文件夹。", Strings.GcuImportTitle,
+					MessageBoxButtons.OK, MessageBoxIcon.Information);
+				using FolderBrowserDialog folderDialog = new FolderBrowserDialog
+				{
+					Description = "选择 GCU 文件夹",
+					ShowNewFolderButton = false,
+					SelectedPath = folder
+				};
+				if (folderDialog.ShowDialog(owner) != DialogResult.OK)
+				{
+					return;
+				}
+				string selected = folderDialog.SelectedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+				string nested = Path.Combine(selected, "GCU");
+				if (string.Equals(Path.GetFileName(selected), "GCU", StringComparison.OrdinalIgnoreCase))
+				{
+					source = selected;
+				}
+				else if (Directory.Exists(nested))
+				{
+					source = nested;
+				}
+				else
+				{
+					MessageBox.Show(owner, "请把 GCU 包或已解压的 GCU 目录放进一个名为「GCU」的文件夹后再选它。" +
+						Environment.NewLine + Environment.NewLine +
+						"（直接选下载目录这类文件夹不会被扫描，避免误识别无关压缩包）",
+						Strings.GcuImportTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+					return;
+				}
 			}
 		}
-		accepted:
+		if (MessageBox.Show(owner, NormalizeNewlines(Strings.GcuImportAsk) + Environment.NewLine + Environment.NewLine + source,
+			Strings.GcuImportTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+		{
+			return;
+		}
+	confirmedWithoutGoto:
+		if (source == null)
+		{
+			return;
+		}
 		string staging = Path.Combine(Path.GetTempPath(), "lm-gcu-import-" + Guid.NewGuid().ToString("N"));
-		string toolDir = Path.Combine(Path.GetTempPath(), "lm-gcu-tool-" + Guid.NewGuid().ToString("N"));
 		try
 		{
 			Directory.CreateDirectory(Path.Combine(staging, "payload"));
-			Directory.CreateDirectory(toolDir);
-			string sevenZip = Path.Combine(toolDir, "7za.exe");
-			ExtractSevenZip(sevenZip);
+			string sevenZip = ResolveSevenZip();
 			int found = Directory.Exists(source)
 				? StageFromFolder(source, sevenZip, staging)
 				: StageFromFile(source, sevenZip, staging);
@@ -142,16 +175,28 @@ internal static class GcuPackageImport
 		finally
 		{
 			TryDeleteDirectory(staging);
-			TryDeleteDirectory(toolDir);
 		}
 	}
 
-	private static void ExtractSevenZip(string targetPath)
+
+
+	/// <summary>取应用目录里的 7za.exe（随安装器装机，不再内嵌进 DLL）。</summary>
+	private static string ResolveSevenZip()
 	{
-		using Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(SevenZipResource)
-			?? throw new InvalidOperationException("缺少内置 7za.exe 资源");
-		using FileStream file = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
-		stream.CopyTo(file);
+		string baseDir = AppContext.BaseDirectory;
+		string[] candidates =
+		{
+			Path.Combine(baseDir, "GCU", "7za.exe"),
+			Path.Combine(baseDir, "7za.exe")
+		};
+		foreach (string candidate in candidates)
+		{
+			if (File.Exists(candidate))
+			{
+				return candidate;
+			}
+		}
+		throw new FileNotFoundException("缺少 7za.exe（应随安装器一起装到 GCU 目录）。请重新运行安装器，或把 7za.exe 放到应用目录。");
 	}
 
 	/// <summary>目录里是否真的含 GCU 包/解压树（自动检测路径用；没有就走手动选择）。</summary>

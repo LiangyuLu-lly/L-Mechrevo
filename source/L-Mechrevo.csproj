@@ -37,9 +37,6 @@
          许可/署名：namazso/PawnIO.Modules（LGPL-2.1-or-later，与 RyzenSMU.bin 同一个上游、同一份 LICENSES\LGPL-2.1.txt）；
          协议来源 kitsunyan/intel-undervolt（GPL-3.0）见 THIRD-PARTY-NOTICES.md §1.2 B4 与 §1.3。 -->
     <EmbeddedResource Include="LMechrevo.IntelMSR.bin" LogicalName="LMechrevo.IntelMSR.bin" />
-
-<!-- 外置 GCU 包导入：运行时解压 7z 用的 7za.exe（与安装器同一份；LGPL-2.1，见 LICENSES\LGPL-2.1.txt） -->
-<EmbeddedResource Include="Resources\7za.exe" LogicalName="L-Mechrevo.7za.exe" />
     <None Remove="LMechrevo.LpcACPIEC.bin" />
     <!-- 2026-10-16 合规：LMechrevo.LpcACPIEC.bin 是 namazso/PawnIO.Modules 的 LpcACPIEC 模块
          （LGPL-2.1-or-later，Copyright (C) 2023 namazso），**原样未修改**地内嵌分发。
