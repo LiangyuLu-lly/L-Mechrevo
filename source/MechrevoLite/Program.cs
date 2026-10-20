@@ -452,6 +452,15 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		// 2026-10-20（充电上限 · B 路只读探测）：`--charge-limit-wmi-probe`
+		//   只读：查 root\WMI AcpiTest_MULong 是否存在、mailbox 读 0x0740/0x087F/0x07B9/0x07C3/0x0742/0x0770；
+		//   不写任何寄存器、不改配置；退出码 0=可用 / 2=不可用 / 1=异常。
+		case "--charge-limit-wmi-probe":
+		{
+			Environment.ExitCode = WmiStoredLimitProbe.Run();
+			Logger.Close();
+			return;
+		}
 		// ⭐⭐ 2026-10-18（宝龙达 · 充电阈值 · 阶段 2）：`--battery-limit-test [--low 60 --high 80] [--disable]`。
 		//   ⭐ 白名单写（仅 0x8153/0x8154/0x8151/0x8150）；严格时序；失败不重试、不做清理写；
 		//   ⭐ 结果写桌面 lm-battery-limit-test-*.txt + [battery-limit-test] 日志。
