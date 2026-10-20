@@ -19507,19 +19507,11 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		BufferedTableLayoutPanel bufferedTableLayoutPanel = new BufferedTableLayoutPanel
 		{
 			Dock = DockStyle.Fill,
-			ColumnCount = 7,
 			RowCount = 1,
 			Margin = Padding.Empty,
 			Padding = new Padding(scale(4), 2, 0, 1),
 			BackColor = panelFooter.BackColor
 		};
-		bufferedTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22f));
-		for (int i = 0; i < 6; i++)
-		{
-			bufferedTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 13f));
-		}
-		bufferedTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-		bufferedTableLayoutPanel.Controls.Add(labelVersion, 0, 0);
 		ResetLegacyFooterButton(buttonQuit, Strings.Quit, UiGlyph.Kind.Close, scale);
 		ResetLegacyFooterButton(buttonDonate, Strings.Donate, UiGlyph.Kind.Heart, scale);
 		ResetLegacyFooterButton(buttonUpdates, Strings.Update, UiGlyph.Kind.Update, scale);
@@ -19555,12 +19547,29 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		{
 			await DiagnosticPackCommand.RunAsync(this, diagnosticButton);
 		};
-		bufferedTableLayoutPanel.Controls.Add(buttonOverlay, 1, 0);
-		bufferedTableLayoutPanel.Controls.Add(rButton, 2, 0);
-		bufferedTableLayoutPanel.Controls.Add(buttonUpdates, 3, 0);
-		bufferedTableLayoutPanel.Controls.Add(buttonDonate, 4, 0);
-		bufferedTableLayoutPanel.Controls.Add(diagnosticButton, 5, 0);
-		bufferedTableLayoutPanel.Controls.Add(buttonQuit, 6, 0);
+		// 按可见按钮数自适应列数（更新页被屏蔽时不留下空格）
+		List<Control> footerButtons = new List<Control>(6) { buttonOverlay, rButton };
+		if (!UpdateForm.TemporarilyHidden)
+		{
+			footerButtons.Add(buttonUpdates);
+		}
+		footerButtons.Add(buttonDonate);
+		footerButtons.Add(diagnosticButton);
+		footerButtons.Add(buttonQuit);
+		buttonUpdates.Visible = !UpdateForm.TemporarilyHidden;
+		bufferedTableLayoutPanel.ColumnCount = footerButtons.Count + 1;
+		bufferedTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22f));
+		float perButton = 78f / footerButtons.Count;
+		for (int i = 0; i < footerButtons.Count; i++)
+		{
+			bufferedTableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, perButton));
+		}
+		bufferedTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+		bufferedTableLayoutPanel.Controls.Add(labelVersion, 0, 0);
+		for (int i = 0; i < footerButtons.Count; i++)
+		{
+			bufferedTableLayoutPanel.Controls.Add(footerButtons[i], i + 1, 0);
+		}
 		panelFooter.Controls.Add(bufferedTableLayoutPanel);
 		panelFooter.Controls.Add(value);
 	}
