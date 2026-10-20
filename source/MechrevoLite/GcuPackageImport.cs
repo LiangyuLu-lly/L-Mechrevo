@@ -152,7 +152,7 @@ internal static class GcuPackageImport
 				string stagedNames = string.Join("、", Directory.EnumerateFiles(Path.Combine(staging, "payload"))
 					.Select(f => Path.GetFileNameWithoutExtension(f) + " 系 GCU"));
 				if (MessageBox.Show(owner, "本机需要 " + expectedVariant + " 系 GCU，实际提供：" + stagedNames + Environment.NewLine + Environment.NewLine +
-					"仍然继续尝试安装吗？（大概率不会成功）", Strings.GcuImportTitle,
+					"仍然继续尝试安装吗？", Strings.GcuImportTitle,
 					MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
 				{
 					return;
