@@ -32,6 +32,9 @@ internal static class CpuVendor
 	/// <summary>是不是 **确认的** AMD。读不到 ⇒ false（⛔ 不是"因为不是 Intel 所以是 AMD"）。</summary>
 	internal static bool IsAmd => Kind == CpuVendorKind.Amd;
 
+	/// <summary>是不是 **确认的** Intel（读不到 ⇒ false）。</summary>
+	internal static bool IsIntel => Kind == CpuVendorKind.Intel;
+
 	/// <summary>
 	/// 注册表里读到的**原始厂商串**（仅用于日志/诊断；读不到时为空串）。
 	/// ⚠️ 不含任何序列号/用户名/机器名/MAC/GUID —— 只有厂商串本身。

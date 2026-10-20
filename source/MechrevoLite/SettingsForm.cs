@@ -9565,6 +9565,12 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		flag5 = lightExtraLightbar;
 		flag6 = lightExtraLogo;
+		// 宝龙达：已适配机型是固定配置（键盘灯/Logo 灯），灯带与 Logo 开关不提供
+		if (hw?.UsesBaolongda == true)
+		{
+			flag5 = false;
+			flag6 = false;
+		}
 		// 2026-10-15（screen-gate）：「屏幕」区主体（panelBrightness，内含刷新率行 + 亮度行 + 校色 +
 		// 色彩增强共 5 行）原来**只认 GCU 上报的能力位**，于是停掉 GCUBridge 后整块消失、只剩「屏幕」
 		// 标题与「自动刷新率」开关。但这两项的数据源本来就是 Win32/WMI（与 GCU 无关）：

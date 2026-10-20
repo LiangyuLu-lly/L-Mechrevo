@@ -4728,6 +4728,18 @@ public class CustomModeForm : RForm
 						ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, persisted.TccTarget ?? hw.TccTarget);
 					}
 				}
+				// Intel 机型（GCU）温度墙不可调 ⇒ 收起该行
+				if (CpuVendor.IsIntel && hw.IsGcuConnected && !hw.UsesBaolongda)
+				{
+					if (_tccChk != null)
+					{
+						_tccChk.Visible = false;
+					}
+					if (_tcc != null)
+					{
+						ApplyRange(_tcc, _tccVal, -1, -1, 0);
+					}
+				}
 				_ocChk.Checked = flag3 & flag4;
 				// 宝龙达/同方 GCU 40 系：GPU 超频开关按本档保存值回显
 				if ((hw.UsesBaolongda || gcuGen40) && !keepPending)
