@@ -48,16 +48,26 @@ internal static class GcuPackageImport
 		{
 			source = archive;
 		}
-		else if (Directory.Exists(folder))
+		else if (Directory.Exists(folder) && HasUsablePayload(folder))
 		{
 			source = folder;
 		}
-		if (source == null)
+		if (source != null)
+		{
+			// 自动检测到包时先确认；选「否」= 手动选别的位置
+			string ask = NormalizeNewlines(Strings.GcuImportAsk) + Environment.NewLine + Environment.NewLine + source;
+			if (MessageBox.Show(owner, ask, Strings.GcuImportTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+			{
+				goto accepted;
+			}
+			source = null;
+		}
 		{
 			using FolderBrowserDialog folderDialog = new FolderBrowserDialog
 			{
 				Description = Strings.GcuImportTitle + "：请选择名为 GCU 的文件夹（内含 GCU 包或已解压的服务目录）",
-				ShowNewFolderButton = false
+				ShowNewFolderButton = false,
+				SelectedPath = folder
 			};
 			if (folderDialog.ShowDialog(owner) != DialogResult.OK)
 			{
@@ -82,11 +92,7 @@ internal static class GcuPackageImport
 				return;
 			}
 		}
-		if (MessageBox.Show(owner, Strings.GcuImportAsk + Environment.NewLine + Environment.NewLine + source,
-			Strings.GcuImportTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-		{
-			return;
-		}
+		accepted:
 		string staging = Path.Combine(Path.GetTempPath(), "lm-gcu-import-" + Guid.NewGuid().ToString("N"));
 		string toolDir = Path.Combine(Path.GetTempPath(), "lm-gcu-tool-" + Guid.NewGuid().ToString("N"));
 		try
@@ -143,6 +149,36 @@ internal static class GcuPackageImport
 			?? throw new InvalidOperationException("缺少内置 7za.exe 资源");
 		using FileStream file = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
 		stream.CopyTo(file);
+	}
+
+	/// <summary>目录里是否真的含 GCU 包/解压树（自动检测路径用；没有就走手动选择）。</summary>
+	private static bool HasUsablePayload(string directory)
+	{
+		foreach (string candidate in new[] { directory, Path.Combine(directory, "payload"), Path.Combine(directory, "GCU") })
+		{
+			foreach (string name in VariantArchives)
+			{
+				if (File.Exists(Path.Combine(candidate, name)))
+				{
+					return true;
+				}
+			}
+		}
+		foreach (string file in Directory.EnumerateFiles(directory))
+		{
+			string ext = Path.GetExtension(file).ToLowerInvariant();
+			if (ext == ".7z" || ext == ".zip")
+			{
+				return true;
+			}
+		}
+		return FindServiceTree(directory) != null;
+	}
+
+	/// <summary>resx 里可能写成字面量 \n（旧资源），这里统一换成真实换行。</summary>
+	private static string NormalizeNewlines(string text)
+	{
+		return text?.Replace("\\n", Environment.NewLine) ?? string.Empty;
 	}
 
 	/// <summary>文件夹：先按标准名找；没有则找里面的任意 .7z/.zip；再没有则按“已解压的树”重打包。</summary>
