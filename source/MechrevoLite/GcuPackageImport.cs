@@ -256,7 +256,8 @@ internal static class GcuPackageImport
 			string fromHw = hw.DgpuGeneration switch
 			{
 				MechrevoLite.Gpu.DgpuGenerationKind.Gen50 => "50",
-				MechrevoLite.Gpu.DgpuGenerationKind.Gen40 => "40",
+				// 40 系改用 50 包（DB 由 GpuDbControl 补）
+				MechrevoLite.Gpu.DgpuGenerationKind.Gen40 => "50",
 				MechrevoLite.Gpu.DgpuGenerationKind.Gen30 => "30",
 				_ => null
 			};
