@@ -29,10 +29,17 @@ internal static class GcuPackageImport
 	internal static bool ShouldOffer()
 	{
 		MechrevoHw hw = Program.hw;
-		if (hw == null || hw.ActiveBackend != MechrevoBackendKind.Gcu)
+		if (hw == null)
+		{
+			return true;
+		}
+		// 明确不是 GCU 的机型不给导入入口：宝龙达（本机不装 GCU）/ 老接口（不经过 GCU）
+		if (hw.ActiveBackend == MechrevoBackendKind.Baolongda || hw.ActiveBackend == MechrevoBackendKind.LegacyMifs)
 		{
 			return false;
 		}
+		return !hw.IsConnected || !MechrevoHw.IsGcuServiceInstalled;
+	}
 		return !hw.IsConnected || !MechrevoHw.IsGcuServiceInstalled;
 	}
 
