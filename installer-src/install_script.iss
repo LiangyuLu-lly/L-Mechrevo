@@ -2748,7 +2748,7 @@ begin
   begin
     // 精简包：只提示，不阻止 LM 安装（装完可在应用里点 GCU 状态导入）
     Log('LM-GCU-EXT: 精简包未找到可用 GCU 载荷（' + Failed + '）⇒ 继续安装 LM，GCU 可在应用内导入');
-    if not UninstallSilent() then
+    if not WizardSilent() then
       MsgBox('本安装包不含内置 GCU 载荷（精简包）。' + #13#10 + #13#10 +
         '缺少的变体：' + Failed + #13#10 + #13#10 +
         '安装将继续：装好后打开 L-Mechrevo，点顶部的「GCU」状态即可导入外置 GCU 包并安装。' + #13#10 +
