@@ -8891,6 +8891,19 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				}
 			}
 		}
+		// 表数据不可信（温度不单调/超范围/点数不足）⇒ 保留上一份可用曲线，避免界面出现乱码轴
+		if (!CurveLooksSane(item, item2))
+		{
+			Logger.WriteLineIfChanged("fan-table-cpu-sane", "[fan] Fan/Table [" + CurveName + "] CPU 表不可信 ⇒ 保留上一份曲线");
+			item = (byte[])CpuCurveUpT.Clone();
+			item2 = (byte[])CpuCurveDuty.Clone();
+		}
+		if (!CurveLooksSane(item3, item4))
+		{
+			Logger.WriteLineIfChanged("fan-table-gpu-sane", "[fan] Fan/Table [" + CurveName + "] GPU 表不可信 ⇒ 保留上一份曲线");
+			item3 = (byte[])GpuCurveUpT.Clone();
+			item4 = (byte[])GpuCurveDuty.Clone();
+		}
 		CpuCurveUpT = item;
 		CpuCurveDuty = item2;
 		GpuCurveUpT = item3;
@@ -10282,6 +10295,31 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			Interlocked.Exchange(ref _turboFanRepair, 0);
 		}
+	}
+
+	/// <summary>曲线表可信度：至少 4 个点、温度单调不超 120℃、占空比 0..100。</summary>
+	private static bool CurveLooksSane(byte[] upT, byte[] duty)
+	{
+		int points = 0;
+		int previous = -1;
+		for (int i = 0; i < 16; i++)
+		{
+			if (upT[i] == byte.MaxValue)
+			{
+				break;
+			}
+			if (upT[i] > 120 || duty[i] > 100)
+			{
+				return false;
+			}
+			if (upT[i] < previous)
+			{
+				return false;
+			}
+			previous = upT[i];
+			points++;
+		}
+		return points >= 4;
 	}
 
 	private static (byte[] upT, byte[] duty) ParseCurve(JArray? arr)

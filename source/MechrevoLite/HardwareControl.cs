@@ -1558,8 +1558,10 @@ public static class HardwareControl
 			gpuCoreFreq = hw.GpuCoreFreq;
 			ramUsage = hw.RamUsage;
 			ramUsedMb = (int)(hw.RamUsedGb * 1024.0);
-			batteryCapacity = hw.BatteryPercent;
-			batteryCharge = hw.BatteryPercent;
+			// 电池百分比以 Windows 当前值为准（GCU 推送可能滞后，任务栏与本程序要对得上）
+			int winBattery = (int)Math.Round(System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
+			batteryCapacity = ((winBattery >= 0 && winBattery <= 100) ? winBattery : hw.BatteryPercent);
+			batteryCharge = batteryCapacity;
 		};
 	}
 
