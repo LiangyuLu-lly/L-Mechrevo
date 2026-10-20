@@ -2226,6 +2226,16 @@ public class CustomModeForm : RForm
 		{
 		}
 		PawnIO.SmuPowerSnapshot snap = hw.BaolongdaSmuSnapshot;
+		if (snap == null && hw.WujieSmuApu)
+		{
+			try
+			{
+				snap = MechrevoLite.Mode.ModeControl.SharedSmu?.GetPowerSnapshot();
+			}
+			catch
+			{
+			}
+		}
 		bool syncing = _syncing;
 		_syncing = true;
 		try
@@ -3546,7 +3556,8 @@ public class CustomModeForm : RForm
 		string displayedModeId = instance.DisplayedModeId;
 		// 2026-10-05: in firmware-profile mode do not let a non-empty _pending batch swallow
 		// the mode-change refresh -- that is what made quick switching feel unresponsive.
-		if (!string.Equals(displayedModeId, _modeId, StringComparison.Ordinal) && (_pending.Count == 0 || _firmwareMode))
+		bool localMachine = (Program.hw?.WujieSmuApu ?? false) || (Program.hw?.UsesBaolongda ?? false);
+		if (!string.Equals(displayedModeId, _modeId, StringComparison.Ordinal) && (_pending.Count == 0 || _firmwareMode || localMachine))
 		{
 			BindMode(displayedModeId);
 			await RefreshHardwareStateAsync();
