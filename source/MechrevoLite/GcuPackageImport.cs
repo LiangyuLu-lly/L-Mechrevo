@@ -223,17 +223,59 @@ internal static class GcuPackageImport
 	private static string ExpectedVariant()
 	{
 		MechrevoHw hw = Program.hw;
-		if (hw == null)
+		if (hw != null)
 		{
-			return null;
+			string fromHw = hw.DgpuGeneration switch
+			{
+				MechrevoLite.Gpu.DgpuGenerationKind.Gen50 => "50",
+				MechrevoLite.Gpu.DgpuGenerationKind.Gen40 => "40",
+				MechrevoLite.Gpu.DgpuGenerationKind.Gen30 => "30",
+				_ => null
+			};
+			if (fromHw != null)
+			{
+				return fromHw;
+			}
 		}
-		return hw.DgpuGeneration switch
+		// GCU 未连接时 hw 拿不到代际 ⇒ 用安装器的变体选择脚本现算（纯只读，读注册表/PCI id）
+		try
 		{
-			MechrevoLite.Gpu.DgpuGenerationKind.Gen50 => "50",
-			MechrevoLite.Gpu.DgpuGenerationKind.Gen40 => "40",
-			MechrevoLite.Gpu.DgpuGenerationKind.Gen30 => "30",
-			_ => null
-		};
+			string baseDir = AppContext.BaseDirectory;
+			string selector = Path.Combine(baseDir, "GCU", "Select-GcuPayload.ps1");
+			if (File.Exists(selector))
+			{
+				string outFile = Path.Combine(Path.GetTempPath(), "lm-gcu-variant-" + Guid.NewGuid().ToString("N") + ".txt");
+				try
+				{
+					string ps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+					int code = RunProcess(ps, $"-NoProfile -ExecutionPolicy Bypass -File \"{selector}\" -Variant Auto -OutputFile \"{outFile}\"", null);
+					if (code == 0 && File.Exists(outFile))
+					{
+						string variant = File.ReadAllText(outFile).Trim().ToUpperInvariant();
+						if (variant.Length != 0)
+						{
+							Logger.WriteError($"[gcu-import] 本机所需变体（选择脚本判定）={variant}");
+							return variant;
+						}
+					}
+				}
+				finally
+				{
+					try
+					{
+						File.Delete(outFile);
+					}
+					catch
+					{
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteError("[gcu-import] 变体选择脚本失败：" + ex.Message);
+		}
+		return null;
 	}
 
 	/// <summary>安装脚本失败时的可读原因：读本次日志尾部的 FATAL 行。</summary>
