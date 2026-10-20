@@ -7758,7 +7758,10 @@ public class SettingsForm : RForm
 		_labelGcuStatus.Click += async (object? _, EventArgs _) =>
 		{
 			// GCU 机型但未连接/未安装 ⇒ 提供外置包导入；非 GCU 机型只刷新状态
-			if (GcuPackageImport.ShouldOffer())
+			MechrevoHw clickHw = Program.hw;
+			bool offer = GcuPackageImport.ShouldOffer();
+			Logger.WriteError($"[gcu-import] 点击 GCU 状态：backend={clickHw?.ActiveBackend} connected={clickHw?.IsConnected} serviceInstalled={MechrevoHw.IsGcuServiceInstalled} offer={offer}");
+			if (offer)
 			{
 				await GcuPackageImport.OfferAsync(this);
 			}
