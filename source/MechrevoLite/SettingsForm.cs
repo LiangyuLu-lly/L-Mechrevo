@@ -9531,7 +9531,14 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		MechrevoDeviceCapabilities caps = hw?.Capabilities ?? _deviceCapabilities;
 		bool audit = Program.UiAuditMode && !Program.UiAuditUseReportedCapabilities;
 		SupportDecision decision = RuntimeModelSupport.Current();
-		bool flag = RuntimeModelSupport.ShouldDegradeToReadOnly(decision, hw != null && hw.IsReconnecting && hw.ConnectionGeneration == 0);
+		// GCU 未连接/未安装时拿不到机型证据（精简安装包装完、导入 GCU 之前）⇒ 不判“无法识别”，也不进只读
+		bool modelEvidenceMissing = hw == null || !hw.IsConnected;
+		bool flag = !modelEvidenceMissing
+			&& RuntimeModelSupport.ShouldDegradeToReadOnly(decision, hw != null && hw.IsReconnecting && hw.ConnectionGeneration == 0);
+		if (modelEvidenceMissing)
+		{
+			Logger.WriteLineIfChanged("model-notice-pending", "[model] GCU 未连接/未安装，机型判据暂不可得 ⇒ 不显示“无法识别/只读”提示（等 GCU 就绪后再判）；decision=" + decision.Reason);
+		}
 		List<bool> list = new List<bool>(_quickSwitches.Length);
 		Dictionary<string, bool> visibleByKey = new Dictionary<string, bool>(_quickSwitches.Length);
 		CheckBox[] quickSwitches = _quickSwitches;
