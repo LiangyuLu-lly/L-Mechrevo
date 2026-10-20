@@ -772,7 +772,7 @@ public class CustomModeForm : RForm
 			tuple2 = (MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts, wjPl1, true);
 			tuple3 = (MechrevoLite.Hardware.WujieSmuGate.PlMinWatts, MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts, wjPl2, true);
 		}
-		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl1, hw?.BaolongdaPl1Unset ?? false), tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
+		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(PowerWallRowLabel(smuPowerControls ? Strings.SmuStapmLimitLabel : Strings.CpuPl1, hw?.BaolongdaPl1Unset ?? false), tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
 		{
 			QueuePowerLimit("PL1", v);
 		});
@@ -784,7 +784,7 @@ public class CustomModeForm : RForm
 		// 非 SMU 路径行顺序保持原样：PL1 → PL2
 		if (!smuPowerControls)
 		{
-			tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+			tuple4 = AddSliderRow(PowerWallRowLabel(smuPowerControls ? Strings.SmuFastLimitLabel : Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
 			{
 				QueuePowerLimit("PL2", v);
 			});
@@ -809,7 +809,7 @@ public class CustomModeForm : RForm
 			});
 			_smuSlowTime = tuple4.Item1;
 			_smuSlowTimeVal = tuple4.Item2;
-			tuple4 = AddSliderRow(PowerWallRowLabel(Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+			tuple4 = AddSliderRow(PowerWallRowLabel(smuPowerControls ? Strings.SmuFastLimitLabel : Strings.CpuPl2, hw?.BaolongdaPl2Unset ?? false), tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
 			{
 				QueuePowerLimit("PL2", v);
 			});

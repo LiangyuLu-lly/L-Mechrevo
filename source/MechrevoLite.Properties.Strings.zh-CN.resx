@@ -5694,6 +5694,12 @@
     <value>颜色</value>
   </data>
 
+  <data name="SmuStapmLimitLabel" xml:space="preserve">
+    <value>STAPM 功率限制（W）</value>
+  </data>
+  <data name="SmuFastLimitLabel" xml:space="preserve">
+    <value>快速功率限制（W）</value>
+  </data>
   <data name="SmuSlowLimitLabel" xml:space="preserve">
     <value>慢速功率限制（W）</value>
   </data>

@@ -440,6 +440,8 @@ internal class Strings
 	/// <summary>2026-10-19（30 系 · SMU 功耗时间窗）：行标题「功耗时间窗（STAPM，秒）」。</summary>
 	internal static string CpuStapmTimeWindow => ResourceManager.GetString("CpuStapmTimeWindow", resourceCulture);
 	internal static string SmuSlowLimitLabel => ResourceManager.GetString("SmuSlowLimitLabel", resourceCulture);
+	internal static string SmuStapmLimitLabel => ResourceManager.GetString("SmuStapmLimitLabel", resourceCulture);
+	internal static string SmuFastLimitLabel => ResourceManager.GetString("SmuFastLimitLabel", resourceCulture);
 	internal static string SmuSlowTimeLabel => ResourceManager.GetString("SmuSlowTimeLabel", resourceCulture);
 	internal static string SmuFastTimeLabel => ResourceManager.GetString("SmuFastTimeLabel", resourceCulture);
 

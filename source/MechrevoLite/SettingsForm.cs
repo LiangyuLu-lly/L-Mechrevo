@@ -11842,13 +11842,21 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		Padding padding = new Padding(5, 5, 5, 5);
 		menuEco = (menuStandard = (menuUltimate = null));
 		MechrevoHw trayHw = Program.hw;
+		// 本机配置类（宝龙达/无界）切到自定义档时，固件模式回读仍可能是 1/2 ⇒ 托盘勾选只保留自定义，避免“性能和自定义同时打勾”
+		PerfModeService trayPerfEarly = PerfModeService.Instance;
+		bool trayLocalCustomActive = false;
+		if (trayPerfEarly != null)
+		{
+			string trayDisplayed = trayPerfEarly.DisplayedModeId;
+			trayLocalCustomActive = trayPerfEarly.Modes.Any((PerfModeDefinition m) => m.IsCustom && string.Equals(m.Id, trayDisplayed, StringComparison.Ordinal));
+		}
 		MechrevoDeviceCapabilities mechrevoDeviceCapabilities = trayHw?.Capabilities ?? _deviceCapabilities;
 		bool trayAudit = Program.UiAuditMode;
 		AddDisabledTitle(Strings.PerformanceMode);
 		// 2026-10-09（30 系「模式 × 配置」失败可见化）：托盘右键同样是**用户主动切模式**的入口，
 		// 标一次「用户主动」，SwitchMode 里那次 ProfileIndex 回读判定才会把结论交给 UI 弹提示。
 		Program.service?.MarkUserModeSwitch();
-		AddAsyncAction(Strings.SilentMode, num == 0, async () =>
+		AddAsyncAction(Strings.SilentMode, num == 0 && !trayLocalCustomActive, async () =>
 		{
 			MechrevoService.ModeSwitchResult switchResult = (Program.service == null) ? MechrevoService.ModeSwitchResult.Failed : await Program.service.SwitchMode(2);
 			if (switchResult == MechrevoService.ModeSwitchResult.Ok)
@@ -11868,7 +11876,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				SetContextMenu();
 			}
 		});
-		AddAsyncAction(Strings.BalancedMode, num == 1, async () =>
+		AddAsyncAction(Strings.BalancedMode, num == 1 && !trayLocalCustomActive, async () =>
 		{
 			MechrevoService.ModeSwitchResult switchResult = (Program.service == null) ? MechrevoService.ModeSwitchResult.Failed : await Program.service.SwitchMode(0);
 			if (switchResult == MechrevoService.ModeSwitchResult.Ok)
@@ -11889,7 +11897,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		});
 if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvailability.Supported))
 		{
-			AddAsyncAction(Strings.SilentTurbo, (num == 2) & isSilentTurboActive, async () =>
+			AddAsyncAction(Strings.SilentTurbo, (num == 2) & isSilentTurboActive && !trayLocalCustomActive, async () =>
 			{
 				MechrevoService.ModeSwitchResult switchResult = (Program.service == null) ? MechrevoService.ModeSwitchResult.Failed : await Program.service.SwitchMode(1);
 				if (switchResult == MechrevoService.ModeSwitchResult.Ok)
@@ -11915,7 +11923,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		if (TrayShow(mechrevoDeviceCapabilities.TurboMode || (Program.hw?.UsesBaolongda ?? false)
 			|| ((Program.hw != null) && !Program.hw.IsConnected && MechrevoHw.IsGcuServiceInstalled && !Program.hw.UsesBaolongda)))
 		{
-			AddAsyncAction(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvailability.Supported ? Strings.TurboHighEnergy : Strings.Turbo, num == 2 && !isSilentTurboActive, async () =>
+			AddAsyncAction(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvailability.Supported ? Strings.TurboHighEnergy : Strings.Turbo, num == 2 && !isSilentTurboActive && !trayLocalCustomActive, async () =>
 			{
 				MechrevoService.ModeSwitchResult switchResult = (Program.service == null) ? MechrevoService.ModeSwitchResult.Failed : await Program.service.SwitchMode(1);
 				if (switchResult == MechrevoService.ModeSwitchResult.Ok)
