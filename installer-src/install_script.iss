@@ -245,7 +245,7 @@ Source: "files\GCU\payload\50.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: Sho
 #ifndef NOGCU_PAYLOAD
 Source: "files\GCU\payload\WJXY.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
-Source: "files\GCU\7za.exe"; DestDir: "{app}\GCU"; Flags: ignoreversion; Check: ShouldInstallGcu
+Source: "files\GCU\7za.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: ShouldInstallGcu
 Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 ; --- shared\ 按【目的地】铺开（⛔ 不再整目录落 {app}\GCU\shared\；铺完 shared\ 这个层级就没有了）----
