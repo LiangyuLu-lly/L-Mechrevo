@@ -4131,6 +4131,16 @@ public class MechrevoService
 				return false;
 			}
 			Logger.WriteError($"[smu] slow={result}W 下发=OK");
+			// Wujie：fast(fPPT) 必须 ≥ slow(GCU PL2)，否则固件可能忽略 fast ⇒ 自动抬 fast 并记日志
+			if (hw.WujieSmuApu && hw.Pl2 > 0 && result > hw.Pl2)
+			{
+				PawnIO.SmuStatus raiseFast = smu.SetFastLimit(result);
+				Logger.WriteError($"[smu] Wujie：slow={result}W > 当前 fast={hw.Pl2}W ⇒ 同步抬 fast={result}W（{raiseFast}）");
+				if (raiseFast == PawnIO.SmuStatus.OK)
+				{
+					hw.NoteBaolongdaSmuLimitsApplied(0, result, 0);
+				}
+			}
 			return true;
 		}
 		if (isSlowTime)
@@ -4238,10 +4248,10 @@ public class MechrevoService
 			pl2Status = "未写";
 			if (pl1 > 0)
 			{
+				// STAPM 行只写 STAPM（对应 GCU 的 PL1）；慢速对应 GCU PL2，由独立「慢速功率限制」行走 SetSlowLimit
 				PawnIO.SmuStatus staple = smu.SetStapmLimit(pl1);
-				PawnIO.SmuStatus slowSt = smu.SetSlowLimit(pl1);
-				pl1Status = $"stapm={staple}/slow={slowSt}";
-				wrotePl1 = staple == PawnIO.SmuStatus.OK && slowSt == PawnIO.SmuStatus.OK;
+				pl1Status = $"stapm={staple}";
+				wrotePl1 = staple == PawnIO.SmuStatus.OK;
 				ok &= wrotePl1;
 				if (wrotePl1)
 				{
