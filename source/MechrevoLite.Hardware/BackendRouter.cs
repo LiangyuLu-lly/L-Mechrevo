@@ -91,7 +91,7 @@ internal static class BackendRouter
 				return new BackendRouteDecision(rule.Index, rule.Description, rule.Backend, identity, DeclarationPassed: true);
 			}
 			// 声明不支持 ⇒ 不静默换后端，记下原因并落到兜底规则（不是“探测失败重试”）。
-			Logger.WriteLine("[router] 规则 #" + rule.Index + " 命中 " + rule.Backend + "，但该后端声明不支持当前机型 ⇒ 落兜底规则");
+			Logger.WriteLine("[强化机型分流] 规则 #" + rule.Index + " 命中 " + rule.Backend + "，但该后端声明不支持当前机型 ⇒ 落兜底规则");
 			break;
 		}
 		return new BackendRouteDecision(Rules.Length + 1, "fallback -> GCU", Fallback, identity,
@@ -102,7 +102,7 @@ internal static class BackendRouter
 	{
 		BackendRouteDecision decision = Decide(MachineIdentity.Collect());
 		BackendDeclaration declaration = DeclarationFor(decision.Backend);
-		Logger.WriteLine("[router] backend=" + decision.Backend
+		Logger.WriteLine("[强化机型分流] backend=" + decision.Backend
 			+ " | machine=" + decision.Identity.Summary
 			+ " | rule=#" + decision.RuleIndex + " " + decision.Rule
 			+ " | decl=" + (declaration == null ? "(无)" : declaration.DisplayName + (decision.DeclarationPassed ? "=pass" : "=fail")));

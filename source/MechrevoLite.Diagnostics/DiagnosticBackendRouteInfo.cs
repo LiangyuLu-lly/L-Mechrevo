@@ -5,8 +5,8 @@ using MechrevoLite.Hardware;
 namespace MechrevoLite.Diagnostics;
 
 /// <summary>
-/// 诊断包用：[后端路由（声明式 · 只读）] 一节。
-/// <para>与运行日志 <c>[router]</c> / <c>[gate] 机型分类</c> 共用同一份 <see cref="MachineIdentity" />，
+/// 诊断包用：[强化机型分流（只读）] 一节。
+/// <para>与运行日志 <c>[强化机型分流]</c> / <c>[gate] 机型分类</c> 共用同一份 <see cref="MachineIdentity" />，
 /// 保证诊断包的机型事实与运行判定一致（第 4 步：日志/诊断对齐）。</para>
 /// <para>只读：不探测后端、不发 MQTT、不写任何东西。</para>
 /// </summary>
@@ -15,7 +15,7 @@ internal static class DiagnosticBackendRouteInfo
 	internal static string Build()
 	{
 		StringBuilder sb = new StringBuilder();
-		sb.AppendLine("[后端路由（声明式 · 只读）]");
+		sb.AppendLine("[强化机型分流（只读）]");
 		try
 		{
 			MachineIdentity identity = MachineIdentity.Collect();

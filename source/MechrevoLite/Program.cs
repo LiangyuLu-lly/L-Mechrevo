@@ -3728,7 +3728,7 @@ internal static class Program
 				Logger.WriteError("[gate] 机型分类：" + gateIdentity.Summary
 					+ " · baolongda=" + warmHw.UsesBaolongda + " gen=" + warmHw.DgpuGeneration
 					+ " wujieApu=" + warmHw.WujieSmuApu + " amd=" + amd + " nvidia=" + nvidia
-					+ " | router=" + gateRoute.Backend + " rule=#" + gateRoute.RuleIndex
+					+ " | 强化机型分流=" + gateRoute.Backend + " rule=#" + gateRoute.RuleIndex
 					+ " | 启用分支：kbdEc=" + (warmHw.UsesBaolongda && gen30)
 					+ " wujieSmu=" + warmHw.WujieSmuApu
 					+ " igpuPower=" + igpuPower
