@@ -4139,6 +4139,25 @@ public class MechrevoService
 				return false;
 			}
 			Logger.WriteError($"[smu] slow={result}W 下发=OK");
+			// 2026-10-21：慢速功率(sPPT) 回读诊断 —— 固件可能静默钳位/被 fast 覆盖，日志如实记录命令与回读
+			try
+			{
+				System.Threading.Thread.Sleep(150);
+				PawnIO.SmuPowerSnapshot slowSnap = smu.GetPowerSnapshot();
+				if (slowSnap != null)
+				{
+					int rbSlow = (int)Math.Round(slowSnap.Slow);
+					Logger.WriteError("[smu] slow 回读=" + rbSlow + "W（目标=" + result + "W）⇒ " + ((rbSlow == result) ? "已确认" : "未生效（固件可能钳位该平台 sPPT 下限，或被 fast 覆盖）"));
+				}
+				else
+				{
+					Logger.WriteError("[smu] slow 回读失败（PM 表读不到）⇒ 命令已接受但无法确认");
+				}
+			}
+			catch (Exception exSlowRb)
+			{
+				Logger.WriteError("[smu] slow 回读异常（已吞掉）：" + exSlowRb.GetType().Name);
+			}
 			// Wujie：fast(fPPT) 必须 ≥ slow(GCU PL2)，否则固件可能忽略 fast ⇒ 自动抬 fast 并记日志
 			if (hw.WujieSmuApu && hw.Pl2 > 0 && result > hw.Pl2)
 			{
