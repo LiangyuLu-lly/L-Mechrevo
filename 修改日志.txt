@@ -7,6 +7,9 @@ r79（2026-10-21 · **0.293.4 beta23.4**）★★ Intel+GCU 温度墙接正 + �
 - 下发走 Fan/Control `SET_OPERATING_MODE_DETAIL`：`CpuTccOffsetSwitch` + `CpuTccOffset`（墙温→偏移），下发后 lazy-verify 回读确认；越界值（旧存档 101℃ 等）自动夹回范围再发。
 - 实测：50 GCU（JIGUANG）与 40 GCU 1.0.2.70（极光Pro GM6PQ7X）均可读、可写、可确认。
 
+## 新增
+- 后端匹配声明式架构（第 1、2 步）：新增 MachineIdentity（板号+来源/白名单/显卡代际/GCU服务安装，只读、失败=Unknown）与 BackendRouter（有序规则表：宝龙达白名单→GCU服务→30/40/50→兜底 GCU，首条命中并落 `[router] backend=… | machine=… | rule=#n` 日志）；MechrevoBackendOrder.Probe 改为按路由结果取候选顺序，探测行为与改动前一致。
+
 二、无界（WJXY / Wujie APU）
 - 键盘灯：自动启用 Keyboard/Ctrl 全字段链路（旧链路字段不全导致不生效）；效果下拉只保留「单色」、RGB 页隐藏颜色选择（EC 单分区单色白键盘）。
 - 自定义档切换立即刷新；切回自定义档按该档保存值强制下发一次（不再只切界面）。

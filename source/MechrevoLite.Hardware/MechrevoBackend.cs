@@ -100,9 +100,25 @@ internal static class MechrevoBackendOrder
 	/// ⚠️ 每个候选的异常都被吞掉（只写一行日志），⛔ 绝不外抛 —— ConnectAsync 里探后端不许把启动搞崩。
 	/// ⚠️ 本方法是**同步阻塞**的（调用方已经把它包在 <c>Task.Run</c> 里），⛔ 别在 UI 线程上直接调。
 	/// </summary>
+	internal static MechrevoBackendProbe[] CandidatesFor(MechrevoBackendKind preferred)
+	{
+		MechrevoBackendProbe gcuGate = Candidates[0];
+		MechrevoBackendProbe baolongda = Candidates[1];
+		MechrevoBackendProbe legacyMifs = Candidates[2];
+		MechrevoBackendProbe gcuMarker = Candidates[3];
+		if (preferred == MechrevoBackendKind.Baolongda)
+		{
+			// 机型已证明是宝龙达：先宝龙达（内部仍有板号白名单硬闸门），再老接口，最后 GCU 哨兵。
+			return new MechrevoBackendProbe[3] { baolongda, legacyMifs, gcuMarker };
+		}
+		// GCU 优先或兜底：保持原有安全顺序（GCU 门控 → 宝龙达 → 老接口 → GCU 哨兵）。
+		return new MechrevoBackendProbe[4] { gcuGate, baolongda, legacyMifs, gcuMarker };
+	}
+
 	internal static (MechrevoBackendKind Kind, object Created) Probe()
 	{
-		MechrevoBackendProbe[] candidates = Candidates;
+		BackendRouteDecision decision = BackendRouter.DecideAndLog();
+		MechrevoBackendProbe[] candidates = CandidatesFor(decision.Backend);
 		for (int i = 0; i < candidates.Length; i++)
 		{
 			MechrevoBackendProbe candidate = candidates[i];
