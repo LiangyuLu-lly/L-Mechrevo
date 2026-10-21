@@ -5804,18 +5804,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// 2026-10-21：这里**不覆盖** Pl1/Pl2（那是“最后下发的意图值”，下一步下发要拿它当基线）；
 			// 固件可能把 STAPM 改回默认值，覆盖会把回退值当成基线再写回去。
 			// 2026-10-21：记录“外部变化”（非本进程下发）—— 用来区分是固件/GCU/模式切换把值改回去，还是我们写错。
-			bool externalChange = false;
 			try
 			{
 				if (WujieLiveStapmWatts > 0 && wjStapm > 0 && Math.Abs(wjStapm - WujieLiveStapmWatts) > 1)
 				{
 					Logger.WriteError("[smu] 无界 STAPM 外部变化：" + WujieLiveStapmWatts + "W → " + wjStapm + "W（非本次下发；可能固件回退/GCU 下发/切换性能模式）");
-					externalChange = true;
 				}
 				if (WujieLiveFastWatts > 0 && wjFast > 0 && Math.Abs(wjFast - WujieLiveFastWatts) > 1)
 				{
 					Logger.WriteError("[smu] 无界 fPPT 外部变化：" + WujieLiveFastWatts + "W → " + wjFast + "W（非本次下发；可能固件回退/GCU 下发/切换性能模式）");
-					externalChange = true;
 				}
 			}
 			catch
@@ -5828,11 +5825,6 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			if (wjFast >= wjLo && wjFast <= wjHi)
 			{
 				WujieLiveFastWatts = wjFast;
-			}
-			// 2026-10-21（机主：加模式守护）：数值被外部改掉 ⇒ 交给 PerfModeService 决定是否重放自定义档
-			if (externalChange)
-			{
-				MechrevoLite.Mode.PerfModeService.Instance?.RequestWujieGuardReapply("STAPM/fPPT 外部变化");
 			}
 			Logger.WriteLine("[smu] 无界当前值（只读 PM 表）：STAPM(PL1)=" + (wjStapm > 0 ? wjStapm + "W" : "读不到")
 				+ " · fast(PL2)=" + (wjFast > 0 ? wjFast + "W" : "读不到"));

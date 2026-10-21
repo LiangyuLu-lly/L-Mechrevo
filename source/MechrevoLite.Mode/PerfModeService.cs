@@ -36,83 +36,6 @@ internal sealed class PerfModeService
 	/// <summary>2026-10-21：最近一次用户/面板下发时刻（TickCount64；0=还没发过）。启动重放据此避让。</summary>
 	private static long _lastApplyTick;
 
-	// 2026-10-21（机主：自定义功耗会被模式预设改回去；切一次狂暴才生效 65W）：模式守护 ——
-	// 自定义档激活时若 SMU 值被外部改掉，自动重放一次（有冷却、有次数上限，避免和 GCU/固件互相打架）。
-	private static long _wujieGuardLastTick;
-
-	private static int _wujieGuardCount;
-
-	/// <summary>由 <see cref="MechrevoHw" /> 的外部变化检测调用：自定义档下 SMU 值被改掉 ⇒ 安排一次重放。</summary>
-	internal void RequestWujieGuardReapply(string reason)
-	{
-		try
-		{
-			if (_hw == null || !_hw.WujieSmuApu)
-			{
-				return;
-			}
-			if (MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
-			{
-				return;
-			}
-			// 有下发在飞行中/等待切换 ⇒ 不做守护（那次下发自己会校验/重试）
-			if (PendingModeId != null)
-			{
-				return;
-			}
-			PerfModeDefinition mode = Find(ActiveModeId);
-			if (mode == null || !mode.IsCustom)
-			{
-				return;
-			}
-			PerfModeSettings settings = mode.Settings;
-			int expPl1 = settings.Pl1.GetValueOrDefault();
-			int expPl2 = settings.Pl2.GetValueOrDefault();
-			bool matchPl1 = expPl1 <= 0 || Math.Abs(_hw.WujieLiveStapmWatts - expPl1) <= 1;
-			bool matchPl2 = expPl2 <= 0 || Math.Abs(_hw.WujieLiveFastWatts - expPl2) <= 1;
-			if (matchPl1 && matchPl2)
-			{
-				return;
-			}
-			long now = Environment.TickCount64;
-			long last = Interlocked.Read(ref _wujieGuardLastTick);
-			if (last != 0 && now - last < 15000)
-			{
-				return;
-			}
-			if (now - last > 300000)
-			{
-				Interlocked.Exchange(ref _wujieGuardCount, 0);
-			}
-			if (Interlocked.Increment(ref _wujieGuardCount) > 5)
-			{
-				Logger.WriteError("[perfmode] 无界模式守护：本时段已重放 5 次，暂停守护（避免与 GCU/固件打架；原因：" + reason + "）");
-				return;
-			}
-			Interlocked.Exchange(ref _wujieGuardLastTick, now);
-			string activeId = ActiveModeId;
-			Logger.WriteError("[perfmode] 无界模式守护：SMU 值被外部改掉（" + reason + "）⇒ 800ms 后重放自定义档 " + activeId
-				+ "（配置 PL1=" + expPl1 + " PL2=" + expPl2 + "）");
-			_ = Task.Run(async delegate
-			{
-				try
-				{
-					await Task.Delay(800).ConfigureAwait(continueOnCapturedContext: false);
-					await ActivateAsync(activeId, "wujie guard reapply", forceParameters: true).ConfigureAwait(continueOnCapturedContext: false);
-				}
-				catch (Exception exGuard)
-				{
-					Logger.WriteError("[perfmode] 无界模式守护重放异常（已吞掉）：" + exGuard.GetType().Name + " " + exGuard.Message);
-				}
-			});
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("[perfmode] 无界模式守护调度失败（已吞掉）：" + ex.Message);
-		}
-	}
-
-
 	private int _guardSeq;
 
 	private int _activating;
@@ -830,10 +753,27 @@ internal sealed class PerfModeService
 			{
 				Logger.WriteError(wujieLog);
 			}
-		}		IReadOnlyList<PerfApplyStep> readOnlyList = PerfModeApplyPlanner.Build(mode, plan, caps);
+		}
+		IReadOnlyList<PerfApplyStep> readOnlyList = PerfModeApplyPlanner.Build(mode, plan, caps);
 		// （机主：「显卡超频设置了但频率没变化」· 可观测性①）
 		LogGpuOverclockPlan(mode, plan, caps, readOnlyList);
 		Logger.WriteLine($"PerfModes: activate {mode.Id} ({reason}) route={mode.Route} slot={plan?.SlotIndex.ToString() ?? "-"} write={plan?.NeedsParameterWrite.ToString() ?? "-"} steps={readOnlyList.Count}");
+		// 2026-10-21（机主）：无界目标功耗 > 60W 时，先切狂暴模式再下发 SMU（已在狂暴不重复发）。
+		if (caps.WujieSmuLocalOnly && mode.IsCustom)
+		{
+			int wujieTargetMax = Math.Max(mode.Settings.Pl1.GetValueOrDefault(), mode.Settings.Pl2.GetValueOrDefault());
+			if (wujieTargetMax > 60)
+			{
+				try
+				{
+					await _backend.EnsureWujieHighPowerModeAsync(ct).ConfigureAwait(continueOnCapturedContext: false);
+				}
+				catch (Exception exTurbo)
+				{
+					Logger.WriteError("[perfmode] 无界：切狂暴模式异常（继续下发 SMU）：" + exTurbo.Message);
+				}
+			}
+		}
 		Stopwatch elapsed = Stopwatch.StartNew();
 		PerfApplyOutcome outcome;
 		try

@@ -4078,20 +4078,12 @@ public class MechrevoService
 		if (isPl1 && !isPl2)
 		{
 			// ⭐ 用户抬高了 PL1 ⇒ 把 PL2 一起抬（⭐ 受 PL2 上限约束）
-			// 2026-10-21（无界真机观测）：若 fPPT 与 STAPM 同值，固件约 0.7s 后会把 STAPM 改回默认 35W
-			//（疑似要求 fPPT ≥ STAPM+5）⇒ 无界这里抬到 PL1+5。
-			int raiseTarget = pl1;
-			if (hw.WujieSmuApu && !MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
-			{
-				raiseTarget = pl1 + 5;
-			}
-			pl2 = ((hw.Pl2Maximum > 0) ? Math.Min(raiseTarget, hw.Pl2Maximum) : raiseTarget);
+			pl2 = ((hw.Pl2Maximum > 0) ? Math.Min(pl1, hw.Pl2Maximum) : pl1);
 			if (pl2 < pl1)
 			{
 				pl1 = pl2;
 			}
-			reason = "因 PL1=" + pl1.ToString(CultureInfo.InvariantCulture)
-				+ (hw.WujieSmuApu ? "（无界：fPPT 自动抬到 PL1+5）" : "");
+			reason = "因 PL1=" + pl1.ToString(CultureInfo.InvariantCulture);
 		}
 		else
 		{
@@ -4300,11 +4292,9 @@ public class MechrevoService
 		string pl2Status;
 		if (hw.WujieSmuApu)
 		{
-			if (Logger.TryMarkChanged("wujie-smu-mode", "legacy=" + MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat))
+			if (Logger.TryMarkChanged("wujie-smu-uxte", "1"))
 			{
-				Logger.WriteError(MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat
-					? "[smu] 无界功耗控制：兼容模式（0.292.3 行为）—— 单次下发、不自动抬 fPPT、不补发、不守护"
-					: "[smu] 无界功耗控制：增强模式 —— fPPT 自动 PL1+5、回读补发、模式守护");
+				Logger.WriteError("[smu] 无界功耗控制：UXTU 口径 —— 单次下发、不回读、不补发、不守护");
 			}
 			// ⭐ Wujie：**先写 slow(PL1) → stapm，再写 fast(PL2=fPPT)**（顺序固定；两条命令都回 OK 才算写成功）✅
 			pl1Status = "未写";
@@ -4319,23 +4309,6 @@ public class MechrevoService
 				if (wrotePl1)
 				{
 					hw.NoteBaolongdaSmuLimitsApplied(pl1, 0, 0);
-						// 2026-10-21（机主：改 39 生效后又跳回 35）：有些固件会在几百 ms 内把 STAPM 改回默认
-						// ⇒ 350ms 后回读一次，被改回就补发一次（有界，不循环）
-						try
-						{
-							System.Threading.Thread.Sleep(350);
-							PawnIO.SmuPowerSnapshot stapmRb = smu.GetPowerSnapshot(writeLog: false);
-							if (!MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat && stapmRb != null && Math.Abs((int)Math.Round((double)stapmRb.Stapm) - pl1) > 1)
-							{
-								PawnIO.SmuStatus stapmRetry = smu.SetStapmLimit(pl1);
-								Logger.WriteError("[smu] Wujie 应用：stapm 第一次回读=" + (int)Math.Round((double)stapmRb.Stapm)
-									+ "W ≠ 目标 " + pl1 + "W（疑似固件改回默认）⇒ 补发一次（" + stapmRetry + "）");
-								pl1Status = pl1Status + "/retry=" + stapmRetry;
-							}
-						}
-						catch
-						{
-						}
 				}
 			}
 			if (pl2 > 0)
@@ -4375,22 +4348,6 @@ public class MechrevoService
 				{
 					hw.NoteBaolongdaSmuLimitsApplied(0, pl2, 0);
 				}
-						// 2026-10-21（机主：快速功耗偶尔不生效）：写完立刻读 PM 表，不一致就补发一次（有界，不循环）
-						try
-						{
-							System.Threading.Thread.Sleep(80);
-							PawnIO.SmuPowerSnapshot fastRb = smu.GetPowerSnapshot(writeLog: false);
-							if (!MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat && fastRb != null && Math.Abs((int)Math.Round((double)fastRb.Fast) - pl2) > 1)
-							{
-								PawnIO.SmuStatus fastRetry = smu.SetFastLimit(pl2);
-								Logger.WriteError("[smu] Wujie 应用：fast 第一次回读=" + (int)Math.Round((double)fastRb.Fast)
-									+ "W ≠ 目标 " + pl2 + "W ⇒ 补发一次（" + fastRetry + "）");
-								pl2Status = pl2Status + "/retry=" + fastRetry;
-							}
-						}
-						catch
-						{
-						}
 			}
 		}
 		else if (pl1 > 0 && pl2 > 0)
@@ -4474,7 +4431,7 @@ public class MechrevoService
 			verified = true;
 			verifyDetail = "无写入（无需回读）";
 		}
-		else if (hw.WujieSmuApu && MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
+		else if (hw.WujieSmuApu)
 		{
 			// 2026-10-21（机主：行为对齐 UXTU；UXTU 用 RyzenAdj 只写不读回）：
 			// 兼容模式下命令被 SMU 接受即视为已下发，不再拿 PM 表回读去判失败。
@@ -4487,39 +4444,6 @@ public class MechrevoService
 		{
 			verified = VerifyBaolongdaSmuPower(hw, wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0,
 				wroteWall ? tempWallC : 0, out verifyDetail);
-		}
-		// Wujie：显式打印三档写入与回读（PL1→stapm/slow；PL2→fast/fPPT）；fast 回读≠目标 ⇒ 如实失败、不重试
-		if (hw.WujieSmuApu && !MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
-		{
-			int rbStapm = -1;
-			int rbSlow = -1;
-			int rbFast = -1;
-			try
-			{
-				PawnIO.SmuPowerSnapshot snap = smu.GetPowerSnapshot();
-				if (snap != null)
-				{
-					rbStapm = (int)Math.Round((double)snap.Stapm);
-					rbSlow = (int)Math.Round((double)snap.Slow);
-					rbFast = (int)Math.Round((double)snap.Fast);
-				}
-			}
-			catch
-			{
-			}
-			Logger.WriteError("[smu] Wujie 应用：PL1=" + pl1 + " → stapm=" + rbStapm + "(=" + pl1 + ") · slow=" + rbSlow + "(=" + pl1 + ")");
-			Logger.WriteError("[smu] Wujie 应用：PL2=" + pl2 + " → fast=" + rbFast + "(=" + pl2 + ")");
-			Logger.WriteError("[smu] Wujie 应用：fPPT(fast) 当前=" + rbFast + ((rbFast == pl2) ? "（=目标）" : ("（⚠️ ≠目标 " + pl2 + "）")));
-			if (wrotePl1 && rbStapm != pl1)
-			{
-				verified = false;
-				Logger.WriteError("[smu] ⛔ Wujie：stapm/slow 回读≠目标 ⇒ 如实失败、不重试");
-			}
-			if (wrotePl2 && rbFast != pl2)
-			{
-				verified = false;
-				Logger.WriteError("[smu] ⛔ Wujie：fast(fPPT) 回读≠目标 ⇒ 如实失败、不重试");
-			}
 		}
 		Logger.WriteError($"[smu-30] 30 系功耗墙（SMU 路径 · 无 WMI 23）：基线刷新={refreshed} "
 			+ $"⇒ PL1(slow)={ShowPowerValue(pl1)} [{pl1Status}] · PL2(fast)={ShowPowerValue(pl2)} [{pl2Status}] "

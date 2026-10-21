@@ -7,6 +7,9 @@ public interface IPerfModeBackend
 {
 	Task<bool> SwitchBuiltInAsync(PerfModeKind kind, CancellationToken ct);
 
+	/// <summary>2026-10-21：无界目标功耗 > 60W 时，先把固件切到狂暴模式（已在狂暴不重复发）。</summary>
+	Task<bool> EnsureWujieHighPowerModeAsync(CancellationToken ct);
+
 	Task<bool> SwitchTurboSubModeAsync(bool silent, CancellationToken ct);
 
 	Task<bool> SwitchFirmwareSlotAsync(int slotIndex, CancellationToken ct);

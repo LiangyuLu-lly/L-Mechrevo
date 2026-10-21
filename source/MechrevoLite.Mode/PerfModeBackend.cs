@@ -90,6 +90,41 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		};
 	}
 
+	private static long _wujieTurboSentAt;
+
+	/// <summary>2026-10-21（机主）：无界目标功耗 &gt; 60W 时，先切狂暴模式再下发 SMU；已在狂暴/刚切过则不重复发。</summary>
+	public async Task<bool> EnsureWujieHighPowerModeAsync(CancellationToken ct)
+	{
+		if (_hw == null || !_hw.WujieSmuApu)
+		{
+			return true;
+		}
+		int op = _hw.OperatingMode;
+		if (op == 1)
+		{
+			if (Logger.TryMarkChanged("wujie-turbo-already", "1"))
+			{
+				Logger.WriteError("[perfmode] 无界：当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令");
+			}
+			return true;
+		}
+		long last = Interlocked.Read(ref _wujieTurboSentAt);
+		if (last != 0 && Environment.TickCount64 - last < 10000)
+		{
+			return true;
+		}
+		Interlocked.Exchange(ref _wujieTurboSentAt, Environment.TickCount64);
+		Logger.WriteError("[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU（当前 OP=" + op + "）");
+		MechrevoService.ModeSwitchResult result = await _service.SwitchMode(1).ConfigureAwait(continueOnCapturedContext: false);
+		Logger.WriteError("[perfmode] 无界：切狂暴模式结果=" + result);
+		if (result != MechrevoService.ModeSwitchResult.Ok)
+		{
+			return false;
+		}
+		await Task.Delay(300, ct).ConfigureAwait(continueOnCapturedContext: false);
+		return true;
+	}
+
 	public async Task<bool> SwitchBuiltInAsync(PerfModeKind kind, CancellationToken ct)
 	{
 		if (SuppressWujieModeSwitch("应用/对账"))
