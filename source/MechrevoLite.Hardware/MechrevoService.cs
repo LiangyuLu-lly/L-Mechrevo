@@ -4184,6 +4184,28 @@ public class MechrevoService
 				return false;
 			}
 			Logger.WriteError($"[smu] slow 时间窗={result}s 下发=OK");
+			// 2026-10-21：写后回读（PM 表 slow_time）—— 不确认就等于"不知道有没有生效"。
+			hw.NoteSmuSlowTimeApplied(result);
+			int rbSlowTime = 0;
+			try
+			{
+				System.Threading.Thread.Sleep(120);
+				PawnIO.SmuPowerSnapshot slowTimeRb = smu.GetPowerSnapshot();
+				rbSlowTime = slowTimeRb?.SlowTimeSeconds ?? 0;
+			}
+			catch
+			{
+				rbSlowTime = 0;
+			}
+			if (rbSlowTime > 0 && Math.Abs(rbSlowTime - result) <= 1)
+			{
+				Logger.WriteError($"[smu] slow 时间窗={result}s · 回读={rbSlowTime}s（PM 表）⇒ 已确认 ✅");
+			}
+			else
+			{
+				Logger.WriteError($"[smu] slow 时间窗={result}s · 回读={(rbSlowTime > 0 ? rbSlowTime + "s" : "读不到")}"
+					+ "（PM 表）⇒ 未确认（固件可能忽略该命令或该表版本不反映 slow_time；⛔ 不假装成功）");
+			}
 			return true;
 		}
 		if (isStapmTime)

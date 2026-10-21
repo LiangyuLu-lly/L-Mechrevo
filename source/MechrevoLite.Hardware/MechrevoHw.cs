@@ -5755,10 +5755,67 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 	// （机主：「是持续功耗时间（STAPM time）」）：当前 **STAPM 时间窗（秒）**；
 	internal int BaolongdaStapmTimeSeconds { get; private set; }
+	/// <summary>当前 SMU slow 时间窗（秒，0 = 读不到）；30 系与无界共用，只读采样。</summary>
+	internal int SmuSlowTimeSeconds { get; private set; }
+	/// <summary>当前 SMU 慢速功率(sPPT)（W，0 = 读不到）；只读采样。</summary>
+	internal int SmuSlowLimitWatts { get; private set; }
 
 	/// <summary>最近一次 30 系 SMU **只读**采样（null = 还没读/读不到；仅供日志与 UI 判断，不参与下发）。</summary>
 	internal PawnIO.SmuPowerSnapshot BaolongdaSmuSnapshot => _baolongdaSmuSnapshot;
 	// <para> 失败方向：PawnIO 不可用 / 非 AMD / 读表失败 ⇒ 返回 false + 日志；调用方必须如实处理
+	/// <summary>2026-10-21：无界（Wujie）的 SMU 只读快照刷新（时间窗见长；不动 PL/温度墙的本地记忆）。</summary>
+	internal void RefreshWujieSmuSnapshot()
+	{
+		try
+		{
+			PawnIO.RyzenSmuService smu = MechrevoLite.Mode.ModeControl.SharedSmu;
+			if (smu == null)
+			{
+				return;
+			}
+			PawnIO.SmuPowerSnapshot snapshot = smu.GetPowerSnapshot();
+			if (snapshot == null)
+			{
+				return;
+			}
+			_baolongdaSmuSnapshot = snapshot;
+			_baolongdaSmuSnapshotAt = DateTime.UtcNow;
+			BaolongdaStapmTimeSeconds = snapshot.StapmTimeSeconds ?? 0;
+			SmuSlowTimeSeconds = snapshot.SlowTimeSeconds ?? 0;
+			SmuSlowLimitWatts = (snapshot.Slow > 0f && !float.IsNaN(snapshot.Slow) && !float.IsInfinity(snapshot.Slow)) ? (int)Math.Round(snapshot.Slow) : 0;
+			int wjStapm = (snapshot.Stapm > 0f && !float.IsNaN(snapshot.Stapm)) ? (int)Math.Round(snapshot.Stapm) : 0;
+			int wjFast = (snapshot.Fast > 0f && !float.IsNaN(snapshot.Fast)) ? (int)Math.Round(snapshot.Fast) : 0;
+			int wjLo = MechrevoLite.Hardware.WujieSmuGate.PlMinWatts;
+			int wjHi = MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts;
+			if (wjStapm >= wjLo && wjStapm <= wjHi)
+			{
+				Pl1 = wjStapm;
+			}
+			if (wjFast >= wjLo && wjFast <= wjHi)
+			{
+				Pl2 = wjFast;
+			}
+			Logger.WriteLine("[smu] 无界当前值（只读 PM 表）：STAPM(PL1)=" + (wjStapm > 0 ? wjStapm + "W" : "读不到")
+				+ " · slow=" + ((SmuSlowLimitWatts > 0) ? SmuSlowLimitWatts + "W" : "读不到")
+				+ " · fast(PL2)=" + (wjFast > 0 ? wjFast + "W" : "读不到")
+				+ " · slow 时间窗=" + (SmuSlowTimeSeconds > 0 ? SmuSlowTimeSeconds + "s" : "读不到"));
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[smu] 无界时间窗刷新异常（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
+	/// <summary>2026-10-21：记录刚下发的 slow 时间窗（本地记忆；回读确认由调用方另行判定）。</summary>
+	internal void NoteSmuSlowTimeApplied(int seconds)
+	{
+		SmuSlowTimeSeconds = seconds;
+		if (_baolongdaSmuSnapshot != null)
+		{
+			_baolongdaSmuSnapshot = _baolongdaSmuSnapshot with { SlowTimeSeconds = seconds };
+		}
+	}
+
 	internal bool RefreshBaolongda30SeriesSmuPower(bool force = false, bool requireStableStapmTime = false)
 	{
 		if (!IsBaolongda30Series)
@@ -5799,6 +5856,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				}
 			}
 			BaolongdaStapmTimeSeconds = stapmTimeSeconds;
+		SmuSlowTimeSeconds = snapshot.SlowTimeSeconds ?? 0;
+		SmuSlowLimitWatts = RoundPositive(snapshot.Slow);
 			// ⭐ limits → 本地记忆（只在"值合理"时填；越界/N/A 一律保持原样，⛔ 不硬塞）
 			int pl1 = RoundPositive(snapshot.Slow);
 			if (pl1 >= BaolongdaPlMinWatts && pl1 <= BaolongdaPl1MaxWatts)
@@ -5821,6 +5880,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			Logger.WriteError($"[smu-30] 当前功耗墙（只读 PM 表）：PL1(slow)={ShowUnset(_baolongdaMemPl1, "W")} "
 				+ $"PL2(fast)={ShowUnset(_baolongdaMemPl2, "W")} 温度墙(tctl)={ShowUnset(_baolongdaMemTempWall, "℃")} "
 				+ $"STAPM 时间窗={(BaolongdaStapmTimeSeconds > 0 ? BaolongdaStapmTimeSeconds + "s" : "读不到")} "
+			+ $"slow 时间窗={(SmuSlowTimeSeconds > 0 ? SmuSlowTimeSeconds + "s" : "读不到")} "
 				+ $"(PM 表 0x{snapshot.TableVersion:X6})");
 			return true;
 		}

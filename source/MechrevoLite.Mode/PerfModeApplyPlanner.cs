@@ -86,18 +86,19 @@ public static class PerfModeApplyPlanner
 			if (settings.Pl4.HasValue)
 			{
 				list.Add(Field("PL4", settings.Pl4.Value, PerfApplyVerify.CpuPackagePower));
-	if (settings.SmuSlowLimit.HasValue)
-	{
-		list.Add(Field("SmuSlowLimit", settings.SmuSlowLimit.Value, PerfApplyVerify.CpuPackagePower));
-	}
-	if (settings.SmuSlowTimeSeconds.HasValue)
-	{
-		list.Add(Field("SmuSlowTimeSeconds", settings.SmuSlowTimeSeconds.Value));
-	}
-	if (settings.SmuFastTimeSeconds.HasValue)
-	{
-		list.Add(Field("SmuFastTimeSeconds", settings.SmuFastTimeSeconds.Value));
-	}
+			}
+			// 2026-10-21：慢速功率/时间窗是独立字段（无界可能没有 PL4）⇒ 不能嵌在 PL4 块里，否则切档重放整段被跳过
+			if (settings.SmuSlowLimit.HasValue)
+			{
+			list.Add(Field("SmuSlowLimit", settings.SmuSlowLimit.Value, PerfApplyVerify.CpuPackagePower));
+			}
+			if (settings.SmuSlowTimeSeconds.HasValue)
+			{
+			list.Add(Field("SmuSlowTimeSeconds", settings.SmuSlowTimeSeconds.Value));
+			}
+			if (settings.SmuFastTimeSeconds.HasValue)
+			{
+			list.Add(Field("SmuFastTimeSeconds", settings.SmuFastTimeSeconds.Value));
 			}
 			if (!caps.SupportsWmiPowerFields && settings.TccTarget.HasValue)
 			{

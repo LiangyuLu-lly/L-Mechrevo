@@ -761,6 +761,11 @@ public class CustomModeForm : RForm
 			//   ⚠️ `requireStableStapmTime: true` ⇒ STAPM 时间窗必须**连续两次读数一致**才算"读得到"
 			//      （真机教训：部分 PM 表版本上这个字段是动态量、会跳）⇒ 不稳定按「未设置」显示（行照建）。
 			hw.RefreshBaolongda30SeriesSmuPower(force: true, requireStableStapmTime: true);
+			// 无界：上面那条只对宝龙达 30 系生效 ⇒ 单独读一次时间窗（只读）
+			if (wujieApu)
+			{
+				hw.RefreshWujieSmuSnapshot();
+			}
 		}
 		(int, int, int, bool) tuple2 = DeviceRange(hw?.Pl1Minimum ?? (-1), hw?.Pl1Maximum ?? (-1), hw?.Pl1 ?? 0);
 		(int, int, int, bool) tuple3 = DeviceRange(hw?.Pl2Minimum ?? (-1), hw?.Pl2Maximum ?? (-1), hw?.Pl2 ?? 0);
@@ -796,14 +801,22 @@ public class CustomModeForm : RForm
 		if (smuPowerControls)
 		{
 			// SMU 路径按参考工具的排列：STAPM（PL1）→ 慢速功率 → 慢速时长 → 快速功率（PL2）→ 快速时长
-			(int, int, int, bool) slowRange = DeviceRange((hw?.Pl1Minimum ?? 15), (hw?.Pl2Maximum ?? 120), hw?.Pl1 ?? 28);
+			// 2026-10-21：慢速功率(sPPT)当前值从 PM 表读（读不到才用 PL1/28W 起步），不再拿 PL1 冒充
+			int currentSlowLimit = (hw != null && hw.SmuSlowLimitWatts > 0) ? hw.SmuSlowLimitWatts : ((hw?.Pl1 ?? 28));
+			(int, int, int, bool) slowRange = DeviceRange((hw?.Pl1Minimum ?? 15), (hw?.Pl2Maximum ?? 120), currentSlowLimit);
 			tuple4 = AddSliderRow(Strings.SmuSlowLimitLabel, slowRange.Item1, slowRange.Item2, slowRange.Item3, (int v) =>
 			{
 				Queue("SmuSlowLimit", v.ToString());
 			});
 			_smuSlowLimit = tuple4.Item1;
 			_smuSlowLimitVal = tuple4.Item2;
-			tuple4 = AddSliderRow(Strings.SmuSlowTimeLabel, BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, 128, (int v) =>
+			// 2026-10-21：slow 时间窗按 SMU 当前值回填（读不到才用参考默认 128），不再永远显示默认值
+			int currentSlowTime = hw?.SmuSlowTimeSeconds ?? 0;
+			bool slowTimeUnset = currentSlowTime < BaolongdaProfile.StapmTimeMinSeconds
+				|| currentSlowTime > BaolongdaProfile.StapmTimeMaxSeconds;
+			int slowTimeStart = slowTimeUnset ? 128 : currentSlowTime;
+			tuple4 = AddSliderRow(PowerWallRowLabel(Strings.SmuSlowTimeLabel, slowTimeUnset),
+				BaolongdaProfile.StapmTimeMinSeconds, BaolongdaProfile.StapmTimeMaxSeconds, slowTimeStart, (int v) =>
 			{
 				Queue("SmuSlowTimeSeconds", v.ToString());
 			});
@@ -4263,6 +4276,19 @@ public class CustomModeForm : RForm
 					{
 						StapmTimeSeconds = result
 					}, 
+					// 2026-10-21：慢速功率/慢速时长/快速时长也要写进档位配置，否则切配置后重放丢失
+					"SmuSlowLimit" => perfModeSettings with
+					{
+						SmuSlowLimit = result
+					},
+					"SmuSlowTimeSeconds" => perfModeSettings with
+					{
+						SmuSlowTimeSeconds = result
+					},
+					"SmuFastTimeSeconds" => perfModeSettings with
+					{
+						SmuFastTimeSeconds = result
+					},
 					"PL4" => perfModeSettings with
 					{
 						Pl4 = result
