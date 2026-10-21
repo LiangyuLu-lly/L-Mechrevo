@@ -60,6 +60,11 @@ internal static class WujieSmuGate
 
 	internal const int TccMaxCelsius = 105;
 
+	/// <summary>2026-10-21（机主：0.292.3 beta23.3 那版功耗控制没问题、越改越糟）：无界功耗控制兼容模式。
+	/// 默认开 = 回到旧行为：单次下发、不自动抬 fPPT、不回读补发、不做模式守护；
+	/// 配置 <c>wujie_smu_legacy=0</c> 可启用新版增强（+5 / 补发 / 守护）。</summary>
+	internal static bool LegacySmuCompat => AppConfig.Get("wujie_smu_legacy", 1) == 1;
+
 	/// <summary>
 	/// ⭐ **无界 APU 判据**（不含 SMU 可用性）：机型名含无界/WUJIE/WJXY && CpuVendor.IsAmd && 无 NVIDIA 独显 ✅。
 	/// <para>⚠️ 只读；SMU 是否可用由调用方另加 `SmuAvailability.IsReady`（与 `<see cref="PerfModeCapabilities.UsesSmuForCustomPower" />` 同源）。</para>

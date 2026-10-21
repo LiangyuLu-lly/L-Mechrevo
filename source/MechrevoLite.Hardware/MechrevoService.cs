@@ -4081,7 +4081,7 @@ public class MechrevoService
 			// 2026-10-21（无界真机观测）：若 fPPT 与 STAPM 同值，固件约 0.7s 后会把 STAPM 改回默认 35W
 			//（疑似要求 fPPT ≥ STAPM+5）⇒ 无界这里抬到 PL1+5。
 			int raiseTarget = pl1;
-			if (hw.WujieSmuApu)
+			if (hw.WujieSmuApu && !MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
 			{
 				raiseTarget = pl1 + 5;
 			}
@@ -4300,6 +4300,12 @@ public class MechrevoService
 		string pl2Status;
 		if (hw.WujieSmuApu)
 		{
+			if (Logger.TryMarkChanged("wujie-smu-mode", "legacy=" + MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat))
+			{
+				Logger.WriteError(MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat
+					? "[smu] 无界功耗控制：兼容模式（0.292.3 行为）—— 单次下发、不自动抬 fPPT、不补发、不守护"
+					: "[smu] 无界功耗控制：增强模式 —— fPPT 自动 PL1+5、回读补发、模式守护");
+			}
 			// ⭐ Wujie：**先写 slow(PL1) → stapm，再写 fast(PL2=fPPT)**（顺序固定；两条命令都回 OK 才算写成功）✅
 			pl1Status = "未写";
 			pl2Status = "未写";
@@ -4319,7 +4325,7 @@ public class MechrevoService
 						{
 							System.Threading.Thread.Sleep(350);
 							PawnIO.SmuPowerSnapshot stapmRb = smu.GetPowerSnapshot(writeLog: false);
-							if (stapmRb != null && Math.Abs((int)Math.Round((double)stapmRb.Stapm) - pl1) > 1)
+							if (!MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat && stapmRb != null && Math.Abs((int)Math.Round((double)stapmRb.Stapm) - pl1) > 1)
 							{
 								PawnIO.SmuStatus stapmRetry = smu.SetStapmLimit(pl1);
 								Logger.WriteError("[smu] Wujie 应用：stapm 第一次回读=" + (int)Math.Round((double)stapmRb.Stapm)
@@ -4374,7 +4380,7 @@ public class MechrevoService
 						{
 							System.Threading.Thread.Sleep(80);
 							PawnIO.SmuPowerSnapshot fastRb = smu.GetPowerSnapshot(writeLog: false);
-							if (fastRb != null && Math.Abs((int)Math.Round((double)fastRb.Fast) - pl2) > 1)
+							if (!MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat && fastRb != null && Math.Abs((int)Math.Round((double)fastRb.Fast) - pl2) > 1)
 							{
 								PawnIO.SmuStatus fastRetry = smu.SetFastLimit(pl2);
 								Logger.WriteError("[smu] Wujie 应用：fast 第一次回读=" + (int)Math.Round((double)fastRb.Fast)

@@ -51,6 +51,10 @@ internal sealed class PerfModeService
 			{
 				return;
 			}
+			if (MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
+			{
+				return;
+			}
 			// 有下发在飞行中/等待切换 ⇒ 不做守护（那次下发自己会校验/重试）
 			if (PendingModeId != null)
 			{

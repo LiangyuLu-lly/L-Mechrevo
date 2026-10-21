@@ -4784,8 +4784,25 @@ public class CustomModeForm : RForm
 			bool keepPending = _panelDirty;
 			try
 			{
-				ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1);
-				ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2);
+				// 2026-10-21（机主：自定义显示的功耗跟着模式走；说了自定义就显示自定义配置的）：
+				// 无界自定义档下用**落盘配置值**回填 PL1/PL2（GCU/模式会实时回写 45/35 等预设值，不能拿它当显示）。
+				int showPl1 = hw.Pl1;
+				int showPl2 = hw.Pl2;
+				PerfModeDefinition showMode = FindMode(_modeId);
+				if (hw.WujieSmuApu && showMode != null && showMode.IsCustom)
+				{
+					PerfModeSettings showStored = PerfModeStore.LoadSettings(showMode.Id);
+					if (showStored.Pl1.HasValue)
+					{
+						showPl1 = showStored.Pl1.Value;
+					}
+					if (showStored.Pl2.HasValue)
+					{
+						showPl2 = showStored.Pl2.Value;
+					}
+				}
+				ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, showPl1);
+				ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, showPl2);
 				// （写成功后 NoteBaolongdaSmuStapmTimeApplied 会把它更新成刚下发的值；
 				if (_stapmTime != null)
 				{
