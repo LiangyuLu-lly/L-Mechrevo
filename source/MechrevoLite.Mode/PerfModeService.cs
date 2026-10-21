@@ -758,11 +758,11 @@ internal sealed class PerfModeService
 		// （机主：「显卡超频设置了但频率没变化」· 可观测性①）
 		LogGpuOverclockPlan(mode, plan, caps, readOnlyList);
 		Logger.WriteLine($"PerfModes: activate {mode.Id} ({reason}) route={mode.Route} slot={plan?.SlotIndex.ToString() ?? "-"} write={plan?.NeedsParameterWrite.ToString() ?? "-"} steps={readOnlyList.Count}");
-		// 2026-10-21（机主）：无界目标功耗 > 60W 时，先切狂暴模式再下发 SMU（已在狂暴不重复发）。
+		// 2026-10-21（机主）：无界目标功耗 ≥ 60W 时，先切狂暴模式再下发 SMU（已在狂暴不重复发）。
 		if (caps.WujieSmuLocalOnly && mode.IsCustom)
 		{
 			int wujieTargetMax = Math.Max(mode.Settings.Pl1.GetValueOrDefault(), mode.Settings.Pl2.GetValueOrDefault());
-			if (wujieTargetMax > 60)
+			if (wujieTargetMax >= 60)
 			{
 				try
 				{

@@ -100,11 +100,11 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			return true;
 		}
 		int op = _hw.OperatingMode;
-		if (op == 1)
+		if (op == 2)
 		{
 			if (Logger.TryMarkChanged("wujie-turbo-already", "1"))
 			{
-				Logger.WriteError("[perfmode] 无界：当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令");
+				Logger.WriteError("[perfmode] 无界：当前已在狂暴模式（OP=2）⇒ 不重复下发档位命令");
 			}
 			return true;
 		}
@@ -114,7 +114,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			return true;
 		}
 		Interlocked.Exchange(ref _wujieTurboSentAt, Environment.TickCount64);
-		Logger.WriteError("[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU（当前 OP=" + op + "）");
+		Logger.WriteError("[perfmode] 无界：目标功耗 ≥ 60W ⇒ 先切狂暴模式再下发 SMU（当前 OP=" + op + "）");
 		MechrevoService.ModeSwitchResult result = await _service.SwitchMode(1).ConfigureAwait(continueOnCapturedContext: false);
 		Logger.WriteError("[perfmode] 无界：切狂暴模式结果=" + result);
 		if (result != MechrevoService.ModeSwitchResult.Ok)
