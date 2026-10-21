@@ -187,7 +187,7 @@ internal static class BatteryLimitWriter
 				detail = log.ToString();
 				return false;
 			}
-			if (!TriggerAndWait(0, log))
+			if (!TriggerAndWait(ModeActive, log))
 			{
 				detail = log.ToString();
 				return false;
@@ -196,7 +196,9 @@ internal static class BatteryLimitWriter
 			Snapshot after = ReadSnapshot();
 			log.AppendLine("启用后：" + after.Describe());
 			bool paramsOk = after.High == high && after.Low == low;
-			bool settled = after.State == ModeNativeState && (after.Substate == 2 || after.Substate == 3);
+			// 高电量开启时固件会先进入初始化放电子状态（substate=1）；这也算启用成功，稳定（2/3）会在放到阈值附近后达成。
+			bool initializing = allowInitialDischarge && after.Substate == 1;
+			bool settled = after.State == ModeNativeState && (after.Substate == 2 || after.Substate == 3 || initializing);
 			if (!paramsOk || !settled)
 			{
 				log.AppendLine("⛔ 启用后校验未通过（阈值一致=" + paramsOk + " · 已稳定=" + settled + "）⇒ 如实报失败，不重试");
@@ -268,11 +270,22 @@ internal static class BatteryLimitWriter
 		{
 			return false;
 		}
+		// EC 退出原生态有延迟（state/flags 会残留一会儿）⇒ 最多等 5s 再判失败，不立即读一次就下结论。
 		Snapshot after = ReadSnapshot();
+		long waitStart = Environment.TickCount64;
+		while (Environment.TickCount64 - waitStart <= 5000)
+		{
+			after = ReadSnapshot();
+			if (NormalPolicyActive(after))
+			{
+				break;
+			}
+			Thread.Sleep(50);
+		}
 		log.AppendLine("关闭后：" + after.Describe());
 		if (!NormalPolicyActive(after))
 		{
-			log.AppendLine("⛔ 关闭结果校验未通过（应 mode=0x00）⇒ 如实报失败，不重试");
+			log.AppendLine("⛔ 关闭结果校验未通过（应 mode=0x00 且 flags=0）⇒ 如实报失败，不重试");
 			return false;
 		}
 		log.AppendLine("已恢复默认充电");
