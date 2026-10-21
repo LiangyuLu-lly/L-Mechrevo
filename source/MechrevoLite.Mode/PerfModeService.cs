@@ -33,6 +33,9 @@ internal sealed class PerfModeService
 	private IReadOnlyList<PerfModeDefinition>? _modes;
 
 	private int _requestSeq;
+	/// <summary>2026-10-21：最近一次用户/面板下发时刻（TickCount64；0=还没发过）。启动重放据此避让。</summary>
+	private static long _lastApplyTick;
+
 
 	private int _guardSeq;
 
@@ -435,6 +438,11 @@ internal sealed class PerfModeService
 
 	public async Task<PerfApplyOutcome?> ActivateAsync(string modeId, string reason, bool forceParameters = false)
 	{
+		// 2026-10-21：只有“用户/面板发起的下发”才记时刻；启动重放本身不记（否则会把自己挡掉）。
+		if (string.IsNullOrEmpty(reason) || reason.IndexOf("replay", StringComparison.OrdinalIgnoreCase) < 0)
+		{
+			Interlocked.Exchange(ref _lastApplyTick, Environment.TickCount64);
+		}
 		// ⭐⭐ 2026-10-17（「高性能电源」**彻底解耦 GCU**）：⭐ 切档时由 **LM 自己**同步 Windows「电源模式」
 		//   （设置 → 系统 → 电源 → 电源模式：最佳性能 / 平衡 / 最佳能效）✅
 		//   ⚠️ 纯 Windows API（powrprof `PowerSetActiveOverlayScheme`）⇒ ⛔ 不依赖 GCU、不按能力位、不写 EC ✅
@@ -1275,6 +1283,14 @@ internal sealed class PerfModeService
 				+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）"
 			: "[perfmode] " + backendLabel + " 启动恢复：ActiveModeId=" + mode.Id + " ⇒ 重放本机参数（PL1="
 				+ settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault() + "）";
+		// 2026-10-21（真机：启动空闲预热的重放与自定义页应用并发，两边互写导致值来回跳）
+		// 最近 10 秒内已经有过下发 ⇒ 用户/面板在管事，启动重放让位，避免并发覆盖。
+		long lastApply = Interlocked.Read(ref _lastApplyTick);
+		if (lastApply != 0 && Environment.TickCount64 - lastApply < 10000)
+		{
+			Logger.WriteError("[perfmode] " + backendLabel + " 启动恢复：最近 10 秒内已有下发（用户/面板在操作）⇒ 跳过本次启动重放，避免并发覆盖");
+			return;
+		}
 		if (Logger.TryMarkChanged("local-startup-replay-" + backendLabel, replay))
 		{
 			Logger.WriteError(replay);

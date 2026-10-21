@@ -4078,12 +4078,20 @@ public class MechrevoService
 		if (isPl1 && !isPl2)
 		{
 			// ⭐ 用户抬高了 PL1 ⇒ 把 PL2 一起抬（⭐ 受 PL2 上限约束）
-			pl2 = ((hw.Pl2Maximum > 0) ? Math.Min(pl1, hw.Pl2Maximum) : pl1);
+			// 2026-10-21（无界真机观测）：若 fPPT 与 STAPM 同值，固件约 0.7s 后会把 STAPM 改回默认 35W
+			//（疑似要求 fPPT ≥ STAPM+5）⇒ 无界这里抬到 PL1+5。
+			int raiseTarget = pl1;
+			if (hw.WujieSmuApu)
+			{
+				raiseTarget = pl1 + 5;
+			}
+			pl2 = ((hw.Pl2Maximum > 0) ? Math.Min(raiseTarget, hw.Pl2Maximum) : raiseTarget);
 			if (pl2 < pl1)
 			{
 				pl1 = pl2;
 			}
-			reason = "因 PL1=" + pl1.ToString(CultureInfo.InvariantCulture);
+			reason = "因 PL1=" + pl1.ToString(CultureInfo.InvariantCulture)
+				+ (hw.WujieSmuApu ? "（无界：fPPT 自动抬到 PL1+5）" : "");
 		}
 		else
 		{
