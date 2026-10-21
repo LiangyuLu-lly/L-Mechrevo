@@ -4625,6 +4625,14 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 
 	public Task<bool> SetKeyboardBrightnessPreservingEffect(int level0to4)
 	{
+		if (ShouldUseEcKeyboardLight())
+		{
+			bool ok = (level0to4 <= 0)
+				? EcKeyboardLight.TryApply(false, 0)
+				: EcKeyboardLight.TryApply(true, Math.Clamp(level0to4, 1, 4));
+			Logger.WriteError("[kbd-ec] 白键盘亮度=" + level0to4 + " ⇒ " + (ok ? "已生效" : "失败"));
+			return Task.FromResult(ok);
+		}
 		// 直接跳过（不写亮度、 不把亮度写成非 0、 不改电源镜像）
 		if (_hw != null && _hw.UsesBaolongda
 			&& (_hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
@@ -5234,8 +5242,25 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		}
 	}
 
+	/// <summary>2026-10-22（无界白键盘）：GCU 不报键盘通道（Keyboard/Status solution=UNKNOWN）时，
+	/// 键盘背光在 EC 0x78C（bit1=开关、bit4~7=亮度）⇒ 走 EC 直控；其它机型/暴风雪 RGB 版仍走原链路。</summary>
+	private bool ShouldUseEcKeyboardLight()
+	{
+		if (_hw == null || !_hw.WujieSmuApu || !_hw.KeyboardStatusSeen)
+		{
+			return false;
+		}
+		return string.Equals(_hw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
+	}
+
 	public Task<bool> SetKeyboardPower(bool on)
 	{
+		if (ShouldUseEcKeyboardLight())
+		{
+			bool ok = EcKeyboardLight.TrySetPower(on);
+			Logger.WriteError("[kbd-ec] 白键盘电源 on=" + on + " ⇒ " + (ok ? "已生效" : "失败"));
+			return Task.FromResult(ok);
+		}
 		// ⭐⭐ 2026-10-17（真机反馈「logo 和键盘开关都无效」+ 用户澄清「宝龙达键盘灯其实关就是亮度 0，
 		//   不存在真的开关」）：⭐ **宝龙达没有独立的"电源开/关"命令** ⚠️
 		//   ⭐ 它的关灯手段就是**把亮度（功能号 18）写成 0** ✅（参考实现界面原文

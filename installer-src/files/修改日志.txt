@@ -37,6 +37,7 @@ r79（2026-10-21 · **0.293.4 beta23.4**）★★ Intel+GCU 温度墙接正 + �
 - 无界键盘灯取证诊断：Keyboard/Status 与 Setting/Status 各记一行 Error 级 `[kbd] 状态诊断 …KeyboardType=… solution=… effect=… light=… brightness=… power=…`（只读、每主题一行），用于区分暴风雪版（单分区 RGB，同翼龙）与白色背光版（仅开关+四档亮度）。
 - 修无界键盘 UI 误显示“单键 RGB”：该机 GCU 不报键盘类型（`KeyboardType=0` · `solution=UNKNOWN`），旧代码对未知类型兜底成 PerKey（单键 RGB）。现无界机型按单分区（1）兜底，显示单分区键盘页而不是单键 RGB。
 - 解析 GCU `Customize/Info` 的键盘能力位：`KeyboardType` / `LightbarType` 现在会读入（此前只读 `Setting/Status`，该机没有这些键 ⇒ KeyboardType 恒 0、UI 误落单键 RGB）。诊断包应出现 `[kbd] Customize/Info: KeyboardType=…`；灯带行/键盘分流按实际上报判定。
+- 无界白键盘 EC 直控（实测定位）：EC `0x78C` bit1=电源、bit4~7=亮度档（0~4），官方控制台开关不会走 GCU MQTT（`Keyboard/Status` 恒 `solution=UNKNOWN`）⇒ 新增 `EcKeyboardLight`（ACPIDriver 读-改-写，仅改 bit1/bit4~7，带回读确认）；无界且 GCU 不报键盘通道时，开关/亮度改走 EC；日志 `[kbd-ec] 键盘背光：0x78C 0x41 -> 0x43 … 回读一致`。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。
