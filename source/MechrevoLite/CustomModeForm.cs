@@ -873,6 +873,12 @@ public class CustomModeForm : RForm
 			_tcc.Enabled = on;
 		});
 		(int, int, int, bool) tuple6 = DeviceRange(hw?.TccMinimum ?? (-1), hw?.TccMaximum ?? (-1), hw?.TccTarget ?? 0);
+		if (tuple6.Item1 < 0 && hw != null && hw.IsGcuConnected && !hw.UsesAmdPowerFields)
+		{
+			int tccTjMax = (hw.TjMax > 0) ? hw.TjMax : 100;
+			tuple6 = (75, tccTjMax, Math.Clamp(95, 75, tccTjMax), true);
+			Logger.WriteLine("[custom-ui] GCU 未上报 TCC 范围 ⇒ 温度墙按兜底 75.." + tccTjMax + "℃ 显示");
+		}
 		if (wujieApu && smuPowerControls)
 		{
 			// ⭐ 无界 APU：温度墙沿用 60–105℃（与 SMU tctl 命令同一口径）✅
@@ -4699,6 +4705,11 @@ public class CustomModeForm : RForm
 				SyncUnsetMark(_pl2Label, hw.BaolongdaPl2Unset);
 				ApplyRange(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, hw.Pl4);
 				bool flag = ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, hw.TccTarget);
+				if (hw.IsGcuConnected && !hw.UsesAmdPowerFields && hw.TccMinimum < 0)
+				{
+					int tccTjMax2 = (hw.TjMax > 0) ? hw.TjMax : 100;
+					flag = ApplyRange(_tcc, _tccVal, 75, tccTjMax2, Math.Clamp(95, 75, tccTjMax2));
+				}
 				SyncUnsetMark(_tccLabel, hw.BaolongdaTempWallUnset);
 				bool enabled = ApplyRange(_tgp, _tgpVal, hw.GpuTgpMinimum, hw.GpuTgpMaximum, hw.GpuTgp);
 				bool flag2 = ApplyRange(_db, _dbVal, hw.GpuDbMinimum, hw.GpuDbMaximum, hw.GpuDb);

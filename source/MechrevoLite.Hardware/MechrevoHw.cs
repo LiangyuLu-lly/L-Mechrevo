@@ -1214,7 +1214,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return IsAdjustable(TccMinimum, TccMaximum);
 			}
-			return false;
+			// 2026-10-21：同方 Intel + GCU 机型状态里可能不带 CPU_TccOffset* 字段；
+			// GCU 本身支持 TCC（写 EC 0x786），这里按“支持”处理，范围由界面兜底。
+			return IsGcuConnected && !UsesAmdPowerFields;
 		}
 	}
 
