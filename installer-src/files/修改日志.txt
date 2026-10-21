@@ -21,6 +21,7 @@ r79（2026-10-21 · **0.293.4 beta23.4**）★★ Intel+GCU 温度墙接正 + �
 - 电池电压修复内置化第一步（探针）：新增 I2EC 电池通道（PawnIO LpcIO 原始端口 0x681/0x682/0x683）+ CLI `--battery-voltage-probe`（只读：通道/身份/4S/基础电压/desired/queued/停充门）与 `--battery-voltage-test [--seconds N]`（写入 17600mV/2816mA、解停充门，结束恢复原值），报告写桌面。验证通过后再接到电池页开关。
 - 无界电池电压修复内置化（不依赖 Python）：直接 P/Invoke 本机已安装的 inpoutx64 驱动访问 I2EC（0x681/0x682/0x683），内置周期保持 17600mV/2816mA + 解停充门、停止/退出时恢复原值；驱动缺失或不可用时回退原 JG_BAT+Python 外挂路径。探针与电池页提示同步更新。
 - 移除电池电压修复的测试探针代码（--battery-voltage-probe / --battery-voltage-test 与 I2ecBattery 探针类），只保留内置 inpoutx64 修复功能；该功能 2026-10-21 实测可用。
+- 暂时隐藏两类机型的 EC 限充 UI：无界 Intel（LNL）与星耀（GCU 载荷 WJXY / 型号含星耀、XINGYAO）——这两类未验证同方 0x7B9 系 EC 位置；判定只读，ec_charge_limit=1/0 强覆盖仍优先。
 二、无界（WJXY / Wujie APU）
 - 键盘灯：自动启用 Keyboard/Ctrl 全字段链路（旧链路字段不全导致不生效）；效果下拉只保留「单色」、RGB 页隐藏颜色选择（EC 单分区单色白键盘）。
 - 自定义档切换立即刷新；切回自定义档按该档保存值强制下发一次（不再只切界面）。

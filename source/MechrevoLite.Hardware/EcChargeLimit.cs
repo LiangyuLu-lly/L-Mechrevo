@@ -252,6 +252,14 @@ internal static class EcChargeLimit
 		{
 			return false;
 		}
+		// 2026-10-21（机主要求）：无界 Intel（LNL）与星耀（WJXY 载荷）暂未验证 EC 限充位置 ⇒ 暂时隐藏。
+		// ⚠️ 只影响这两类机型的 EC 限充 UI 判定；其它同方/GCU 机型逐位不变；ec_charge_limit=1/0 强覆盖仍在上面优先生效。
+		if (IsTemporarilyHiddenModel(out string hiddenReason))
+		{
+			Logger.WriteLineIfChanged("charge-limit-hidden-model",
+				"限充可用性：暂时隐藏（" + hiddenReason + "）⇒ 判定不可用（未写任何 EC）");
+			return false;
+		}
 		// ⚠️ 2026-10-15（隐藏规则 B 的**分层** · 关键设计）：10/16/20/30 系的代际门控**故意不放在这里** ——
 		// 本方法回答的是「EC 通道能不能用」，而界面侧还用它决定**整张电池卡片**的可见性
 		// （ApplyChargeLimitSliderGating 的 panelBattery.Visible）与三档按钮的启用态。若把代际门控塞进来，
@@ -297,6 +305,47 @@ internal static class EcChargeLimit
 			return true;
 		}
 		return ProbeChannelAvailable();
+	}
+
+	/// <summary>2026-10-21：暂时隐藏 EC 限充 UI 的机型判定（只读，不写 EC）。</summary>
+	private static bool IsTemporarilyHiddenModel(out string reason)
+	{
+		reason = string.Empty;
+		try
+		{
+			// 星耀：GCU 载荷为 WJXY（安装器登记 / 包特征识别）
+			if (string.Equals(GcuIdentity.Variant, "WJXY", StringComparison.OrdinalIgnoreCase))
+			{
+				reason = "星耀机型（GCU 载荷 WJXY）暂未验证 EC 限充地址";
+				return true;
+			}
+			try
+			{
+				BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
+				string model = ((evidence.RegSystemProduct ?? string.Empty) + " " + (evidence.WmiModel ?? string.Empty)).Trim();
+				bool wujieName = model.IndexOf("无界", StringComparison.OrdinalIgnoreCase) >= 0
+					|| model.IndexOf("WUJIE", StringComparison.OrdinalIgnoreCase) >= 0;
+				bool xingyaoName = model.IndexOf("星耀", StringComparison.OrdinalIgnoreCase) >= 0
+					|| model.IndexOf("XINGYAO", StringComparison.OrdinalIgnoreCase) >= 0;
+				if (xingyaoName)
+				{
+					reason = "星耀机型暂未验证 EC 限充地址（model=" + model + "）";
+					return true;
+				}
+				if (wujieName && CpuVendor.IsIntel)
+				{
+					reason = "无界 Intel（LNL）机型暂未验证 EC 限充地址（model=" + model + "）";
+					return true;
+				}
+			}
+			catch
+			{
+			}
+		}
+		catch
+		{
+		}
+		return false;
 	}
 
 	// 2026-10-15（限充代系门控 · 用户原话「10系-30系用这个可能损坏硬件必须强制隐藏EC三档和滑块 只保留GCU路」）：
