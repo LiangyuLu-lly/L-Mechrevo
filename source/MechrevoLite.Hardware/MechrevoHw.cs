@@ -9684,7 +9684,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// 2026-10-21：不再用 CPU_TccOffsetMaximum(10) 当 UI 上限（实测 offset 12/14/21 都能被接受）；
 		// Intel TCC 偏移按 0..30 放开 ⇒ 温度墙 [TjMax-30 .. TjMax]（255HX: 75..105℃）。
 		TccMinimum = Math.Max(75, tjBase - 30);
-		TccMaximum = tjBase;
+		// 实测：温度墙 100℃(偏移5) 可写，104/105℃(偏移1/0) 被固件拒 ⇒ 上限先按 100℃
+		TccMaximum = Math.Min(100, tjBase);
 		goto IL_066f;
 	}
 
