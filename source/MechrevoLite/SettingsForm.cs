@@ -14298,7 +14298,19 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				return;
 			}
 		}
-		// 本机配置机型（宝龙达 / 无界 APU）：内置档位只记录到本机（没有可下发的固件档），
+		// 宝龙达：离开自定义档时，先把软件闭环风扇曲线退出、交回固件控制。
+	// ⚠️ 必须早于下面的模式下发（SwitchMode），否则固件/风扇控制权顺序会乱。
+	MechrevoHw? leavingHw = Program.hw;
+	if (leavingHw != null && leavingHw.UsesBaolongda && leavingHw.BaolongdaFanCurveApplied)
+	{
+		string currentModeId = MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId ?? string.Empty;
+		if (currentModeId.StartsWith("custom", StringComparison.OrdinalIgnoreCase))
+		{
+			leavingHw.RestoreBaolongdaFanFirmwareControl();
+			Logger.WriteError("[fan] 离开自定义档 ⇒ 先退出软件闭环、交回固件（在模式下发之前）");
+		}
+	}
+	// 本机配置机型（宝龙达 / 无界 APU）：内置档位只记录到本机（没有可下发的固件档），
 		// 这样「上次选的是静音/平衡/狂暴」会持久化，重启不会自动跳回自定义档。
 		MechrevoHw modeHw = Program.hw;
 		if (modeHw != null && (modeHw.UsesBaolongda || modeHw.WujieSmuApu))
