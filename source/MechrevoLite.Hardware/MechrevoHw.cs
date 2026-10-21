@@ -8405,6 +8405,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			case "Keyboard/Status":
 				OnKeyboardStatus(o);
 				break;
+			case "Setting/Control":
+				OnSettingControl(o);
+				break;
 			case "BT_LC/Status":
 				OnBtLcStatus(o);
 				break;
@@ -8473,6 +8476,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	/// <summary>GCU 实时上报的校色档位数（Customize/Info），优先于注册表 ItemSupport。</summary>
 	public int? MqttColorCalibrationLevel => _mqttColorCalibrationLevel;
+
+	/// <summary>2026-10-22：GCU/控制台的键盘自动关闭时间（分钟，-1=还没收到）。</summary>
+	internal int KeyboardAutoOffMinutes { get; private set; } = -1;
 
 	/// <summary>2026-10-21：Customize/Info 上报的键盘类型（-1=还没收到）。</summary>
 	internal int CustomizeKeyboardType { get; private set; } = -1;
@@ -8814,6 +8820,36 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			QuickSwitches[key] = string.Equals(power, "On", StringComparison.OrdinalIgnoreCase);
 		}
 		Logger.WriteLineIfChanged("lb-status-" + topic, flag ? $"LB {topic}: type={type ?? "-"} power={power ?? "-"} light={o["brightNess"]?.ToString() ?? "-"}" : ("LB " + topic + ": no hardware evidence"));
+	}
+
+	/// <summary>2026-10-22：解析 <c>Setting/Control</c> —— 目前只取键盘自动关闭时间
+	///（<c>{"Action":"KEYBOARD_LIGHTBAR_TIMER_ON","Mins":N}</c>，GCU 侧是软件计时器，不写 EC）。</summary>
+	private void OnSettingControl(JObject o)
+	{
+		try
+		{
+			string action = o["Action"]?.ToString();
+			if (!string.Equals(action, "KEYBOARD_LIGHTBAR_TIMER_ON", StringComparison.OrdinalIgnoreCase))
+			{
+				return;
+			}
+			JToken minsToken = o["Mins"];
+			if (minsToken == null || minsToken.Type != JTokenType.Integer)
+			{
+				return;
+			}
+			int mins = (int)minsToken;
+			if (KeyboardAutoOffMinutes == mins)
+			{
+				return;
+			}
+			KeyboardAutoOffMinutes = mins;
+			Logger.WriteError("[kbd] 键盘自动关闭时间 = " + mins + " 分钟（来自 GCU 设置；GCU 软件计时器，不写 EC）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[kbd] Setting/Control 解析失败（已吞掉）：" + ex.Message);
+		}
 	}
 
 	private void OnKeyboardStatus(JObject o)
