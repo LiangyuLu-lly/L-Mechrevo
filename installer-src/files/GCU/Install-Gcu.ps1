@@ -601,7 +601,7 @@ function New-GcuUnpackDir {
 $script:PayloadArchiveFactory = @{
     '1020' = @{ Size = 9167136;  Sha256 = '3F8835ADC7E4140734A68FB33344818DB57836DA6FC687513CB0949090DB3163'; Name = '1020.7z' }
     '30'   = @{ Size = 8802015;  Sha256 = '199A5124B1B700856BB77BBDD6133713DBBA47307E0B90454387011BE3BD54DE'; Name = '30.7z' }
-    '40'   = @{ Size = 14444731; Sha256 = '1A8B0232B68A0F14ADA536A28F94FC34C045C46A177C453DD8714A5FDE9D2123'; Name = '40.7z' }
+    '40'   = @{ Size = 17106392; Sha256 = '17826E53405C7B7C02FBB3DDF5828EA5B15292BA507956D885D337741F7BB3B0'; Name = '50.7z' }   # 2026-10-21: 40 系暂用 50 载荷
     '50'   = @{ Size = 17106392; Sha256 = '17826E53405C7B7C02FBB3DDF5828EA5B15292BA507956D885D337741F7BB3B0'; Name = '50.7z' }
     'WJXY' = @{ Size = 17484769; Sha256 = 'D71D3D975E8DB3A95F051E86CB6CB380011B16DD375AEB42EE66AF6001725638'; Name = 'WJXY.7z' }
 }
@@ -609,7 +609,7 @@ $script:PayloadArchiveFactory = @{
 $script:PayloadLandedExpect = @{
     '1020' = @{ Files = 175; Bytes = 42456148 }
     '30'   = @{ Files = 173; Bytes = 46012624 }
-    '40'   = @{ Files = 71;  Bytes = 44434074 }
+    '40'   = @{ Files = 93;  Bytes = 55608072 }   # 2026-10-21: 40 系暂用 50 载荷 ⇒ 落地期望值同 50
     '50'   = @{ Files = 93;  Bytes = 55608072 }
     'WJXY' = @{ Files = 98;  Bytes = 57468032 }
 }
@@ -1118,7 +1118,7 @@ function Get-GcuPayloadArchiveFor {
     $table = @{
         '1020' = @{ FileName = '1020.7z'; InnerRoot = '20';    ServiceDir = 'UniwillService' }
         '30'   = @{ FileName = '30.7z';   InnerRoot = '30';    ServiceDir = 'UniwillService' }
-        '40'   = @{ FileName = '40.7z';   InnerRoot = '40';    ServiceDir = 'AiStoneService' }
+        '40'   = @{ FileName = '50.7z';   InnerRoot = '50';    ServiceDir = 'AiStoneService' }   # 2026-10-21: 40 系暂用 50 载荷
         '50'   = @{ FileName = '50.7z';   InnerRoot = '50';    ServiceDir = 'AiStoneService' }
         'WJXY' = @{ FileName = 'WJXY.7z'; InnerRoot = 'WJXY'; ServiceDir = 'AiStoneService' }
     }

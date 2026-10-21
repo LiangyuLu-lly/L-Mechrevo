@@ -237,7 +237,8 @@ Source: "files\GCU\payload\1020.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: S
 Source: "files\GCU\payload\30.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 #ifndef NOGCU_PAYLOAD
-Source: "files\GCU\payload\40.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+; 2026-10-21（机主要求）：暂时不随包提供 40 载荷 —— 40 系改用 50 载荷（GcuVariant 仍如实写 40，不提示用户）。
+; Source: "files\GCU\payload\40.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 #ifndef NOGCU_PAYLOAD
 Source: "files\GCU\payload\50.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
@@ -2064,7 +2065,8 @@ end;
 // ==== 2026-10-14（7z 载荷化 + 40B 整体移除）：GCU 变体判定口径 ====
 // ⛔ 40B 逻辑已整个删除（owner 指示「40B 逻辑【整个不要了】」）：40 系一律走 `40`。
 //    随包载荷由「base + 40/30/50 覆盖层」改成 5 个独立 7z（1020 / 30 / 40 / 50 / WJXY），
-//    其中 40.7z 就是 40 系的唯一载荷；不再有 40B 覆盖层、不再有「是否支持核显模式」的询问。
+//    其中 40.7z 就是 40 系的唯一载荷；2026-10-21 起 40 载荷暂时不随包（40 系用 50 载荷，GcuVariant 仍写 40）；
+//    不再有 40B 覆盖层、不再有「是否支持核显模式」的询问。
 // 新增机型判据（owner 2026-10-14 定）：机型串含 `XINGYAO` 或 `LNL` => 走 WJXY 特别变体；
 //    其余照常走 30/40/50 判据；判不出来 => 记日志 + 走现有判据（⛔ 不静默乱选）。
 //    ⭐ 判据实现与日志都在 Select-GcuPayload.ps1（同一份脚本、同一份口径），本段只保留
@@ -2682,13 +2684,12 @@ begin
     Result := '';
     Exit;
   end;
-  SetArrayLength(GcuStagingFiles, 6);
+  SetArrayLength(GcuStagingFiles, 5);
   GcuStagingFiles[0] := '1020.7z';
   GcuStagingFiles[1] := '30.7z';
-  GcuStagingFiles[2] := '40.7z';
-  GcuStagingFiles[3] := '50.7z';
-  GcuStagingFiles[4] := 'WJXY.7z';
-  GcuStagingFiles[5] := '7za.exe';
+  GcuStagingFiles[2] := '50.7z';
+  GcuStagingFiles[3] := 'WJXY.7z';
+  GcuStagingFiles[4] := '7za.exe';
   // 先解出 7za.exe（外置 GCU.7z 解压需要）
   try
     ExtractTemporaryFile('7za.exe');
@@ -2699,7 +2700,7 @@ begin
   StageExternalGcuPayloads();
 #ifndef NOGCU_PAYLOAD
   // 内置载荷补齐缺失变体
-  for I := 0 to 4 do
+  for I := 0 to 3 do
   begin
     Dest := ExpandConstant('{tmp}\payload\' + GcuStagingFiles[I]);
     if not FileExists(Dest) then
@@ -2720,7 +2721,7 @@ begin
     end;
   end;
 #else
-  for I := 0 to 4 do
+  for I := 0 to 3 do
   begin
     Dest := ExpandConstant('{tmp}\payload\' + GcuStagingFiles[I]);
     if not FileExists(Dest) then

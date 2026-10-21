@@ -173,7 +173,7 @@ function Resolve-GcuVariant {
         switch ($gpuGen.Generation) {
             "GEN1020" { $forced = "1020"; $notes.Add("legacy 10/16/20-series machine -> 1020 payload") | Out-Null }
             "GEN30"   { $forced = "30";   $notes.Add("30-series -> 30 payload") | Out-Null }
-            "GEN40"   { $forced = "40";   $notes.Add("40-series -> 40 payload when available; caller falls back to 50 only if 40 is missing") | Out-Null }
+            "GEN40"   { $forced = "40";   $notes.Add("40-series -> variant 40 (payload temporarily 50.7z; 40 archive not shipped, no prompt)") | Out-Null }
             "GEN50"   { $forced = "50";   $notes.Add("50-series -> 50 payload") | Out-Null }
             default   { $forced = "50";   $notes.Add("GPU generation unresolved -> safety floor 50 payload (no silent guessing)") | Out-Null }
         }
@@ -213,7 +213,7 @@ $script:Archives = [ordered]@{
     # it is NOT the name on disk - see Install-Gcu.ps1 Get-GcuServiceLeafName.
     "1020" = [pscustomobject]@{ Variant = "1020"; FileName = "1020.7z"; RelPath = "payload\1020.7z"; InnerRoot = "20";    ServiceDir = "UniwillService"; DisplayName = "1020 series (legacy GamingCenterU)" }
     "30"   = [pscustomobject]@{ Variant = "30";   FileName = "30.7z";   RelPath = "payload\30.7z";   InnerRoot = "30";    ServiceDir = "UniwillService"; DisplayName = "30 series" }
-    "40"   = [pscustomobject]@{ Variant = "40";   FileName = "40.7z";   RelPath = "payload\40.7z";   InnerRoot = "40";    ServiceDir = "AiStoneService"; DisplayName = "40 series" }
+    "40"   = [pscustomobject]@{ Variant = "40";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "40 series (temporary: 50 payload; 40 archive not shipped)" }
     "50"   = [pscustomobject]@{ Variant = "50";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "50 series" }
     "WJXY" = [pscustomobject]@{ Variant = "WJXY"; FileName = "WJXY.7z"; RelPath = "payload\WJXY.7z"; InnerRoot = "WJXY"; ServiceDir = "AiStoneService"; DisplayName = "WJXY special variant (XINGYAO / LNL machines)" }
 }
