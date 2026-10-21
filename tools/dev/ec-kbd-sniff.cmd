@@ -1,21 +1,27 @@
 @echo off
+chcp 936 >nul
 setlocal
-rem åŒå‡»è¿è¡Œï¼šè‡ªåŠ¨ææƒåå¯åŠ¨ EC å¯„å­˜å™¨å˜åŒ–å—…æ¢ï¼ˆåªè¯»ï¼‰
-rem ç”¨æ³•ï¼šç›´æ¥åŒå‡»ï¼›æˆ– cmd é‡Œå¸¦å‚æ•°è¿è¡Œï¼ˆä¼šåŸæ ·ä¼ ç»™ ec-kbd-sniff.ps1ï¼‰
-rem   ec-kbd-sniff.cmd -Start 0x740 -End 0x8FF -IntervalMs 500 -Seconds 180
+title EC ×¥È¡£¨Ö»¶Á£©
+set "PS1=%~dp0ec-kbd-sniff.ps1"
 
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-  echo éœ€è¦ç®¡ç†å‘˜æƒé™ï¼Œæ­£åœ¨ææƒ...
-  powershell -NoProfile -Command "Start-Process -Verb RunAs -FilePath '%~f0' -ArgumentList '%*'"
+  echo ÕıÔÚÇëÇó¹ÜÀíÔ±È¨ÏŞ...
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath 'powershell' -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-File','%PS1%'"
+  if errorlevel 1 (
+    echo.
+    echo ÌáÈ¨Ê§°Ü£ºÇëÓÒ¼ü±¾ÎÄ¼ş£¬Ñ¡Ôñ¡°ÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ¡±¡£
+  )
+  echo.
+  pause
   exit /b
 )
 
-set "PS1=%~dp0ec-kbd-sniff.ps1"
-set "ARGS=%*"
-if "%ARGS%"=="" set "ARGS=-Start 0x700 -End 0x8FF -IntervalMs 500 -Seconds 180"
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PS1%" %ARGS%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS1%" %*
+set "RC=%errorlevel%"
 echo.
-echo æ—¥å¿—è§ %TEMP%\ec-kbd-sniff.txt
+echo ============================================================
+echo  ×¥È¡½áÊø£¨ÍË³öÂë %RC%£©
+echo  ÈÕÖ¾ÎÄ¼ş£º%TEMP%\ec-kbd-sniff.txt
+echo ============================================================
 pause

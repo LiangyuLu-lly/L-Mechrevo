@@ -1,15 +1,14 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal
-rem ä¸€é”®å¯åŠ¨ï¼šGCU é”®ç›˜ç¯ä¸“é¡¹æŠ“åŒ…ï¼ˆè¢«åŠ¨è®¢é˜…ï¼Œä¸å‘ GCU å‘æ§åˆ¶æŒ‡ä»¤ï¼‰
-rem è¾“å‡ºï¼šD:\openLM\diagnostics\GCU_kbd_capture_<æ—¶é—´>.log ä¸ ..._é”®ç›˜ç›¸å…³.log
-rem ç”¨æ³•ï¼šåŒå‡»ï¼›æˆ–å¸¦ç§’æ•°ï¼šè¿è¡Œ-GCUé”®ç›˜æŠ“åŒ….cmd 300
+title GCU ¼üÅÌµÆ×¥°ü
+set "PY=%~dp0gcu_kbd_capture.py"
 
 echo ============================================================
-echo  GCU é”®ç›˜ç¯ä¸“é¡¹æŠ“åŒ…ï¼ˆè¢«åŠ¨ï¼‰
-echo  1) æœ¬çª—å£å¯åŠ¨åï¼Œå†æ‰“å¼€å®˜æ–¹ GCU æ§åˆ¶å°æ“ä½œé”®ç›˜ç¯
-echo  2) ä¸€æ¬¡ä¸€ä¸ªåŠ¨ä½œã€é—´éš” 5 ç§’ï¼šå¼€ç¯ / äº®åº¦+ / äº®åº¦- / æ¢æ•ˆæœ / å…³ç¯
-echo  3) ç»“æŸåæŠŠ D:\openLM\diagnostics\GCU_kbd_capture_*.log å‘å›
+echo  GCU ¼üÅÌµÆ×¨Ïî×¥°ü£¨±»¶¯£¬²»Ïò GCU ·¢¿ØÖÆÖ¸Áî£©
+echo  1) ±¾´°¿ÚÆô¶¯ºó£¬ÔÙ´ò¿ª¹Ù·½ GCU ¿ØÖÆÌ¨²Ù×÷¼üÅÌµÆ
+echo  2) Ò»´ÎÒ»¸ö¶¯×÷¡¢¼ä¸ô 5 Ãë£º¿ªµÆ / ÁÁ¶È+ / ÁÁ¶È- / »»Ğ§¹û / ¹ØµÆ
+echo  3) ½áÊøºó°Ñ D:\openLM\diagnostics\GCU_kbd_capture_*.log ·¢»Ø
 echo ============================================================
 echo.
 
@@ -18,14 +17,13 @@ if "%ARGS%"=="" set "ARGS=240"
 
 where py >nul 2>&1
 if %errorlevel%==0 (
-  py -3 "%~dp0gcu_kbd_capture.py" %ARGS%
+  py -3 "%PY%" %ARGS%
 ) else (
-  python "%~dp0gcu_kbd_capture.py" %ARGS%
+  python "%PY%" %ARGS%
 )
-if errorlevel 1 (
-  echo.
-  echo è¿è¡Œå¤±è´¥ï¼šè¯·ç¡®è®¤æœ¬æœºæœ‰ Pythonï¼ˆpy -3 æˆ– pythonï¼‰ä¸”å·²å®‰è£… paho-mqttã€‚
-  pause
-  exit /b 1
+set "RC=%errorlevel%"
+echo.
+if not "%RC%"=="0" (
+  echo ÔËĞĞÊ§°Ü£¨ÍË³öÂë %RC%£©£ºÇëÈ·ÈÏÒÑ°²×° Python£¬²¢Ö´ĞĞ py -3 -m pip install paho-mqtt
 )
 pause
