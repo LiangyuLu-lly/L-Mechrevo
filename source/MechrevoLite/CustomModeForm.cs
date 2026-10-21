@@ -4342,7 +4342,9 @@ public class CustomModeForm : RForm
 		return (PerfModeSettings s) => s with
 		{
 			CpuFanDuty = persisted.CpuFanDuty,
-			GpuFanDuty = persisted.GpuFanDuty
+			GpuFanDuty = persisted.GpuFanDuty,
+			// 曲线下发开关也以落盘值为准（关闭时 planner 不生成曲线步骤）
+			FanCurveOn = persisted.FanCurveOn
 		};
 	}
 	// 宝龙达 UI 近似范围，只是让滑块可操作， 不是硬件范围；写入仍以回读为准）；显存不另造兜底

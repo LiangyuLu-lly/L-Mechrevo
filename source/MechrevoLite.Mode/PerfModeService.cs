@@ -1535,6 +1535,7 @@ internal sealed class PerfModeService
 		}
 		PerfModeSettings settings = PerfModeStore.LoadSettings(mode.Id) with { FanCurveOn = enabled };
 		PerfModeStore.SaveSettings(mode.Id, settings);
+		Invalidate();
 		Logger.WriteLine("[fan] 曲线下发开关：" + (enabled ? "开" : "关") + "（档位=" + mode.Id + "）");
 	}
 
