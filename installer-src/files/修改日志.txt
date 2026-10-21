@@ -70,6 +70,7 @@
 - 温度墙映射修正（同方 Intel）：按 Fan/Status 的 TjMax=105 计算，范围 95..105℃（偏移 10..0），目标按 TjMax−offset 换算；不再把 CPU_AmdTccTarget 当目标温度、也不再把上限硬压到 95（此前 95..105 被压成 95..95 ⇒ 判不可调、行被隐藏）。验证：255HX 95℃=偏移10。
 - 温度墙范围修正（关键）：Intel 的 CPU_TccOffsetMaximum=10 且没有 CPU_TccOffsetMinimum ⇒ 按偏移 0..10 换算温度墙 95..105℃（此前把缺失的 minimum 当 -1，算出 95..95 ⇒ adjustable=False，开关/滑块不显示、应用被拒）。TccOffsetSwitch 解析同时兼容布尔写法。
 - 温度墙放开 Intel 限制：不再把 CPU_TccOffsetMaximum=10 当作 UI 上限（实测 offset 12/14/21 均可被接受），Intel+GCU 温度墙范围改为 [TjMax-30 .. TjMax]（255HX: 75..105℃），当前值按 TjMax−offset 回显；下发仍为 Fan/Control CpuTccOffset（墙温→偏移换算）。
+- 修复温度墙范围残留 bug：替换代码时遗留 `{ TccMinimum = TccMaximum; }`，把范围又压成 105..105 ⇒ adjustable=False、开关/偏移全被拒。现 Intel 范围正确为 75..105（偏移0..30），目标按 TjMax−offset 显示。
 r78（2026-10-20 · **0.292.3 beta23.3**）★★ Logo/灯带颜色对齐官方 + 键盘灯开机闪与关灯被拉亮 + 30 系每配置本地化 + APU 防缩缸记忆 + 安装器简化 + 宝龙达机型识别/多档修复
 
 一、灯效（40 系同方）

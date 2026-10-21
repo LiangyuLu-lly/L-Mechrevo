@@ -9685,9 +9685,6 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// Intel TCC 偏移按 0..30 放开 ⇒ 温度墙 [TjMax-30 .. TjMax]（255HX: 75..105℃）。
 		TccMinimum = Math.Max(75, tjBase - 30);
 		TccMaximum = tjBase;
-		{
-			TccMinimum = TccMaximum;
-		}
 		goto IL_066f;
 	}
 
