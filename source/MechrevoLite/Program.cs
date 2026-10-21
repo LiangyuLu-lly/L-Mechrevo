@@ -3796,6 +3796,7 @@ internal static class Program
 					try
 					{
 						await warmPerf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
+			MechrevoLite.Hardware.BatteryVoltageFix.RunOnStartupIfEnabled();
 				warmPerf.ApplyApuAntiDegradeOnStartup();
 				try
 				{

@@ -48,6 +48,8 @@ internal sealed class BatteryLimitPanel : Panel
 	// ⭐ 机主批准：高级开关（默认关；允许 SOC ≥ 停充阈值时启用，固件会先放电）✅
 	private readonly RCheckBox _allowInitialDischargeBox;
 
+	private readonly RCheckBox _voltageFixBox;
+
 	private CancellationTokenSource? _dischargeWatch;
 
 	private readonly Button _applyButton;
@@ -140,6 +142,31 @@ internal sealed class BatteryLimitPanel : Panel
 			BatteryLimitRestore.SetAllowInitialDischarge(_allowInitialDischargeBox.Checked);
 		};
 
+		// 8000 系无界：电池充电电压修复（外挂 JG_BAT；本机自身不注入驱动）
+		_voltageFixBox = new RCheckBox
+		{
+			AutoSize = true,
+			Text = "电池充电电压修复（8000 系无界，外挂 JG_BAT）",
+			BackColor = Color.Transparent,
+			Margin = Padding.Empty,
+			Checked = MechrevoLite.Hardware.BatteryVoltageFix.Enabled,
+			Visible = MechrevoLite.Hardware.BatteryVoltageFix.IsSupportedMachine()
+		};
+		_toolTip.SetToolTip(_voltageFixBox, "用外部 JG_BAT 工具覆盖 EC 老化降额，把充电目标恢复为 17.6V（需要已安装 JG_BAT 与 Python）");
+		_voltageFixBox.CheckedChanged += delegate
+		{
+			MechrevoLite.Hardware.BatteryVoltageFix.Enabled = _voltageFixBox.Checked;
+			if (_voltageFixBox.Checked)
+			{
+				(bool ok, string detail) = MechrevoLite.Hardware.BatteryVoltageFix.Run("hold-full");
+				_statusLabel.Text = "电池电压修复：" + (ok ? "已执行" : "失败") + " · " + detail;
+			}
+			else
+			{
+				_statusLabel.Text = "电池电压修复：已关闭（重启后回默认）";
+			}
+		};
+
 		_statusLabel = MakeFixedLabel(Strings.BatteryLimitStatusReading, D(360));
 		_statusLabel.Margin = Padding.Empty;
 
@@ -148,7 +175,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Dock = DockStyle.Top,
 			AutoSize = false,
 			ColumnCount = 4,
-			RowCount = 5,
+			RowCount = 6,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = Color.Transparent
@@ -164,7 +191,8 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowAdvanced)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
-		grid.Height = D(RowSoc + RowInput + RowAdvanced + RowStatus);
+	grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(24)));
+		grid.Height = D(RowSoc + RowInput + RowAdvanced + RowStatus + 24);
 
 		// ⭐ 开关 + 保存按钮同一行：内嵌表 2 列（开关占满、按钮固定 120 逻辑像素，⛔ 不再被 25% 列裁字）✅
 		TableLayoutPanel switchRow = new TableLayoutPanel
@@ -195,6 +223,8 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.SetColumnSpan(_allowInitialDischargeBox, 4);
 		grid.Controls.Add(_statusLabel, 0, 4);
 		grid.SetColumnSpan(_statusLabel, 4);
+		grid.Controls.Add(_voltageFixBox, 0, 5);
+		grid.SetColumnSpan(_voltageFixBox, 4);
 		Controls.Add(grid);
 		// ⭐ 代码级 UI 自检（无法启动 GUI 时作为可验证替代）：标签宽度是否足够 ⇒ 不换行 ✅
 		LogLabelWidthCheck("起充标签", _lowLabel, D(88));
