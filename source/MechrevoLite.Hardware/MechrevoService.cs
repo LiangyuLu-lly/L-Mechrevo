@@ -5273,7 +5273,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 	/// 新的键盘灯效果下发入口：<c>Keyboard/Ctrl</c> + <c>SetEffectALL</c>。
 	/// 开关关闭时**直接返回 false、不组包、不发帧**（保证关闭态与改前逐字一致）。
 	/// </summary>
-	public async Task<bool> PublishKeyboardCtrlEffectAsync(string effect, int light, int speed, Color? singleColor = null, int powerstatus = 1)
+	public async Task<bool> PublishKeyboardCtrlEffectAsync(string effect, int light, int speed, Color? singleColor = null, int powerstatus = 0)
 	{
 		if (!KeyboardCtrlPublishSwitch.Enabled)
 		{
@@ -5295,7 +5295,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				powerstatus: powerstatus,
 				monochromeIndex: monoIndex,
 				manualIndexes: settings.ManualIndexes,
-				manualInterval: string.Equals(effect, "Manual", StringComparison.Ordinal) ? speed : 6,
+				manualInterval: string.Equals(effect, "Manual", StringComparison.Ordinal) ? speed : 10,
 				breathingIndex: settings.BreathingIndex,
 				colorBufferArgb: colorBuffer,
 				colorBlocks: blocks.BlockCount);
@@ -5322,6 +5322,32 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			Dictionary<string, object> payload = KeyboardCtrlPayload.BuildSetPower(on);
 			await _hw.Publish(KeyboardCtrlPayload.Topic, payload).ConfigureAwait(continueOnCapturedContext: false);
 			Logger.WriteLine($"[kbd] Keyboard/Ctrl SetPower on={on} 结果=已发送 payload={KeyboardCtrlPayload.Serialize(payload)}");
+			// 2026-10-21（无界键盘灯）：50 GCU 单分区只在 powerStatus=On 后才把效果写进 EC，
+			// 冷启动 GCU 报 powerStatus=Off；开灯后补一次全字段 SetEffectALL，颜色/效果才会恢复。
+			if (on && _hw != null && _hw.WujieSmuApu)
+			{
+				await Task.Delay(200).ConfigureAwait(continueOnCapturedContext: false);
+				string fillEffect = "Single";
+				int fillSpeed = 1;
+				Color? fillColor = null;
+				if (LightingSettingsStore.TryLoad(KeyboardCtrlPayload.Topic, out var fillSaved) && KeyboardFirmwareEffects.Contains(fillSaved.Effect))
+				{
+					fillEffect = fillSaved.Effect;
+					fillSpeed = fillSaved.Speed;
+					fillColor = ResolveKeyboardColor(fillEffect, fillSaved);
+				}
+				if (!IsWujieKeyboardEffect(fillEffect))
+				{
+					fillEffect = "Single";
+				}
+				int fillLight = KeyboardEcBrightness.GetLastLevel();
+				if (fillLight <= 0)
+				{
+					fillLight = 4;
+				}
+				bool fillOk = await PublishKeyboardCtrlEffectAsync(fillEffect, fillLight, fillSpeed, fillColor, powerstatus: 0).ConfigureAwait(continueOnCapturedContext: false);
+				Logger.WriteLine($"[kbd] Keyboard/Ctrl 开灯后补发 SetEffectALL effect={fillEffect} light={fillLight} speed={fillSpeed} 结果={(fillOk ? "已发送" : "失败")}");
+			}
 			return true;
 		}
 		catch (Exception ex)
@@ -5340,6 +5366,15 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		}
 		try
 		{
+			// 2026-10-21（无界键盘灯 · 50 GCU 协议）：50 GCU 单分区键盘的亮度入口是 SetEffectLight
+			//（只读 mode + light，没有 SetLightingLevel）；无界改发它，其它机型保持原样。
+			if (_hw != null && _hw.WujieSmuApu)
+			{
+				Dictionary<string, object> effectLightPayload = KeyboardCtrlPayload.BuildSetEffectLight(level0to4);
+				await _hw.Publish(KeyboardCtrlPayload.Topic, effectLightPayload).ConfigureAwait(continueOnCapturedContext: false);
+				Logger.WriteLine($"[kbd] Keyboard/Ctrl SetEffectLight light={level0to4}（50 GCU 单分区亮度入口）结果=已发送 payload={KeyboardCtrlPayload.Serialize(effectLightPayload)}");
+				return true;
+			}
 			int speed = 1;
 			Color? singleColor = null;
 			string effect;
@@ -5365,7 +5400,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				speed: speed,
 				monochromeIndex: monoIndex,
 				manualIndexes: current.ManualIndexes,
-				manualInterval: string.Equals(effect, "Manual", StringComparison.Ordinal) ? speed : 6,
+				manualInterval: string.Equals(effect, "Manual", StringComparison.Ordinal) ? speed : 10,
 				breathingIndex: current.BreathingIndex,
 				colorBufferArgb: colorBuffer,
 				colorBlocks: blocks.BlockCount);
@@ -5384,6 +5419,12 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 	/// 单色索引口径与老路径 <c>SetLightEffect("Keyboard/Ctrl")</c> 逐字一致：自定义色（ColorBuffer 带色）⇒ 33；
 	/// 否则若 <c>keyboard.cfg</c> 里存的是 1..29 的预设色板索引，就用它。
 	/// </summary>
+	/// <summary>2026-10-21：无界 EC 单分区键盘只支持 Single / Breathing / Rainbow / Manual（其它效果映射过去无反应）。</summary>
+	private static bool IsWujieKeyboardEffect(string effect)
+	{
+		return effect == "Single" || effect == "Breathing" || effect == "Rainbow" || effect == "Manual";
+	}
+
 	private static int ResolveKeyboardCtrlMonochromeIndex(LightChannelSettings settings, bool hasCustomColor)
 	{
 		if (hasCustomColor)

@@ -31,6 +31,7 @@ r79（2026-10-21 · **0.293.4 beta23.4**）★★ Intel+GCU 温度墙接正 + �
 - 无界键盘灯根因修复（诊断包实证）：`KeyboardCtrlPublishSwitch` 把启动早期（`Program.hw` 尚未建立、无界自动启用判不出来）的 false **缓存**了 ⇒ 整进程永远不发 Keyboard/Ctrl 帧（日志 `下发开关 = OFF` 但设计上无界应自动启用）。改为只缓存「打开」，并在无界自动启用时打 `[kbd] 无界键盘：自动启用 Keyboard/Ctrl 全字段链路`。
 - 修正无界 >60W 切狂暴的两个细节（诊断包实证）：① 触发条件由「>60W」改为「≥60W」（自定义拉到正好 60W 时之前不会切）；② 无界 GCU 的狂暴 = `OP=2`（旧代码把 `OP=1` 当狂暴，已在狂暴时仍会重复切一次），现在 OP=2 才判定“已在狂暴、不重复发”。
 - 无界默认屏蔽 Logo 与灯带开关：`light_strip_ui` / `light_logo_ui` 为 auto 时，无界（WujieSmuApu）一律收起这两行（本机没有灯带/Logo 灯），日志带 `+wujie-default-hide`；用户把对应键显式设成 `show` 仍可强制显示。
+- 无界键盘灯按 50 GCU 协议收口：① 亮度改发 `SetEffectLight`（`{function,mode:Lighting,light}`，50 GCU 无 `SetLightingLevel` 入口）；② 开灯后 200ms 补发一次全字段 `SetEffectALL`（50 单分区只在 powerStatus=On 后才写 EC，冷启动会被丢）；③ `SetEffectALL` 的 `powerstatus` 默认改 0、非 Manual 的 `ManualInterval` 改 10（对齐官方）；④ 无界效果白名单 Single/Breathing/Rainbow/Manual。取证分析见 docs/notes/无界键盘灯-命令链路-20261021.md。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

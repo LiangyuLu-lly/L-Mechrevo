@@ -147,6 +147,17 @@ internal static class KeyboardCtrlPayload
 		};
 	}
 
+	/// <summary>2026-10-21：<c>SetEffectLight</c> —— 50 GCU 单分区键盘的亮度入口（只读 mode + light 两个字段）。</summary>
+	internal static Dictionary<string, object> BuildSetEffectLight(int light)
+	{
+		return new Dictionary<string, object>
+		{
+			["function"] = "SetEffectLight",
+			["mode"] = "Lighting",
+			["light"] = light.ToString(CultureInfo.InvariantCulture)
+		};
+	}
+
 	/// <summary>
 	/// <c>SetLightingLevel</c>（亮度）：字段集合与老路径 <c>MechrevoService.SetLightingLevelAsync</c> 相同，
 	/// 但同样无条件带全 <c>MonochromeIndex</c>/<c>ManualIndex*</c>/<c>DefaultData</c>/<c>AuroraSwitch</c>。
