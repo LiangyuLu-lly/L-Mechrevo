@@ -9541,6 +9541,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			TjMax = result2;
 		}
+			// GCU 未上报 TjMax 时，Intel 直接读 MSR 0x1A2（TjMax 逐 CPU 不同，不能写死 100/105）
+			if (TjMax <= 0 && CpuVendor.IsIntel)
+			{
+				int msrTjMax = PawnIO.IntelMsrTjMax.TryRead();
+				if (msrTjMax > 0)
+				{
+					TjMax = msrTjMax;
+					Logger.WriteLine("[gcu] TjMax 取 MSR 0x1A2 = " + msrTjMax + "℃");
+				}
+			}
 		int num7 = OptionalInt(o, "CPU_AmdTccTarget", -1);
 		if (IsAmdPlatformForLimits)
 		{
@@ -9685,7 +9695,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// Intel TCC 偏移按 0..30 放开 ⇒ 温度墙 [TjMax-30 .. TjMax]（255HX: 75..105℃）。
 		TccMinimum = Math.Max(75, tjBase - 30);
 		// 实测：温度墙 100℃(偏移5) 可写，104/105℃(偏移1/0) 被固件拒 ⇒ 上限先按 100℃
-		TccMaximum = Math.Min(100, tjBase);
+		TccMaximum = Math.Max(75, tjBase - 5);   // 偏移下限 5（实测 0/1 被固件拒）
 		goto IL_066f;
 	}
 

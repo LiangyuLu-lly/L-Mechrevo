@@ -875,8 +875,9 @@ public class CustomModeForm : RForm
 		(int, int, int, bool) tuple6 = DeviceRange(hw?.TccMinimum ?? (-1), hw?.TccMaximum ?? (-1), hw?.TccTarget ?? 0);
 		if (hw != null && hw.IsGcuConnected && !hw.UsesAmdPowerFields)
 		{
-			int tccTjMax = Math.Min(100, (hw.TjMax > 0) ? hw.TjMax : 105);
-			int tccWallMin = Math.Max(75, tccTjMax - 30);
+			int tccTjBase = (hw.TjMax > 0) ? hw.TjMax : 105;
+			int tccTjMax = Math.Max(75, tccTjBase - 5);
+			int tccWallMin = Math.Max(75, (tccTjMax + 5) - 30);
 			int tccWallCur = Math.Clamp((hw.TccTarget > 0) ? hw.TccTarget : tccWallMin, tccWallMin, tccTjMax);
 			tuple6 = (tccWallMin, tccTjMax, tccWallCur, true);
 			Logger.WriteLine("[custom-ui] Intel+GCU 温度墙范围 " + tccWallMin + ".." + tccTjMax + "℃（偏移 5..30）");
@@ -4758,8 +4759,9 @@ public class CustomModeForm : RForm
 				bool flag5 = ApplyRange(_fanSwitchSpeed, _fanSwitchSpeedVal, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum, hw.FanSwitchSpeed);
 				if (hw.IsGcuConnected && !hw.UsesAmdPowerFields)
 				{
-					int tccTjR = Math.Min(100, (hw.TjMax > 0) ? hw.TjMax : 105);
-					int tccWallMinR = Math.Max(75, tccTjR - 30);
+					int tccTjBaseR = (hw.TjMax > 0) ? hw.TjMax : 105;
+			int tccTjR = Math.Max(75, tccTjBaseR - 5);
+					int tccWallMinR = Math.Max(75, (tccTjR + 5) - 30);
 					int tccWallCurR = Math.Clamp((hw.TccTarget > 0) ? hw.TccTarget : tccWallMinR, tccWallMinR, tccTjR);
 					ApplyRange(_tcc, _tccVal, tccWallMinR, tccTjR, tccWallCurR);
 					_tcc.Enabled = true; _tccVal.Enabled = true; _tccChk.Enabled = true;
