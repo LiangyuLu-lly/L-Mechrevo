@@ -243,6 +243,11 @@ public class MechrevoHw : IDisposable
 	private long _gpuSwitchResultVersion;
 
 	private long _fanStatusVersion;
+	/// <summary>2026-10-21：GCU 最近一次上报的 CPU_PL1/PL2（用于区分“谁把功耗改回去”：GCU 上报变化 = GCU/固件侧）。</summary>
+	private int _gcuReportedPl1 = -1;
+
+	private int _gcuReportedPl2 = -1;
+
 
 	private long _customProfileStatusVersion;
 
@@ -9607,6 +9612,24 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		CpuAmdFppt = OptionalUsablePowerValue(o, "CPU_AmdFPPT", CpuAmdFppt);
 		Pl1 = ((UsesAmdPowerFields && CpuAmdSpl > 0) ? CpuAmdSpl : num3);
 		Pl2 = ((UsesAmdPowerFields && CpuAmdSppt > 0) ? CpuAmdSppt : num4);
+		// 2026-10-21（机主：怀疑是 GCU 把耗改回去的）：把 GCU 上报的功耗变化显式记出来。
+		//   ⚠️ 只记“变化”，默认级别可见；不写任何东西。
+		try
+		{
+			if ((UsesWjxyGcuPayload || WujieSmuApu) && num3 > 0 && num4 > 0
+				&& (num3 != _gcuReportedPl1 || num4 != _gcuReportedPl2))
+			{
+				Logger.WriteError("[gcu] 上报功耗变化：CPU_PL1 " + (_gcuReportedPl1 > 0 ? _gcuReportedPl1 + "W" : "(首见)")
+					+ " → " + num3 + "W · CPU_PL2 " + (_gcuReportedPl2 > 0 ? _gcuReportedPl2 + "W" : "(首见)")
+					+ " → " + num4 + "W（OP=" + num + " · 本项来自 GCU 上报，不是 LM 下发）");
+				_gcuReportedPl1 = num3;
+				_gcuReportedPl2 = num4;
+			}
+		}
+		catch (Exception exGcuPl)
+		{
+			Logger.WriteLine("[gcu] 上报功耗日志失败（已吞掉）：" + exGcuPl.Message);
+		}
 		TccOffset = Int(o, "CPU_TccOffset");
 		if (HasField(o, "CPU_TccOffset") || HasField(o, "CPU_TccOffsetMinimum") || HasField(o, "CPU_TccOffsetMaximum") || HasField(o, "CPU_TccOffsetSwitch") || HasField(o, "CPU_AmdTccTarget"))
 		{
