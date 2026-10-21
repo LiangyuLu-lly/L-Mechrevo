@@ -5757,6 +5757,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	internal int BaolongdaStapmTimeSeconds { get; private set; }
 	/// <summary>当前 SMU slow 时间窗（秒，0 = 读不到）；30 系与无界共用，只读采样。</summary>
 	internal int SmuSlowTimeSeconds { get; private set; }
+	/// <summary>2026-10-21：本机 GCU 载荷是否为 WJXY（星耀 / 无界 LNL 等特殊的 1.0.2.70 分支）。只读。</summary>
+	internal bool UsesWjxyGcuPayload => string.Equals(GcuIdentity.Variant, "WJXY", StringComparison.OrdinalIgnoreCase);
+
 	/// <summary>当前 SMU 慢速功率(sPPT)（W，0 = 读不到）；只读采样。</summary>
 	internal int SmuSlowLimitWatts { get; private set; }
 
