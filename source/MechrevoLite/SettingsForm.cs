@@ -1338,26 +1338,46 @@ public class SettingsForm : RForm
 
 	internal static readonly string KeyboardControllerUnsupportedText = Strings.KeyboardControllerUnsupported;
 
-	internal static readonly (string Label, int Mins, int IdleSeconds)[] LightingCloseTimerOptions = new (string, int, int)[9]
+	internal static readonly (string Label, int Mins, int IdleSeconds)[] LightingCloseTimerOptions = new (string, int, int)[17]
 	{
 		(Strings.Off, 0, 0),
 		(Strings.IdleOff10Sec, 0, 10),
+		(Strings.IdleOff15Sec, 0, 15),
+		(Strings.IdleOff20Sec, 0, 20),
+		(Strings.IdleOff30Sec, 0, 30),
+		(Strings.IdleOff45Sec, 0, 45),
+		(Strings.IdleOff1Min, 1, 60),
+		(Strings.IdleOff2Min, 2, 120),
+		(Strings.IdleOff5Min, 5, 300),
 		(Strings.IdleOff10Min, 10, 600),
 		(Strings.IdleOff15Min, 15, 900),
 		(Strings.IdleOff20Min, 20, 1200),
 		(Strings.IdleOff30Min, 30, 1800),
 		(Strings.IdleOff45Min, 45, 2700),
 		(Strings.IdleOff1Hour, 60, 3600),
-		(Strings.IdleOff2Hour, 120, 7200)
+		(Strings.IdleOff2Hour, 120, 7200),
+		(Strings.IdleOff3Hour, 180, 10800)
 	};
 	// （机主批准「灯光自动关闭时间」· 宝龙达软件实现）
-	internal static readonly (string Label, int Seconds)[] KeyboardAutoOffOptions = new (string, int)[5]
+	internal static readonly (string Label, int Seconds)[] KeyboardAutoOffOptions = new (string, int)[17]
 	{
 		(Strings.Off, 0),
 		(Strings.IdleOff10Sec, 10),
+		(Strings.IdleOff15Sec, 15),
+		(Strings.IdleOff20Sec, 20),
+		(Strings.IdleOff30Sec, 30),
+		(Strings.IdleOff45Sec, 45),
+		(Strings.IdleOff1Min, 60),
+		(Strings.IdleOff2Min, 120),
 		(Strings.IdleOff5Min, 300),
 		(Strings.IdleOff10Min, 600),
-		(Strings.IdleOff30Min, 1800)
+		(Strings.IdleOff15Min, 900),
+		(Strings.IdleOff20Min, 1200),
+		(Strings.IdleOff30Min, 1800),
+		(Strings.IdleOff45Min, 2700),
+		(Strings.IdleOff1Hour, 3600),
+		(Strings.IdleOff2Hour, 7200),
+		(Strings.IdleOff3Hour, 10800)
 	};
 
 	internal bool IsReadOnlyDegraded { get; private set; }

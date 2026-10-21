@@ -40,6 +40,7 @@ r79（2026-10-21 · **0.293.4 beta23.4**）★★ Intel+GCU 温度墙接正 + �
 - 无界白键盘 EC 直控（实测定位）：EC `0x78C` bit1=电源、bit4~7=亮度档（0~4），官方控制台开关不会走 GCU MQTT（`Keyboard/Status` 恒 `solution=UNKNOWN`）⇒ 新增 `EcKeyboardLight`（ACPIDriver 读-改-写，仅改 bit1/bit4~7，带回读确认）；无界且 GCU 不报键盘通道时，开关/亮度改走 EC；日志 `[kbd-ec] 键盘背光：0x78C 0x41 -> 0x43 … 回读一致`。
 - 无界白键盘 EC 位定义按官方实现校正：`0x78C` **bit1=关灯位（0=开、1=关）**；**bit5~7=亮度（0~7）**，写亮度时按官方写法 `(b|0x10)&0x1F | (level<<5)`（bit4 置 1）。之前“bit4~7=亮度/bit1=开”是错的，已修。
 - 解析 GCU `Setting/Control` 的键盘自动关闭时间：`{"Action":"KEYBOARD_LIGHTBAR_TIMER_ON","Mins":N}` ⇒ 记 `[kbd] 键盘自动关闭时间 = N 分钟`（Error 级）。该值是 GCU 软件计时器，不写 EC、不在 Keyboard/Status 上报，只有这条 MQTT 能反映。
+- 自动关闭时间下拉补齐官方全部档位（10/15/20/30/45 秒、1/2/5/10/15/20/30/45 分钟、1/2/3 小时、不关闭）：新增 `IdleOff15Sec/20Sec/30Sec/45Sec/1Min/2Min/3Hour` 资源（中英两套）；宝龙达软件计时与同方/GCU 本机软件计时都支持；GCU 侧不足 1 分钟时本机计时（`Mins=0` 关 GCU 计时器，秒数由 LM 软件计时执行）。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

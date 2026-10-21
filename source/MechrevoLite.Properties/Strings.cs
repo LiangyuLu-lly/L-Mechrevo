@@ -1255,6 +1255,20 @@ internal class Strings
 
 	/// <summary>⭐ 2026-10-19（宝龙达「灯光自动关闭时间」· 软件实现）：5 分钟选项 ✅。</summary>
 	internal static string IdleOff5Min => ResourceManager.GetString("IdleOff5Min", resourceCulture);
+	internal static string IdleOff15Sec => ResourceManager.GetString("IdleOff15Sec", resourceCulture);
+
+	internal static string IdleOff20Sec => ResourceManager.GetString("IdleOff20Sec", resourceCulture);
+
+	internal static string IdleOff30Sec => ResourceManager.GetString("IdleOff30Sec", resourceCulture);
+
+	internal static string IdleOff45Sec => ResourceManager.GetString("IdleOff45Sec", resourceCulture);
+
+	internal static string IdleOff1Min => ResourceManager.GetString("IdleOff1Min", resourceCulture);
+
+	internal static string IdleOff2Min => ResourceManager.GetString("IdleOff2Min", resourceCulture);
+
+	internal static string IdleOff3Hour => ResourceManager.GetString("IdleOff3Hour", resourceCulture);
+
 
 	internal static string QuickAcRecovery => ResourceManager.GetString("QuickAcRecovery", resourceCulture);
 

@@ -2434,7 +2434,7 @@ public class KeyboardRgb : IDisposable
 					StaticColor = Color.FromArgb(result);
 					break;
 				case "closeTimer":
-					CloseTimerMinutes = Math.Clamp(result, 0, 120);
+					CloseTimerMinutes = Math.Clamp(result, 0, 180);
 					break;
 				case "kbHidMode":
 					KbHidMode = Math.Clamp(result, 0, 9);

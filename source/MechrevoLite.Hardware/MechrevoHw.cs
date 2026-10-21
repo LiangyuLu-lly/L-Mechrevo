@@ -4830,12 +4830,26 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 把任意输入收敛到受支持的选项值（0 = 关；其它一律按"关"处理，⛔ 不猜）✅。</summary>
 	private static int NormalizeKeyboardAutoOffSeconds(int seconds)
 	{
+		// 2026-10-22（机主：官方控制台能选 10/15/20/30/45 秒等，LM 也要能选）：
+		// 只接受选项表里出现过的值，其它一律按“关”处理。
 		return seconds switch
 		{
 			10 => 10,
+			15 => 15,
+			20 => 20,
+			30 => 30,
+			45 => 45,
+			60 => 60,
+			120 => 120,
 			300 => 300,
 			600 => 600,
+			900 => 900,
+			1200 => 1200,
 			1800 => 1800,
+			2700 => 2700,
+			3600 => 3600,
+			7200 => 7200,
+			10800 => 10800,
 			_ => 0
 		};
 	}
@@ -4843,9 +4857,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ 人读描述（日志用；秒 ⇒ "10 秒" / "N 分钟"）✅。</summary>
 	private static string DescribeKeyboardAutoOffSeconds(int seconds)
 	{
-		if (seconds == 10)
+		if (seconds < 60)
 		{
-			return "10 秒";
+			return seconds + " 秒";
+		}
+		if (seconds % 3600 == 0)
+		{
+			return (seconds / 3600) + " 小时";
 		}
 		return (seconds / 60) + " 分钟";
 	}
