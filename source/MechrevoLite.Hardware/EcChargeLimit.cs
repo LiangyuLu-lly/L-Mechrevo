@@ -279,10 +279,13 @@ internal static class EcChargeLimit
 		//      仍可用 `ec_charge_limit=1` 逃生 ✅（⭐ 与既有设计一致 ✅）
 		if (Program.hw?.UsesBaolongda == true)
 		{
+			// 2026-10-21：宝龙达没有 UWACPIDriver 不等于没有 EC 通道 —— PawnIO LpcACPIEC（0x62/0x66）可用。
+			// 参考脚本同样走端口 I/O；这里以“能否只读 EC 身份”为准（读不到不算支持）。
+			bool pawnioEcOk = EcPortIo.TryReadEcIdentityAcpi(out _, out _, out string baolongdaEcNote);
 			Logger.WriteLineIfChanged("charge-limit-baolongda",
-				"限充可用性：本机是宝龙达模具（该模具没有 UWACPIDriver，真机诊断包已证实 \\\\.\\ACPIDriver 打不开）"
-				+ " ⇒ 判定不可用 ⇒ 限充 UI 隐藏（同方/GCU 机型不受本判断影响）");
-			return false;
+				"限充可用性：本机是宝龙达模具 ⇒ 经 PawnIO ACPI-EC 通道探测 ⇒ "
+				+ (pawnioEcOk ? "可用（不再依赖 UWACPIDriver）" : ("不可用：" + baolongdaEcNote)));
+			return pawnioEcOk;
 		}
 		// ⚠️ 语义是**或**、不是替换（用户批准的修法②：「ModelSupport 白名单**保留**…但**不再作为唯一门**」）：
 		//   ① 既有判据（机型白名单 / GCU 已服务）判支持 ⇒ 支持 —— 与改前逐字一致；

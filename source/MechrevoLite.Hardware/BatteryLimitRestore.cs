@@ -25,7 +25,7 @@ internal static class BatteryLimitRestore
 	internal const string AllowInitialDischargeKey = "battery_limit_allow_initial_discharge";
 
 	/// <summary>⭐ 高级开关：允许 SOC ≥ 停充阈值时启用（默认 0；⛔ 不默认开）✅。</summary>
-	internal static bool AllowInitialDischarge => AppConfig.Get(AllowInitialDischargeKey, 0) == 1;
+	internal static bool AllowInitialDischarge => AppConfig.Get(AllowInitialDischargeKey, 1) == 1;   // UI 开关已删：默认允许高电量启用
 
 	internal static void SetAllowInitialDischarge(bool allow)
 	{
@@ -98,9 +98,9 @@ internal static class BatteryLimitRestore
 				Logger.WriteLine("[battery] 启动核对：EC 状态读不到（" + source + "）：" + stateDetail + " ⇒ 不恢复");
 				return;
 			}
-			bool needRestore = enabled
-				? (mode != BatteryLimitWriter.ModeActive || ecHigh != high || ecLow != low)
-				: (mode == BatteryLimitWriter.ModeActive);
+			// 2026-10-21：启用状态一律在启动时重新下发一次 —— 寄存器可能残留旧值/看似生效但策略未运行，
+			// 只比数值会误判“无需恢复”（机主反馈重启后限充不生效）。关闭时仍只在处于限充模式时恢复。
+			bool needRestore = enabled || (mode == BatteryLimitWriter.ModeActive);
 			Logger.WriteLine("[battery] 启动核对：EC(" + stateDetail + ") vs 配置(enabled=" + enabled
 				+ " high=" + high + " low=" + low + ") ⇒ 需要恢复=" + needRestore + "（来源=" + source + "）");
 			if (!needRestore)
