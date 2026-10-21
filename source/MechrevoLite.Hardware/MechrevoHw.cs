@@ -9647,6 +9647,34 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Logger.WriteLine("[gcu] TjMax 取 MSR 0x1A2 = " + msrTjMax + "℃");
 				}
 			}
+		// 2026-10-21（星耀 / 无界 LNL · WJXY 载荷）：Intel 控制字段探测日志（只读，每个不同组合只记一次）
+		if (UsesWjxyGcuPayload || WujieSmuApu)
+		{
+			try
+			{
+				string wjxyFields = "variant=" + (GcuIdentity.Variant.Length > 0 ? GcuIdentity.Variant : "(空)")
+					+ " · cpu=" + (CpuVendor.IsIntel ? "Intel" : (CpuVendor.IsAmd ? "AMD" : "未知"))
+					+ " · CPU_PL1=" + (HasField(o, "CPU_PL1") ? o["CPU_PL1"]?.ToString() : "无")
+					+ " · CPU_PL2=" + (HasField(o, "CPU_PL2") ? o["CPU_PL2"]?.ToString() : "无")
+					+ " · CPU_TccOffset=" + (HasField(o, "CPU_TccOffset") ? o["CPU_TccOffset"]?.ToString() : "无")
+					+ " · CPU_TccOffsetSwitch=" + (HasField(o, "CPU_TccOffsetSwitch") ? o["CPU_TccOffsetSwitch"]?.ToString() : "无")
+					+ " · CPU_TccOffsetMaximum=" + (HasField(o, "CPU_TccOffsetMaximum") ? o["CPU_TccOffsetMaximum"]?.ToString() : "无")
+					+ " · TjMax=" + (HasField(o, "TjMax") ? o["TjMax"]?.ToString() : "无")
+					+ " · CPU_AmdSPL=" + (HasField(o, "CPU_AmdSPL") ? o["CPU_AmdSPL"]?.ToString() : "无")
+					+ " · IsAMDPlatform=" + (HasField(o, "IsAMDPlatform") ? o["IsAMDPlatform"]?.ToString() : "无")
+					+ " ⇒ 计算值 Pl1=" + Pl1 + " Pl2=" + Pl2 + " TjMax(本地)=" + TjMax
+					+ " TccRaw=" + TccRawMinimum + ".." + TccRawMaximum;
+				if (Logger.TryMarkChanged("wjxy-intel-fields", wjxyFields))
+				{
+					Logger.WriteError("[gcu] WJXY/LNL Intel 控制字段：" + wjxyFields);
+				}
+			}
+			catch (Exception exWjxy)
+			{
+				Logger.WriteLine("[gcu] WJXY Intel 字段日志失败（已吞掉）：" + exWjxy.Message);
+			}
+		}
+
 		int num7 = OptionalInt(o, "CPU_AmdTccTarget", -1);
 		if (IsAmdPlatformForLimits)
 		{
