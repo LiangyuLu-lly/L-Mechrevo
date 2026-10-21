@@ -2348,6 +2348,14 @@ internal static class Program
 		}
 	}
 
+	/// <summary>2026-10-22（无界白键盘）：键盘灯在 EC 0x78C（不走 GCU）时，自动关灯/恢复也要走 EC。</summary>
+	private static bool ShouldUseEcKeyboardPowerChannel()
+	{
+		MechrevoHw mechrevoHw = hw;
+		return mechrevoHw != null && mechrevoHw.WujieSmuApu && mechrevoHw.KeyboardStatusSeen
+			&& string.Equals(mechrevoHw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
+	}
+
 	private static async Task SuspendLightingTemporarilyAsync()
 	{
 		LogLightBoot("自动关灯/临时熄灭：suspend 开始（来源=空闲/离电）");
@@ -2355,6 +2363,14 @@ internal static class Program
 		Interlocked.Exchange(ref _keyboardEffectProtectArmed, 0);
 		rgb.StopCurrentEffect();
 		MechrevoHw mechrevoHw = hw;
+		// 2026-10-22（无界白键盘）：到点自动关灯要走 EC 0x78C（原来只发 GCU Keyboard/Ctrl，对白键盘无效）。
+		bool ecKeyboardSuspend = ShouldUseEcKeyboardPowerChannel();
+		if (ecKeyboardSuspend && service != null && ResolveEffectiveKbPower())
+		{
+			bool ecOff = await service.SetKeyboardPower(false).ConfigureAwait(continueOnCapturedContext: false);
+			LogLightBoot($"键盘电源 off 下发（来源=自动关灯 · EC 0x78C）结果={ecOff}");
+			Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 1);
+		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：下面整段都在发 Keyboard/Ctrl 等 MQTT ⇒ 真正需要 GCU。
 		if (mechrevoHw == null || !mechrevoHw.IsGcuConnected || service == null)
 		{
@@ -2367,7 +2383,7 @@ internal static class Program
 		// 现在改成"有效电源"（与 UI 写入同一份判据）。
 		// 2026-10-12（分流泄漏修复）：⛔ 单键 RGB 机型不发这条 GCU 键盘电源 —— 临时熄灯对那种机型
 		// 由上面那句 `rgb.StopCurrentEffect()`（HID 帧流停掉）完成，GCU 只管非单键机型。
-		bool useGcuKeyboardPowerChannel = ShouldUseGcuKeyboardPowerChannel();
+		bool useGcuKeyboardPowerChannel = !ecKeyboardSuspend && ShouldUseGcuKeyboardPowerChannel();
 		bool gcuPowerOffDelivered = false;
 		if (useGcuKeyboardPowerChannel && ResolveEffectiveKbPower())
 		{
@@ -3135,6 +3151,15 @@ internal static class Program
 			bool powerJustIssued = false;
 			int requestId = Volatile.Read(in _lightingRestoreRequestId);
 			bool appliedThisCycle = Volatile.Read(in _keyboardRestoreAppliedRequestId) == requestId;
+			// 2026-10-22（无界白键盘）：恢复/启动恢复直接走 EC 0x78C 开灯，不走 GCU Keyboard/Ctrl。
+			if (!appliedThisCycle && ShouldUseEcKeyboardPowerChannel() && service != null && ResolveEffectiveKbPower())
+			{
+				bool ecOn = await service.SetKeyboardPower(true).ConfigureAwait(continueOnCapturedContext: false);
+				LogLightBoot($"键盘电源 on 下发（来源=恢复 · EC 0x78C）结果={ecOn}");
+				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
+				Volatile.Write(ref _keyboardRestoreAppliedRequestId, requestId);
+				return true;
+			}
 			if (appliedThisCycle && rgb.IsConnected && rgb.ActiveMode == rgb.KbHidMode)
 			{
 				MarkKeyboardCustomStatusBaseline();
