@@ -9695,7 +9695,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// Intel TCC 偏移按 0..30 放开 ⇒ 温度墙 [TjMax-30 .. TjMax]（255HX: 75..105℃）。
 		TccMinimum = Math.Max(75, tjBase - 30);
 		// 实测：温度墙 100℃(偏移5) 可写，104/105℃(偏移1/0) 被固件拒 ⇒ 上限先按 100℃
-		TccMaximum = Math.Max(75, tjBase - 5);   // 偏移下限 5（实测 0/1 被固件拒）
+		// 墙温超过 100℃ 固件不允许（105℃ 机器上偏移 1/0 被拒 = 墙温 104/105）
+		TccMaximum = Math.Min(100, tjBase);
 		goto IL_066f;
 	}
 
