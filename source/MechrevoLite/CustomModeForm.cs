@@ -1393,6 +1393,8 @@ public class CustomModeForm : RForm
 			}
 			_powerWallTimer.Enabled = Visible && !Program.UiAuditMode;
 			if (Visible && !Program.UiAuditMode)
+			// 2026-10-21：每次显示都同步【应用】可用性（无待应用改动时也应可点=修复型重应用）
+			SyncApplyButtons();
 			{
 				// 2026-10-09：主按钮「应用」的强调底色会被主题重下发（UiVisualStyle.ApplyTree 的
 				// 二次按钮分支 / ControlHelper.Adjust）冲掉，故每次显示时按「主按钮样式」补一次
@@ -3223,7 +3225,7 @@ public class CustomModeForm : RForm
 		// 在该状态下仍可改，也必须能保存+下发（它们不在 OptionControls() 名单里，见那里的说明）。
 		// 硬件参数行在锁定时是禁用的 ⇒ Queue() 根本点不出来，故这里不可能有硬件字段；万一有（历史脏值），
 		// 就照旧不下发、停在界面上等用户处理，与改动前"锁定档位一律不发"同一口径。
-		if (IsDisposed || !_panelDirty || (_optionsLocked && (_pending.Count > 0 || _gpuOcDirty)))
+		if (IsDisposed || (_optionsLocked && (_pending.Count > 0 || _gpuOcDirty)))
 		{
 			return;
 		}
@@ -3299,6 +3301,30 @@ public class CustomModeForm : RForm
 					+ " · 数字框 core=" + _coreOcVal.Value + " mem=" + _memOcVal.Value + "（滑块 core=" + _coreOc.Value + " mem=" + _memOc.Value + "）"
 					+ " · 偏移可调 core=" + _gpuOcCoreAdjustable + " mem=" + _gpuOcMemoryAdjustable
 					+ " · 偏移脏=" + offsetsPending);
+			}
+			// 2026-10-21（机主：应用是灰的/点了没反应）：没有任何待应用改动时，【应用】= 修复型重应用，
+			// 按当前落盘配置全量重发一次（幂等；开机后 EC 掉值/被固件覆盖时用它拉回来）。
+			if (fields.Count == 0 && edits.Count == 0)
+			{
+				_status.Text = Strings.ModeTuneApplying;
+				_status.ForeColor = UiVisualStyle.Muted;
+				PerfApplyOutcome reapplyOutcome = (perf != null) ? await perf.ActivateAsync(_modeId, "manual reapply", forceParameters: true) : null;
+				if (IsDisposed)
+				{
+					return;
+				}
+				if ((object)reapplyOutcome != null)
+				{
+					ShowOutcome(reapplyOutcome);
+				}
+				else
+				{
+					_status.Text = Strings.ParamsConfirmed;
+					_status.ForeColor = UiVisualStyle.Ok;
+				}
+				_panelDirty = false;
+				SyncApplyButtons();
+				return;
 			}
 			PerfApplyOutcome? outcome = null;
 			bool confirmed = true;
@@ -3801,6 +3827,8 @@ public class CustomModeForm : RForm
 	{
 		base.OnShown(e);
 		ResizeToContent();
+		// 2026-10-21：打开窗口后同步一次【应用】按钮可用性（构造时按钮默认 Enabled=false，此前要改一次值才亮）
+		SyncApplyButtons();
 	}
 
 	private void UpdatePowerWallVerdict()
