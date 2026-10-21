@@ -655,7 +655,8 @@ public class RgbForm : RForm
 		bool baolongda = Program.hw?.UsesBaolongda ?? false;
 		// **只隐藏颜色**：亮度滑块 / 亮度数值 / 亮度标签**始终保留可用** ——
 		bool rainbowEffect = string.Equals(lightChannelSettings.Effect, "Rainbow", StringComparison.OrdinalIgnoreCase);
-		bool hideColorBlock = baolongda && rainbowEffect;
+		// 无界键盘是单色白色（EC 单分区）⇒ 颜色选择一律隐藏
+		bool hideColorBlock = (baolongda && rainbowEffect) || (Program.hw?.WujieSmuApu == true);
 		if (baolongda && _kbdColorUiHiddenState != (hideColorBlock ? 1 : 0))
 		{
 			_kbdColorUiHiddenState = hideColorBlock ? 1 : 0;

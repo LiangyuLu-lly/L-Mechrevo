@@ -17616,8 +17616,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		// 无界（本机配置 APU）：键盘灯只有开关 + 四档亮度，没有灯效/颜色 UI
 		if (Program.hw?.WujieSmuApu == true)
 		{
-			effectCombo.Visible = false;
-			effectCombo.Enabled = false;
+			effectCombo.Visible = true;
+			effectCombo.Enabled = true;
 		}
 		// 后台线程 + 结果缓存；结果供 RgbForm 的亮度滑块范围使用（彩虹已改软件刷色，与校准无关）
 		effectCombo.DropDown += delegate
@@ -18709,6 +18709,12 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			flag = true;
 			// （软件彩虹）：彩虹始终可用（软件刷色）⇒ 固定用「单色 + 彩虹」两项
 			array = BaolongdaLightEffects;
+		}
+		else if (Program.hw?.WujieSmuApu == true)
+		{
+			// 无界：键盘为单色白色（EC 单分区，无颜色/多彩通道）⇒ 效果只留“单色”
+			flag = true;
+			array = new (string, string)[1] { ("Single", Strings.EffectSingle) };
 		}
 		(int, string)[] array2 = RgbForm.VisibleHidEffects(keyboardType);
 		string[] array3 = (flag ? array.Select(((string Id, string Label) e) => e.Label).ToArray() : array2.Select(((int Mode, string Name) e) => e.Name).ToArray());
