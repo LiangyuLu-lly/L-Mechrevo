@@ -8436,6 +8436,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				OnLchwocStatus(o);
 				break;
 			}
+			// 2026-10-21（无界键盘灯取证）：键盘/灯光状态只读诊断 —— 每个主题一行（type/solution/effect/light/brightness/power）。
+			if ((topic == "Keyboard/Status" || topic == "Setting/Status") && Capabilities != null)
+			{
+				if (Logger.TryMarkChanged("kbd-diag-" + topic, "type=" + Capabilities.KeyboardType + "|sol=" + KeyboardSolution
+					+ "|eff=" + KeyboardEffect + "|light=" + KeyboardLight + "|bri=" + KeyboardBrightness + "|pwr=" + KeyboardPower))
+				{
+					Logger.WriteError("[kbd] 状态诊断 " + topic + "：KeyboardType=" + Capabilities.KeyboardType
+						+ " · solution=" + KeyboardSolution + " · effect=" + KeyboardEffect + " · light=" + KeyboardLight
+						+ " · brightness=" + KeyboardBrightness + " · power=" + KeyboardPower);
+				}
+			}
 			if (text != null)
 			{
 				string b = SnapshotCapabilityFlags();
