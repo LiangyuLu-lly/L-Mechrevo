@@ -307,6 +307,46 @@ internal static class EcChargeLimit
 		return ProbeChannelAvailable();
 	}
 
+	/// <summary>2026-10-21：无界 Intel 里只有 Lunar Lake 平台暂时隐藏（其它 Intel 无界不动）。
+	/// 判据：CPU 名匹配 Core Ultra xxxV，或 CPUID family 6 / model 0xBD（Lunar Lake）。只读，不写任何东西。</summary>
+	private static bool IsLunarLakeCpu()
+	{
+		try
+		{
+			string cpuName = PawnIO.CpuInfo.Name ?? string.Empty;
+			if (cpuName.IndexOf("Ultra", StringComparison.OrdinalIgnoreCase) >= 0
+				&& System.Text.RegularExpressions.Regex.IsMatch(cpuName, @"\b\d{3}V\b"))
+			{
+				return true;
+			}
+		}
+		catch
+		{
+		}
+		try
+		{
+			if (System.Runtime.Intrinsics.X86.X86Base.IsSupported)
+			{
+				int eax = System.Runtime.Intrinsics.X86.X86Base.CpuId(1, 0).Eax;
+				int family = (int)((eax >> 8) & 0xF);
+				int model = (int)((eax >> 4) & 0xF);
+				int extModel = (int)((eax >> 16) & 0xF);
+				if (family == 6 && extModel != 0)
+				{
+					model |= extModel << 4;
+				}
+				if (family == 6 && model == 0xBD)
+				{
+					return true;
+				}
+			}
+		}
+		catch
+		{
+		}
+		return false;
+	}
+
 	/// <summary>2026-10-21：暂时隐藏 EC 限充 UI 的机型判定（只读，不写 EC）。</summary>
 	private static bool IsTemporarilyHiddenModel(out string reason)
 	{
@@ -332,7 +372,7 @@ internal static class EcChargeLimit
 					reason = "星耀机型暂未验证 EC 限充地址（model=" + model + "）";
 					return true;
 				}
-				if (wujieName && CpuVendor.IsIntel)
+				if (wujieName && IsLunarLakeCpu())
 				{
 					reason = "无界 Intel（LNL）机型暂未验证 EC 限充地址（model=" + model + "）";
 					return true;
