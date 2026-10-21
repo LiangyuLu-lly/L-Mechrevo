@@ -4311,8 +4311,9 @@ public class MechrevoService
 			smu.SetAllLimits(pl1, pl2, pl1, out PawnIO.SmuStatus stapmStatus, out PawnIO.SmuStatus fastStatus, out PawnIO.SmuStatus slowStatus);
 			pl1Status = $"stapm={stapmStatus}/slow={slowStatus}";
 			pl2Status = fastStatus.ToString();
-			ok = stapmStatus == PawnIO.SmuStatus.OK && fastStatus == PawnIO.SmuStatus.OK && slowStatus == PawnIO.SmuStatus.OK;
-			wrotePl1 = stapmStatus == PawnIO.SmuStatus.OK && slowStatus == PawnIO.SmuStatus.OK;
+			ok = stapmStatus == PawnIO.SmuStatus.OK && fastStatus == PawnIO.SmuStatus.OK && (hw.WujieSmuApu || slowStatus == PawnIO.SmuStatus.OK);
+			// 无界：PL1 只以 STAPM 为准（slow 由「慢速功率限制」行单独管理），避免回读 slow 被固件钳住导致整体判失败
+			wrotePl1 = stapmStatus == PawnIO.SmuStatus.OK && (hw.WujieSmuApu || slowStatus == PawnIO.SmuStatus.OK);
 			wrotePl2 = fastStatus == PawnIO.SmuStatus.OK;
 			if (!ok)
 			{
@@ -4334,7 +4335,7 @@ public class MechrevoService
 				PawnIO.SmuStatus st = smu.SetStapmLimit(pl1);
 				PawnIO.SmuStatus sl = smu.SetSlowLimit(pl1);
 				pl1Status = $"stapm={st} slow={sl}";
-				wrotePl1 = st == PawnIO.SmuStatus.OK && sl == PawnIO.SmuStatus.OK;
+				wrotePl1 = st == PawnIO.SmuStatus.OK && (hw.WujieSmuApu || sl == PawnIO.SmuStatus.OK);
 				ok &= wrotePl1;
 				if (wrotePl1)
 				{
@@ -4412,7 +4413,7 @@ public class MechrevoService
 			Logger.WriteError("[smu] Wujie 应用：PL1=" + pl1 + " → stapm=" + rbStapm + "(=" + pl1 + ") · slow=" + rbSlow + "(=" + pl1 + ")");
 			Logger.WriteError("[smu] Wujie 应用：PL2=" + pl2 + " → fast=" + rbFast + "(=" + pl2 + ")");
 			Logger.WriteError("[smu] Wujie 应用：fPPT(fast) 当前=" + rbFast + ((rbFast == pl2) ? "（=目标）" : ("（⚠️ ≠目标 " + pl2 + "）")));
-			if (wrotePl1 && (rbStapm != pl1 || rbSlow != pl1))
+			if (wrotePl1 && rbStapm != pl1)
 			{
 				verified = false;
 				Logger.WriteError("[smu] ⛔ Wujie：stapm/slow 回读≠目标 ⇒ 如实失败、不重试");
