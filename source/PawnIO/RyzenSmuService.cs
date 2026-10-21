@@ -871,7 +871,7 @@ public sealed class RyzenSmuService : IDisposable
 	private const int PM_TABLE_SNAPSHOT_QWORDS = 512;
 
 	// ⚠️ 返回 null = 读不到（⛔ 不编默认值）；本工程未开 #nullable ⇒ 故意不写 `?` 注解（避免新增 CS8632 告警）。
-	public SmuPowerSnapshot GetPowerSnapshot()
+	public SmuPowerSnapshot GetPowerSnapshot(bool writeLog = true)
 	{
 		if (!TryReadPmTable(PM_TABLE_SNAPSHOT_QWORDS, out uint tableVersion, out float[] floats))
 		{
@@ -892,9 +892,12 @@ public sealed class RyzenSmuService : IDisposable
 		int? slowTime = (timeOffset < 0) ? ((int?)null) : ReadSecondsAt(floats, timeOffset + 4);
 		SmuPowerSnapshot result = new SmuPowerSnapshot(floats[0], floats[2], floats[4], floats[tctlIndex],
 			stapmTime, slowTime, tableVersion);
-		Logger.WriteLine($"[smu-30] PM snapshot: ver=0x{tableVersion:X6} SPL={result.Stapm:F1}W sPPT={result.Slow:F1}W "
-			+ $"fPPT={result.Fast:F1}W tctl={result.TctlTemp:F0}℃ stapm_time={(stapmTime.HasValue ? stapmTime.Value + "s" : "?")} "
-			+ $"slow_time={(slowTime.HasValue ? slowTime.Value + "s" : "?")}");
+		if (writeLog)
+		{
+			Logger.WriteLine($"[smu-30] PM snapshot: ver=0x{tableVersion:X6} SPL={result.Stapm:F1}W sPPT={result.Slow:F1}W "
+				+ $"fPPT={result.Fast:F1}W tctl={result.TctlTemp:F0}℃ stapm_time={(stapmTime.HasValue ? stapmTime.Value + "s" : "?")} "
+				+ $"slow_time={(slowTime.HasValue ? slowTime.Value + "s" : "?")}");
+		}
 		return result;
 	}
 

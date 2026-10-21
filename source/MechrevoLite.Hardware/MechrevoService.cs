@@ -4318,7 +4318,7 @@ public class MechrevoService
 						try
 						{
 							System.Threading.Thread.Sleep(350);
-							PawnIO.SmuPowerSnapshot stapmRb = smu.GetPowerSnapshot();
+							PawnIO.SmuPowerSnapshot stapmRb = smu.GetPowerSnapshot(writeLog: false);
 							if (stapmRb != null && Math.Abs((int)Math.Round((double)stapmRb.Stapm) - pl1) > 1)
 							{
 								PawnIO.SmuStatus stapmRetry = smu.SetStapmLimit(pl1);
@@ -4339,7 +4339,7 @@ public class MechrevoService
 				{
 					try
 					{
-						PawnIO.SmuPowerSnapshot preSnap = smu.GetPowerSnapshot();
+						PawnIO.SmuPowerSnapshot preSnap = smu.GetPowerSnapshot(writeLog: false);
 						if (preSnap != null)
 						{
 							int curSlow = (int)Math.Round((double)preSnap.Slow);
@@ -4373,7 +4373,7 @@ public class MechrevoService
 						try
 						{
 							System.Threading.Thread.Sleep(80);
-							PawnIO.SmuPowerSnapshot fastRb = smu.GetPowerSnapshot();
+							PawnIO.SmuPowerSnapshot fastRb = smu.GetPowerSnapshot(writeLog: false);
 							if (fastRb != null && Math.Abs((int)Math.Round((double)fastRb.Fast) - pl2) > 1)
 							{
 								PawnIO.SmuStatus fastRetry = smu.SetFastLimit(pl2);

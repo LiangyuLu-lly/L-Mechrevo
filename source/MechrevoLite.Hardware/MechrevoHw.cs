@@ -5786,7 +5786,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				return;
 			}
-			PawnIO.SmuPowerSnapshot snapshot = smu.GetPowerSnapshot();
+			PawnIO.SmuPowerSnapshot snapshot = smu.GetPowerSnapshot(writeLog: false);
 			if (snapshot == null)
 			{
 				return;
@@ -5897,7 +5897,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Logger.WriteError("[smu-30] 读取当前功耗墙失败：PawnIO/SMU 不可用（30 系的 PL/温度墙只能走 SMU；需要管理员权限）");
 				return false;
 			}
-			PawnIO.SmuPowerSnapshot snapshot = smu.GetPowerSnapshot();
+			PawnIO.SmuPowerSnapshot snapshot = smu.GetPowerSnapshot(writeLog: false);
 			if (snapshot == null)
 			{
 				Logger.WriteError("[smu-30] 读取当前功耗墙失败：PM 表读不到（SMU 初始化过了但表没有数据）");
@@ -5909,7 +5909,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			int stapmTimeSeconds = snapshot.StapmTimeSeconds ?? 0;
 			if (requireStableStapmTime && stapmTimeSeconds > 0)
 			{
-				PawnIO.SmuPowerSnapshot second = smu.GetPowerSnapshot();
+				PawnIO.SmuPowerSnapshot second = smu.GetPowerSnapshot(writeLog: false);
 				int secondTime = (second != null) ? (second.StapmTimeSeconds ?? 0) : 0;
 				if (secondTime <= 0 || Math.Abs(secondTime - stapmTimeSeconds) > 1)
 				{
