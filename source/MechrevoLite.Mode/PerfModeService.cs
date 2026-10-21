@@ -1180,6 +1180,7 @@ internal sealed class PerfModeService
 		}
 		if (!PerfModeStore.HasStoredActive)
 		{
+			Logger.WriteError("[perfmode] 启动恢复：没有保存的活动档（HasStoredActive=False）⇒ 不重放；界面可能按固件回读显示默认档");
 			return;
 		}
 		PerfModeDefinition mode = Find(ActiveModeId);
@@ -1237,8 +1238,14 @@ internal sealed class PerfModeService
 		bool match;
 		if (isWujie)
 		{
-			match = TryReadWujieSmuCurrent(out int curPl1, out int curPl2, out int curTctl)
-				&& WujieSmuValuesMatch(settings, curPl1, curPl2, curTctl);
+		// 2026-10-21：无界开机“默认自定义但没应用”：SMU 回读可能还是固件默认/缓存值，
+		// 恰好与配置相同 ⇒ 误判“已应用”而跳过重放；启动恢复一律强制重放一次（幂等）。
+		if (TryReadWujieSmuCurrent(out int curPl1, out int curPl2, out int curTctl))
+		{
+			Logger.WriteError("[perfmode] 无界启动恢复：SMU 当前 PL1=" + curPl1 + "/PL2=" + curPl2 + "/tctl=" + curTctl
+				+ " · 配置 PL1=" + settings.Pl1.GetValueOrDefault() + "/PL2=" + settings.Pl2.GetValueOrDefault() + "/tctl=" + settings.TccTarget.GetValueOrDefault());
+		}
+		match = false;
 		}
 		else if (isBaolongda)
 		{
