@@ -264,6 +264,24 @@ public class ModeControl : IDisposable
 	{
 		try
 		{
+			// 2026-10-21（机主：无界根本没有原生自定义档，切自定义不应下发 GCU 命令）：
+			// Wujie 的自定义档完全走本机 SMU ⇒ 这里只重放本机配置，⛔ 不发 SwitchCustomProfile（GCU/MQTT）。
+			if (Program.hw?.WujieSmuApu == true)
+			{
+				PerfModeService perf = PerfModeService.Instance;
+				string activeId = perf?.ActiveModeId;
+				PerfModeDefinition activeMode = (perf != null && !string.IsNullOrEmpty(activeId)) ? perf.Find(activeId) : null;
+				if (activeMode != null && activeMode.IsCustom)
+				{
+					Logger.WriteError("[perfmode] 无界 APU：自定义档重放走本机 SMU（跳过 GCU SwitchCustomProfile）· mode=" + activeMode.Id);
+					_ = perf.ActivateAsync(activeMode.Id, "wujie auto replay", forceParameters: true);
+				}
+				else
+				{
+					Logger.WriteLine("[perfmode] 无界 APU：无自定义档激活 ⇒ 跳过 GCU SwitchCustomProfile");
+				}
+				return;
+			}
 			MechrevoService service = Program.service;
 			if (service != null)
 			{

@@ -4474,13 +4474,22 @@ public class MechrevoService
 			verified = true;
 			verifyDetail = "无写入（无需回读）";
 		}
+		else if (hw.WujieSmuApu && MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
+		{
+			// 2026-10-21（机主：行为对齐 UXTU；UXTU 用 RyzenAdj 只写不读回）：
+			// 兼容模式下命令被 SMU 接受即视为已下发，不再拿 PM 表回读去判失败。
+			verified = true;
+			verifyDetail = "UXTU 口径：不回读（命令被 SMU 接受即视为已下发）";
+			Logger.WriteError("[smu] Wujie 应用（UXTU 口径）：PL1=" + pl1 + "W · PL2=" + pl2 + "W · tctl=" + tempWallC
+				+ "℃ · 命令已接受，不做回读校验");
+		}
 		else
 		{
 			verified = VerifyBaolongdaSmuPower(hw, wrotePl1 ? pl1 : 0, wrotePl2 ? pl2 : 0,
 				wroteWall ? tempWallC : 0, out verifyDetail);
 		}
 		// Wujie：显式打印三档写入与回读（PL1→stapm/slow；PL2→fast/fPPT）；fast 回读≠目标 ⇒ 如实失败、不重试
-		if (hw.WujieSmuApu)
+		if (hw.WujieSmuApu && !MechrevoLite.Hardware.WujieSmuGate.LegacySmuCompat)
 		{
 			int rbStapm = -1;
 			int rbSlow = -1;
