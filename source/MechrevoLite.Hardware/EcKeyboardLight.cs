@@ -4,8 +4,13 @@ using System.Runtime.InteropServices;
 namespace MechrevoLite.Hardware;
 
 /// <summary>
-/// 2026-10-22（无界白键盘 · EC 直控）：白色背光键盘在 EC 的 H2RAM 0x78C 上
-/// —— bit1 = 电源开/关，bit4~7 = 亮度档（0~4）。
+/// 2026-10-22（无界白键盘 · EC 直控）：白色背光键盘在 EC 的 H2RAM 0x78C 上。
+/// <para>实测（Fn 亮度键循环 0x01 → 0x21 → 0x41 → 0x01，视觉为“关/暗/亮”）：</para>
+/// <list type="bullet">
+/// <item>bit5~7 = 亮度档：<c>0=关、1=暗、2=亮</c>（只有两档亮度）；</item>
+/// <item>bit4 = 写入时置 1 的“亮度更新”标记（写完由固件自清）；</item>
+/// <item>低 5 位保留（bit0 常为 1）。</item>
+/// </list>
 /// <para>⚠️ 只走 <c>\\.\ACPIDriver</c>（H2RAM 0x700~0x7FF），读-改-写保留其它位；不碰别的寄存器。</para>
 /// <para>⚠️ 仅当机型是「无界 + GCU 不报键盘通道（solution=UNKNOWN）」时才由上层调用。</para>
 /// </summary>
@@ -20,14 +25,13 @@ internal static class EcKeyboardLight
 
 	private const string DevicePath = "\\\\.\\ACPIDriver";
 
-	/// <summary>bit1 = 关闭位：1=关灯、0=开灯（与固件/官方控制台一致）。</summary>
-	private const byte PowerOffBit = 0x02;
-
-	/// <summary>写亮度时固定置 1 的位。</summary>
+	/// <summary>写亮度时固定置 1 的位（固件用它标记“亮度更新”，写完自清）。</summary>
 	private const byte BrightnessWriteFlag = 0x10;
 
-	/// <summary>亮度在 bit5~7（0~7）。</summary>
+	/// <summary>亮度在 bit5~7：0=关、1=暗、2=亮。</summary>
 	private const int BrightnessShift = 5;
+
+	private const int MaxBrightnessLevel = 2;
 
 	private static readonly object Gate = new object();
 
@@ -80,7 +84,7 @@ internal static class EcKeyboardLight
 		}
 	}
 
-	/// <summary>读当前状态（开/关 + 亮度档 0~4）。</summary>
+	/// <summary>读当前状态（开/关 + 亮度档 0~2）。</summary>
 	internal static bool TryGet(out bool on, out int brightnessLevel)
 	{
 		on = false;
@@ -90,31 +94,31 @@ internal static class EcKeyboardLight
 		{
 			return false;
 		}
-		on = (value & PowerOffBit) == 0;
 		brightnessLevel = (value >> BrightnessShift) & 0x07;
+		on = brightnessLevel > 0;
 		return true;
 	}
 
-	/// <summary>开/关灯（读-改-写，保留亮度与其它位）。</summary>
+	/// <summary>开/关灯：关=亮度码 0；开=恢复到上次亮度（原来是关则用最亮档）。</summary>
 	internal static bool TrySetPower(bool on)
 	{
 		return TryApply(on, null);
 	}
 
-	/// <summary>设亮度档 0~4（读-改-写，保留开关与其它位）。</summary>
-	internal static bool TrySetBrightness(int level0to4)
+	/// <summary>设亮度档：0=关、1=暗、2=亮（实测只有两档亮度）。</summary>
+	internal static bool TrySetBrightness(int level0to2)
 	{
-		if (level0to4 < 0 || level0to4 > 4)
+		if (level0to2 < 0 || level0to2 > MaxBrightnessLevel)
 		{
 			return false;
 		}
-		return TryApply(null, level0to4);
+		return TryApply(level0to2 > 0, level0to2);
 	}
 
-	/// <summary>同时设开/关与亮度（读-改-写）；只改 bit1 与 bit4~7。</summary>
-	internal static bool TryApply(bool? on, int? brightnessLevel0to4)
+	/// <summary>同时设开/关与亮度（读-改-写）；只改 bit4~7。</summary>
+	internal static bool TryApply(bool? on, int? brightnessLevel0to2)
 	{
-		if (brightnessLevel0to4.HasValue && (brightnessLevel0to4.Value < 0 || brightnessLevel0to4.Value > 2))
+		if (brightnessLevel0to2.HasValue && (brightnessLevel0to2.Value < 0 || brightnessLevel0to2.Value > MaxBrightnessLevel))
 		{
 			return false;
 		}
@@ -134,34 +138,36 @@ internal static class EcKeyboardLight
 					Logger.WriteError("[kbd-ec] 键盘背光：读 0x78C 失败（EC 通道不通）");
 					return false;
 				}
-				int value = before;
+				int currentLevel = (before >> BrightnessShift) & 0x07;
+				int targetLevel = currentLevel;
 				if (on.HasValue)
 				{
-					// 开=清 bit1；关=置 bit1（与固件语义一致）
 					if (on.Value)
 					{
-						value &= ~PowerOffBit;
+						targetLevel = (currentLevel > 0) ? currentLevel : MaxBrightnessLevel;
 					}
 					else
 					{
-						value |= PowerOffBit;
+						targetLevel = 0;
 					}
 				}
-				if (brightnessLevel0to4.HasValue)
+				if (brightnessLevel0to2.HasValue)
 				{
-					// 与固件写法一致：保留低 5 位、置 bit4、bit5~7 = 亮度档
-					value = (value & 0x1F) | BrightnessWriteFlag | ((brightnessLevel0to4.Value & 0x07) << BrightnessShift);
+					targetLevel = brightnessLevel0to2.Value;
 				}
-				if (value == before)
+				if (targetLevel > MaxBrightnessLevel)
 				{
-					return true;
+					targetLevel = MaxBrightnessLevel;
 				}
+				// 与固件写法一致：保留低 5 位、置 bit4、bit5~7 = 亮度档（0=关/1=暗/2=亮）
+				int value = (before & 0x1F) | BrightnessWriteFlag | ((targetLevel & 0x07) << BrightnessShift);
 				bool written = Write(handle, Register, (byte)value);
 				int after = Read(handle, Register);
-				bool ok = written && after == value;
+				int afterLevel = (after < 0) ? (-1) : ((after >> BrightnessShift) & 0x07);
+				bool ok = written && afterLevel == targetLevel;
 				Logger.WriteError("[kbd-ec] 键盘背光：0x78C 0x" + before.ToString("X2") + " -> 0x" + value.ToString("X2")
-					+ "（开=" + (((value & PowerOffBit) == 0) ? "是" : "否") + " · 亮度=" + ((value >> BrightnessShift) & 0x07) + "）"
-					+ " ⇒ " + (ok ? "回读一致" : ("未确认（写=" + (written ? "成功" : "失败") + " · 回读=" + (after < 0 ? "读不到" : "0x" + after.ToString("X2")) + "）")));
+					+ "（" + DescribeLevel(targetLevel) + "）"
+					+ " ⇒ " + (ok ? "回读一致" : ("未确认（写=" + (written ? "成功" : "失败") + " · 回读档=" + (afterLevel < 0 ? "读不到" : afterLevel.ToString()) + "）")));
 				return ok;
 			}
 			finally
@@ -169,6 +175,17 @@ internal static class EcKeyboardLight
 				CloseHandle(handle);
 			}
 		}
+	}
+
+	private static string DescribeLevel(int level)
+	{
+		return level switch
+		{
+			0 => "关",
+			1 => "暗",
+			2 => "亮",
+			_ => level.ToString()
+		};
 	}
 
 	private static int Read(nint handle, int address)

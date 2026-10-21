@@ -4627,11 +4627,10 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 	{
 		if (ShouldUseEcKeyboardLight())
 		{
-			// 2026-10-22（实测：白键盘 EC 只有 0/1/2 三档，视觉上两档亮度）：
-			// UI 的 1~4 档收敛到 1~2，避免 3/4 档写进 EC 后出现“2 档比 3 档亮”。
-			bool ok = (level0to4 <= 0)
-				? EcKeyboardLight.TryApply(false, 0)
-				: EcKeyboardLight.TryApply(true, Math.Clamp(level0to4, 1, 2));
+			// 2026-10-22（实测：白键盘 EC 亮度码 0=关、1=暗、2=亮，只有两档亮度）：
+			// UI 0~4 档映射：0 => 关；1~2 => 暗；3~4 => 亮。
+			int whiteLevel = (level0to4 <= 0) ? 0 : ((level0to4 >= 3) ? 2 : 1);
+			bool ok = EcKeyboardLight.TryApply(whiteLevel > 0, whiteLevel);
 			Logger.WriteError("[kbd-ec] 白键盘亮度=" + level0to4 + " ⇒ " + (ok ? "已生效" : "失败"));
 			return Task.FromResult(ok);
 		}
