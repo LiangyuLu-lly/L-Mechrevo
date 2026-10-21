@@ -5300,7 +5300,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				colorBufferArgb: colorBuffer,
 				colorBlocks: blocks.BlockCount);
 			await _hw.Publish(KeyboardCtrlPayload.Topic, payload).ConfigureAwait(continueOnCapturedContext: false);
-			Logger.WriteLine($"[kbd] Keyboard/Ctrl SetEffectALL effect={effect} light={light} speed={speed} mono={monoIndex} color={DescribeKeyboardCtrlColor(singleColor)} 结果=已发送 payload={KeyboardCtrlPayload.Serialize(payload)}");
+			Logger.WriteError($"[kbd] Keyboard/Ctrl SetEffectALL effect={effect} light={light} speed={speed} mono={monoIndex} color={DescribeKeyboardCtrlColor(singleColor)} 结果=已发送 payload={KeyboardCtrlPayload.Serialize(payload)}");
 			return true;
 		}
 		catch (Exception ex)
@@ -5321,7 +5321,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		{
 			Dictionary<string, object> payload = KeyboardCtrlPayload.BuildSetPower(on);
 			await _hw.Publish(KeyboardCtrlPayload.Topic, payload).ConfigureAwait(continueOnCapturedContext: false);
-			Logger.WriteLine($"[kbd] Keyboard/Ctrl SetPower on={on} 结果=已发送 payload={KeyboardCtrlPayload.Serialize(payload)}");
+			Logger.WriteError($"[kbd] Keyboard/Ctrl SetPower on={on} 结果=已发送 payload={KeyboardCtrlPayload.Serialize(payload)}");
 			// 2026-10-21（无界键盘灯）：50 GCU 单分区只在 powerStatus=On 后才把效果写进 EC，
 			// 冷启动 GCU 报 powerStatus=Off；开灯后补一次全字段 SetEffectALL，颜色/效果才会恢复。
 			if (on && _hw != null && _hw.WujieSmuApu)
@@ -5346,7 +5346,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 					fillLight = 4;
 				}
 				bool fillOk = await PublishKeyboardCtrlEffectAsync(fillEffect, fillLight, fillSpeed, fillColor, powerstatus: 0).ConfigureAwait(continueOnCapturedContext: false);
-				Logger.WriteLine($"[kbd] Keyboard/Ctrl 开灯后补发 SetEffectALL effect={fillEffect} light={fillLight} speed={fillSpeed} 结果={(fillOk ? "已发送" : "失败")}");
+				Logger.WriteError($"[kbd] Keyboard/Ctrl 开灯后补发 SetEffectALL effect={fillEffect} light={fillLight} speed={fillSpeed} 结果={(fillOk ? "已发送" : "失败")}");
 			}
 			return true;
 		}
@@ -5372,7 +5372,7 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			{
 				Dictionary<string, object> effectLightPayload = KeyboardCtrlPayload.BuildSetEffectLight(level0to4);
 				await _hw.Publish(KeyboardCtrlPayload.Topic, effectLightPayload).ConfigureAwait(continueOnCapturedContext: false);
-				Logger.WriteLine($"[kbd] Keyboard/Ctrl SetEffectLight light={level0to4}（50 GCU 单分区亮度入口）结果=已发送 payload={KeyboardCtrlPayload.Serialize(effectLightPayload)}");
+				Logger.WriteError($"[kbd] Keyboard/Ctrl SetEffectLight light={level0to4}（50 GCU 单分区亮度入口）结果=已发送 payload={KeyboardCtrlPayload.Serialize(effectLightPayload)}");
 				return true;
 			}
 			int speed = 1;

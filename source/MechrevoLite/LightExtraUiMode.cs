@@ -354,11 +354,8 @@ internal static class LightExtraRows
 		}
 		else
 		{
-			// 2026-10-21（机主）：无界（WujieSmuApu）本机没有灯带/Logo 灯，默认收掉这两行
-			//（用户仍可在设置页把 light_strip_ui 显式设成 show 强制显示）。
-			bool wujieDefaultHide = hw != null && hw.WujieSmuApu;
-			lightbarOut = lightbarRow && !phantom && !wujieDefaultHide;
-			stripReason = "auto(" + baseEvidence + ")" + (wujieDefaultHide ? "+wujie-default-hide" : "") + "->" + (lightbarOut ? "keep" : "hide");
+			lightbarOut = lightbarRow && !phantom;
+			stripReason = "auto(" + baseEvidence + ")->" + (lightbarOut ? "keep" : "hide");
 		}
 		bool logoOut;
 		string logoReason;
@@ -376,10 +373,8 @@ internal static class LightExtraRows
 		}
 		else
 		{
-			// 2026-10-21（机主）：无界（WujieSmuApu）默认收掉 Logo 灯行（显式 show 仍可强制显示）。
-			bool wujieDefaultHide = hw != null && hw.WujieSmuApu;
-			logoOut = logoRow && logoReal && !wujieDefaultHide;
-			logoReason = "auto(" + logoEvidence + ")" + (wujieDefaultHide ? "+wujie-default-hide" : "") + "->" + (logoOut ? "keep" : "hide");
+			logoOut = logoRow && logoReal;
+			logoReason = "auto(" + logoEvidence + ")->" + (logoOut ? "keep" : "hide");
 		}
 		reason = "base:" + stripReason + "; logo:" + logoReason;
 		return (lightbarOut, logoOut);
