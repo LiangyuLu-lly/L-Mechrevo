@@ -873,11 +873,13 @@ public class CustomModeForm : RForm
 			_tcc.Enabled = on;
 		});
 		(int, int, int, bool) tuple6 = DeviceRange(hw?.TccMinimum ?? (-1), hw?.TccMaximum ?? (-1), hw?.TccTarget ?? 0);
-		if (tuple6.Item1 < 0 && hw != null && hw.IsGcuConnected && !hw.UsesAmdPowerFields)
+		if (hw != null && hw.IsGcuConnected && !hw.UsesAmdPowerFields)
 		{
-			int tccTjMax = (hw.TjMax > 0) ? hw.TjMax : 100;
-			tuple6 = (75, tccTjMax, Math.Clamp(95, 75, tccTjMax), true);
-			Logger.WriteLine("[custom-ui] GCU 未上报 TCC 范围 ⇒ 温度墙按兜底 75.." + tccTjMax + "℃ 显示");
+			int tccTjMax = (hw.TjMax > 0) ? hw.TjMax : 105;
+			int tccWallMin = Math.Max(75, tccTjMax - 30);
+			int tccWallCur = Math.Clamp((hw.TccTarget > 0) ? hw.TccTarget : tccWallMin, tccWallMin, tccTjMax);
+			tuple6 = (tccWallMin, tccTjMax, tccWallCur, true);
+			Logger.WriteLine("[custom-ui] Intel+GCU 温度墙范围放开为 " + tccWallMin + ".." + tccTjMax + "℃（偏移 0..30）");
 		}
 		if (wujieApu && smuPowerControls)
 		{
@@ -4756,16 +4758,14 @@ public class CustomModeForm : RForm
 				bool flag5 = ApplyRange(_fanSwitchSpeed, _fanSwitchSpeedVal, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum, hw.FanSwitchSpeed);
 				if (hw.IsGcuConnected && !hw.UsesAmdPowerFields)
 				{
-					int tccTjR = (hw.TjMax > 0) ? hw.TjMax : 100;
-					if (_tcc.Maximum <= _tcc.Minimum)
-					{
-						_tcc.Minimum = 75; _tcc.Maximum = tccTjR; _tcc.Value = Math.Clamp(95, 75, tccTjR);
-						_tccVal.Minimum = 75; _tccVal.Maximum = tccTjR; _tccVal.Value = Math.Clamp(95, 75, tccTjR);
-					}
+					int tccTjR = (hw.TjMax > 0) ? hw.TjMax : 105;
+					int tccWallMinR = Math.Max(75, tccTjR - 30);
+					int tccWallCurR = Math.Clamp((hw.TccTarget > 0) ? hw.TccTarget : tccWallMinR, tccWallMinR, tccTjR);
+					ApplyRange(_tcc, _tccVal, tccWallMinR, tccTjR, tccWallCurR);
 					_tcc.Enabled = true; _tccVal.Enabled = true; _tccChk.Enabled = true;
-					flag = true;
 					SetRowVisible(_tccChk, true);
 					SetRowVisible(_tcc, true, _tccVal);
+					flag = true;
 				}
 				SetRowVisible(_tccChk, flag);
 				SetRowVisible(_dbChk, flag2);

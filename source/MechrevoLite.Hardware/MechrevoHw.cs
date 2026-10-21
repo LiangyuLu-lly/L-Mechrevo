@@ -9681,10 +9681,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		// 2026-10-21：Intel 的 TCC 字段是“偏移”范围：给出 CPU_TccOffsetMaximum=10 ⇒ 温度墙 95..105
 		// （之前把缺失的 minimum 当 -1，导致 max 被算成 95、范围压平 95..95 ⇒ 判不可调、整行隐藏）
 		int tjBase = (num8 > 0) ? num8 : 105;
-		int tccOffMin = (TccRawMinimum >= 0) ? TccRawMinimum : 0;
-		int tccOffMax = (TccRawMaximum >= 0) ? TccRawMaximum : 10;
-		TccMinimum = Math.Clamp(tjBase - tccOffMax, 75, tjBase);
-		TccMaximum = Math.Clamp(tjBase - tccOffMin, 75, tjBase);
+		// 2026-10-21：不再用 CPU_TccOffsetMaximum(10) 当 UI 上限（实测 offset 12/14/21 都能被接受）；
+		// Intel TCC 偏移按 0..30 放开 ⇒ 温度墙 [TjMax-30 .. TjMax]（255HX: 75..105℃）。
+		TccMinimum = Math.Max(75, tjBase - 30);
+		TccMaximum = tjBase;
 		{
 			TccMinimum = TccMaximum;
 		}
