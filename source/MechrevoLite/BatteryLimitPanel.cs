@@ -137,7 +137,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Checked = MechrevoLite.Hardware.BatteryVoltageFix.Enabled,
 			Visible = MechrevoLite.Hardware.BatteryVoltageFix.IsSupportedMachine()
 		};
-		_toolTip.SetToolTip(_voltageFixBox, "用外部 JG_BAT 工具覆盖 EC 老化降额，把充电目标恢复为 17.6V（需要已安装 JG_BAT 与 Python）");
+		_toolTip.SetToolTip(_voltageFixBox, "内置（inpoutx64 驱动）覆盖 EC 老化降额，把充电目标恢复为 17.6V；无驱动时回退外部 JG_BAT");
 		_voltageFixBox.CheckedChanged += delegate
 		{
 			MechrevoLite.Hardware.BatteryVoltageFix.Enabled = _voltageFixBox.Checked;

@@ -16,7 +16,23 @@ internal static class BatteryVoltageProbe
 {
 	internal static int RunReadOnly()
 	{
-		string report = I2ecBattery.Probe();
+		StringBuilder sb = new StringBuilder();
+		sb.AppendLine("=== 电池 EC 探针（内置 inpoutx64 优先 · 只读） ===");
+		sb.AppendLine("主机：" + Environment.MachineName + " · " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+		sb.AppendLine();
+		if (I2ecInpOut.TryReadStatus(out string nativeStatus))
+		{
+			sb.AppendLine("[内置 inpoutx64] 可用");
+			sb.AppendLine(nativeStatus);
+		}
+		else
+		{
+			sb.AppendLine("[内置 inpoutx64] 不可用：" + I2ecInpOut.InitDetail);
+			sb.AppendLine();
+			sb.AppendLine("[PawnIO 回退探测]");
+			sb.AppendLine(I2ecBattery.Probe());
+		}
+		string report = sb.ToString();
 		string path = WriteReport("lm-battery-voltage-probe", report);
 		report += "\n报告文件：" + path;
 		Console.WriteLine(report);

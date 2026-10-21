@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 namespace MechrevoLite.Hardware;
 
 /// <summary>
-/// 8000 系无界的电池充电电压修复（外挂式）：
-/// 调用用户本机已安装的 JG_BAT 工具（batteryctl.py）执行 hold-full，
-/// 覆盖 EC 的辅助老化降额（17600mV → 16600mV）。
-/// <para>LM 自身不注入任何驱动，只调用外部 Python 工具；找不到工具/依赖时如实返回失败。</para>
+/// 8000 系无界的电池充电电压修复：
+/// <list type="number">
+/// <item>优先 <b>内置</b>：直接经本机已安装的 inpoutx64 驱动访问 I2EC（不需要 Python / 外部脚本）；</item>
+/// <item>回退 <b>外挂</b>：调用用户本机 JG_BAT 工具（batteryctl.py），需要 Python。</item>
+/// </list>
+/// <para>目标：覆盖 EC 辅助老化降额（17600mV → 16600mV），周期保持 17600mV/2816mA + 解停充门，停止时恢复原值。</para>
 /// </summary>
 internal static class BatteryVoltageFix
 {
@@ -43,6 +45,11 @@ internal static class BatteryVoltageFix
 		{
 			AppConfig.Set(ConfigKey, value ? 1 : 0);
 			AppConfig.Flush();
+			if (!value)
+			{
+				// 关闭时停掉内置覆盖并恢复 EC 原值（外挂模式无需恢复：脚本已自行恢复）
+				Stop();
+			}
 		}
 	}
 
@@ -52,13 +59,30 @@ internal static class BatteryVoltageFix
 		return hw != null && hw.WujieSmuApu;
 	}
 
+	/// <summary>停掉内置覆盖（幂等）。</summary>
+	internal static void Stop()
+	{
+		try
+		{
+			I2ecInpOut.Stop();
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery-fix] 停止内置覆盖异常（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
 	internal static string DescribeAvailability()
 	{
+		if (I2ecInpOut.TryReadStatus(out string nativeDetail))
+		{
+			return "内置可用（不需要 Python）：\n" + nativeDetail;
+		}
 		if (FindTool(out string detail) != null)
 		{
-			return "工具可用：" + detail;
+			return "内置不可用（" + I2ecInpOut.InitDetail + "）\n外挂工具可用：" + detail;
 		}
-		return "工具不可用：" + detail;
+		return "内置不可用（" + I2ecInpOut.InitDetail + "）；外挂工具不可用：" + detail;
 	}
 
 	private static string FindTool(out string detail)
@@ -116,13 +140,31 @@ internal static class BatteryVoltageFix
 		return null;
 	}
 
-	/// <summary>执行 batteryctl.py 的一个子命令，返回是否成功与输出摘要。</summary>
+	/// <summary>
+	/// 执行修复动作：<c>hold-full</c> 优先内置；<c>status</c> 优先内置；内置不可用时回退外挂 Python 工具。
+	/// </summary>
 	internal static (bool Ok, string Detail) Run(string argument, int timeoutMs = 30000)
 	{
+		if (string.Equals(argument, "hold-full", StringComparison.OrdinalIgnoreCase))
+		{
+			if (I2ecInpOut.TryStart(out string nativeStartDetail))
+			{
+				return (Ok: true, Detail: "内置（inpoutx64）：" + nativeStartDetail);
+			}
+			Logger.WriteLine("[battery-fix] 内置不可用 ⇒ 回退外挂 JG_BAT：" + nativeStartDetail);
+		}
+		else if (string.Equals(argument, "status", StringComparison.OrdinalIgnoreCase))
+		{
+			if (I2ecInpOut.TryReadStatus(out string nativeStatus))
+			{
+				return (Ok: true, Detail: nativeStatus);
+			}
+		}
 		string tool = FindTool(out string findDetail);
 		if (tool == null)
 		{
-			return (Ok: false, Detail: findDetail);
+			string nativeInfo = I2ecInpOut.InitDetail;
+			return (Ok: false, Detail: "内置不可用（" + nativeInfo + "）；外挂工具不可用：" + findDetail);
 		}
 		string python = FindPython();
 		if (python == null)
@@ -148,37 +190,7 @@ internal static class BatteryVoltageFix
 			{
 				return (Ok: false, Detail: "进程启动失败");
 			}
-			StringBuilder sb = new StringBuilder();
-			proc.OutputDataReceived += delegate (object sender, DataReceivedEventArgs e)
-			{
-				if (e.Data != null)
-				{
-					sb.AppendLine(e.Data);
-				}
-			};
-			proc.ErrorDataReceived += delegate (object sender, DataReceivedEventArgs e)
-			{
-				if (e.Data != null)
-				{
-					sb.AppendLine(e.Data);
-				}
-			};
-			proc.BeginOutputReadLine();
-			proc.BeginErrorReadLine();
-			bool exited = proc.WaitForExit(timeoutMs);
-			if (!exited)
-			{
-				try
-				{
-					proc.Kill(entireProcessTree: true);
-				}
-				catch
-				{
-				}
-				return (Ok: false, Detail: "超时（" + timeoutMs + "ms）");
-			}
-			proc.WaitForExit();
-			string text = sb.ToString().Trim();
+			string text = RunExternal(proc, timeoutMs);
 			bool ok = proc.ExitCode == 0;
 			string detail = text.Length == 0 ? ("退出码=" + proc.ExitCode) : "退出码=" + proc.ExitCode + " · " + Truncate(text, 600);
 			return (Ok: ok, Detail: detail);
@@ -189,7 +201,42 @@ internal static class BatteryVoltageFix
 		}
 	}
 
-	/// <summary>只读状态（batteryctl.py status），用于界面显示当前电压/是否降额。</summary>
+	private static string RunExternal(Process proc, int timeoutMs)
+	{
+		StringBuilder sb = new StringBuilder();
+		proc.OutputDataReceived += delegate (object sender, DataReceivedEventArgs e)
+		{
+			if (e.Data != null)
+			{
+				sb.AppendLine(e.Data);
+			}
+		};
+		proc.ErrorDataReceived += delegate (object sender, DataReceivedEventArgs e)
+		{
+			if (e.Data != null)
+			{
+				sb.AppendLine(e.Data);
+			}
+		};
+		proc.BeginOutputReadLine();
+		proc.BeginErrorReadLine();
+		bool exited = proc.WaitForExit(timeoutMs);
+		if (!exited)
+		{
+			try
+			{
+				proc.Kill(entireProcessTree: true);
+			}
+			catch
+			{
+			}
+			return "(超时 " + timeoutMs + "ms)";
+		}
+		proc.WaitForExit();
+		return sb.ToString().Trim();
+	}
+
+	/// <summary>只读状态（内置优先，其次外挂 batteryctl.py status）。</summary>
 	internal static (bool Ok, string Detail) ReadStatus()
 	{
 		return Run("status", 20000);
