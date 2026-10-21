@@ -46,7 +46,6 @@ internal sealed class BatteryLimitPanel : Panel
 	private readonly RCheckBox _enableBox;
 
 	// ⭐ 机主批准：高级开关（默认关；允许 SOC ≥ 停充阈值时启用，固件会先放电）✅
-	private readonly RCheckBox _allowInitialDischargeBox;
 
 	private readonly RCheckBox _voltageFixBox;
 
@@ -128,20 +127,6 @@ internal sealed class BatteryLimitPanel : Panel
 		_applyButton.AutoEllipsis = false;
 		_applyButton.Click += ApplyButton_Click;
 
-		_allowInitialDischargeBox = new RCheckBox
-		{
-			AutoSize = true,
-			Text = Strings.BatteryLimitAllowInitialDischarge,
-			BackColor = Color.Transparent,
-			Margin = Padding.Empty,
-			Checked = BatteryLimitRestore.AllowInitialDischarge
-		};
-		_toolTip.SetToolTip(_allowInitialDischargeBox, Strings.BatteryLimitAllowInitialDischargeTip);
-		_allowInitialDischargeBox.CheckedChanged += delegate
-		{
-			BatteryLimitRestore.SetAllowInitialDischarge(_allowInitialDischargeBox.Checked);
-		};
-
 		// 8000 系无界：电池充电电压修复（外挂 JG_BAT；本机自身不注入驱动）
 		_voltageFixBox = new RCheckBox
 		{
@@ -175,7 +160,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Dock = DockStyle.Top,
 			AutoSize = false,
 			ColumnCount = 4,
-			RowCount = 6,
+			RowCount = 5,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = Color.Transparent
@@ -189,10 +174,9 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowSoc)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(24)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowInput)));
-		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowAdvanced)));
 		grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(RowStatus)));
 	grid.RowStyles.Add(new RowStyle(SizeType.Absolute, D(24)));
-		grid.Height = D(RowSoc + RowInput + RowAdvanced + RowStatus + 24);
+		grid.Height = D(RowSoc + RowInput + RowStatus + 24);
 
 		// ⭐ 开关 + 保存按钮同一行：内嵌表 2 列（开关占满、按钮固定 120 逻辑像素，⛔ 不再被 25% 列裁字）✅
 		TableLayoutPanel switchRow = new TableLayoutPanel
@@ -219,11 +203,9 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.Controls.Add(_lowBox, 1, 2);
 		grid.Controls.Add(_highLabel, 2, 2);
 		grid.Controls.Add(_highBox, 3, 2);
-		grid.Controls.Add(_allowInitialDischargeBox, 0, 3);
-		grid.SetColumnSpan(_allowInitialDischargeBox, 4);
-		grid.Controls.Add(_statusLabel, 0, 4);
+		grid.Controls.Add(_statusLabel, 0, 3);
 		grid.SetColumnSpan(_statusLabel, 4);
-		grid.Controls.Add(_voltageFixBox, 0, 5);
+		grid.Controls.Add(_voltageFixBox, 0, 4);
 		grid.SetColumnSpan(_voltageFixBox, 4);
 		Controls.Add(grid);
 		// ⭐ 代码级 UI 自检（无法启动 GUI 时作为可验证替代）：标签宽度是否足够 ⇒ 不换行 ✅
@@ -418,7 +400,7 @@ internal sealed class BatteryLimitPanel : Panel
 			{
 				if (want)
 				{
-					bool enabled = BatteryLimitWriter.TryEnable((int)_lowBox.Value, (int)_highBox.Value, BatteryLimitRestore.AllowInitialDischarge, out string enableDetail);
+					bool enabled = BatteryLimitWriter.TryEnable((int)_lowBox.Value, (int)_highBox.Value, allowInitialDischarge: false, out string enableDetail);
 					return (enabled, enableDetail);
 				}
 				bool disabled = BatteryLimitWriter.TryDisable(out string disableDetail);
@@ -537,7 +519,7 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			(bool ok, string detail) = await Task.Run(delegate
 			{
-				bool result = BatteryLimitWriter.TryEnable(low, high, BatteryLimitRestore.AllowInitialDischarge, out string enableDetail);
+				bool result = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: false, out string enableDetail);
 				return (result, enableDetail);
 			});
 			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + "\n" + detail);
@@ -686,7 +668,7 @@ internal sealed class BatteryLimitPanel : Panel
 			LogSaveButtonCheck(stage);
 			Logger.WriteLineIfChanged("battery-ui-metrics-bounds",
 				"[battery-ui] 控件 bounds(" + stage + ")：电量=" + Rect(_socLabel) + " · 开关行=" + Rect(_enableBox)
-				+ " · 起充/停充=" + Rect(_lowBox) + "/" + Rect(_highBox) + " · 高级=" + Rect(_allowInitialDischargeBox)
+				+ " · 起充/停充=" + Rect(_lowBox) + "/" + Rect(_highBox)
 				+ " · 状态=" + Rect(_statusLabel));
 		}
 		catch (Exception ex)
