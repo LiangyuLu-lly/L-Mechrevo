@@ -138,12 +138,33 @@ internal static class KeyboardFirmwareEffects
 	}
 
 	/// <summary>
+	/// 2026-10-21（无界）：GCU 不报键盘类型（KeyboardType=0 / solution=UNKNOWN）时，不能按“未知 ⇒ 单键 RGB”兜底；
+	/// 无界机型一律按单分区（1）处理，避免把白色/单分区键盘显示成单键 RGB 的 UI。
+	/// </summary>
+	internal static int EffectiveKeyboardType(int keyboardType)
+	{
+		if (keyboardType > 0)
+		{
+			return keyboardType;
+		}
+		try
+		{
+			return (Program.hw != null && Program.hw.WujieSmuApu) ? 1 : keyboardType;
+		}
+		catch
+		{
+			return keyboardType;
+		}
+	}
+
+	/// <summary>
 	/// 判据（作者口径，见类注释）：ordinal=1(SingleZone) 才是单分区；2=FourZone、3=FourZoneSingleColor
 	/// 都不是；越界/不认识 ⇒ 兜底 PerKey。开关 LightCompatibilitySwitches.KeyboardKindModelEnabled
 	/// 置 0 时回到 0.291.2 旧判据（KeyboardType∈{1,2} 都算单分区）。
 	/// </summary>
 	internal static bool IsSingleZoneRgb(int keyboardType)
 	{
+		keyboardType = EffectiveKeyboardType(keyboardType);
 		if (!LightCompatibilitySwitches.KeyboardKindModelEnabled)
 		{
 			return (uint)(keyboardType - 1) <= 1u;
@@ -154,6 +175,7 @@ internal static class KeyboardFirmwareEffects
 	/// <summary>四分区（ordinal=2）：走它自己的分支与 6 项灯效表，不再被当单分区。</summary>
 	internal static bool IsFourZoneRgb(int keyboardType)
 	{
+		keyboardType = EffectiveKeyboardType(keyboardType);
 		if (!LightCompatibilitySwitches.KeyboardKindModelEnabled)
 		{
 			return false;
@@ -169,11 +191,13 @@ internal static class KeyboardFirmwareEffects
 	/// </summary>
 	internal static bool IsGcuZoneKeyboardPath(int keyboardType)
 	{
+		keyboardType = EffectiveKeyboardType(keyboardType);
 		return (uint)(keyboardType - 1) <= 1u;
 	}
 
 	internal static (string Id, string Label)[] Visible(int keyboardType)
 	{
+		keyboardType = EffectiveKeyboardType(keyboardType);
 		if (!LightCompatibilitySwitches.KeyboardKindModelEnabled)
 		{
 			return ((uint)(keyboardType - 1) <= 1u) ? SingleZone : All;
@@ -190,6 +214,7 @@ internal static class KeyboardFirmwareEffects
 	/// <summary>作者 0.290.6 KindFromTypeName 的键盘部分（作者对 PerKeyLegacy 也是 All(11) 项，故与 PerKey 等价）。</summary>
 	private static KeyboardKind Classify(int keyboardType)
 	{
+		keyboardType = EffectiveKeyboardType(keyboardType);
 		string name = (keyboardType >= 0 && keyboardType < RgbkbTypeOrdinals.Length) ? RgbkbTypeOrdinals[keyboardType] : null;
 		if (string.IsNullOrWhiteSpace(name))
 		{
