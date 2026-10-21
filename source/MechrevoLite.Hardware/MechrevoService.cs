@@ -4344,6 +4344,22 @@ public class MechrevoService
 				{
 					hw.NoteBaolongdaSmuLimitsApplied(0, pl2, 0);
 				}
+						// 2026-10-21（机主：快速功耗偶尔不生效）：写完立刻读 PM 表，不一致就补发一次（有界，不循环）
+						try
+						{
+							System.Threading.Thread.Sleep(80);
+							PawnIO.SmuPowerSnapshot fastRb = smu.GetPowerSnapshot();
+							if (fastRb != null && Math.Abs((int)Math.Round((double)fastRb.Fast) - pl2) > 1)
+							{
+								PawnIO.SmuStatus fastRetry = smu.SetFastLimit(pl2);
+								Logger.WriteError("[smu] Wujie 应用：fast 第一次回读=" + (int)Math.Round((double)fastRb.Fast)
+									+ "W ≠ 目标 " + pl2 + "W ⇒ 补发一次（" + fastRetry + "）");
+								pl2Status = pl2Status + "/retry=" + fastRetry;
+							}
+						}
+						catch
+						{
+						}
 			}
 		}
 		else if (pl1 > 0 && pl2 > 0)
@@ -4512,7 +4528,12 @@ public class MechrevoService
 			{
 				Thread.Sleep(200);
 			}
-			if (!hw.RefreshBaolongda30SeriesSmuPower(force: true))
+			// 2026-10-21（无界）：刷新接口/字段口径都不同 —— PL1 写的是 STAPM（不是 slow），fPPT=Fast。
+			if (hw.WujieSmuApu)
+			{
+				hw.RefreshWujieSmuSnapshot();
+			}
+			else if (!hw.RefreshBaolongda30SeriesSmuPower(force: true))
 			{
 				detail = $"第 {attempt + 1} 次回读失败（PM 表读不到）";
 				continue;
@@ -4523,13 +4544,13 @@ public class MechrevoService
 				detail = $"第 {attempt + 1} 次回读失败（没有快照）";
 				continue;
 			}
-			int readPl1 = (int)Math.Round(snapshot.Slow, MidpointRounding.AwayFromZero);
+			int readPl1 = (int)Math.Round(hw.WujieSmuApu ? snapshot.Stapm : snapshot.Slow, MidpointRounding.AwayFromZero);
 			int readPl2 = (int)Math.Round(snapshot.Fast, MidpointRounding.AwayFromZero);
 			int readWall = (int)Math.Round(snapshot.TctlTemp, MidpointRounding.AwayFromZero);
 			bool matchPl1 = (pl1 <= 0) || Math.Abs(readPl1 - pl1) <= 1;
 			bool matchPl2 = (pl2 <= 0) || Math.Abs(readPl2 - pl2) <= 1;
 			bool matchWall = (tempWallC <= 0) || Math.Abs(readWall - tempWallC) <= 1;
-			detail = $"读回 PL1(slow)={readPl1}W PL2(fast)={readPl2}W tctl={readWall}℃ "
+			detail = $"读回 PL1{(hw.WujieSmuApu ? "(stapm)" : "(slow)")}={readPl1}W PL2(fast)={readPl2}W tctl={readWall}℃ "
 				+ $"⇒ 一致 PL1={matchPl1} PL2={matchPl2} 温度墙={matchWall}（第 {attempt + 1} 次）";
 			if (matchPl1 && matchPl2 && matchWall)
 			{
