@@ -3155,6 +3155,14 @@ internal static class Program
 			if (!appliedThisCycle && ShouldUseEcKeyboardPowerChannel() && service != null && ResolveEffectiveKbPower())
 			{
 				bool ecOn = await service.SetKeyboardPower(true).ConfigureAwait(continueOnCapturedContext: false);
+				// 2026-10-22（机主：无界灯光档位要记忆）：开灯后再按上次档位（0=关/1=暗/2=亮）恢复亮度。
+				int savedEcLevel = AppConfig.Get("wujie_kbd_level", -1);
+				if (savedEcLevel < 1 || savedEcLevel > 2)
+				{
+					savedEcLevel = Math.Max(1, KeyboardRgb.MapSoftwareBrightnessToHardwareLevel(rgb.Brightness));
+				}
+				bool ecBright = await service.SetKeyboardBrightnessPreservingEffect(savedEcLevel).ConfigureAwait(continueOnCapturedContext: false);
+				LogLightBoot($"键盘亮度记忆恢复：档位={savedEcLevel}（保存亮度={rgb.Brightness}%）结果={ecBright}");
 				LogLightBoot($"键盘电源 on 下发（来源=恢复 · EC 0x78C）结果={ecOn}");
 				Interlocked.Exchange(ref _keyboardPowerTemporarilySuspended, 0);
 				Volatile.Write(ref _keyboardRestoreAppliedRequestId, requestId);

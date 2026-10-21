@@ -4631,6 +4631,11 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			// UI 0~4 档映射：0 => 关；1~2 => 暗；3~4 => 亮。
 			int whiteLevel = (level0to4 <= 0) ? 0 : ((level0to4 >= 3) ? 2 : 1);
 			bool ok = EcKeyboardLight.TryApply(whiteLevel > 0, whiteLevel);
+			if (ok && whiteLevel > 0)
+			{
+				// 2026-10-22（机主：无界灯光档位要记忆）：记住实际 EC 档位（0=关/1=暗/2=亮），下次启动恢复。
+				AppConfig.Set("wujie_kbd_level", whiteLevel);
+			}
 			Logger.WriteError("[kbd-ec] 白键盘亮度=" + level0to4 + " ⇒ " + (ok ? "已生效" : "失败"));
 			return Task.FromResult(ok);
 		}
