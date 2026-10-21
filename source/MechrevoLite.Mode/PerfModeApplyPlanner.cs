@@ -88,9 +88,13 @@ public static class PerfModeApplyPlanner
 				list.Add(Field("PL4", settings.Pl4.Value, PerfApplyVerify.CpuPackagePower));
 			}
 			// 2026-10-21：慢速功率/时间窗是独立字段（无界可能没有 PL4）⇒ 不能嵌在 PL4 块里，否则切档重放整段被跳过
-			if (settings.SmuSlowLimit.HasValue)
+			// 2026-10-21：无界固件 sPPT 固定 45W、时间窗回读无效 ⇒ 这些字段在无界不生成下发步骤（其它机型不变）
+			if (!caps.WujieSmuLocalOnly)
 			{
-			list.Add(Field("SmuSlowLimit", settings.SmuSlowLimit.Value, PerfApplyVerify.CpuPackagePower));
+				if (settings.SmuSlowLimit.HasValue)
+				{
+				list.Add(Field("SmuSlowLimit", settings.SmuSlowLimit.Value, PerfApplyVerify.CpuPackagePower));
+				}
 			}
 			if (settings.SmuSlowTimeSeconds.HasValue)
 			{

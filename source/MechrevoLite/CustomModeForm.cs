@@ -850,6 +850,13 @@ public class CustomModeForm : RForm
 				Logger.WriteLine("[custom-ui] 移除快速提升持续时间行失败（已吞掉）：" + exFast.Message);
 			}
 		}
+			// 2026-10-21（诊断包实证）：无界固件 ① sPPT 固定 45W（写 60 回读 45）② stapm_time/slow_time 回读是乱跳值
+			// ⇒ 慢速功率/慢速时长/STAPM 时间窗这三行在无界不可调、也无法确认，直接隐藏（控件对象保留，不在树上）。
+			if (wujieApu)
+			{
+				HideSmuRowForWujie(_smuSlowLimit, "慢速功率");
+				HideSmuRowForWujie(_smuSlowTime, "慢速时长");
+			}
 		// 之后：功耗时间窗（STAPM，秒）→ PL4/FPPT → 温度墙
 		if (smuPowerControls)
 		{
@@ -865,6 +872,10 @@ public class CustomModeForm : RForm
 			_stapmTime = tuple4.Item1;
 			_stapmTimeVal = tuple4.Item2;
 			_stapmTimeLabel = RowLabelOf(_stapmTime);
+			if (wujieApu)
+			{
+				HideSmuRowForWujie(_stapmTime, "功耗时间窗");
+			}
 			// tooltip 正面解释（⛔ 不写"不是 PL2 生效时间"这类否定/对比句）
 			AttachPowerWallHint(_stapmTime, _stapmTimeVal, _stapmTimeLabel, Strings.CpuStapmTimeWindowHint);
 			if (stapmTimeUnset)
@@ -4222,6 +4233,23 @@ public class CustomModeForm : RForm
 				_ocChk.Checked = (value == 1);
 				break;
 			}
+		}
+	}
+
+	/// <summary>2026-10-21：无界上不可调/无法回读的 SMU 行直接隐藏（控件对象保留，避免其它代码 NRE）。</summary>
+	private static void HideSmuRowForWujie(RSlider slider, string label)
+	{
+		try
+		{
+			if (slider?.Tag is Control row && row.Parent != null)
+			{
+				row.Parent.Controls.Remove(row);
+				Logger.WriteLine("[custom-ui] 无界隐藏 " + label + " 行（固件不可调/回读无效）");
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[custom-ui] 无界隐藏 " + label + " 行失败（已吞掉）：" + ex.Message);
 		}
 	}
 

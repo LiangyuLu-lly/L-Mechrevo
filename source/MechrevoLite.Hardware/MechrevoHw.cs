@@ -5780,9 +5780,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			_baolongdaSmuSnapshot = snapshot;
 			_baolongdaSmuSnapshotAt = DateTime.UtcNow;
-			BaolongdaStapmTimeSeconds = snapshot.StapmTimeSeconds ?? 0;
-			SmuSlowTimeSeconds = snapshot.SlowTimeSeconds ?? 0;
-			SmuSlowLimitWatts = (snapshot.Slow > 0f && !float.IsNaN(snapshot.Slow) && !float.IsInfinity(snapshot.Slow)) ? (int)Math.Round(snapshot.Slow) : 0;
+			// 2026-10-21（诊断包实证）：该固件 stapm_time/slow_time 回读是乱跳值 ⇒ 不写本地记忆（UI 行也已隐藏）
+			BaolongdaStapmTimeSeconds = 0;
+			SmuSlowTimeSeconds = 0;
+			SmuSlowLimitWatts = 0;
 			int wjStapm = (snapshot.Stapm > 0f && !float.IsNaN(snapshot.Stapm)) ? (int)Math.Round(snapshot.Stapm) : 0;
 			int wjFast = (snapshot.Fast > 0f && !float.IsNaN(snapshot.Fast)) ? (int)Math.Round(snapshot.Fast) : 0;
 			int wjLo = MechrevoLite.Hardware.WujieSmuGate.PlMinWatts;
@@ -5796,9 +5797,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				Pl2 = wjFast;
 			}
 			Logger.WriteLine("[smu] 无界当前值（只读 PM 表）：STAPM(PL1)=" + (wjStapm > 0 ? wjStapm + "W" : "读不到")
-				+ " · slow=" + ((SmuSlowLimitWatts > 0) ? SmuSlowLimitWatts + "W" : "读不到")
-				+ " · fast(PL2)=" + (wjFast > 0 ? wjFast + "W" : "读不到")
-				+ " · slow 时间窗=" + (SmuSlowTimeSeconds > 0 ? SmuSlowTimeSeconds + "s" : "读不到"));
+				+ " · fast(PL2)=" + (wjFast > 0 ? wjFast + "W" : "读不到"));
 		}
 		catch (Exception ex)
 		{
