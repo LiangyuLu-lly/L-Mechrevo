@@ -4764,6 +4764,8 @@ public class CustomModeForm : RForm
 					}
 					_tcc.Enabled = true; _tccVal.Enabled = true; _tccChk.Enabled = true;
 					flag = true;
+					SetRowVisible(_tccChk, true);
+					SetRowVisible(_tcc, true, _tccVal);
 				}
 				SetRowVisible(_tccChk, flag);
 				SetRowVisible(_dbChk, flag2);
