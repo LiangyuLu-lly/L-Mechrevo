@@ -892,6 +892,19 @@ public class CustomModeForm : RForm
 		_tccLabel = RowLabelOf(_tcc);
 		AttachPowerWallUnsetHint(_tcc, _tccVal, _tccLabel);
 		_tccChk.Enabled = tuple6.Item4;
+		// 2026-10-21：同方 Intel + GCU 机型：温度墙行强制显示（原厂 GCU 有该项）
+		if (hw != null && hw.IsGcuConnected && !hw.UsesAmdPowerFields)
+		{
+			int tccTj = (hw.TjMax > 0) ? hw.TjMax : 100;
+			if (_tcc.Maximum <= _tcc.Minimum)
+			{
+				_tcc.Minimum = 75; _tcc.Maximum = tccTj; _tcc.Value = Math.Clamp(95, 75, tccTj);
+				_tccVal.Minimum = 75; _tccVal.Maximum = tccTj; _tccVal.Value = Math.Clamp(95, 75, tccTj);
+			}
+			_tcc.Enabled = true; _tccVal.Enabled = true; _tccChk.Enabled = true;
+			SetRowVisible(_tccChk, true);
+			SetRowVisible(_tcc, true, _tccVal);
+		}
 		// 「未设置」提示；读不到时保留原来的只读/未设置说明（更贴近用户看到的现象）。
 		if (smuPowerControls)
 		{
@@ -4741,6 +4754,17 @@ public class CustomModeForm : RForm
 					_gpuOcMemoryAdjustable = hw.GpuMemoryOffsetAdjustable;
 				}
 				bool flag5 = ApplyRange(_fanSwitchSpeed, _fanSwitchSpeedVal, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum, hw.FanSwitchSpeed);
+				if (hw.IsGcuConnected && !hw.UsesAmdPowerFields)
+				{
+					int tccTjR = (hw.TjMax > 0) ? hw.TjMax : 100;
+					if (_tcc.Maximum <= _tcc.Minimum)
+					{
+						_tcc.Minimum = 75; _tcc.Maximum = tccTjR; _tcc.Value = Math.Clamp(95, 75, tccTjR);
+						_tccVal.Minimum = 75; _tccVal.Maximum = tccTjR; _tccVal.Value = Math.Clamp(95, 75, tccTjR);
+					}
+					_tcc.Enabled = true; _tccVal.Enabled = true; _tccChk.Enabled = true;
+					flag = true;
+				}
 				SetRowVisible(_tccChk, flag);
 				SetRowVisible(_dbChk, flag2);
 				SetRowVisible(_ocChk, supportsGpuOverclock);
