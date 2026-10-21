@@ -52,7 +52,7 @@ internal static class KeyboardCtrlPublishSwitch
 			bool? enabled = _enabled;
 			if (!enabled.HasValue)
 			{
-				enabled = Read();
+				enabled = Read() || IsMachineAutoEnabled();
 				_enabled = enabled;
 			}
 			return enabled.Value;
@@ -72,6 +72,19 @@ internal static class KeyboardCtrlPublishSwitch
 		string processValue = ReadRaw(EnvironmentVariable, EnvironmentVariableTarget.Process);
 		string userValue = ReadRaw(EnvironmentVariable, EnvironmentVariableTarget.User);
 		Logger.WriteLine($"[kbd] Keyboard/Ctrl 下发开关 = {(Enabled ? "ON" : "OFF")}（默认 OFF）| {EnvironmentVariable}: process={(processValue.Length == 0 ? "(unset)" : processValue)} user={(userValue.Length == 0 ? "(unset)" : userValue)} | config {ConfigKey}={AppConfig.Get(ConfigKey, 0)} | {(Enabled ? "键盘灯 SetEffectALL/SetPower/SetLightingLevel 将直接发往 Keyboard/Ctrl" : "不发任何 Keyboard/Ctrl 帧，行为与改前逐字一致")}");
+	}
+
+	/// <summary>无界（WujieSmuApu）单分区 EC 键盘：50 系 GCU 需要全字段 Keyboard/Ctrl 负载，本机自动启用新链路。</summary>
+	private static bool IsMachineAutoEnabled()
+	{
+		try
+		{
+			return Program.hw != null && Program.hw.WujieSmuApu;
+		}
+		catch
+		{
+			return false;
+		}
 	}
 
 	private static string ReadRaw(string name, EnvironmentVariableTarget target)
