@@ -9534,7 +9534,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		string text3 = o["CPU_TccOffsetSwitch"]?.ToString();
 		if (text3 != null)
 		{
-			TccSwitch = text3 == "1";
+			TccSwitch = text3 == "1" || string.Equals(text3, "true", StringComparison.OrdinalIgnoreCase);
 		}
 		string text4 = o["TjMax"]?.ToString();
 		if (text4 != null && int.TryParse(text4, out var result2) && result2 > 0)
@@ -9678,9 +9678,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		IL_0617:
 		int value = num10;
 		int value2 = ((num9 == 0 && TccRawMinimum >= 0) ? (num8 - TccRawMinimum) : 95);
-		int tccCeiling = Math.Max(95, num8);   // 上限按 TjMax（255HX=105）放开，避免 95..105 被压平
-		TccMinimum = Math.Clamp(value, 75, tccCeiling);
-		TccMaximum = Math.Clamp(value2, 75, tccCeiling);
+		// 2026-10-21：Intel 的 TCC 字段是“偏移”范围：给出 CPU_TccOffsetMaximum=10 ⇒ 温度墙 95..105
+		// （之前把缺失的 minimum 当 -1，导致 max 被算成 95、范围压平 95..95 ⇒ 判不可调、整行隐藏）
+		int tjBase = (num8 > 0) ? num8 : 105;
+		int tccOffMin = (TccRawMinimum >= 0) ? TccRawMinimum : 0;
+		int tccOffMax = (TccRawMaximum >= 0) ? TccRawMaximum : 10;
+		TccMinimum = Math.Clamp(tjBase - tccOffMax, 75, tjBase);
+		TccMaximum = Math.Clamp(tjBase - tccOffMin, 75, tjBase);
 		{
 			TccMinimum = TccMaximum;
 		}
