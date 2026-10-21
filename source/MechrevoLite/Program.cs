@@ -3722,16 +3722,17 @@ internal static class Program
 					bool nvidia = !noDgpu && warmHw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.Unknown;
 					bool igpuPower = amd && noDgpu;
 					// （机主：宝龙达被判成同方）： gate 行加入板号与命中来源
-				MechrevoLite.Hardware.BoardWhitelist.BoardProductEvidence gateBoard = MechrevoLite.Hardware.BoardWhitelist.GetBoardProductEvidence();
-				MechrevoLite.Hardware.BoardWhitelist.LogEvidence(gateBoard, warmHw.UsesBaolongda);
-				Logger.WriteError("[gate] 机型分类：board=" + (gateBoard.Product.Length == 0 ? "(读不到)" : gateBoard.Product)
-					+ " · src=" + (gateBoard.Source.Length == 0 ? "(无)" : gateBoard.Source)
+				// 第 4 步（声明式架构）：[gate] 与 [router] 共用同一份 MachineIdentity 事实，避免两套判据不一致。
+				MechrevoLite.Hardware.MachineIdentity gateIdentity = MechrevoLite.Hardware.MachineIdentity.Collect();
+				MechrevoLite.Hardware.BackendRouteDecision gateRoute = MechrevoLite.Hardware.BackendRouter.Decide(gateIdentity);
+				Logger.WriteError("[gate] 机型分类：" + gateIdentity.Summary
 					+ " · baolongda=" + warmHw.UsesBaolongda + " gen=" + warmHw.DgpuGeneration
-						+ " wujieApu=" + warmHw.WujieSmuApu + " amd=" + amd + " nvidia=" + nvidia
-						+ " | 启用分支：kbdEc=" + (warmHw.UsesBaolongda && gen30)
-						+ " wujieSmu=" + warmHw.WujieSmuApu
-						+ " igpuPower=" + igpuPower
-						+ " quickExtra=" + warmHw.WujieSmuApu);
+					+ " wujieApu=" + warmHw.WujieSmuApu + " amd=" + amd + " nvidia=" + nvidia
+					+ " | router=" + gateRoute.Backend + " rule=#" + gateRoute.RuleIndex
+					+ " | 启用分支：kbdEc=" + (warmHw.UsesBaolongda && gen30)
+					+ " wujieSmu=" + warmHw.WujieSmuApu
+					+ " igpuPower=" + igpuPower
+					+ " quickExtra=" + warmHw.WujieSmuApu);
 				}
 				catch (Exception ex)
 				{

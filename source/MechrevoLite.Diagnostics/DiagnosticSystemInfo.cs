@@ -37,6 +37,7 @@ internal static class DiagnosticSystemInfo
 		// 诊断包（机主已经会导出）才是默认级别下唯一可靠的出口。⛔ 严格只读（只查 WMI + 既有 EC 读通道），
 		// ⛔ 不写注册表/EC/ACPI/NVRAM；⛔ 序列号字段从不读取；WMI 失败写 unavailable，不抛。
 		stringBuilder.Append(MachineCodeProbe.BuildSection());
+stringBuilder.Append(DiagnosticBackendRouteInfo.Build());
 		AppendCpu(stringBuilder);
 		// ⭐ 2026-10-18（机主：30 系 CPU 温度显示卡在 80℃ 不动、调节电后真实温度变了显示没变）：
 		//   ⭐ 紧跟 [CPU] 之后追加「CPU 温度来源明细」一节 —— ⭐ 只读 ✅：
