@@ -9574,7 +9574,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		goto IL_0617;
 		IL_066f:
 		int num11;
-		if (num7 >= 0)
+		if (IsAmdPlatformForLimits && num7 >= 0)
 		{
 			num11 = num7;
 		}
@@ -9678,9 +9678,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		IL_0617:
 		int value = num10;
 		int value2 = ((num9 == 0 && TccRawMinimum >= 0) ? (num8 - TccRawMinimum) : 95);
-		TccMinimum = Math.Clamp(value, 75, 95);
-		TccMaximum = Math.Clamp(value2, 75, 95);
-		if (TccMinimum > TccMaximum)
+		int tccCeiling = Math.Max(95, num8);   // 上限按 TjMax（255HX=105）放开，避免 95..105 被压平
+		TccMinimum = Math.Clamp(value, 75, tccCeiling);
+		TccMaximum = Math.Clamp(value2, 75, tccCeiling);
 		{
 			TccMinimum = TccMaximum;
 		}
