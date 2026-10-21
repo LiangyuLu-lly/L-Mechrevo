@@ -4305,6 +4305,23 @@ public class MechrevoService
 				if (wrotePl1)
 				{
 					hw.NoteBaolongdaSmuLimitsApplied(pl1, 0, 0);
+						// 2026-10-21（机主：改 39 生效后又跳回 35）：有些固件会在几百 ms 内把 STAPM 改回默认
+						// ⇒ 350ms 后回读一次，被改回就补发一次（有界，不循环）
+						try
+						{
+							System.Threading.Thread.Sleep(350);
+							PawnIO.SmuPowerSnapshot stapmRb = smu.GetPowerSnapshot();
+							if (stapmRb != null && Math.Abs((int)Math.Round((double)stapmRb.Stapm) - pl1) > 1)
+							{
+								PawnIO.SmuStatus stapmRetry = smu.SetStapmLimit(pl1);
+								Logger.WriteError("[smu] Wujie 应用：stapm 第一次回读=" + (int)Math.Round((double)stapmRb.Stapm)
+									+ "W ≠ 目标 " + pl1 + "W（疑似固件改回默认）⇒ 补发一次（" + stapmRetry + "）");
+								pl1Status = pl1Status + "/retry=" + stapmRetry;
+							}
+						}
+						catch
+						{
+						}
 				}
 			}
 			if (pl2 > 0)

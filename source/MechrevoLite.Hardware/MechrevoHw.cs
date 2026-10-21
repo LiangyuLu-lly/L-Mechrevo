@@ -5760,6 +5760,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>2026-10-21：本机 GCU 载荷是否为 WJXY（星耀 / 无界 LNL 等特殊的 1.0.2.70 分支）。只读。</summary>
 	internal bool UsesWjxyGcuPayload => string.Equals(GcuIdentity.Variant, "WJXY", StringComparison.OrdinalIgnoreCase);
 
+	/// <summary>无界：最近一次从 PM 表读到的 STAPM / fPPT 实况值（只用于日志/对比，⛔ 不回写）。</summary>
+	internal int WujieLiveStapmWatts { get; private set; }
+
+	internal int WujieLiveFastWatts { get; private set; }
+
 	/// <summary>当前 SMU 慢速功率(sPPT)（W，0 = 读不到）；只读采样。</summary>
 	internal int SmuSlowLimitWatts { get; private set; }
 
@@ -5791,13 +5796,15 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			int wjFast = (snapshot.Fast > 0f && !float.IsNaN(snapshot.Fast)) ? (int)Math.Round(snapshot.Fast) : 0;
 			int wjLo = MechrevoLite.Hardware.WujieSmuGate.PlMinWatts;
 			int wjHi = MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts;
+			// 2026-10-21：这里**不覆盖** Pl1/Pl2（那是“最后下发的意图值”，下一步下发要拿它当基线）；
+			// 固件可能把 STAPM 改回默认值，覆盖会把回退值当成基线再写回去。
 			if (wjStapm >= wjLo && wjStapm <= wjHi)
 			{
-				Pl1 = wjStapm;
+				WujieLiveStapmWatts = wjStapm;
 			}
 			if (wjFast >= wjLo && wjFast <= wjHi)
 			{
-				Pl2 = wjFast;
+				WujieLiveFastWatts = wjFast;
 			}
 			Logger.WriteLine("[smu] 无界当前值（只读 PM 表）：STAPM(PL1)=" + (wjStapm > 0 ? wjStapm + "W" : "读不到")
 				+ " · fast(PL2)=" + (wjFast > 0 ? wjFast + "W" : "读不到"));
