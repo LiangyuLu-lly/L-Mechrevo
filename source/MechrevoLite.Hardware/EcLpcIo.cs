@@ -783,6 +783,86 @@ internal static class EcLpcIo
 		}
 	}
 
+	/// <summary>实验：直接读任意端口（受 LpcIO 模块白名单限制；失败返回 false 并给原因）。</summary>
+	internal static bool TryRawPortRead(ushort port, out byte value, out string note)
+	{
+		value = 0;
+		note = "";
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				note = "通道已中毒：" + _poisonReason;
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				note = "模块未装载：" + _loadFailure;
+				return false;
+			}
+			if (!TryEnterMutex(out Mutex mutex, out bool held))
+			{
+				note = "无法获取互斥体";
+				return false;
+			}
+			try
+			{
+				bool ok = PioInb(port, out byte v);
+				value = v;
+				note = ok ? "成功" : ("被拒（Win32=" + LastIoctlError + "）");
+				return ok;
+			}
+			catch (Exception ex)
+			{
+				note = "异常：" + ex.GetType().Name;
+				return false;
+			}
+			finally
+			{
+				ReleaseMutex(mutex, held);
+			}
+		}
+	}
+
+	/// <summary>实验：直接写任意端口（受 LpcIO 模块白名单限制；失败返回 false 并给原因）。</summary>
+	internal static bool TryRawPortWrite(ushort port, byte value, out string note)
+	{
+		note = "";
+		lock (Gate)
+		{
+			if (_poisoned)
+			{
+				note = "通道已中毒：" + _poisonReason;
+				return false;
+			}
+			if (!EnsureModule())
+			{
+				note = "模块未装载：" + _loadFailure;
+				return false;
+			}
+			if (!TryEnterMutex(out Mutex mutex, out bool held))
+			{
+				note = "无法获取互斥体";
+				return false;
+			}
+			try
+			{
+				bool ok = PioOutb(port, value, "原始端口写");
+				note = ok ? "成功" : ("被拒（Win32=" + LastIoctlError + "）");
+				return ok;
+			}
+			catch (Exception ex)
+			{
+				note = "异常：" + ex.GetType().Name;
+				return false;
+			}
+			finally
+			{
+				ReleaseMutex(mutex, held);
+			}
+		}
+	}
+
 	/// <summary>⭐ 原始端口读（PawnIO LpcIO `ioctl_pio_inb`）✅</summary>
 	private static bool PioInb(ushort port, out byte value)
 	{

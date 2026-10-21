@@ -661,6 +661,14 @@ internal static class Program
 		//   L-Mechrevo.exe --gcu-variant-family [输出.txt]
 		// WinExe 没有控制台，故结论同时写文件（给了路径就用它，否则落 %TEMP%\lm-gcu-variant-family.txt）
 		// 与 Logger（log.txt）；退出码 = 0 全通过 / 1 有失败。
+		// 2026-10-21（电池电压修复 · 通道探测）：`--i2ec-port-probe`
+		//   只读探测 PawnIO LpcIO 是否放行 I2EC 端口 0x681/0x682/0x683；结果写桌面报告。
+		case "--i2ec-port-probe":
+		{
+			bool allowWrite = args.Skip(1).Any((string a) => string.Equals(a, "--allow-write-probe", StringComparison.OrdinalIgnoreCase));
+			Environment.ExitCode = I2ecPortProbe.Run(allowWrite);
+			return;
+		}
 		case "--gcu-variant-family":
 		{
 			string familyReport = MechrevoLite.Hardware.GcuVariantFamily.RunSelfTest();
