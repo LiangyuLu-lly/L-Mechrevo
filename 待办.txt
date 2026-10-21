@@ -153,3 +153,30 @@
   - [ ] ⚠️ 待解 ⑤：用户那两条判断（14X/15X 可用 50 系 · 星耀 + 无界14 2026 不行）**均未真机验证**
   - [ ] ⭐ 决定性一步（⛔ 未做）：先定「哪一代配哪一台」的判据 —— ⚠️ 不能用机型码 ⇒ 需另找可靠判据
 
+
+
+## [待办 · 主题颜色与背景自定义]（新增，2026-10-22）
+- 现状：已有明/暗两套主题（config `ui_theme_mode`、`ui_theme_follow_system`；`source/MechrevoLite.UI/UiVisualStyle.cs` 里 Palette 固定）。
+- 目标（v1 待确认范围）：**自定义强调色（accent）+ 主窗口背景**（纯色/图片，可调不透明度）；主题仍随明暗切换。
+- 目标（v2 可选）：卡片/输入面/文字成组自定义、主题导出/导入、每套明暗各自记忆。
+- 技术落点：
+  - `UiVisualStyle.Palette` 增加可覆盖项，读取 config（如 `ui_accent_argb`、`ui_bg_image`、`ui_bg_color`、`ui_bg_opacity`）；
+  - 设置页加“主题颜色”拾色器 + “背景”文件选择/恢复默认；
+  - 现有窗体大多经 `UiVisualStyle` 取色，需核查自绘控件与主题重下发（`UiVisualStyle.ApplyTree`）是否覆盖新色。
+- 风险：自绘控件缓存旧色；背景图重绘性能与 DWM；深浅主题下的文字/强调色对比度；R* 控件是否硬编码颜色。
+- 待定问题：背景只换主窗体还是所有窗体？是否每套主题独立记忆？是否需要“恢复默认”一键回滚。
+
+## [待办 · 40 系在 50 GCU 下的静音狂暴补丁]（新增，2026-10-22）
+- 既有结论（2026-10-20，`docs/notes/GCU50-静音与性能档实现-20261020.md` 第 8/9 节）：
+  - 40 系 + **40 GCU（1.0.2.70）** 没有 `SET_CPU_CORE_OFFSET_SILENT/EXTREME`，不能发静音狂暴子模式；
+  - 静音狂暴能力位来自 **EC/WMI `WMIIsTurboSubModeSupport() == 0x55`**，换 GCU 版本不改变该返回值 ⇒ 当时结论是“不装 50 GCU 换静音狂暴”。
+- 现状：LM 的“静音狂暴”按钮按注册表 `IsTurboSubModeSupport`（GCU 上报）放开；开发机 Gen40 + 50 GCU 实测该位 = false ⇒ 按钮隐藏。
+- 本次要验证（只读优先）：
+  1. 在 **40 系 + 50 GCU** 机器上直接读 WMI `WMIIsTurboSubModeSupport` 返回值（看是否 == 0x55=85）；
+  2. 若为 85 ⇒ 做“补丁”：LM 不依赖注册表位，改为直接探测 EC/WMI 能力；能力成立时放开“静音狂暴”按钮，并走 50 GCU 的 `Fan/Control` 的 `SET_CPU_CORE_OFFSET_SILENT/EXTREME`；
+  3. 确认 50 GCU 在 Gen40 上对这两个动作回 OK（可回滚、先只读/单机验证）；
+  4. 若 WMI 返回不是 85 ⇒ 记录结论（硬件不支持），改为“自定义档模拟静音狂暴”（PL/温度墙/风扇保守化）。
+- 待做：
+  - [ ] 写只读 WMI 探测（`WMIIsTurboSubModeSupport`）并在开发机/目标机取值；
+  - [ ] 核对 50 GCU `Fan/Control` 两个动作在 Gen40 的响应；
+  - [ ] 能力成立时实现 capability override + UI 放开 + 日志（不成立则写结论）。
