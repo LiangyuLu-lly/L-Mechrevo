@@ -114,7 +114,7 @@ internal static class EcKeyboardLight
 	/// <summary>同时设开/关与亮度（读-改-写）；只改 bit1 与 bit4~7。</summary>
 	internal static bool TryApply(bool? on, int? brightnessLevel0to4)
 	{
-		if (brightnessLevel0to4.HasValue && (brightnessLevel0to4.Value < 0 || brightnessLevel0to4.Value > 4))
+		if (brightnessLevel0to4.HasValue && (brightnessLevel0to4.Value < 0 || brightnessLevel0to4.Value > 2))
 		{
 			return false;
 		}

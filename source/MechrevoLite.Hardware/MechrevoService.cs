@@ -4627,9 +4627,11 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 	{
 		if (ShouldUseEcKeyboardLight())
 		{
+			// 2026-10-22（实测：白键盘 EC 只有 0/1/2 三档，视觉上两档亮度）：
+			// UI 的 1~4 档收敛到 1~2，避免 3/4 档写进 EC 后出现“2 档比 3 档亮”。
 			bool ok = (level0to4 <= 0)
 				? EcKeyboardLight.TryApply(false, 0)
-				: EcKeyboardLight.TryApply(true, Math.Clamp(level0to4, 1, 4));
+				: EcKeyboardLight.TryApply(true, Math.Clamp(level0to4, 1, 2));
 			Logger.WriteError("[kbd-ec] 白键盘亮度=" + level0to4 + " ⇒ " + (ok ? "已生效" : "失败"));
 			return Task.FromResult(ok);
 		}
