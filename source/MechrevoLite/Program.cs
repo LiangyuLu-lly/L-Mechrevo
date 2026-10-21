@@ -669,6 +669,28 @@ internal static class Program
 			Environment.ExitCode = I2ecPortProbe.Run(allowWrite);
 			return;
 		}
+		// 2026-10-21（无界电池电压修复 · 内置探针/写入测试）
+		//   --battery-voltage-probe：只读探测 I2EC 通道与电池电压寄存器，报告写桌面
+		case "--battery-voltage-probe":
+		{
+			Environment.ExitCode = BatteryVoltageProbe.RunReadOnly();
+			return;
+		}
+		//   --battery-voltage-test [--seconds N]：写入测试（17600mV/2816mA，结束恢复原值）
+		case "--battery-voltage-test":
+		{
+			int seconds = 15;
+			string[] rest = args.Skip(1).ToArray();
+			for (int i = 0; i < rest.Length; i++)
+			{
+				if (string.Equals(rest[i], "--seconds", StringComparison.OrdinalIgnoreCase) && i + 1 < rest.Length && int.TryParse(rest[i + 1], out int parsedSeconds))
+				{
+					seconds = Math.Clamp(parsedSeconds, 1, 600);
+				}
+			}
+			Environment.ExitCode = BatteryVoltageProbe.RunWriteTest(seconds);
+			return;
+		}
 		case "--gcu-variant-family":
 		{
 			string familyReport = MechrevoLite.Hardware.GcuVariantFamily.RunSelfTest();
