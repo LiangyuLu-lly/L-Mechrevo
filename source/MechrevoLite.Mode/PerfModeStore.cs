@@ -167,6 +167,7 @@ public static class PerfModeStore
 			GpuDynamicBoostOn = GetBool(id, "dbon"),
 			GpuDynamicBoost = GetInt(id, "db"),
 			CpuFanDuty = GetCurve(id, "fancpu"),
+			FanCurveOn = GetBool(id, "fanon"),
 			GpuFanDuty = GetCurve(id, "fangpu"),
 			TccOn = GetBool(id, "tccon"),
 			TccTarget = GetInt(id, "tcc"),
@@ -199,6 +200,7 @@ public static class PerfModeStore
 		PutBool(id, "dbon", settings.GpuDynamicBoostOn);
 		PutInt(id, "db", settings.GpuDynamicBoost);
 		PutCurve(id, "fancpu", settings.CpuFanDuty);
+		PutBool(id, "fanon", settings.FanCurveOn);
 		PutCurve(id, "fangpu", settings.GpuFanDuty);
 		PutBool(id, "tccon", settings.TccOn);
 		PutInt(id, "tcc", settings.TccTarget);

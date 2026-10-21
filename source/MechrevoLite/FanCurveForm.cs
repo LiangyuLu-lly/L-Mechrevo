@@ -251,6 +251,9 @@ public class FanCurveForm : RForm
 	//   原来保存曲线必然 Enabled=true 且没有关闭入口 ⇒ 机主只能手改 cfg 才能停掉
 	private RCheckBox? _bdEnableChk;
 
+	/// <summary>GCD 风扇曲线下发开关：关闭 = 只保存不推送。</summary>
+	private RCheckBox _fanApplyChk;
+
 	private bool _syncingBdEnable;
 
 	// 2026-10-19（机主：双风扇 0.85 联动开关放进「风扇曲线」窗口）：开关见 OnCurveUpdated 的同步逻辑
@@ -278,7 +281,26 @@ public class FanCurveForm : RForm
 
 	/// <summary>2026-10-10（用户反馈 ②「自定义模式风扇表不能保存」）：这条曲线要记进**哪一个档位**。
 	/// null = 沿用旧口径（当时活动的档位）。从自定义模式打开时由 CustomModeForm 传入正在编辑的档位。</summary>
-	internal string TargetModeId { get; set; }
+	private string _targetModeId;
+	internal string TargetModeId
+	{
+		get => _targetModeId;
+		set
+		{
+			_targetModeId = value;
+			// 打开窗口后再传入目标档位时，同步“曲线下发开关”的持久状态
+			if (_fanApplyChk != null && !string.IsNullOrWhiteSpace(value))
+			{
+				try
+				{
+					_fanApplyChk.Checked = MechrevoLite.Mode.PerfModeStore.LoadSettings(value).FanCurveOn != false;
+				}
+				catch
+				{
+				}
+			}
+		}
+	}
 
 	/// <summary>
 	/// 2026-10-15（bugfix-fan-logo bug①，round2 用户改案「保存 = 保存 + 自动应用一次」）：
@@ -444,6 +466,39 @@ public class FanCurveForm : RForm
 			}
 		};
 		flowLayoutPanel.Controls.Add(_respectiveChk);
+
+		// GCU 机型：风扇曲线下发开关（关闭 = 只保存不推送，交回固件曲线）
+		_fanApplyChk = new RCheckBox
+		{
+			Text = "下发风扇曲线（关闭 = 只保存不推送）",
+			Checked = true,
+			ForeColor = UiVisualStyle.Text,
+			BackColor = UiVisualStyle.Window,
+			AutoSize = true,
+			Margin = new Padding(0, D(4), D(12), 0),
+			Cursor = Cursors.Hand
+		};
+		try
+		{
+			if (!string.IsNullOrWhiteSpace(TargetModeId))
+			{
+				_fanApplyChk.Checked = MechrevoLite.Mode.PerfModeStore.LoadSettings(TargetModeId).FanCurveOn != false;
+			}
+		}
+		catch
+		{
+		}
+		_fanApplyChk.CheckedChanged += delegate
+		{
+			try
+			{
+				MechrevoLite.Mode.PerfModeService.Instance?.RecordFanCurveEnabled(TargetModeId, _fanApplyChk.Checked);
+			}
+			catch
+			{
+			}
+		};
+		flowLayoutPanel.Controls.Add(_fanApplyChk);
 		_respectiveHint = new Label
 		{
 			Text = Strings.FanIndepHelp,
@@ -908,6 +963,17 @@ public class FanCurveForm : RForm
 		if (hw == null || !hw.IsGcuConnected)
 		{
 			_status.Text = Strings.NotConnectedNotSaved;
+			return;
+		}
+		if (_fanApplyChk != null && !_fanApplyChk.Checked)
+		{
+			_cpuPending = (_gpuPending = false);
+			int[] cpuSaved = _cpuPanel.Duties.ToArray();
+			int[] gpuSaved = _gpuPanel.Duties.ToArray();
+			PerfModeService.Instance?.RecordFanCurves(TargetModeId, cpuSaved, gpuSaved);
+			_status.Text = "已保存曲线（未下发：风扇曲线下发开关关闭）";
+			Logger.WriteLine("[fan] 曲线：下发开关关闭 ⇒ 仅保存、不推送");
+			RaiseFanCurveSaved(confirmed: true);
 			return;
 		}
 		_saveInProgress = true;

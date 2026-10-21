@@ -124,11 +124,18 @@ public static class PerfModeApplyPlanner
 				list.Add(Field("FanSwitchSpeed", settings.FanSwitchSpeedMs.Value));
 			}
 			int[] cpuFanDuty = settings.CpuFanDuty;
+			int[] gpuFanDutyPre = settings.GpuFanDuty;
+			// 风扇曲线下发开关（未设置 = true 兼容旧行为；false = 只保存不推送）
+			if (settings.FanCurveOn == false)
+			{
+				cpuFanDuty = null;
+				gpuFanDutyPre = null;
+			}
 			if (cpuFanDuty != null && cpuFanDuty.Length == 16)
 			{
 				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: true, settings.CpuFanDuty, PerfApplyVerify.FanDuty));
 			}
-			int[] gpuFanDuty = settings.GpuFanDuty;
+			int[] gpuFanDuty = gpuFanDutyPre;
 			if (gpuFanDuty != null && gpuFanDuty.Length == 16)
 			{
 				list.Add(new PerfApplyStep(PerfApplyStepKind.WriteFanCurve, null, null, 0, IsCpuCurve: false, settings.GpuFanDuty, PerfApplyVerify.FanDuty));

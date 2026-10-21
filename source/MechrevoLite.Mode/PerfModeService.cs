@@ -1525,6 +1525,19 @@ internal sealed class PerfModeService
 	/// ② 找不到档位或不是固件槽档时，**留一行日志说明**，不再静默。
 	/// ⚠️ 落盘键名/写入点一个字没改：仍是 <c>perf_&lt;档位id&gt;_fancpu</c> / <c>_fangpu</c>（PerfModeStore.SaveSettings）。
 	/// </summary>
+	/// <summary>风扇曲线下发开关（perf_&lt;档&gt;_fanon）：关闭后只保存曲线、不随档位下发。</summary>
+	public void RecordFanCurveEnabled(string targetModeId, bool enabled)
+	{
+		PerfModeDefinition mode = (string.IsNullOrWhiteSpace(targetModeId) ? Active : Find(targetModeId));
+		if (mode == null)
+		{
+			return;
+		}
+		PerfModeSettings settings = PerfModeStore.LoadSettings(mode.Id) with { FanCurveOn = enabled };
+		PerfModeStore.SaveSettings(mode.Id, settings);
+		Logger.WriteLine("[fan] 曲线下发开关：" + (enabled ? "开" : "关") + "（档位=" + mode.Id + "）");
+	}
+
 	public void RecordFanCurves(string targetModeId, int[] cpuDuty, int[] gpuDuty)
 	{
 		PerfModeDefinition mode = (string.IsNullOrWhiteSpace(targetModeId) ? Active : Find(targetModeId));

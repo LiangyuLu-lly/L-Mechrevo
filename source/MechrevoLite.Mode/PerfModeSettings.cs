@@ -44,6 +44,9 @@ public sealed record PerfModeSettings
 
 	public bool? FanBoost { get; set; }
 
+	/// <summary>风扇曲线是否随档位下发（false = 只保存不推送；未设置按 true 兼容旧行为）。</summary>
+	public bool? FanCurveOn { get; init; }
+
 	public bool? FanSwitchSpeedOn { get; init; }
 
 	public int? FanSwitchSpeedMs { get; init; }
