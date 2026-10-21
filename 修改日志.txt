@@ -25,6 +25,7 @@ r79（2026-10-21 · **0.293.4 beta23.4**）★★ Intel+GCU 温度墙接正 + �
 - 无界 Intel 的隐藏条件收紧为「仅 Lunar Lake」：CPU 名匹配 Core Ultra xxxV 或 CPUID family 6 / model 0xBD；其它 Intel 无界机型不再隐藏。
 - 无界 SMU 慢速功率/加速功率/时间窗“读不回+切配置不记录”三处修复：① 规划器里 SmuSlowLimit/SmuSlowTime/SmuFastTime 原被嵌在 PL4 分支（无界没 PL4 ⇒ 切档重放整段跳过），已移出独立生成；② 自定义窗口 ApplyFields 补上这三个键 → 档位配置真正落盘（切配置不再丢）；③ 新增 SmuSlowLimitWatts/SmuSlowTimeSeconds 读回，无界打开界面时从 PM 表回填 PL1(Stapm)/PL2(Fast)/slow 功率/时间窗，slow 时间窗写后回读确认。
 - 诊断包实证后的无界收尾：① 固件 sPPT 固定 45W（写 60 回读 45）② PM 表 ver=0x4C0008 的 stapm_time/slow_time 回读是乱跳值（56/53/50/31s、46/16/66s）⇒ 无界隐藏「慢速功率/慢速时长/功耗时间窗」三行，且规划器对无界不生成这些下发步骤（不再假装可调）；PL1(Stapm)/PL2(Fast)/温度墙仍读回正常。切配置持久化修复对 30 系依旧有效。
+- 无界双风扇与曲线记录：① GCU FanInfo 只给一路/不给时，从 EC 0xC834/0xC835 补两路转速（×100 RPM，只读）并打 FanInfo 时间戳让界面正常显示；② 无界保存风扇曲线时固件回读不可靠 ⇒ 仍把曲线记进档位配置（避免切配置/重放回旧曲线导致“乱跳”），状态行改为“已保存（回读不可靠，按已下发处理）”。
 二、无界（WJXY / Wujie APU）
 - 键盘灯：自动启用 Keyboard/Ctrl 全字段链路（旧链路字段不全导致不生效）；效果下拉只保留「单色」、RGB 页隐藏颜色选择（EC 单分区单色白键盘）。
 - 自定义档切换立即刷新；切回自定义档按该档保存值强制下发一次（不再只切界面）。

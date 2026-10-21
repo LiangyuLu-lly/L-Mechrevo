@@ -5805,6 +5805,40 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 	}
 
+	/// <summary>2026-10-21（无界双风扇）：从 EC 读两路风扇转速（0xC834/0xC835 × 100 RPM）。
+	/// <para>只读；仅在无界机型使用，用来补 GCU FanInfo 只给一路/不给的情况。</para></summary>
+	internal bool TryReadWujieEcFanSpeeds(out int fan1Rpm, out int fan2Rpm)
+	{
+		fan1Rpm = -1;
+		fan2Rpm = -1;
+		if (!WujieSmuApu)
+		{
+			return false;
+		}
+		try
+		{
+			bool ok1 = EcPortIo.TryReadByte(0xC834, out int byte1);
+			bool ok2 = EcPortIo.TryReadByte(0xC835, out int byte2);
+			if (!ok1 && !ok2)
+			{
+				return false;
+			}
+			if (ok1)
+			{
+				fan1Rpm = byte1 * 100;
+			}
+			if (ok2)
+			{
+				fan2Rpm = byte2 * 100;
+			}
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	/// <summary>2026-10-21：记录刚下发的 slow 时间窗（本地记忆；回读确认由调用方另行判定）。</summary>
 	internal void NoteSmuSlowTimeApplied(int seconds)
 	{

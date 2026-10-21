@@ -1011,6 +1011,15 @@ public class FanCurveForm : RForm
 					// 自动应用一次（owner 会以最新落盘值为基线强制重发，确保生效且可见结果）。
 					RaiseFanCurveSaved(confirmed: true);
 				}
+				else if (Program.hw != null && Program.hw.WujieSmuApu)
+				{
+					// 2026-10-21（无界）：固件回读曲线不可靠（保存未确认但实际已生效）⇒
+					// 仍把曲线记进档位配置，避免切配置/重放时回旧曲线导致"曲线乱跳"。
+					PerfModeService.Instance?.RecordFanCurves(TargetModeId, sendCpu ? cpu : null, sendGpu ? gpu : null);
+					_status.Text = "已保存（无界：固件回读不可靠，按已下发处理）";
+					Logger.WriteLine("[fan] 曲线：无界回读不一致（固件回读不可靠）⇒ 按已下发记录，避免切配置回旧曲线");
+					RaiseFanCurveSaved(confirmed: true);
+				}
 				else
 				{
 					// 回读不一致 ⇒ 曲线可能没写进去。同样通知 owner（confirmed=false），

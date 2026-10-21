@@ -1484,6 +1484,27 @@ public static class HardwareControl
 					gpuFanRPM = gpuFanFromHw;
 				}
 			}
+			// 2026-10-21（无界双风扇）：GCU FanInfo 只给一路/不给时，从 EC 0xC834/0xC835 补两路（×100 RPM）
+			if (hw.WujieSmuApu && (cpuFanRPM <= 0 || gpuFanRPM <= 0))
+			{
+				if (hw.TryReadWujieEcFanSpeeds(out int ecFan1, out int ecFan2))
+				{
+					if (cpuFanRPM <= 0 && ecFan1 >= 0)
+					{
+						cpuFanRPM = ecFan1;
+					}
+					if (gpuFanRPM <= 0 && ecFan2 >= 0)
+					{
+						gpuFanRPM = ecFan2;
+					}
+					Logger.WriteLineIfChanged("wujie-ec-fan",
+						"[fan] 无界 EC 风扇转速：Fan1=" + (ecFan1 >= 0 ? ecFan1 + "rpm" : "读不到")
+						+ " · Fan2=" + (ecFan2 >= 0 ? ecFan2 + "rpm" : "读不到")
+						+ "（GCU 那路缺失时用它补位）");
+				}
+					// 界面 RPM 行要求 FanInfo 新鲜 ⇒ 用 EC 值补位时也打一次时间戳（否则有值也不显示）
+					hw.MarkFanInfoReceived();
+			}
 		}
 		catch
 		{
