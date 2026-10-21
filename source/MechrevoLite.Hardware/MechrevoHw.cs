@@ -8474,8 +8474,37 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>GCU 实时上报的校色档位数（Customize/Info），优先于注册表 ItemSupport。</summary>
 	public int? MqttColorCalibrationLevel => _mqttColorCalibrationLevel;
 
+	/// <summary>2026-10-21：Customize/Info 上报的键盘类型（-1=还没收到）。</summary>
+	internal int CustomizeKeyboardType { get; private set; } = -1;
+
+	/// <summary>2026-10-21：Customize/Info 上报的灯带类型（0=没有灯带）。</summary>
+	internal int CustomizeLightbarType { get; private set; } = -1;
+
 	private void OnCustomizeInfo(JObject o)
 	{
+		// 2026-10-21（无界键盘灯取证）：GCU 的 Customize/Info 带的 KeyboardType/LightbarType 是机型能力位，
+		// Setting/Status 里没有这两个键 ⇒ 旧代码 KeyboardType 恒 0（UI 误落单键 RGB 兜底）。
+		try
+		{
+			string kbTypeText = o.GetValue("KeyboardType", StringComparison.OrdinalIgnoreCase)?.ToString();
+			if (!string.IsNullOrWhiteSpace(kbTypeText) && int.TryParse(kbTypeText, System.Globalization.NumberStyles.Integer, CultureInfo.InvariantCulture, out int kbType) && kbType >= 0)
+			{
+				if (CustomizeKeyboardType != kbType)
+				{
+					CustomizeKeyboardType = kbType;
+					Logger.WriteLine("[kbd] Customize/Info: KeyboardType=" + kbType);
+				}
+			}
+			string lbTypeText = o.GetValue("LightbarType", StringComparison.OrdinalIgnoreCase)?.ToString();
+			if (!string.IsNullOrWhiteSpace(lbTypeText) && int.TryParse(lbTypeText, System.Globalization.NumberStyles.Integer, CultureInfo.InvariantCulture, out int lbType) && lbType >= 0)
+			{
+				CustomizeLightbarType = lbType;
+			}
+		}
+		catch (Exception exKbInfo)
+		{
+			Logger.WriteLine("[kbd] Customize/Info 键盘字段解析失败（已吞掉）：" + exKbInfo.Message);
+		}
 		string? projectId = o.GetValue("ProjectID", StringComparison.OrdinalIgnoreCase)?.ToString()
 			?? o.GetValue("BIOS_PROJECT_ID", StringComparison.OrdinalIgnoreCase)?.ToString();
 		// 2026-10-09：守卫 —— GCU 的 Customize/Info ProjectID 实测可能只是**纯数字**（如 "26"），

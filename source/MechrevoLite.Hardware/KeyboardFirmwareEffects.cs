@@ -149,7 +149,17 @@ internal static class KeyboardFirmwareEffects
 		}
 		try
 		{
-			return (Program.hw != null && Program.hw.WujieSmuApu) ? 1 : keyboardType;
+			MechrevoHw hw = Program.hw;
+			if (hw == null)
+			{
+				return keyboardType;
+			}
+			// Customize/Info 上报的 KeyboardType 优先（Setting/Status 里没有这个键，旧代码恒 0）。
+			if (hw.CustomizeKeyboardType > 0)
+			{
+				return hw.CustomizeKeyboardType;
+			}
+			return hw.WujieSmuApu ? 1 : keyboardType;
 		}
 		catch
 		{
