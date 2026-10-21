@@ -109,7 +109,12 @@ internal static class BatteryLimitWriter
 			}
 
 			// 同一套配置且已稳定 ⇒ 复用，不重置迟滞
-			if (snapshot.Mode == ModeActive && snapshot.High == high && snapshot.Low == low
+			// 2026-10-21：高电量 + 允许初始放电 ⇒ 必须重新触发一次 enable（固件才会放电到阈值）；
+			// 复用分支会跳过触发 —— 表现就是 100% 开着限充却一直不放电。
+			int socNow = Math.Max(snapshot.Soc,
+				(int)Math.Round(System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent * 100.0));
+			bool forceInitialDischarge = allowInitialDischarge && socNow >= high;
+			if (!forceInitialDischarge && snapshot.Mode == ModeActive && snapshot.High == high && snapshot.Low == low
 				&& (snapshot.Substate == 2 || snapshot.Substate == 3))
 			{
 				detail = log + "已是目标配置且已生效 ⇒ 无需重写";
