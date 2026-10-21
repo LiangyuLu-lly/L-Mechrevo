@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace MechrevoLite.Hardware;
 
@@ -44,18 +45,33 @@ internal static class KeyboardCtrlPublishSwitch
 
 	private static int _startupLogged;
 
-	/// <summary>开关是否打开（默认 false）。首次求值时读一次环境变量与 config，之后缓存。</summary>
+	private static int _autoEnabledLogged;
+
+	/// <summary>
+	/// 开关是否打开（默认 false）。
+	/// <para>⚠️ 只缓存「打开」：启动日志那一次求值可能早于机型识别（<c>Program.hw</c> 还没建好），
+	/// 那一刻无界自动启用判不出来；若把 false 也缓存，整进程就永远发不出 Keyboard/Ctrl。</para>
+	/// </summary>
 	internal static bool Enabled
 	{
 		get
 		{
-			bool? enabled = _enabled;
-			if (!enabled.HasValue)
+			if (_enabled == true)
 			{
-				enabled = Read() || IsMachineAutoEnabled();
-				_enabled = enabled;
+				return true;
 			}
-			return enabled.Value;
+			bool flag = Read();
+			bool auto = false;
+			bool enabled = flag || (auto = IsMachineAutoEnabled());
+			if (enabled)
+			{
+				_enabled = true;
+				if (auto && !flag && Interlocked.Exchange(ref _autoEnabledLogged, 1) == 0)
+				{
+					Logger.WriteError("[kbd] 无界键盘：自动启用 Keyboard/Ctrl 全字段链路（默认 OFF 只对非无界机型）");
+				}
+			}
+			return enabled;
 		}
 	}
 
