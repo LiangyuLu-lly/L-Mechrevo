@@ -417,7 +417,14 @@ internal static class BatteryLimitWriter
 
 	private static bool TriggerAndWait(int expectedMode, StringBuilder log)
 	{
-		if (!CheckMailbox(expectedMode, log))
+		// 2026-10-21：触发前 mailbox 校验应针对“当前模式”，不是“目标模式”——
+		// 目标模式要等触发执行完才会变（关闭时当前 0x48、目标 0x00）；拿目标去校验会永远判“不发命令”。
+		if (!ReadEc(ModeRegister, out int currentMode))
+		{
+			log.AppendLine("⛔ 0x83C0 读不到 ⇒ 不发命令");
+			return false;
+		}
+		if (!CheckMailbox(currentMode, log))
 		{
 			return false;
 		}
