@@ -124,6 +124,18 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		{
 			return Task.FromResult(result: true);
 		}
+		// 2026-10-21：温度墙越界值夹回当前范围（旧存档/换 CPU 后），避免 reconcile 被 capability 拒绝
+		if (wireKey == "CpuTccOffset" && int.TryParse(value, out int tccWall)
+			&& _hw.IsGcuConnected && !_hw.UsesAmdPowerFields
+			&& _hw.TccMaximum > _hw.TccMinimum)
+		{
+			int clamped = Math.Clamp(tccWall, _hw.TccMinimum, _hw.TccMaximum);
+			if (clamped != tccWall)
+			{
+				Logger.WriteLine("[tcc] 温度墙越界 " + tccWall + "℃ ⇒ 夹回范围 [" + _hw.TccMinimum + ".." + _hw.TccMaximum + "] 的 " + clamped + "℃");
+				value = clamped.ToString();
+			}
+		}
 		return _service.SetCustomDetail(new Dictionary<string, string> { [wireKey] = value });
 	}
 
