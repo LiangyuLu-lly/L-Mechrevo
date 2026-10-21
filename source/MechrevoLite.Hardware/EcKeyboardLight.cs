@@ -20,9 +20,14 @@ internal static class EcKeyboardLight
 
 	private const string DevicePath = "\\\\.\\ACPIDriver";
 
-	private const byte PowerBit = 0x02;
+	/// <summary>bit1 = 关闭位：1=关灯、0=开灯（与固件/官方控制台一致）。</summary>
+	private const byte PowerOffBit = 0x02;
 
-	private const int BrightnessShift = 4;
+	/// <summary>写亮度时固定置 1 的位。</summary>
+	private const byte BrightnessWriteFlag = 0x10;
+
+	/// <summary>亮度在 bit5~7（0~7）。</summary>
+	private const int BrightnessShift = 5;
 
 	private static readonly object Gate = new object();
 
@@ -85,8 +90,8 @@ internal static class EcKeyboardLight
 		{
 			return false;
 		}
-		on = (value & PowerBit) != 0;
-		brightnessLevel = (value >> BrightnessShift) & 0x0F;
+		on = (value & PowerOffBit) == 0;
+		brightnessLevel = (value >> BrightnessShift) & 0x07;
 		return true;
 	}
 
@@ -132,18 +137,20 @@ internal static class EcKeyboardLight
 				int value = before;
 				if (on.HasValue)
 				{
+					// 开=清 bit1；关=置 bit1（与固件语义一致）
 					if (on.Value)
 					{
-						value |= PowerBit;
+						value &= ~PowerOffBit;
 					}
 					else
 					{
-						value &= ~PowerBit;
+						value |= PowerOffBit;
 					}
 				}
 				if (brightnessLevel0to4.HasValue)
 				{
-					value = (value & ~0xF0) | ((brightnessLevel0to4.Value & 0x0F) << BrightnessShift);
+					// 与固件写法一致：保留低 5 位、置 bit4、bit5~7 = 亮度档
+					value = (value & 0x1F) | BrightnessWriteFlag | ((brightnessLevel0to4.Value & 0x07) << BrightnessShift);
 				}
 				if (value == before)
 				{
@@ -153,7 +160,7 @@ internal static class EcKeyboardLight
 				int after = Read(handle, Register);
 				bool ok = written && after == value;
 				Logger.WriteError("[kbd-ec] 键盘背光：0x78C 0x" + before.ToString("X2") + " -> 0x" + value.ToString("X2")
-					+ "（开=" + (((value & PowerBit) != 0) ? "是" : "否") + " · 亮度=" + ((value >> BrightnessShift) & 0x0F) + "）"
+					+ "（开=" + (((value & PowerOffBit) == 0) ? "是" : "否") + " · 亮度=" + ((value >> BrightnessShift) & 0x07) + "）"
 					+ " ⇒ " + (ok ? "回读一致" : ("未确认（写=" + (written ? "成功" : "失败") + " · 回读=" + (after < 0 ? "读不到" : "0x" + after.ToString("X2")) + "）")));
 				return ok;
 			}
