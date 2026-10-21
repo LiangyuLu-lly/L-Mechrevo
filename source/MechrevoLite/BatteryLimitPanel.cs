@@ -131,7 +131,7 @@ internal sealed class BatteryLimitPanel : Panel
 		_voltageFixBox = new RCheckBox
 		{
 			AutoSize = true,
-			Text = "电池充电电压修复（8000 系无界，外挂 JG_BAT）",
+			Text = "电池充电电压修复（无界）",
 			BackColor = Color.Transparent,
 			Margin = Padding.Empty,
 			Checked = MechrevoLite.Hardware.BatteryVoltageFix.Enabled,
