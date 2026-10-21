@@ -400,7 +400,7 @@ internal sealed class BatteryLimitPanel : Panel
 			{
 				if (want)
 				{
-					bool enabled = BatteryLimitWriter.TryEnable((int)_lowBox.Value, (int)_highBox.Value, allowInitialDischarge: false, out string enableDetail);
+					bool enabled = BatteryLimitWriter.TryEnable((int)_lowBox.Value, (int)_highBox.Value, allowInitialDischarge: true, out string enableDetail);
 					return (enabled, enableDetail);
 				}
 				bool disabled = BatteryLimitWriter.TryDisable(out string disableDetail);
@@ -519,7 +519,7 @@ internal sealed class BatteryLimitPanel : Panel
 		{
 			(bool ok, string detail) = await Task.Run(delegate
 			{
-				bool result = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: false, out string enableDetail);
+				bool result = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: true, out string enableDetail);
 				return (result, enableDetail);
 			});
 			Logger.WriteLine("[battery] 充电限制保存阈值（UI）：low=" + low + " high=" + high + " ok=" + ok + "\n" + detail);
