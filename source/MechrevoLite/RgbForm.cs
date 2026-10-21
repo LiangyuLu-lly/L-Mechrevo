@@ -664,13 +664,28 @@ public class RgbForm : RForm
 				? "[kbd] 彩虹模式 ⇒ 隐藏颜色、保留亮度（软件刷色，不写颜色；亮度仍可调）"
 				: "[kbd] 单色模式 ⇒ 颜色选择已恢复");
 		}
-		int brightMin = baolongda ? 1 : 0;
-		int brightMax = baolongda
-			? Math.Max(brightMin, MechrevoHw.EffectiveKeyboardBrightnessMax())
-			: 4;
+		// 2026-10-22（无界白键盘）：EC 只有 关/暗/亮 两档亮度 ⇒ UI 也收成 2 档，不再显示 0~4 档。
+		bool wujieEcKeyboard = Program.hw != null && Program.hw.WujieSmuApu && Program.hw.KeyboardStatusSeen
+			&& string.Equals(Program.hw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
+		int brightMin = (baolongda || wujieEcKeyboard) ? 1 : 0;
+		int brightMax = wujieEcKeyboard
+			? 2
+			: (baolongda ? Math.Max(brightMin, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
 		_brightMinimum = brightMin;
 		_brightMaximum = brightMax;
 		int initialBrightLevel = Math.Clamp(lightChannelSettings.Light, brightMin, brightMax);
+		if (wujieEcKeyboard)
+		{
+			// 优先按记忆档位显示；读得到 EC 实际档位时以 EC 为准。
+			int rememberedLevel = AppConfig.Get("wujie_kbd_level", 2);
+			initialBrightLevel = Math.Clamp(rememberedLevel, 1, 2);
+			if (EcKeyboardLight.TryGet(out bool ecOnNow, out int ecLevelNow) && ecLevelNow >= 1 && ecLevelNow <= 2 && ecOnNow)
+			{
+				initialBrightLevel = ecLevelNow;
+			}
+		}
+		bool wujieEcKbdLocal = wujieEcKeyboard;
+		string BrightLevelText(int value) => wujieEcKbdLocal ? ((value >= 2) ? "亮" : "暗") : (value + "/" + brightMax);
 		_brightSlider = new RSlider
 		{
 			Minimum = brightMin,
@@ -681,7 +696,7 @@ public class RgbForm : RForm
 		};
 		_brightValueLabel = new Label
 		{
-			Text = initialBrightLevel + "/" + brightMax,
+			Text = BrightLevelText(initialBrightLevel),
 			AutoSize = true,
 			ForeColor = UiVisualStyle.Muted,
 			Margin = new Padding(D(6), 0, 0, 0)
@@ -703,8 +718,16 @@ public class RgbForm : RForm
 				return;
 			}
 			int brightLevel = Math.Clamp(_brightSlider.Value, _brightMinimum, _brightMaximum);
-			PersistGcuLightAndPublishBrightness(brightLevel);
-			_brightValueLabel.Text = brightLevel + "/" + _brightMaximum;
+			if (wujieEcKbdLocal)
+			{
+				// 白键盘两档：暗 => 软件亮度 50%（EC=1），亮 => 100%（EC=2）
+				PersistGcuLightAndPublishBrightness(brightLevel >= 2 ? 4 : 2);
+			}
+			else
+			{
+				PersistGcuLightAndPublishBrightness(brightLevel);
+			}
+			_brightValueLabel.Text = BrightLevelText(brightLevel);
 		};
 		AddRow(Strings.Brightness, brightPanel);
 		if (string.Equals(lightChannelSettings.Effect, "Manual", StringComparison.Ordinal))
