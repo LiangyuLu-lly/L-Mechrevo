@@ -7421,7 +7421,7 @@ public class SettingsForm : RForm
 			AutoSize = true,
 			Margin = new Padding(0, 4, 8, 4)
 		};
-		bool ocSupported = MechrevoService.IsGcu50;
+		bool ocSupported = GpuOcHeaderSupported(Program.hw);
 		_gpuOcBox.Checked = ocSupported && AppConfig.Is("gpu_oc");
 		MechrevoService.GpuOverclockEnabled = ocSupported && _gpuOcBox.Checked;
 		_gpuOcBox.CheckedChanged += async (object? _, EventArgs _) =>
@@ -7442,7 +7442,7 @@ public class SettingsForm : RForm
 		MechrevoHw? hw0 = Program.hw;
 		// 2026-10-12（本轮 · 缺陷修复）：判据一字未改 —— 只是把结果**同时记进意图字段**，
 		// 供 SyncPerfShortcutsVisibility / BuildTitleRow 在构造期（有效 Visible 恒 false）使用。
-		_perfShortcutGpuOcIntent = Program.service != null && Program.service.CurrentMode == 1 && hw0 != null && MechrevoService.IsGcu50;
+		_perfShortcutGpuOcIntent = Program.service != null && Program.service.CurrentMode == 1 && GpuOcHeaderSupported(hw0);
 		_gpuOcBox.Visible = _perfShortcutGpuOcIntent;
 		// 2026-10-04：30 系「配置编辑」按钮 —— 先建好，再作为 extraControl 传入 BuildHeadRow，
 		// 落在「显卡OC」与「风扇强冷」之间（仅 30 系可见）
@@ -8515,6 +8515,20 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	/// NoDpug（无独显办公本，如无界 15X）与 Gen40 / Gen50 一律开放。判定走 GpuGenerationProvider
 	/// （持久化在 config 的 dgpu_generation，硬件没连上也能判）。
 	/// </summary>
+	/// <summary>2026-10-22（机主 GM5HG0A：狂暴模式不显示显卡超频开关）：标题行开关不再只认 GCU50，
+	/// 改为看 GCU 的 GPU 超频能力（OcSettingsSupport / GcuGpuOverclockAvailable / SupportsGpuOverclock）。</summary>
+	private static bool GpuOcHeaderSupported(MechrevoHw hw)
+	{
+		if (hw == null)
+		{
+			return false;
+		}
+		return MechrevoService.IsGcu50
+			|| hw.SupportsGpuOverclock
+			|| hw.Capabilities?.OverclockSettings == true
+			|| hw.GcuGpuOverclockAvailable;
+	}
+
 	/// <summary>2026-10-22：电池修复开关的构造期判据（SettingsForm 构造时 Program.hw 仍为 null）。
 	/// 证据来源 = 本窗自己的 _deviceCapabilities（构造字段初始化时已 Load）+ CPU 名。</summary>
 	private bool IsWujieBatteryFixSupported()
@@ -13959,7 +13973,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		if (_gpuOcBox != null)
 		{
 			MechrevoHw? hw0 = Program.hw;
-			_perfShortcutGpuOcIntent = mode == 1 && hw0 != null && MechrevoService.IsGcu50;
+			_perfShortcutGpuOcIntent = mode == 1 && GpuOcHeaderSupported(hw0);
 			_gpuOcBox.Visible = _perfShortcutGpuOcIntent;
 			// 2026-10-11（本轮）：「显卡超频」的显隐变了 ⇒ 同步标题行那颗容器的宽度/可见性。
 			SyncPerfShortcutsVisibility();
