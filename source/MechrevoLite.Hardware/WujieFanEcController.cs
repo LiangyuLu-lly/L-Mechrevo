@@ -50,11 +50,19 @@ internal sealed class WujieFanEcController : IDisposable
 
 	private static WujieFanEcController _active;
 
-	private byte[] _curveTemps = Array.Empty<byte>();
+	private byte[] _cpuTemps = Array.Empty<byte>();
 
-	private int[] _curveDuties = Array.Empty<int>();
+	private int[] _cpuDuties = Array.Empty<int>();
 
-	private int _validPoints;
+	private int _validCpu;
+
+	private byte[] _gpuTemps = Array.Empty<byte>();
+
+	private int[] _gpuDuties = Array.Empty<int>();
+
+	private int _validGpu;
+
+	private bool _independent;
 
 	private bool _running;
 
@@ -83,17 +91,23 @@ internal sealed class WujieFanEcController : IDisposable
 
 	internal string LastDetail { get; private set; } = "";
 
-	/// <summary>启动曲线控制：温度数组与占空比数组（长度 16，0xFF 表示无效点）。</summary>
-	internal bool Start(byte[] curveTemps, int[] curveDuties, out string detail)
+	/// <summary>启动曲线控制：CPU/GPU 两套温度与占空比数组（长度 16，0xFF 表示无效点）；
+	/// independent=true 时主扇按 CPU 曲线、副扇按 GPU 曲线分别输出。</summary>
+	internal bool Start(byte[] cpuTemps, int[] cpuDuties, bool independent, byte[] gpuTemps, int[] gpuDuties, out string detail)
 	{
 		if (!WujieFanEc.IsWujiePlatform())
 		{
 			detail = "不是无界机型";
 			return false;
 		}
-		if (curveTemps == null || curveDuties == null || curveTemps.Length == 0 || curveDuties.Length == 0)
+		if (cpuTemps == null || cpuDuties == null || cpuTemps.Length == 0 || cpuDuties.Length == 0)
 		{
-			detail = "曲线数据为空";
+			detail = "CPU 曲线数据为空";
+			return false;
+		}
+		if (independent && (gpuTemps == null || gpuDuties == null || gpuTemps.Length == 0 || gpuDuties.Length == 0))
+		{
+			detail = "独立控制需要 GPU 曲线，但 GPU 曲线为空";
 			return false;
 		}
 		// 启动前先验通道：I2EC（inpoutx64）优先；没有驱动时回退 ACPI-EC 0x93（实验路径）。
@@ -134,18 +148,22 @@ internal sealed class WujieFanEcController : IDisposable
 		StopActive("被新的曲线控制器替换");
 		lock (_gate)
 		{
-			_curveTemps = (byte[])curveTemps.Clone();
-			_curveDuties = (int[])curveDuties.Clone();
-			int valid = 0;
-			for (int i = 0; i < _curveTemps.Length; i++)
+			_independent = independent;
+			_cpuTemps = (byte[])cpuTemps.Clone();
+			_cpuDuties = (int[])cpuDuties.Clone();
+			_validCpu = CountValidPoints(_cpuTemps, _cpuDuties);
+			if (independent)
 			{
-				if (_curveTemps[i] == byte.MaxValue)
-				{
-					break;
-				}
-				valid++;
+				_gpuTemps = (byte[])gpuTemps.Clone();
+				_gpuDuties = (int[])gpuDuties.Clone();
+				_validGpu = CountValidPoints(_gpuTemps, _gpuDuties);
 			}
-			_validPoints = Math.Max(1, Math.Min(valid, Math.Min(_curveTemps.Length, _curveDuties.Length)));
+			else
+			{
+				_gpuTemps = (byte[])_cpuTemps.Clone();
+				_gpuDuties = (int[])_cpuDuties.Clone();
+				_validGpu = _validCpu;
+			}
 			_fan2ZeroCount = 0;
 			_tempFailTicks = 0;
 			_writeFailTicks = 0;
@@ -159,7 +177,7 @@ internal sealed class WujieFanEcController : IDisposable
 			_active = this;
 			_timer.Change(WriteIntervalMs, WriteIntervalMs);
 		}
-		detail = "已启动（" + ChannelName(channel) + " 25Hz 双扇直写 · 曲线点数=" + _validPoints + " · 当前 " + temp + "℃）";
+		detail = "已启动（" + ChannelName(channel) + " 25Hz 双扇直写 · " + (independent ? "独立控制" : "同步控制") + " · CPU " + _validCpu + " 点 / GPU " + _validGpu + " 点 · 当前 " + temp + "℃）";
 		Logger.WriteLine("[fan] 无界 EC 曲线启动：" + detail);
 		return true;
 	}
@@ -259,14 +277,25 @@ internal sealed class WujieFanEcController : IDisposable
 				}
 				return;
 			}
-			int target = (temp >= 85) ? 100 : ResolveCurveDuty(temp);
-			if (target > 0 && target < WujieFanEc.FanFloorPercent)
+			int cpuTarget = (temp >= 85) ? 100 : ResolveDuty(_cpuTemps, _cpuDuties, _validCpu, temp);
+			int secondaryTemp = temp;
+			if (_independent && ReadEc(0x044F, out int gpuTemp) && gpuTemp > 0 && gpuTemp <= 120)
 			{
-				target = WujieFanEc.FanFloorPercent;
+				secondaryTemp = gpuTemp;
 			}
-			int raw = Math.Max(1, Math.Min(EcPortIo.WujieFanDutyMaxRaw, (int)Math.Round(target * 2.0)));
+			int gpuTarget = (secondaryTemp >= 85) ? 100 : ResolveDuty(_gpuTemps, _gpuDuties, _validGpu, secondaryTemp);
+			if (cpuTarget > 0 && cpuTarget < WujieFanEc.FanFloorPercent)
+			{
+				cpuTarget = WujieFanEc.FanFloorPercent;
+			}
+			if (gpuTarget > 0 && gpuTarget < WujieFanEc.FanFloorPercent)
+			{
+				gpuTarget = WujieFanEc.FanFloorPercent;
+			}
+			int raw = Math.Max(1, Math.Min(EcPortIo.WujieFanDutyMaxRaw, (int)Math.Round(cpuTarget * 2.0)));
+			int rawSecondary = Math.Max(1, Math.Min(EcPortIo.WujieFanDutyMaxRaw, (int)Math.Round(gpuTarget * 2.0)));
 			bool ok1 = WriteDuty(WujieFanEc.RegisterDutyFan1, raw, out string writeDetail1);
-			bool ok2 = WriteDuty(WujieFanEc.RegisterDutyFan2, raw, out string writeDetail2);
+			bool ok2 = WriteDuty(WujieFanEc.RegisterDutyFan2, rawSecondary, out string writeDetail2);
 			if (!ok1 || !ok2)
 			{
 				_writeFailTicks++;
@@ -281,22 +310,23 @@ internal sealed class WujieFanEcController : IDisposable
 			{
 				_writeFailTicks = 0;
 				_lastRaw = raw;
-				if (target != _lastTargetPercent)
+				int combined = (_independent ? (cpuTarget * 1000 + gpuTarget) : cpuTarget);
+				if (combined != _lastTargetPercent)
 				{
-					_lastTargetPercent = target;
-					Logger.WriteLineIfChanged("wujie-fan-target", $"[fan] 无界 EC 曲线：{temp}℃ → 目标 {target}% (raw={raw}) · 主/副扇均写入（I2EC）");
+					_lastTargetPercent = combined;
+					Logger.WriteLineIfChanged("wujie-fan-target", $"[fan] 无界 EC 曲线：{temp}℃ → CPU {cpuTarget}% (raw={raw}) · 副扇 {gpuTarget}% (raw={rawSecondary}) · {(_independent ? "独立" : "同步")}（I2EC）");
 				}
 			}
 			// ② 每 500ms 采样一次：回读一致性 + 副扇堵转看门狗。
 			if (Environment.TickCount64 - _lastSampleTick >= SampleIntervalMs)
 			{
 				_lastSampleTick = Environment.TickCount64;
-				if (ReadEc(WujieFanEc.RegisterDutyFan1, out int readBack) && readBack != raw)
+				if ((ReadEc(WujieFanEc.RegisterDutyFan1, out int readBack) && readBack != raw) || (ReadEc(WujieFanEc.RegisterDutyFan2, out int readBackSecondary) && readBackSecondary != rawSecondary))
 				{
 					_readbackMismatchSamples++;
 					if (_readbackMismatchSamples >= MaxReadbackMismatchSamples)
 					{
-						Stop("占空比回读持续不一致（写 " + raw + " / 读 " + readBack + "），交还 EC");
+						Stop("占空比回读持续不一致（主扇写 " + raw + "·副扇写 " + rawSecondary + "），交还 EC");
 						LastDetail = "回读不一致已停止";
 						return;
 					}
@@ -327,38 +357,50 @@ internal sealed class WujieFanEcController : IDisposable
 		}
 	}
 
-	private int ResolveCurveDuty(int temp)
+	private static int CountValidPoints(byte[] temps, int[] duties)
 	{
-		byte[] temps = _curveTemps;
-		int[] duties = _curveDuties;
-		int points = _validPoints;
+		int valid = 0;
+		for (int i = 0; i < temps.Length && i < duties.Length; i++)
+		{
+			if (temps[i] == byte.MaxValue)
+			{
+				break;
+			}
+			valid++;
+		}
+		return Math.Max(1, valid);
+	}
+
+	private static int ResolveDuty(byte[] temps, int[] duties, int points, int temp)
+	{
 		if (points <= 0)
 		{
 			return 100;
 		}
-		// 低温区的曲线点对无界 EC 无意义：统一按 45℃ 起算（第一个有效点若低于 45 也按 45 处理）。
+		byte[] effectiveTemps = new byte[points];
+		Array.Copy(temps, effectiveTemps, points);
 		for (int i = 0; i < points; i++)
 		{
-			if (temps[i] != byte.MaxValue && temps[i] < MinimumOperatingTemperatureC)
+			if (effectiveTemps[i] < MinimumOperatingTemperatureC)
 			{
-				temps[i] = MinimumOperatingTemperatureC;
+				effectiveTemps[i] = (byte)MinimumOperatingTemperatureC;
 			}
 		}
 		temp = Math.Max(temp, MinimumOperatingTemperatureC);
-		if (temp <= temps[0])
+		if (temp <= effectiveTemps[0])
 		{
 			return duties[0];
 		}
 		for (int i = 1; i < points; i++)
 		{
-			int current = temps[i];
+			int current = effectiveTemps[i];
 			if (current == byte.MaxValue)
 			{
 				break;
 			}
 			if (temp <= current)
 			{
-				int previousTemp = temps[i - 1];
+				int previousTemp = effectiveTemps[i - 1];
 				int span = Math.Max(1, current - previousTemp);
 				int deltaDuty = duties[i] - duties[i - 1];
 				return duties[i - 1] + (int)Math.Round(deltaDuty * (double)(temp - previousTemp) / span);

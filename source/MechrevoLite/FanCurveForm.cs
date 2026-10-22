@@ -474,6 +474,14 @@ public class FanCurveForm : RForm
 		};
 		_respectiveChk.CheckedChanged += async (object? _, EventArgs _) =>
 		{
+			if (!_syncingRespective && Program.hw?.WujieSmuApu == true)
+			{
+				// 2026-10-22（机主：打开独立控制时给无界两个风扇独立曲线）：
+				// 无界不经过 GCU；独立开关只作为曲线控制器“两路分开输出”的开关，保存/应用后生效。
+				Logger.WriteLine("[fan] 无界风扇独立控制：" + (_respectiveChk.Checked ? "开（CPU/副扇两路独立）" : "关（双扇同步）") + "（保存曲线后生效，不经 GCU）");
+				_status.Text = "无界独立控制：" + (_respectiveChk.Checked ? "开（保存曲线后生效）" : "关（双扇同步）");
+				return;
+			}
 			if (!_syncingRespective && Program.service != null)
 			{
 				bool requested = _respectiveChk.Checked;
@@ -957,7 +965,8 @@ public class FanCurveForm : RForm
 		try
 		{
 			_wujieFanController ??= new WujieFanEcController();
-			bool ok = _wujieFanController.Start(_cpuPanel.Temperatures, _cpuPanel.Duties, out string detail);
+			bool independent = _respectiveChk != null && _respectiveChk.Checked;
+			bool ok = _wujieFanController.Start(_cpuPanel.Temperatures, _cpuPanel.Duties, independent, _gpuPanel.Temperatures, _gpuPanel.Duties, out string detail);
 			if (ok)
 			{
 				_status.Text = "无界 EC 直写已启用（45℃ 以下不接管，交还 EC）· " + detail;
