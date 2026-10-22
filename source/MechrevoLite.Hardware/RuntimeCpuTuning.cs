@@ -990,6 +990,9 @@ internal sealed class RuntimeCpuTuning : IDisposable
 			reason = "the amd-co option is absent from the last probe (no CO route for this codename)";
 			return false;
 		}
+		// 2026-10-22（蛟龙 AMD：逐核降压点应用直接崩）：这里原来只取到 candidate 却没赋给 out option，
+		// 调用方随后读 option.Minimum/Maximum 就 NullReferenceException —— SMU 命令一条都没发出去。
+		option = candidate;
 		if (_smu == null || !_smu.IsInitialized)
 		{
 			reason = "the SMU service is not initialized";
