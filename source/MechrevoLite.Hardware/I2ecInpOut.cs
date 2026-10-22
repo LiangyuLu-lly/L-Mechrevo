@@ -652,7 +652,7 @@ internal static class I2ecInpOut
 				_cts = new CancellationTokenSource();
 				CancellationToken token = _cts.Token;
 				_running = true;
-				_loop = Task.Run(() => LoopAsync(token));
+				_loop = Task.Run(() => Loop(token));
 				AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
 				detail = "内置覆盖已启动（原值 desiredV=" + _origDesiredV + "/queuedV=" + _origQueuedV
 					+ " gate=" + _origGate + "；停止时恢复）";
@@ -668,7 +668,7 @@ internal static class I2ecInpOut
 		}
 	}
 
-	private static async Task LoopAsync(CancellationToken token)
+	private static void Loop(CancellationToken token)
 	{
 		try
 		{
@@ -747,14 +747,9 @@ internal static class I2ecInpOut
 				{
 					Logger.WriteError("[battery-fix] 内置覆盖写入异常（继续重试）：" + ex.GetType().Name + " " + ex.Message);
 				}
-				try
-				{
-					await Task.Delay(TimeSpan.FromSeconds(2.0), token).ConfigureAwait(continueOnCapturedContext: false);
-				}
-				catch (OperationCanceledException)
-				{
-					break;
-				}
+				// 与参考脚本一致：每 2ms 重新写一遍（脚本 time.sleep(0.002)），
+				// 否则 2s 间隔里 EC 会回写/中断充电，表现为电流一会有一会没有。
+				Thread.Sleep(2);
 			}
 		}
 		finally
