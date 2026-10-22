@@ -342,6 +342,9 @@ public class SettingsForm : RForm
 
 	private RButton? buttonCustomMode;
 
+	// 2026-10-22（机主：自定义 + 号颜色切换后不同步）：保存引用，主题色变化时重绘图标
+	private RButton _quickTileAddButton;
+
 	private CustomModeForm? customModeForm;
 
 	// 2026-10-09（回归修复：「我切不到自定义档位了」）：主界面【自定义】按钮点击时是否**显式切档**。
@@ -5423,6 +5426,27 @@ public class SettingsForm : RForm
 	/// = <see cref="Strings.QuickTileAdd" />（「自定义快捷按钮」）。⚠️ 这一格是本行**最宽**的一格，
 	/// <see cref="ComputeQuickTileCellWidths" /> 按它自己的文字实测宽给列宽 ⇒ ⛔ 不会被裁成"…"。
 	/// </summary>
+	/// <summary>2026-10-22：主题色/明暗切换后重绘「自定义 +」磁贴的图标（Image 是静态位图，不随主题重绘）。</summary>
+	private void RefreshQuickTileAddIcon()
+	{
+		if (_quickTileAddButton == null || _quickTileAddButton.IsDisposed)
+		{
+			return;
+		}
+		try
+		{
+			int icon = ResponsiveLayout.LogicalToDevice(this, QuickTileLogicalIcon);
+			Image old = _quickTileAddButton.Image;
+			_quickTileAddButton.Image = UiGlyph.Render(UiGlyph.Kind.Plus, icon, UiVisualStyle.Accent);
+			old?.Dispose();
+			_quickTileAddButton.Invalidate();
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[theme] 重绘 + 磁贴图标失败（已吞掉）：" + ex.Message);
+		}
+	}
+
 	private RButton CreateQuickTileAddButton()
 	{
 		int num = ResponsiveLayout.LogicalToDevice(this, QuickTileLogicalGap);
@@ -5451,6 +5475,7 @@ public class SettingsForm : RForm
 		// tooltip 用「＋」面板自己的标题（「自定义快捷磁贴」）—— 磁贴上的文字只有 3 个字「自定义」，
 		// 悬浮说明点下去会发生什么（用户原话「自定义快捷按钮改成自定义吧 这看着太宽了」）。
 		_quickTileToolTip.SetToolTip(rButton, Strings.QuickTilePickerTitle);
+		_quickTileAddButton = rButton;
 		return rButton;
 	}
 
@@ -8195,6 +8220,7 @@ public class SettingsForm : RForm
 		{
 			// 立即把新强调色/背景应用到本窗体与已打开的其它窗口（不用重启）。
 			ApplyThemeMode(UiVisualStyle.IsNightMode);
+			RefreshQuickTileAddIcon();
 			foreach (Form form in Application.OpenForms)
 			{
 				if (form == null || form.IsDisposed || form == this)
@@ -19954,13 +19980,6 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		panelFooter.Padding = new Padding(scale(12), scale(6), scale(10), scale(4));
 		panelFooter.Height = scale(51);
 		panelFooter.Controls.Clear();
-		Panel value = new Panel
-		{
-			Dock = DockStyle.Top,
-			Height = 1,
-			BackColor = UiVisualStyle.Border,
-			
-		};
 		labelVersion.AutoSize = true;
 		labelVersion.Dock = DockStyle.Fill;
 		labelVersion.Font = UiVisualStyle.Font(8.5f);
@@ -20032,7 +20051,6 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			bufferedTableLayoutPanel.Controls.Add(footerButtons[i], i + 1, 0);
 		}
 		panelFooter.Controls.Add(bufferedTableLayoutPanel);
-		panelFooter.Controls.Add(value);
 	}
 
 	private int FooterButtonWidth(string label, Func<int, int> scale)
