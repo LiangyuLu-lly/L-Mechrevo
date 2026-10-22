@@ -120,6 +120,9 @@ stringBuilder.Append(DiagnosticBackendRouteInfo.Build());
 				stringBuilder.AppendLine("[无界电池电压修复状态（只读）]");
 				stringBuilder.AppendLine(BatteryVoltageFix.DescribeAvailability());
 				stringBuilder.AppendLine();
+				// 2026-10-22（机主：AIDA64 电流一会有一会没有）：100ms 波形采样，判断真实充/放交替。
+				stringBuilder.Append(BatteryChargeWaveformProbe.Build(5000, 100));
+				stringBuilder.AppendLine();
 			}
 		}
 		catch (Exception exBatteryFix)
