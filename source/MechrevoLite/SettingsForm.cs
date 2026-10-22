@@ -8515,6 +8515,32 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	/// NoDpug（无独显办公本，如无界 15X）与 Gen40 / Gen50 一律开放。判定走 GpuGenerationProvider
 	/// （持久化在 config 的 dgpu_generation，硬件没连上也能判）。
 	/// </summary>
+	/// <summary>2026-10-22：电池修复开关的构造期判据（SettingsForm 构造时 Program.hw 仍为 null）。
+	/// 证据来源 = 本窗自己的 _deviceCapabilities（构造字段初始化时已 Load）+ CPU 名。</summary>
+	private bool IsWujieBatteryFixSupported()
+	{
+		string identity = ((_deviceCapabilities?.Model ?? "") + " " + (_deviceCapabilities?.BaseboardProduct ?? "")).Trim();
+		bool wujie = identity.IndexOf("WUJIE", StringComparison.OrdinalIgnoreCase) >= 0
+			|| identity.IndexOf("无界", StringComparison.OrdinalIgnoreCase) >= 0;
+		if (!wujie)
+		{
+			return false;
+		}
+		try
+		{
+			string cpuName = PawnIO.CpuInfo.Name ?? "";
+			if (string.IsNullOrWhiteSpace(cpuName))
+			{
+				return true; // 读不到 CPU 名时不误挡（避免再次“开关消失”）
+			}
+			return System.Text.RegularExpressions.Regex.IsMatch(cpuName, @"\b8[0-9]{3}") || cpuName.Contains("8040");
+		}
+		catch
+		{
+			return true;
+		}
+	}
+
 	/// <summary>2026-10-22（机主：无极限充/电池修复只给 8040 系无界）：CPU 名匹配 8[0-9]{3}。</summary>
 	private static bool IsWujie8040Series()
 	{
@@ -9258,7 +9284,9 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		// 2026-10-16（EC 直写逃生口）：在既有两条布局（含/不含无极限充滑块行）都建完之后挂第 6 行。
 		BuildEcDirectWriteOffRow(host, _ecDirectWriteOffRowIndex);
 		// 2026-10-22（机主：电池行没有电池修复开关）：仅无界 8040 系追加一行。
-		if (BatteryVoltageFix.IsSupportedMachine() && IsWujie8040Series())
+		// 2026-10-22（根因：SettingsForm 在 Program.hw 赋值之前构造 ⇒ 原判据此时恒 false）：
+		// 改用构造期就有的 _deviceCapabilities + CPU 名判定，不依赖 Program.hw。
+		if (IsWujieBatteryFixSupported())
 		{
 			int batteryFixRow = host.RowCount;
 			host.RowCount = batteryFixRow + 1;
