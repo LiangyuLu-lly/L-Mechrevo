@@ -551,6 +551,16 @@ public static class NvmlHelper
 	// 期间任何 NVML 原生调用都可能踩到失效句柄 ⇒ 熄屏期间完全跳过采样，亮屏后重建再恢复。
 	private static int _displaySuspended;
 
+	/// <summary>2026-10-22（JIGUANG 待机亮屏）：采样泵判定 NVML 卡死 ⇒ 本进程停止一切 NVML 原生调用。
+	/// <para>卡在原生调用里的线程无法安全终止，只能保证不再产生新的调用（不再叠加卡死线程）。</para></summary>
+	internal static void QuarantineAfterNativeHang(string reason)
+	{
+		lock (_lock)
+		{
+			DisableLocked(reason);
+		}
+	}
+
 	internal static void SuspendForDisplayOff()
 	{
 		Volatile.Write(ref _displaySuspended, 1);

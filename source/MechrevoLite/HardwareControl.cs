@@ -572,6 +572,10 @@ public static class HardwareControl
 	// 记开始时刻，超过 15s 判卡死并强制放闸（旧线程可能仍阻塞，但至少泵能活过来并留证据）。
 	private static long _localSamplingPumpStartedTick;
 
+	// 2026-10-22（实机日志）：卡死一次后若继续重试，会不断产生新的 NVML 阻塞线程，最终仍 0xc0000005；
+	// 因此首次判定卡死就隔离 NVML 并停用采样泵（CPU 温度仍有 SettingsForm 的传感器定时器）。
+	private static int _localSamplingPumpQuarantined;
+
 	/// <summary>⭐ 最近一次**任何调用方**开始采样的时刻（<see cref="Environment.TickCount64"/>；0 = 还没采过）—— 采样泵据此让位。</summary>
 	private static long _lastLocalSampleTick;
 
@@ -781,20 +785,36 @@ public static class HardwareControl
 		Logger.WriteLine("[pump] 显示器关闭 ⇒ 暂停本地采样泵（避免 GPU 进 D3/驱动重置期原生调用）");
 	}
 
-	/// <summary>2026-10-22：显示器打开 ⇒ 清掉可能卡死的重入闸门并重建 Timer（旧 Timer 丢弃）。</summary>
+	/// <summary>2026-10-22：显示器打开 ⇒ 延迟 15s 再重建采样泵（给 GPU/驱动重初始化留窗口）。</summary>
 	internal static void ResumeLocalSamplingAfterDisplayOn()
 	{
+		if (Volatile.Read(in _localSamplingPumpQuarantined) != 0)
+		{
+			Logger.WriteLine("[pump] 采样泵已被隔离（本进程曾检测到卡死）⇒ 显示器打开后不重建");
+			return;
+		}
 		lock (lhmLock)
 		{
 			Interlocked.Exchange(ref _localSamplingPumpInFlight, 0);
 			Interlocked.Exchange(ref _localSamplingPumpStartedTick, 0L);
 			StopLocalSamplingPumpLocked();
-			if (Volatile.Read(in _localMonitoringEnabled))
-			{
-				StartLocalSamplingPumpLocked();
-			}
 		}
-		Logger.WriteLine("[pump] 显示器打开 ⇒ 采样泵已重建（重入闸门清零）");
+		_ = Task.Run(async delegate
+		{
+			await Task.Delay(15000).ConfigureAwait(continueOnCapturedContext: false);
+			if (Volatile.Read(in _localSamplingPumpQuarantined) != 0)
+			{
+				return;
+			}
+			lock (lhmLock)
+			{
+				if (Volatile.Read(in _localMonitoringEnabled))
+				{
+					StartLocalSamplingPumpLocked();
+				}
+			}
+			Logger.WriteLine("[pump] 显示器打开 15s ⇒ 采样泵已重建（重入闸门清零）");
+		});
 	}
 
 	/// <summary>⭐ 2026-10-17：⭐ 停常驻采样泵（⭐ 调用方必须已持有 <c>lhmLock</c> ✅）。</summary>
@@ -820,14 +840,18 @@ public static class HardwareControl
 			long stuckSince = Interlocked.Read(in _localSamplingPumpStartedTick);
 			if (stuckSince != 0L && Environment.TickCount64 - stuckSince > 15000L)
 			{
+				// 实机日志（21:09:52 起反复触发）证明：只放闸重试会让新回调继续卡进 NVML，
+				// 最终仍在 21:12 以 0xc0000005 终止。⇒ 首次卡死就隔离 NVML + 停泵，不再产生新原生调用。
 				Interlocked.Exchange(ref _localSamplingPumpInFlight, 0);
 				Interlocked.Exchange(ref _localSamplingPumpStartedTick, 0L);
-				Logger.WriteError("[pump] 采样泵回调超过 15 s 未返回 ⇒ 判定原生调用卡死，强制复位重试（旧线程可能仍阻塞）");
+				Interlocked.Exchange(ref _localSamplingPumpQuarantined, 1);
+				System.Threading.Timer stuckPump = _localSamplingPump;
+				stuckPump?.Change(Timeout.Infinite, Timeout.Infinite);
+				Logger.WriteError("[pump] 采样泵回调超过 15 s 未返回 ⇒ 判定原生调用卡死；已隔离 NVML 并停用采样泵（本进程不再重试）");
+				NvmlHelper.QuarantineAfterNativeHang("采样泵回调卡死（>15s 未返回）");
+				return;
 			}
-			else
-			{
-				return; // ⭐ 上一轮还没跑完 ⇒ ⭐ 本轮直接跳过（⛔ 不堆积）✅
-			}
+			return; // ⭐ 上一轮还没跑完 ⇒ ⭐ 本轮直接跳过（⛔ 不堆积）✅
 		}
 		Interlocked.Exchange(ref _localSamplingPumpStartedTick, Environment.TickCount64);
 		try
