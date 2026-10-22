@@ -1484,26 +1484,27 @@ public static class HardwareControl
 					gpuFanRPM = gpuFanFromHw;
 				}
 			}
-			// 2026-10-21（无界双风扇）：GCU FanInfo 只给一路/不给时，从 EC 0xC834/0xC835 补两路（×100 RPM）
-			if (hw.WujieSmuApu && (cpuFanRPM <= 0 || gpuFanRPM <= 0))
+			// 2026-10-22（机主：LM 显示的 CPU 转速其实是副扇、GPU 读不到）：
+			// 无界机型**以 EC 为准**覆盖 GCU FanInfo：主扇 0x0464 = CPU、副扇 0x046C = GPU。
+			if (hw.WujieSmuApu)
 			{
-				if (hw.TryReadWujieEcFanSpeeds(out int ecFan1, out int ecFan2))
+				if (hw.TryReadWujieEcFanSpeeds(out int mainFanRpm, out int secondaryFanRpm))
 				{
-					if (cpuFanRPM <= 0 && ecFan1 >= 0)
+					if (mainFanRpm >= 0)
 					{
-						cpuFanRPM = ecFan1;
+						cpuFanRPM = mainFanRpm;
 					}
-					if (gpuFanRPM <= 0 && ecFan2 >= 0)
+					if (secondaryFanRpm >= 0)
 					{
-						gpuFanRPM = ecFan2;
+						gpuFanRPM = secondaryFanRpm;
 					}
 					Logger.WriteLineIfChanged("wujie-ec-fan",
-						"[fan] 无界 EC 风扇转速：Fan1=" + (ecFan1 >= 0 ? ecFan1 + "rpm" : "读不到")
-						+ " · Fan2=" + (ecFan2 >= 0 ? ecFan2 + "rpm" : "读不到")
-						+ "（GCU 那路缺失时用它补位）");
+						"[fan] 无界 EC 风扇转速：主扇(CPU)=" + (mainFanRpm >= 0 ? mainFanRpm + "rpm" : "读不到")
+						+ " · 副扇(GPU)=" + (secondaryFanRpm >= 0 ? secondaryFanRpm + "rpm" : "读不到")
+						+ "（EC 为准，覆盖 GCU FanInfo）");
 				}
-					// 界面 RPM 行要求 FanInfo 新鲜 ⇒ 用 EC 值补位时也打一次时间戳（否则有值也不显示）
-					hw.MarkFanInfoReceived();
+				// 界面 RPM 行要求 FanInfo 新鲜 ⇒ 用 EC 值覆盖时也打一次时间戳（否则有值也不显示）
+				hw.MarkFanInfoReceived();
 			}
 		}
 		catch

@@ -5853,6 +5853,25 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 	}
 
+	/// <summary>2026-10-22：读无界风扇转速（大端 16 位）；I2EC 优先，回退 ACPI-EC。</summary>
+	private static bool TryReadWujieFanWord(int address, out int rpm)
+	{
+		rpm = -1;
+		if (I2ecInpOut.IsAvailable
+			&& I2ecInpOut.TryReadEcByte(address, out int high, out _)
+			&& I2ecInpOut.TryReadEcByte(address + 1, out int low, out _))
+		{
+			rpm = ((high & 0xFF) << 8) | (low & 0xFF);
+			return true;
+		}
+		if (EcPortIo.TryReadBytes(address, 2, out int[] values) && values.Length == 2)
+		{
+			rpm = ((values[0] & 0xFF) << 8) | (values[1] & 0xFF);
+			return true;
+		}
+		return false;
+	}
+
 	/// <summary>2026-10-21（无界双风扇）：从 EC 读两路风扇转速（0xC834/0xC835 × 100 RPM）。
 	/// <para>只读；仅在无界机型使用，用来补 GCU FanInfo 只给一路/不给的情况。</para></summary>
 	internal bool TryReadWujieEcFanSpeeds(out int fan1Rpm, out int fan2Rpm)
@@ -5865,6 +5884,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		try
 		{
+			// 2026-10-22（机主：LM 显示的 CPU 转速其实是副扇、GPU 读不到）：
+			// 无界风扇转速改用与风扇曲线同源的 I2EC 寄存器：主扇 0x0464/0x0465（大端），副扇 0x046C/0x046D；
+			// 主扇 = CPU 侧、副扇 = GPU 侧。I2EC 不可用时回退 ACPI-EC，再回退旧的 0xC834/0xC835（×100）。
+			bool okMain = TryReadWujieFanWord(0x0464, out int mainRpm);
+			bool okSecondary = TryReadWujieFanWord(0x046C, out int secondaryRpm);
+			if (okMain)
+			{
+				fan1Rpm = mainRpm;
+			}
+			if (okSecondary)
+			{
+				fan2Rpm = secondaryRpm;
+			}
+			if (okMain || okSecondary)
+			{
+				return true;
+			}
 			bool ok1 = EcPortIo.TryReadByte(0xC834, out int byte1);
 			bool ok2 = EcPortIo.TryReadByte(0xC835, out int byte2);
 			if (!ok1 && !ok2)
