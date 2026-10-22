@@ -42,6 +42,12 @@ Source: "files\BlackSharp.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "files\DiskInfoToolkit.dll"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\HidSharp.dll"; DestDir: "{app}"; Flags: ignoreversion 
+; 2026-10-22（无界风扇 I2EC）：InpOut32/64 用户态 DLL（MIT 式许可，见 LICENSES\LICENSE-InpOut32.txt）。
+;   LM 从 {app}\inpoutx64.dll 直接加载；驱动 sys 放 {app}\inpoutx64\，由 Install-InpOut.ps1 在无界机型上注册服务。
+Source: "files\inpoutx64.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "files\inpoutx64\inpoutx64.sys"; DestDir: "{app}\inpoutx64"; Flags: ignoreversion
+Source: "files\Install-InpOut.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "files\LICENSE-InpOut32.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "files\L-Mechrevo.deps.json"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\L-Mechrevo.dll"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\L-Mechrevo.dll.config"; DestDir: "{app}"; Flags: ignoreversion 
@@ -349,6 +355,8 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 ; 2026-10-18（机主：安装完自动在后台拉起 LM，不显示主界面）：
 ;   ⭐ 传 "startup" 参数 ⇒ 程序按「开机自启」路径启动 ⇒ 只驻留托盘、不显示主窗口（IsStartupLaunch）。
 ;   ⛔ 不再是 finish 页的勾选项（postinstall 已去掉）⇒ 静默/普通安装都会自动后台启动。
+; 2026-10-22：无界机型安装 inpoutx64 驱动（风扇 I2EC 写入需要）；非无界机器脚本自行跳过，失败不阻断安装。
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Install-InpOut.ps1""; exit 0"; StatusMsg: "正在配置无界风扇驱动（inpoutx64）…"; Flags: runhidden waituntilterminated
 Filename: "{app}\L-Mechrevo.exe"; Parameters: "startup"; StatusMsg: "正在后台启动 L-Mechrevo（托盘）…"; Flags: nowait
 
 [UninstallRun]

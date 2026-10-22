@@ -85,3 +85,14 @@ AMD SMU command reference: https://github.com/FlyGoat/RyzenAdj (LGPL-3.0)
 Additional SMU route reference: https://github.com/JamesCJ60/Universal-x86-Tuning-Utility (GPL-3.0)
 The Bluetooth LE liquid-cooler protocol reference is watercooler-manager
 (https://github.com/tomups/watercooler-manager, GPL-3.0).
+---------------------------------------------------------------------------
+InpOut32/64 (Highresolution Enterprises)
+  Files: inpoutx64.dll (v1.5.0.0), inpoutx64.sys (v1.2 x64, signed), Install-InpOut.ps1
+  Upstream: https://www.highrez.co.uk/Downloads/InpOut32
+  Copyright (c) 2003-2015 Phil Gibbons <www.highrez.co.uk>
+  Portions Copyright (c) 2000 logix4u.net
+  License: MIT-style (use/copy/modify/merge/publish/distribute/sublicense/sell,
+  provided the copyright notice and this permission notice are included).
+  Full text: LICENSES\LICENSE-InpOut32.txt
+  Purpose: WUJIE (WUJIE14XA) fan I2EC access and battery-voltage port I/O;
+  the kernel driver is installed on WUJIE models only.

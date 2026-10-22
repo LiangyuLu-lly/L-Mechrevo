@@ -308,3 +308,14 @@ To be edited (see `ATTRIBUTION-PATCH-PLAN.md` for exact anchors; nothing below w
 * `source\MechrevoLite.Properties.Strings.resx`, `Strings.zh-CN.resx`
 * `installer-src\files\THIRD_PARTY_NOTICES,1.txt` / `,2.txt`, `installer-src\install_script.iss`
 * repo root `LICENSE` (does not exist yet — LM has no top-level licence file)
+
+---
+
+## InpOut32/64（Highresolution Enterprises）— 随包组件
+
+- 组件：`inpoutx64.dll`（用户态，v1.5.0.0）、`inpoutx64.sys`（内核驱动，v1.2 x64，已签名）、`Install-InpOut.ps1`
+- 上游：https://www.highrez.co.uk/Downloads/InpOut32
+- 版权：Copyright (c) 2003-2015 Phil Gibbons <www.highrez.co.uk>；Portions Copyright (c) 2000 logix4u.net
+- 许可：MIT 式许可（允许使用/复制/修改/合并/发布/分发/再许可/销售，须保留版权声明与许可文本）
+- 完整许可文本：`LICENSES\LICENSE-InpOut32.txt`
+- 用途：无界（WUJIE14XA）风扇 I2EC 写入与电池电压修复的端口 I/O；驱动仅在无界机型安装
