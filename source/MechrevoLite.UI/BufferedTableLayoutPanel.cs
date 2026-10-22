@@ -48,7 +48,22 @@ internal sealed class BufferedTableLayoutPanel : TableLayoutPanel
 		if (UiVisualStyle.IsOverlayTranslucent(this))
 		{
 			UiVisualStyle.DrawFormBackgroundSlice(e.Graphics, this);
-			using SolidBrush overlayBrush = new SolidBrush(UiVisualStyle.TranslucentFor(this, BackColor, 235));
+			// 2026-10-22（机主：开了是半透明黑色地图）：按容器层级分三档不透明度，让底图更明显、卡片仍有层次。
+			Color baseColor = BackColor;
+			int alpha;
+			if (baseColor == UiVisualStyle.Surface || baseColor == UiVisualStyle.SurfaceRaised)
+			{
+				alpha = 205;
+			}
+			else if (baseColor == UiVisualStyle.ButtonFace || baseColor == UiVisualStyle.ButtonFaceHover || baseColor == UiVisualStyle.ButtonFaceSelected)
+			{
+				alpha = 190;
+			}
+			else
+			{
+				alpha = 168;
+			}
+			using SolidBrush overlayBrush = new SolidBrush(UiVisualStyle.TranslucentFor(this, baseColor, alpha));
 			e.Graphics.FillRectangle(overlayBrush, ClientRectangle);
 			return;
 		}
