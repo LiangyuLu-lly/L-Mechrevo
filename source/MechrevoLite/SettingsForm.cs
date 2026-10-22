@@ -12310,9 +12310,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				Logger.WriteLine("Monitor Power Off");
 				Aura.SleepBrightness();
 				Program.hardwareOverlay?.SuspendForDisplayOff();
+				NvmlHelper.SuspendForDisplayOff();
 				break;
 			case 1:
 				Logger.WriteLine("Monitor Power On");
+				NvmlHelper.ResumeForDisplayOn();
 				if (!Program.SetAutoModes(powerChanged: false, init: false, wakeup: true))
 				{
 					BatteryControl.AutoBattery();

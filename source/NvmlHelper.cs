@@ -547,6 +547,23 @@ public static class NvmlHelper
 		Logger.WriteLine($"NVML 已在本进程停用（GPU 功耗/显存采样降级）：{reason}{text}");
 	}
 
+	// 2026-10-22（JIGUANG：待机熄屏再亮屏 0xc0000005）：显卡驱动在熄屏/唤醒时会重置，
+	// 期间任何 NVML 原生调用都可能踩到失效句柄 ⇒ 熄屏期间完全跳过采样，亮屏后重建再恢复。
+	private static int _displaySuspended;
+
+	internal static void SuspendForDisplayOff()
+	{
+		Volatile.Write(ref _displaySuspended, 1);
+		Logger.WriteLine("NVML: 显示器关闭 ⇒ 暂停采样（避免驱动重置期原生调用）");
+	}
+
+	internal static void ResumeForDisplayOn()
+	{
+		Volatile.Write(ref _displaySuspended, 0);
+		Reset();
+		Logger.WriteLine("NVML: 显示器打开 ⇒ 已请求重建（下次采样重取句柄）");
+	}
+
 	private static void RefreshLocked(uint gpuIndex)
 	{
 		long tickCount = Environment.TickCount64;
@@ -562,6 +579,11 @@ public static class NvmlHelper
 		if (Unavailable)
 		{
 			// (c) 隔离期内一次原生调用都不发。
+			InvalidateSnapshotLocked();
+			return;
+		}
+		if (Volatile.Read(in _displaySuspended) != 0)
+		{
 			InvalidateSnapshotLocked();
 			return;
 		}
