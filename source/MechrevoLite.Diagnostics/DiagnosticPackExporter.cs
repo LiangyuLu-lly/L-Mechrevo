@@ -287,12 +287,12 @@ internal static class DiagnosticPackExporter
 		entries.Add(entryName);
 	}
 
-	/// <summary>诊断包文本清洗：去掉表情符号，并丢弃带内部文档/逆向来源字样的开发备注行。</summary>
+	/// <summary>诊断包文本清洗：去掉表情符号，并丢弃带内部文档路径/开发备注字样的行。</summary>
 private static readonly Regex EmojiPattern = new Regex("[\\u2600-\\u27BF\\u2B00-\\u2BFF\\uFE0F\\u200D\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+", RegexOptions.Compiled);
 
 private static readonly string[] InternalRefMarkers = new string[]
 {
-	"docs\\\\", "docs/", ".md", "反编译", "逆向", "作者版", "官方组件", "对比文档",
+	"docs\\\\", "docs/", ".md", "对比文档",
 	"notes\\\\", "THIRD-PARTY", "LICENSES\\\\", "原理文档", "见 docs", "设计文档", "开发规范"
 };
 
