@@ -1000,6 +1000,7 @@ internal static class Program
 		// 创建 SettingsForm 之前，保证第一个界面读到的就是新口径。只写 config，不碰硬件/EC/下发。
 		LightExtraRows.MigrateLegacyOnce();
 		settingsForm = new SettingsForm();
+		settingsForm.AllowBackgroundImage = true;
 		modeControl = new ModeControl();
 		gpuControl = settingsForm.gpuControl;
 		toast = new ToastForm();

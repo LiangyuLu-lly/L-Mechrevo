@@ -8147,7 +8147,10 @@ public class SettingsForm : RForm
 				try
 				{
 					UiVisualStyle.RetintChrome(form);
-					UiVisualStyle.ApplyFormBackground(form);
+					if (form is RForm backgroundForm && backgroundForm.AllowBackgroundImage)
+					{
+						UiVisualStyle.ApplyFormBackground(form);
+					}
 					form.Invalidate(invalidateChildren: true);
 				}
 				catch

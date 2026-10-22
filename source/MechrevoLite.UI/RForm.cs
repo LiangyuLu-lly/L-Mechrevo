@@ -85,10 +85,16 @@ public class RForm : Form
 		base.OnPaintBackground(e);
 	}
 
+	/// <summary>2026-10-22（机主：背景图只给主 UI）：只有主窗口显式打开，其它窗体（设置页/子窗口/浮动窗）不铺背景图。</summary>
+	public bool AllowBackgroundImage { get; set; }
+
 	protected override void OnHandleCreated(EventArgs e)
 	{
 		base.OnHandleCreated(e);
-		UiVisualStyle.ApplyFormBackground(this);
+		if (AllowBackgroundImage)
+		{
+			UiVisualStyle.ApplyFormBackground(this);
+		}
 	}
 
 	protected override void OnResize(EventArgs e)
