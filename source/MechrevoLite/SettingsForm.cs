@@ -19597,6 +19597,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				_dashboardScrollBar.SetRange(contentHeight, _dashboardScroll.ClientSize.Height);
 			}
 			_dashboardStack.Location = new Point(_dashboardStack.Left, -_dashboardScrollBar.Value);
+			// 2026-10-22（机主：上下拉有残影）：滚动后整棵子树重绘，透明控件不留旧位置残影。
+			_dashboardScroll.Invalidate(invalidateChildren: true);
 		}
 	}
 

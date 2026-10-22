@@ -1780,14 +1780,12 @@ private static void LoadEmbeddedFonts()
 									if (object.Equals(buttonBase2.Tag, "footer-ghost"))
 									{
 										Color footerBackground = buttonBase2.Parent?.BackColor ?? Surface;
-										if (footerBackground.A == 0)
-										{
-											// 2026-10-22（修启动崩溃）：父容器透明时不能用 Transparent 当按钮底色/边色（ButtonBase 会抛异常）。
-											footerBackground = Surface;
-										}
-										buttonBase2.BackColor = footerBackground;
+										// 2026-10-22：父容器透明（背景图）时按钮自身保持透明（不再是一块黑矩形），
+										// 但 ButtonBase 不允许 BorderColor=Transparent ⇒ 边色退回 Surface。
+										Color footerBorder = Surface;
+										buttonBase2.BackColor = Color.Transparent;
 										buttonBase2.ForeColor = ResolveLabelForeground(buttonBase2.ForeColor);
-										buttonBase2.FlatAppearance.BorderColor = footerBackground;
+										buttonBase2.FlatAppearance.BorderColor = footerBorder;
 										buttonBase2.FlatAppearance.BorderSize = 0;
 										buttonBase2.FlatAppearance.MouseOverBackColor = SurfaceRaised;
 										buttonBase2.FlatAppearance.MouseDownBackColor = SurfaceRaised;
