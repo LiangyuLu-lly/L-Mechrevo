@@ -30,13 +30,13 @@ namespace MechrevoLite.Diagnostics;
 internal static class DiagnosticGcuInventoryInfo
 {
 	/// <summary>单个日志文件尾部读取上限（64 KiB）。</summary>
-	internal const int TailBytesPerFile = 65536;
+	internal const int TailBytesPerFile = 32768;
 
 	/// <summary>[GCU 侧日志] 小节所有文件尾部合计上限（512 KiB）。</summary>
-	internal const int ControlCenterBudgetBytes = 524288;
+	internal const int ControlCenterBudgetBytes = 196608;
 
 	/// <summary>[GCU 安装日志] 小节所有文件尾部合计上限（256 KiB；安装日志本身很小）。</summary>
-	internal const int InstallLogBudgetBytes = 262144;
+	internal const int InstallLogBudgetBytes = 131072;
 
 	/// <summary>关键行抽取窗口 = 文件末尾 min(文件大小, 512 KiB)。</summary>
 	private const int KeyLineScanBytes = 524288;
@@ -53,13 +53,13 @@ internal static class DiagnosticGcuInventoryInfo
 	private const int MaxKeyLineChars = 300;
 
 	/// <summary>目录树最大层数（大目录只列前几层）。</summary>
-	private const int MaxTreeDepth = 3;
+	private const int MaxTreeDepth = 2;
 
 	/// <summary>目录树最多列出的条目数（目录 + 文件）。</summary>
-	private const int MaxTreeEntries = 400;
+	private const int MaxTreeEntries = 200;
 
 	/// <summary>单个目录最多列出的子项数。</summary>
-	private const int MaxDirChildrenListed = 40;
+	private const int MaxDirChildrenListed = 20;
 
 	private const string ProgramDataDir = @"C:\ProgramData\L-Mechrevo";
 

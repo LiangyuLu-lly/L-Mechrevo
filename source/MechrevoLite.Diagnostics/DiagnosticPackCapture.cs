@@ -31,13 +31,12 @@ internal static class DiagnosticPackCapture
 			new DiagnosticPackFile(Logger.logFile, "日志/" + Path.GetFileName(Logger.logFile), "应用运行日志（默认级别 all；级别 off 时不存在。超过 10 MB 时整代改名为 log.1.txt，只留 3 代。打包时按同一套规则打码）"),
 			new DiagnosticPackFile(Logger.crashFile, "日志/" + Path.GetFileName(Logger.crashFile), "崩溃现场日志（进程异常退出时落盘的内存环形缓冲快照；打包时按同一套规则打码）")
 		};
-		for (int i = 1; i <= Logger.RetainedLogGenerations; i++)
+		// 2026-10-22（机主：诊断包体积爆大）：只带最近 1 代（log.1.txt）—— 够定位上一次崩溃/唤醒；
+		// 更老的 log.2/log.3 不再进包（本机仍保留磁盘文件，需要时单独取）。
+		string previous = Path.Combine(Logger.appPath, Path.GetFileNameWithoutExtension(Logger.logFile) + ".1" + Path.GetExtension(Logger.logFile));
+		if (File.Exists(previous))
 		{
-			string path = Path.Combine(Logger.appPath, Path.GetFileNameWithoutExtension(Logger.logFile) + "." + i + Path.GetExtension(Logger.logFile));
-			if (File.Exists(path))
-			{
-				list.Add(new DiagnosticPackFile(path, "日志/" + Path.GetFileName(path), "已轮转的上一代运行日志（第 " + i + " 代）"));
-			}
+			list.Add(new DiagnosticPackFile(previous, "日志/" + Path.GetFileName(previous), "上一次运行的日志（只保留最近 1 代进包；更老的 log.2/3 不进包）"));
 		}
 		return list;
 	}

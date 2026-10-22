@@ -160,7 +160,7 @@ internal static class DiagnosticPackExporter
 			+ "=================\n"
 			+ "打包时间：" + (capturedAt ?? DateTime.Now).ToString("yyyy-MM-dd HH:mm:ss") + "（本机本地时间）\n"
 			+ "本次生效的日志级别：" + (logLevel ?? "未知") + "（来源：" + (logLevelSource ?? "未知") + "）\n"
-			+ "文件日志容量：单代 10 MiB、保留 3 代（log.1/2/3.txt），合计 ≈ 40 MiB（超出自动整代轮转）\n"
+			+ "文件日志：磁盘仍保留 3 代（log.1/2/3.txt）；诊断包只带 log.txt + 最近 1 代 log.1.txt，且单文件只取末尾 2 MiB（2026-10-22 瘦身）\n"
 			+ "内存日志缓冲：容量 " + FormatSize(Logger.CrashRingBufferBytes) + "（与日志级别无关，进程内常开，导出时快照）\n"
 			+ "日志打码：日志\\ 下的文件（log.txt / log.N.txt / crash.txt / 内存日志缓冲.txt）都在**打包时**按与其它小节\n"
 			+ "  同一套规则打码（用户名 / 主机名 / 用户目录路径 / 序列号 / MAC / GUID / 长十六进制串）；机主本机的原始日志不受影响。\n"

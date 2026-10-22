@@ -60,7 +60,7 @@ internal static class DiagnosticConfigInfo
 			AppendRegistry(stringBuilder);
 			AppendGcuReported(stringBuilder);
 			AppendRuntime(stringBuilder);
-			stringBuilder.Append(XingyaoPmc2.Describe());
+			// 2026-10-22（诊断包瘦身）：星耀 P916F PMC2 旧研究探针不再进诊断包（非在售机型；类保留作参考）。
 			stringBuilder.Append(WujieFanEc.Describe());
 		}
 		catch (Exception ex)

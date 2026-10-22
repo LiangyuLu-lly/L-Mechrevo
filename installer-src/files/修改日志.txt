@@ -146,6 +146,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 无界电池电压修复开关不可见（根因）：`SettingsForm` 构造在 `Program.hw` 赋值之前（Program.cs:1055 vs 1077）⇒ 电池卡片构建时 `BatteryVoltageFix.IsSupportedMachine()` / `IsWujie8040Series()` 恒 false，行从未创建。改为构造期已有 `_deviceCapabilities`（字段初始化即 Load）+ CPU 名判定，不依赖 Program.hw；读不到 CPU 名时不误挡。
 - 显卡超频标题开关不再硬编码「仅 GCU50」：改为能力判据（`OcSettingsSupport` / `GcuGpuOverclockAvailable` / `SupportsGpuOverclock`）。GM5HG0A（GcuVariant=40、OcSettingsSupport=1）在狂暴模式显示该开关；下发仍走 GCU `ApplyGpuOverclock`（TURBO 默认 core=105/mem=500，GCU 日志已有 TURBO_GPU_OC 写入）。
 - GCU 变体冲突（机主：装的是 50 GCU、注册表却写 40）：`GcuIdentity.Variant` 在“注册表≠50 但实际载荷特征=50（GCUService.exe 1.2.x）”时以实际载荷为准并写 error 日志，避免显卡超频/单分区键盘等「仅50」判据被过期注册表挡住；其余情况仍登记优先（零回归）。建议安装器/机主把 `HKLM\SOFTWARE\L-Mechrevo\GcuVariant` 也改成 50。
+- 诊断包瘦身（机主：体积爆大、过时探针清理）：① 单文件日志只取末尾 **2 MiB**（原 8 MiB）；② 包内只带 `log.txt + crash.txt + log.1.txt`（原含 log.1/2/3，最多 4×8 MiB）；③ GCU 侧日志/安装日志/目录树预算减半（64→32 KB/文件、512→192 KB、目录树 3→2 层/400→200 项）；④ 移除星耀 P916F PMC2 旧研究探针段（类保留作参考）；说明.txt 同步更新。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。
