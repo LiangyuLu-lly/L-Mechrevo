@@ -251,7 +251,6 @@ public class FanCurveForm : RForm
 	private WujieFanEcController _wujieFanController;
 
 	// 2026-10-22（无界）：读取 GCU 官方风扇表（UserFanTables）做显示/初始化
-	private RButton _officialTableButton;
 
 	private Label _status;
 
@@ -449,19 +448,6 @@ public class FanCurveForm : RForm
 			await SendBoth();
 		};
 		flowLayoutPanel.Controls.Add(rButton);
-		// 2026-10-22（无界）：官方风扇表按钮（只在无界显示；只读 JSON，不自动下发）
-		_officialTableButton = new RButton
-		{
-			Text = "读取官方风扇表",
-			AutoSize = true,
-			Height = D(30),
-			Margin = new Padding(0, 0, D(12), 0),
-			Cursor = Cursors.Hand,
-			Visible = Program.hw?.WujieSmuApu == true
-		};
-		_officialTableButton.Click += delegate { LoadOfficialFanTable(); };
-		UiVisualStyle.ApplySecondaryButton(_officialTableButton);
-		flowLayoutPanel.Controls.Add(_officialTableButton);
 		_respectiveChk = new RCheckBox
 		{
 			Text = Strings.FanIndependentControl,
@@ -679,25 +665,6 @@ public class FanCurveForm : RForm
 		ClientSize = new Size(width, height);
 	}
 
-	/// <summary>2026-10-22（无界）：读取 GCU 官方风扇表 JSON，填入曲线面板做参考（只显示，不自动下发）。</summary>
-	private void LoadOfficialFanTable()
-	{
-		bool ok = WujieFanTableFile.TryLoad(TargetModeId,
-			out byte[] cpuTemps, out byte[] cpuDuties,
-			out byte[] gpuTemps, out byte[] gpuDuties,
-			out string sourcePath, out string detail);
-		if (!ok)
-		{
-			_status.Text = "读取官方风扇表失败：" + detail + "（不影响曲线保存/下发，仍可按界面点位保存）";
-			Logger.WriteLine("[fan] 官方风扇表读取失败：" + detail + "（仅参考表读取失败，保存/下发不受影响）");
-			return;
-		}
-		_cpuPanel.Load(cpuTemps, cpuDuties);
-		_gpuPanel.Load(gpuTemps, gpuDuties);
-		_status.Text = "已读取官方风扇表：" + System.IO.Path.GetFileName(sourcePath) + " · " + detail + "（仅显示，未下发）";
-		Logger.WriteLine("[fan] 官方风扇表已读取：" + sourcePath + " · " + detail + "（仅显示，未下发）");
-	}
-
 	private void OnCurveUpdated()
 	{
 		try
@@ -714,10 +681,6 @@ public class FanCurveForm : RForm
 			MechrevoHw hw = Program.hw;
 			if (hw != null)
 			{
-				if (_officialTableButton != null)
-				{
-					_officialTableButton.Visible = hw.WujieSmuApu;
-				}
 				// ** 2026-10-17（风扇曲线接入）：** 宝龙达**没有固件曲线表** ⚠️
 				//   => 它走的是**软件闭环**（读温度 -> 查曲线 -> 写功能号 21），数据存 `BaolongdaFanCurveStore`
 				//   => 本窗复用同一套绘制控件，只是把 **RPM 换算成占空比 %** 显示
