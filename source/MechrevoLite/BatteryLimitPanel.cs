@@ -139,12 +139,19 @@ internal sealed class BatteryLimitPanel : Panel
 			BackColor = Color.Transparent,
 			Margin = Padding.Empty,
 			Checked = MechrevoLite.Hardware.BatteryVoltageFix.Enabled,
-			Visible = MechrevoLite.Hardware.BatteryVoltageFix.IsSupportedMachine()
+			Visible = MechrevoLite.Hardware.BatteryVoltageFix.IsUiVisible
 		};
 		_toolTip.SetToolTip(_voltageFixBox, "内置（inpoutx64 驱动）覆盖 EC 老化降额，把充电目标恢复为 17.6V；不调用任何外部脚本");
 		_voltageFixBox.CheckedChanged += delegate
 		{
 			MechrevoLite.Hardware.BatteryVoltageFix.Enabled = _voltageFixBox.Checked;
+			if (_voltageFixBox.Checked && !MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
+			{
+				// 2026-10-23（机主）：与非 100% 限充/非长效模式互斥，拒绝启用并回弹。
+				_voltageFixBox.Checked = false;
+				_statusLabel.Text = "电池电压修复：无法启用（请先把充电上限调到 100%/长效模式）";
+				return;
+			}
 			if (_voltageFixBox.Checked)
 			{
 				(bool ok, string detail) = MechrevoLite.Hardware.BatteryVoltageFix.Run("hold-full");

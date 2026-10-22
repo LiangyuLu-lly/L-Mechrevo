@@ -256,6 +256,8 @@ internal static class I2ecInpOut
 
 	private static int _batteryLoopCount;
 
+	private static bool _interlockStopRequested;
+
 	private static volatile bool _running;
 
 	internal static bool IsRunning => _running;
@@ -717,6 +719,13 @@ internal static class I2ecInpOut
 							}
 							WriteByte(AddrStopGate, 0);
 					// 2026-10-22（机主：AIDA 电流一会有一会没有）：改成 1s 采样，抓完整充/放波形。
+					// 2026-10-23（机主）：与非 100% 限充/非长效模式互斥 —— 运行中一旦被打开限充，立即停止并恢复原值。
+					if (!BatteryVoltageFix.IsChargeLimitNeutral(out string interlock))
+					{
+						Logger.WriteError("[battery-fix] 检测到限充/非长效模式（" + interlock + "）⇒ 停止覆盖并恢复原值");
+						_interlockStopRequested = true;
+						break;
+					}
 					if (nowTick - _lastStatusLogTick >= 1000L)
 					{
 						_lastStatusLogTick = nowTick;
@@ -763,6 +772,21 @@ internal static class I2ecInpOut
 		finally
 		{
 			_running = false;
+			if (_interlockStopRequested)
+			{
+				_interlockStopRequested = false;
+				_ = Task.Run(delegate
+				{
+					try
+					{
+						Stop();
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[battery-fix] 互斥停止异常（已吞掉）：" + ex.Message);
+					}
+				});
+			}
 		}
 	}
 

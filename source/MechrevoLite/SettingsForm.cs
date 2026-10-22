@@ -8533,6 +8533,11 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	/// 证据来源 = 本窗自己的 _deviceCapabilities（构造字段初始化时已 Load）+ CPU 名。</summary>
 	private bool IsWujieBatteryFixSupported()
 	{
+		// 2026-10-22（机主决定）：实验性功能暂时屏蔽 ⇒ 设置页不显示入口。
+		if (!BatteryVoltageFix.FeatureEnabled)
+		{
+			return false;
+		}
 		string identity = ((_deviceCapabilities?.Model ?? "") + " " + (_deviceCapabilities?.BaseboardProduct ?? "")).Trim();
 		bool wujie = identity.IndexOf("WUJIE", StringComparison.OrdinalIgnoreCase) >= 0
 			|| identity.IndexOf("无界", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -9330,6 +9335,16 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				}
 				bool on = _wujieBatteryFixBox.Checked;
 				BatteryVoltageFix.Enabled = on;
+				if (on && !BatteryVoltageFix.Enabled)
+				{
+					// 2026-10-23（机主）：与非 100% 限充/非长效模式互斥，拒绝启用并回弹。
+					_syncingWujieBatteryFix = true;
+					_wujieBatteryFixBox.Checked = false;
+					_syncingWujieBatteryFix = false;
+					BatteryVoltageFix.Enabled = false;
+					ToastForm.ShowFailure("无法启用：请先把充电上限调到 100%/长效模式");
+					return;
+				}
 				if (!on)
 				{
 					return;
