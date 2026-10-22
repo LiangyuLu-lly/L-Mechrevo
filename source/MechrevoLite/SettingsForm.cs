@@ -934,6 +934,8 @@ public class SettingsForm : RForm
 
 	private readonly System.Timers.Timer _sensorTimer;
 
+	private double _sensorTimerNormalInterval = 1000.0;
+
 	private readonly System.Windows.Forms.Timer batteryTimer = new System.Windows.Forms.Timer
 	{
 		Interval = 200
@@ -6313,6 +6315,7 @@ public class SettingsForm : RForm
 		};
 		ChargeLimitMonitor.VerdictChanged += OnChargeLimitVerdictChanged;
 		_sensorTimer = new System.Timers.Timer(AppConfig.Get("sensor_timer", 1000));
+		_sensorTimerNormalInterval = _sensorTimer.Interval;
 		_sensorTimer.Elapsed += OnTimedEvent;
 		// 传感器轮询常驻：不随主窗显示/隐藏启停（对齐 beta21「最小化时除传感器轮询外暂停显示回读」），
 		// 避免每次打开主窗都重新进入读取周期
@@ -12270,6 +12273,43 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				// （机主：界面刷新在关闭 UI 后应停止）
 				_quickSwitchStatusTimer.Enabled = Visible;
 				LogUiRefreshTimerLifecycle(Visible);
+				// 2026-10-23（机主：降低后台占用）：隐藏主 UI 时传感器轮询放慢到 5s、采样泵放慢到 5s，
+				// 并空闲后回收一次工作集；显示时恢复原周期。托盘/风扇曲线/电池修复仍在跑。
+				try
+				{
+					if (_sensorTimer == null)
+					{
+						return;
+					}
+					if (Visible)
+					{
+						_sensorTimer.Interval = _sensorTimerNormalInterval;
+						HardwareControl.SetBackgroundSampling(false);
+					}
+					else
+					{
+						_sensorTimer.Interval = Math.Max(5000.0, _sensorTimerNormalInterval);
+						HardwareControl.SetBackgroundSampling(true);
+						_ = Task.Run(async delegate
+						{
+							try
+							{
+								await Task.Delay(3000).ConfigureAwait(continueOnCapturedContext: false);
+								if (!IsDisposed && !Visible)
+								{
+									Program.TrimWorkingSet();
+								}
+							}
+							catch
+							{
+							}
+						});
+					}
+				}
+				catch (Exception exBg)
+				{
+					Logger.WriteLine("[bg] 后台低占用切换失败（已吞掉）：" + exBg.Message);
+				}
 			}
 			if (Visible)
 			{
