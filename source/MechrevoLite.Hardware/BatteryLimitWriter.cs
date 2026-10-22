@@ -164,17 +164,11 @@ internal static class BatteryLimitWriter
 				detail = log.ToString();
 				return false;
 			}
-			int rbHigh = -1;
-			int rbLow = -1;
-			bool rbHighOk = ReadEc(HighRegister, out rbHigh);
-			bool rbLowOk = ReadEc(LowRegister, out rbLow);
-			if (!rbHighOk || !rbLowOk || rbHigh != high || rbLow != low)
-			{
-				log.AppendLine("⛔ 参数回读不一致（0x83A1=" + Fmt(rbHigh) + " · 0x83A2=" + Fmt(rbLow) + "）⇒ 不触发");
-				detail = log.ToString();
-				return false;
-			}
-			log.AppendLine("参数回读：0x83A1=" + Fmt(rbHigh) + " · 0x83A2=" + Fmt(rbLow));
+			// 2026-10-22（宝龙达 MRID6：改阈值后弹回）：0x8153/0x8154 只写 mailbox 参数，
+			// 常驻 0x83A1/0x83A2 由固件在**触发启用后**才更新 ⇒ 不能在触发前拿它做回读校验，
+			// 否则改任何数值都会「参数回读不一致 ⇒ 不触发」，UI 看起来就是弹回原值。
+			// 此处只依赖 WriteParam 的 mailbox 回读；常驻阈值在触发后统一校验。
+			log.AppendLine("参数已写入 mailbox（0x83A1/0x83A2 由触发后固件更新，不在此处校验）");
 
 			if (!CheckMailbox(0, log) || !WriteCommand(0x0D, "0x8151=0x0D(启用)", log))
 			{
@@ -193,7 +187,8 @@ internal static class BatteryLimitWriter
 				return false;
 			}
 
-			Snapshot after = ReadSnapshot();
+			// 触发后等固件把 mailbox 参数落到常驻阈值（最多 1 秒），再做一致性校验。
+			Snapshot after = WaitForParams(high, low, 1000);
 			log.AppendLine("启用后：" + after.Describe());
 			bool paramsOk = after.High == high && after.Low == low;
 			// 高电量开启时固件会先进入初始化放电子状态（substate=1）；这也算启用成功，稳定（2/3）会在放到阈值附近后达成。
@@ -487,6 +482,23 @@ internal static class BatteryLimitWriter
 		bool ok = EcPortIo.TryWriteBatteryByte(EcPortIo.BatteryCommandRegister, (byte)value, out int readBack);
 		log.AppendLine(label + " ⇒ " + (ok ? "回读 0x" + readBack.ToString("X2") : "失败"));
 		return ok;
+	}
+
+	/// <summary>2026-10-22：触发后等待 0x83A1/0x83A2 落到目标值（固件异步更新），最多 timeoutMs。</summary>
+	private static Snapshot WaitForParams(int high, int low, int timeoutMs)
+	{
+		long start = Environment.TickCount64;
+		Snapshot snapshot = ReadSnapshot();
+		while (Environment.TickCount64 - start < timeoutMs)
+		{
+			if (snapshot.High == high && snapshot.Low == low)
+			{
+				break;
+			}
+			Thread.Sleep(50);
+			snapshot = ReadSnapshot();
+		}
+		return snapshot;
 	}
 
 	private static bool ReadEc(int address, out int value)
