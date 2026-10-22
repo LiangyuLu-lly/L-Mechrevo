@@ -7896,7 +7896,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(232),
+				Height = scale(80),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7915,10 +7915,6 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
-			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			Label label = new Label
 			{
 				Name = "labelThemeModeTitle",
@@ -7997,127 +7993,131 @@ public class SettingsForm : RForm
 			tableLayoutPanel.Controls.Add(CreateThemeRowPanel(accentSwatch, accentButton, accentDefault), 1, 1);
 			tableLayoutPanel.SetColumnSpan(tableLayoutPanel.GetControlFromPosition(1, 1), 2);
 
-			Color backgroundCurrent = UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey));
-			if (backgroundCurrent == Color.Empty)
+			// 2026-10-22（机主：背景图定制先隐藏）：默认不建背景色/背景图/不透明度/内容遮罩控件；
+			// 配置 ui_show_background_customization=1 可恢复。
+			if (AppConfig.Get("ui_show_background_customization", 0) == 1)
 			{
-				backgroundCurrent = UiVisualStyle.Window;
+				Color backgroundCurrent = UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey));
+				if (backgroundCurrent == Color.Empty)
+				{
+					backgroundCurrent = UiVisualStyle.Window;
+				}
+				Panel backgroundSwatch = CreateThemeSwatch(backgroundCurrent);
+				Button backgroundColorButton = CreateThemeSettingButton(Strings.ThemeChoose);
+				backgroundColorButton.Click += (object sender, EventArgs e) =>
+				{
+					using ColorDialog dialog = new ColorDialog
+					{
+						FullOpen = true,
+						Color = backgroundCurrent
+					};
+					if (dialog.ShowDialog(this) == DialogResult.OK)
+					{
+						UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, dialog.Color);
+						AppConfig.Flush();
+						backgroundSwatch.BackColor = dialog.Color;
+						ApplyThemeLive();
+					}
+				};
+				Button backgroundColorDefault = CreateThemeSettingButton(Strings.ThemeDefault);
+				backgroundColorDefault.Click += (object sender, EventArgs e) =>
+				{
+					UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, Color.Empty);
+					AppConfig.Flush();
+					backgroundSwatch.BackColor = UiVisualStyle.Window;
+					ApplyThemeLive();
+				};
+				Label backgroundColorLabel = CreateThemeSettingLabel(Strings.ThemeBackgroundColor);
+				FlowLayoutPanel backgroundColorPanel = CreateThemeRowPanel(backgroundSwatch, backgroundColorButton, backgroundColorDefault);
+				tableLayoutPanel.Controls.Add(backgroundColorLabel, 0, 2);
+				tableLayoutPanel.Controls.Add(backgroundColorPanel, 1, 2);
+				tableLayoutPanel.SetColumnSpan(backgroundColorPanel, 2);
+				// 2026-10-22（机主：有图片的时候背景色应该置灰）：已配置背景图时整行保留但禁用/置灰。
+				bool backgroundImageConfigured = !string.IsNullOrWhiteSpace(AppConfig.GetString(UiVisualStyle.BackgroundImageConfigKey));
+				SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, !backgroundImageConfigured);
+
+				Button backgroundImageButton = CreateThemeSettingButton(Strings.ThemeChoose);
+				backgroundImageButton.Click += (object sender, EventArgs e) =>
+				{
+					using OpenFileDialog dialog = new OpenFileDialog
+					{
+						Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
+						CheckFileExists = true
+					};
+					if (dialog.ShowDialog(this) == DialogResult.OK)
+					{
+							AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, dialog.FileName);
+						AppConfig.Flush();
+						SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, false);
+						ApplyThemeLive();
+					}
+				};
+				Button backgroundImageClear = CreateThemeSettingButton(Strings.ThemeClear);
+				backgroundImageClear.Click += (object sender, EventArgs e) =>
+				{
+					AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, "");
+					AppConfig.Flush();
+					SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, true);
+					ApplyThemeLive();
+				};
+				tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundImage), 0, 3);
+				tableLayoutPanel.Controls.Add(CreateThemeRowPanel(backgroundImageButton, backgroundImageClear), 1, 3);
+				tableLayoutPanel.SetColumnSpan(tableLayoutPanel.GetControlFromPosition(1, 3), 2);
+
+				RSlider opacitySlider = new RSlider
+				{
+					Minimum = 0,
+					Maximum = 100,
+					Value = Math.Clamp(AppConfig.Get(UiVisualStyle.BackgroundOpacityConfigKey, 65), 0, 100),
+					Dock = DockStyle.Fill,
+					MinimumSize = new Size(scale(80), scale(20))
+				};
+				Label opacityLabel = new Label
+				{
+					Text = opacitySlider.Value + "%",
+					Dock = DockStyle.Fill,
+					TextAlign = ContentAlignment.MiddleLeft,
+					ForeColor = UiVisualStyle.Muted,
+					Margin = new Padding(scale(6), 0, 0, 0)
+				};
+				opacitySlider.ValueChanged += (object sender, EventArgs e) =>
+				{
+					AppConfig.Set(UiVisualStyle.BackgroundOpacityConfigKey, opacitySlider.Value);
+					AppConfig.Flush();
+					opacityLabel.Text = opacitySlider.Value + "%";
+				};
+				opacitySlider.MouseUp += (object sender, MouseEventArgs e) => UiVisualStyle.ApplyFormBackground(this);
+				tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageOpacity), 0, 4);
+				tableLayoutPanel.Controls.Add(opacitySlider, 1, 4);
+				tableLayoutPanel.Controls.Add(opacityLabel, 2, 4);
+
+				RSlider scrimSlider = new RSlider
+				{
+					Minimum = 0,
+					Maximum = 100,
+					Value = Math.Clamp(AppConfig.Get(UiVisualStyle.BackgroundScrimConfigKey, 50), 0, 100),
+					Dock = DockStyle.Fill,
+					MinimumSize = new Size(scale(80), scale(20))
+				};
+				Label scrimLabel = new Label
+				{
+					Text = scrimSlider.Value + "%",
+					Dock = DockStyle.Fill,
+					TextAlign = ContentAlignment.MiddleLeft,
+					ForeColor = UiVisualStyle.Muted,
+					Margin = new Padding(scale(6), 0, 0, 0)
+				};
+				scrimSlider.ValueChanged += (object sender, EventArgs e) =>
+				{
+					AppConfig.Set(UiVisualStyle.BackgroundScrimConfigKey, scrimSlider.Value);
+					AppConfig.Flush();
+					scrimLabel.Text = scrimSlider.Value + "%";
+				};
+				scrimSlider.MouseUp += (object sender, MouseEventArgs e) => UiVisualStyle.ApplyFormBackground(this);
+				tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageScrim), 0, 5);
+				tableLayoutPanel.Controls.Add(scrimSlider, 1, 5);
+				tableLayoutPanel.Controls.Add(scrimLabel, 2, 5);
 			}
-			Panel backgroundSwatch = CreateThemeSwatch(backgroundCurrent);
-			Button backgroundColorButton = CreateThemeSettingButton(Strings.ThemeChoose);
-			backgroundColorButton.Click += (object sender, EventArgs e) =>
-			{
-				using ColorDialog dialog = new ColorDialog
-				{
-					FullOpen = true,
-					Color = backgroundCurrent
-				};
-				if (dialog.ShowDialog(this) == DialogResult.OK)
-				{
-					UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, dialog.Color);
-					AppConfig.Flush();
-					backgroundSwatch.BackColor = dialog.Color;
-					ApplyThemeLive();
-				}
-			};
-			Button backgroundColorDefault = CreateThemeSettingButton(Strings.ThemeDefault);
-			backgroundColorDefault.Click += (object sender, EventArgs e) =>
-			{
-				UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, Color.Empty);
-				AppConfig.Flush();
-				backgroundSwatch.BackColor = UiVisualStyle.Window;
-				ApplyThemeLive();
-			};
-			Label backgroundColorLabel = CreateThemeSettingLabel(Strings.ThemeBackgroundColor);
-			FlowLayoutPanel backgroundColorPanel = CreateThemeRowPanel(backgroundSwatch, backgroundColorButton, backgroundColorDefault);
-			tableLayoutPanel.Controls.Add(backgroundColorLabel, 0, 2);
-			tableLayoutPanel.Controls.Add(backgroundColorPanel, 1, 2);
-			tableLayoutPanel.SetColumnSpan(backgroundColorPanel, 2);
-			// 2026-10-22（机主：有图片的时候背景色应该置灰）：已配置背景图时整行保留但禁用/置灰。
-			bool backgroundImageConfigured = !string.IsNullOrWhiteSpace(AppConfig.GetString(UiVisualStyle.BackgroundImageConfigKey));
-			SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, !backgroundImageConfigured);
-
-			Button backgroundImageButton = CreateThemeSettingButton(Strings.ThemeChoose);
-			backgroundImageButton.Click += (object sender, EventArgs e) =>
-			{
-				using OpenFileDialog dialog = new OpenFileDialog
-				{
-					Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
-					CheckFileExists = true
-				};
-				if (dialog.ShowDialog(this) == DialogResult.OK)
-				{
-						AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, dialog.FileName);
-					AppConfig.Flush();
-					SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, false);
-					ApplyThemeLive();
-				}
-			};
-			Button backgroundImageClear = CreateThemeSettingButton(Strings.ThemeClear);
-			backgroundImageClear.Click += (object sender, EventArgs e) =>
-			{
-				AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, "");
-				AppConfig.Flush();
-				SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, true);
-				ApplyThemeLive();
-			};
-			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundImage), 0, 3);
-			tableLayoutPanel.Controls.Add(CreateThemeRowPanel(backgroundImageButton, backgroundImageClear), 1, 3);
-			tableLayoutPanel.SetColumnSpan(tableLayoutPanel.GetControlFromPosition(1, 3), 2);
-
-			RSlider opacitySlider = new RSlider
-			{
-				Minimum = 0,
-				Maximum = 100,
-				Value = Math.Clamp(AppConfig.Get(UiVisualStyle.BackgroundOpacityConfigKey, 65), 0, 100),
-				Dock = DockStyle.Fill,
-				MinimumSize = new Size(scale(80), scale(20))
-			};
-			Label opacityLabel = new Label
-			{
-				Text = opacitySlider.Value + "%",
-				Dock = DockStyle.Fill,
-				TextAlign = ContentAlignment.MiddleLeft,
-				ForeColor = UiVisualStyle.Muted,
-				Margin = new Padding(scale(6), 0, 0, 0)
-			};
-			opacitySlider.ValueChanged += (object sender, EventArgs e) =>
-			{
-				AppConfig.Set(UiVisualStyle.BackgroundOpacityConfigKey, opacitySlider.Value);
-				AppConfig.Flush();
-				opacityLabel.Text = opacitySlider.Value + "%";
-			};
-			opacitySlider.MouseUp += (object sender, MouseEventArgs e) => UiVisualStyle.ApplyFormBackground(this);
-			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageOpacity), 0, 4);
-			tableLayoutPanel.Controls.Add(opacitySlider, 1, 4);
-			tableLayoutPanel.Controls.Add(opacityLabel, 2, 4);
-
-			RSlider scrimSlider = new RSlider
-			{
-				Minimum = 0,
-				Maximum = 100,
-				Value = Math.Clamp(AppConfig.Get(UiVisualStyle.BackgroundScrimConfigKey, 50), 0, 100),
-				Dock = DockStyle.Fill,
-				MinimumSize = new Size(scale(80), scale(20))
-			};
-			Label scrimLabel = new Label
-			{
-				Text = scrimSlider.Value + "%",
-				Dock = DockStyle.Fill,
-				TextAlign = ContentAlignment.MiddleLeft,
-				ForeColor = UiVisualStyle.Muted,
-				Margin = new Padding(scale(6), 0, 0, 0)
-			};
-			scrimSlider.ValueChanged += (object sender, EventArgs e) =>
-			{
-				AppConfig.Set(UiVisualStyle.BackgroundScrimConfigKey, scrimSlider.Value);
-				AppConfig.Flush();
-				scrimLabel.Text = scrimSlider.Value + "%";
-			};
-			scrimSlider.MouseUp += (object sender, MouseEventArgs e) => UiVisualStyle.ApplyFormBackground(this);
-			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageScrim), 0, 5);
-			tableLayoutPanel.Controls.Add(scrimSlider, 1, 5);
-			tableLayoutPanel.Controls.Add(scrimLabel, 2, 5);
-
 
 			_themeModePanel.Controls.Add(tableLayoutPanel);
 		}

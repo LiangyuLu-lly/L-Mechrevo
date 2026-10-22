@@ -1112,6 +1112,28 @@ private static void LoadEmbeddedFonts()
 		try
 		{
 			Color currentWindow = Window;
+			// 2026-10-22（机主：背景图定制先隐藏）：功能关闭时不读取/不应用背景图，
+			// 并把之前设过透明的容器还原，避免旧配置残留造成闪烁。
+			if (AppConfig.Get("ui_show_background_customization", 0) != 1)
+			{
+				if (TransparentRoots.TryGetValue(form, out List<Control> previousControls))
+				{
+					foreach (Control staleControl in previousControls)
+					{
+						if (staleControl != null && !staleControl.IsDisposed && staleControl.BackColor == Color.Transparent)
+						{
+							staleControl.BackColor = currentWindow;
+						}
+					}
+					TransparentRoots.Remove(form);
+				}
+				if (form.BackgroundImage != null)
+				{
+					form.BackgroundImage = null;
+				}
+				form.BackColor = currentWindow;
+				return;
+			}
 			Image image = LoadBackgroundImage();
 			form.BackColor = currentWindow;
 			form.BackgroundImageLayout = ImageLayout.None;
