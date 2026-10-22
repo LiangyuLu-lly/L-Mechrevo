@@ -491,13 +491,23 @@ internal static class EcPortIo
 		}
 	}
 
+	/// <summary>2026-10-22（无界风扇曲线）：无界 EC 的主/副扇占空比目标（0..200 = 0..100%）。
+	/// 与宝龙达一样走 ACPI EC 0x92/0x93 的 XRAM 双字节地址；无界转速 0xC834/0xC835 已用同一通道读过。</summary>
+	internal const int WujieFan1DutyAddress = 0x1804;
+
+	internal const int WujieFan2DutyAddress = 0x1809;
+
+	internal const int WujieFanDutyMaxRaw = 200;
+
 	/// <summary>⭐ ACPI EC 写白名单（3+1 个地址）✅</summary>
 	internal static bool IsAcpiFanWriteAddress(int address)
 	{
 		return address == AcpiFan1TargetAddress
 			|| address == AcpiFan2TargetAddress
 			|| address == AcpiFanManualMaskAddress
-			|| address == AcpiEcUnlockAddress;
+			|| address == AcpiEcUnlockAddress
+			|| address == WujieFan1DutyAddress
+			|| address == WujieFan2DutyAddress;
 	}
 
 	/// <summary>
@@ -608,6 +618,22 @@ internal static class EcPortIo
 			return false;
 		}
 		return TryWriteByteVerified(address, units100Rpm, out readBack);
+	}
+
+	/// <summary>2026-10-22（无界风扇曲线）：写无界主/副扇占空比（0..200）+ 回读比对。
+	/// ⚠️ 只有地址为 0x1804/0x1809 且值在 0..200 才放行；其余一律拒绝。</summary>
+	internal static bool TryWriteWujieFanDuty(int address, int rawValue, out int readBack)
+	{
+		readBack = -1;
+		if (address != WujieFan1DutyAddress && address != WujieFan2DutyAddress)
+		{
+			return false;
+		}
+		if (rawValue < 0 || rawValue > WujieFanDutyMaxRaw)
+		{
+			return false;
+		}
+		return TryWriteByteVerified(address, rawValue, out readBack);
 	}
 
 	/// <summary>⭐ ACPI EC 读-改-写 0xB20（只改 bit1/bit3，保留其它位）+ 回读 ✅</summary>
