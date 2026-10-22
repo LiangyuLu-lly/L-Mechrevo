@@ -111,6 +111,21 @@ stringBuilder.Append(DiagnosticBackendRouteInfo.Build());
 		{
 			stringBuilder.AppendLine("⚠️ 星耀 PMC2 诊断段追加失败（已吞掉）：" + exXingyao.Message);
 		}
+		// 2026-10-22（机主：电池电压修复开了不知道有没有用 / 日志级别 ErrorOnly 看不到状态行）：
+		// 诊断包里直接只读回读 EC，与日志级别无关。
+		try
+		{
+			if (Program.hw?.WujieSmuApu == true)
+			{
+				stringBuilder.AppendLine("[无界电池电压修复状态（只读）]");
+				stringBuilder.AppendLine(BatteryVoltageFix.DescribeAvailability());
+				stringBuilder.AppendLine();
+			}
+		}
+		catch (Exception exBatteryFix)
+		{
+			stringBuilder.AppendLine("⚠️ 无界电池电压修复状态追加失败（已吞掉）：" + exBatteryFix.Message);
+		}
 		return stringBuilder.ToString();
 	}
 
