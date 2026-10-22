@@ -10383,6 +10383,44 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 	}
 
+	/// <summary>2026-10-22（机主：所有机器都要恢复默认曲线）：取内置 DefaultCurve_*.json 的默认 CPU/GPU 曲线；
+	/// GCU/同方用 SetFanCurve 写回，读不到资源文件时返回 false。</summary>
+	internal bool TryGetBuiltInDefaultFanCurve(out byte[] cpuUpT, out byte[] cpuDuty, out byte[] gpuUpT, out byte[] gpuDuty)
+	{
+		cpuUpT = null;
+		cpuDuty = null;
+		gpuUpT = null;
+		gpuDuty = null;
+		int num = TableNameToMode(CurveName);
+		if (num < 0)
+		{
+			num = OperatingMode switch
+			{
+				0 => 1,
+				1 => 0,
+				2 => 2,
+				_ => 0,
+			};
+		}
+		if (num < 0 || num >= _defaultCpuDuty.Length)
+		{
+			return false;
+		}
+		byte[] array = _defaultCpuUpT[num];
+		byte[] array2 = _defaultCpuDuty[num];
+		byte[] array3 = _defaultGpuUpT[num];
+		byte[] array4 = _defaultGpuDuty[num];
+		if (array == null || array2 == null || array3 == null || array4 == null)
+		{
+			return false;
+		}
+		cpuUpT = (byte[])array.Clone();
+		cpuDuty = (byte[])array2.Clone();
+		gpuUpT = (byte[])array3.Clone();
+		gpuDuty = (byte[])array4.Clone();
+		return true;
+	}
+
 	public async Task SetFanCurve(int type, int[] duties)
 	{
 		if ((type < 0 || type > 1) ? true : false)
