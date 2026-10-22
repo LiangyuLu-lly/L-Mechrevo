@@ -593,11 +593,6 @@ public static class HardwareControl
 	/// </summary>
 	private const int LocalSamplingPumpIntervalMs = 2500;
 
-	/// <summary>2026-10-23：主 UI 隐藏后的后台采样周期（降低后台占用）。</summary>
-	private const int LocalSamplingPumpBackgroundIntervalMs = 5000;
-
-	private static bool _localSamplingPumpBackgroundMode;
-
 	/// <summary>⭐ 最近这段时间内已经有人采过 ⇒ 采样泵让位（ms）。</summary>
 	private const int LocalSamplingPumpIdleGuardMs = 2000;
 
@@ -781,24 +776,6 @@ public static class HardwareControl
 	}
 
 	/// <summary>2026-10-22（JIGUANG 待机亮屏 0xc0000005）：显示器关闭 ⇒ 只停泵、不 Dispose LHM/NVML（保留温度源）。</summary>
-	/// <summary>2026-10-23（机主：降低后台占用）：主 UI 隐藏时把常驻采样泵从 2.5s 放慢到 5s；
-	/// 显示时恢复。只调周期，不停止/不 Dispose LHM/NVML，风扇曲线与电池修复不受影响。</summary>
-	internal static void SetBackgroundSampling(bool background)
-	{
-		lock (lhmLock)
-		{
-			_localSamplingPumpBackgroundMode = background;
-			int interval = background ? LocalSamplingPumpBackgroundIntervalMs : LocalSamplingPumpIntervalMs;
-			try
-			{
-				_localSamplingPump?.Change(interval, interval);
-			}
-			catch
-			{
-			}
-		}
-	}
-
 	internal static void SuspendLocalSamplingForDisplayOff()
 	{
 		lock (lhmLock)

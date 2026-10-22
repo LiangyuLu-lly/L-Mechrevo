@@ -934,8 +934,6 @@ public class SettingsForm : RForm
 
 	private readonly System.Timers.Timer _sensorTimer;
 
-	private double _sensorTimerNormalInterval = 1000.0;
-
 	private readonly System.Windows.Forms.Timer batteryTimer = new System.Windows.Forms.Timer
 	{
 		Interval = 200
@@ -6315,7 +6313,6 @@ public class SettingsForm : RForm
 		};
 		ChargeLimitMonitor.VerdictChanged += OnChargeLimitVerdictChanged;
 		_sensorTimer = new System.Timers.Timer(AppConfig.Get("sensor_timer", 1000));
-		_sensorTimerNormalInterval = _sensorTimer.Interval;
 		_sensorTimer.Elapsed += OnTimedEvent;
 		// 传感器轮询常驻：不随主窗显示/隐藏启停（对齐 beta21「最小化时除传感器轮询外暂停显示回读」），
 		// 避免每次打开主窗都重新进入读取周期
@@ -12273,37 +12270,6 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				// （机主：界面刷新在关闭 UI 后应停止）
 				_quickSwitchStatusTimer.Enabled = Visible;
 				LogUiRefreshTimerLifecycle(Visible);
-				// 2026-10-23（机主：托盘信息仍需 1s 刷新，且不能让风扇曲线变慢）：
-				// 隐藏主 UI 时**不降采样频率**，只在空闲后回收一次工作集；传感器/托盘保持原节奏。
-				try
-				{
-					if (_sensorTimer != null)
-					{
-						_sensorTimer.Interval = _sensorTimerNormalInterval;
-					}
-					HardwareControl.SetBackgroundSampling(false);
-					if (!Visible)
-					{
-						_ = Task.Run(async delegate
-						{
-							try
-							{
-								await Task.Delay(3000).ConfigureAwait(continueOnCapturedContext: false);
-								if (!IsDisposed && !Visible)
-								{
-									Program.TrimWorkingSet();
-								}
-							}
-							catch
-							{
-							}
-						});
-					}
-				}
-				catch (Exception exBg)
-				{
-					Logger.WriteLine("[bg] 后台低占用切换失败（已吞掉）：" + exBg.Message);
-				}
 			}
 			if (Visible)
 			{

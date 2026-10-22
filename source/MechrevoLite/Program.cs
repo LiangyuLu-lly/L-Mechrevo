@@ -1376,25 +1376,6 @@ internal static class Program
 	/// </para>
 	/// </summary>
 	/// <returns>建好（或已存在）的托盘图标；构建确实不成功时返回 null（调用方按退化路径只记日志）。</returns>
-	/// <summary>2026-10-23（机主：降低后台占用）：主 UI 隐藏 3 秒后回收一次工作集，避免界面资源长期占着物理内存。</summary>
-	[System.Runtime.InteropServices.DllImport("psapi.dll")]
-	private static extern bool EmptyWorkingSet(IntPtr hProcess);
-
-	[System.Runtime.InteropServices.DllImport("kernel32.dll")]
-	private static extern IntPtr GetCurrentProcess();
-
-	internal static void TrimWorkingSet()
-	{
-		try
-		{
-			EmptyWorkingSet(GetCurrentProcess());
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("[bg] 工作集回收失败（已吞掉）：" + ex.Message);
-		}
-	}
-
 	internal static NotifyIcon EnsureTrayIcon()
 	{
 		NotifyIcon existing = trayIcon;
