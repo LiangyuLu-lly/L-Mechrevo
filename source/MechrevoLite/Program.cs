@@ -1357,6 +1357,8 @@ internal static class Program
 			}
 			settingsForm.InitAura();
 			SetAutoModes(powerChanged: false, init: true);
+		// 2026-10-22（机主：无界开机且在自定义上再启用）：开机后按已保存点位自动启动 EC 曲线
+		WujieFanCurveAutoApply.Schedule();
 			// 2026-10-05 percore-product: 每核 CO「开机自动应用」的唯一调度点（只跑一次、不受节流影响）。
 			ScheduleCpuCoAutoApply();
 			// 2026-10-10（用户反馈 ③）：显卡超频的「上次非正常关机就自动关闭」—— 开机后独立调度一次；

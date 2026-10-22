@@ -479,6 +479,8 @@ public class FanCurveForm : RForm
 				// 2026-10-22（机主：打开独立控制时给无界两个风扇独立曲线）：
 				// 无界不经过 GCU；独立开关只作为曲线控制器“两路分开输出”的开关，保存/应用后生效。
 				Logger.WriteLine("[fan] 无界风扇独立控制：" + (_respectiveChk.Checked ? "开（CPU/副扇两路独立）" : "关（双扇同步）") + "（保存曲线后生效，不经 GCU）");
+				// 2026-10-22（机主：无界开机且在自定义上再启用）：把独立开关记下来，开机自动曲线沿用同一设置。
+				AppConfig.Set("wujie_fan_independent", _respectiveChk.Checked ? 1 : 0);
 				_status.Text = "无界独立控制：" + (_respectiveChk.Checked ? "开（保存曲线后生效）" : "关（双扇同步）");
 				return;
 			}
@@ -946,6 +948,24 @@ public class FanCurveForm : RForm
 		await FlushPendingAsync();
 	}
 
+	/// <summary>2026-10-22：界面温度轴无效（未读官方表/全 0/非递增）时用固定 16 点阶梯，避免保存/启动被卡死。</summary>
+	private static byte[] NormalizeWujieTemps(byte[] temps)
+	{
+		bool ok = temps != null && temps.Length >= 2 && temps[0] >= 45;
+		if (ok)
+		{
+			for (int i = 1; i < temps.Length; i++)
+			{
+				if (temps[i] == 0 || temps[i] <= temps[i - 1])
+				{
+					ok = false;
+					break;
+				}
+			}
+		}
+		return ok ? temps : WujieFanEcController.DefaultTemperatures();
+	}
+
 	/// <summary>2026-10-22（无界）：保存曲线 = 启动/停止 EC 直写控制器；不经过 GCU 固件曲线。</summary>
 	private async Task FlushWujieFanCurveAsync(MechrevoHw hw)
 	{
@@ -966,7 +986,11 @@ public class FanCurveForm : RForm
 		{
 			_wujieFanController ??= new WujieFanEcController();
 			bool independent = _respectiveChk != null && _respectiveChk.Checked;
-			bool ok = _wujieFanController.Start(_cpuPanel.Temperatures, _cpuPanel.Duties, independent, _gpuPanel.Temperatures, _gpuPanel.Duties, out string detail);
+			// 2026-10-22（机主：风扇表读取失败不应影响实际功能）：界面温度轴可能全 0（没读官方表）⇒
+			// 用固定 45..90℃ 阶梯兜底，保证保存下来的占空比点位仍能启动控制器。
+			byte[] cpuTemps = NormalizeWujieTemps(_cpuPanel.Temperatures);
+			byte[] gpuTemps = NormalizeWujieTemps(_gpuPanel.Temperatures);
+			bool ok = _wujieFanController.Start(cpuTemps, _cpuPanel.Duties, independent, gpuTemps, _gpuPanel.Duties, out string detail);
 			// 2026-10-22（机主：风扇表失败不应影响实际功能，检查写入和保存）：
 			// 写入（EC 25Hz）与保存（档位点位）必须解耦 —— 即使本次 EC 下发失败，也先把界面点位按档位落盘，
 			// 不能因为“启动失败”把用户刚保存的曲线丢掉。

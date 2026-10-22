@@ -93,6 +93,17 @@ internal sealed class WujieFanEcController : IDisposable
 
 	/// <summary>启动曲线控制：CPU/GPU 两套温度与占空比数组（长度 16，0xFF 表示无效点）；
 	/// independent=true 时主扇按 CPU 曲线、副扇按 GPU 曲线分别输出。</summary>
+	/// <summary>2026-10-22：无界保存的只有占空比点位（官方表可能读失败/无温度轴）⇒ 开机自启用固定温度阶梯 45..90℃（16 点）。</summary>
+	internal static byte[] DefaultTemperatures()
+	{
+		byte[] temps = new byte[16];
+		for (int i = 0; i < temps.Length; i++)
+		{
+			temps[i] = (byte)(45 + i * 3);
+		}
+		return temps;
+	}
+
 	internal bool Start(byte[] cpuTemps, int[] cpuDuties, bool independent, byte[] gpuTemps, int[] gpuDuties, out string detail)
 	{
 		if (!WujieFanEc.IsWujiePlatform())
