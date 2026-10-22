@@ -18,6 +18,9 @@ namespace MechrevoLite;
 
 public sealed class SettingsDialog : RForm
 {
+	/// <summary>2026-10-22（机主）：隐私与反馈暂时隐藏；配置 ui_show_privacy_feedback=1 可恢复。</summary>
+	private static bool ShowPrivacyAndFeedbackSection => AppConfig.Get("ui_show_privacy_feedback", 0) == 1;
+
 	private Control? _displayHeader;
 
 	private Control? _displayRow;
@@ -296,8 +299,12 @@ public sealed class SettingsDialog : RForm
 		}
 		// 2026-10-06：新增「日志级别」设置项（关/仅错误/全部），落盘 log_level，下一次写日志即生效。
 		AddRow(BuildLogLevelRow(D));
-		AddHeader(Strings.SettingsZonePrivacy, 10);
-		AddRow(BuildPrivacyRow(D));
+		// 2026-10-22（机主：这个功能暂时隐藏和关闭）→ 隐私与反馈整段不建（匿名统计开关 + 问题反馈按钮）。
+		if (ShowPrivacyAndFeedbackSection)
+		{
+			AddHeader(Strings.SettingsZonePrivacy, 10);
+			AddRow(BuildPrivacyRow(D));
+		}
 		// 2026-10-09（exportperm）：设置的一键导出/导入（自定义档、风扇曲线、灯效等用户设置）。
 		AddHeader(Strings.SettingsZoneBackup, 10);
 		AddRow(BuildSettingsBackupRow(D));

@@ -56,6 +56,15 @@ internal static class UiVisualStyle
 
 	internal const string ThemeModeConfigKey = "ui_theme_mode";
 
+	/// <summary>2026-10-22（主题自定义）：用户自定义强调色，`#RRGGBB` 或 `#AARRGGBB`；空=默认。</summary>
+	internal const string AccentColorConfigKey = "ui_accent_color";
+
+	/// <summary>2026-10-22（主题自定义）：主窗口背景色覆盖，`#RRGGBB` 或 `#AARRGGBB`；空=默认。</summary>
+	internal const string BackgroundColorConfigKey = "ui_bg_color";
+
+	/// <summary>2026-10-22（主题自定义）：主窗口背景图片路径；空=不显示。</summary>
+	internal const string BackgroundImageConfigKey = "ui_bg_image";
+
 	internal const string ThemeFollowSystemKey = "ui_theme_follow_system";
 
 	internal const string BaseFontFamily = "HarmonyOS Sans SC";
@@ -267,11 +276,28 @@ private static void LoadEmbeddedFonts()
 	{
 		get
 		{
-			if (!IsNightMode)
+			Palette palette = (IsNightMode ? NightPalette : DayPalette);
+			Color? customAccent = ParseCustomColor(AppConfig.GetString(AccentColorConfigKey));
+			if (customAccent.HasValue)
 			{
-				return DayPalette;
+				Color accent = customAccent.Value;
+				palette = palette with
+				{
+					Accent = accent,
+					AccentHover = Mix(accent, Color.White, IsNightMode ? 0.18f : 0.12f),
+					AccentPressed = Mix(accent, Color.Black, IsNightMode ? 0.12f : 0.18f),
+					AccentText = ContrastTextFor(accent)
+				};
 			}
-			return NightPalette;
+			Color? customBackground = ParseCustomColor(AppConfig.GetString(BackgroundColorConfigKey));
+			if (customBackground.HasValue)
+			{
+				palette = palette with
+				{
+					Window = customBackground.Value
+				};
+			}
+			return palette;
 		}
 	}
 
@@ -933,6 +959,125 @@ private static void LoadEmbeddedFonts()
 	{
 		Palette palette = (night ? NightPalette : DayPalette);
 		return (Background: palette.AccentHover, Foreground: palette.AccentText);
+	}
+
+	/// <summary>2026-10-22（主题自定义）：解析 config 里的颜色字符串（#RRGGBB / #AARRGGBB）；空/非法返回 null。</summary>
+	internal static Color? ParseCustomColor(string raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+		{
+			return null;
+		}
+		try
+		{
+			string text = raw.Trim();
+			if (text.StartsWith("#", StringComparison.Ordinal))
+			{
+				text = text.Substring(1);
+			}
+			if (text.Length == 6)
+			{
+				return Color.FromArgb(255, Convert.ToInt32(text.Substring(0, 2), 16), Convert.ToInt32(text.Substring(2, 2), 16), Convert.ToInt32(text.Substring(4, 2), 16));
+			}
+			if (text.Length == 8)
+			{
+				return Color.FromArgb(Convert.ToInt32(text.Substring(0, 2), 16), Convert.ToInt32(text.Substring(2, 2), 16), Convert.ToInt32(text.Substring(4, 2), 16), Convert.ToInt32(text.Substring(6, 2), 16));
+			}
+		}
+		catch
+		{
+		}
+		return null;
+	}
+
+	/// <summary>2026-10-22：把颜色写成 config 字符串（#RRGGBB）。</summary>
+	internal static void SaveCustomColor(string key, Color? color)
+	{
+		AppConfig.Set(key, color.HasValue ? ("#" + color.Value.R.ToString("X2") + color.Value.G.ToString("X2") + color.Value.B.ToString("X2")) : "");
+	}
+
+	private static Color ContrastTextFor(Color background)
+	{
+		return (RelativeLuminance(background) > 0.5) ? Color.FromArgb(8, 18, 31) : Color.White;
+	}
+
+	private static readonly object BackgroundImageGate = new object();
+	private static readonly ConditionalWeakTable<Form, List<Control>> TransparentRoots = new ConditionalWeakTable<Form, List<Control>>();
+	private static string _loadedBackgroundImagePath = "";
+	private static Image _loadedBackgroundImage;
+
+	/// <summary>2026-10-22（主题自定义）：把「强调色 + 背景色/背景图」应用到窗体。
+	/// <para>背景图只在主窗体上生效：把根容器（底色=Window 的面板）设成透明，让图片从卡片间隙露出来。</para></summary>
+	internal static void ApplyFormBackground(Form form)
+	{
+		if (form == null || form.IsDisposed)
+		{
+			return;
+		}
+		try
+		{
+			form.BackColor = Window;
+			Image image = LoadBackgroundImage();
+			form.BackgroundImageLayout = ImageLayout.Zoom;
+			form.BackgroundImage = image;
+			List<Control> transparent = new List<Control>();
+			if (image != null)
+			{
+				foreach (Control child in form.Controls)
+				{
+					if (child is Panel || child is TableLayoutPanel)
+					{
+						if (child.BackColor == Window || child.BackColor == NightPalette.Window || child.BackColor == DayPalette.Window)
+						{
+							child.BackColor = Color.Transparent;
+							transparent.Add(child);
+						}
+					}
+				}
+			}
+			TransparentRoots.Remove(form);
+			TransparentRoots.Add(form, transparent);
+			Logger.WriteLine("[theme] 背景应用：color=" + ToHex(Window) + " · image=" + (image != null ? "有" : "无") + " · 透明根=" + transparent.Count);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[theme] 背景应用失败（已忽略）：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
+	private static Image LoadBackgroundImage()
+	{
+		string path = (AppConfig.GetString(BackgroundImageConfigKey) ?? "").Trim();
+		lock (BackgroundImageGate)
+		{
+			if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+			{
+				_loadedBackgroundImagePath = "";
+				_loadedBackgroundImage = null;
+				return null;
+			}
+			if (string.Equals(path, _loadedBackgroundImagePath, StringComparison.OrdinalIgnoreCase))
+			{
+				return _loadedBackgroundImage;
+			}
+			try
+			{
+				_loadedBackgroundImage = Image.FromFile(path);
+				_loadedBackgroundImagePath = path;
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[theme] 背景图加载失败：" + ex.Message);
+				_loadedBackgroundImagePath = "";
+				_loadedBackgroundImage = null;
+			}
+			return _loadedBackgroundImage;
+		}
+	}
+
+	private static string ToHex(Color color)
+	{
+		return "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2");
 	}
 
 	internal static void RetintChrome(Control root)

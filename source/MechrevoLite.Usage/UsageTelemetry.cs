@@ -98,7 +98,11 @@ internal static class UsageTelemetry
 
 	internal static Func<string, string, CancellationToken, Task>? HttpPostOverride { get; set; }
 
-	internal static bool Enabled => AppConfig.Get("usage_telemetry", 1) != 0;
+	/// <summary>2026-10-22（机主：隐私与反馈功能暂时隐藏和关闭）：置 true 时彻底停用匿名统计上传。
+	/// 保留本地崩溃/日志文件写入，但不联网。</summary>
+	internal const bool TemporarilyDisabled = true;
+
+	internal static bool Enabled => !TemporarilyDisabled && AppConfig.Get("usage_telemetry", 1) != 0;
 
 	internal static bool NoticeShown => AppConfig.Get("usage_notice_version", 0) >= 1;
 

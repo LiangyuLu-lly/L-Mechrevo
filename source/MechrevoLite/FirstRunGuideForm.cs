@@ -10,6 +10,9 @@ namespace MechrevoLite;
 
 public sealed class FirstRunGuideForm : RForm
 {
+	/// <summary>2026-10-22（机主）：匿名统计说明步骤暂时隐藏；配置 ui_show_privacy_feedback=1 可恢复。</summary>
+	private static bool ShowTelemetryGuideStep => AppConfig.Get("ui_show_privacy_feedback", 0) == 1;
+
 	// 2026-10-05「核显模式显示策略」：第 4 步的回答。
 	// 2026-10-09（igpugate）：键仍是 igpu_only_ui，但值域扩成 auto/show/hide（见 Gpu\IgpuOnlyUiMode.cs）——
 	// 落盘规则改为：
@@ -195,7 +198,7 @@ public sealed class FirstRunGuideForm : RForm
 			AutoSize = true,
 			AutoSizeMode = AutoSizeMode.GrowAndShrink,
 			ColumnCount = 1,
-			RowCount = (igpuOnlyStepOnly ? 1 : (_skipIgpuOnlyStep ? 4 : 5)),
+			RowCount = (igpuOnlyStepOnly ? 1 : ((_skipIgpuOnlyStep ? 4 : 5) - (ShowTelemetryGuideStep ? 0 : 1))),
 			Padding = (igpuOnlyStepOnly ? new Padding(12, 4, 12, 4) : new Padding(16, 12, 16, 12)),
 			Margin = Padding.Empty,
 			BackColor = UiVisualStyle.Window
@@ -220,7 +223,8 @@ public sealed class FirstRunGuideForm : RForm
 		// 2026-10-09（telemetryguide）：第 5 步 —— 「匿名使用统计与匿名日志」（用户要求"这个开关应该在引导时候说明"）。
 		// 只加在**完整**首次引导里：单问模式是给升级用户补问「核显模式」那一问的，
 		// 与它无关，也不加（那一问的控件、语义与判据一字未动，双弹修复逻辑也不受影响）。
-		if (!igpuOnlyStepOnly)
+		// 2026-10-22（机主：隐私与反馈暂时隐藏和关闭）→ 第 5 步（匿名统计说明）整步不建。
+		if (!igpuOnlyStepOnly && ShowTelemetryGuideStep)
 		{
 			// ⭐ 2026-10-17：第 4 步被跳过时它没占用 stepRow，第 5 步直接落在当前行；
 			//   否则先推进一行（第 4 步占用了 stepRow 那一行）。
