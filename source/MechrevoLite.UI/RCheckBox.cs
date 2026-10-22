@@ -187,7 +187,7 @@ public class RCheckBox : CheckBox
 		graphics.SmoothingMode = SmoothingMode.AntiAlias;
 		// 2026-10-22（机主：底色填充删除 + 开关半透明）：背景图模式下不再填整块底色，
 		// 滑轨/圆钮用半透明画法直接叠在图片上。
-		bool translucent = UiVisualStyle.FormHasBackgroundImage(this);
+		bool translucent = UiVisualStyle.IsOverlayTranslucent(this);
 		// 2026-10-22（机主：开关控件的底色改成都去除）：不再填任何自身底色（原填充只是与父容器同色，
 		// 去掉后观感一致，但不会再在有背景/有色底时盖出一块矩形）。
 		if (translucent)

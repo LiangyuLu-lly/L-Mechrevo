@@ -5776,4 +5776,7 @@
   <data name="ThemeImageScrim" xml:space="preserve">
     <value>内容遮罩</value>
   </data>
+  <data name="ThemeContentTransparent" xml:space="preserve">
+    <value>控件透出底图（实验）</value>
+  </data>
 </root>

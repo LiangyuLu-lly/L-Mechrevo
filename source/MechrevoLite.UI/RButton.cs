@@ -612,7 +612,7 @@ public class RButton : Button
 				// 也不再被啃掉。**P1 起日间也铺**（日间外扩量已从 1 提到 2，不铺就一定会露出一圈环）。
 				// 只填底色，随后的圆角面/边照旧覆盖中间区域；颜色与 WM_ERASEBKGND 的擦除色逐分量相同
 				//（都是 UiVisualStyle.ContextBackColor(this)），不改任何 Bounds/Margin/Region 之外的东西。
-				if (UiVisualStyle.FormHasBackgroundImage(this) && !UiVisualStyle.IsInsideFooter(this))
+				if (UiVisualStyle.IsOverlayTranslucent(this) && !UiVisualStyle.IsInsideFooter(this))
 		{
 			UiVisualStyle.DrawFormBackgroundSlice(pevent.Graphics, this);
 		}
@@ -741,7 +741,7 @@ public class RButton : Button
 			// 2026-10-09（P1）：与独立按钮（None）同一套 —— Region 外扩 **2 设备像素**（两主题一致）+
 			// 圆角外整块铺父容器真色。
 			UiVisualStyle.SetRoundedRegion(this, path3, UiVisualStyle.RegionOutsetDevicePx);
-			if (UiVisualStyle.FormHasBackgroundImage(this) && !UiVisualStyle.IsInsideFooter(this))
+			if (UiVisualStyle.IsOverlayTranslucent(this) && !UiVisualStyle.IsInsideFooter(this))
 		{
 			UiVisualStyle.DrawFormBackgroundSlice(pevent.Graphics, this);
 		}

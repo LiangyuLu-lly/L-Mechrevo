@@ -1289,6 +1289,8 @@ internal class Strings
 
 	internal static string ThemeImageScrim => ResourceManager.GetString("ThemeImageScrim", resourceCulture);
 
+	internal static string ThemeContentTransparent => ResourceManager.GetString("ThemeContentTransparent", resourceCulture);
+
 
 
 	internal static string QuickAcRecovery => ResourceManager.GetString("QuickAcRecovery", resourceCulture);

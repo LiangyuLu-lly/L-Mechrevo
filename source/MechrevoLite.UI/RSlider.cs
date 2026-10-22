@@ -306,7 +306,7 @@ public class RSlider : Control
 		// 与所在位置的实际底色逐分量相等，整块填充因此完全不可见。
 		// ⚠️ 只是"填充色"变了：滑轨（Track/Accent 圆角条）、滑钮（两个同心圆）的形状与配色、
 		// 以及 ApplyValueAt(e.X) 的命中算法（只依赖 Width/Height，与填充无关）全部未动。
-		if (UiVisualStyle.FormHasBackgroundImage(this))
+		if (UiVisualStyle.IsOverlayTranslucent(this))
 		{
 			// 2026-10-22（机主：滑块白底闪）：背景图模式下不再填实色/白底，改铺背景切片。
 			UiVisualStyle.DrawFormBackgroundSlice(graphics, this);

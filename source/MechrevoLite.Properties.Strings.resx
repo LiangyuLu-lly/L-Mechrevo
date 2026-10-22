@@ -5781,4 +5781,7 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
   <data name="ThemeImageScrim" xml:space="preserve">
     <value>Content scrim</value>
   </data>
+  <data name="ThemeContentTransparent" xml:space="preserve">
+    <value>Translucent controls (experimental)</value>
+  </data>
 </root>

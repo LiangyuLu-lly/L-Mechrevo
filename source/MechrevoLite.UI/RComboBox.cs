@@ -1014,7 +1014,7 @@ public class RComboBox : ComboBox
 		// 填充面永远与输入区零差异。
 		Color cellColor = fieldColor;
 		bool open = DroppedDown;
-		if (UiVisualStyle.FormHasBackgroundImage(this))
+		if (UiVisualStyle.IsOverlayTranslucent(this))
 		{
 			// 2026-10-22（机主：下拉有黑色底色矩形）：先铺背景切片，再用半透明输入底色。
 			UiVisualStyle.DrawFormBackgroundSlice(g, this);

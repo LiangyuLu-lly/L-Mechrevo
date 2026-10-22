@@ -17,38 +17,17 @@ public sealed class RFooterPanel : Panel
 		BackColor = Color.Transparent;
 	}
 
-	protected override void OnControlAdded(ControlEventArgs e)
-	{
-		base.OnControlAdded(e);
-		// 2026-10-22（机主：底栏有黑色矩形）：底栏内的容器/标签统一透明，让半透明底透出来。
-		MakeTranslucent(e.Control);
-	}
-
-	private static void MakeTranslucent(Control control)
-	{
-		if (control is Panel || control is TableLayoutPanel || control is FlowLayoutPanel || control is Label || control is TableLayoutPanel)
-		{
-			control.BackColor = Color.Transparent;
-		}
-		foreach (Control child in control.Controls)
-		{
-			MakeTranslucent(child);
-		}
-	}
-
 	protected override void OnPaint(PaintEventArgs e)
 	{
 		Graphics graphics = e.Graphics;
 		graphics.SmoothingMode = SmoothingMode.AntiAlias;
-		UiVisualStyle.DrawFormBackgroundSlice(graphics, this);
 		float scale = UiDpi.Paint(this) / 96f;
 		int inset = Math.Max(1, (int)Math.Round(scale));
 		int radius = Math.Max(4, (int)Math.Round(10f * scale));
 		Rectangle bounds = new Rectangle(inset, inset, Math.Max(2, Width - inset * 2), Math.Max(2, Height - inset * 2));
 		using GraphicsPath path = RoundedRect(bounds, radius);
-		Color fill = UiVisualStyle.FormHasBackgroundImage(this)
-			? Color.FromArgb(150, UiVisualStyle.Window.R, UiVisualStyle.Window.G, UiVisualStyle.Window.B)
-			: UiVisualStyle.Window;
+		// 2026-10-22：底栏不再参与背景图透出（透明子控件会造成重影），固定实色圆角、与主题一致。
+		Color fill = UiVisualStyle.Window;
 		using (SolidBrush brush = new SolidBrush(fill))
 		{
 			graphics.FillPath(brush, path);

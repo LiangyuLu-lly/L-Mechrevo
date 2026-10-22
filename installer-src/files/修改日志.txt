@@ -84,6 +84,8 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 底栏按钮黑矩形：footer-ghost 按钮在透明父容器下自身保持透明（边色退回 Surface，避免 ButtonBase BorderColor=Transparent 崩溃）。
 - 下拉黑底：RComboBox 背景图模式先铺背景切片 + 半透明输入底色（190/255）。
 - 滚动残影：UpdateDashboardScroll 移动 stack 后 `_dashboardScroll.Invalidate(invalidateChildren: true)`，滚动即整棵子树重绘。
+- 新增「控件透出底图（实验）」开关（config `ui_bg_transparent_content`，默认 **关**）：关=稳定模式（只有窗口边缘可见底图、控件/底栏不透明，无残影）；开=全透底实验模式（残影风险，WinForms 透明绘制限制）。
+- 底栏改回**稳定实色圆角**（不再让子控件透明）：修掉底栏底图混乱/按钮重影；滚动改为 `_dashboardScroll.Refresh()` 同步整树重绘。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

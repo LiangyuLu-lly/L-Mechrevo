@@ -1617,19 +1617,6 @@ public class SettingsForm : RForm
 		ApplyRowSkins();
 		RefreshThemeButtons();
 		UiVisualStyle.ApplyFormBackground(this);
-		// 2026-10-22（机主：底下边栏改圆角矩形 + 整个底色半透明）：底栏及其子容器透明，让 RFooterPanel 自绘的半透明底透出来。
-		if (panelFooter != null)
-		{
-			panelFooter.BackColor = Color.Transparent;
-		}
-		if (tableButtons != null)
-		{
-			tableButtons.BackColor = Color.Transparent;
-		}
-		if (panelVersion != null)
-		{
-			panelVersion.BackColor = Color.Transparent;
-		}
 		// 界面外观卡片（ApplyWindow 对自绘 RButton/自定义卡片不一定覆盖），并打覆盖自检日志
 		ApplyOfficialConsoleCardTheme();
 		LogSettingsThemeCoverage();
@@ -2572,7 +2559,7 @@ public class SettingsForm : RForm
 			AutoSize = true,
 			AutoSizeMode = AutoSizeMode.GrowAndShrink,
 			ColumnCount = 3,
-			RowCount = 6,
+			RowCount = 7,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = bufferedPanel.BackColor
@@ -7899,7 +7886,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(232),
+				Height = scale(264),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7916,6 +7903,7 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
+			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
@@ -8120,6 +8108,24 @@ public class SettingsForm : RForm
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageScrim), 0, 5);
 			tableLayoutPanel.Controls.Add(scrimSlider, 1, 5);
 			tableLayoutPanel.Controls.Add(scrimLabel, 2, 5);
+
+			RCheckBox transparentContentCheck = new RCheckBox
+			{
+				Name = "checkBgTransparentContent",
+				Text = Strings.ThemeContentTransparent,
+				AutoSize = true,
+				Checked = UiVisualStyle.BackgroundContentTransparent,
+				ForeColor = UiVisualStyle.Text,
+				Margin = new Padding(0, scale(4), 0, 0)
+			};
+			transparentContentCheck.CheckedChanged += (object sender, EventArgs e) =>
+			{
+				AppConfig.Set(UiVisualStyle.BackgroundTransparentContentKey, transparentContentCheck.Checked ? 1 : 0);
+				AppConfig.Flush();
+				ApplyThemeLive();
+			};
+			tableLayoutPanel.Controls.Add(transparentContentCheck, 1, 6);
+			tableLayoutPanel.SetColumnSpan(transparentContentCheck, 2);
 
 			_themeModePanel.Controls.Add(tableLayoutPanel);
 		}
@@ -19597,8 +19603,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 				_dashboardScrollBar.SetRange(contentHeight, _dashboardScroll.ClientSize.Height);
 			}
 			_dashboardStack.Location = new Point(_dashboardStack.Left, -_dashboardScrollBar.Value);
-			// 2026-10-22（机主：上下拉有残影）：滚动后整棵子树重绘，透明控件不留旧位置残影。
-			_dashboardScroll.Invalidate(invalidateChildren: true);
+			// 2026-10-22（机主：上下拉有残影）：滚动后同步整树重绘（Refresh=Invalidate+Update），否则旧帧会留在缓冲里。
+			_dashboardScroll.Refresh();
 		}
 	}
 

@@ -71,6 +71,19 @@ internal static class UiVisualStyle
 	/// <summary>2026-10-22（主题自定义）：内容区遮罩 0~100（默认 50，越大底图越淡、文字越清楚）。</summary>
 	internal const string BackgroundScrimConfigKey = "ui_bg_scrim";
 
+	/// <summary>2026-10-22（机主：控件透底会残影）：控件/容器透出底图开关，默认关（稳定模式）；
+	/// 置 1 = 实验模式（全透底，WinForms 下滚动可能残影）。</summary>
+	internal const string BackgroundTransparentContentKey = "ui_bg_transparent_content";
+
+	/// <summary>2026-10-22：是否让控件/容器透出底图（默认 false = 只有窗口边缘/底栏可见底图，无残影）。</summary>
+	internal static bool BackgroundContentTransparent => AppConfig.Get(BackgroundTransparentContentKey, 0) == 1;
+
+	/// <summary>2026-10-22：控件是否应做“透底”绘制（背景图 + 实验开关都成立）。</summary>
+	internal static bool IsOverlayTranslucent(Control control)
+	{
+		return BackgroundContentTransparent && FormHasBackgroundImage(control);
+	}
+
 	internal const string ThemeFollowSystemKey = "ui_theme_follow_system";
 
 	internal const string BaseFontFamily = "HarmonyOS Sans SC";
@@ -1059,9 +1072,10 @@ private static void LoadEmbeddedFonts()
 					}
 				}
 			}
-			if (image != null)
+			if (image != null && BackgroundContentTransparent)
 			{
 				// 递归处理：把「页面底」色的容器都设透明（主页仪表盘/栈/分组），卡片(Surface)保持不透明。
+				// ⚠️ 仅在实验模式（ui_bg_transparent_content=1）启用：稳定模式下不透明，避免 WinForms 残影。
 				ApplyTransparentPageBackgrounds(form, transparent);
 			}
 			TransparentRoots.Remove(form);
