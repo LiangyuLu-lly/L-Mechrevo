@@ -390,15 +390,6 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
-		// 读 P0 基线 → 核心/显存各 +50 → 回读 → 各 +100 → 回读 → 归零 → 回读；
-		case "--gpu-oc-probe":
-		{
-			string probeLog = GpuOcProbe.Run();
-			Console.WriteLine(probeLog);
-			Logger.WriteLine("[gpu-oc-probe] " + probeLog);
-			Logger.Close();
-			return;
-		}
 		// （机主：GCU 最多 -900 显存？NV 范围到底多少）：**只读** 偏移范围探针。
 		case "--gpu-offset-probe":
 		{
@@ -820,15 +811,6 @@ internal static class Program
 		}
 		bool startMinimized = IsStartupLaunch(text);
 		_showGuideOnFirstRestore = startMinimized;
-		if ((text == "--secure-mqtt" || text == "--secure-mqtt-remove") ? true : false)
-		{
-			MqttSecurity.OperationResult operationResult = ((text == "--secure-mqtt") ? MqttSecurity.TryCreateInboundBlockRule() : MqttSecurity.TryRemoveInboundBlockRule());
-			Logger.WriteLine(operationResult.Message);
-			Console.WriteLine(operationResult.Message);
-			Environment.ExitCode = ((!operationResult.Success) ? 1 : 0);
-			Logger.Close();
-			return;
-		}
 		bool flag;
 		switch (text)
 		{
@@ -842,30 +824,6 @@ internal static class Program
 			else
 			{
 				Environment.ExitCode = ((!Startup.ScheduleUserTaskOnly()) ? 1 : 0);
-				Logger.Close();
-			}
-			return;
-		case "--official-isolate":
-		case "--official-restore":
-			flag = true;
-			break;
-		default:
-			flag = false;
-			break;
-		}
-		if (flag)
-		{
-			if (!ProcessHelper.IsUserAdministrator())
-			{
-				Logger.WriteLine("Official console action requires administrator rights.");
-				Environment.ExitCode = 5;
-				Logger.Close();
-			}
-			else
-			{
-				OfficialConsoleIsolation.OperationResult operationResult2 = ((text == "--official-isolate") ? OfficialConsoleIsolation.Enable() : OfficialConsoleIsolation.Restore());
-				Logger.WriteLine(operationResult2.Message);
-				Environment.ExitCode = ((!operationResult2.Success) ? 1 : 0);
 				Logger.Close();
 			}
 			return;
@@ -890,44 +848,6 @@ internal static class Program
 				Logger.WriteLine("Settings backup export failed (headless): " + ex);
 				Environment.ExitCode = 1;
 			}
-			Logger.Close();
-			return;
-		}
-		if (text == "--ui-audit")
-		{
-			UiAuditMode = true;
-			Environment.SetEnvironmentVariable("LMECHREVO_LOG_LEVEL", "all");
-			Environment.ExitCode = UiAuditRunner.Run((args.Length > 1) ? Path.GetFullPath(args[1]) : Path.Combine(AppContext.BaseDirectory, "ui-audit"));
-			Logger.Close();
-			return;
-		}
-		// ⭐⭐ 2026-10-16（0.291.9 · 宝龙达适配）：⭐ 传感器能力转储（⭐ 落实"LHM 能读温度就优先用它"✅）
-		//    ⭐ 用法：⭐ `L-Mechrevo.exe --sensor-dump [输出目录]` ✅
-		// ⭐⭐ 2026-10-16（宝龙达 · 风扇前置）：⭐ 只读观察两个风扇通道 ＋ ⭐ CPU/GPU 温度
-		//    ⭐ 用法：⭐ `L-Mechrevo.exe --fan-watch [秒数] [输出目录]` ✅
-		//    ⭐ 目的：⭐ 确认"⭐ 哪个通道是 CPU、⭐ 哪个是 GPU"⭐（⭐ 搞反会导致散热逻辑全错 ⚠️）
-		if (text == "--fan-watch")
-		{
-			int seconds = 60;
-			string watchOut = null;
-			if (args.Length > 1 && int.TryParse(args[1], out int parsedSeconds))
-			{
-				seconds = parsedSeconds;
-				if (args.Length > 2)
-				{
-					watchOut = Path.GetFullPath(args[2]);
-				}
-			}
-			else if (args.Length > 1)
-			{
-				watchOut = Path.GetFullPath(args[1]);
-			}
-			Environment.ExitCode = MechrevoLite.Hardware.FanWatchRunner.Run(seconds, watchOut);
-			Logger.Close();
-			return;
-		}		if (text == "--sensor-dump")
-		{
-			Environment.ExitCode = MechrevoLite.Hardware.SensorDumpRunner.Run((args.Length > 1) ? Path.GetFullPath(args[1]) : null);
 			Logger.Close();
 			return;
 		}
