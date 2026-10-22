@@ -136,6 +136,9 @@ internal static class Program
 	private const int KeyboardEffectProtectWindowMs = 3000;
 
 	private static int _resumeKeyboardRestorePending;
+
+	// 2026-10-22（耀世睡眠唤醒键盘灯不重新打开）：睡前记键盘电源，唤醒时即使无已保存灯效配置也恢复键盘灯
+	private static int _kbPowerBeforeSuspend = -1;
 	// （同方单键 RGB 开机闪）：硬件状态重申的最后一次执行时间（TickCount64；用于 3s 防抖）。
 	private static long _lastReassertKeyboardCustomModeTick;
 
@@ -1387,6 +1390,32 @@ internal static class Program
 			break;
 		}
 		Task.Run(() => RestoreLightingWithRetryAsync());
+		// 2026-10-22（耀世开机灯带/Logo 亮一会儿自动灭）：GCU 官方启动任务会在开机后改写灯带/Logo 状态，
+		// LM 启动时的一次恢复可能被它盖掉 ⇒ 20s/45s 各补一次（仅在用户有已保存灯效意图时；开关为关就恢复成关）。
+		_ = Task.Run(async delegate
+		{
+			foreach (int delaySeconds in new int[2] { 20, 45 })
+			{
+				try
+				{
+					await Task.Delay(TimeSpan.FromSeconds(delaySeconds)).ConfigureAwait(continueOnCapturedContext: false);
+					if (Volatile.Read(in _exitStarted) != 0)
+					{
+						return;
+					}
+					if (!LightingSettingsStore.HasUserLightingIntent())
+					{
+						return;
+					}
+					Logger.WriteLine("[light] 开机灯效补恢复（t=" + delaySeconds + "s，抵消 GCU 启动任务改写）");
+					await RestoreLightingWithRetryAsync(force: true).ConfigureAwait(continueOnCapturedContext: false);
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[light] 开机灯效补恢复失败（已吞掉）：" + ex.Message);
+				}
+			}
+		});
 		Task.Run(() => HardwareControl.EnableLocalMonitoring());
 		StartSilentUpdateCheck();
 		UsageTelemetry.Start();
@@ -3667,6 +3696,8 @@ internal static class Program
 		if (e.Mode == PowerModes.Suspend)
 		{
 			Logger.WriteLine("Power Mode Changed:" + e.Mode);
+			_kbPowerBeforeSuspend = ResolveEffectiveKbPower() ? 1 : 0;
+			Logger.WriteLine("[light] 睡眠前键盘灯状态=" + (_kbPowerBeforeSuspend == 1 ? "开" : "关") + "（唤醒按此恢复）");
 			gpuControl.StandardModeFix();
 			InputDispatcher.ShutdownStatusLed();
 			return;
@@ -3691,10 +3722,14 @@ internal static class Program
 		// 2026-10-10（①「安装后灯被熄灭」）：唤醒重放（force:true）与开机恢复同语义 ——
 		// 情况 B（无已保存灯效配置）下 ⛔ 整条重放都不做：不发键盘电源、不发外部灯效、不启动 HID 帧流，
 		// 硬件保持官方控制台 / EC / 固件给的状态。情况 A/C 照旧（C 恢复成"关"）。
+		if (!LightingSettingsStore.HasUserLightingIntent() && _kbPowerBeforeSuspend != 1)
+		{
+			Logger.WriteLine("RGB 唤醒恢复：无已保存灯效配置且睡前键盘灯是关的，跳过（不重放任何灯光下发）");
+			return;
+		}
 		if (!LightingSettingsStore.HasUserLightingIntent())
 		{
-			Logger.WriteLine("RGB 唤醒恢复：无已保存灯效配置，跳过（不重放任何灯光下发）");
-			return;
+			Logger.WriteLine("RGB 唤醒恢复：无已保存灯效配置，但睡前键盘灯是开的 ⇒ 只恢复键盘灯，不动灯带/Logo");
 		}
 		KeyboardRgb keyboardRgb = rgb;
 		if (keyboardRgb == null)
@@ -3732,6 +3767,7 @@ internal static class Program
 				finally
 				{
 					Volatile.Write(ref _resumeKeyboardRestorePending, 0);
+				_kbPowerBeforeSuspend = -1;
 				}
 			});
 		}

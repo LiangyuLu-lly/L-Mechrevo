@@ -5599,6 +5599,16 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 					return true;
 				}
 			}
+			// 2026-10-22（耀世：开机灯带/Logo 亮一会儿自动灭）：GCU 不回报该主题 Status 时（statusSeen=n），
+			// 确认路径永远等不到值 ⇒ 不要把它当失败（否则恢复被回滚）。命令已下发，按 best-effort 处理。
+			bool noStatusChannel = topic.IndexOf("Logo", StringComparison.OrdinalIgnoreCase) >= 0
+				? !_hw.LogoLightStatusSeen
+				: !_hw.LightbarStatusSeen;
+			if (noStatusChannel)
+			{
+				Logger.WriteLine($"SetLightPower({topic}, {on}) 无状态回读通道 ⇒ 按已下发处理（best-effort）");
+				return true;
+			}
 			Logger.WriteLine($"SetLightPower({topic}, {on}) not confirmed");
 			return false;
 		}
