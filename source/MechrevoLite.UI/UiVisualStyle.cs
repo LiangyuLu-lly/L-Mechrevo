@@ -1142,6 +1142,40 @@ private static void LoadEmbeddedFonts()
 		}
 	}
 
+	/// <summary>2026-10-22（主题背景图）：把窗体背景图在控件位置上的那一块画进控件，
+	/// 让按钮/开关的半透明填充真正“透出底图”（否则 WinForms 控件会先擦成实心底，alpha 只在实心底上混）。
+	/// <para>只处理 BackgroundImageLayout=Zoom（与 ApplyFormBackground 一致）。</para></summary>
+	internal static void DrawFormBackgroundSlice(Graphics graphics, Control control)
+	{
+		Form form = control?.FindForm();
+		Image image = form?.BackgroundImage;
+		if (graphics == null || form == null || image == null || control.Width <= 0 || control.Height <= 0)
+		{
+			return;
+		}
+		Rectangle client = form.ClientRectangle;
+		float scale = Math.Min((float)client.Width / image.Width, (float)client.Height / image.Height);
+		if (scale <= 0f)
+		{
+			return;
+		}
+		float width = image.Width * scale;
+		float height = image.Height * scale;
+		float left = client.X + (client.Width - width) / 2f;
+		float top = client.Y + (client.Height - height) / 2f;
+		Point controlOnForm = form.PointToClient(control.PointToScreen(Point.Empty));
+		System.Drawing.Drawing2D.GraphicsState state = graphics.Save();
+		try
+		{
+			graphics.SetClip(new Rectangle(0, 0, control.Width, control.Height));
+			graphics.DrawImage(image, new RectangleF(left - controlOnForm.X, top - controlOnForm.Y, width, height));
+		}
+		finally
+		{
+			graphics.Restore(state);
+		}
+	}
+
 	/// <summary>2026-10-22（主题背景图）：按透明度返回控件填充色；未启用背景图时原样返回。</summary>
 	internal static Color TranslucentFor(Control control, Color color, int alpha)
 	{
