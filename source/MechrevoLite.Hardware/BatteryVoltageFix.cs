@@ -145,6 +145,12 @@ internal static class BatteryVoltageFix
 	/// </summary>
 	internal static (bool Ok, string Detail) Run(string argument, int timeoutMs = 30000)
 	{
+		// 2026-10-22（无界集成）：内置通道要求 inpoutx64；随包 DLL/sys 在但驱动没装时先自动安装一次。
+		if (!I2ecInpOut.IsAvailable)
+		{
+			InpOutDriverInstaller.TryEnsureInstalled(out string installDetail);
+			Logger.WriteLine("[battery-fix] inpoutx64 自动安装结果：" + installDetail);
+		}
 		if (string.Equals(argument, "hold-full", StringComparison.OrdinalIgnoreCase))
 		{
 			if (I2ecInpOut.TryStart(out string nativeStartDetail))

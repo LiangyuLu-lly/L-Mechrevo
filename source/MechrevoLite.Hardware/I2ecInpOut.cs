@@ -99,6 +99,17 @@ internal static class I2ecInpOut
 
 	internal static string InitDetail => _initDetail;
 
+	/// <summary>2026-10-22：驱动刚安装/服务刚启动后允许重新初始化（不清已加载的 DLL）。</summary>
+	internal static void ResetInitialization()
+	{
+		lock (Gate)
+		{
+			_initialized = false;
+			_available = false;
+			_initDetail = "(重新初始化)";
+		}
+	}
+
 	/// <summary>加载 inpoutx64.dll 并确认驱动可用（只读，不写端口）。</summary>
 	private static bool EnsureInitialized(out string detail)
 	{

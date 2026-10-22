@@ -110,6 +110,12 @@ internal sealed class WujieFanEcController : IDisposable
 			detail = "独立控制需要 GPU 曲线，但 GPU 曲线为空";
 			return false;
 		}
+		// 2026-10-22（无界集成）：随包 DLL/sys 在，但驱动没装时先尝试自动安装一次，再验通道。
+		if (!I2ecInpOut.IsAvailable)
+		{
+			InpOutDriverInstaller.TryEnsureInstalled(out string installDetail);
+			Logger.WriteLine("[fan] 无界 EC 曲线：驱动自动安装结果=" + installDetail);
+		}
 		// 启动前先验通道：I2EC（inpoutx64）优先；没有驱动时回退 ACPI-EC 0x93（实验路径）。
 		WriteChannel channel = WriteChannel.None;
 		int temp = -1;
