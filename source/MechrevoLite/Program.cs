@@ -313,6 +313,15 @@ internal static class Program
 		{
 			text = args[0];
 		}
+		if (text == "--inpout-probe")
+		{
+			// 2026-10-22（机主：先探测 inpoutx64 能不能用）：只读 + 等值写自检，不改变风扇/电池行为。
+			string inpoutReport = InpOutProbe.Run((args.Length > 1) ? args[1] : "");
+			Console.WriteLine(inpoutReport);
+			Logger.WriteLine("[inpout-probe] " + inpoutReport.Replace("\r\n", " | "));
+			Logger.Close();
+			return;
+		}
 		// 2026-10-22（机主：UI 探针）：强制启用某机型 UI 只做预览，不连接硬件、不下发命令。
 		// 两条入口：命令行 --ui-probe <profile:form>；或环境变量 LMECHREVO_UI_PROBE=<profile:form>
 		// （后者便于双击启动：设用户级变量后正常打开即可，不必拼命令行）。
