@@ -49,6 +49,9 @@ internal sealed class WujieFanEcController : IDisposable
 
 	private int _lastTargetPercent = -1;
 
+	// 2026-10-22（机主：强冷继续走 GCU）：同一时刻只允许一个曲线控制器；强冷开启时由调用方停掉曲线。
+	private static WujieFanEcController _active;
+
 	internal WujieFanEcController()
 	{
 		_timer = new Timer(OnTick, null, Timeout.Infinite, Timeout.Infinite);
@@ -71,6 +74,7 @@ internal sealed class WujieFanEcController : IDisposable
 			detail = "曲线数据为空";
 			return false;
 		}
+		StopActive("被新的曲线控制器替换");
 		lock (_gate)
 		{
 			_curveTemps = (byte[])curveTemps.Clone();
@@ -90,6 +94,7 @@ internal sealed class WujieFanEcController : IDisposable
 			_lastSampleTick = Environment.TickCount64;
 			_lastTargetPercent = -1;
 			_running = true;
+			_active = this;
 			_timer.Change(WriteIntervalMs, WriteIntervalMs);
 		}
 		detail = "已启动（25Hz 双扇直写 · 曲线点数=" + _validPoints + "）";
@@ -117,12 +122,26 @@ internal sealed class WujieFanEcController : IDisposable
 		{
 			Logger.WriteLine("[fan] 无界 EC 曲线停止：" + reason + "（交还 EC）");
 		}
+		if (ReferenceEquals(_active, this))
+		{
+			_active = null;
+		}
 	}
 
 	public void Dispose()
 	{
 		Stop("窗口关闭");
 		_timer.Dispose();
+	}
+
+	/// <summary>停掉当前活动的无界风扇曲线控制器（例如强冷开启时；强冷本身仍走 GCU）。</summary>
+	internal static void StopActive(string reason)
+	{
+		WujieFanEcController active = _active;
+		if (active != null)
+		{
+			active.Stop(reason);
+		}
 	}
 
 	private void OnTick(object state)

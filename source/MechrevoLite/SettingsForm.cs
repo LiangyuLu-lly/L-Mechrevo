@@ -2185,9 +2185,17 @@ public class SettingsForm : RForm
 							if (hw != null && hw.IsConnected)
 							{
 								// SwitchFanBoost（GCU/MQTT 专用）⇒ 宝龙达上必然失败，表现为"点了没反应" ❌
-								await ApplyQuickSwitchAsync(cb, (bool on) => (Program.hw?.UsesBaolongda ?? false)
-									? Program.service.SwitchQuick("fanboost", on)
-									: Program.service.SwitchFanBoost(on));
+								await ApplyQuickSwitchAsync(cb, async (bool on) =>
+								{
+									// 2026-10-22（机主：强冷继续走 GCU）：强冷开启时先停掉无界 EC 风扇曲线，避免两条路抢占空比。
+									if (on && Program.hw?.WujieSmuApu == true)
+									{
+										WujieFanEcController.StopActive("强冷开启：暂停 EC 曲线，交还 GCU/EC");
+									}
+									return (Program.hw?.UsesBaolongda ?? false)
+										? await Program.service.SwitchQuick("fanboost", on)
+										: await Program.service.SwitchFanBoost(on);
+								});
 							}
 						}
 					}
