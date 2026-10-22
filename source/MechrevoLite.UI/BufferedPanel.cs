@@ -85,19 +85,8 @@ internal class BufferedPanel : Panel
 			UiVisualStyle.DrawFormBackgroundSlice(e.Graphics, this);
 			// 2026-10-22（机主：开了是半透明黑色地图）：按容器层级分三档不透明度，让底图更明显、卡片仍有层次。
 			Color baseColor = BackColor;
-			int alpha;
-			if (baseColor == UiVisualStyle.Surface || baseColor == UiVisualStyle.SurfaceRaised)
-			{
-				alpha = 205;
-			}
-			else if (baseColor == UiVisualStyle.ButtonFace || baseColor == UiVisualStyle.ButtonFaceHover || baseColor == UiVisualStyle.ButtonFaceSelected)
-			{
-				alpha = 190;
-			}
-			else
-			{
-				alpha = 168;
-			}
+			// 2026-10-22（机主：半透明底很怪）：所有容器统一一档不透明度（约 78%），不再按层级分三档。
+			int alpha = 200;
 			using SolidBrush overlayBrush = new SolidBrush(UiVisualStyle.TranslucentFor(this, baseColor, alpha));
 			e.Graphics.FillRectangle(overlayBrush, ClientRectangle);
 			return;
