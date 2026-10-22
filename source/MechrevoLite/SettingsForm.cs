@@ -7695,8 +7695,6 @@ public class SettingsForm : RForm
 		_dashboardScrollBar.ValueChanged += (object? _, EventArgs _) =>
 		{
 			UpdateDashboardScroll(rangeChanged: false);
-			// 2026-10-22（机主：滚动有滑块残余）：滚动后整窗重绘，避免透明容器留下旧切片残影。
-			Invalidate(invalidateChildren: true);
 		};
 		_dashboardStack.SizeChanged += (object? _, EventArgs _) =>
 		{
@@ -19604,11 +19602,8 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			}
 			_dashboardStack.Location = new Point(_dashboardStack.Left, -_dashboardScrollBar.Value);
 			// 2026-10-22（机主：上下拉有残影）：滚动后同步整树重绘（Refresh=Invalidate+Update），否则旧帧会留在缓冲里。
-			_dashboardScroll.Refresh();
-		if (UiVisualStyle.BackgroundContentTransparent)
-		{
-			Refresh();
-		}
+			// 2026-10-22（B 性能）：滚动只失效滚动区，不再整窗同步重绘（否则一顿一顿）。
+			_dashboardScroll.Invalidate(invalidateChildren: true);
 		}
 	}
 

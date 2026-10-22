@@ -1039,6 +1039,62 @@ private static void LoadEmbeddedFonts()
 
 	private static readonly object BackgroundImageGate = new object();
 	private static readonly ConditionalWeakTable<Form, List<Control>> TransparentRoots = new ConditionalWeakTable<Form, List<Control>>();
+
+	private sealed class CoverCache
+	{
+		public Bitmap Bitmap;
+		public Size Size;
+		public Image Source;
+	}
+
+	private static readonly ConditionalWeakTable<Form, CoverCache> CoverCaches = new ConditionalWeakTable<Form, CoverCache>();
+
+	/// <summary>2026-10-22（B 方案性能）：把 cover 后的背景图缓存成窗体客户区同尺寸位图，
+	/// 窗体与各容器都用 1:1 切片，避免每次重绘都缩放 DrawImage（滚动卡顿主因）。</summary>
+	private static Bitmap GetCoverBitmap(Form form)
+	{
+		Image image = form?.BackgroundImage;
+		if (form == null || image == null)
+		{
+			return null;
+		}
+		Size size = form.ClientSize;
+		if (size.Width <= 0 || size.Height <= 0 || image.Width <= 0 || image.Height <= 0)
+		{
+			return null;
+		}
+		if (CoverCaches.TryGetValue(form, out CoverCache cache) && cache.Size == size && ReferenceEquals(cache.Source, image))
+		{
+			return cache.Bitmap;
+		}
+		try
+		{
+			Bitmap bitmap = new Bitmap(size.Width, size.Height);
+			using (Graphics graphics = Graphics.FromImage(bitmap))
+			{
+				graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
+				float scale = Math.Max((float)size.Width / image.Width, (float)size.Height / image.Height);
+				float width = image.Width * scale;
+				float height = image.Height * scale;
+				float left = (size.Width - width) / 2f;
+				float top = (size.Height - height) / 2f;
+				graphics.DrawImage(image, new RectangleF(left, top, width, height));
+			}
+			CoverCaches.Remove(form);
+			CoverCaches.Add(form, new CoverCache
+			{
+				Bitmap = bitmap,
+				Size = size,
+				Source = image
+			});
+			return bitmap;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[theme] 背景位图缓存失败：" + ex.GetType().Name + " " + ex.Message);
+			return null;
+		}
+	}
 	private static string _loadedBackgroundImagePath = "";
 	private static Image _loadedBackgroundImage;
 	private static int _loadedBackgroundOpacity = -1;
@@ -1164,22 +1220,12 @@ private static void LoadEmbeddedFonts()
 	/// <returns>true 表示已画（调用方不要再走默认背景绘制）。</returns></summary>
 	internal static bool PaintFormBackground(Graphics graphics, Form form)
 	{
-		Image image = form?.BackgroundImage;
-		if (graphics == null || form == null || image == null)
+		Bitmap bitmap = GetCoverBitmap(form);
+		if (graphics == null || bitmap == null)
 		{
 			return false;
 		}
-		Size client = form.ClientSize;
-		if (client.Width <= 0 || client.Height <= 0 || image.Width <= 0 || image.Height <= 0)
-		{
-			return false;
-		}
-		float scale = Math.Max((float)client.Width / image.Width, (float)client.Height / image.Height);
-		float width = image.Width * scale;
-		float height = image.Height * scale;
-		float left = (client.Width - width) / 2f;
-		float top = (client.Height - height) / 2f;
-		graphics.DrawImage(image, new RectangleF(left, top, width, height));
+		graphics.DrawImageUnscaled(bitmap, 0, 0);
 		return true;
 	}
 
@@ -1202,28 +1248,17 @@ private static void LoadEmbeddedFonts()
 	internal static void DrawFormBackgroundSlice(Graphics graphics, Control control)
 	{
 		Form form = control?.FindForm();
-		Image image = form?.BackgroundImage;
-		if (graphics == null || form == null || image == null || control.Width <= 0 || control.Height <= 0)
+		Bitmap bitmap = GetCoverBitmap(form);
+		if (graphics == null || form == null || bitmap == null || control.Width <= 0 || control.Height <= 0)
 		{
 			return;
 		}
-		Rectangle client = form.ClientRectangle;
-		// 2026-10-22（机主：图片上下边要填满）：按 cover 缩放（取较大比例、超出部分裁掉）。
-		float scale = Math.Max((float)client.Width / image.Width, (float)client.Height / image.Height);
-		if (scale <= 0f)
-		{
-			return;
-		}
-		float width = image.Width * scale;
-		float height = image.Height * scale;
-		float left = client.X + (client.Width - width) / 2f;
-		float top = client.Y + (client.Height - height) / 2f;
 		Point controlOnForm = form.PointToClient(control.PointToScreen(Point.Empty));
 		System.Drawing.Drawing2D.GraphicsState state = graphics.Save();
 		try
 		{
 			graphics.SetClip(new Rectangle(0, 0, control.Width, control.Height));
-			graphics.DrawImage(image, new RectangleF(left - controlOnForm.X, top - controlOnForm.Y, width, height));
+			graphics.DrawImageUnscaled(bitmap, -controlOnForm.X, -controlOnForm.Y);
 		}
 		finally
 		{

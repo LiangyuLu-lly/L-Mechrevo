@@ -89,9 +89,9 @@ public class RForm : Form
 	/// 稳定模式下恢复双缓冲（避免闪烁）。</summary>
 	public void SetOverlayBackgroundMode(bool on)
 	{
-		DoubleBuffered = !on;
-		SetStyle(ControlStyles.OptimizedDoubleBuffer, !on);
-		SetStyle(ControlStyles.AllPaintingInWmPaint, true);
+		// 2026-10-22：容器自绘后不再关闭双缓冲（关掉会整窗重绘，滚动一顿一顿）。
+		DoubleBuffered = true;
+		SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
 	}
 
 	/// <summary>2026-10-22（机主：背景图只给主 UI）：只有主窗口显式打开，其它窗体（设置页/子窗口/浮动窗）不铺背景图。</summary>
