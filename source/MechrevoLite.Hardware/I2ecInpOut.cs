@@ -85,7 +85,7 @@ internal static class I2ecInpOut
 				{
 					return false;
 				}
-				Thread.Sleep(5);
+				Thread.Sleep(1);
 			}
 		}
 		catch
@@ -253,6 +253,8 @@ internal static class I2ecInpOut
 	private static long _nextInputCheckTick;
 
 	private static long _lastStatusLogTick;
+
+	private static int _batteryLoopCount;
 
 	private static volatile bool _running;
 
@@ -750,6 +752,12 @@ internal static class I2ecInpOut
 				// 与参考脚本一致：每 2ms 重新写一遍（脚本 time.sleep(0.002)），
 				// 否则 2s 间隔里 EC 会回写/中断充电，表现为电流一会有一会没有。
 				Thread.Sleep(2);
+				// 2026-10-22（机主：预防风扇竞争）：电池 500Hz 循环每 8 轮额外让出 2ms，
+				// 保证风扇 25Hz 写有窗口，不会被 2ms 电池写长期抢占 I2EC 锁。
+				if ((++_batteryLoopCount % 8) == 0)
+				{
+					Thread.Sleep(2);
+				}
 			}
 		}
 		finally
