@@ -42,6 +42,45 @@ internal static class I2ecInpOut
 
 	private static readonly object Gate = new object();
 
+	// 2026-10-22（fanctl README 的坑：两个 EC 句柄并发会把地址窗口改掉 ⇒ 静默读错寄存器）：
+	// I2EC 是三步端口操作（地址高→地址低→数据），必须**跨进程**串行化。
+	// UI 风扇曲线控制器 与 SYSTEM 电池修复常驻任务各一个进程，进程内 lock 挡不住对方，故加全局互斥体。
+	private static readonly Mutex EcMutex = new Mutex(initiallyOwned: false, @"Global\L-Mechrevo-I2EC");
+
+	private static bool TryEnterEcMutex(out bool held)
+	{
+		held = false;
+		try
+		{
+			held = EcMutex.WaitOne(500);
+			return true;
+		}
+		catch (AbandonedMutexException)
+		{
+			held = true;
+			return true;
+		}
+		catch
+		{
+			return true;
+		}
+	}
+
+	private static void ExitEcMutex(bool held)
+	{
+		if (!held)
+		{
+			return;
+		}
+		try
+		{
+			EcMutex.ReleaseMutex();
+		}
+		catch
+		{
+		}
+	}
+
 	private static readonly string[] DllSearchDirs =
 	{
 		AppContext.BaseDirectory,
@@ -283,6 +322,7 @@ internal static class I2ecInpOut
 		}
 		lock (Gate)
 		{
+			TryEnterEcMutex(out bool held);
 			try
 			{
 				value = ReadByte(address);
@@ -293,6 +333,10 @@ internal static class I2ecInpOut
 			{
 				detail = ex.GetType().Name + " " + ex.Message;
 				return false;
+			}
+			finally
+			{
+				ExitEcMutex(held);
 			}
 		}
 	}
@@ -307,6 +351,7 @@ internal static class I2ecInpOut
 		}
 		lock (Gate)
 		{
+			TryEnterEcMutex(out bool held);
 			try
 			{
 				WriteByte(address, value & 0xFF);
@@ -323,6 +368,10 @@ internal static class I2ecInpOut
 			{
 				detail = ex.GetType().Name + " " + ex.Message;
 				return false;
+			}
+			finally
+			{
+				ExitEcMutex(held);
 			}
 		}
 	}
@@ -440,16 +489,27 @@ internal static class I2ecInpOut
 			{
 				try
 				{
-					WriteLe16(AddrDesiredVoltage, ExpectedBaseVoltageMv);
-					WriteLe16(AddrQueuedVoltage, ExpectedBaseVoltageMv);
-					WriteLe16(AddrDesiredCurrent, ChargeCurrentMa);
-					WriteLe16(AddrQueuedCurrent, ChargeCurrentMa);
-					int queuedInput = ReadLe16(AddrQueuedInputCurrent);
-					if (queuedInput == InputCurrentSourceMa || queuedInput == ChargeCurrentMa)
+					lock (Gate)
 					{
-						WriteLe16(AddrQueuedInputCurrent, ChargeCurrentMa);
+						TryEnterEcMutex(out bool held);
+						try
+						{
+							WriteLe16(AddrDesiredVoltage, ExpectedBaseVoltageMv);
+							WriteLe16(AddrQueuedVoltage, ExpectedBaseVoltageMv);
+							WriteLe16(AddrDesiredCurrent, ChargeCurrentMa);
+							WriteLe16(AddrQueuedCurrent, ChargeCurrentMa);
+							int queuedInput = ReadLe16(AddrQueuedInputCurrent);
+							if (queuedInput == InputCurrentSourceMa || queuedInput == ChargeCurrentMa)
+							{
+								WriteLe16(AddrQueuedInputCurrent, ChargeCurrentMa);
+							}
+							WriteByte(AddrStopGate, 0);
+						}
+						finally
+						{
+							ExitEcMutex(held);
+						}
 					}
-					WriteByte(AddrStopGate, 0);
 				}
 				catch (Exception ex)
 				{
@@ -501,6 +561,7 @@ internal static class I2ecInpOut
 			{
 				return;
 			}
+			TryEnterEcMutex(out bool held);
 			try
 			{
 				WriteLe16(AddrDesiredVoltage, _origDesiredV);
@@ -515,6 +576,10 @@ internal static class I2ecInpOut
 			catch (Exception ex)
 			{
 				Logger.WriteError("[battery-fix] 恢复原值失败（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
+			}
+			finally
+			{
+				ExitEcMutex(held);
 			}
 			_originalsCaptured = false;
 		}
