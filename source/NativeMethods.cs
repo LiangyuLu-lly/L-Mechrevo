@@ -17,7 +17,7 @@ public static class NativeMethods
 
 		public uint DataLength;
 
-		public byte Data;
+		public uint Data; // 2026-10-22：真实语义是 DWORD（原 byte 靠小端碰巧对）
 	}
 
 	public class PowerSettingGuid
@@ -109,7 +109,7 @@ public static class NativeMethods
 	internal static extern nint RegisterPowerSettingNotification(nint hWnd, [In] Guid PowerSettingGuid, uint Flags);
 
 	[DllImport("User32.dll", SetLastError = true)]
-	internal static extern bool UnregisterPowerSettingNotification(nint hWnd);
+	internal static extern bool UnregisterPowerSettingNotification(nint hPowerNotify);
 
 	[DllImport("User32.dll", SetLastError = true)]
 	internal static extern nint RegisterSuspendResumeNotification(nint hRecipient, uint Flags);

@@ -12296,24 +12296,26 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			Logger.WriteLine("Battery Saver: " + pOWERBROADCAST_SETTING.Data);
 			buttonEnergySaver.Visible = pOWERBROADCAST_SETTING.Data != 0;
 		}
-		else
+		else if (pOWERBROADCAST_SETTING.PowerSetting == NativeMethods.PowerSettingGuid.ConsoleDisplayState)
 		{
-			// 2026-10-11（重构）：息屏已改虚拟显示器方案（VirtualDisplayBlank），不再依赖系统回报确认；
-			// 旧的 SC_MONITORPOWER 确认机制已随 ScreenBlankController 一并删除。
-			if (pOWERBROADCAST_SETTING.PowerSetting == NativeMethods.PowerSettingGuid.ConsoleDisplayState)
+			// 2026-10-22（JIGUANG 崩溃分析）：显式只认 ConsoleDisplayState，⛔ 不再把其他 GUID 的 Data 误读成显示器状态。
+			if (pOWERBROADCAST_SETTING.DataLength < 4)
 			{
-				// 息屏已改虚拟显示器方案，不再需要系统回报确认显示器开关状态。
+				m.Result = 1;
+				return;
 			}
 			switch (pOWERBROADCAST_SETTING.Data)
 			{
 			case 0:
 				Logger.WriteLine("Monitor Power Off");
 				Aura.SleepBrightness();
-				Program.hardwareOverlay?.SuspendForDisplayOff();
+				HardwareControl.SuspendLocalSamplingForDisplayOff();
 				NvmlHelper.SuspendForDisplayOff();
+				Program.hardwareOverlay?.SuspendForDisplayOff();
 				break;
 			case 1:
 				Logger.WriteLine("Monitor Power On");
+				HardwareControl.ResumeLocalSamplingAfterDisplayOn();
 				NvmlHelper.ResumeForDisplayOn();
 				if (!Program.SetAutoModes(powerChanged: false, init: false, wakeup: true))
 				{

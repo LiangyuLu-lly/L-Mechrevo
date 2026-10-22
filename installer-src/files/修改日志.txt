@@ -141,6 +141,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 删除无界风扇曲线窗口的「读取官方风扇表」按钮及其实现（温度轴完全按我们保存的曲线走；`WujieFanTableFile` 保留仅作参考代码，不再被 UI 调用）。
 - 耀世睡眠开盖键盘灯：诊断包实证现代待机走 `PBT_APMSUSPEND/RESUME`（日志只有 `System Suspend/Resume`，没有 `Power Mode Changed`）⇒ 原恢复钩子挂在 `SystemEvents.PowerModeChanged` 上从未执行。现改挂 `WM_POWERBROADCAST`（wParam 4 记键盘灯状态、18/7 唤醒调恢复），解决开盖后键盘灯不亮。
 - 待机熄屏再亮屏 0xc0000005：显示器关闭时暂停 NVML 采样、亮屏后 `Reset()` 重建再恢复（显卡驱动在熄屏/唤醒会重置，旧句柄/驱动桩内原生 AV 不可捕获，与历史 NVML 崩溃同族）；`Monitor Power Off/On` 分别调用 `SuspendForDisplayOff/ResumeForDisplayOn`。
+- 待机息屏再亮屏 0xc0000005（同事分析诊断包结论）：常驻采样泵在亮屏后卡在 NVML/LHM 原生调用，`_localSamplingPumpInFlight` 因 finally 不执行而永久=1 ⇒ 泵静默且无日志；已加 15s 看门狗强制放闸 + 日志，并在 `Monitor Power Off/On` 暂停/重建采样泵（只停泵不 Dispose LHM/NVML）；同时 `POWERBROADCAST_SETTING.Data` 改 uint、只认 ConsoleDisplayState 且校验 DataLength<4，避免其它电源 GUID 被误当显示器状态。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

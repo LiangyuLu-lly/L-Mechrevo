@@ -568,6 +568,10 @@ public static class HardwareControl
 	/// <summary>⭐ 采样泵重入保护（⭐ 1 = 本轮回调在跑 ✅）。</summary>
 	private static int _localSamplingPumpInFlight;
 
+	// 2026-10-22（JIGUANG 待机亮屏 0xc0000005）：泵回调卡在原生调用时 finally 永不执行 ⇒ 永久静默；
+	// 记开始时刻，超过 15s 判卡死并强制放闸（旧线程可能仍阻塞，但至少泵能活过来并留证据）。
+	private static long _localSamplingPumpStartedTick;
+
 	/// <summary>⭐ 最近一次**任何调用方**开始采样的时刻（<see cref="Environment.TickCount64"/>；0 = 还没采过）—— 采样泵据此让位。</summary>
 	private static long _lastLocalSampleTick;
 
@@ -767,6 +771,32 @@ public static class HardwareControl
 			+ " GPU 温度（NVML）与 CPU/GPU 功耗 ✅ ⇒ ⛔ 不再出现「关页 6 秒后温度变 —、功耗冻结」❌）");
 	}
 
+	/// <summary>2026-10-22（JIGUANG 待机亮屏 0xc0000005）：显示器关闭 ⇒ 只停泵、不 Dispose LHM/NVML（保留温度源）。</summary>
+	internal static void SuspendLocalSamplingForDisplayOff()
+	{
+		lock (lhmLock)
+		{
+			StopLocalSamplingPumpLocked();
+		}
+		Logger.WriteLine("[pump] 显示器关闭 ⇒ 暂停本地采样泵（避免 GPU 进 D3/驱动重置期原生调用）");
+	}
+
+	/// <summary>2026-10-22：显示器打开 ⇒ 清掉可能卡死的重入闸门并重建 Timer（旧 Timer 丢弃）。</summary>
+	internal static void ResumeLocalSamplingAfterDisplayOn()
+	{
+		lock (lhmLock)
+		{
+			Interlocked.Exchange(ref _localSamplingPumpInFlight, 0);
+			Interlocked.Exchange(ref _localSamplingPumpStartedTick, 0L);
+			StopLocalSamplingPumpLocked();
+			if (Volatile.Read(in _localMonitoringEnabled))
+			{
+				StartLocalSamplingPumpLocked();
+			}
+		}
+		Logger.WriteLine("[pump] 显示器打开 ⇒ 采样泵已重建（重入闸门清零）");
+	}
+
 	/// <summary>⭐ 2026-10-17：⭐ 停常驻采样泵（⭐ 调用方必须已持有 <c>lhmLock</c> ✅）。</summary>
 	private static void StopLocalSamplingPumpLocked()
 	{
@@ -785,8 +815,21 @@ public static class HardwareControl
 	{
 		if (Interlocked.CompareExchange(ref _localSamplingPumpInFlight, 1, 0) != 0)
 		{
-			return; // ⭐ 上一轮还没跑完 ⇒ ⭐ 本轮直接跳过（⛔ 不堆积）✅
+			// 2026-10-22（JIGUANG 待机亮屏 0xc0000005）：回调卡在原生调用里时 finally 不会执行，
+			// 原样 return 会让泵永久静默。15s 还没回来 ⇒ 判定卡死，强制放闸重试并留一行证据。
+			long stuckSince = Interlocked.Read(in _localSamplingPumpStartedTick);
+			if (stuckSince != 0L && Environment.TickCount64 - stuckSince > 15000L)
+			{
+				Interlocked.Exchange(ref _localSamplingPumpInFlight, 0);
+				Interlocked.Exchange(ref _localSamplingPumpStartedTick, 0L);
+				Logger.WriteError("[pump] 采样泵回调超过 15 s 未返回 ⇒ 判定原生调用卡死，强制复位重试（旧线程可能仍阻塞）");
+			}
+			else
+			{
+				return; // ⭐ 上一轮还没跑完 ⇒ ⭐ 本轮直接跳过（⛔ 不堆积）✅
+			}
 		}
+		Interlocked.Exchange(ref _localSamplingPumpStartedTick, Environment.TickCount64);
 		try
 		{
 			if (!Volatile.Read(in _localMonitoringEnabled))
@@ -814,6 +857,7 @@ public static class HardwareControl
 		}
 		finally
 		{
+			Interlocked.Exchange(ref _localSamplingPumpStartedTick, 0L);
 			Interlocked.Exchange(ref _localSamplingPumpInFlight, 0);
 		}
 	}
