@@ -5505,25 +5505,28 @@ public class SettingsForm : RForm
 		bool on = QuickTileHighlightOn(key, switchOn);
 		// 高亮 = 开（亮色图标 + 强调色描边 + 浅底，与 RButton 既有选中态同一套画法）；
 		// 暗淡 = 关（Muted 图标/文字 + 普通边框）。⛔ 不另造一套配色。
-		// 2026-10-22（机主：不想要「边框一条细线亮」）：快捷开关磁贴改为**实心强调色填充**（不是细描边）。
-		tile.Image = UiGlyph.Render(QuickTileGlyph(key, switchOn), num, on ? UiVisualStyle.AccentText : UiVisualStyle.Muted);
+		// 2026-10-22（机主：快捷按钮高亮改成「边框 + 淡填充」，不要整块填充）：与其它选中按钮统一。
+		tile.Image = UiGlyph.Render(QuickTileGlyph(key, switchOn), num, on ? UiVisualStyle.Accent : UiVisualStyle.Muted);
 		if (image != null)
 		{
 			image.Dispose();
 		}
 		tile.Activated = on;
-		tile.ActivatedOutline = false;
-		tile.SelectionUsesAssignedAccent = false;
+		tile.ActivatedOutline = true;
+		tile.SelectionUsesAssignedAccent = true;
 		tile.SelectionUsesModeFill = false;
-		Color tileOnColor = UiVisualStyle.Accent;
-		if (UiVisualStyle.FormHasBackgroundImage(this))
+		Color tileOnColor = UiVisualStyle.ButtonFace;
+		if (on)
 		{
-			// 2026-10-22（机主：底的颜色填充删除 / 半透明）：背景图模式下用半透明强调色填充。
-			tileOnColor = Color.FromArgb(170, UiVisualStyle.Accent.R, UiVisualStyle.Accent.G, UiVisualStyle.Accent.B);
+			// 淡强调色填充（约 18% 混入），整块仍是中性面、不是饱和色块。
+			tileOnColor = Color.FromArgb(
+				(int)Math.Round(UiVisualStyle.ButtonFace.R * 0.82 + UiVisualStyle.Accent.R * 0.18),
+				(int)Math.Round(UiVisualStyle.ButtonFace.G * 0.82 + UiVisualStyle.Accent.G * 0.18),
+				(int)Math.Round(UiVisualStyle.ButtonFace.B * 0.82 + UiVisualStyle.Accent.B * 0.18));
 		}
-		tile.BackColor = on ? tileOnColor : UiVisualStyle.ButtonFace;
-		tile.ForeColor = on ? UiVisualStyle.AccentText : UiVisualStyle.Muted;
-		tile.ActivatedTextColor = on ? UiVisualStyle.AccentText : Color.Empty;
+		tile.BackColor = tileOnColor;
+		tile.ForeColor = on ? UiVisualStyle.Text : UiVisualStyle.Muted;
+		tile.ActivatedColor = on ? UiVisualStyle.Accent : Color.Empty;
 		tile.BorderColor = on ? UiVisualStyle.Accent : UiVisualStyle.Border;
 		tile.Invalidate();
 	}
@@ -8017,10 +8020,9 @@ public class SettingsForm : RForm
 			tableLayoutPanel.Controls.Add(backgroundColorLabel, 0, 2);
 			tableLayoutPanel.Controls.Add(backgroundColorPanel, 1, 2);
 			tableLayoutPanel.SetColumnSpan(backgroundColorPanel, 2);
-			// 2026-10-22（机主：有图片的时候背景色不应该可以用）：已配置背景图时整行隐藏（也不参与取色）。
+			// 2026-10-22（机主：有图片的时候背景色应该置灰）：已配置背景图时整行保留但禁用/置灰。
 			bool backgroundImageConfigured = !string.IsNullOrWhiteSpace(AppConfig.GetString(UiVisualStyle.BackgroundImageConfigKey));
-			backgroundColorLabel.Visible = !backgroundImageConfigured;
-			backgroundColorPanel.Visible = !backgroundImageConfigured;
+			SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, !backgroundImageConfigured);
 
 			Button backgroundImageButton = CreateThemeSettingButton(Strings.ThemeChoose);
 			backgroundImageButton.Click += (object sender, EventArgs e) =>
@@ -8034,8 +8036,7 @@ public class SettingsForm : RForm
 				{
 						AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, dialog.FileName);
 					AppConfig.Flush();
-					backgroundColorLabel.Visible = false;
-					backgroundColorPanel.Visible = false;
+					SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, false);
 					ApplyThemeLive();
 				}
 			};
@@ -8044,8 +8045,7 @@ public class SettingsForm : RForm
 			{
 				AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, "");
 				AppConfig.Flush();
-				backgroundColorLabel.Visible = true;
-				backgroundColorPanel.Visible = true;
+				SetBackgroundColorRowEnabled(backgroundColorLabel, backgroundColorPanel, true);
 				ApplyThemeLive();
 			};
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundImage), 0, 3);
@@ -8155,6 +8155,21 @@ public class SettingsForm : RForm
 				}
 				catch
 				{
+				}
+			}
+		}
+		void SetBackgroundColorRowEnabled(Label rowLabel, FlowLayoutPanel rowPanel, bool enabled)
+		{
+			// 2026-10-22（机主：启用背景图时背景色置灰）：保留行、禁用并变灰。
+			rowLabel.ForeColor = enabled ? UiVisualStyle.Text : UiVisualStyle.Muted;
+			rowLabel.Enabled = enabled;
+			rowPanel.Enabled = enabled;
+			foreach (Control control in rowPanel.Controls)
+			{
+				control.Enabled = enabled;
+				if (control is Label controlLabel)
+				{
+					controlLabel.ForeColor = enabled ? UiVisualStyle.Text : UiVisualStyle.Muted;
 				}
 			}
 		}
