@@ -180,3 +180,15 @@
   - [ ] 写只读 WMI 探测（`WMIIsTurboSubModeSupport`）并在开发机/目标机取值；
   - [ ] 核对 50 GCU `Fan/Control` 两个动作在 Gen40 的响应；
   - [ ] 能力成立时实现 capability override + UI 放开 + 日志（不成立则写结论）。
+
+
+## [存档] 2026-10-22 主题/背景阶段状态（版本 0.293.5 beta23.5）
+- 已完成：
+  - [x] 主题色功能（设置→界面外观卡片；立即生效；默认恢复；config `ui_accent_color`）
+  - [x] 背景图定制**已隐藏**（UI 不建控件、运行时不读取；config `ui_show_background_customization=1` 可恢复）——WinForms 透明+滚动限制，详见 `docs/notes/主题与背景-阶段存档-20261022.md` 与 `docs/notes/WPF-迁移评估-20261022.md`
+  - [x] 隐私与反馈隐藏 + 匿名统计关闭
+  - [x] 版本号 0.293.5 beta23.5
+- 待决定：
+  - [ ] WPF P0 原型（主界面一页：背景图+半透明+平滑滚动+主题色，1~2 周）
+  - [ ] 主题色扩展（预设色板 / 明暗各存一套）
+- 注意：工作区 `docs/`、`tools/` 下仍有历史未提交改动（非本轮产生，未动）。
