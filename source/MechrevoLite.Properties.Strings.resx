@@ -5775,4 +5775,7 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
   <data name="ThemeRestartToApply" xml:space="preserve">
     <value>Restart L-Mechrevo to apply the theme change.</value>
   </data>
+  <data name="ThemePresetColors" xml:space="preserve">
+    <value>Preset colors</value>
+  </data>
 </root>

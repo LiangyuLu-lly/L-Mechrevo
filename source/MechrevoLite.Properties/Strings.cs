@@ -1285,6 +1285,8 @@ internal class Strings
 
 	internal static string ThemeRestartToApply => ResourceManager.GetString("ThemeRestartToApply", resourceCulture);
 
+	internal static string ThemePresetColors => ResourceManager.GetString("ThemePresetColors", resourceCulture);
+
 
 
 	internal static string QuickAcRecovery => ResourceManager.GetString("QuickAcRecovery", resourceCulture);

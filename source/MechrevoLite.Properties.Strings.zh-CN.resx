@@ -5770,4 +5770,7 @@
   <data name="ThemeRestartToApply" xml:space="preserve">
     <value>重启 L-Mechrevo 后生效。</value>
   </data>
+  <data name="ThemePresetColors" xml:space="preserve">
+    <value>预设配色</value>
+  </data>
 </root>

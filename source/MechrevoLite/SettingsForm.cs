@@ -2559,7 +2559,7 @@ public class SettingsForm : RForm
 			AutoSize = true,
 			AutoSizeMode = AutoSizeMode.GrowAndShrink,
 			ColumnCount = 3,
-			RowCount = 5,
+			RowCount = 6,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = bufferedPanel.BackColor
@@ -7869,7 +7869,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(176),
+				Height = scale(208),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7887,6 +7887,7 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
@@ -7934,52 +7935,61 @@ public class SettingsForm : RForm
 						_themeModePanel.Invalidate(true);
 					}
 				}));
-			// 2026-10-22（机主：主题色 + 背景自定义）
+			// 2026-10-22（机主：主题色 + 背景自定义；改完立即生效、不需要重启）
 			Color accentCurrent = UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.AccentColorConfigKey));
 			if (accentCurrent == Color.Empty)
 			{
 				accentCurrent = UiVisualStyle.Accent;
 			}
+			Panel accentSwatch = CreateThemeSwatch(accentCurrent);
 			Button accentButton = CreateThemeSettingButton(Strings.ThemeChoose);
-			SetThemeSwatch(accentButton, accentCurrent);
 			accentButton.Click += (object sender, EventArgs e) =>
 			{
 				using ColorDialog dialog = new ColorDialog
 				{
 					FullOpen = true,
-					Color = ((UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.AccentColorConfigKey)) == Color.Empty) ? UiVisualStyle.Accent : UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.AccentColorConfigKey)))
+					Color = accentCurrent
 				};
 				if (dialog.ShowDialog(this) == DialogResult.OK)
 				{
 					UiVisualStyle.SaveCustomColor(UiVisualStyle.AccentColorConfigKey, dialog.Color);
 					AppConfig.Flush();
-					SetThemeSwatch(accentButton, dialog.Color);
-					ShowThemeRestartHint();
+					accentSwatch.BackColor = dialog.Color;
+					ApplyThemeLive();
 				}
 			};
+			Button accentDefault = CreateThemeSettingButton(Strings.ThemeDefault);
+			accentDefault.Click += (object sender, EventArgs e) =>
+			{
+				UiVisualStyle.SaveCustomColor(UiVisualStyle.AccentColorConfigKey, Color.Empty);
+				AppConfig.Flush();
+				accentSwatch.BackColor = UiVisualStyle.Accent;
+				ApplyThemeLive();
+			};
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeAccentColor), 0, 1);
-			tableLayoutPanel.Controls.Add(accentButton, 1, 1);
+			tableLayoutPanel.Controls.Add(CreateThemeRowPanel(accentSwatch, accentButton, accentDefault), 1, 1);
+			tableLayoutPanel.SetColumnSpan(tableLayoutPanel.GetControlFromPosition(1, 1), 2);
 
-			Button backgroundColorButton = CreateThemeSettingButton(Strings.ThemeChoose);
 			Color backgroundCurrent = UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey));
 			if (backgroundCurrent == Color.Empty)
 			{
 				backgroundCurrent = UiVisualStyle.Window;
 			}
-			SetThemeSwatch(backgroundColorButton, backgroundCurrent);
+			Panel backgroundSwatch = CreateThemeSwatch(backgroundCurrent);
+			Button backgroundColorButton = CreateThemeSettingButton(Strings.ThemeChoose);
 			backgroundColorButton.Click += (object sender, EventArgs e) =>
 			{
 				using ColorDialog dialog = new ColorDialog
 				{
 					FullOpen = true,
-					Color = ((UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey)) == Color.Empty) ? UiVisualStyle.Window : UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey)))
+					Color = backgroundCurrent
 				};
 				if (dialog.ShowDialog(this) == DialogResult.OK)
 				{
 					UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, dialog.Color);
 					AppConfig.Flush();
-					SetThemeSwatch(backgroundColorButton, dialog.Color);
-					ShowThemeRestartHint();
+					backgroundSwatch.BackColor = dialog.Color;
+					ApplyThemeLive();
 				}
 			};
 			Button backgroundColorDefault = CreateThemeSettingButton(Strings.ThemeDefault);
@@ -7987,12 +7997,12 @@ public class SettingsForm : RForm
 			{
 				UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, Color.Empty);
 				AppConfig.Flush();
-				SetThemeSwatch(backgroundColorButton, UiVisualStyle.Window);
-				ShowThemeRestartHint();
+				backgroundSwatch.BackColor = UiVisualStyle.Window;
+				ApplyThemeLive();
 			};
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundColor), 0, 2);
-			tableLayoutPanel.Controls.Add(backgroundColorButton, 1, 2);
-			tableLayoutPanel.Controls.Add(backgroundColorDefault, 2, 2);
+			tableLayoutPanel.Controls.Add(CreateThemeRowPanel(backgroundSwatch, backgroundColorButton, backgroundColorDefault), 1, 2);
+			tableLayoutPanel.SetColumnSpan(tableLayoutPanel.GetControlFromPosition(1, 2), 2);
 
 			Button backgroundImageButton = CreateThemeSettingButton(Strings.ThemeChoose);
 			backgroundImageButton.Click += (object sender, EventArgs e) =>
@@ -8006,7 +8016,7 @@ public class SettingsForm : RForm
 				{
 					AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, dialog.FileName);
 					AppConfig.Flush();
-					ShowThemeRestartHint();
+					ApplyThemeLive();
 				}
 			};
 			Button backgroundImageClear = CreateThemeSettingButton(Strings.ThemeClear);
@@ -8014,11 +8024,11 @@ public class SettingsForm : RForm
 			{
 				AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, "");
 				AppConfig.Flush();
-				ShowThemeRestartHint();
+				ApplyThemeLive();
 			};
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundImage), 0, 3);
-			tableLayoutPanel.Controls.Add(backgroundImageButton, 1, 3);
-			tableLayoutPanel.Controls.Add(backgroundImageClear, 2, 3);
+			tableLayoutPanel.Controls.Add(CreateThemeRowPanel(backgroundImageButton, backgroundImageClear), 1, 3);
+			tableLayoutPanel.SetColumnSpan(tableLayoutPanel.GetControlFromPosition(1, 3), 2);
 
 			RSlider opacitySlider = new RSlider
 			{
@@ -8041,14 +8051,109 @@ public class SettingsForm : RForm
 				AppConfig.Set(UiVisualStyle.BackgroundOpacityConfigKey, opacitySlider.Value);
 				AppConfig.Flush();
 				opacityLabel.Text = opacitySlider.Value + "%";
+				UiVisualStyle.ApplyFormBackground(this);
 			};
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageOpacity), 0, 4);
 			tableLayoutPanel.Controls.Add(opacitySlider, 1, 4);
 			tableLayoutPanel.Controls.Add(opacityLabel, 2, 4);
 
+			// 预设配色：常用强调色，点一下立即应用。
+			Color[] presetColors = new Color[8]
+			{
+				Color.FromArgb(77, 163, 255),
+				Color.FromArgb(52, 199, 89),
+				Color.FromArgb(168, 85, 247),
+				Color.FromArgb(255, 159, 10),
+				Color.FromArgb(255, 69, 58),
+				Color.FromArgb(50, 212, 222),
+				Color.FromArgb(255, 111, 181),
+				Color.FromArgb(142, 155, 179)
+			};
+			FlowLayoutPanel presetPanel = new FlowLayoutPanel
+			{
+				FlowDirection = FlowDirection.LeftToRight,
+				WrapContents = false,
+				AutoSize = true,
+				AutoSizeMode = AutoSizeMode.GrowAndShrink,
+				Dock = DockStyle.Fill,
+				Margin = Padding.Empty
+			};
+			foreach (Color preset in presetColors)
+			{
+				Color color = preset;
+				Button presetButton = new Button
+				{
+					Size = new Size(scale(20), scale(20)),
+					BackColor = color,
+					FlatStyle = FlatStyle.Flat,
+					Margin = new Padding(scale(2), scale(5), scale(2), scale(2)),
+					Cursor = Cursors.Hand,
+					TabStop = false
+				};
+				presetButton.FlatAppearance.BorderColor = UiVisualStyle.Border;
+				presetButton.FlatAppearance.BorderSize = 1;
+				presetButton.Click += (object sender, EventArgs e) =>
+				{
+					UiVisualStyle.SaveCustomColor(UiVisualStyle.AccentColorConfigKey, color);
+					AppConfig.Flush();
+					accentSwatch.BackColor = color;
+					ApplyThemeLive();
+				};
+				presetPanel.Controls.Add(presetButton);
+			}
+			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemePresetColors), 0, 5);
+			tableLayoutPanel.Controls.Add(presetPanel, 1, 5);
+			tableLayoutPanel.SetColumnSpan(presetPanel, 2);
+
 			_themeModePanel.Controls.Add(tableLayoutPanel);
 		}
 		RefreshThemeButtons();
+		Panel CreateThemeSwatch(Color color)
+		{
+			Panel swatch = new Panel
+			{
+				Size = new Size(scale(20), scale(20)),
+				BackColor = color,
+				BorderStyle = BorderStyle.FixedSingle,
+				Margin = new Padding(scale(2), scale(5), scale(6), scale(2))
+			};
+			return swatch;
+		}
+		FlowLayoutPanel CreateThemeRowPanel(params Control[] controls)
+		{
+			FlowLayoutPanel panel = new FlowLayoutPanel
+			{
+				FlowDirection = FlowDirection.LeftToRight,
+				WrapContents = false,
+				AutoSize = true,
+				AutoSizeMode = AutoSizeMode.GrowAndShrink,
+				Dock = DockStyle.Fill,
+				Margin = Padding.Empty
+			};
+			panel.Controls.AddRange(controls);
+			return panel;
+		}
+		void ApplyThemeLive()
+		{
+			// 立即把新强调色/背景应用到本窗体与已打开的其它窗口（不用重启）。
+			ApplyThemeMode(UiVisualStyle.IsNightMode);
+			foreach (Form form in Application.OpenForms)
+			{
+				if (form == null || form.IsDisposed || form == this)
+				{
+					continue;
+				}
+				try
+				{
+					UiVisualStyle.RetintChrome(form);
+					UiVisualStyle.ApplyFormBackground(form);
+					form.Invalidate(invalidateChildren: true);
+				}
+				catch
+				{
+				}
+			}
+		}
 		Label CreateThemeSettingLabel(string text)
 		{
 			return new Label
@@ -8078,16 +8183,6 @@ public class SettingsForm : RForm
 			ApplyRoundedRegion(button, scale(8));
 			button.Resize += (object sender, EventArgs e) => ApplyRoundedRegion(button, scale(8));
 			return button;
-		}
-		void SetThemeSwatch(Button button, Color color)
-		{
-			button.BackColor = color;
-			button.ForeColor = ((color.R * 299 + color.G * 587 + color.B * 114) / 1000 > 140) ? Color.FromArgb(20, 20, 20) : Color.White;
-			button.FlatAppearance.BorderColor = UiVisualStyle.Border;
-		}
-		void ShowThemeRestartHint()
-		{
-			MessageBox.Show(this, Strings.ThemeRestartToApply, Strings.UiAppearance, MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 		Button CreateThemeButton(string text, bool night)
 		{
