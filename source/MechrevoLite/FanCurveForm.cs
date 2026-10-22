@@ -921,7 +921,7 @@ public class FanCurveForm : RForm
 			bool ok = _wujieFanController.Start(_cpuPanel.Temperatures, _cpuPanel.Duties, out string detail);
 			if (ok)
 			{
-				_status.Text = "无界 EC 直写已启用 · " + detail;
+				_status.Text = "无界 EC 直写已启用（45℃ 以下不接管，交还 EC）· " + detail;
 				PerfModeService.Instance?.RecordFanCurves(TargetModeId, cpu, gpu);
 				Logger.WriteLine("[fan] 曲线：无界 EC 直写已启动（25Hz 双扇 · 曲线点数=" + _cpuPanel.ValidPoints + "）");
 			}

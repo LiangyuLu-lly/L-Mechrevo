@@ -25,6 +25,10 @@ internal sealed class WujieFanEcController : IDisposable
 
 	private const int MaxIoFailures = 5;
 
+	/// <summary>2026-10-22（机主：45℃ 以下风扇会停转、写不进去）：低温区不写占空比，交还 EC 原生策略。
+	/// 曲线最低点也应按 45℃ 起算。</summary>
+	internal const int MinimumOperatingTemperatureC = 45;
+
 	private readonly Timer _timer;
 
 	private readonly object _gate = new object();
@@ -143,6 +147,17 @@ internal sealed class WujieFanEcController : IDisposable
 				LastDetail = "温度过高已交还 EC";
 				return;
 			}
+			if (temp < MinimumOperatingTemperatureC)
+			{
+				// 45℃ 以下 EC 本来就会让风扇停转/低转，写占空比也压不住；交还 EC、不做看门狗计数。
+				_fan2ZeroCount = 0;
+				if (_lastTargetPercent != -1)
+				{
+					_lastTargetPercent = -1;
+					Logger.WriteLine("[fan] 无界 EC 曲线：温度 " + temp + "℃ < 45℃，暂停写入并交还 EC");
+				}
+				return;
+			}
 			int target = (temp >= 85) ? 100 : ResolveCurveDuty(temp);
 			if (target > 0 && target < WujieFanEc.FanFloorPercent)
 			{
@@ -195,6 +210,15 @@ internal sealed class WujieFanEcController : IDisposable
 		{
 			return 100;
 		}
+		// 低温区的曲线点对无界 EC 无意义：统一按 45℃ 起算（第一个有效点若低于 45 也按 45 处理）。
+		for (int i = 0; i < points; i++)
+		{
+			if (temps[i] != byte.MaxValue && temps[i] < MinimumOperatingTemperatureC)
+			{
+				temps[i] = MinimumOperatingTemperatureC;
+			}
+		}
+		temp = Math.Max(temp, MinimumOperatingTemperatureC);
 		if (temp <= temps[0])
 		{
 			return duties[0];
