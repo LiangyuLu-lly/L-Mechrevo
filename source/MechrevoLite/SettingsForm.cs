@@ -8081,17 +8081,16 @@ public class SettingsForm : RForm
 			foreach (Color preset in presetColors)
 			{
 				Color color = preset;
-				Button presetButton = new Button
+				// 2026-10-22：预设色块用 Panel 而不是 Button —— Button 的 BackColor 会被主题重下发刷成按钮面，
+				// 预设色会因此「变成一排黑块」。
+				Panel presetButton = new Panel
 				{
 					Size = new Size(scale(20), scale(20)),
 					BackColor = color,
-					FlatStyle = FlatStyle.Flat,
+					BorderStyle = BorderStyle.FixedSingle,
 					Margin = new Padding(scale(2), scale(5), scale(2), scale(2)),
-					Cursor = Cursors.Hand,
-					TabStop = false
+					Cursor = Cursors.Hand
 				};
-				presetButton.FlatAppearance.BorderColor = UiVisualStyle.Border;
-				presetButton.FlatAppearance.BorderSize = 1;
 				presetButton.Click += (object sender, EventArgs e) =>
 				{
 					UiVisualStyle.SaveCustomColor(UiVisualStyle.AccentColorConfigKey, color);
