@@ -39,6 +39,10 @@ public class FanCurveForm : RForm
 
 		public int[] Duties => _duties;
 
+		public byte[] Temperatures => _temps;
+
+		public int ValidPoints => _valid;
+
 		public CurvePanel(string label, Color color, Action changed)
 		{
 			_label = label;
@@ -242,6 +246,9 @@ public class FanCurveForm : RForm
 	private CurvePanel _cpuPanel;
 
 	private CurvePanel _gpuPanel;
+
+	// 2026-10-22（无界风扇曲线）：无界 EC 直写控制器（25Hz 双扇）
+	private WujieFanEcController _wujieFanController;
 
 	private Label _status;
 
@@ -596,6 +603,8 @@ public class FanCurveForm : RForm
 			{
 				Program.hw.CurveUpdated -= OnCurveUpdated;
 				Program.hw.CustomModeChanged -= OnCustomChanged;
+				_wujieFanController?.Dispose();
+				_wujieFanController = null;
 				_toolTip.Dispose();
 			};
 		}
@@ -603,6 +612,8 @@ public class FanCurveForm : RForm
 		{
 			FormClosed += (object? _, FormClosedEventArgs _) =>
 			{
+				_wujieFanController?.Dispose();
+				_wujieFanController = null;
 				_toolTip.Dispose();
 			};
 		}
@@ -888,6 +899,48 @@ public class FanCurveForm : RForm
 		await FlushPendingAsync();
 	}
 
+	/// <summary>2026-10-22（无界）：保存曲线 = 启动/停止 EC 直写控制器；不经过 GCU 固件曲线。</summary>
+	private async Task FlushWujieFanCurveAsync(MechrevoHw hw)
+	{
+		_cpuPending = (_gpuPending = false);
+		int[] cpu = _cpuPanel.Duties.ToArray();
+		int[] gpu = _gpuPanel.Duties.ToArray();
+		if (_fanApplyChk != null && !_fanApplyChk.Checked)
+		{
+			_wujieFanController?.Stop("下发开关关闭");
+			_status.Text = "已保存曲线（未下发：风扇曲线下发开关关闭）";
+			PerfModeService.Instance?.RecordFanCurves(TargetModeId, cpu, gpu);
+			Logger.WriteLine("[fan] 曲线：无界 EC 直写开关关闭 ⇒ 仅保存、不启动");
+			RaiseFanCurveSaved(confirmed: true);
+			await Task.CompletedTask;
+			return;
+		}
+		try
+		{
+			_wujieFanController ??= new WujieFanEcController();
+			bool ok = _wujieFanController.Start(_cpuPanel.Temperatures, _cpuPanel.Duties, out string detail);
+			if (ok)
+			{
+				_status.Text = "无界 EC 直写已启用 · " + detail;
+				PerfModeService.Instance?.RecordFanCurves(TargetModeId, cpu, gpu);
+				Logger.WriteLine("[fan] 曲线：无界 EC 直写已启动（25Hz 双扇 · 曲线点数=" + _cpuPanel.ValidPoints + "）");
+			}
+			else
+			{
+				_status.Text = "无界风扇曲线启动失败：" + detail;
+				Logger.WriteLine("[fan] 曲线：无界 EC 直写启动失败：" + detail);
+			}
+			RaiseFanCurveSaved(confirmed: ok);
+		}
+		catch (Exception ex)
+		{
+			_status.Text = "无界风扇曲线启动异常";
+			Logger.WriteLine("[fan] 曲线：无界 EC 直写异常：" + ex.GetType().Name + " " + ex.Message);
+			RaiseFanCurveSaved(confirmed: false);
+		}
+		await Task.CompletedTask;
+	}
+
 	private async Task FlushPendingAsync()
 	{
 		if (_saveInProgress)
@@ -957,6 +1010,12 @@ public class FanCurveForm : RForm
 				_status.Text = "风扇曲线保存失败";
 				RaiseFanCurveSaved(confirmed: false);
 			}
+			return;
+		}
+		// 2026-10-22（无界风扇曲线）：走 EC 直写（PawnIO ACPI-EC，25Hz 双扇），不发 GCU 16 点曲线。
+		if (hw != null && hw.WujieSmuApu)
+		{
+			await FlushWujieFanCurveAsync(hw);
 			return;
 		}
 		// 2026-10-15（C-1 第 2 步分类 ①）：本函数是「保存风扇曲线到 GCU」⇒ 真正需要 GCU。

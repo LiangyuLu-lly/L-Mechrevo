@@ -104,6 +104,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 无界风扇曲线第一步（宝龙达同款通道）：`EcPortIo` 增加无界占空比 0x1804/0x1809 白名单写（0..200、写后 ACPI EC 稳定回读校验）；新增 `WujieFanEc` 只读状态（0x200D/占空比/温度/转速）与单次写占空比（副扇 20% 下限），接入诊断包新小节。**不需要 inpoutx64**（走 PawnIO ACPI EC 0x92/0x93）。25Hz 曲线控制器与 UI 下一步接。
 - 修「蛟龙 AMD 逐核 CO 降压应用点不动/写不进去」：`RuntimeCpuTuning.EnsurePerCoreWrite` 取到候选 option 后**忘了赋给 out 参数**，调用方读 `option.Minimum` 直接 NullReferenceException ⇒ SMU 一条命令都没发（诊断包实测：逐核重置 16/16 OK，应用却在发命令前崩溃）。已改为 `option = candidate`。
 - 修「蛟龙 DragonRange 逐核 CO 写后回读不一致→被回滚」：每核**读**命令 0xD5 的 arg0 原来对桌面 Zen4 发裸核号，实际应与每核写同一套 core mask `(ccd<<28)|((core%8)<<20)`；读错核心 ⇒ 误判“回读不一致”并回滚（写入本身已被 SMU 接受）。已改为 Vermeer/Raphael/GraniteRidge/DragonRange 统一用 mask，APU 仍用裸核号。
+- 无界风扇曲线接入（基于实机回读确认）：`WujieFanEcController` 25Hz 双寄存器直写 `0x1804/0x1809`（PawnIO ACPI-EC，无需 inpoutx64），曲线按 CPU 温度 `0x043E` 插值；安全网：副扇 20% 下限、≥85℃ 全速、≥95℃/副扇 0RPM 12s/连续 I/O 失败 ⇒ 停止写入交还 EC；停止不做渐进降速。`FanCurveForm` 无界机型保存曲线改为启动该控制器（不再发 GCU 16 点曲线），下发开关关闭/关窗即停写。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

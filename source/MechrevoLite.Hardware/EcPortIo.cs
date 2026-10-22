@@ -636,6 +636,21 @@ internal static class EcPortIo
 		return TryWriteByteVerified(address, rawValue, out readBack);
 	}
 
+	/// <summary>2026-10-22（无界风扇曲线 · 25Hz 周期写）：只写不回读的白名单快路径。
+	/// ⚠️ 只有 0x1804/0x1809、值 0..200 才放行；调用方负责周期末/停止前做一次回读校验。</summary>
+	internal static bool TryWriteWujieFanDutyFast(int address, int rawValue)
+	{
+		if (address != WujieFan1DutyAddress && address != WujieFan2DutyAddress)
+		{
+			return false;
+		}
+		if (rawValue < 0 || rawValue > WujieFanDutyMaxRaw)
+		{
+			return false;
+		}
+		return TryWriteByte(address, rawValue);
+	}
+
 	/// <summary>⭐ ACPI EC 读-改-写 0xB20（只改 bit1/bit3，保留其它位）+ 回读 ✅</summary>
 	internal static bool TryWriteAcpiFanManualMask(bool fan1Manual, bool fan2Manual, out int readBack, out string note)
 	{
