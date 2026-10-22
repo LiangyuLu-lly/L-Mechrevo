@@ -581,6 +581,7 @@ internal static class I2ecInpOut
 					detail = "I2EC 当前不是读写模式（0x200D=0x" + mode.ToString("X2") + "）⇒ 不启动";
 					return false;
 				}
+				Logger.WriteLine("[battery-fix] 字节序=base:BE / desired/current:LE（与参考脚本一致）");
 				int baseV = ReadBe16(0x030E);
 				int cells = ReadCells();
 				if (cells != 4)
