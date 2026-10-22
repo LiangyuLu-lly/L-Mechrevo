@@ -128,6 +128,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - I2EC 跨进程串行化改为**文件锁** `%ProgramData%\L-Mechrevo\i2ec.lock`（FileShare.None，500ms 轮询）：SYSTEM 电池保持任务与 UI 风扇曲线不再并发改 EC 地址窗口；拿不到锁时本次操作失败而不是裸奔。避免命名互斥体跨会话 ACL 问题。
 - 修「耀世 16 Super 看不到 MiniLED 开关」：屏幕区重建为手写布局后，`buttonMiniled` 仍留在旧 designer 的 `tableScreen` 里、没进新布局（诊断包 `MiniledOffered=True` 但界面无开关）。新布局第 5 行补「MiniLED 分区控光」行，按钮跟随 `flag22`（`SupportsLocalDimming`）显隐；`VisualiseScreen` 仍负责单分区/多分区文案与点击。
 - UI 探针支持显示无界电池电压修复开关：`BatteryVoltageFix.IsSupportedMachine` 在探针的合成 hw 下额外按 Model/Board 含「无界/WUJIE」放行（真机仍只看 `WujieSmuApu`），便于检查该行 UI。
+- 修「非 MiniLED 机器屏幕区底部多一行空白」：MiniLED 行的 RowStyle 高度随 `flag22` 收起为 0 / 展开为 D(34)，不再只隐藏控件而保留行高。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

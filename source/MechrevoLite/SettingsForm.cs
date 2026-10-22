@@ -10227,6 +10227,12 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			_miniledRow.Visible = flag22;
 		}
+		// 2026-10-22（非 MiniLED 机器底部多一行空白）：第 5 行高度随 flag22 收起/展开，避免空行占位。
+		if (_screenRowsLayout != null && _screenRowsLayout.RowStyles.Count > 5)
+		{
+			float miniledRowHeight = flag22 ? (float)ResponsiveLayout.LogicalToDevice(this, 34) : 0f;
+			_screenRowsLayout.RowStyles[5] = new RowStyle(SizeType.Absolute, miniledRowHeight);
+		}
 		// 2026-10-13（miniledgcu）：MiniLED 取证行 —— 改前这一整条判据零日志，诊断包里无从自证
 		// "为什么这颗不显示"。口径与 flag22 同源（Show(hw?.SupportsLocalDimming ?? caps.LocalDimming)），
 		// 由 MechrevoHw.SupportsLocalDimming 在解析时写进 LocalDimmingEvidence
