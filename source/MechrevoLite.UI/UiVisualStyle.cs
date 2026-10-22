@@ -638,6 +638,13 @@ private static void LoadEmbeddedFonts()
 	/// </summary>
 	internal static Color ContextBackColor(Control? control)
 	{
+		// 2026-10-22（主题背景图）：父容器已经是「透明」（背景图从下面透出来）时，返回透明，
+		// 让自定义控件（开关/滑块/数字框…）不再往自己的矩形里填一块实心底色（否则会成为黑方块）。
+		// ⚠️ 只看**直接父容器**：父容器是实色时仍按原逻辑取它，保持既有观感。
+		if (control?.Parent != null && control.Parent.BackColor.A == 0)
+		{
+			return Color.Transparent;
+		}
 		for (Control? parent = control?.Parent; parent != null; parent = parent.Parent)
 		{
 			Color parentColor = parent.BackColor;
