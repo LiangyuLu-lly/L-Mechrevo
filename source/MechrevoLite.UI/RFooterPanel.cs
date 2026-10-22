@@ -17,6 +17,25 @@ public sealed class RFooterPanel : Panel
 		BackColor = Color.Transparent;
 	}
 
+	protected override void OnControlAdded(ControlEventArgs e)
+	{
+		base.OnControlAdded(e);
+		// 2026-10-22（机主：底栏有黑色矩形）：底栏内的容器/标签统一透明，让半透明底透出来。
+		MakeTranslucent(e.Control);
+	}
+
+	private static void MakeTranslucent(Control control)
+	{
+		if (control is Panel || control is TableLayoutPanel || control is FlowLayoutPanel || control is Label || control is TableLayoutPanel)
+		{
+			control.BackColor = Color.Transparent;
+		}
+		foreach (Control child in control.Controls)
+		{
+			MakeTranslucent(child);
+		}
+	}
+
 	protected override void OnPaint(PaintEventArgs e)
 	{
 		Graphics graphics = e.Graphics;

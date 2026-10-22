@@ -76,6 +76,9 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 滚动条滑钮贴边：滑钮左右贴满控件宽度（去掉 2px 内缩）。
 - 底栏改圆角矩形 + 整个底色半透明：新增 `RFooterPanel` 自绘（背景切片 + 150/255 窗口色圆角块 + 淡边），底栏内 `tableButtons`/`panelVersion` 透明。
 - 修「每次重启背景不刷新、被黑色挡住」：之前在句柄创建时套背景会被启动期主题/布局覆盖；现在在 `RForm.OnShown`（窗口真正显示、布局完成）应用一次，再 `BeginInvoke` 补一次、并用 500ms 一次性定时器兜底再套一次，保证启动后背景与透明容器生效。
+- 修滚动残影：滚动条 ValueChanged 在 UpdateDashboardScroll 后整窗 `Invalidate(invalidateChildren: true)`，透明容器不再残留旧切片。
+- 修底栏黑色矩形：`RFooterPanel.OnControlAdded` 把底栏内 Panel/TableLayoutPanel/Label 统一设透明（递归），让半透明圆角底透出。
+- 修主题设置行对齐：设置按钮宽度 84→70、行内 FlowLayoutPanel 改 `Anchor=Right`（不再 Dock=Fill），「主题色/背景色」的 色块+选择+默认 与其它行右对齐一致。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

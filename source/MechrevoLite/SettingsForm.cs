@@ -7708,6 +7708,8 @@ public class SettingsForm : RForm
 		_dashboardScrollBar.ValueChanged += (object? _, EventArgs _) =>
 		{
 			UpdateDashboardScroll(rangeChanged: false);
+			// 2026-10-22（机主：滚动有滑块残余）：滚动后整窗重绘，避免透明容器留下旧切片残影。
+			Invalidate(invalidateChildren: true);
 		};
 		_dashboardStack.SizeChanged += (object? _, EventArgs _) =>
 		{
@@ -8141,7 +8143,7 @@ public class SettingsForm : RForm
 				WrapContents = false,
 				AutoSize = true,
 				AutoSizeMode = AutoSizeMode.GrowAndShrink,
-				Dock = DockStyle.Fill,
+				Anchor = AnchorStyles.Right,
 				Margin = Padding.Empty
 			};
 			panel.Controls.AddRange(controls);
@@ -8203,7 +8205,7 @@ public class SettingsForm : RForm
 			button.AutoSize = false;
 			button.Dock = DockStyle.None;
 			button.Anchor = AnchorStyles.Right;
-			button.Size = new Size(scale(84), scale(28));
+			button.Size = new Size(scale(70), scale(28));
 			button.Margin = new Padding(scale(4), scale(1), scale(4), scale(1));
 			button.FlatStyle = FlatStyle.Flat;
 			button.UseVisualStyleBackColor = false;
