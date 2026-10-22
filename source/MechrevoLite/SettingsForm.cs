@@ -417,6 +417,9 @@ public class SettingsForm : RForm
 
 	private TableLayoutPanel? _hzSegTable;
 
+	// 2026-10-22（耀世 MiniLED 没看到开关）：重建后的屏幕区缺少 MiniLED 行，补一行
+	private TableLayoutPanel _miniledRow;
+
 	private TableLayoutPanel? _screenRowsLayout;
 
 	// 2026-10-16：由 3 行扩到 5 行 —— 屏幕区布局（bufferedTableLayoutPanel，见 :2262~2266 的 RowStyles）
@@ -2586,6 +2589,7 @@ public class SettingsForm : RForm
 		bufferedTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
 		bufferedTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
 		bufferedTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
+		bufferedTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
 		_screenRowsLayout = bufferedTableLayoutPanel;
 		bufferedPanel.Controls.Add(bufferedTableLayoutPanel);
 		Label control = new Label
@@ -3177,6 +3181,38 @@ public class SettingsForm : RForm
 		displayEffectRow.Controls.Add(effectEditBtn, 3, 0);
 		bufferedTableLayoutPanel.SetColumnSpan(displayEffectRow, 3);
 		bufferedTableLayoutPanel.Controls.Add(displayEffectRow, 0, 4);
+		// 2026-10-22：MiniLED 行（原按钮在旧 tableScreen，重建后的屏幕区没带进来 ⇒ 耀世看不到开关）
+		TableLayoutPanel miniledRow = new TableLayoutPanel
+		{
+			Dock = DockStyle.Top,
+			ColumnCount = 2,
+			RowCount = 1,
+			Height = ResponsiveLayout.LogicalToDevice(this, 34),
+			Margin = new Padding(0, ResponsiveLayout.LogicalToDevice(this, 4), 0, 0),
+			BackColor = UiVisualStyle.Window,
+			Name = "rowMiniled"
+		};
+		miniledRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+		miniledRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+		miniledRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+		Label miniledCaption = new Label
+		{
+			Text = "MiniLED 分区控光",
+			AutoSize = false,
+			Dock = DockStyle.Fill,
+			ForeColor = UiVisualStyle.Text,
+			BackColor = UiVisualStyle.Window,
+			Font = UiStyleBody(),
+			TextAlign = ContentAlignment.MiddleLeft,
+			Margin = Padding.Empty
+		};
+		buttonMiniled.Dock = DockStyle.Fill;
+		buttonMiniled.Margin = new Padding(ResponsiveLayout.LogicalToDevice(this, 8), ResponsiveLayout.LogicalToDevice(this, 3), 0, ResponsiveLayout.LogicalToDevice(this, 3));
+		miniledRow.Controls.Add(miniledCaption, 0, 0);
+		miniledRow.Controls.Add(buttonMiniled, 1, 0);
+		bufferedTableLayoutPanel.SetColumnSpan(miniledRow, 3);
+		bufferedTableLayoutPanel.Controls.Add(miniledRow, 0, 5);
+		_miniledRow = miniledRow;
 		MechrevoHw hw0 = Program.hw;
 		bool? gcuEffectOn0 = hw0?.DisplayEffectOn;
 		// 2026-10-09（默认值修正）：display_effect 键缺失 = 新装 / 全新配置 ⇒ 默认「关」。
@@ -10187,6 +10223,10 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		MiniledOffered = flag22;
 		buttonMiniled.Visible = flag22;
+		if (_miniledRow != null)
+		{
+			_miniledRow.Visible = flag22;
+		}
 		// 2026-10-13（miniledgcu）：MiniLED 取证行 —— 改前这一整条判据零日志，诊断包里无从自证
 		// "为什么这颗不显示"。口径与 flag22 同源（Show(hw?.SupportsLocalDimming ?? caps.LocalDimming)），
 		// 由 MechrevoHw.SupportsLocalDimming 在解析时写进 LocalDimmingEvidence

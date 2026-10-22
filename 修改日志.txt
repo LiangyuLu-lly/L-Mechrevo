@@ -126,6 +126,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 无界电池电压修复**注册开机保持任务**（`LMechrevoBatteryFix`，SYSTEM；BootTrigger + 内核启动事件 27，动作 `L-Mechrevo.exe batteryfix`，无执行时限）⇒ 常驻保持 EC 目标，防止重启/断电后 EC 老化降额弹回；勾选修复时注册、取消时停止进程并删除任务；新增 `batteryfix` CLI 常驻入口（内置 inpoutx64 保持循环）。
 - 修 fanctl 记录的 EC 句柄并发坑：`I2ecInpOut` 增加**跨进程全局互斥体** `Global\L-Mechrevo-I2EC`（单字节读写、电池保持循环整段、停止恢复整段都串行化）⇒ UI 风扇曲线与 SYSTEM 电池修复常驻任务不再互相改地址窗口、静默读错寄存器；进程内仍保留 lock(Gate)。
 - I2EC 跨进程串行化改为**文件锁** `%ProgramData%\L-Mechrevo\i2ec.lock`（FileShare.None，500ms 轮询）：SYSTEM 电池保持任务与 UI 风扇曲线不再并发改 EC 地址窗口；拿不到锁时本次操作失败而不是裸奔。避免命名互斥体跨会话 ACL 问题。
+- 修「耀世 16 Super 看不到 MiniLED 开关」：屏幕区重建为手写布局后，`buttonMiniled` 仍留在旧 designer 的 `tableScreen` 里、没进新布局（诊断包 `MiniledOffered=True` 但界面无开关）。新布局第 5 行补「MiniLED 分区控光」行，按钮跟随 `flag22`（`SupportsLocalDimming`）显隐；`VisualiseScreen` 仍负责单分区/多分区文案与点击。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。
