@@ -601,9 +601,21 @@ internal static class I2ecInpOut
 				if (currentDesiredCheck < MinimumPlausibleVoltageMv || currentDesiredCheck > MaximumPlausibleVoltageMv
 					|| currentQueuedCheck < MinimumPlausibleVoltageMv || currentQueuedCheck > MaximumPlausibleVoltageMv)
 				{
-					detail = "EC 当前 desired/queued=" + currentDesiredCheck + "/" + currentQueuedCheck
-						+ "mV 不在合理范围 ⇒ 可能字节序不匹配，拒绝写入（未改任何寄存器）";
-					return false;
+					// 旧版“全部按大端”写 17600 会在 LE 寄存器里留下 [44,C0]，
+					// 按 LE 读成 0xC044=49220；交换回来若落在合理范围，说明是已知旧版错位值，
+					// 允许启动并用正确的 LE 17600 覆盖；其它未知值一律拒绝。
+					int swappedDesired = ((currentDesiredCheck & 0xFF) << 8) | ((currentDesiredCheck >> 8) & 0xFF);
+					int swappedQueued = ((currentQueuedCheck & 0xFF) << 8) | ((currentQueuedCheck >> 8) & 0xFF);
+					bool knownCorruption = swappedDesired >= MinimumPlausibleVoltageMv && swappedDesired <= MaximumPlausibleVoltageMv
+						&& swappedQueued >= MinimumPlausibleVoltageMv && swappedQueued <= MaximumPlausibleVoltageMv;
+					if (!knownCorruption)
+					{
+						detail = "EC 当前 desired/queued=" + currentDesiredCheck + "/" + currentQueuedCheck
+							+ "mV 不在合理范围且不是已知旧版错位 ⇒ 拒绝写入（未改任何寄存器）";
+						return false;
+					}
+					Logger.WriteError("[battery-fix] 检测到旧版字节序遗留值 desiredV=" + currentDesiredCheck + "mV（交换后=" + swappedDesired
+						+ "mV）⇒ 允许启动并用正确的 17600mV 覆盖");
 				}
 					if (!TryLoadOriginals())
 					{
