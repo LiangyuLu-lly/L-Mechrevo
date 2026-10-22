@@ -253,6 +253,69 @@ internal static class I2ecInpOut
 
 	private static int ReadCells() => ((ReadByte(0x0491) & 0xC0) == 0xC0) ? 4 : (((ReadByte(0x0491) & 0xC0) == 0x80) ? 3 : 2);
 
+	/// <summary>2026-10-22（无界风扇曲线）：I2EC 通道是否可用（inpoutx64 已装且导出齐全）。</summary>
+	internal static bool IsAvailable
+	{
+		get
+		{
+			return EnsureInitialized(out _);
+		}
+	}
+
+	/// <summary>2026-10-22（无界风扇曲线）：通用 I2EC 单字节读（走 0x681/0x682/0x683 窗口）。</summary>
+	internal static bool TryReadEcByte(int address, out int value, out string detail)
+	{
+		value = -1;
+		if (!EnsureInitialized(out detail))
+		{
+			return false;
+		}
+		lock (Gate)
+		{
+			try
+			{
+				value = ReadByte(address);
+				detail = "ok";
+				return true;
+			}
+			catch (Exception ex)
+			{
+				detail = ex.GetType().Name + " " + ex.Message;
+				return false;
+			}
+		}
+	}
+
+	/// <summary>2026-10-22（无界风扇曲线）：通用 I2EC 单字节写 + **回读确认**（写入后立即读回）。</summary>
+	internal static bool TryWriteEcByte(int address, int value, out string detail)
+	{
+		detail = "";
+		if (!EnsureInitialized(out detail))
+		{
+			return false;
+		}
+		lock (Gate)
+		{
+			try
+			{
+				WriteByte(address, value & 0xFF);
+				int readBack = ReadByte(address);
+				if (readBack != (value & 0xFF))
+				{
+					detail = "回读不一致：写 0x" + (value & 0xFF).ToString("X2") + " / 读 0x" + readBack.ToString("X2");
+					return false;
+				}
+				detail = "ok";
+				return true;
+			}
+			catch (Exception ex)
+			{
+				detail = ex.GetType().Name + " " + ex.Message;
+				return false;
+			}
+		}
+	}
+
 	/// <summary>只读状态文本（内置）。</summary>
 	internal static bool TryReadStatus(out string detail)
 	{

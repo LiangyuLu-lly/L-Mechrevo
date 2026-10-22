@@ -1,19 +1,21 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace MechrevoLite.Hardware;
 
 /// <summary>
 /// 2026-10-22（无界风扇曲线）：无界（WUJIE14XA）EC 风扇曲线控制器。
 ///
-/// <para>无界 EC 的占空比目标（主扇 0x1804 / 副扇 0x1809，0..200 = 0..100%）会被 EC 热管理任务
-/// 周期性覆写，所以必须**持续高频写**（实测 25Hz 才能压住；2Hz 被压制、10Hz 拉锯）。
-/// 两路必须同时写，只写主扇会让副扇被 EC 斜坡挪到 0。</para>
+/// <para>通道：**I2EC 窗口**（端口 0x681/0x682/0x683，经本机已安装的 inpoutx64.dll）——
+/// 这是无界 EC 风扇占空比实际可写的通道；占空比目标为主扇 0x1804、副扇 0x1809（0..200 = 0..100%），
+/// 温度 0x043E，转速 0x0464/0x046C（大端）。</para>
 ///
-/// <para>安全：副扇 20% 下限；≥85℃ 强制 100%；≥95℃ 停止写入交还 EC；
-/// 副扇连续约 12 秒 0 RPM 视为被闭锁，停止写入；写失败/读温度失败连续多次也停止。
-/// ⛔ 停止时不做渐进降速（实测渐进释放会把副扇锁在 0）。</para>
+/// <para>写入必须**25Hz 持续**（EC 热管理会周期性覆写；2Hz 被压制、10Hz 拉锯），并且两路必须同时写
+/// （只写主扇会让副扇被 EC 斜坡挪到 0）。</para>
+///
+/// <para>安全：45℃ 以下不接管（EC 低温会停转）；副扇 20% 下限；≥85℃ 强制 100%；≥95℃ 停止交还 EC；
+/// 副扇连续约 12 秒 0 RPM 停止；温度读失败约 2.4 秒、写失败约 1 秒、回读持续不一致均停止。
+/// ⛔ 停止时不做渐进降速。</para>
 /// </summary>
 internal sealed class WujieFanEcController : IDisposable
 {
@@ -23,15 +25,20 @@ internal sealed class WujieFanEcController : IDisposable
 
 	private const int Fan2ZeroSamples = 24;
 
-	private const int MaxIoFailures = 5;
+	private const int MaxTempFailTicks = 60;
 
-	/// <summary>2026-10-22（机主：45℃ 以下风扇会停转、写不进去）：低温区不写占空比，交还 EC 原生策略。
-	/// 曲线最低点也应按 45℃ 起算。</summary>
+	private const int MaxWriteFailTicks = 25;
+
+	private const int MaxReadbackMismatchSamples = 3;
+
+	/// <summary>2026-10-22（机主：45℃ 以下风扇会停转、写不进去）：低温区不写占空比，交还 EC 原生策略。</summary>
 	internal const int MinimumOperatingTemperatureC = 45;
 
 	private readonly Timer _timer;
 
 	private readonly object _gate = new object();
+
+	private static WujieFanEcController _active;
 
 	private byte[] _curveTemps = Array.Empty<byte>();
 
@@ -43,14 +50,19 @@ internal sealed class WujieFanEcController : IDisposable
 
 	private int _fan2ZeroCount;
 
-	private int _ioFailures;
+	private int _tempFailTicks;
+
+	private int _writeFailTicks;
+
+	private int _readbackMismatchSamples;
+
+	private int _lastTempC = -1;
+
+	private int _lastRaw = -1;
 
 	private long _lastSampleTick;
 
 	private int _lastTargetPercent = -1;
-
-	// 2026-10-22（机主：强冷继续走 GCU）：同一时刻只允许一个曲线控制器；强冷开启时由调用方停掉曲线。
-	private static WujieFanEcController _active;
 
 	internal WujieFanEcController()
 	{
@@ -74,6 +86,22 @@ internal sealed class WujieFanEcController : IDisposable
 			detail = "曲线数据为空";
 			return false;
 		}
+		// 启动前先验通道：I2EC 可用（inpoutx64）、0x200D 读写模式、温度可读。
+		if (!I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterMode, out int mode, out string modeDetail))
+		{
+			detail = "I2EC 通道不可用（需要本机已安装 inpoutx64）：" + modeDetail;
+			return false;
+		}
+		if ((mode & 0x03) != 0x03)
+		{
+			detail = "I2EC 不是读写模式（0x200D=0x" + mode.ToString("X2") + "）";
+			return false;
+		}
+		if (!I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterCpuTemp, out int temp, out string tempDetail) || temp < 0 || temp > 120)
+		{
+			detail = "读取 CPU 温度失败（0x043E）：" + tempDetail;
+			return false;
+		}
 		StopActive("被新的曲线控制器替换");
 		lock (_gate)
 		{
@@ -90,14 +118,18 @@ internal sealed class WujieFanEcController : IDisposable
 			}
 			_validPoints = Math.Max(1, Math.Min(valid, Math.Min(_curveTemps.Length, _curveDuties.Length)));
 			_fan2ZeroCount = 0;
-			_ioFailures = 0;
+			_tempFailTicks = 0;
+			_writeFailTicks = 0;
+			_readbackMismatchSamples = 0;
+			_lastTempC = temp;
+			_lastRaw = -1;
 			_lastSampleTick = Environment.TickCount64;
 			_lastTargetPercent = -1;
 			_running = true;
 			_active = this;
 			_timer.Change(WriteIntervalMs, WriteIntervalMs);
 		}
-		detail = "已启动（25Hz 双扇直写 · 曲线点数=" + _validPoints + "）";
+		detail = "已启动（I2EC 25Hz 双扇直写 · 曲线点数=" + _validPoints + " · 当前 " + temp + "℃）";
 		Logger.WriteLine("[fan] 无界 EC 曲线启动：" + detail);
 		return true;
 	}
@@ -112,7 +144,9 @@ internal sealed class WujieFanEcController : IDisposable
 			_running = false;
 			_timer.Change(Timeout.Infinite, Timeout.Infinite);
 			_fan2ZeroCount = 0;
-			_ioFailures = 0;
+			_tempFailTicks = 0;
+			_writeFailTicks = 0;
+			_readbackMismatchSamples = 0;
 			if (reason.Length > 0)
 			{
 				LastDetail = reason;
@@ -155,9 +189,26 @@ internal sealed class WujieFanEcController : IDisposable
 		}
 		try
 		{
-			if (!EcPortIo.TryReadByte(WujieFanEc.RegisterCpuTemp, out int temp) || temp < 0 || temp > 120)
+			// ① 温度：读失败时短暂沿用上次值继续维持写入；超过约 2.4 秒仍失败则交还 EC。
+			bool tempOk = I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterCpuTemp, out int temp, out _) && temp >= 0 && temp <= 120;
+			if (!tempOk)
 			{
-				NoteIoFailure("读 CPU 温度失败");
+				_tempFailTicks++;
+				if (_tempFailTicks >= MaxTempFailTicks)
+				{
+					Stop("连续读 CPU 温度失败（I2EC），交还 EC");
+					LastDetail = "I/O 失败已停止";
+					return;
+				}
+				temp = _lastTempC;
+			}
+			else
+			{
+				_tempFailTicks = 0;
+				_lastTempC = temp;
+			}
+			if (temp < 0)
+			{
 				return;
 			}
 			if (temp >= 95)
@@ -168,7 +219,8 @@ internal sealed class WujieFanEcController : IDisposable
 			}
 			if (temp < MinimumOperatingTemperatureC)
 			{
-				// 45℃ 以下 EC 本来就会让风扇停转/低转，写占空比也压不住；交还 EC、不做看门狗计数。
+				// 45℃ 以下 EC 本来就会让风扇停转/低转；暂停写入并交还 EC，不做看门狗计数。
+				_lastRaw = -1;
 				_fan2ZeroCount = 0;
 				if (_lastTargetPercent != -1)
 				{
@@ -183,22 +235,46 @@ internal sealed class WujieFanEcController : IDisposable
 				target = WujieFanEc.FanFloorPercent;
 			}
 			int raw = Math.Max(1, Math.Min(EcPortIo.WujieFanDutyMaxRaw, (int)Math.Round(target * 2.0)));
-			bool ok1 = EcPortIo.TryWriteWujieFanDutyFast(WujieFanEc.RegisterDutyFan1, raw);
-			bool ok2 = EcPortIo.TryWriteWujieFanDutyFast(WujieFanEc.RegisterDutyFan2, raw);
+			bool ok1 = I2ecInpOut.TryWriteEcByte(WujieFanEc.RegisterDutyFan1, raw, out string writeDetail1);
+			bool ok2 = I2ecInpOut.TryWriteEcByte(WujieFanEc.RegisterDutyFan2, raw, out string writeDetail2);
 			if (!ok1 || !ok2)
 			{
-				NoteIoFailure("写占空比失败");
-				return;
+				_writeFailTicks++;
+				if (_writeFailTicks >= MaxWriteFailTicks)
+				{
+					Stop("连续写占空比失败（" + (ok1 ? writeDetail2 : writeDetail1) + "），交还 EC");
+					LastDetail = "写入失败已停止";
+					return;
+				}
 			}
-			_ioFailures = 0;
-			if (target != _lastTargetPercent)
+			else
 			{
-				_lastTargetPercent = target;
-				Logger.WriteLineIfChanged("wujie-fan-target", $"[fan] 无界 EC 曲线：{temp}℃ → 目标 {target}% (raw={raw}) · 主/副扇均写入");
+				_writeFailTicks = 0;
+				_lastRaw = raw;
+				if (target != _lastTargetPercent)
+				{
+					_lastTargetPercent = target;
+					Logger.WriteLineIfChanged("wujie-fan-target", $"[fan] 无界 EC 曲线：{temp}℃ → 目标 {target}% (raw={raw}) · 主/副扇均写入（I2EC）");
+				}
 			}
+			// ② 每 500ms 采样一次：回读一致性 + 副扇堵转看门狗。
 			if (Environment.TickCount64 - _lastSampleTick >= SampleIntervalMs)
 			{
 				_lastSampleTick = Environment.TickCount64;
+				if (I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterDutyFan1, out int readBack, out _) && readBack != raw)
+				{
+					_readbackMismatchSamples++;
+					if (_readbackMismatchSamples >= MaxReadbackMismatchSamples)
+					{
+						Stop("占空比回读持续不一致（写 " + raw + " / 读 " + readBack + "），交还 EC");
+						LastDetail = "回读不一致已停止";
+						return;
+					}
+				}
+				else
+				{
+					_readbackMismatchSamples = 0;
+				}
 				if (TryReadFan2Rpm(out int fan2Rpm) && fan2Rpm <= 0)
 				{
 					_fan2ZeroCount++;
@@ -216,7 +292,8 @@ internal sealed class WujieFanEcController : IDisposable
 		}
 		catch (Exception ex)
 		{
-			NoteIoFailure(ex.GetType().Name + " " + ex.Message);
+			Stop("控制器异常（" + ex.GetType().Name + "），交还 EC");
+			LastDetail = "控制器异常已停止";
 		}
 	}
 
@@ -263,21 +340,12 @@ internal sealed class WujieFanEcController : IDisposable
 	private static bool TryReadFan2Rpm(out int rpm)
 	{
 		rpm = 0;
-		if (!EcPortIo.TryReadBytes(WujieFanEc.RegisterFan2RpmHigh, 2, out int[] values) || values.Length != 2)
+		if (!I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterFan2RpmHigh, out int high, out _)
+		|| !I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterFan2RpmHigh + 1, out int low, out _))
 		{
 			return false;
 		}
-		rpm = ((values[0] & 0xFF) << 8) | (values[1] & 0xFF);
+		rpm = ((high & 0xFF) << 8) | (low & 0xFF);
 		return true;
-	}
-
-	private void NoteIoFailure(string reason)
-	{
-		_ioFailures++;
-		if (_ioFailures >= MaxIoFailures)
-		{
-			Stop("连续 I/O 失败（" + reason + "），交还 EC");
-			LastDetail = "I/O 失败已停止";
-		}
 	}
 }
