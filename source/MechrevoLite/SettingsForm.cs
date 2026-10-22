@@ -12878,7 +12878,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 	}
 
-	public void VisualiseScreen(bool screenEnabled, bool screenAuto, int frequency, int maxFrequency, int overdrive, bool overdriveSetting, int miniled1, int miniled2, bool hdr, bool acm, int fhd, int hdrControl)
+	public void VisualiseScreen(bool screenEnabled, bool screenAuto, int frequency, int maxFrequency, int overdrive, bool overdriveSetting, bool hdr, bool acm, int fhd, int hdrControl)
 	{
 		Logger.WriteLine($"VisualiseScreen <- enabled={screenEnabled} freq={frequency} maxFreq={maxFrequency} minRate={ScreenControl.MIN_RATE}");
 		ButtonEnabled(button60Hz, screenEnabled);

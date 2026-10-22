@@ -273,16 +273,8 @@ public static class ScreenControl
 		bool screenAuto = AppConfig.Is("screen_auto");
 		bool overdriveSetting = Program.acpi.IsOverdriveSupported() && !AppConfig.IsNoOverdrive();
 		int overdrive = ((!AppConfig.IsNoOverdrive()) ? Program.acpi.DeviceGet(327705u) : 0);
-		int miniled1 = Program.acpi.DeviceGet(327710u);
-		int miniled2 = Program.acpi.DeviceGet(327726u);
-		int num = ((miniled1 >= 0) ? miniled1 : miniled2);
 		bool hdr = false;
 		bool acm = false;
-		if (num >= 0)
-		{
-			Logger.WriteLine($"Miniled: {miniled1} {miniled2}");
-			AppConfig.Set("miniled", num);
-		}
 		try
 		{
 			hdr = ScreenCCD.GetHDRStatus(out acm);
@@ -313,7 +305,7 @@ public static class ScreenControl
 		Logger.WriteLine($"InitScreen -> screen={laptopScreen ?? "(null)"} confidence={screenConfidence} freq={frequency} maxFreq={maxFrequency} screenEnabled={screenEnabled} MIN_RATE={MIN_RATE} MAX_RATE={MAX_RATE} cfgMaxFreq={AppConfig.Get("max_frequency")}");
 		Program.settingsForm.BeginInvoke(() =>
 		{
-			Program.settingsForm.VisualiseScreen(screenEnabled, screenAuto, frequency, maxFrequency, overdrive, overdriveSetting, miniled1, miniled2, hdr, acm, fhd, hdrControl);
+			Program.settingsForm.VisualiseScreen(screenEnabled, screenAuto, frequency, maxFrequency, overdrive, overdriveSetting, hdr, acm, fhd, hdrControl);
 		});
 	}
 }

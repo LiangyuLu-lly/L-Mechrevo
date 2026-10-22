@@ -8,10 +8,6 @@ public class AsusACPI
 {
 	public const uint ScreenOverdrive = 327705u;
 
-	public const uint ScreenMiniled1 = 327710u;
-
-	public const uint ScreenMiniled2 = 327726u;
-
 	public const uint ScreenFHD = 327708u;
 
 	public const uint ScreenHDRControl = 327793u;
