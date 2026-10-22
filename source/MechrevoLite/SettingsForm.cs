@@ -7881,7 +7881,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(240),
+				Height = scale(208),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7900,7 +7900,6 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
@@ -8013,9 +8012,15 @@ public class SettingsForm : RForm
 				backgroundSwatch.BackColor = UiVisualStyle.Window;
 				ApplyThemeLive();
 			};
-			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundColor), 0, 2);
-			tableLayoutPanel.Controls.Add(CreateThemeRowPanel(backgroundSwatch, backgroundColorButton, backgroundColorDefault), 1, 2);
-			tableLayoutPanel.SetColumnSpan(tableLayoutPanel.GetControlFromPosition(1, 2), 2);
+			Label backgroundColorLabel = CreateThemeSettingLabel(Strings.ThemeBackgroundColor);
+			FlowLayoutPanel backgroundColorPanel = CreateThemeRowPanel(backgroundSwatch, backgroundColorButton, backgroundColorDefault);
+			tableLayoutPanel.Controls.Add(backgroundColorLabel, 0, 2);
+			tableLayoutPanel.Controls.Add(backgroundColorPanel, 1, 2);
+			tableLayoutPanel.SetColumnSpan(backgroundColorPanel, 2);
+			// 2026-10-22（机主：有图片的时候背景色不应该可以用）：已配置背景图时整行隐藏（也不参与取色）。
+			bool backgroundImageConfigured = !string.IsNullOrWhiteSpace(AppConfig.GetString(UiVisualStyle.BackgroundImageConfigKey));
+			backgroundColorLabel.Visible = !backgroundImageConfigured;
+			backgroundColorPanel.Visible = !backgroundImageConfigured;
 
 			Button backgroundImageButton = CreateThemeSettingButton(Strings.ThemeChoose);
 			backgroundImageButton.Click += (object sender, EventArgs e) =>
@@ -8027,8 +8032,10 @@ public class SettingsForm : RForm
 				};
 				if (dialog.ShowDialog(this) == DialogResult.OK)
 				{
-					AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, dialog.FileName);
+						AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, dialog.FileName);
 					AppConfig.Flush();
+					backgroundColorLabel.Visible = false;
+					backgroundColorPanel.Visible = false;
 					ApplyThemeLive();
 				}
 			};
@@ -8037,6 +8044,8 @@ public class SettingsForm : RForm
 			{
 				AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, "");
 				AppConfig.Flush();
+				backgroundColorLabel.Visible = true;
+				backgroundColorPanel.Visible = true;
 				ApplyThemeLive();
 			};
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundImage), 0, 3);
@@ -8096,53 +8105,6 @@ public class SettingsForm : RForm
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageScrim), 0, 5);
 			tableLayoutPanel.Controls.Add(scrimSlider, 1, 5);
 			tableLayoutPanel.Controls.Add(scrimLabel, 2, 5);
-
-			// 预设配色：常用强调色，点一下立即应用。
-			Color[] presetColors = new Color[8]
-			{
-				Color.FromArgb(77, 163, 255),
-				Color.FromArgb(52, 199, 89),
-				Color.FromArgb(168, 85, 247),
-				Color.FromArgb(255, 159, 10),
-				Color.FromArgb(255, 69, 58),
-				Color.FromArgb(50, 212, 222),
-				Color.FromArgb(255, 111, 181),
-				Color.FromArgb(142, 155, 179)
-			};
-			FlowLayoutPanel presetPanel = new FlowLayoutPanel
-			{
-				FlowDirection = FlowDirection.LeftToRight,
-				WrapContents = false,
-				AutoSize = true,
-				AutoSizeMode = AutoSizeMode.GrowAndShrink,
-				Dock = DockStyle.Fill,
-				Margin = Padding.Empty
-			};
-			foreach (Color preset in presetColors)
-			{
-				Color color = preset;
-				// 2026-10-22：预设色块用 Panel 而不是 Button —— Button 的 BackColor 会被主题重下发刷成按钮面，
-				// 预设色会因此「变成一排黑块」。
-				Panel presetButton = new Panel
-				{
-					Size = new Size(scale(20), scale(20)),
-					BackColor = color,
-					BorderStyle = BorderStyle.FixedSingle,
-					Margin = new Padding(scale(2), scale(5), scale(2), scale(2)),
-					Cursor = Cursors.Hand
-				};
-				presetButton.Click += (object sender, EventArgs e) =>
-				{
-					UiVisualStyle.SaveCustomColor(UiVisualStyle.AccentColorConfigKey, color);
-					AppConfig.Flush();
-					accentSwatch.BackColor = color;
-					ApplyThemeLive();
-				};
-				presetPanel.Controls.Add(presetButton);
-			}
-			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemePresetColors), 0, 6);
-			tableLayoutPanel.Controls.Add(presetPanel, 1, 6);
-			tableLayoutPanel.SetColumnSpan(presetPanel, 2);
 
 			_themeModePanel.Controls.Add(tableLayoutPanel);
 		}

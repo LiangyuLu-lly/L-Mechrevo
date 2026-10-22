@@ -296,7 +296,7 @@ private static void LoadEmbeddedFonts()
 				};
 			}
 			Color customBackground = ParseCustomColor(AppConfig.GetString(BackgroundColorConfigKey));
-			if (customBackground != Color.Empty)
+			if (customBackground != Color.Empty && string.IsNullOrWhiteSpace(AppConfig.GetString(BackgroundImageConfigKey)))
 			{
 				palette = palette with
 				{
@@ -1026,14 +1026,6 @@ private static void LoadEmbeddedFonts()
 
 	private static readonly object BackgroundImageGate = new object();
 	private static readonly ConditionalWeakTable<Form, List<Control>> TransparentRoots = new ConditionalWeakTable<Form, List<Control>>();
-
-	private sealed class BackgroundState
-	{
-		public Image Image;
-		public Color Window;
-	}
-
-	private static readonly ConditionalWeakTable<Form, BackgroundState> BackgroundStates = new ConditionalWeakTable<Form, BackgroundState>();
 	private static string _loadedBackgroundImagePath = "";
 	private static Image _loadedBackgroundImage;
 	private static int _loadedBackgroundOpacity = -1;
@@ -1052,13 +1044,6 @@ private static void LoadEmbeddedFonts()
 		{
 			Color currentWindow = Window;
 			Image image = LoadBackgroundImage();
-			if (BackgroundStates.TryGetValue(form, out BackgroundState state) && ReferenceEquals(state.Image, image) && state.Window == currentWindow)
-			{
-				// 2026-10-22（机主：界面刷新会闪一下背景）：同一张图、同一底色时不重复设 BackColor/透明容器，
-				// 只重绘，避免切换/拖动时整窗闪一下。
-				form.Invalidate(invalidateChildren: true);
-				return;
-			}
 			form.BackColor = currentWindow;
 			form.BackgroundImageLayout = ImageLayout.Zoom;
 			form.BackgroundImage = image;
@@ -1079,14 +1064,17 @@ private static void LoadEmbeddedFonts()
 				// 递归处理：把「页面底」色的容器都设透明（主页仪表盘/栈/分组），卡片(Surface)保持不透明。
 				ApplyTransparentPageBackgrounds(form, transparent);
 			}
-			BackgroundStates.Remove(form);
-			BackgroundStates.Add(form, new BackgroundState
-			{
-				Image = image,
-				Window = currentWindow
-			});
 			TransparentRoots.Remove(form);
 			TransparentRoots.Add(form, transparent);
+			// 2026-10-22：透明容器/文字控件重设后强制整窗重绘，避免残影（旧帧没被擦掉）。
+			foreach (Control control in transparent)
+			{
+				if (control != null && !control.IsDisposed)
+				{
+					control.Invalidate();
+				}
+			}
+			form.Invalidate(invalidateChildren: true);
 			Logger.WriteLine("[theme] 背景应用：color=" + ToHex(Window) + " · image=" + (image != null ? "有" : "无") + " · 透明根=" + transparent.Count);
 		}
 		catch (Exception ex)
