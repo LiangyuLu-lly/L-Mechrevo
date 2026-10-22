@@ -3719,6 +3719,14 @@ internal static class Program
 		SchedulePowerCheck();
 	}
 
+	/// <summary>2026-10-22（耀世：睡眠开盖键盘灯不亮）：现代待机走 PBT_APMSUSPEND，不是 SystemEvents.PowerModeChanged ⇒
+	/// 由 SettingsForm 的 WM_POWERBROADCAST(0x218) 调用，睡前记录键盘灯电源。</summary>
+	internal static void CaptureKeyboardPowerBeforeSuspend()
+	{
+		_kbPowerBeforeSuspend = ResolveEffectiveKbPower() ? 1 : 0;
+		Logger.WriteLine("[light] 睡眠前键盘灯状态=" + (_kbPowerBeforeSuspend == 1 ? "开" : "关") + "（PBT 路径 · 唤醒按此恢复）");
+	}
+
 	internal static void ScheduleKeyboardLightingRestoreAfterResume()
 	{
 		// 2026-10-10（①「安装后灯被熄灭」）：唤醒重放（force:true）与开机恢复同语义 ——

@@ -12256,12 +12256,16 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			Logger.WriteLine("System Suspend");
 			// 2026-10-11（修「唤醒后屏幕反复被关闭」）：睡眠前清理息屏状态（不发 SC_MONITORPOWER、还原临时 sleep guard）。
 			VirtualDisplayBlank.AbortOnSuspend();
+			// 2026-10-22（耀世：睡眠开盖键盘灯不亮）：现代待机走 PBT_APMSUSPEND，补记键盘灯状态。
+			Program.CaptureKeyboardPowerBeforeSuspend();
 			m.Result = 1;
 		}
-		if (m.WParam == 18)
+		if (m.WParam == 18 || m.WParam == 7)
 		{
 			Logger.WriteLine("System Resume");
 			BatteryControl.AutoBattery();
+			// 2026-10-22（耀世）：PBT 唤醒路径补一次键盘灯恢复（现代待机不触发 SystemEvents.PowerModeChanged）。
+			Program.ScheduleKeyboardLightingRestoreAfterResume();
 			m.Result = 1;
 		}
 		if (m.WParam != 32787)
