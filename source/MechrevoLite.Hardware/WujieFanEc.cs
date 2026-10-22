@@ -130,6 +130,39 @@ internal static class WujieFanEc
 		return ok1 && ok2;
 	}
 
+	/// <summary>2026-10-22：宝龙达同款 LPC EC-RAM 通道只读探测（PawnIO LpcIO）。返回一段诊断文本。</summary>
+	private static string ProbeLpcPath()
+	{
+		StringBuilder sb = new StringBuilder();
+		sb.AppendLine("[无界风扇 · LPC EC-RAM 只读探测（宝龙达同款通道，仅读）]");
+		try
+		{
+			sb.AppendLine("LPC EC-RAM 基准（温度 0x043E / 转速 0x0464）："
+				+ DescribeLpc(0x043E) + " · " + DescribeLpc(0x0464));
+			sb.AppendLine("无界占空比（0x1800/0x1801/0x1804/0x1806/0x1809）："
+				+ DescribeLpc(0x1800) + " · " + DescribeLpc(0x1801) + " · " + DescribeLpc(0x1804) + " · " + DescribeLpc(0x1806) + " · " + DescribeLpc(0x1809));
+			sb.AppendLine("模式/转速（0x200D / 0xC834 / 0xC835）：" + DescribeLpc(0x200D) + " · " + DescribeLpc(0xC834) + " · " + DescribeLpc(0xC835));
+			bool dutyOk = EcLpcIo.TryReadByte(0x1804, out int duty1) && duty1 >= 0 && duty1 <= 200
+				&& EcLpcIo.TryReadByte(0x1809, out int duty2) && duty2 >= 0 && duty2 <= 200;
+			bool tempOk = EcLpcIo.TryReadByte(0x043E, out int temp) && temp > 0 && temp < 120;
+			sb.AppendLine(dutyOk && tempOk
+				? "结论：LPC 通道可读无界占空比/温度 ⇒ 写入也可尝试改走 PawnIO（不依赖 inpoutx64）。"
+				: "结论：LPC 通道读不到（或值不合理）⇒ 写入仍需 inpoutx64（I2EC）或自研 PawnIO I2EC 模块。");
+		}
+		catch (Exception ex)
+		{
+			sb.AppendLine("LPC 探测异常（已忽略）：" + ex.GetType().Name + " " + ex.Message);
+		}
+		return sb.ToString().TrimEnd();
+	}
+
+	private static string DescribeLpc(int address)
+	{
+		return EcLpcIo.TryReadByte(address, out int value)
+			? "0x" + address.ToString("X4") + "=0x" + value.ToString("X2")
+			: "0x" + address.ToString("X4") + "=读不到";
+	}
+
 	/// <summary>诊断包用：无界风扇 EC 状态（只读）。</summary>
 	internal static string Describe()
 	{
@@ -153,6 +186,9 @@ internal static class WujieFanEc
 			sb.AppendLine($"占空比：主扇={duty1}/200 · 副扇={duty2}/200 · CPU={tempC}℃ · 主扇={fan1Rpm}rpm · 副扇={fan2Rpm}rpm");
 			sb.AppendLine("参考语义：占空比 0..200 → 0..100%；低于 20% 副扇可能被判堵转闭锁；写入需 25Hz 持续维持（EC 会覆写）。");
 			sb.AppendLine("边界：本段只读；写曲线尚未接入 UI（下一步：25Hz 控制器 + FanCurveForm 无界分支）。");
+			// 2026-10-22（机主：无界能不能走宝龙达那条 PawnIO 路子）：只读探测 LPC EC-RAM 通道是否能摸到无界的
+			// 温度/转速/占空比地址。若能读到合理值，就可以把写入也挪到 PawnIO（不再依赖 inpoutx64）。
+			sb.AppendLine(ProbeLpcPath());
 		}
 		catch (Exception ex)
 		{

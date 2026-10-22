@@ -110,6 +110,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 新增 **UI 探针**（`--ui-probe`）：强制合成某类机型能力位打开对应 UI，只预览、不连硬件/不下发命令。用法：`L-Mechrevo.exe --ui-probe list`；`--ui-probe wujie:settings` / `baolongda:settings` / `gen50:settings` / `all:custommode` / `*:fancurve`；能力档 all/wujie/baolongda/gen50/minimal，窗体 settings/custommode/fancurve。合成 `MechrevoHw`（无服务连接）⇒ 按钮不会触达真实硬件。
 - UI 探针增加**环境变量入口**：`LMECHREVO_UI_PROBE=<profile:form>` 后正常双击启动即进入预览（便于不用命令行；删变量/清空恢复）。预览成功时日志出现 `[ui-probe] 启动 UI 预览：profile=... form=...`，窗口标题含「UI 探针」。
 - 无界风扇曲线改走 **I2EC 通道**（端口 0x681-0x683，inpoutx64）：实机日志显示走 ACPI-EC 0x93 写 `0x1804/0x1809` 后约 8 秒 EC 通道连续 I/O 失败（写不生效且把通道拖死）⇒ 写入改用 fanctl 验证过的 I2EC 窗口；启动前先验 0x200D 读写模式与温度，失败时状态行如实提示（需要本机已装 inpoutx64）。温度读失败改为 2.4 秒宽限、写失败 1 秒、回读持续不一致才停写交还 EC。
+- 无界风扇：新增「LPC EC-RAM 只读探测」（宝龙达同款 PawnIO LpcIO 通道）诊断段——只读 0x043E/0x0464/0x1800/0x1801/0x1804/0x1806/0x1809/0x200D/0xC834/0xC835，并给出结论「能否把无界风扇写入改走 PawnIO（不依赖 inpoutx64）」。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。
