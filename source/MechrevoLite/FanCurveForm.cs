@@ -686,8 +686,8 @@ public class FanCurveForm : RForm
 			out string sourcePath, out string detail);
 		if (!ok)
 		{
-			_status.Text = "读取官方风扇表失败：" + detail;
-			Logger.WriteLine("[fan] 官方风扇表读取失败：" + detail);
+			_status.Text = "读取官方风扇表失败：" + detail + "（不影响曲线保存/下发，仍可按界面点位保存）";
+			Logger.WriteLine("[fan] 官方风扇表读取失败：" + detail + "（仅参考表读取失败，保存/下发不受影响）");
 			return;
 		}
 		_cpuPanel.Load(cpuTemps, cpuDuties);
@@ -967,16 +967,19 @@ public class FanCurveForm : RForm
 			_wujieFanController ??= new WujieFanEcController();
 			bool independent = _respectiveChk != null && _respectiveChk.Checked;
 			bool ok = _wujieFanController.Start(_cpuPanel.Temperatures, _cpuPanel.Duties, independent, _gpuPanel.Temperatures, _gpuPanel.Duties, out string detail);
+			// 2026-10-22（机主：风扇表失败不应影响实际功能，检查写入和保存）：
+			// 写入（EC 25Hz）与保存（档位点位）必须解耦 —— 即使本次 EC 下发失败，也先把界面点位按档位落盘，
+			// 不能因为“启动失败”把用户刚保存的曲线丢掉。
+			PerfModeService.Instance?.RecordFanCurves(TargetModeId, cpu, gpu);
 			if (ok)
 			{
 				_status.Text = "无界 EC 直写已启用（45℃ 以下不接管，交还 EC）· " + detail;
-				PerfModeService.Instance?.RecordFanCurves(TargetModeId, cpu, gpu);
 				Logger.WriteLine("[fan] 曲线：无界 EC 直写已启动（25Hz 双扇 · 曲线点数=" + _cpuPanel.ValidPoints + "）");
 			}
 			else
 			{
-				_status.Text = "无界风扇曲线启动失败：" + detail;
-				Logger.WriteLine("[fan] 曲线：无界 EC 直写启动失败：" + detail);
+				_status.Text = "曲线已保存（无界 EC 下发失败：" + detail + "；下次保存/应用会重试）";
+				Logger.WriteLine("[fan] 曲线：已按界面点位保存；无界 EC 直写启动失败：" + detail);
 			}
 			RaiseFanCurveSaved(confirmed: ok);
 		}
