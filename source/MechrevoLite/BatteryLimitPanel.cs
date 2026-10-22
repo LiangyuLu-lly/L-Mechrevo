@@ -131,7 +131,7 @@ internal sealed class BatteryLimitPanel : Panel
 		_applyButton.AutoEllipsis = false;
 		_applyButton.Click += ApplyButton_Click;
 
-		// 8000 系无界：电池充电电压修复（外挂 JG_BAT；本机自身不注入驱动）
+		// 8000 系无界：电池充电电压修复（仅内置 inpoutx64 通道）
 		_voltageFixBox = new RCheckBox
 		{
 			AutoSize = true,
@@ -141,7 +141,7 @@ internal sealed class BatteryLimitPanel : Panel
 			Checked = MechrevoLite.Hardware.BatteryVoltageFix.Enabled,
 			Visible = MechrevoLite.Hardware.BatteryVoltageFix.IsSupportedMachine()
 		};
-		_toolTip.SetToolTip(_voltageFixBox, "内置（inpoutx64 驱动）覆盖 EC 老化降额，把充电目标恢复为 17.6V；无驱动时回退外部 JG_BAT");
+		_toolTip.SetToolTip(_voltageFixBox, "内置（inpoutx64 驱动）覆盖 EC 老化降额，把充电目标恢复为 17.6V；不调用任何外部脚本");
 		_voltageFixBox.CheckedChanged += delegate
 		{
 			MechrevoLite.Hardware.BatteryVoltageFix.Enabled = _voltageFixBox.Checked;

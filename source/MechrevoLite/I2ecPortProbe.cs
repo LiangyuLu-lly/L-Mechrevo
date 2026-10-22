@@ -78,7 +78,7 @@ internal static class I2ecPortProbe
 				sb.AppendLine("== 结论 ==");
 				sb.AppendLine(anyReadOk
 					? "读放行、写被拒：只能做探测，不能按 I2EC 协议选地址。"
-					: "端口全部被 LpcIO 模块拒绝 ⇒ 需要新的 PawnIO 模块或外挂 JG_BAT。");
+					: "端口全部被 LpcIO 模块拒绝 ⇒ 需要新的 PawnIO 模块。");
 			}
 
 			string path = WriteReportFile(sb.ToString());

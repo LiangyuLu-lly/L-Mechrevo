@@ -13,7 +13,7 @@ namespace MechrevoLite.Hardware;
 /// <summary>
 /// 无界（8000 系）电池电压修复的<b>内置</b>实现：直接调用本机已安装的 inpoutx64 驱动
 /// （P/Invoke <c>Inp32/Out32</c>）访问 IT5571 的 I2EC 接口（0x681 地址高 / 0x682 地址低 / 0x683 数据）。
-/// <para>不依赖 Python / JG_BAT 脚本；驱动与 DLL 由用户机器提供（LM 只加载、不分发）。</para>
+/// <para>不依赖外部脚本；驱动与 DLL 由用户机器提供（LM 只加载、使用安装包自带文件）。</para>
 /// <para>只用于覆盖 EC 辅助老化降额：desired/queued = 17600mV、电流 2816mA、解停充门；停止时恢复原值。</para>
 /// </summary>
 internal static class I2ecInpOut
@@ -200,10 +200,6 @@ internal static class I2ecInpOut
 	private static readonly string[] DllSearchDirs =
 	{
 		AppContext.BaseDirectory,
-		@"E:\JG_BAT",
-		@"D:\JG_BAT",
-		@"C:\JG_BAT",
-		Path.Combine(AppContext.BaseDirectory, "JG_BAT"),
 		Environment.GetFolderPath(Environment.SpecialFolder.System)
 	};
 
@@ -368,7 +364,7 @@ internal static class I2ecInpOut
 			}
 		}
 		handle = IntPtr.Zero;
-		detail = "尝试系统目录/程序目录/E:/D:/C:\\JG_BAT 均失败（Windows 不自带该驱动，需要安装 inpoutx64）";
+		detail = "尝试系统目录/程序目录均失败（Windows 不自带该驱动，需要安装 inpoutx64）";
 		return false;
 	}
 
@@ -561,7 +557,7 @@ internal static class I2ecInpOut
 		}
 	}
 
-	/// <summary>启动内置覆盖（等价 batteryctl.py hold-full）：周期保持 17600mV/2816mA + 解停充门；停止时恢复原值。</summary>
+	/// <summary>启动内置覆盖：周期保持 17600mV/2816mA + 解停充门；停止时恢复原值。</summary>
 	internal static bool TryStart(out string detail)
 	{
 		detail = string.Empty;

@@ -149,6 +149,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 诊断包瘦身（机主：体积爆大、过时探针清理）：① 单文件日志只取末尾 **2 MiB**（原 8 MiB）；② 包内只带 `log.txt + crash.txt + log.1.txt`（原含 log.1/2/3，最多 4×8 MiB）；③ GCU 侧日志/安装日志/目录树预算减半（64→32 KB/文件、512→192 KB、目录树 3→2 层/400→200 项）；④ 移除星耀 P916F PMC2 旧研究探针段（类保留作参考）；说明.txt 同步更新。
 - 清理过时探针 CLI（机主批准）：移除 `--ui-audit`、`--fan-watch`、`--sensor-dump`、`--official-isolate/--official-restore`、`--secure-mqtt/--secure-mqtt-remove`、`--gpu-oc-probe` 入口，并删除只被它们使用的 `UiAuditRunner` / `FanWatchRunner` / `SensorDumpRunner` / `GpuOcProbe` 源文件；正式功能路径（设置里的官方控制台隔离、MqttSecurity 启动检查等）保留不动。
 - 无界电池电压修复黑屏/重启：核对参考脚本 `batteryctl.py` 后确认——**只有基础目标 `0x030E` 是大端（`read_be16`）**，desired/queued/current/pack 都是小端（`read_le16/write_le16`）。早先 C# 把 `0x030E` 也按小端读成 49220mV，导致 LM 校验误判、从未启动（日志可见），不是 LM 下发了 49.2V。现已按脚本对齐字节序，并在启动前校验当前 desired/queued 在 12–18V 合理范围，异常则拒绝写入、不改任何寄存器。
+- 删除电池电压修复的外部脚本接口与提示（机主要求）：`BatteryVoltageFix` 只保留内置 I2EC 通道，移除 JG_BAT/batteryctl.py 的查找、Python 调用、外挂回退与相关提示；`I2ecInpOut` DLL 搜索不再扫描 E:/D:/C:\JG_BAT；电池页 tooltip 改为“不调用任何外部脚本”；删除已不再引用的星耀 PMC2 旧探针。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

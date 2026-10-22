@@ -34,7 +34,7 @@ internal static class InpOutProbe
 		sb.AppendLine("[inpout 探测]");
 		if (string.IsNullOrEmpty(dll))
 		{
-			sb.AppendLine("未找到 inpoutx64.dll（尝试过 LM 目录、E:/D:/C:\\JG_BAT、System32、传入路径）");
+			sb.AppendLine("未找到 inpoutx64.dll（尝试过 LM 目录、System32、传入路径）");
 			sb.AppendLine("结论：不可用（DLL 未找到）");
 			return sb.ToString().TrimEnd();
 		}
@@ -162,10 +162,6 @@ internal static class InpOutProbe
 		string[] candidates = new string[]
 		{
 			Path.Combine(AppContext.BaseDirectory, "inpoutx64.dll"),
-			@"E:\JG_BAT\inpoutx64.dll",
-			@"D:\JG_BAT\inpoutx64.dll",
-			@"C:\JG_BAT\inpoutx64.dll",
-			Path.Combine(AppContext.BaseDirectory, "JG_BAT", "inpoutx64.dll"),
 			Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "inpoutx64.dll")
 		};
 		foreach (string candidate in candidates)
