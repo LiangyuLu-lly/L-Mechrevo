@@ -199,6 +199,35 @@ public class RForm : Form
 		//（例如按硬件能力/配置现建的行）。本方法是幂等的：已上过色的下拉在 StyleComboBox 里是空操作。
 		UiVisualStyle.StyleAllCombos(this);
 		ApplyResponsiveBounds();
+		if (AllowBackgroundImage)
+		{
+			// 2026-10-22（机主：每次重启背景不刷新、被黑色挡住）：启动期句柄创建时套背景会被后续初始化覆盖，
+			// 这里在窗口真正显示、布局完成后再套，并用一次短延迟定时器兜底（等主题/布局全部落定）。
+			UiVisualStyle.ApplyFormBackground(this);
+			BeginInvoke((Action)(() =>
+			{
+				if (!IsDisposed && AllowBackgroundImage)
+				{
+					UiVisualStyle.ApplyFormBackground(this);
+					Invalidate(invalidateChildren: true);
+				}
+			}));
+			Timer startupBackgroundTimer = new Timer
+			{
+				Interval = 500
+			};
+			startupBackgroundTimer.Tick += (object sender, EventArgs args) =>
+			{
+				startupBackgroundTimer.Stop();
+				startupBackgroundTimer.Dispose();
+				if (!IsDisposed && AllowBackgroundImage)
+				{
+					UiVisualStyle.ApplyFormBackground(this);
+					Invalidate(invalidateChildren: true);
+				}
+			};
+			startupBackgroundTimer.Start();
+		}
 	}
 
 	protected override void OnDpiChanged(DpiChangedEventArgs e)
