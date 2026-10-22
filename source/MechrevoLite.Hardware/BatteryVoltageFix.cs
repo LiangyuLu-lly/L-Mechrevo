@@ -286,7 +286,20 @@ internal static class BatteryVoltageFix
 
 	internal static void RunOnStartupIfEnabled()
 	{
-		if (!Enabled || !IsSupportedMachine())
+		if (!Enabled)
+		{
+			// 2026-10-22：上次可能是被强杀（没走到恢复）⇒ 只要落盘原值还在，这里恢复一次。
+			try
+			{
+				I2ecInpOut.Stop();
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("[battery-fix] 启动清理落盘原值异常（已吞掉）：" + ex.Message);
+			}
+			return;
+		}
+		if (!IsSupportedMachine())
 		{
 			return;
 		}

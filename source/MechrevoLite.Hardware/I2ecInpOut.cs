@@ -110,6 +110,84 @@ internal static class I2ecInpOut
 		_ecLockStream = null;
 	}
 
+	// 2026-10-22（fanctl README 风险提示）：进程被强杀时内存里的“原值”会丢，
+	// 下次启动若把已覆盖值当原值，关闭功能就无法恢复。首次写 EC 前把原值落盘，
+	// 正常停止/关闭功能时恢复并删除；崩溃/断电后下次启动优先用落盘原值。
+	private static string OriginalsPath()
+	{
+		string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "L-Mechrevo");
+		Directory.CreateDirectory(dir);
+		return Path.Combine(dir, "i2ec-originals.txt");
+	}
+
+	private static void SaveOriginals()
+	{
+		try
+		{
+			string text = "desiredV=" + _origDesiredV + "\nqueuedV=" + _origQueuedV
+				+ "\ndesiredI=" + _origDesiredI + "\nqueuedI=" + _origQueuedI
+				+ "\nqueuedInputI=" + _origQueuedInputI + "\ngate=" + _origGate + "\n";
+			File.WriteAllText(OriginalsPath(), text);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery-fix] 保存 EC 原值失败（已吞掉）：" + ex.Message);
+		}
+	}
+
+	private static bool TryLoadOriginals()
+	{
+		try
+		{
+			string path = OriginalsPath();
+			if (!File.Exists(path))
+			{
+				return false;
+			}
+			Dictionary<string, int> values = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+			foreach (string line in File.ReadAllLines(path))
+			{
+				int index = line.IndexOf('=');
+				if (index > 0 && int.TryParse(line.Substring(index + 1).Trim(), out int value))
+				{
+					values[line.Substring(0, index).Trim()] = value;
+				}
+			}
+			if (!(values.ContainsKey("desiredV") && values.ContainsKey("queuedV") && values.ContainsKey("desiredI")
+				&& values.ContainsKey("queuedI") && values.ContainsKey("queuedInputI") && values.ContainsKey("gate")))
+			{
+				return false;
+			}
+			_origDesiredV = values["desiredV"];
+			_origQueuedV = values["queuedV"];
+			_origDesiredI = values["desiredI"];
+			_origQueuedI = values["queuedI"];
+			_origQueuedInputI = values["queuedInputI"];
+			_origGate = values["gate"];
+			_originalsCaptured = true;
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	private static void DeleteOriginals()
+	{
+		try
+		{
+			string path = OriginalsPath();
+			if (File.Exists(path))
+			{
+				File.Delete(path);
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	private static readonly string[] DllSearchDirs =
 	{
 		AppContext.BaseDirectory,
@@ -492,13 +570,17 @@ internal static class I2ecInpOut
 					detail = "基础目标 " + baseV + "mV ≠ 已验证的 " + ExpectedBaseVoltageMv + "mV ⇒ 不启动";
 					return false;
 				}
-				_origDesiredV = ReadLe16(AddrDesiredVoltage);
-				_origQueuedV = ReadLe16(AddrQueuedVoltage);
-				_origDesiredI = ReadLe16(AddrDesiredCurrent);
-				_origQueuedI = ReadLe16(AddrQueuedCurrent);
-				_origQueuedInputI = ReadLe16(AddrQueuedInputCurrent);
-				_origGate = ReadByte(AddrStopGate);
-				_originalsCaptured = true;
+				if (!TryLoadOriginals())
+				{
+					_origDesiredV = ReadLe16(AddrDesiredVoltage);
+					_origQueuedV = ReadLe16(AddrQueuedVoltage);
+					_origDesiredI = ReadLe16(AddrDesiredCurrent);
+					_origQueuedI = ReadLe16(AddrQueuedCurrent);
+					_origQueuedInputI = ReadLe16(AddrQueuedInputCurrent);
+					_origGate = ReadByte(AddrStopGate);
+					_originalsCaptured = true;
+					SaveOriginals();
+				}
 				_cts = new CancellationTokenSource();
 				CancellationToken token = _cts.Token;
 				_running = true;
@@ -576,7 +658,7 @@ internal static class I2ecInpOut
 	{
 		lock (Gate)
 		{
-			if (_cts == null && !_originalsCaptured)
+			if (_cts == null && !_originalsCaptured && !TryLoadOriginals())
 			{
 				return;
 			}
@@ -597,7 +679,7 @@ internal static class I2ecInpOut
 			_loop = null;
 			_cts = null;
 			_running = false;
-			if (!_originalsCaptured)
+			if (!_originalsCaptured && !TryLoadOriginals())
 			{
 				return;
 			}
@@ -612,6 +694,7 @@ internal static class I2ecInpOut
 				WriteByte(AddrStopGate, _origGate);
 				Logger.WriteLine("[battery-fix] 内置覆盖已停止并恢复原值（desiredV=" + _origDesiredV
 					+ " / queuedV=" + _origQueuedV + " / gate=" + _origGate + "）");
+				DeleteOriginals();
 			}
 			catch (Exception ex)
 			{
