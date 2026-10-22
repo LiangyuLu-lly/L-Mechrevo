@@ -31,6 +31,16 @@ internal sealed class WujieFanEcController : IDisposable
 
 	private const int MaxReadbackMismatchSamples = 3;
 
+	/// <summary>2026-10-22：写入通道选择 —— I2EC（inpoutx64，实测可写）优先；没有驱动时回退 ACPI-EC 0x93（实验）。</summary>
+	private enum WriteChannel
+	{
+		None,
+		I2ec,
+		AcpiEc
+	}
+
+	private WriteChannel _channel;
+
 	/// <summary>2026-10-22（机主：45℃ 以下风扇会停转、写不进去）：低温区不写占空比，交还 EC 原生策略。</summary>
 	internal const int MinimumOperatingTemperatureC = 45;
 
@@ -86,21 +96,40 @@ internal sealed class WujieFanEcController : IDisposable
 			detail = "曲线数据为空";
 			return false;
 		}
-		// 启动前先验通道：I2EC 可用（inpoutx64）、0x200D 读写模式、温度可读。
-		if (!I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterMode, out int mode, out string modeDetail))
+		// 启动前先验通道：I2EC（inpoutx64）优先；没有驱动时回退 ACPI-EC 0x93（实验路径）。
+		WriteChannel channel = WriteChannel.None;
+		int temp = -1;
+		string i2ecDetail = "";
+		if (I2ecInpOut.IsAvailable
+			&& I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterMode, out int mode, out string modeDetail))
 		{
-			detail = "I2EC 通道不可用（需要本机已安装 inpoutx64）：" + modeDetail;
-			return false;
+			if ((mode & 0x03) != 0x03)
+			{
+				detail = "I2EC 不是读写模式（0x200D=0x" + mode.ToString("X2") + "）";
+				return false;
+			}
+			if (!I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterCpuTemp, out temp, out string tempDetail) || temp < 0 || temp > 120)
+			{
+				detail = "读取 CPU 温度失败（0x043E，I2EC）：" + tempDetail;
+				return false;
+			}
+			channel = WriteChannel.I2ec;
 		}
-		if ((mode & 0x03) != 0x03)
+		else
 		{
-			detail = "I2EC 不是读写模式（0x200D=0x" + mode.ToString("X2") + "）";
-			return false;
-		}
-		if (!I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterCpuTemp, out int temp, out string tempDetail) || temp < 0 || temp > 120)
-		{
-			detail = "读取 CPU 温度失败（0x043E）：" + tempDetail;
-			return false;
+			i2ecDetail = I2ecInpOut.IsAvailable ? "I2EC 读失败" : "inpoutx64.dll 未安装";
+			if (!EcPortIo.TryReadByteStable(WujieFanEc.RegisterMode, out int modeAcpi, out string modeAcpiNote)
+				|| (modeAcpi & 0x03) != 0x03)
+			{
+				detail = "无可用 EC 通道（I2EC：" + i2ecDetail + "；ACPI-EC：" + modeAcpiNote + "）";
+				return false;
+			}
+			if (!EcPortIo.TryReadByte(WujieFanEc.RegisterCpuTemp, out temp) || temp < 0 || temp > 120)
+			{
+				detail = "无可用 EC 通道（I2EC：" + i2ecDetail + "；ACPI-EC 读温度失败）";
+				return false;
+			}
+			channel = WriteChannel.AcpiEc;
 		}
 		StopActive("被新的曲线控制器替换");
 		lock (_gate)
@@ -126,10 +155,11 @@ internal sealed class WujieFanEcController : IDisposable
 			_lastSampleTick = Environment.TickCount64;
 			_lastTargetPercent = -1;
 			_running = true;
+			_channel = channel;
 			_active = this;
 			_timer.Change(WriteIntervalMs, WriteIntervalMs);
 		}
-		detail = "已启动（I2EC 25Hz 双扇直写 · 曲线点数=" + _validPoints + " · 当前 " + temp + "℃）";
+		detail = "已启动（" + ChannelName(channel) + " 25Hz 双扇直写 · 曲线点数=" + _validPoints + " · 当前 " + temp + "℃）";
 		Logger.WriteLine("[fan] 无界 EC 曲线启动：" + detail);
 		return true;
 	}
@@ -190,7 +220,7 @@ internal sealed class WujieFanEcController : IDisposable
 		try
 		{
 			// ① 温度：读失败时短暂沿用上次值继续维持写入；超过约 2.4 秒仍失败则交还 EC。
-			bool tempOk = I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterCpuTemp, out int temp, out _) && temp >= 0 && temp <= 120;
+			bool tempOk = ReadEc(WujieFanEc.RegisterCpuTemp, out int temp) && temp >= 0 && temp <= 120;
 			if (!tempOk)
 			{
 				_tempFailTicks++;
@@ -235,8 +265,8 @@ internal sealed class WujieFanEcController : IDisposable
 				target = WujieFanEc.FanFloorPercent;
 			}
 			int raw = Math.Max(1, Math.Min(EcPortIo.WujieFanDutyMaxRaw, (int)Math.Round(target * 2.0)));
-			bool ok1 = I2ecInpOut.TryWriteEcByte(WujieFanEc.RegisterDutyFan1, raw, out string writeDetail1);
-			bool ok2 = I2ecInpOut.TryWriteEcByte(WujieFanEc.RegisterDutyFan2, raw, out string writeDetail2);
+			bool ok1 = WriteDuty(WujieFanEc.RegisterDutyFan1, raw, out string writeDetail1);
+			bool ok2 = WriteDuty(WujieFanEc.RegisterDutyFan2, raw, out string writeDetail2);
 			if (!ok1 || !ok2)
 			{
 				_writeFailTicks++;
@@ -261,7 +291,7 @@ internal sealed class WujieFanEcController : IDisposable
 			if (Environment.TickCount64 - _lastSampleTick >= SampleIntervalMs)
 			{
 				_lastSampleTick = Environment.TickCount64;
-				if (I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterDutyFan1, out int readBack, out _) && readBack != raw)
+				if (ReadEc(WujieFanEc.RegisterDutyFan1, out int readBack) && readBack != raw)
 				{
 					_readbackMismatchSamples++;
 					if (_readbackMismatchSamples >= MaxReadbackMismatchSamples)
@@ -337,15 +367,55 @@ internal sealed class WujieFanEcController : IDisposable
 		return duties[Math.Max(0, points - 1)];
 	}
 
-	private static bool TryReadFan2Rpm(out int rpm)
+	private bool TryReadFan2Rpm(out int rpm)
 	{
 		rpm = 0;
-		if (!I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterFan2RpmHigh, out int high, out _)
-		|| !I2ecInpOut.TryReadEcByte(WujieFanEc.RegisterFan2RpmHigh + 1, out int low, out _))
+		if (!ReadEc(WujieFanEc.RegisterFan2RpmHigh, out int high)
+		|| !ReadEc(WujieFanEc.RegisterFan2RpmHigh + 1, out int low))
 		{
 			return false;
 		}
 		rpm = ((high & 0xFF) << 8) | (low & 0xFF);
 		return true;
+	}
+
+	private bool ReadEc(int address, out int value)
+	{
+		value = -1;
+		if (_channel == WriteChannel.I2ec)
+		{
+			return I2ecInpOut.TryReadEcByte(address, out value, out _);
+		}
+		if (_channel == WriteChannel.AcpiEc)
+		{
+			return EcPortIo.TryReadByte(address, out value);
+		}
+		return false;
+	}
+
+	private bool WriteDuty(int address, int raw, out string detail)
+	{
+		if (_channel == WriteChannel.I2ec)
+		{
+			return I2ecInpOut.TryWriteEcByte(address, raw, out detail);
+		}
+		if (_channel == WriteChannel.AcpiEc)
+		{
+			bool ok = EcPortIo.TryWriteWujieFanDuty(address, raw, out int readBack);
+			detail = ok ? "ok" : ("回读 0x" + readBack.ToString("X2") + " / " + EcPortIo.LastAcpiWriteTrace);
+			return ok;
+		}
+		detail = "通道未选择";
+		return false;
+	}
+
+	private static string ChannelName(WriteChannel channel)
+	{
+		return channel switch
+		{
+			WriteChannel.I2ec => "I2EC",
+			WriteChannel.AcpiEc => "ACPI-EC（实验）",
+			_ => "无",
+		};
 	}
 }
