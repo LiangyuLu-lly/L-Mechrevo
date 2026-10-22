@@ -313,10 +313,22 @@ internal static class Program
 		{
 			text = args[0];
 		}
-		if (text == "--ui-probe")
+		// 2026-10-22（机主：UI 探针）：强制启用某机型 UI 只做预览，不连接硬件、不下发命令。
+		// 两条入口：命令行 --ui-probe <profile:form>；或环境变量 LMECHREVO_UI_PROBE=<profile:form>
+		// （后者便于双击启动：设用户级变量后正常打开即可，不必拼命令行）。
+		string uiProbeEnv = "";
+		try
 		{
-			// 2026-10-22（机主：UI 探针）：强制启用某机型 UI 只做预览，不连接硬件、不下发命令。
-			Environment.ExitCode = UiProbeRunner.Run((args.Length > 1) ? args[1] : "");
+			uiProbeEnv = Environment.GetEnvironmentVariable("LMECHREVO_UI_PROBE") ?? "";
+		}
+		catch
+		{
+			uiProbeEnv = "";
+		}
+		string uiProbeArg = (text == "--ui-probe") ? ((args.Length > 1) ? args[1] : "") : ((args.Length == 0 && uiProbeEnv.Trim().Length > 0) ? uiProbeEnv.Trim() : null);
+		if (uiProbeArg != null)
+		{
+			Environment.ExitCode = UiProbeRunner.Run(uiProbeArg);
 			Logger.Close();
 			return;
 		}
