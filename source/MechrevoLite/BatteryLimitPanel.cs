@@ -57,6 +57,8 @@ internal sealed class BatteryLimitPanel : Panel
 
 	private TableLayoutPanel _grid;
 
+	private TableLayoutPanel _switchRow;
+
 	private readonly ToolTip _toolTip = new ToolTip();
 
 	private bool _busy;
@@ -84,7 +86,9 @@ internal sealed class BatteryLimitPanel : Panel
 	public BatteryLimitPanel()
 	{
 		Name = PanelControlName;
-		BackColor = Color.Transparent;
+		// 2026-10-22（机主截图：无界/宝龙达电池面板“UI 叠一起”）：透明面板不擦除背景，
+		// 滚动/重绘时会把下面卡片的旧文字（如「退出」/日期）透出来 ⇒ 面板改不透明。
+		BackColor = UiVisualStyle.Surface;
 		AutoSize = true;
 		AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		// ⭐ 紧凑布局：Dock=Top + AutoSize，⛔ 不用 Fill 拉满（避免上下空白）✅
@@ -163,7 +167,7 @@ internal sealed class BatteryLimitPanel : Panel
 			RowCount = 5,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
-			BackColor = Color.Transparent
+			BackColor = UiVisualStyle.Surface
 		};
 		_grid = grid;
 		for (int c = 0; c < 4; c++)
@@ -186,8 +190,9 @@ internal sealed class BatteryLimitPanel : Panel
 			RowCount = 1,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
-			BackColor = Color.Transparent
+			BackColor = UiVisualStyle.Surface
 		};
+		_switchRow = switchRow;
 		switchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 		switchRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 		switchRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -208,6 +213,7 @@ internal sealed class BatteryLimitPanel : Panel
 		grid.Controls.Add(_voltageFixBox, 0, 4);
 		grid.SetColumnSpan(_voltageFixBox, 4);
 		Controls.Add(grid);
+		SyncOpaqueBackColor();
 		// ⭐ 代码级 UI 自检（无法启动 GUI 时作为可验证替代）：标签宽度是否足够 ⇒ 不换行 ✅
 		LogLabelWidthCheck("起充标签", _lowLabel, D(88));
 		LogLabelWidthCheck("停充标签", _highLabel, D(88));
@@ -235,10 +241,32 @@ internal sealed class BatteryLimitPanel : Panel
 	}
 
 	/// <summary>⭐⭐ 主题适配：颜色全部走 UiVisualStyle（浅/深色同一套语义），⛔ 不硬编码 ✅。</summary>
+	/// <summary>2026-10-22：面板及内嵌表格跟随宿主卡片的实际背景色（不透明），避免透明重绘叠字。</summary>
+	private void SyncOpaqueBackColor()
+	{
+		Color color = (Parent != null && Parent.BackColor != Color.Transparent) ? Parent.BackColor : UiVisualStyle.Surface;
+		BackColor = color;
+		if (_grid != null)
+		{
+			_grid.BackColor = color;
+		}
+		if (_switchRow != null)
+		{
+			_switchRow.BackColor = color;
+		}
+	}
+
+	protected override void OnParentChanged(EventArgs e)
+	{
+		base.OnParentChanged(e);
+		SyncOpaqueBackColor();
+	}
+
 	internal void ApplyTheme()
 	{
 		Color text = UiVisualStyle.Text;
-		BackColor = Color.Transparent;
+		// 2026-10-22：与构造一致，主题应用时保持不透明，避免重绘把下层文字透出来。
+		SyncOpaqueBackColor();
 		_socLabel.ForeColor = text;
 		_lowLabel.ForeColor = text;
 		_highLabel.ForeColor = text;
