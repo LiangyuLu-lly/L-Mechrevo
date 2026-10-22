@@ -60,6 +60,7 @@ internal static class DiagnosticConfigInfo
 			AppendRegistry(stringBuilder);
 			AppendGcuReported(stringBuilder);
 			AppendRuntime(stringBuilder);
+			stringBuilder.Append(XingyaoPmc2.Describe());
 		}
 		catch (Exception ex)
 		{
