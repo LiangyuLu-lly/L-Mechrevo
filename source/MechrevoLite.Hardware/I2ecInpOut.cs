@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,24 +47,50 @@ internal static class I2ecInpOut
 	// 2026-10-22（fanctl README 的坑：两个 EC 句柄并发会把地址窗口改掉 ⇒ 静默读错寄存器）：
 	// I2EC 是三步端口操作（地址高→地址低→数据），必须**跨进程**串行化。
 	// UI 风扇曲线控制器 与 SYSTEM 电池修复常驻任务各一个进程，进程内 lock 挡不住对方，故加全局互斥体。
-	private static readonly Mutex EcMutex = new Mutex(initiallyOwned: false, @"Global\L-Mechrevo-I2EC");
+	// 2026-10-22：跨进程互斥改用**文件锁**（FileShare.None）—— 不需要 ACL 配置，
+	// SYSTEM 的电池保持任务与管理员 UI 进程都能访问 %ProgramData%\L-Mechrevo\i2ec.lock。
+	private static FileStream _ecLockStream;
+
+	private static string EcLockPath()
+	{
+		string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "L-Mechrevo");
+		Directory.CreateDirectory(dir);
+		return Path.Combine(dir, "i2ec.lock");
+	}
 
 	private static bool TryEnterEcMutex(out bool held)
 	{
 		held = false;
 		try
 		{
-			held = EcMutex.WaitOne(500);
-			return true;
-		}
-		catch (AbandonedMutexException)
-		{
-			held = true;
-			return true;
+			string path = EcLockPath();
+			long deadline = Environment.TickCount64 + 500;
+			while (true)
+			{
+				try
+				{
+					_ecLockStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+					held = true;
+					return true;
+				}
+				catch (IOException)
+				{
+					// 另一个进程正持有 ⇒ 轮询等待
+				}
+				catch (UnauthorizedAccessException)
+				{
+					return false;
+				}
+				if (Environment.TickCount64 >= deadline)
+				{
+					return false;
+				}
+				Thread.Sleep(5);
+			}
 		}
 		catch
 		{
-			return true;
+			return false;
 		}
 	}
 
@@ -74,11 +102,12 @@ internal static class I2ecInpOut
 		}
 		try
 		{
-			EcMutex.ReleaseMutex();
+			_ecLockStream?.Dispose();
 		}
 		catch
 		{
 		}
+		_ecLockStream = null;
 	}
 
 	private static readonly string[] DllSearchDirs =
@@ -322,7 +351,11 @@ internal static class I2ecInpOut
 		}
 		lock (Gate)
 		{
-			TryEnterEcMutex(out bool held);
+			if (!TryEnterEcMutex(out bool held))
+			{
+				detail = "I2EC 忙（等待全局互斥体超时）";
+				return false;
+			}
 			try
 			{
 				value = ReadByte(address);
@@ -351,7 +384,11 @@ internal static class I2ecInpOut
 		}
 		lock (Gate)
 		{
-			TryEnterEcMutex(out bool held);
+			if (!TryEnterEcMutex(out bool held))
+			{
+				detail = "I2EC 忙（等待全局互斥体超时）";
+				return false;
+			}
 			try
 			{
 				WriteByte(address, value & 0xFF);
@@ -491,7 +528,10 @@ internal static class I2ecInpOut
 				{
 					lock (Gate)
 					{
-						TryEnterEcMutex(out bool held);
+						if (!TryEnterEcMutex(out bool held))
+						{
+							continue;
+						}
 						try
 						{
 							WriteLe16(AddrDesiredVoltage, ExpectedBaseVoltageMv);
