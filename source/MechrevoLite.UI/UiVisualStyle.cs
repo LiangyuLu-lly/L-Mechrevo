@@ -1136,11 +1136,25 @@ private static void LoadEmbeddedFonts()
 				continue;
 			}
 			bool container = child is Panel || child is TableLayoutPanel || child is FlowLayoutPanel;
+			Color back = child.BackColor;
 			if (!container)
 			{
+				// 2026-10-22：标签/复选框这类「文字控件」若还是窗口底色，会在背景图上变成一个个黑色方块；
+				// 把它们也设成透明（不支持透明的控件 try/catch 跳过）。
+				bool textControl = child is Label || child is CheckBox;
+				if (textControl && (back == Window || back == NightPalette.Window || back == DayPalette.Window))
+				{
+					try
+					{
+						child.BackColor = Color.Transparent;
+						transparent.Add(child);
+					}
+					catch
+					{
+					}
+				}
 				continue;
 			}
-			Color back = child.BackColor;
 			if (back == Window || back == NightPalette.Window || back == DayPalette.Window)
 			{
 				child.BackColor = Color.Transparent;
