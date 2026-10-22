@@ -176,6 +176,9 @@ internal static class WujieFanEc
 				return sb.ToString();
 			}
 			sb.AppendLine("通道：PawnIO ACPI-EC 0x62/0x66 · 命令 0x92/0x93 · 地址 0x1804/0x1809（宝龙达同款通道，不需要 inpoutx64）");
+			// 2026-10-22：无界风扇**写**走 I2EC，需要本机 inpoutx64（DLL 放 LM 安装目录即可）；这里如实报告状态。
+			bool i2ecOk = I2ecInpOut.IsAvailable;
+			sb.AppendLine("I2EC 写通道（inpoutx64）：" + (i2ecOk ? "可用 · " : "不可用 · ") + I2ecInpOut.InitDetail);
 			if (!TryReadState(out byte mode, out int duty1, out int duty2, out int tempC, out int fan1Rpm, out int fan2Rpm, out string detail))
 			{
 				sb.AppendLine("读取失败：" + detail);
