@@ -60,12 +60,7 @@ public class RForm : Form
 			CreateParams createParams = base.CreateParams;
 			createParams.Style |= 33554432;
 			createParams.ClassStyle &= -131073;
-			// 2026-10-22（B 方案）：透底模式下让 Windows 自己合成整窗（WS_EX_COMPOSITED），
-			// 子窗口移动/重绘时不再靠 WinForms 自己擦除旧帧，可显著减少滚动残影。
-			if (UiVisualStyle.BackgroundContentTransparent && AllowBackgroundImage)
-			{
-				createParams.ExStyle |= 0x02000000;
-			}
+			// 2026-10-22（机主：不动都在闪）：WS_EX_COMPOSITED 与 WinForms 自绘叠加会持续闪烁 ⇒ 已撤掉。
 			return createParams;
 		}
 	}

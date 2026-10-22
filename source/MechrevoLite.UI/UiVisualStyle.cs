@@ -1113,10 +1113,6 @@ private static void LoadEmbeddedFonts()
 		{
 			Color currentWindow = Window;
 			Image image = LoadBackgroundImage();
-			if (form is RForm overlayForm)
-			{
-				overlayForm.SetOverlayBackgroundMode(image != null && BackgroundContentTransparent);
-			}
 			form.BackColor = currentWindow;
 			form.BackgroundImageLayout = ImageLayout.None;
 			form.BackgroundImage = image;
@@ -1132,10 +1128,11 @@ private static void LoadEmbeddedFonts()
 					}
 				}
 			}
-			if (image != null && BackgroundContentTransparent)
+			// 2026-10-22（机主：半透明底去掉、不动都在闪）：容器/文字控件一律不再设 Color.Transparent ——
+			// WinForms 透明子窗口在重绘时会持续闪烁/残影。实验模式只保留「按钮/开关/滑块/下拉」自己的
+			// 底图切片+半透明填充（它们仍是实窗口，不依赖 Color.Transparent）。
+			if (image != null && AppConfig.Get("ui_bg_containers_transparent", 0) == 1)
 			{
-				// 递归处理：把「页面底」色的容器都设透明（主页仪表盘/栈/分组），卡片(Surface)保持不透明。
-				// ⚠️ 仅在实验模式（ui_bg_transparent_content=1）启用：稳定模式下不透明，避免 WinForms 残影。
 				ApplyTransparentPageBackgrounds(form, transparent);
 			}
 			TransparentRoots.Remove(form);
