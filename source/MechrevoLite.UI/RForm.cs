@@ -75,6 +75,16 @@ public class RForm : Form
 	}
 
 	// 2026-10-22（主题自定义）：窗体句柄建好后应用「强调色 + 背景色/背景图」。
+	// 2026-10-22（主题背景图）：背景图按 cover 铺满整窗（上下/左右不留空），不再用 WinForms 的 Zoom。
+	protected override void OnPaintBackground(PaintEventArgs e)
+	{
+		if (UiVisualStyle.PaintFormBackground(e.Graphics, this))
+		{
+			return;
+		}
+		base.OnPaintBackground(e);
+	}
+
 	protected override void OnHandleCreated(EventArgs e)
 	{
 		base.OnHandleCreated(e);

@@ -1045,7 +1045,7 @@ private static void LoadEmbeddedFonts()
 			Color currentWindow = Window;
 			Image image = LoadBackgroundImage();
 			form.BackColor = currentWindow;
-			form.BackgroundImageLayout = ImageLayout.Zoom;
+			form.BackgroundImageLayout = ImageLayout.None;
 			form.BackgroundImage = image;
 			List<Control> transparent = new List<Control>();
 			// 2026-10-22：先还原上一次设成透明的容器（主题色/背景色变化后要重新套）。
@@ -1142,6 +1142,42 @@ private static void LoadEmbeddedFonts()
 		}
 	}
 
+	/// <summary>2026-10-22（主题背景图）：窗体自己画背景图（cover 铺满整窗，上下/左右不留空）。
+	/// <returns>true 表示已画（调用方不要再走默认背景绘制）。</returns></summary>
+	internal static bool PaintFormBackground(Graphics graphics, Form form)
+	{
+		Image image = form?.BackgroundImage;
+		if (graphics == null || form == null || image == null)
+		{
+			return false;
+		}
+		Size client = form.ClientSize;
+		if (client.Width <= 0 || client.Height <= 0 || image.Width <= 0 || image.Height <= 0)
+		{
+			return false;
+		}
+		float scale = Math.Max((float)client.Width / image.Width, (float)client.Height / image.Height);
+		float width = image.Width * scale;
+		float height = image.Height * scale;
+		float left = (client.Width - width) / 2f;
+		float top = (client.Height - height) / 2f;
+		graphics.DrawImage(image, new RectangleF(left, top, width, height));
+		return true;
+	}
+
+	/// <summary>2026-10-22：控件是否位于底栏（底栏不参与背景自定义）。</summary>
+	internal static bool IsInsideFooter(Control control)
+	{
+		for (Control parent = control; parent != null; parent = parent.Parent)
+		{
+			if (string.Equals(parent.Name, "panelFooter", StringComparison.Ordinal))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/// <summary>2026-10-22（主题背景图）：把窗体背景图在控件位置上的那一块画进控件，
 	/// 让按钮/开关的半透明填充真正“透出底图”（否则 WinForms 控件会先擦成实心底，alpha 只在实心底上混）。
 	/// <para>只处理 BackgroundImageLayout=Zoom（与 ApplyFormBackground 一致）。</para></summary>
@@ -1154,7 +1190,8 @@ private static void LoadEmbeddedFonts()
 			return;
 		}
 		Rectangle client = form.ClientRectangle;
-		float scale = Math.Min((float)client.Width / image.Width, (float)client.Height / image.Height);
+		// 2026-10-22（机主：图片上下边要填满）：按 cover 缩放（取较大比例、超出部分裁掉）。
+		float scale = Math.Max((float)client.Width / image.Width, (float)client.Height / image.Height);
 		if (scale <= 0f)
 		{
 			return;
@@ -1200,6 +1237,11 @@ private static void LoadEmbeddedFonts()
 		foreach (Control child in parent.Controls)
 		{
 			if (child == null || child.IsDisposed)
+			{
+				continue;
+			}
+			// 2026-10-22（机主：底栏不参与背景自定义）：底栏整块跳过，保持原样。
+			if (string.Equals(child.Name, "panelFooter", StringComparison.Ordinal))
 			{
 				continue;
 			}
