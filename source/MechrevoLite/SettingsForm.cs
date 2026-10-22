@@ -366,6 +366,12 @@ public class SettingsForm : RForm
 
 	private RScrollBar? _dashboardScrollBar;
 
+	// 2026-10-22（机主：滑动是平移不重绘）：透底模式下滚动时把内容拍成一张位图做平移，
+	// 不再移动子窗口（移动子窗口会让 WinForms 重绘透明控件 → 残影）。
+	private Bitmap _scrollSnapshot;
+	private System.Windows.Forms.Timer _scrollSnapshotTimer;
+	private bool _scrollSnapshotCapturing;
+
 	private RCollapseGroup? _liquidGroup;
 
 	private RCollapseGroup? _quickGroup;
@@ -7694,8 +7700,14 @@ public class SettingsForm : RForm
 		_dashboardScrollBar.BringToFront();
 		_dashboardScrollBar.ValueChanged += (object? _, EventArgs _) =>
 		{
+			if (UiVisualStyle.BackgroundContentTransparent)
+			{
+				BeginScrollSnapshot();
+			}
 			UpdateDashboardScroll(rangeChanged: false);
+			ScheduleScrollSnapshotEnd();
 		};
+		_dashboardScroll.Paint += DashboardScroll_Paint;
 		_dashboardStack.SizeChanged += (object? _, EventArgs _) =>
 		{
 			UpdateDashboardScroll();
@@ -19589,6 +19601,104 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 	internal static int ResolveCalibrationComboIndex()
 	{
 		return CalibComboIndexFor(ResolveColorCalibrationMode());
+	}
+
+	/// <summary>2026-10-22：透底模式滚动快照 —— 把内容按当前视觉拍成整页位图，滚动只做位图平移。</summary>
+	private void BeginScrollSnapshot()
+	{
+		if (_scrollSnapshot != null || _scrollSnapshotCapturing || _dashboardStack == null || _dashboardScroll == null || _dashboardScrollBar == null)
+		{
+			return;
+		}
+		if (!_dashboardScroll.IsHandleCreated || !_dashboardScroll.Visible)
+		{
+			return;
+		}
+		Size viewport = _dashboardScroll.ClientSize;
+		if (viewport.Width <= 0 || viewport.Height <= 0)
+		{
+			return;
+		}
+		_scrollSnapshotCapturing = true;
+		int savedTop = _dashboardStack.Top;
+		try
+		{
+			int documentHeight = Math.Max(_dashboardStack.Height, DeepestContentBottom(_dashboardStack) + _dashboardStack.Padding.Bottom);
+			int maxScroll = Math.Max(0, documentHeight - viewport.Height);
+			Bitmap document = new Bitmap(viewport.Width, Math.Max(1, documentHeight));
+			using (Graphics graphics = Graphics.FromImage(document))
+			{
+				Point origin = _dashboardScroll.PointToScreen(Point.Empty);
+				for (int offset = 0; offset <= maxScroll; offset += Math.Max(1, viewport.Height))
+				{
+					_dashboardStack.Top = -offset;
+					_dashboardScroll.Refresh();
+					Application.DoEvents();
+					int height = Math.Min(viewport.Height, documentHeight - offset);
+					if (height > 0)
+					{
+						graphics.CopyFromScreen(origin, new Point(0, offset), new Size(viewport.Width, height));
+					}
+				}
+			}
+			_scrollSnapshot = document;
+			_dashboardStack.Visible = false;
+			_dashboardScroll.Invalidate(invalidateChildren: true);
+			Logger.WriteLine("[scroll] 快照平移启用：docH=" + documentHeight + " vpH=" + viewport.Height);
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[scroll] 快照捕获失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+		finally
+		{
+			_dashboardStack.Top = savedTop;
+			_scrollSnapshotCapturing = false;
+		}
+	}
+
+	private void DashboardScroll_Paint(object sender, PaintEventArgs e)
+	{
+		Bitmap snapshot = _scrollSnapshot;
+		if (snapshot != null && _dashboardScrollBar != null)
+		{
+			e.Graphics.DrawImageUnscaled(snapshot, 0, -_dashboardScrollBar.Value);
+		}
+	}
+
+	private void ScheduleScrollSnapshotEnd()
+	{
+		if (_scrollSnapshot == null)
+		{
+			return;
+		}
+		if (_scrollSnapshotTimer == null)
+		{
+			_scrollSnapshotTimer = new System.Windows.Forms.Timer
+			{
+				Interval = 120
+			};
+			_scrollSnapshotTimer.Tick += (object sender, EventArgs args) => EndScrollSnapshot();
+		}
+		_scrollSnapshotTimer.Stop();
+		_scrollSnapshotTimer.Start();
+	}
+
+	private void EndScrollSnapshot()
+	{
+		if (_scrollSnapshotTimer != null)
+		{
+			_scrollSnapshotTimer.Stop();
+		}
+		Bitmap snapshot = _scrollSnapshot;
+		_scrollSnapshot = null;
+		snapshot?.Dispose();
+		if (_dashboardStack != null)
+		{
+			_dashboardStack.Visible = true;
+		}
+		UpdateDashboardScroll(rangeChanged: false);
+		_dashboardScroll?.Invalidate(invalidateChildren: true);
 	}
 
 	private void UpdateDashboardScroll(bool rangeChanged = true)

@@ -1131,8 +1131,9 @@ private static void LoadEmbeddedFonts()
 			// 2026-10-22（机主：半透明底去掉、不动都在闪）：容器/文字控件一律不再设 Color.Transparent ——
 			// WinForms 透明子窗口在重绘时会持续闪烁/残影。实验模式只保留「按钮/开关/滑块/下拉」自己的
 			// 底图切片+半透明填充（它们仍是实窗口，不依赖 Color.Transparent）。
-			if (image != null && AppConfig.Get("ui_bg_containers_transparent", 0) == 1)
+			if (image != null && BackgroundContentTransparent)
 			{
+				// 2026-10-22：恢复完整透底（实验开关控制）；滚动改用快照平移，不再移动子窗口导致残影。
 				ApplyTransparentPageBackgrounds(form, transparent);
 			}
 			TransparentRoots.Remove(form);
@@ -1317,13 +1318,8 @@ private static void LoadEmbeddedFonts()
 			}
 			if (back == Window || back == NightPalette.Window || back == DayPalette.Window)
 			{
-				// 2026-10-22（B 自绘透底）：Buffered* 容器自己在 OnPaintBackground 画「切片 + 半透明底」，
-				// 不再设 Color.Transparent（透明窗口叠多层最容易出残影）。
-				if (!(child is MechrevoLite.UI.BufferedPanel) && !(child is MechrevoLite.UI.BufferedTableLayoutPanel))
-				{
-					child.BackColor = Color.Transparent;
-					transparent.Add(child);
-				}
+				child.BackColor = Color.Transparent;
+				transparent.Add(child);
 				ApplyTransparentPageBackgrounds(child, transparent);
 			}
 			else if (back == Color.Transparent)
