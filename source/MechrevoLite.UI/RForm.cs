@@ -85,6 +85,15 @@ public class RForm : Form
 		base.OnPaintBackground(e);
 	}
 
+	/// <summary>2026-10-22（机主：透底模式滚动残影）：透底模式下关闭窗体双缓冲，迫使每次滚动整窗重绘；
+	/// 稳定模式下恢复双缓冲（避免闪烁）。</summary>
+	public void SetOverlayBackgroundMode(bool on)
+	{
+		DoubleBuffered = !on;
+		SetStyle(ControlStyles.OptimizedDoubleBuffer, !on);
+		SetStyle(ControlStyles.AllPaintingInWmPaint, true);
+	}
+
 	/// <summary>2026-10-22（机主：背景图只给主 UI）：只有主窗口显式打开，其它窗体（设置页/子窗口/浮动窗）不铺背景图。</summary>
 	public bool AllowBackgroundImage { get; set; }
 

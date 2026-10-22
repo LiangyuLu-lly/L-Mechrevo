@@ -19605,6 +19605,10 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 			_dashboardStack.Location = new Point(_dashboardStack.Left, -_dashboardScrollBar.Value);
 			// 2026-10-22（机主：上下拉有残影）：滚动后同步整树重绘（Refresh=Invalidate+Update），否则旧帧会留在缓冲里。
 			_dashboardScroll.Refresh();
+		if (UiVisualStyle.BackgroundContentTransparent)
+		{
+			Refresh();
+		}
 		}
 	}
 

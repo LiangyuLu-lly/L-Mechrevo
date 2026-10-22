@@ -1057,6 +1057,10 @@ private static void LoadEmbeddedFonts()
 		{
 			Color currentWindow = Window;
 			Image image = LoadBackgroundImage();
+			if (form is RForm overlayForm)
+			{
+				overlayForm.SetOverlayBackgroundMode(image != null && BackgroundContentTransparent);
+			}
 			form.BackColor = currentWindow;
 			form.BackgroundImageLayout = ImageLayout.None;
 			form.BackgroundImage = image;
