@@ -12273,23 +12273,17 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 				// （机主：界面刷新在关闭 UI 后应停止）
 				_quickSwitchStatusTimer.Enabled = Visible;
 				LogUiRefreshTimerLifecycle(Visible);
-				// 2026-10-23（机主：降低后台占用）：隐藏主 UI 时传感器轮询放慢到 5s、采样泵放慢到 5s，
-				// 并空闲后回收一次工作集；显示时恢复原周期。托盘/风扇曲线/电池修复仍在跑。
+				// 2026-10-23（机主：托盘信息仍需 1s 刷新，且不能让风扇曲线变慢）：
+				// 隐藏主 UI 时**不降采样频率**，只在空闲后回收一次工作集；传感器/托盘保持原节奏。
 				try
 				{
-					if (_sensorTimer == null)
-					{
-						return;
-					}
-					if (Visible)
+					if (_sensorTimer != null)
 					{
 						_sensorTimer.Interval = _sensorTimerNormalInterval;
-						HardwareControl.SetBackgroundSampling(false);
 					}
-					else
+					HardwareControl.SetBackgroundSampling(false);
+					if (!Visible)
 					{
-						_sensorTimer.Interval = Math.Max(5000.0, _sensorTimerNormalInterval);
-						HardwareControl.SetBackgroundSampling(true);
 						_ = Task.Run(async delegate
 						{
 							try
