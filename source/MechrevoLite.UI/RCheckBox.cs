@@ -188,11 +188,19 @@ public class RCheckBox : CheckBox
 		// 2026-10-22（机主：底色填充删除 + 开关半透明）：背景图模式下不再填整块底色，
 		// 滑轨/圆钮用半透明画法直接叠在图片上。
 		bool translucent = UiVisualStyle.IsOverlayTranslucent(this);
-		// 2026-10-22（机主：开关控件的底色改成都去除）：不再填任何自身底色（原填充只是与父容器同色，
-		// 去掉后观感一致，但不会再在有背景/有色底时盖出一块矩形）。
+		// 2026-10-22（修开关底色混乱/文字重影）：稳定模式下必须先把自身矩形填成「父容器真色」——
+		// 本控件 OnPaint 不调 base，若不填，布局/主题重排后旧像素不会被擦掉（出现重叠文字/黑块）。
+		// 只有背景图透底模式（当前已隐藏）才不填实色、改铺底图切片。
 		if (translucent)
 		{
 			UiVisualStyle.DrawFormBackgroundSlice(graphics, this);
+		}
+		else
+		{
+			using (SolidBrush backgroundBrush = new SolidBrush(SurfaceColor()))
+			{
+				graphics.FillRectangle(backgroundBrush, ClientRectangle);
+			}
 		}
 		// 2026-10-09（P0.5）：DPI 统一到**控件自己的 DPI**（Control.DeviceDpi），不再读绘制 DC 的 Graphics.DpiX。
 		float num = UiDpi.Paint(this) / 96f;
