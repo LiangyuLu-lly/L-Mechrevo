@@ -6255,6 +6255,7 @@ public class SettingsForm : RForm
 			// 写入与返工前一致 —— EcChargeLimit 直写 EC（0x7B9 上限；0x7D0 自 2026-10-10 起只读不写）；
 			// 效果观察器在 CommitChargeLimit 里 Arm。
 			BatteryControl.ApplyChargeLimitFromUserGesture(sliderBattery.Value);
+			SyncWujieBatteryFixState();
 		};
 
 		// 2026-10-08（用户要求 · 充电上限 UI 返工；17:00 修正适用代际）：**只有非 50 系**走下面这套新布局 ——
@@ -8560,7 +8561,41 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 	}
 
-	/// <summary>2026-10-22（机主：无极限充/电池修复只给 8040 系无界）：CPU 名匹配 8[0-9]{3}。</summary>
+	/// <summary>2026-10-23（机主：限充开着时电池修复必须自动关闭并置灰；关闭时清理开机自动应用）。
+	/// 只读判断限充/长效状态，不写 EC；需要关闭时走 BatteryVoltageFix.Enabled=false（会停覆盖 + 删 SYSTEM 任务）。</summary>
+	private void SyncWujieBatteryFixState()
+	{
+		if (_wujieBatteryFixBox == null || _wujieBatteryFixBox.IsDisposed)
+		{
+			return;
+		}
+		bool neutral = BatteryVoltageFix.IsChargeLimitNeutral(out string reason);
+		if (!neutral && BatteryVoltageFix.Enabled)
+		{
+			try
+			{
+				BatteryVoltageFix.Enabled = false;
+				Logger.WriteError("[battery-fix] 检测到限充/非长效（" + reason + "）⇒ 自动关闭电池电压修复并清理开机任务");
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteError("[battery-fix] 自动关闭失败：" + ex.Message);
+			}
+		}
+		_syncingWujieBatteryFix = true;
+		try
+		{
+			_wujieBatteryFixBox.Checked = BatteryVoltageFix.Enabled;
+			_wujieBatteryFixBox.Enabled = neutral;
+		}
+		finally
+		{
+			_syncingWujieBatteryFix = false;
+		}
+		toolTip.SetToolTip(_wujieBatteryFixBox, neutral
+			? "覆盖 EC 老化降额，把充电目标恢复为 17.6V；仅无界 8040 系；默认关闭，取消会恢复 EC 原值。"
+			: "当前不可用：" + reason + "；请先把充电上限调到 100%/长效模式。");
+	}
 	private static bool IsWujie8040Series()
 	{
 		if (Program.hw?.WujieSmuApu != true)
@@ -8904,6 +8939,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		//（⛔ 只改 Enabled，不动任何写入/记忆/下发）。
 		ApplyChargeLimitStageEnablement();
 		RefreshBatteryModeButtons();
+		SyncWujieBatteryFixState();
 	}
 
 
@@ -9379,6 +9415,8 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		ApplyChargeSliderVisibility();
 		RecalculateBatteryTableHeight();
 		RefreshBatteryModeButtons();
+		// 2026-10-23（机主：限充开着时修复开关应自动关且置灰）：构造完成后按当前限充状态同步一次。
+		SyncWujieBatteryFixState();
 		// 2026-10-15（限充真效果判据上屏 · 修法④）：构造时先按当前快照填一次（通常为空 ⇒ 隐藏，零回归）。
 		RefreshChargeLimitEffectLabel();
 	}
@@ -9654,6 +9692,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		{
 			UpdateDashboardScroll();
 		}
+		SyncWujieBatteryFixState();
 	}
 
 	/// <summary>
@@ -15413,6 +15452,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		sliderBattery.Value = Math.Clamp(limit, sliderBattery.Minimum, sliderBattery.Maximum);
 		sliderBattery.AccessibleName = Strings.BatteryChargeLimit + ": " + limit + "%";
 		VisualiseBatteryFull();
+		SyncWujieBatteryFixState();
 	}
 
 	public void VisualiseBatteryUnknown()
@@ -15428,6 +15468,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		}
 		sliderBattery.AccessibleName = Strings.BatteryChargeLimit + ": " + Strings.Unreadable;
 		VisualiseBatteryFull();
+		SyncWujieBatteryFixState();
 	}
 
 	public void VisualiseBatteryFull()

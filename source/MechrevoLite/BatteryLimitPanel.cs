@@ -132,6 +132,11 @@ internal sealed class BatteryLimitPanel : Panel
 		_applyButton.Click += ApplyButton_Click;
 
 		// 8000 系无界：电池充电电压修复（仅内置 inpoutx64 通道）
+		bool batteryFixNeutral = MechrevoLite.Hardware.BatteryVoltageFix.IsChargeLimitNeutral(out string batteryFixConflict);
+		if (!batteryFixNeutral && MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
+		{
+			MechrevoLite.Hardware.BatteryVoltageFix.Enabled = false;
+		}
 		_voltageFixBox = new RCheckBox
 		{
 			AutoSize = true,
@@ -139,9 +144,12 @@ internal sealed class BatteryLimitPanel : Panel
 			BackColor = Color.Transparent,
 			Margin = Padding.Empty,
 			Checked = MechrevoLite.Hardware.BatteryVoltageFix.Enabled,
+			Enabled = batteryFixNeutral,
 			Visible = MechrevoLite.Hardware.BatteryVoltageFix.IsUiVisible
 		};
-		_toolTip.SetToolTip(_voltageFixBox, "内置（inpoutx64 驱动）覆盖 EC 老化降额，把充电目标恢复为 17.6V；不调用任何外部脚本");
+		_toolTip.SetToolTip(_voltageFixBox, batteryFixNeutral
+			? "内置（inpoutx64 驱动）覆盖 EC 老化降额，把充电目标恢复为 17.6V；不调用任何外部脚本"
+			: "当前不可用：" + batteryFixConflict + "；请先把充电上限调到 100%/长效模式");
 		_voltageFixBox.CheckedChanged += delegate
 		{
 			MechrevoLite.Hardware.BatteryVoltageFix.Enabled = _voltageFixBox.Checked;

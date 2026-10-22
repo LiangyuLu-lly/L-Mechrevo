@@ -719,7 +719,13 @@ internal static class I2ecInpOut
 							}
 							WriteByte(AddrStopGate, 0);
 					// 2026-10-22（机主：AIDA 电流一会有一会没有）：改成 1s 采样，抓完整充/放波形。
-					// 2026-10-23（机主）：与非 100% 限充/非长效模式互斥 —— 运行中一旦被打开限充，立即停止并恢复原值。
+					// 2026-10-23（机主）：开关关闭 / 与非 100% 限充、非长效模式互斥 —— 运行中一旦发生，立即停止并恢复原值。
+					if (!BatteryVoltageFix.Enabled)
+					{
+						Logger.WriteLine("[battery-fix] 开关已关闭 ⇒ 停止覆盖并恢复原值");
+						_interlockStopRequested = true;
+						break;
+					}
 					if (!BatteryVoltageFix.IsChargeLimitNeutral(out string interlock))
 					{
 						Logger.WriteError("[battery-fix] 检测到限充/非长效模式（" + interlock + "）⇒ 停止覆盖并恢复原值");

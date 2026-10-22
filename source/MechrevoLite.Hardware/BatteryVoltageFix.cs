@@ -245,13 +245,15 @@ internal static class BatteryVoltageFix
 		if (!Enabled)
 		{
 			// 2026-10-22：上次可能是被强杀（没走到恢复）⇒ 只要落盘原值还在，这里恢复一次。
+			// 2026-10-23（机主：关闭时清理开机自动应用）：同时删掉可能残留的 SYSTEM 任务。
 			try
 			{
 				I2ecInpOut.Stop();
+				global::Startup.UnscheduleBatteryFix();
 			}
 			catch (Exception ex)
 			{
-				Logger.WriteLine("[battery-fix] 启动清理落盘原值异常（已吞掉）：" + ex.Message);
+				Logger.WriteLine("[battery-fix] 启动清理落盘原值/开机任务异常（已吞掉）：" + ex.Message);
 			}
 			return;
 		}
