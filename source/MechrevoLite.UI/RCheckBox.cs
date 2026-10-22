@@ -185,9 +185,15 @@ public class RCheckBox : CheckBox
 		}
 		Graphics graphics = pevent.Graphics;
 		graphics.SmoothingMode = SmoothingMode.AntiAlias;
-		using (SolidBrush brush = new SolidBrush(SurfaceColor()))
+		// 2026-10-22（机主：底色填充删除 + 开关半透明）：背景图模式下不再填整块底色，
+		// 滑轨/圆钮用半透明画法直接叠在图片上。
+		bool translucent = UiVisualStyle.FormHasBackgroundImage(this);
+		if (!translucent)
 		{
-			graphics.FillRectangle(brush, ClientRectangle);
+			using (SolidBrush brush = new SolidBrush(SurfaceColor()))
+			{
+				graphics.FillRectangle(brush, ClientRectangle);
+			}
 		}
 		// 2026-10-09（P0.5）：DPI 统一到**控件自己的 DPI**（Control.DeviceDpi），不再读绘制 DC 的 Graphics.DpiX。
 		float num = UiDpi.Paint(this) / 96f;
@@ -207,7 +213,7 @@ public class RCheckBox : CheckBox
 		{
 			DrawText(graphics, bounds, Checked ? "ON" : "OFF", StateFont, (Enabled && Checked) ? UiVisualStyle.Accent : UiVisualStyle.Muted);
 		}
-		DrawSwitch(graphics, track);
+		DrawSwitch(graphics, track, translucent ? 0.72f : 1f);
 		// 2026-10-08：焦点框整类不画（沿用此前的删除决定）。本控件不是键盘交互目标：
 		// LM 里所有开关都是鼠标点击式（点后被点的开关还会把焦点交回父容器，见
 		// SettingsForm「显示核显模式」那一段），所以不保留键盘焦点提示，可访问性上没有实际损失。
@@ -325,20 +331,30 @@ public class RCheckBox : CheckBox
 		}
 	}
 
-	private void DrawSwitch(Graphics g, Rectangle track)
+	private static Color WithAlpha(Color color, float alpha)
+	{
+		if (alpha >= 1f || color.A == 0)
+		{
+			return color;
+		}
+		return Color.FromArgb((int)Math.Round(255f * Math.Clamp(alpha, 0f, 1f)), color.R, color.G, color.B);
+	}
+
+	private void DrawSwitch(Graphics g, Rectangle track, float alpha = 1f)
 	{
 		int num = track.Height / 2;
 		using (GraphicsPath path = RComboBox.RoundedRect(track, num, num))
 		{
 			// 2026-10-06（igpuscope）：TrackColor 有值时优先用它（只有需要显式区分卡片的开关会设）。
-			using SolidBrush brush = new SolidBrush(trackColor ?? (UiVisualStyle.IsNightMode ? UiVisualStyle.Track : UiVisualStyle.Input));
+			Color trackFill = trackColor ?? (UiVisualStyle.IsNightMode ? UiVisualStyle.Track : UiVisualStyle.Input);
+		using SolidBrush brush = new SolidBrush(WithAlpha(trackFill, alpha));
 			g.FillPath(brush, path);
 		}
 		int num2 = (int)Math.Round(knobPosition * (float)track.Width);
 		if (num2 >= track.Height)
 		{
 			using GraphicsPath path2 = RComboBox.RoundedRect(new Rectangle(track.X, track.Y, num2, track.Height), num, num);
-			using SolidBrush brush2 = new SolidBrush(Enabled ? UiVisualStyle.Accent : UiVisualStyle.Muted);
+			using SolidBrush brush2 = new SolidBrush(WithAlpha(Enabled ? UiVisualStyle.Accent : UiVisualStyle.Muted, alpha));
 			g.FillPath(brush2, path2);
 		}
 		// 2026-10-08：滑轨描边整类不画（只 Fill 滑轨与圆钮，不 DrawPath）—— 这是「开关周围那圈淡框线」
@@ -357,7 +373,7 @@ public class RCheckBox : CheckBox
 		{
 			color = UiVisualStyle.Muted;
 		}
-		using SolidBrush brush3 = new SolidBrush(color);
+		using SolidBrush brush3 = new SolidBrush(WithAlpha(color, Math.Min(1f, alpha + 0.15f)));
 		g.FillEllipse(brush3, num7 - (float)num4 / 2f, track.Y + num5, num4, num4);
 	}
 

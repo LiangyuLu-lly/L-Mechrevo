@@ -5515,7 +5515,13 @@ public class SettingsForm : RForm
 		tile.ActivatedOutline = false;
 		tile.SelectionUsesAssignedAccent = false;
 		tile.SelectionUsesModeFill = false;
-		tile.BackColor = on ? UiVisualStyle.Accent : UiVisualStyle.ButtonFace;
+		Color tileOnColor = UiVisualStyle.Accent;
+		if (UiVisualStyle.FormHasBackgroundImage(this))
+		{
+			// 2026-10-22（机主：底的颜色填充删除 / 半透明）：背景图模式下用半透明强调色填充。
+			tileOnColor = Color.FromArgb(170, UiVisualStyle.Accent.R, UiVisualStyle.Accent.G, UiVisualStyle.Accent.B);
+		}
+		tile.BackColor = on ? tileOnColor : UiVisualStyle.ButtonFace;
 		tile.ForeColor = on ? UiVisualStyle.AccentText : UiVisualStyle.Muted;
 		tile.ActivatedTextColor = on ? UiVisualStyle.AccentText : Color.Empty;
 		tile.BorderColor = on ? UiVisualStyle.Accent : UiVisualStyle.Border;

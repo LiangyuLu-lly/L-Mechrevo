@@ -1132,6 +1132,13 @@ private static void LoadEmbeddedFonts()
 		}
 	}
 
+	/// <summary>2026-10-22（主题背景图）：当前控件所在窗体是否正在显示背景图。</summary>
+	internal static bool FormHasBackgroundImage(Control control)
+	{
+		Form form = control?.FindForm();
+		return form != null && form.BackgroundImage != null;
+	}
+
 	/// <summary>2026-10-22：递归把「页面底」色的容器设成透明，让窗体背景图从卡片间隙/页面空白处露出来。
 	/// <para>⚠️ 只处理 Panel/TableLayoutPanel/FlowLayoutPanel 且底色=Window 的容器；Surface 卡片不透明、整块保留。</para></summary>
 	private static void ApplyTransparentPageBackgrounds(Control parent, List<Control> transparent)
