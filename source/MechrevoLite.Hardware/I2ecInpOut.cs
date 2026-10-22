@@ -714,7 +714,8 @@ internal static class I2ecInpOut
 								}
 							}
 							WriteByte(AddrStopGate, 0);
-					if (nowTick - _lastStatusLogTick >= 10000L)
+					// 2026-10-22（机主：AIDA 电流一会有一会没有）：改成 1s 采样，抓完整充/放波形。
+					if (nowTick - _lastStatusLogTick >= 1000L)
 					{
 						_lastStatusLogTick = nowTick;
 						int stateDesiredV = ReadLe16(AddrDesiredVoltage);
