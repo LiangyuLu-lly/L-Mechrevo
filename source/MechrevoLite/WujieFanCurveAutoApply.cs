@@ -40,6 +40,29 @@ internal static class WujieFanCurveAutoApply
 		});
 	}
 
+	/// <summary>解析保存的温度轴（逗号分隔，最多 16 点，值 0..254）；无效返回 null。</summary>
+	private static byte[] ParseTemps(string text)
+	{
+		if (string.IsNullOrWhiteSpace(text))
+		{
+			return null;
+		}
+		string[] parts = text.Split(',');
+		if (parts.Length < 2)
+		{
+			return null;
+		}
+		byte[] temps = new byte[Math.Min(16, parts.Length)];
+		for (int i = 0; i < temps.Length; i++)
+		{
+			if (!byte.TryParse(parts[i].Trim(), out temps[i]) || temps[i] > 120)
+			{
+				return null;
+			}
+		}
+		return temps;
+	}
+
 	private static void ApplyIfCustomMode()
 	{
 		PerfModeService perf = PerfModeService.Instance;
@@ -67,9 +90,11 @@ internal static class WujieFanCurveAutoApply
 		}
 		int[] gpuDuty = settings.GpuFanDuty ?? settings.CpuFanDuty;
 		bool independent = AppConfig.Is("wujie_fan_independent");
-		byte[] temps = WujieFanEcController.DefaultTemperatures();
+		string key = string.IsNullOrWhiteSpace(active.Id) ? "active" : active.Id;
+		byte[] cpuTemps = ParseTemps(AppConfig.GetString("wujie_fan_cputemps_" + key)) ?? WujieFanEcController.DefaultTemperatures();
+		byte[] gpuTemps = ParseTemps(AppConfig.GetString("wujie_fan_gputemps_" + key)) ?? cpuTemps;
 		WujieFanEcController controller = new WujieFanEcController();
-		bool ok = controller.Start(temps, settings.CpuFanDuty, independent, temps, gpuDuty, out string detail);
+		bool ok = controller.Start(cpuTemps, settings.CpuFanDuty, independent, gpuTemps, gpuDuty, out string detail);
 		Logger.WriteLine("[fan] 无界开机自动曲线（档位=" + active.Id + " · 独立=" + independent + "）⇒ "
 			+ (ok ? "已启用 · " : "未启用 · ") + detail);
 	}

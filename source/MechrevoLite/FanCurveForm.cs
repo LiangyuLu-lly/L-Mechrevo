@@ -948,6 +948,22 @@ public class FanCurveForm : RForm
 		await FlushPendingAsync();
 	}
 
+	/// <summary>2026-10-22（机主：曲线自己做，温度表也按我们的来）：温度轴按档位落盘，供下次打开/开机自启使用。</summary>
+	private static void SaveWujieTemps(string modeId, byte[] cpuTemps, byte[] gpuTemps)
+	{
+		try
+		{
+			string key = string.IsNullOrWhiteSpace(modeId) ? "active" : modeId;
+			AppConfig.Set("wujie_fan_cputemps_" + key, string.Join(",", cpuTemps.Take(16)));
+			AppConfig.Set("wujie_fan_gputemps_" + key, string.Join(",", gpuTemps.Take(16)));
+			Logger.WriteLine("[fan] 无界温度轴已保存：档位=" + key + " · CPU=[" + string.Join(",", cpuTemps.Take(16)) + "]");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[fan] 无界温度轴保存失败（已吞掉）：" + ex.Message);
+		}
+	}
+
 	/// <summary>2026-10-22：界面温度轴无效（未读官方表/全 0/非递增）时用固定 16 点阶梯，避免保存/启动被卡死。</summary>
 	private static byte[] NormalizeWujieTemps(byte[] temps)
 	{
@@ -990,6 +1006,7 @@ public class FanCurveForm : RForm
 			// 用固定 45..90℃ 阶梯兜底，保证保存下来的占空比点位仍能启动控制器。
 			byte[] cpuTemps = NormalizeWujieTemps(_cpuPanel.Temperatures);
 			byte[] gpuTemps = NormalizeWujieTemps(_gpuPanel.Temperatures);
+			SaveWujieTemps(TargetModeId, cpuTemps, gpuTemps);
 			bool ok = _wujieFanController.Start(cpuTemps, _cpuPanel.Duties, independent, gpuTemps, _gpuPanel.Duties, out string detail);
 			// 2026-10-22（机主：风扇表失败不应影响实际功能，检查写入和保存）：
 			// 写入（EC 25Hz）与保存（档位点位）必须解耦 —— 即使本次 EC 下发失败，也先把界面点位按档位落盘，
