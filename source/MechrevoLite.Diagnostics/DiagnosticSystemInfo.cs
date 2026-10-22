@@ -90,6 +90,27 @@ stringBuilder.Append(DiagnosticBackendRouteInfo.Build());
 		// ⚠️ 有了这一节，下一份诊断包才能直接判别"被外部改回"还是"写进去了但没生效"。
 		// ⛔ 纯只读：不写 EC/注册表/配置，不改写入行为，不改任何状态；读不到就如实写"不可读 + 原因"。
 		AppendChargeLimitEc(stringBuilder);
+		// 2026-10-22（机主：0xc0000005 原生崩溃来不及写 crash.txt / 星耀诊断）：追加 WER/转储清单；
+		// 星耀 PMC2 只读探针只在星耀平台执行，其它机型不产生这一节。
+		try
+		{
+			stringBuilder.Append(DiagnosticCrashEvidenceInfo.Build());
+		}
+		catch (Exception exCrash)
+		{
+			stringBuilder.AppendLine("⚠️ 崩溃现场诊断段追加失败（已吞掉）：" + exCrash.Message);
+		}
+		try
+		{
+			if (XingyaoPmc2.IsXingyaoPlatform())
+			{
+				stringBuilder.Append(XingyaoPmc2.Describe());
+			}
+		}
+		catch (Exception exXingyao)
+		{
+			stringBuilder.AppendLine("⚠️ 星耀 PMC2 诊断段追加失败（已吞掉）：" + exXingyao.Message);
+		}
 		return stringBuilder.ToString();
 	}
 

@@ -252,6 +252,8 @@ internal static class I2ecInpOut
 
 	private static long _nextInputCheckTick;
 
+	private static long _lastStatusLogTick;
+
 	private static volatile bool _running;
 
 	internal static bool IsRunning => _running;
@@ -646,6 +648,7 @@ internal static class I2ecInpOut
 					}
 				_inputOverrideActive = _origQueuedInputI == InputCurrentSourceMa;
 				_nextInputCheckTick = Environment.TickCount64 + 60000L;
+		_lastStatusLogTick = Environment.TickCount64;
 				_cts = new CancellationTokenSource();
 				CancellationToken token = _cts.Token;
 				_running = true;
@@ -711,6 +714,27 @@ internal static class I2ecInpOut
 								}
 							}
 							WriteByte(AddrStopGate, 0);
+					if (nowTick - _lastStatusLogTick >= 10000L)
+					{
+						_lastStatusLogTick = nowTick;
+						int stateDesiredV = ReadLe16(AddrDesiredVoltage);
+						int stateQueuedV = ReadLe16(AddrQueuedVoltage);
+						int statePackV = ReadLe16(0x0438);
+						int stateCurrent = ReadLe16(0x050A);
+						if ((stateCurrent & 0x8000) != 0)
+						{
+							stateCurrent -= 0x10000;
+						}
+						int stateSoc = ReadByte(0x04AB);
+						Logger.WriteLine("[battery-fix] 状态：desired/queued=" + stateDesiredV + "/" + stateQueuedV
+							+ "mV · pack=" + statePackV + "mV · 电流=" + stateCurrent + "mA · SOC=" + stateSoc
+							+ "% · 输入限流=" + queuedInput + "mA");
+						if (stateDesiredV != ExpectedBaseVoltageMv || stateQueuedV != ExpectedBaseVoltageMv)
+						{
+							Logger.WriteError("[battery-fix] 写入未保持：desired/queued=" + stateDesiredV + "/" + stateQueuedV
+								+ "mV（期望 " + ExpectedBaseVoltageMv + "mV）⇒ EC 可能回写/通道被占用");
+						}
+					}
 						}
 						finally
 						{
