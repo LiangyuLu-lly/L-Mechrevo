@@ -19,6 +19,9 @@ internal static class WujieFanTableFile
 
 	internal const int PanelPoints = 16;
 
+	/// <summary>2026-10-22（机主：温度不能是奇怪的个位数温度）：官方表里 UpT=0 这类点不再显示/参与曲线。</summary>
+	internal const int MinimumTemperatureC = 10;
+
 	/// <summary>按档位读取官方表；失败时 detail 说明原因（文件缺失/格式异常），不改任何硬件状态。</summary>
 	internal static bool TryLoad(string modeId, out byte[] cpuTemps, out byte[] cpuDuties, out byte[] gpuTemps, out byte[] gpuDuties, out string sourcePath, out string detail)
 	{
@@ -132,6 +135,7 @@ internal static class WujieFanTableFile
 		List<byte> tempList = new List<byte>();
 		List<byte> dutyList = new List<byte>();
 		int previousTemp = -1;
+		int skipped = 0;
 		foreach (JToken item in array)
 		{
 			int upT = item.Value<int?>("UpT") ?? -1;
@@ -141,6 +145,12 @@ internal static class WujieFanTableFile
 				detail = "点数值越界（UpT=" + upT + " Duty=" + duty + "）";
 				return false;
 			}
+			// 2026-10-22：官方表里 UpT=0 / 个位数温度（低温停转占位点）不显示，避免曲线出现奇怪温度点。
+			if (upT < MinimumTemperatureC)
+			{
+				skipped++;
+				continue;
+			}
 			if (upT < previousTemp)
 			{
 				detail = "温度点不是递增（UpT=" + upT + " 前一个=" + previousTemp + "）";
@@ -149,6 +159,15 @@ internal static class WujieFanTableFile
 			previousTemp = upT;
 			tempList.Add((byte)upT);
 			dutyList.Add((byte)duty);
+		}
+		if (tempList.Count < 2)
+		{
+			detail = channel + " 过滤低温点后不足 2 点";
+			return false;
+		}
+		if (skipped > 0)
+		{
+			detail = "（已跳过 " + skipped + " 个 <" + MinimumTemperatureC + "℃ 的点）";
 		}
 		temps = tempList.ToArray();
 		duties = dutyList.ToArray();
