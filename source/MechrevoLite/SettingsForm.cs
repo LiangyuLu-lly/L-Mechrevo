@@ -9308,7 +9308,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 			_wujieBatteryFixBox = new RCheckBox
 			{
 				Name = "checkWujieBatteryFix",
-				Text = "电池充电电压修复（无界）",
+				Text = "无界电池电压修复(实验性)",
 				AutoSize = true,
 				Appearance = Appearance.Normal,
 				Anchor = AnchorStyles.Left,
