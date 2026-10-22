@@ -961,6 +961,21 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		if (text == "--wujie-fan-sample")
+		{
+			// 2026-10-22（无界风扇表会错乱，怎么知道 EC 的温度取值）：只读采样，反推 EC 自动策略曲线。
+			int sampleSeconds = 60;
+			if (args.Length > 1 && int.TryParse(args[1], out int parsedSeconds))
+			{
+				sampleSeconds = Math.Clamp(parsedSeconds, 5, 3600);
+			}
+			string samplePath = (args.Length > 2) ? args[2] : "";
+			string sampleReport = MechrevoLite.Hardware.WujieFanMapProbe.Run(sampleSeconds, samplePath);
+			Console.WriteLine(sampleReport);
+			Logger.WriteLine("[wujie-fan-map] " + sampleReport.Replace("\r\n", " | "));
+			Logger.Close();
+			return;
+		}
 		if (text == "batteryfix")
 		{
 			// 2026-10-22（无界电池电压修复）：SYSTEM 开机任务入口 —— 常驻保持 EC 目标，防止重启/断电后弹回。
