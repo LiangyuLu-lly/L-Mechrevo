@@ -1493,7 +1493,20 @@ public sealed class RyzenSmuService : IDisposable
 	// ==========================================================================================
 	internal static uint EncodeCurveReadArg(CpuCodeName cpu, int coreIndex)
 	{
-		return (cpu == CpuCodeName.Vermeer) ? ((uint)coreIndex << 20) : (uint)coreIndex;
+		// 2026-10-22（蛟龙 DragonRange 逐核写后回读“对不上”）：桌面 Zen3/Zen4 的每核读，arg0 与每核写
+		// 用的是同一套 core mask —— (ccd<<28)|((core%8)<<20)；只有 APU 侧才是裸核号。
+		// 旧实现只给 Vermeer 用了 mask，Raphael/GraniteRidge/DragonRange 仍发裸核号 ⇒ 写后回读读错核心，
+		// 误判为“回读不一致”并触发安全网回滚（写入其实已被 SMU 接受）。
+		switch (cpu)
+		{
+		case CpuCodeName.Vermeer:
+		case CpuCodeName.Raphael:
+		case CpuCodeName.GraniteRidge:
+		case CpuCodeName.DragonRange:
+			return (uint)(((coreIndex / 8) << 28) | ((coreIndex % 8) << 20));
+		default:
+			return (uint)coreIndex;
+		}
 	}
 
 	// 同一条读命令，但 arg0 由调用方**原样**给出。给台式机验证工具用：
