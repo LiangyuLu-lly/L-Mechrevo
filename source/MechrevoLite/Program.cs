@@ -961,6 +961,13 @@ internal static class Program
 			Logger.Close();
 			return;
 		}
+		if (text == "batteryfix")
+		{
+			// 2026-10-22（无界电池电压修复）：SYSTEM 开机任务入口 —— 常驻保持 EC 目标，防止重启/断电后弹回。
+			Environment.ExitCode = RunBatteryFixDaemon();
+			Logger.Close();
+			return;
+		}
 		string text2 = AppConfig.GetString("language");
 		try
 		{
@@ -4074,6 +4081,48 @@ internal static class Program
 		catch (Exception ex)
 		{
 			Logger.WriteLine("System_OFF on exit failed: " + ex.Message);
+		}
+	}
+
+	/// <summary>2026-10-22（无界电池电压修复）：SYSTEM 开机任务常驻 —— 启动内置保持循环后不退出，断电重启由任务重跑。</summary>
+	private static int RunBatteryFixDaemon()
+	{
+		try
+		{
+			if (!MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
+			{
+				Logger.WriteLine("[battery-fix] 开机任务：功能未启用 ⇒ 退出");
+				return 0;
+			}
+			string model = MechrevoDeviceCapabilities.Current.Model ?? "";
+			bool wujie = model.IndexOf("WUJIE", StringComparison.OrdinalIgnoreCase) >= 0
+				|| model.IndexOf("无界", StringComparison.OrdinalIgnoreCase) >= 0;
+			if (!wujie)
+			{
+				Logger.WriteLine("[battery-fix] 开机任务：非无界机型（model=" + model + "）⇒ 退出");
+				return 0;
+			}
+			while (true)
+			{
+				MechrevoLite.Hardware.InpOutDriverInstaller.TryEnsureInstalled(out string drvDetail);
+				if (MechrevoLite.Hardware.I2ecInpOut.TryStart(out string startDetail))
+				{
+					Logger.WriteLine("[battery-fix] 开机任务已启动内置保持：" + startDetail + " · 驱动=" + drvDetail);
+					break;
+				}
+				Logger.WriteLine("[battery-fix] 开机任务启动失败：" + startDetail + " ⇒ 10 秒后重试");
+				Thread.Sleep(10000);
+			}
+			// 常驻：I2ecInpOut 内部线程每 2 秒保持；本进程不退出，任务被杀/重启时由下次开机重跑。
+			while (true)
+			{
+				Thread.Sleep(30000);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[battery-fix] 开机任务异常：" + ex.GetType().Name + " " + ex.Message);
+			return 1;
 		}
 	}
 

@@ -45,9 +45,29 @@ internal static class BatteryVoltageFix
 		{
 			AppConfig.Set(ConfigKey, value ? 1 : 0);
 			AppConfig.Flush();
-			if (!value)
+			if (value)
+			{
+				// 2026-10-22（机主：注册开机修复，防止 EC 变回去）：SYSTEM 开机任务常驻保持。
+				try
+				{
+					global::Startup.ScheduleBatteryFix();
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[battery-fix] 注册开机保持任务失败（已吞掉）：" + ex.Message);
+				}
+			}
+			else
 			{
 				// 关闭时停掉内置覆盖并恢复 EC 原值（外挂模式无需恢复：脚本已自行恢复）
+				try
+				{
+					global::Startup.UnscheduleBatteryFix();
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine("[battery-fix] 移除开机保持任务失败（已吞掉）：" + ex.Message);
+				}
 				Stop();
 			}
 		}
