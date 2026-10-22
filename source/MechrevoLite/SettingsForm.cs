@@ -5505,15 +5505,21 @@ public class SettingsForm : RForm
 		bool on = QuickTileHighlightOn(key, switchOn);
 		// 高亮 = 开（亮色图标 + 强调色描边 + 浅底，与 RButton 既有选中态同一套画法）；
 		// 暗淡 = 关（Muted 图标/文字 + 普通边框）。⛔ 不另造一套配色。
-		tile.Image = UiGlyph.Render(QuickTileGlyph(key, switchOn), num, on ? UiVisualStyle.Text : UiVisualStyle.Muted);
+		// 2026-10-22（机主：不想要「边框一条细线亮」）：快捷开关磁贴改为**实心强调色填充**（不是细描边）。
+		tile.Image = UiGlyph.Render(QuickTileGlyph(key, switchOn), num, on ? UiVisualStyle.AccentText : UiVisualStyle.Muted);
 		if (image != null)
 		{
 			image.Dispose();
 		}
 		tile.Activated = on;
-		tile.ActivatedOutline = true;
-		tile.ForeColor = on ? UiVisualStyle.Text : UiVisualStyle.Muted;
-		tile.BorderColor = on ? UiVisualStyle.AccentSelectionOutline : UiVisualStyle.Border;
+		tile.ActivatedOutline = false;
+		tile.SelectionUsesAssignedAccent = false;
+		tile.SelectionUsesModeFill = false;
+		tile.BackColor = on ? UiVisualStyle.Accent : UiVisualStyle.ButtonFace;
+		tile.ForeColor = on ? UiVisualStyle.AccentText : UiVisualStyle.Muted;
+		tile.ActivatedTextColor = on ? UiVisualStyle.AccentText : Color.Empty;
+		tile.BorderColor = on ? UiVisualStyle.Accent : UiVisualStyle.Border;
+		tile.Invalidate();
 	}
 
 	/// <summary>
