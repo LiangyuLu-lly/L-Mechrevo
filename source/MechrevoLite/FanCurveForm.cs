@@ -448,6 +448,22 @@ public class FanCurveForm : RForm
 			await SendBoth();
 		};
 		flowLayoutPanel.Controls.Add(rButton);
+		// 2026-10-22（机主：无界风扇曲线没有恢复默认）：停止 EC 直写、清除该档保存的曲线点位，交还 EC 自动。
+		RButton restoreDefaultButton = new RButton
+		{
+			Text = "恢复默认曲线",
+			Width = D(120),
+			Height = D(30),
+			Margin = new Padding(0, 0, D(12), 0),
+			Cursor = Cursors.Hand,
+			Visible = Program.hw?.WujieSmuApu == true
+		};
+		restoreDefaultButton.Click += async (object? _, EventArgs _) =>
+		{
+			await RestoreWujieFanDefaultAsync();
+		};
+		UiVisualStyle.ApplySecondaryButton(restoreDefaultButton);
+		flowLayoutPanel.Controls.Add(restoreDefaultButton);
 		_respectiveChk = new RCheckBox
 		{
 			Text = Strings.FanIndependentControl,
@@ -943,6 +959,63 @@ public class FanCurveForm : RForm
 			}
 		}
 		return ok ? temps : WujieFanEcController.DefaultTemperatures();
+	}
+
+	/// <summary>2026-10-22（机主：无界风扇曲线没有恢复默认）：停止 25Hz 控制器，删除该档保存的曲线点位与温度轴，
+	/// 交还 EC 自动控制；界面回到固件/默认曲线显示。</summary>
+	private async Task RestoreWujieFanDefaultAsync()
+	{
+		if (Program.hw?.WujieSmuApu != true)
+		{
+			return;
+		}
+		if (MessageBox.Show(this, "将停止自定义风扇曲线、交还 EC 自动控制，并清除该档已保存的曲线点位。继续？",
+			"恢复默认风扇曲线", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+		{
+			return;
+		}
+		try
+		{
+			_wujieFanController?.Stop("恢复默认风扇曲线");
+			string modeId = TargetModeId;
+			string key = string.IsNullOrWhiteSpace(modeId) ? "active" : modeId;
+			if (!string.IsNullOrWhiteSpace(modeId))
+			{
+				PerfModeSettings settings = PerfModeStore.LoadSettings(modeId);
+				PerfModeStore.SaveSettings(modeId, settings with { CpuFanDuty = null, GpuFanDuty = null });
+			}
+			AppConfig.Remove("wujie_fan_cputemps_" + key);
+			AppConfig.Remove("wujie_fan_gputemps_" + key);
+			AppConfig.Flush();
+			// 界面回到固件当前曲线（读不到就保持原样，不伪造数据）
+			try
+			{
+				MechrevoHw hw = Program.hw;
+				if (hw != null && hw.CpuCurveDuty != null && hw.CpuCurveDuty.Length > 0)
+				{
+					_cpuPanel.Load(hw.CpuCurveUpT, hw.CpuCurveDuty);
+					_gpuPanel.Load(hw.GpuCurveUpT, hw.GpuCurveDuty);
+				}
+				else if (WujieFanTableFile.TryLoad(modeId, out byte[] cpuTemps, out byte[] cpuDuties,
+					out byte[] gpuTemps, out byte[] gpuDuties, out _, out _))
+				{
+					// 固件曲线读不到时显示 GCU 官方默认表，避免“清了却还停在旧自定义曲线”。
+					_cpuPanel.Load(cpuTemps, cpuDuties);
+					_gpuPanel.Load(gpuTemps, gpuDuties);
+				}
+			}
+			catch
+			{
+			}
+			_status.Text = "已恢复默认：EC 直写已停止，该档保存的曲线已清除（交还 EC 自动）";
+			Logger.WriteLine("[fan] 无界曲线：已恢复默认（档位=" + key + " · 控制器已停止 · 曲线点位/温度轴已删除）");
+		}
+		catch (Exception ex)
+		{
+			_status.Text = "恢复默认失败：" + ex.Message;
+			Logger.WriteLine("[fan] 无界曲线恢复默认失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+		await Task.CompletedTask;
 	}
 
 	/// <summary>2026-10-22（无界）：保存曲线 = 启动/停止 EC 直写控制器；不经过 GCU 固件曲线。</summary>
