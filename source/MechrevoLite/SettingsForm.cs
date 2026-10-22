@@ -2565,7 +2565,7 @@ public class SettingsForm : RForm
 			AutoSize = true,
 			AutoSizeMode = AutoSizeMode.GrowAndShrink,
 			ColumnCount = 3,
-			RowCount = 7,
+			RowCount = 6,
 			Margin = Padding.Empty,
 			Padding = Padding.Empty,
 			BackColor = bufferedPanel.BackColor
@@ -7896,7 +7896,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(264),
+				Height = scale(232),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7916,7 +7916,6 @@ public class SettingsForm : RForm
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
-		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
@@ -8119,23 +8118,6 @@ public class SettingsForm : RForm
 			tableLayoutPanel.Controls.Add(scrimSlider, 1, 5);
 			tableLayoutPanel.Controls.Add(scrimLabel, 2, 5);
 
-			RCheckBox transparentContentCheck = new RCheckBox
-			{
-				Name = "checkBgTransparentContent",
-				Text = Strings.ThemeContentTransparent,
-				AutoSize = true,
-				Checked = UiVisualStyle.BackgroundContentTransparent,
-				ForeColor = UiVisualStyle.Text,
-				Margin = new Padding(0, scale(4), 0, 0)
-			};
-			transparentContentCheck.CheckedChanged += (object sender, EventArgs e) =>
-			{
-				AppConfig.Set(UiVisualStyle.BackgroundTransparentContentKey, transparentContentCheck.Checked ? 1 : 0);
-				AppConfig.Flush();
-				ApplyThemeLive();
-			};
-			tableLayoutPanel.Controls.Add(transparentContentCheck, 1, 6);
-			tableLayoutPanel.SetColumnSpan(transparentContentCheck, 2);
 
 			_themeModePanel.Controls.Add(tableLayoutPanel);
 		}
