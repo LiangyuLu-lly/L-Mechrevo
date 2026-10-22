@@ -10,7 +10,7 @@ namespace MechrevoLite.Hardware;
 /// <summary>
 /// 星耀 14（P916F-STX，ITE IT5571 EC）的 **PMC2 电池限充只读探针**。
 ///
-/// <para><b>依据</b>（参考存档：<c>archive/refs/Mechrevo-Xingyao-14-20261022</c>）：
+/// <para><b>依据</b>（参考存档：<c>docs/refs/Mechrevo-Xingyao-14-20261022</c>）：
 /// PMC2 数据口 <c>0x68</c>、命令/状态口 <c>0x6C</c>；状态位 bit0=OBF（有回包）、bit1=IBF（主机需等待）。
 /// 只读命令：<c>F1 12</c> 读状态、<c>F1 13</c> 读 T1、<c>F1 14</c> 读 T2。
 /// 写入命令 <c>F2/F3</c> 与使能 <c>F1 11</c> 属于**写操作**，本类一律不执行。</para>

@@ -98,7 +98,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 新增《WPF 迁移评估》文档（docs/notes/WPF-迁移评估-20261022.md）：WinForms 透明/滚动限制实测结论、WPF vs WinUI 3 对比、迁移范围/分阶段/风险与结论。
 - 修「开关控件底色混乱/文字重影」：上一轮把 RCheckBox 的自身底色填充删了，但本控件 OnPaint 不调 base、不自擦除，布局/主题重排后旧像素残留 ⇒ 恢复稳定模式的「父容器真色填充」（透底模式仍走底图切片）。
 - 小步清理 MiniLED 相关的 ASUS 残留：删除 `AsusACPI.ScreenMiniled1/2` 常量、`ScreenControl` 里恒为 -1 的 miniled1/miniled2 读取与 `AppConfig.Set("miniled")`、`VisualiseScreen` 两个未使用参数（MiniLED 实际状态/下发仍走 GCU `LocalDimming*`，行为不变）。
-- 存档上游《Mechrevo-Xingyao-14》技术参考到 `archive/refs/Mechrevo-Xingyao-14-20261022/`（27 个文件，CC BY 4.0，含 SOURCE.md 记录来源提交）。
+- 存档上游《Mechrevo-Xingyao-14》技术参考到 `docs/refs/Mechrevo-Xingyao-14-20261022/`（27 个文件，CC BY 4.0，含 SOURCE.md 记录来源提交）。
 - 星耀 14 适配第一步（只读）：新增 `XingyaoPmc2` —— 平台识别（GCU 载荷 WJXY / 机型含星耀 / 板号含 P916F）+ 经本机已装 inpoutx64 只读 PMC2 电池限充状态（`F1 12/13/14` → enabled/T1/T2），接入诊断包新小节；⛔ 不写任何阈值。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
