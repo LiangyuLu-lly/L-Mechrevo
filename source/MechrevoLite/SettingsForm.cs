@@ -1617,6 +1617,19 @@ public class SettingsForm : RForm
 		ApplyRowSkins();
 		RefreshThemeButtons();
 		UiVisualStyle.ApplyFormBackground(this);
+		// 2026-10-22（机主：底下边栏改圆角矩形 + 整个底色半透明）：底栏及其子容器透明，让 RFooterPanel 自绘的半透明底透出来。
+		if (panelFooter != null)
+		{
+			panelFooter.BackColor = Color.Transparent;
+		}
+		if (tableButtons != null)
+		{
+			tableButtons.BackColor = Color.Transparent;
+		}
+		if (panelVersion != null)
+		{
+			panelVersion.BackColor = Color.Transparent;
+		}
 		// 界面外观卡片（ApplyWindow 对自绘 RButton/自定义卡片不一定覆盖），并打覆盖自检日志
 		ApplyOfficialConsoleCardTheme();
 		LogSettingsThemeCoverage();
@@ -7884,7 +7897,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(208),
+				Height = scale(232),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -8161,15 +8174,14 @@ public class SettingsForm : RForm
 		void SetBackgroundColorRowEnabled(Label rowLabel, FlowLayoutPanel rowPanel, bool enabled)
 		{
 			// 2026-10-22（机主：启用背景图时背景色置灰）：保留行、禁用并变灰。
-			rowLabel.ForeColor = enabled ? UiVisualStyle.Text : UiVisualStyle.Muted;
-			rowLabel.Enabled = enabled;
+			rowLabel.ForeColor = UiVisualStyle.Text;
 			rowPanel.Enabled = enabled;
 			foreach (Control control in rowPanel.Controls)
 			{
 				control.Enabled = enabled;
 				if (control is Label controlLabel)
 				{
-					controlLabel.ForeColor = enabled ? UiVisualStyle.Text : UiVisualStyle.Muted;
+					controlLabel.ForeColor = UiVisualStyle.Text;
 				}
 			}
 		}
@@ -15311,7 +15323,7 @@ if (TrayShow(mechrevoDeviceCapabilities.SilentTurboAvailability == FeatureAvaila
 		this.labelBattery = new System.Windows.Forms.Label();
 		this.pictureBattery = new System.Windows.Forms.PictureBox();
 		this.labelBatteryTitle = new System.Windows.Forms.Label();
-		this.panelFooter = new System.Windows.Forms.Panel();
+		this.panelFooter = new MechrevoLite.UI.RFooterPanel();
 		this.tableButtons = new System.Windows.Forms.TableLayoutPanel();
 		this.buttonDonate = new MechrevoLite.UI.RBadgeButton();
 		this.buttonQuit = new MechrevoLite.UI.RButton();

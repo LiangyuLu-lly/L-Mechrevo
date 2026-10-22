@@ -105,7 +105,8 @@ internal sealed class RScrollBar : Control
 		int num4 = Math.Max(1, Height - num3);
 		int num5 = ((Height > num3) ? ((int)Math.Round((double)num4 * (double)_value / (double)_max)) : 0);
 		e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-		using GraphicsPath path = RoundedRect(new Rectangle(num2, num5 + num2, Math.Max(2, Width - num2 * 2), Math.Max(4, num3 - num2 * 2)), radius);
+		// 2026-10-22（机主：下拉滑轨贴边）：滑钮左右贴满控件宽度，不再留 2px 内缩。
+		using GraphicsPath path = RoundedRect(new Rectangle(0, num5 + num2, Width, Math.Max(4, num3 - num2 * 2)), radius);
 		using SolidBrush brush = new SolidBrush(UiVisualStyle.Border);
 		e.Graphics.FillPath(brush, path);
 	}
