@@ -100,6 +100,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - 小步清理 MiniLED 相关的 ASUS 残留：删除 `AsusACPI.ScreenMiniled1/2` 常量、`ScreenControl` 里恒为 -1 的 miniled1/miniled2 读取与 `AppConfig.Set("miniled")`、`VisualiseScreen` 两个未使用参数（MiniLED 实际状态/下发仍走 GCU `LocalDimming*`，行为不变）。
 - 存档上游《Mechrevo-Xingyao-14》技术参考到 `docs/refs/Mechrevo-Xingyao-14-20261022/`（27 个文件，CC BY 4.0，含 SOURCE.md 记录来源提交）。
 - 星耀 14 适配第一步（只读）：新增 `XingyaoPmc2` —— 平台识别（GCU 载荷 WJXY / 机型含星耀 / 板号含 P916F）+ 经本机已装 inpoutx64 只读 PMC2 电池限充状态（`F1 12/13/14` → enabled/T1/T2），接入诊断包新小节；⛔ 不写任何阈值。
+- 星耀只读探针改进（不再强制 inpoutx64）：优先经**已内嵌可分发**的 PawnIO ACPI-EC 通道读 EC XRAM（0x0D01 状态 / 0x0D13 T1 / 0x0D14 T2），读不到再兜底 inpoutx64 PMC2 命令（F1 12/13/14）；两条通道结果都写诊断包。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

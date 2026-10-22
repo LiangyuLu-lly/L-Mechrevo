@@ -112,7 +112,18 @@ internal static class XingyaoPmc2
 			{
 				return sb.ToString();
 			}
-			sb.AppendLine("通道：PMC2 DATA=0x68 · CMD/STATUS=0x6C（OBF=bit0、IBF=bit1）· 只读命令 F1 12/13/14");
+			sb.AppendLine("通道计划：① PawnIO ACPI-EC（0x62/0x66 + 0x92 双字节地址）读 XRAM 0x0D01/0x0D13/0x0D14（无需 inpoutx64）；② 兜底 inpoutx64 PMC2 命令 F1 12/13/14");
+			// 2026-10-22（机主：没有 inpoutx64 就读不到？）：先走已内嵌的 PawnIO 通道读 XRAM —— 限充阈值就在 EC XRAM 0x0D13/0x0D14。
+			bool xramOk = TryReadXramValues(out byte xramEnabled, out byte xramT1, out byte xramT2, out string xramDetail);
+			if (xramOk)
+			{
+				sb.AppendLine($"PawnIO ACPI-EC 读数：enabled={xramEnabled} · T1={xramT1}% · T2={xramT2}%");
+				sb.AppendLine("参考语义：SOC<T1 充电 · T1<=SOC<=T2 保持(Not charging) · SOC>T2 主动放电（AC 在线）");
+				sb.AppendLine("边界：本探针只读取 XRAM；写 T1/T2/使能尚未实现（PMC2 命令通道未接管，需另做）。");
+				sb.AppendLine();
+				return sb.ToString();
+			}
+			sb.AppendLine("PawnIO ACPI-EC 读取失败/不可用：" + xramDetail);
 			if (!EnsureInitialized(out string detail))
 			{
 				sb.AppendLine("驱动：" + detail);
@@ -141,6 +152,42 @@ internal static class XingyaoPmc2
 		}
 		sb.AppendLine();
 		return sb.ToString();
+	}
+
+	/// <summary>只读：经 PawnIO ACPI-EC（0x62/0x66 + 命令 0x92 双字节地址）读星耀限充状态/阈值。</summary>
+	private static bool TryReadXramValues(out byte enabled, out byte t1, out byte t2, out string detail)
+	{
+		enabled = 0;
+		t1 = 0;
+		t2 = 0;
+		try
+		{
+			if (!EcPortIo.TryReadByte(0x0D01, out int state) || state < 0)
+			{
+				detail = "读 XRAM[0x0D01] 失败（PawnIO/EC 通道不可用）";
+				return false;
+			}
+			enabled = (byte)((state >> 4) & 1);
+			if (!EcPortIo.TryReadByte(0x0D13, out int rawT1) || rawT1 < 0 || rawT1 > 100)
+			{
+				detail = "读 XRAM[0x0D13] 失败或越界（raw=" + rawT1 + "）";
+				return false;
+			}
+			if (!EcPortIo.TryReadByte(0x0D14, out int rawT2) || rawT2 < 0 || rawT2 > 100)
+			{
+				detail = "读 XRAM[0x0D14] 失败或越界（raw=" + rawT2 + "）";
+				return false;
+			}
+			t1 = (byte)rawT1;
+			t2 = (byte)rawT2;
+			detail = "ok";
+			return true;
+		}
+		catch (Exception ex)
+		{
+			detail = ex.GetType().Name + " " + ex.Message;
+			return false;
+		}
 	}
 
 	private static bool EnsureInitialized(out string detail)
