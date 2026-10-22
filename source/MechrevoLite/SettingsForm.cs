@@ -8064,8 +8064,8 @@ public class SettingsForm : RForm
 				AppConfig.Set(UiVisualStyle.BackgroundOpacityConfigKey, opacitySlider.Value);
 				AppConfig.Flush();
 				opacityLabel.Text = opacitySlider.Value + "%";
-				UiVisualStyle.ApplyFormBackground(this);
 			};
+			opacitySlider.MouseUp += (object sender, MouseEventArgs e) => UiVisualStyle.ApplyFormBackground(this);
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageOpacity), 0, 4);
 			tableLayoutPanel.Controls.Add(opacitySlider, 1, 4);
 			tableLayoutPanel.Controls.Add(opacityLabel, 2, 4);
@@ -8091,8 +8091,8 @@ public class SettingsForm : RForm
 				AppConfig.Set(UiVisualStyle.BackgroundScrimConfigKey, scrimSlider.Value);
 				AppConfig.Flush();
 				scrimLabel.Text = scrimSlider.Value + "%";
-				UiVisualStyle.ApplyFormBackground(this);
 			};
+			scrimSlider.MouseUp += (object sender, MouseEventArgs e) => UiVisualStyle.ApplyFormBackground(this);
 			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageScrim), 0, 5);
 			tableLayoutPanel.Controls.Add(scrimSlider, 1, 5);
 			tableLayoutPanel.Controls.Add(scrimLabel, 2, 5);

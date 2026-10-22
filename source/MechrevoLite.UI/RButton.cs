@@ -617,7 +617,7 @@ public class RButton : Button
 					pevent.Graphics.FillRectangle(contextBrush, clientRectangle);
 				}
 				pevent.Graphics.DrawPath(pen, path);
-				using (SolidBrush brush = new SolidBrush(bgColor))
+				using (SolidBrush brush = new SolidBrush(UiVisualStyle.TranslucentFor(this, bgColor, 190)))
 				{
 					pevent.Graphics.FillPath(brush, path);
 				}
@@ -742,7 +742,7 @@ public class RButton : Button
 				pevent.Graphics.FillRectangle(contextBrush3, clientRectangle);
 			}
 			pevent.Graphics.DrawPath(pen3, path3);
-			using (Brush brush3 = new SolidBrush(color))
+			using (Brush brush3 = new SolidBrush(UiVisualStyle.TranslucentFor(this, color, 190)))
 			{
 				pevent.Graphics.FillPath(brush3, path3);
 			}
