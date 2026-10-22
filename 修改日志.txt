@@ -148,6 +148,7 @@ r79（2026-10-22 · **0.293.5 beta23.5**）★★ Intel+GCU 温度墙接正 + �
 - GCU 变体冲突（机主：装的是 50 GCU、注册表却写 40）：`GcuIdentity.Variant` 在“注册表≠50 但实际载荷特征=50（GCUService.exe 1.2.x）”时以实际载荷为准并写 error 日志，避免显卡超频/单分区键盘等「仅50」判据被过期注册表挡住；其余情况仍登记优先（零回归）。建议安装器/机主把 `HKLM\SOFTWARE\L-Mechrevo\GcuVariant` 也改成 50。
 - 诊断包瘦身（机主：体积爆大、过时探针清理）：① 单文件日志只取末尾 **2 MiB**（原 8 MiB）；② 包内只带 `log.txt + crash.txt + log.1.txt`（原含 log.1/2/3，最多 4×8 MiB）；③ GCU 侧日志/安装日志/目录树预算减半（64→32 KB/文件、512→192 KB、目录树 3→2 层/400→200 项）；④ 移除星耀 P916F PMC2 旧研究探针段（类保留作参考）；说明.txt 同步更新。
 - 清理过时探针 CLI（机主批准）：移除 `--ui-audit`、`--fan-watch`、`--sensor-dump`、`--official-isolate/--official-restore`、`--secure-mqtt/--secure-mqtt-remove`、`--gpu-oc-probe` 入口，并删除只被它们使用的 `UiAuditRunner` / `FanWatchRunner` / `SensorDumpRunner` / `GpuOcProbe` 源文件；正式功能路径（设置里的官方控制台隔离、MqttSecurity 启动检查等）保留不动。
+- 无界电池电压修复黑屏/重启根因：EC 电压/电流寄存器是**大端**；17600mV=0x44C0，按小端读成 0xC044=49220mV、按小端写 17600 实际下发 49.2V ⇒ 过压保护黑屏重启（地址没写错）。已把 `0x030E/0x0522/0x0836/0x0520/0x0834/0x083A/0x0438/0x050A` 全部改为大端读写；`i2ec-originals.txt` 升到 version=2，旧小端原值丢弃；当前 EC 若已被写成 49.2V，启动时记录并纠正为 17600，恢复时不再写回异常值。
 二、无界（WJXY / Wujie APU）
 - 无界功耗控制定稿为 UXTU 口径：单次下发、不回读确认、不补发、不守护（删掉此前的 fPPT+5 / 回读补发 / 模式守护 / 兼容开关等增强分支，净减约 90 行）。
 - 无界目标功耗 > 60W 时：下发 SMU 之前先切狂暴模式（已在狂暴或 10 秒内刚切过则不重复发），切完等 300ms 再写 SMU；日志 `[perfmode] 无界：目标功耗 > 60W ⇒ 先切狂暴模式再下发 SMU` / `当前已在狂暴模式（OP=1）⇒ 不重复下发档位命令`。

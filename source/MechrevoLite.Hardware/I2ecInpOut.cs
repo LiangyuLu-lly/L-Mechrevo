@@ -124,7 +124,7 @@ internal static class I2ecInpOut
 	{
 		try
 		{
-			string text = "desiredV=" + _origDesiredV + "\nqueuedV=" + _origQueuedV
+			string text = "version=2\ndesiredV=" + _origDesiredV + "\nqueuedV=" + _origQueuedV
 				+ "\ndesiredI=" + _origDesiredI + "\nqueuedI=" + _origQueuedI
 				+ "\nqueuedInputI=" + _origQueuedInputI + "\ngate=" + _origGate + "\n";
 			File.WriteAllText(OriginalsPath(), text);
@@ -153,9 +153,18 @@ internal static class I2ecInpOut
 					values[line.Substring(0, index).Trim()] = value;
 				}
 			}
-			if (!(values.ContainsKey("desiredV") && values.ContainsKey("queuedV") && values.ContainsKey("desiredI")
+			if (!(values.ContainsKey("version") && values["version"] >= 2
+				&& values.ContainsKey("desiredV") && values.ContainsKey("queuedV") && values.ContainsKey("desiredI")
 				&& values.ContainsKey("queuedI") && values.ContainsKey("queuedInputI") && values.ContainsKey("gate")))
 			{
+				// 旧版（小端）写下的原值不可信 ⇒ 删掉，按当前 EC 重新取。
+				DeleteOriginals();
+				return false;
+			}
+			if (values["desiredV"] < MinimumPlausibleVoltageMv || values["desiredV"] > MaximumPlausibleVoltageMv
+				|| values["queuedV"] < MinimumPlausibleVoltageMv || values["queuedV"] > MaximumPlausibleVoltageMv)
+			{
+				DeleteOriginals();
 				return false;
 			}
 			_origDesiredV = values["desiredV"];
@@ -400,13 +409,23 @@ internal static class I2ecInpOut
 		_out32(PortData, value & 0xFF);
 	}
 
-	private static int ReadLe16(int address) => ReadByte(address) | (ReadByte(address + 1) << 8);
+	/// <summary>2026-10-22（机主：改电压上限黑屏重启）：这些 EC 电压/电流寄存器是**大端**。
+	/// 实测 0x030E 基础目标=0x44C0=17600mV；按小端会读成 0xC044=49220mV，写 17600 也会变成 49220 ⇒ 过压保护黑屏/重启。</summary>
+	private static int ReadBe16(int address) => (ReadByte(address) << 8) | ReadByte(address + 1);
 
-	private static void WriteLe16(int address, int value)
+	private static void WriteBe16(int address, int value)
 	{
-		WriteByte(address, value & 0xFF);
-		WriteByte(address + 1, (value >> 8) & 0xFF);
+		WriteByte(address, (value >> 8) & 0xFF);
+		WriteByte(address + 1, value & 0xFF);
 	}
+
+	private const int MinimumPlausibleVoltageMv = 12000;
+
+	private const int MaximumPlausibleVoltageMv = 18000;
+
+	private static int PlausibleVoltage(int value, int fallback) => (value >= MinimumPlausibleVoltageMv && value <= MaximumPlausibleVoltageMv) ? value : fallback;
+
+	private static int PlausibleCurrent(int value, int fallback) => (value >= 0 && value <= 6000) ? value : fallback;
 
 	private static int ReadCells() => ((ReadByte(0x0491) & 0xC0) == 0xC0) ? 4 : (((ReadByte(0x0491) & 0xC0) == 0x80) ? 3 : 2);
 
@@ -504,16 +523,16 @@ internal static class I2ecInpOut
 		{
 			int mode = ReadByte(0x200D);
 			int id = ReadByte(0x0454);
-			int baseV = ReadLe16(0x030E);
-			int desiredV = ReadLe16(AddrDesiredVoltage);
-			int queuedV = ReadLe16(AddrQueuedVoltage);
-			int desiredI = ReadLe16(AddrDesiredCurrent);
-			int queuedI = ReadLe16(AddrQueuedCurrent);
-			int queuedInput = ReadLe16(AddrQueuedInputCurrent);
+			int baseV = ReadBe16(0x030E);
+			int desiredV = ReadBe16(AddrDesiredVoltage);
+			int queuedV = ReadBe16(AddrQueuedVoltage);
+			int desiredI = ReadBe16(AddrDesiredCurrent);
+			int queuedI = ReadBe16(AddrQueuedCurrent);
+			int queuedInput = ReadBe16(AddrQueuedInputCurrent);
 			int gate = ReadByte(AddrStopGate);
 			int soc = ReadByte(0x04AB);
-			int packV = ReadLe16(0x0438);
-			int current = ReadLe16(0x050A);
+			int packV = ReadBe16(0x0438);
+			int current = ReadBe16(0x050A);
 			if ((current & 0x8000) != 0)
 			{
 				current -= 0x10000;
@@ -558,7 +577,7 @@ internal static class I2ecInpOut
 					detail = "I2EC 当前不是读写模式（0x200D=0x" + mode.ToString("X2") + "）⇒ 不启动";
 					return false;
 				}
-				int baseV = ReadLe16(0x030E);
+				int baseV = ReadBe16(0x030E);
 				int cells = ReadCells();
 				if (cells != 4)
 				{
@@ -570,17 +589,25 @@ internal static class I2ecInpOut
 					detail = "基础目标 " + baseV + "mV ≠ 已验证的 " + ExpectedBaseVoltageMv + "mV ⇒ 不启动";
 					return false;
 				}
-				if (!TryLoadOriginals())
-				{
-					_origDesiredV = ReadLe16(AddrDesiredVoltage);
-					_origQueuedV = ReadLe16(AddrQueuedVoltage);
-					_origDesiredI = ReadLe16(AddrDesiredCurrent);
-					_origQueuedI = ReadLe16(AddrQueuedCurrent);
-					_origQueuedInputI = ReadLe16(AddrQueuedInputCurrent);
-					_origGate = ReadByte(AddrStopGate);
-					_originalsCaptured = true;
-					SaveOriginals();
-				}
+					if (!TryLoadOriginals())
+					{
+						int currentDesiredV = ReadBe16(AddrDesiredVoltage);
+						int currentQueuedV = ReadBe16(AddrQueuedVoltage);
+						if (currentDesiredV > MaximumPlausibleVoltageMv || currentQueuedV > MaximumPlausibleVoltageMv)
+						{
+							// 旧版本按小端写 17600 会变成 49220mV（过压），这里明确记录并按 17600 修正。
+							Logger.WriteError("[battery-fix] EC 当前目标电压异常（desiredV=" + currentDesiredV + "mV / queuedV=" + currentQueuedV
+								+ "mV，疑似旧版字节序错误）⇒ 按 17600mV 修正");
+						}
+						_origDesiredV = PlausibleVoltage(currentDesiredV, ExpectedBaseVoltageMv);
+						_origQueuedV = PlausibleVoltage(currentQueuedV, ExpectedBaseVoltageMv);
+						_origDesiredI = PlausibleCurrent(ReadBe16(AddrDesiredCurrent), ChargeCurrentMa);
+						_origQueuedI = PlausibleCurrent(ReadBe16(AddrQueuedCurrent), ChargeCurrentMa);
+						_origQueuedInputI = PlausibleCurrent(ReadBe16(AddrQueuedInputCurrent), InputCurrentSourceMa);
+						_origGate = ReadByte(AddrStopGate);
+						_originalsCaptured = true;
+						SaveOriginals();
+					}
 				_cts = new CancellationTokenSource();
 				CancellationToken token = _cts.Token;
 				_running = true;
@@ -616,14 +643,14 @@ internal static class I2ecInpOut
 						}
 						try
 						{
-							WriteLe16(AddrDesiredVoltage, ExpectedBaseVoltageMv);
-							WriteLe16(AddrQueuedVoltage, ExpectedBaseVoltageMv);
-							WriteLe16(AddrDesiredCurrent, ChargeCurrentMa);
-							WriteLe16(AddrQueuedCurrent, ChargeCurrentMa);
-							int queuedInput = ReadLe16(AddrQueuedInputCurrent);
+							WriteBe16(AddrDesiredVoltage, ExpectedBaseVoltageMv);
+							WriteBe16(AddrQueuedVoltage, ExpectedBaseVoltageMv);
+							WriteBe16(AddrDesiredCurrent, ChargeCurrentMa);
+							WriteBe16(AddrQueuedCurrent, ChargeCurrentMa);
+							int queuedInput = ReadBe16(AddrQueuedInputCurrent);
 							if (queuedInput == InputCurrentSourceMa || queuedInput == ChargeCurrentMa)
 							{
-								WriteLe16(AddrQueuedInputCurrent, ChargeCurrentMa);
+								WriteBe16(AddrQueuedInputCurrent, ChargeCurrentMa);
 							}
 							WriteByte(AddrStopGate, 0);
 						}
@@ -686,11 +713,11 @@ internal static class I2ecInpOut
 			TryEnterEcMutex(out bool held);
 			try
 			{
-				WriteLe16(AddrDesiredVoltage, _origDesiredV);
-				WriteLe16(AddrQueuedVoltage, _origQueuedV);
-				WriteLe16(AddrDesiredCurrent, _origDesiredI);
-				WriteLe16(AddrQueuedCurrent, _origQueuedI);
-				WriteLe16(AddrQueuedInputCurrent, _origQueuedInputI);
+				WriteBe16(AddrDesiredVoltage, _origDesiredV);
+				WriteBe16(AddrQueuedVoltage, _origQueuedV);
+				WriteBe16(AddrDesiredCurrent, _origDesiredI);
+				WriteBe16(AddrQueuedCurrent, _origQueuedI);
+				WriteBe16(AddrQueuedInputCurrent, _origQueuedInputI);
 				WriteByte(AddrStopGate, _origGate);
 				Logger.WriteLine("[battery-fix] 内置覆盖已停止并恢复原值（desiredV=" + _origDesiredV
 					+ " / queuedV=" + _origQueuedV + " / gate=" + _origGate + "）");
