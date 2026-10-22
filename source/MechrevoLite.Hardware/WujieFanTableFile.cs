@@ -132,9 +132,7 @@ internal static class WujieFanTableFile
 			detail = channel + " 数组缺失或不足 2 点";
 			return false;
 		}
-		List<byte> tempList = new List<byte>();
-		List<byte> dutyList = new List<byte>();
-		int previousTemp = -1;
+		List<(int Temp, int Duty)> points = new List<(int Temp, int Duty)>();
 		int skipped = 0;
 		foreach (JToken item in array)
 		{
@@ -145,32 +143,31 @@ internal static class WujieFanTableFile
 				detail = "点数值越界（UpT=" + upT + " Duty=" + duty + "）";
 				return false;
 			}
-			// 2026-10-22：官方表里 UpT=0 / 个位数温度（低温停转占位点）不显示，避免曲线出现奇怪温度点。
-			if (upT < MinimumTemperatureC)
+			// 2026-10-22（实机 fan table）：官方表可能逆序/含 127 哨兵值，不能按原顺序判递增；
+			// 统一过滤 <45℃ 与 >=127 的占位点，再按温度升序排序。
+			if (upT < MinimumTemperatureC || upT >= 127)
 			{
 				skipped++;
 				continue;
 			}
-			if (upT < previousTemp)
-			{
-				detail = "温度点不是递增（UpT=" + upT + " 前一个=" + previousTemp + "）";
-				return false;
-			}
-			previousTemp = upT;
-			tempList.Add((byte)upT);
-			dutyList.Add((byte)duty);
+			points.Add((upT, duty));
 		}
-		if (tempList.Count < 2)
+		if (points.Count < 2)
 		{
-			detail = channel + " 过滤低温点后不足 2 点";
+			detail = channel + " 过滤低温/哨兵点后不足 2 点";
 			return false;
+		}
+		points.Sort((a, b) => a.Temp.CompareTo(b.Temp));
+		temps = new byte[points.Count];
+		duties = new byte[points.Count];
+		for (int i = 0; i < points.Count; i++)
+		{
+			temps[i] = (byte)points[i].Temp;
+			duties[i] = (byte)points[i].Duty;
 		}
 		if (skipped > 0)
 		{
-			detail = "（已跳过 " + skipped + " 个 <" + MinimumTemperatureC + "℃ 的点）";
+			detail = "（已跳过 " + skipped + " 个 <" + MinimumTemperatureC + "℃ 或 >=127 的点）";
 		}
-		temps = tempList.ToArray();
-		duties = dutyList.ToArray();
 		return true;
-	}
-}
+	}}

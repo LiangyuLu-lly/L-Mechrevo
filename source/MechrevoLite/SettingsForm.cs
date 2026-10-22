@@ -284,6 +284,11 @@ public class SettingsForm : RForm
 	// 下面三个引用字段**故意不写可空注解**（`?`）：本文件没有 #nullable 上下文，写注解会各多一条
 	// CS8632，而本仓库的构建基线（0 错误 / 1435 警告）是硬上限 —— 语义与加注解等价（都在用之前判 != null）。
 	private RCheckBox checkChargeSlider;
+
+	// 2026-10-22（无界 8040 系）：电池充电电压修复开关（放在电池卡片内）
+	private RCheckBox _wujieBatteryFixBox;
+
+	private bool _syncingWujieBatteryFix;
 	private TableLayoutPanel _chargeSliderTable;
 	private Label _chargeSliderLabel;
 	private int _chargeSliderRowIndex = -1;
@@ -8510,8 +8515,32 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 	/// NoDpug（无独显办公本，如无界 15X）与 Gen40 / Gen50 一律开放。判定走 GpuGenerationProvider
 	/// （持久化在 config 的 dgpu_generation，硬件没连上也能判）。
 	/// </summary>
+	/// <summary>2026-10-22（机主：无极限充/电池修复只给 8040 系无界）：CPU 名匹配 8[0-9]{3}。</summary>
+	private static bool IsWujie8040Series()
+	{
+		if (Program.hw?.WujieSmuApu != true)
+		{
+			return false;
+		}
+		try
+		{
+			string cpuName = PawnIO.CpuInfo.Name ?? "";
+			return System.Text.RegularExpressions.Regex.IsMatch(cpuName, @"\b8[0-9]{3}[A-Z]*\b");
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	private static bool ChargeSliderSupported()
 	{
+		// 2026-10-22（机主：该开关只给 8040 系无界启用）：其它无界（如 7040 系）不建此开关。
+		if (Program.hw?.WujieSmuApu == true && !IsWujie8040Series())
+		{
+			Logger.WriteLine("限充门控：无界但非 8040 系 ⇒ 不建「无极限充（实验性）」开关与滑块");
+			return false;
+		}
 		// 2026-10-15（隐藏规则 B · 用户原话「10系-30系用这个可能损坏硬件必须强制隐藏EC三档和滑块」）：
 		// 老机型上**连行都不建**（比建好再收起来更彻底：不存在任何被程序化路径重新点亮的机会）——
 		// 判据走 GcuVariant（'1020' = 10/16/20 系、'30' = 30 系），与 EC 侧 IsLegacyGenerationBlocked 同源。
@@ -9228,6 +9257,68 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		}
 		// 2026-10-16（EC 直写逃生口）：在既有两条布局（含/不含无极限充滑块行）都建完之后挂第 6 行。
 		BuildEcDirectWriteOffRow(host, _ecDirectWriteOffRowIndex);
+		// 2026-10-22（机主：电池行没有电池修复开关）：仅无界 8040 系追加一行。
+		if (BatteryVoltageFix.IsSupportedMachine() && IsWujie8040Series())
+		{
+			int batteryFixRow = host.RowCount;
+			host.RowCount = batteryFixRow + 1;
+			host.RowStyles.Add(new RowStyle(SizeType.Absolute, ResponsiveLayout.LogicalToDevice(this, 26)));
+			_wujieBatteryFixBox = new RCheckBox
+			{
+				Name = "checkWujieBatteryFix",
+				Text = "电池充电电压修复（无界）",
+				AutoSize = true,
+				Appearance = Appearance.Normal,
+				Anchor = AnchorStyles.Left,
+				SwitchOnRight = false,
+				TabStop = false,
+				Cursor = Cursors.Hand,
+				ForeColor = UiVisualStyle.Text,
+				BackColor = panelBattery.BackColor,
+				Font = UiStyleCaptionFont(),
+				Margin = Padding.Empty,
+				Checked = BatteryVoltageFix.Enabled
+			};
+			toolTip.SetToolTip(_wujieBatteryFixBox, "覆盖 EC 老化降额，把充电目标恢复为 17.6V；仅无界 8040 系；默认关闭，取消会恢复 EC 原值。");
+			_wujieBatteryFixBox.CheckedChanged += (_, _) =>
+			{
+				if (_syncingWujieBatteryFix)
+				{
+					return;
+				}
+				bool on = _wujieBatteryFixBox.Checked;
+				BatteryVoltageFix.Enabled = on;
+				if (!on)
+				{
+					return;
+				}
+				_ = Task.Run(delegate
+				{
+					try
+					{
+						(bool ok, string detail) = BatteryVoltageFix.Run("hold-full");
+						Logger.WriteLine("[battery-fix] UI 开关启动：" + (ok ? "成功" : "失败") + " · " + detail);
+						if (!ok)
+						{
+							BeginInvoke(delegate
+							{
+								_syncingWujieBatteryFix = true;
+								_wujieBatteryFixBox.Checked = false;
+								_syncingWujieBatteryFix = false;
+								BatteryVoltageFix.Enabled = false;
+								ToastForm.ShowFailure("电池电压修复启动失败：" + detail);
+							});
+						}
+					}
+					catch (Exception ex)
+					{
+						Logger.WriteLine("[battery-fix] UI 开关异常：" + ex.GetType().Name + " " + ex.Message);
+					}
+				});
+			};
+			host.Controls.Add(_wujieBatteryFixBox, 0, batteryFixRow);
+			host.SetColumnSpan(_wujieBatteryFixBox, 3);
+		}
 		ApplyChargeSliderVisibility();
 		RecalculateBatteryTableHeight();
 		RefreshBatteryModeButtons();
