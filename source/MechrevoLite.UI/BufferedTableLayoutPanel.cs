@@ -41,6 +41,20 @@ internal sealed class BufferedTableLayoutPanel : TableLayoutPanel
 	/// 被腾出来的条带属于本面板自己的客户区，必须自己重绘；否则残留旧像素（偶发细线），
 	/// 鼠标悬停触发别的控件重绘时才消失。
 	/// </summary>
+	protected override void OnPaintBackground(PaintEventArgs e)
+	{
+		// 2026-10-22（机主选 B：自绘透底）：实验模式下本容器自己画「底图切片 + 半透明底色」，
+		// 不再依赖 Color.Transparent —— 容器仍是实窗口、能够正常滚动/双缓冲，减少残影。
+		if (UiVisualStyle.IsOverlayTranslucent(this))
+		{
+			UiVisualStyle.DrawFormBackgroundSlice(e.Graphics, this);
+			using SolidBrush overlayBrush = new SolidBrush(UiVisualStyle.TranslucentFor(this, BackColor, 235));
+			e.Graphics.FillRectangle(overlayBrush, ClientRectangle);
+			return;
+		}
+		base.OnPaintBackground(e);
+	}
+
 	protected override void OnLayout(LayoutEventArgs e)
 	{
 		base.OnLayout(e);

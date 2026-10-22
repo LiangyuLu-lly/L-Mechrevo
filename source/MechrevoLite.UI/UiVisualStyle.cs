@@ -1285,8 +1285,13 @@ private static void LoadEmbeddedFonts()
 			}
 			if (back == Window || back == NightPalette.Window || back == DayPalette.Window)
 			{
-				child.BackColor = Color.Transparent;
-				transparent.Add(child);
+				// 2026-10-22（B 自绘透底）：Buffered* 容器自己在 OnPaintBackground 画「切片 + 半透明底」，
+				// 不再设 Color.Transparent（透明窗口叠多层最容易出残影）。
+				if (!(child is MechrevoLite.UI.BufferedPanel) && !(child is MechrevoLite.UI.BufferedTableLayoutPanel))
+				{
+					child.BackColor = Color.Transparent;
+					transparent.Add(child);
+				}
 				ApplyTransparentPageBackgrounds(child, transparent);
 			}
 			else if (back == Color.Transparent)

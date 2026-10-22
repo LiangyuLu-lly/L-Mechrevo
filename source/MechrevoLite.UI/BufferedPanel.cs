@@ -76,6 +76,20 @@ internal class BufferedPanel : Panel
 	/// 之后，本容器被腾出来的那些条带属于**自己的客户区**，必须自己整块重绘；否则旧像素留在原地，
 	/// 表现为偶发细线/残影，鼠标悬停触发别的控件重绘后才消失。布局变化很稀疏，双缓冲下代价可忽略。
 	/// </summary>
+	protected override void OnPaintBackground(PaintEventArgs e)
+	{
+		// 2026-10-22（机主选 B：自绘透底）：实验模式下本容器自己画「底图切片 + 半透明底色」，
+		// 不再依赖 Color.Transparent —— 容器仍是实窗口、能够正常滚动/双缓冲，减少残影。
+		if (UiVisualStyle.IsOverlayTranslucent(this))
+		{
+			UiVisualStyle.DrawFormBackgroundSlice(e.Graphics, this);
+			using SolidBrush overlayBrush = new SolidBrush(UiVisualStyle.TranslucentFor(this, BackColor, 235));
+			e.Graphics.FillRectangle(overlayBrush, ClientRectangle);
+			return;
+		}
+		base.OnPaintBackground(e);
+	}
+
 	protected override void OnLayout(LayoutEventArgs e)
 	{
 		base.OnLayout(e);
