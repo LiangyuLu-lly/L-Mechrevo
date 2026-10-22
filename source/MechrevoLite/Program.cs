@@ -313,6 +313,13 @@ internal static class Program
 		{
 			text = args[0];
 		}
+		if (text == "--ui-probe")
+		{
+			// 2026-10-22（机主：UI 探针）：强制启用某机型 UI 只做预览，不连接硬件、不下发命令。
+			Environment.ExitCode = UiProbeRunner.Run((args.Length > 1) ? args[1] : "");
+			Logger.Close();
+			return;
+		}
 		switch (text)
 		{
 		// （机主要求「直接调 LM 接口」）： 键盘灯 WMI 探针走**主程序自己的通道**
