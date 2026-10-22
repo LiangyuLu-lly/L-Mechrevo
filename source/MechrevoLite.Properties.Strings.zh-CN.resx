@@ -5746,4 +5746,28 @@
   <data name="IdleOff3Hour" xml:space="preserve">
     <value>3 小时</value>
   </data>
+  <data name="ThemeAccentColor" xml:space="preserve">
+    <value>主题色</value>
+  </data>
+  <data name="ThemeBackgroundColor" xml:space="preserve">
+    <value>背景色</value>
+  </data>
+  <data name="ThemeBackgroundImage" xml:space="preserve">
+    <value>背景图</value>
+  </data>
+  <data name="ThemeImageOpacity" xml:space="preserve">
+    <value>图片不透明度</value>
+  </data>
+  <data name="ThemeChoose" xml:space="preserve">
+    <value>选择…</value>
+  </data>
+  <data name="ThemeClear" xml:space="preserve">
+    <value>清除</value>
+  </data>
+  <data name="ThemeDefault" xml:space="preserve">
+    <value>默认</value>
+  </data>
+  <data name="ThemeRestartToApply" xml:space="preserve">
+    <value>重启 L-Mechrevo 后生效。</value>
+  </data>
 </root>

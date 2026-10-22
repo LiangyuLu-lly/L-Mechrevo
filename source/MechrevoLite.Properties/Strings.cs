@@ -1269,6 +1269,23 @@ internal class Strings
 
 	internal static string IdleOff3Hour => ResourceManager.GetString("IdleOff3Hour", resourceCulture);
 
+	internal static string ThemeAccentColor => ResourceManager.GetString("ThemeAccentColor", resourceCulture);
+
+	internal static string ThemeBackgroundColor => ResourceManager.GetString("ThemeBackgroundColor", resourceCulture);
+
+	internal static string ThemeBackgroundImage => ResourceManager.GetString("ThemeBackgroundImage", resourceCulture);
+
+	internal static string ThemeImageOpacity => ResourceManager.GetString("ThemeImageOpacity", resourceCulture);
+
+	internal static string ThemeChoose => ResourceManager.GetString("ThemeChoose", resourceCulture);
+
+	internal static string ThemeClear => ResourceManager.GetString("ThemeClear", resourceCulture);
+
+	internal static string ThemeDefault => ResourceManager.GetString("ThemeDefault", resourceCulture);
+
+	internal static string ThemeRestartToApply => ResourceManager.GetString("ThemeRestartToApply", resourceCulture);
+
+
 
 	internal static string QuickAcRecovery => ResourceManager.GetString("QuickAcRecovery", resourceCulture);
 

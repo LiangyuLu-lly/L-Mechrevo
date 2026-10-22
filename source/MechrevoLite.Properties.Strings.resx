@@ -5751,4 +5751,28 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
   <data name="IdleOff3Hour" xml:space="preserve">
     <value>3 hours</value>
   </data>
+  <data name="ThemeAccentColor" xml:space="preserve">
+    <value>Accent color</value>
+  </data>
+  <data name="ThemeBackgroundColor" xml:space="preserve">
+    <value>Background color</value>
+  </data>
+  <data name="ThemeBackgroundImage" xml:space="preserve">
+    <value>Background image</value>
+  </data>
+  <data name="ThemeImageOpacity" xml:space="preserve">
+    <value>Image opacity</value>
+  </data>
+  <data name="ThemeChoose" xml:space="preserve">
+    <value>Choose...</value>
+  </data>
+  <data name="ThemeClear" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="ThemeDefault" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="ThemeRestartToApply" xml:space="preserve">
+    <value>Restart L-Mechrevo to apply the theme change.</value>
+  </data>
 </root>

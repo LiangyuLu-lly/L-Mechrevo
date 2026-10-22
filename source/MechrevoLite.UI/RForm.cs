@@ -74,6 +74,13 @@ public class RForm : Form
 		ResizeRedraw = false;
 	}
 
+	// 2026-10-22（主题自定义）：窗体句柄建好后应用「强调色 + 背景色/背景图」。
+	protected override void OnHandleCreated(EventArgs e)
+	{
+		base.OnHandleCreated(e);
+		UiVisualStyle.ApplyFormBackground(this);
+	}
+
 	protected override void OnResize(EventArgs e)
 	{
 		base.OnResize(e);

@@ -1616,6 +1616,7 @@ public class SettingsForm : RForm
 		pictureScreen.Visible = false;
 		ApplyRowSkins();
 		RefreshThemeButtons();
+		UiVisualStyle.ApplyFormBackground(this);
 		// 界面外观卡片（ApplyWindow 对自绘 RButton/自定义卡片不一定覆盖），并打覆盖自检日志
 		ApplyOfficialConsoleCardTheme();
 		LogSettingsThemeCoverage();
@@ -7868,7 +7869,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(48),
+				Height = scale(176),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7886,6 +7887,10 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			Label label = new Label
 			{
 				Name = "labelThemeModeTitle",
@@ -7929,9 +7934,161 @@ public class SettingsForm : RForm
 						_themeModePanel.Invalidate(true);
 					}
 				}));
+			// 2026-10-22（机主：主题色 + 背景自定义）
+			Color accentCurrent = UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.AccentColorConfigKey));
+			if (accentCurrent == Color.Empty)
+			{
+				accentCurrent = UiVisualStyle.Accent;
+			}
+			Button accentButton = CreateThemeSettingButton(Strings.ThemeChoose);
+			SetThemeSwatch(accentButton, accentCurrent);
+			accentButton.Click += (object sender, EventArgs e) =>
+			{
+				using ColorDialog dialog = new ColorDialog
+				{
+					FullOpen = true,
+					Color = ((UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.AccentColorConfigKey)) == Color.Empty) ? UiVisualStyle.Accent : UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.AccentColorConfigKey)))
+				};
+				if (dialog.ShowDialog(this) == DialogResult.OK)
+				{
+					UiVisualStyle.SaveCustomColor(UiVisualStyle.AccentColorConfigKey, dialog.Color);
+					AppConfig.Flush();
+					SetThemeSwatch(accentButton, dialog.Color);
+					ShowThemeRestartHint();
+				}
+			};
+			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeAccentColor), 0, 1);
+			tableLayoutPanel.Controls.Add(accentButton, 1, 1);
+
+			Button backgroundColorButton = CreateThemeSettingButton(Strings.ThemeChoose);
+			Color backgroundCurrent = UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey));
+			if (backgroundCurrent == Color.Empty)
+			{
+				backgroundCurrent = UiVisualStyle.Window;
+			}
+			SetThemeSwatch(backgroundColorButton, backgroundCurrent);
+			backgroundColorButton.Click += (object sender, EventArgs e) =>
+			{
+				using ColorDialog dialog = new ColorDialog
+				{
+					FullOpen = true,
+					Color = ((UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey)) == Color.Empty) ? UiVisualStyle.Window : UiVisualStyle.ParseCustomColor(AppConfig.GetString(UiVisualStyle.BackgroundColorConfigKey)))
+				};
+				if (dialog.ShowDialog(this) == DialogResult.OK)
+				{
+					UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, dialog.Color);
+					AppConfig.Flush();
+					SetThemeSwatch(backgroundColorButton, dialog.Color);
+					ShowThemeRestartHint();
+				}
+			};
+			Button backgroundColorDefault = CreateThemeSettingButton(Strings.ThemeDefault);
+			backgroundColorDefault.Click += (object sender, EventArgs e) =>
+			{
+				UiVisualStyle.SaveCustomColor(UiVisualStyle.BackgroundColorConfigKey, Color.Empty);
+				AppConfig.Flush();
+				SetThemeSwatch(backgroundColorButton, UiVisualStyle.Window);
+				ShowThemeRestartHint();
+			};
+			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundColor), 0, 2);
+			tableLayoutPanel.Controls.Add(backgroundColorButton, 1, 2);
+			tableLayoutPanel.Controls.Add(backgroundColorDefault, 2, 2);
+
+			Button backgroundImageButton = CreateThemeSettingButton(Strings.ThemeChoose);
+			backgroundImageButton.Click += (object sender, EventArgs e) =>
+			{
+				using OpenFileDialog dialog = new OpenFileDialog
+				{
+					Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
+					CheckFileExists = true
+				};
+				if (dialog.ShowDialog(this) == DialogResult.OK)
+				{
+					AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, dialog.FileName);
+					AppConfig.Flush();
+					ShowThemeRestartHint();
+				}
+			};
+			Button backgroundImageClear = CreateThemeSettingButton(Strings.ThemeClear);
+			backgroundImageClear.Click += (object sender, EventArgs e) =>
+			{
+				AppConfig.Set(UiVisualStyle.BackgroundImageConfigKey, "");
+				AppConfig.Flush();
+				ShowThemeRestartHint();
+			};
+			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeBackgroundImage), 0, 3);
+			tableLayoutPanel.Controls.Add(backgroundImageButton, 1, 3);
+			tableLayoutPanel.Controls.Add(backgroundImageClear, 2, 3);
+
+			RSlider opacitySlider = new RSlider
+			{
+				Minimum = 0,
+				Maximum = 100,
+				Value = Math.Clamp(AppConfig.Get(UiVisualStyle.BackgroundOpacityConfigKey, 65), 0, 100),
+				Dock = DockStyle.Fill,
+				MinimumSize = new Size(scale(80), scale(20))
+			};
+			Label opacityLabel = new Label
+			{
+				Text = opacitySlider.Value + "%",
+				Dock = DockStyle.Fill,
+				TextAlign = ContentAlignment.MiddleLeft,
+				ForeColor = UiVisualStyle.Muted,
+				Margin = new Padding(scale(6), 0, 0, 0)
+			};
+			opacitySlider.ValueChanged += (object sender, EventArgs e) =>
+			{
+				AppConfig.Set(UiVisualStyle.BackgroundOpacityConfigKey, opacitySlider.Value);
+				AppConfig.Flush();
+				opacityLabel.Text = opacitySlider.Value + "%";
+			};
+			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageOpacity), 0, 4);
+			tableLayoutPanel.Controls.Add(opacitySlider, 1, 4);
+			tableLayoutPanel.Controls.Add(opacityLabel, 2, 4);
+
 			_themeModePanel.Controls.Add(tableLayoutPanel);
 		}
 		RefreshThemeButtons();
+		Label CreateThemeSettingLabel(string text)
+		{
+			return new Label
+			{
+				Text = text,
+				Dock = DockStyle.Fill,
+				TextAlign = ContentAlignment.MiddleLeft,
+				Margin = Padding.Empty,
+				ForeColor = UiVisualStyle.Text
+			};
+		}
+		Button CreateThemeSettingButton(string text)
+		{
+			Button button = new Button();
+			button.Text = text;
+			button.AutoSize = false;
+			button.Dock = DockStyle.None;
+			button.Anchor = AnchorStyles.Right;
+			button.Size = new Size(scale(84), scale(28));
+			button.Margin = new Padding(scale(4), scale(1), scale(4), scale(1));
+			button.FlatStyle = FlatStyle.Flat;
+			button.UseVisualStyleBackColor = false;
+			button.Cursor = Cursors.Hand;
+			button.BackColor = UiVisualStyle.ButtonFace;
+			button.ForeColor = UiVisualStyle.Text;
+			button.FlatAppearance.BorderColor = UiVisualStyle.Border;
+			ApplyRoundedRegion(button, scale(8));
+			button.Resize += (object sender, EventArgs e) => ApplyRoundedRegion(button, scale(8));
+			return button;
+		}
+		void SetThemeSwatch(Button button, Color color)
+		{
+			button.BackColor = color;
+			button.ForeColor = ((color.R * 299 + color.G * 587 + color.B * 114) / 1000 > 140) ? Color.FromArgb(20, 20, 20) : Color.White;
+			button.FlatAppearance.BorderColor = UiVisualStyle.Border;
+		}
+		void ShowThemeRestartHint()
+		{
+			MessageBox.Show(this, Strings.ThemeRestartToApply, Strings.UiAppearance, MessageBoxButtons.OK, MessageBoxIcon.Information);
+		}
 		Button CreateThemeButton(string text, bool night)
 		{
 			Button button = new Button();
@@ -8776,7 +8933,7 @@ using System.Management.ManagementObjectSearcher searcher = new System.Managemen
 		TableLayoutPanel modePanel = new TableLayoutPanel
 		{
 			ColumnCount = 3,
-			RowCount = 1,
+			RowCount = 5,
 			Dock = DockStyle.Fill,
 			AutoSize = false,
 			Margin = new Padding(0, ResponsiveLayout.LogicalToDevice(this, 2), ResponsiveLayout.LogicalToDevice(this, 2), ResponsiveLayout.LogicalToDevice(this, 2)),

@@ -65,6 +65,9 @@ internal static class UiVisualStyle
 	/// <summary>2026-10-22（主题自定义）：主窗口背景图片路径；空=不显示。</summary>
 	internal const string BackgroundImageConfigKey = "ui_bg_image";
 
+	/// <summary>2026-10-22（主题自定义）：背景图不透明度 0~100（默认 65，越低界面越易读）。</summary>
+	internal const string BackgroundOpacityConfigKey = "ui_bg_opacity";
+
 	internal const string ThemeFollowSystemKey = "ui_theme_follow_system";
 
 	internal const string BaseFontFamily = "HarmonyOS Sans SC";
@@ -277,10 +280,10 @@ private static void LoadEmbeddedFonts()
 		get
 		{
 			Palette palette = (IsNightMode ? NightPalette : DayPalette);
-			Color? customAccent = ParseCustomColor(AppConfig.GetString(AccentColorConfigKey));
-			if (customAccent.HasValue)
+			Color customAccent = ParseCustomColor(AppConfig.GetString(AccentColorConfigKey));
+			if (customAccent != Color.Empty)
 			{
-				Color accent = customAccent.Value;
+				Color accent = customAccent;
 				palette = palette with
 				{
 					Accent = accent,
@@ -289,12 +292,12 @@ private static void LoadEmbeddedFonts()
 					AccentText = ContrastTextFor(accent)
 				};
 			}
-			Color? customBackground = ParseCustomColor(AppConfig.GetString(BackgroundColorConfigKey));
-			if (customBackground.HasValue)
+			Color customBackground = ParseCustomColor(AppConfig.GetString(BackgroundColorConfigKey));
+			if (customBackground != Color.Empty)
 			{
 				palette = palette with
 				{
-					Window = customBackground.Value
+					Window = customBackground
 				};
 			}
 			return palette;
@@ -962,11 +965,19 @@ private static void LoadEmbeddedFonts()
 	}
 
 	/// <summary>2026-10-22（主题自定义）：解析 config 里的颜色字符串（#RRGGBB / #AARRGGBB）；空/非法返回 null。</summary>
-	internal static Color? ParseCustomColor(string raw)
+	internal static Color ParseCustomColor(string raw)
 	{
+		Color color;
+		return TryParseCustomColor(raw, out color) ? color : Color.Empty;
+	}
+
+	/// <summary>2026-10-22：解析成功返回 true（颜色写入 <paramref name="color" />）；空/非法返回 false。</summary>
+	internal static bool TryParseCustomColor(string raw, out Color color)
+	{
+		color = Color.Empty;
 		if (string.IsNullOrWhiteSpace(raw))
 		{
-			return null;
+			return false;
 		}
 		try
 		{
@@ -977,23 +988,25 @@ private static void LoadEmbeddedFonts()
 			}
 			if (text.Length == 6)
 			{
-				return Color.FromArgb(255, Convert.ToInt32(text.Substring(0, 2), 16), Convert.ToInt32(text.Substring(2, 2), 16), Convert.ToInt32(text.Substring(4, 2), 16));
+				color = Color.FromArgb(255, Convert.ToInt32(text.Substring(0, 2), 16), Convert.ToInt32(text.Substring(2, 2), 16), Convert.ToInt32(text.Substring(4, 2), 16));
+				return true;
 			}
 			if (text.Length == 8)
 			{
-				return Color.FromArgb(Convert.ToInt32(text.Substring(0, 2), 16), Convert.ToInt32(text.Substring(2, 2), 16), Convert.ToInt32(text.Substring(4, 2), 16), Convert.ToInt32(text.Substring(6, 2), 16));
+				color = Color.FromArgb(Convert.ToInt32(text.Substring(0, 2), 16), Convert.ToInt32(text.Substring(2, 2), 16), Convert.ToInt32(text.Substring(4, 2), 16), Convert.ToInt32(text.Substring(6, 2), 16));
+				return true;
 			}
 		}
 		catch
 		{
 		}
-		return null;
+		return false;
 	}
 
-	/// <summary>2026-10-22：把颜色写成 config 字符串（#RRGGBB）。</summary>
-	internal static void SaveCustomColor(string key, Color? color)
+	/// <summary>2026-10-22：把颜色写成 config 字符串（#RRGGBB）；<see cref="Color.Empty" /> 表示清除。</summary>
+	internal static void SaveCustomColor(string key, Color color)
 	{
-		AppConfig.Set(key, color.HasValue ? ("#" + color.Value.R.ToString("X2") + color.Value.G.ToString("X2") + color.Value.B.ToString("X2")) : "");
+		AppConfig.Set(key, (color == Color.Empty) ? "" : ("#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2")));
 	}
 
 	private static Color ContrastTextFor(Color background)
@@ -1005,6 +1018,8 @@ private static void LoadEmbeddedFonts()
 	private static readonly ConditionalWeakTable<Form, List<Control>> TransparentRoots = new ConditionalWeakTable<Form, List<Control>>();
 	private static string _loadedBackgroundImagePath = "";
 	private static Image _loadedBackgroundImage;
+	private static int _loadedBackgroundOpacity = -1;
+	private static Color _loadedBackgroundBaseColor = Color.Empty;
 
 	/// <summary>2026-10-22（主题自定义）：把「强调色 + 背景色/背景图」应用到窗体。
 	/// <para>背景图只在主窗体上生效：把根容器（底色=Window 的面板）设成透明，让图片从卡片间隙露出来。</para></summary>
@@ -1048,6 +1063,8 @@ private static void LoadEmbeddedFonts()
 	private static Image LoadBackgroundImage()
 	{
 		string path = (AppConfig.GetString(BackgroundImageConfigKey) ?? "").Trim();
+		int opacity = Math.Clamp(AppConfig.Get(BackgroundOpacityConfigKey, 65), 0, 100);
+		Color baseColor = Window;
 		lock (BackgroundImageGate)
 		{
 			if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
@@ -1056,14 +1073,37 @@ private static void LoadEmbeddedFonts()
 				_loadedBackgroundImage = null;
 				return null;
 			}
-			if (string.Equals(path, _loadedBackgroundImagePath, StringComparison.OrdinalIgnoreCase))
+			if (string.Equals(path, _loadedBackgroundImagePath, StringComparison.OrdinalIgnoreCase)
+				&& opacity == _loadedBackgroundOpacity
+				&& baseColor == _loadedBackgroundBaseColor)
 			{
 				return _loadedBackgroundImage;
 			}
 			try
 			{
-				_loadedBackgroundImage = Image.FromFile(path);
+				using Image source = Image.FromFile(path);
+				// 2026-10-22（机主：加背景图后按钮可能需要半透明）：WinForms 对子控件透明度支持有限，
+				// 这里改成把图片按不透明度**预先混到窗口底色上**，卡片/按钮保持原色也仍然清晰。
+				Bitmap blended = new Bitmap(Math.Max(1, source.Width), Math.Max(1, source.Height));
+				using (Graphics graphics = Graphics.FromImage(blended))
+				{
+					graphics.Clear(baseColor);
+					if (opacity > 0)
+					{
+						using System.Drawing.Imaging.ImageAttributes attributes = new System.Drawing.Imaging.ImageAttributes();
+						System.Drawing.Imaging.ColorMatrix matrix = new System.Drawing.Imaging.ColorMatrix
+						{
+							Matrix33 = opacity / 100f
+						};
+						attributes.SetColorMatrix(matrix);
+						graphics.DrawImage(source, new Rectangle(0, 0, blended.Width, blended.Height), 0, 0, source.Width, source.Height, GraphicsUnit.Pixel, attributes);
+					}
+				}
+				_loadedBackgroundImage?.Dispose();
+				_loadedBackgroundImage = blended;
 				_loadedBackgroundImagePath = path;
+				_loadedBackgroundOpacity = opacity;
+				_loadedBackgroundBaseColor = baseColor;
 			}
 			catch (Exception ex)
 			{
