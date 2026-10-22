@@ -76,7 +76,23 @@ internal static class BatteryVoltageFix
 	internal static bool IsSupportedMachine()
 	{
 		MechrevoHw hw = Program.hw;
-		return hw != null && hw.WujieSmuApu;
+		if (hw == null)
+		{
+			return false;
+		}
+		if (hw.WujieSmuApu)
+		{
+			return true;
+		}
+		// 2026-10-22（UI 探针）：探测模式的合成 hw 不会让 WujieSmuApu 变真（它读真机身份/CPU），
+		// 但 wujie 能力档的 Model/Board 含 无界/WUJIE ⇒ 也把这个开关显示出来，便于检查 UI。
+		if (Program.UiAuditUseReportedCapabilities)
+		{
+			string text = ((hw.Capabilities?.Model ?? "") + " " + (hw.Capabilities?.BaseboardProduct ?? "")).Trim();
+			return text.IndexOf("WUJIE", StringComparison.OrdinalIgnoreCase) >= 0
+				|| text.IndexOf("无界", StringComparison.OrdinalIgnoreCase) >= 0;
+		}
+		return false;
 	}
 
 	/// <summary>停掉内置覆盖（幂等）。</summary>
