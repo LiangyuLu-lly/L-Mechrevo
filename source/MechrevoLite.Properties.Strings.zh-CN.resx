@@ -5773,4 +5773,7 @@
   <data name="ThemePresetColors" xml:space="preserve">
     <value>预设配色</value>
   </data>
+  <data name="ThemeImageScrim" xml:space="preserve">
+    <value>内容遮罩</value>
+  </data>
 </root>

@@ -68,6 +68,9 @@ internal static class UiVisualStyle
 	/// <summary>2026-10-22（主题自定义）：背景图不透明度 0~100（默认 65，越低界面越易读）。</summary>
 	internal const string BackgroundOpacityConfigKey = "ui_bg_opacity";
 
+	/// <summary>2026-10-22（主题自定义）：内容区遮罩 0~100（默认 50，越大底图越淡、文字越清楚）。</summary>
+	internal const string BackgroundScrimConfigKey = "ui_bg_scrim";
+
 	internal const string ThemeFollowSystemKey = "ui_theme_follow_system";
 
 	internal const string BaseFontFamily = "HarmonyOS Sans SC";
@@ -1019,6 +1022,7 @@ private static void LoadEmbeddedFonts()
 	private static string _loadedBackgroundImagePath = "";
 	private static Image _loadedBackgroundImage;
 	private static int _loadedBackgroundOpacity = -1;
+	private static int _loadedBackgroundScrim = -1;
 	private static Color _loadedBackgroundBaseColor = Color.Empty;
 
 	/// <summary>2026-10-22（主题自定义）：把「强调色 + 背景色/背景图」应用到窗体。
@@ -1066,6 +1070,7 @@ private static void LoadEmbeddedFonts()
 	{
 		string path = (AppConfig.GetString(BackgroundImageConfigKey) ?? "").Trim();
 		int opacity = Math.Clamp(AppConfig.Get(BackgroundOpacityConfigKey, 65), 0, 100);
+		int scrim = Math.Clamp(AppConfig.Get(BackgroundScrimConfigKey, 50), 0, 100);
 		Color baseColor = Window;
 		lock (BackgroundImageGate)
 		{
@@ -1077,6 +1082,7 @@ private static void LoadEmbeddedFonts()
 			}
 			if (string.Equals(path, _loadedBackgroundImagePath, StringComparison.OrdinalIgnoreCase)
 				&& opacity == _loadedBackgroundOpacity
+				&& scrim == _loadedBackgroundScrim
 				&& baseColor == _loadedBackgroundBaseColor)
 			{
 				return _loadedBackgroundImage;
@@ -1090,12 +1096,13 @@ private static void LoadEmbeddedFonts()
 				using (Graphics graphics = Graphics.FromImage(blended))
 				{
 					graphics.Clear(baseColor);
-					if (opacity > 0)
+					float effectiveAlpha = (opacity / 100f) * (1f - scrim / 100f);
+					if (effectiveAlpha > 0.001f)
 					{
 						using System.Drawing.Imaging.ImageAttributes attributes = new System.Drawing.Imaging.ImageAttributes();
 						System.Drawing.Imaging.ColorMatrix matrix = new System.Drawing.Imaging.ColorMatrix
 						{
-							Matrix33 = opacity / 100f
+							Matrix33 = effectiveAlpha
 						};
 						attributes.SetColorMatrix(matrix);
 						graphics.DrawImage(source, new Rectangle(0, 0, blended.Width, blended.Height), 0, 0, source.Width, source.Height, GraphicsUnit.Pixel, attributes);
@@ -1105,6 +1112,7 @@ private static void LoadEmbeddedFonts()
 				_loadedBackgroundImage = blended;
 				_loadedBackgroundImagePath = path;
 				_loadedBackgroundOpacity = opacity;
+				_loadedBackgroundScrim = scrim;
 				_loadedBackgroundBaseColor = baseColor;
 			}
 			catch (Exception ex)

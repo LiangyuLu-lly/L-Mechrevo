@@ -5778,4 +5778,7 @@ Restart L-Mechrevo now to apply them (until then the running instance may overwr
   <data name="ThemePresetColors" xml:space="preserve">
     <value>Preset colors</value>
   </data>
+  <data name="ThemeImageScrim" xml:space="preserve">
+    <value>Content scrim</value>
+  </data>
 </root>

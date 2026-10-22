@@ -7869,7 +7869,7 @@ public class SettingsForm : RForm
 			{
 				Name = "panelThemeMode",
 				CardStyle = true,
-				Height = scale(208),
+				Height = scale(240),
 				Padding = new Padding(scale(12), scale(8), scale(12), scale(8)),
 				BackColor = UiVisualStyle.Surface
 			};
@@ -7877,7 +7877,7 @@ public class SettingsForm : RForm
 			{
 				Dock = DockStyle.Fill,
 				ColumnCount = 3,
-				RowCount = 1,
+				RowCount = 7,
 				Margin = Padding.Empty,
 				Padding = Padding.Empty,
 				BackColor = _themeModePanel.BackColor
@@ -7886,6 +7886,7 @@ public class SettingsForm : RForm
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, scale(92)));
+			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
 		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, scale(32)));
@@ -8057,6 +8058,33 @@ public class SettingsForm : RForm
 			tableLayoutPanel.Controls.Add(opacitySlider, 1, 4);
 			tableLayoutPanel.Controls.Add(opacityLabel, 2, 4);
 
+			RSlider scrimSlider = new RSlider
+			{
+				Minimum = 0,
+				Maximum = 100,
+				Value = Math.Clamp(AppConfig.Get(UiVisualStyle.BackgroundScrimConfigKey, 50), 0, 100),
+				Dock = DockStyle.Fill,
+				MinimumSize = new Size(scale(80), scale(20))
+			};
+			Label scrimLabel = new Label
+			{
+				Text = scrimSlider.Value + "%",
+				Dock = DockStyle.Fill,
+				TextAlign = ContentAlignment.MiddleLeft,
+				ForeColor = UiVisualStyle.Muted,
+				Margin = new Padding(scale(6), 0, 0, 0)
+			};
+			scrimSlider.ValueChanged += (object sender, EventArgs e) =>
+			{
+				AppConfig.Set(UiVisualStyle.BackgroundScrimConfigKey, scrimSlider.Value);
+				AppConfig.Flush();
+				scrimLabel.Text = scrimSlider.Value + "%";
+				UiVisualStyle.ApplyFormBackground(this);
+			};
+			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemeImageScrim), 0, 5);
+			tableLayoutPanel.Controls.Add(scrimSlider, 1, 5);
+			tableLayoutPanel.Controls.Add(scrimLabel, 2, 5);
+
 			// 预设配色：常用强调色，点一下立即应用。
 			Color[] presetColors = new Color[8]
 			{
@@ -8100,8 +8128,8 @@ public class SettingsForm : RForm
 				};
 				presetPanel.Controls.Add(presetButton);
 			}
-			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemePresetColors), 0, 5);
-			tableLayoutPanel.Controls.Add(presetPanel, 1, 5);
+			tableLayoutPanel.Controls.Add(CreateThemeSettingLabel(Strings.ThemePresetColors), 0, 6);
+			tableLayoutPanel.Controls.Add(presetPanel, 1, 6);
 			tableLayoutPanel.SetColumnSpan(presetPanel, 2);
 
 			_themeModePanel.Controls.Add(tableLayoutPanel);
