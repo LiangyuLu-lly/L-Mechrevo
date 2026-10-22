@@ -1036,19 +1036,21 @@ private static void LoadEmbeddedFonts()
 			form.BackgroundImageLayout = ImageLayout.Zoom;
 			form.BackgroundImage = image;
 			List<Control> transparent = new List<Control>();
-			if (image != null)
+			// 2026-10-22：先还原上一次设成透明的容器（主题色/背景色变化后要重新套）。
+			if (TransparentRoots.TryGetValue(form, out List<Control> previous))
 			{
-				foreach (Control child in form.Controls)
+				foreach (Control old in previous)
 				{
-					if (child is Panel || child is TableLayoutPanel)
+					if (old != null && !old.IsDisposed && old.BackColor == Color.Transparent)
 					{
-						if (child.BackColor == Window || child.BackColor == NightPalette.Window || child.BackColor == DayPalette.Window)
-						{
-							child.BackColor = Color.Transparent;
-							transparent.Add(child);
-						}
+						old.BackColor = Window;
 					}
 				}
+			}
+			if (image != null)
+			{
+				// 递归处理：把「页面底」色的容器都设透明（主页仪表盘/栈/分组），卡片(Surface)保持不透明。
+				ApplyTransparentPageBackgrounds(form, transparent);
 			}
 			TransparentRoots.Remove(form);
 			TransparentRoots.Add(form, transparent);
@@ -1112,6 +1114,35 @@ private static void LoadEmbeddedFonts()
 				_loadedBackgroundImage = null;
 			}
 			return _loadedBackgroundImage;
+		}
+	}
+
+	/// <summary>2026-10-22：递归把「页面底」色的容器设成透明，让窗体背景图从卡片间隙/页面空白处露出来。
+	/// <para>⚠️ 只处理 Panel/TableLayoutPanel/FlowLayoutPanel 且底色=Window 的容器；Surface 卡片不透明、整块保留。</para></summary>
+	private static void ApplyTransparentPageBackgrounds(Control parent, List<Control> transparent)
+	{
+		foreach (Control child in parent.Controls)
+		{
+			if (child == null || child.IsDisposed)
+			{
+				continue;
+			}
+			bool container = child is Panel || child is TableLayoutPanel || child is FlowLayoutPanel;
+			if (!container)
+			{
+				continue;
+			}
+			Color back = child.BackColor;
+			if (back == Window || back == NightPalette.Window || back == DayPalette.Window)
+			{
+				child.BackColor = Color.Transparent;
+				transparent.Add(child);
+				ApplyTransparentPageBackgrounds(child, transparent);
+			}
+			else if (back == Color.Transparent)
+			{
+				ApplyTransparentPageBackgrounds(child, transparent);
+			}
 		}
 	}
 
