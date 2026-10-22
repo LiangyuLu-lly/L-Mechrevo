@@ -246,9 +246,7 @@ internal static class I2ecInpOut
 
 	// 2026-10-22（机主：电池电压修复影响快充）：不压低原厂快充电流，只把偏低的值补到 2816；
 	// 输入限流按参考脚本 60s 复查，EC 改成其它 PD 值时退出覆盖，避免和充电协商打架。
-	private static int _targetDesiredI;
 
-	private static int _targetQueuedI;
 
 	private static bool _inputOverrideActive;
 
@@ -646,12 +644,8 @@ internal static class I2ecInpOut
 						_originalsCaptured = true;
 						SaveOriginals();
 					}
-				_targetDesiredI = Math.Clamp(Math.Max(ChargeCurrentMa, _origDesiredI), ChargeCurrentMa, 6000);
-				_targetQueuedI = Math.Clamp(Math.Max(ChargeCurrentMa, _origQueuedI), ChargeCurrentMa, 6000);
 				_inputOverrideActive = _origQueuedInputI == InputCurrentSourceMa;
 				_nextInputCheckTick = Environment.TickCount64 + 60000L;
-				Logger.WriteLine("[battery-fix] 充电电流：原厂 desired/queued=" + _origDesiredI + "/" + _origQueuedI
-					+ "mA ⇒ 保持不低于 " + ChargeCurrentMa + "mA（实际写 " + _targetDesiredI + "/" + _targetQueuedI + "mA）；输入限流覆盖=" + _inputOverrideActive);
 				_cts = new CancellationTokenSource();
 				CancellationToken token = _cts.Token;
 				_running = true;
@@ -689,8 +683,8 @@ internal static class I2ecInpOut
 						{
 							WriteLe16(AddrDesiredVoltage, ExpectedBaseVoltageMv);
 							WriteLe16(AddrQueuedVoltage, ExpectedBaseVoltageMv);
-							WriteLe16(AddrDesiredCurrent, _targetDesiredI);
-							WriteLe16(AddrQueuedCurrent, _targetQueuedI);
+							WriteLe16(AddrDesiredCurrent, ChargeCurrentMa);
+							WriteLe16(AddrQueuedCurrent, ChargeCurrentMa);
 							int queuedInput = ReadLe16(AddrQueuedInputCurrent);
 							long nowTick = Environment.TickCount64;
 							if (_inputOverrideActive)
@@ -701,7 +695,7 @@ internal static class I2ecInpOut
 								}
 								else
 								{
-									// EC/PD 已把输入限流改成别的值 ⇒ 停止覆盖，避免把快充协商顶回去。
+									// 与参考脚本一致：OEM 改写了输入限流 ⇒ 停止覆盖，60s 后再判断。
 									_inputOverrideActive = false;
 									_nextInputCheckTick = nowTick + 60000L;
 									Logger.WriteLine("[battery-fix] 输入限流=" + queuedInput + "mA（非 2304/2816）⇒ 停止覆盖，60s 后复查");
@@ -713,7 +707,7 @@ internal static class I2ecInpOut
 								if (queuedInput == InputCurrentSourceMa)
 								{
 									_inputOverrideActive = true;
-									WriteLe16(AddrQueuedInputCurrent, ChargeCurrentMa);
+									Logger.WriteLine("[battery-fix] 输入限流=2304mA ⇒ 60s 复查后恢复覆盖");
 								}
 							}
 							WriteByte(AddrStopGate, 0);
