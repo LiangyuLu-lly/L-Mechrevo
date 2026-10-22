@@ -55,12 +55,16 @@ internal static class WujieFanEc
 		fan2Rpm = -1;
 		try
 		{
-			bool okMode = EcPortIo.TryReadByteStable(RegisterMode, out int modeValue, out string modeNote);
-			bool okDuty1 = EcPortIo.TryReadByteStable(RegisterDutyFan1, out int duty1Value, out string duty1Note);
-			bool okDuty2 = EcPortIo.TryReadByteStable(RegisterDutyFan2, out int duty2Value, out string duty2Note);
-			bool okTemp = EcPortIo.TryReadByte(RegisterCpuTemp, out int tempValue);
-			bool okRpm1 = EcPortIo.TryReadBytes(RegisterFan1RpmHigh, 2, out int[] rpm1Bytes);
-			bool okRpm2 = EcPortIo.TryReadBytes(RegisterFan2RpmHigh, 2, out int[] rpm2Bytes);
+			// 2026-10-22：控制器正在走 I2EC 时，ACPI-EC 0x92 可能被占用而读失败；
+			// 诊断优先用 I2EC（与写同一通道），不可用时再回退 ACPI-EC。
+			bool okMode = ReadByteAny(RegisterMode, out int modeValue, out string modeNote);
+			bool okDuty1 = ReadByteAny(RegisterDutyFan1, out int duty1Value, out string duty1Note);
+			bool okDuty2 = ReadByteAny(RegisterDutyFan2, out int duty2Value, out string duty2Note);
+			bool okTemp = ReadByteAny(RegisterCpuTemp, out int tempValue, out _);
+			int[] rpm1Bytes = new int[2];
+			int[] rpm2Bytes = new int[2];
+			bool okRpm1 = ReadByteAny(RegisterFan1RpmHigh, out rpm1Bytes[0], out _) && ReadByteAny(RegisterFan1RpmHigh + 1, out rpm1Bytes[1], out _);
+			bool okRpm2 = ReadByteAny(RegisterFan2RpmHigh, out rpm2Bytes[0], out _) && ReadByteAny(RegisterFan2RpmHigh + 1, out rpm2Bytes[1], out _);
 			mode = okMode ? (byte)modeValue : (byte)0;
 			duty1 = okDuty1 && duty1Value >= 0 ? duty1Value : -1;
 			duty2 = okDuty2 && duty2Value >= 0 ? duty2Value : -1;
@@ -83,6 +87,18 @@ internal static class WujieFanEc
 			detail = ex.GetType().Name + " " + ex.Message;
 			return false;
 		}
+	}
+
+	/// <summary>2026-10-22：优先 I2EC（inpoutx64）读，回退 ACPI-EC；供诊断与状态读取使用。</summary>
+	private static bool ReadByteAny(int address, out int value, out string note)
+	{
+		if (I2ecInpOut.IsAvailable && I2ecInpOut.TryReadEcByte(address, out value, out string i2ecNote))
+		{
+			note = "I2EC";
+			return true;
+		}
+		bool ok = EcPortIo.TryReadByteStable(address, out value, out note);
+		return ok;
 	}
 
 	/// <summary>单次写双扇占空比（百分比，0..100；非 0 时下限 20%）：写后逐个回读确认。</summary>
