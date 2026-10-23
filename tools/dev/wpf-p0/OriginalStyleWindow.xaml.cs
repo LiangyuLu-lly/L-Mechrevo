@@ -60,16 +60,16 @@ public partial class OriginalStyleWindow : Window
     {
         ("touchpad", "触摸板", "\uE7C9"), ("touchpadtoggle", "触摸板切换键", "\uE7C9"),
         ("wifi", "WiFi", "\uE701"), ("bt", "蓝牙", "\uE702"),
-        ("webcam", "摄像头", "\uE722"), ("micmute", "麦克风静音", "\uE720"),
+        ("webcam", "摄像头", "\uE722"), ("micmute", "麦克风", "\uE720"),
         ("numpad", "小键盘锁", "\uE765"), ("winkey", "Win键锁", "\uE765"),
         ("fnkey", "Fn键锁", "\uE765"), ("capslock", "大小写锁定", "\uE8AB"),
         ("osd", "OSD提示", "\uE7F4"), ("copilot", "Copilot键锁", "\uE8B7"),
         ("usb", "关机USB供电", "\uE88E"), ("acrecovery", "来电自启", "\uE7E8"),
         ("highperf", "高性能电源", "\uE945"), ("apuboost", "APU 防缩缸", "\uE9D9"),
-        ("fanboost", "风扇强冷", "\uE9CA"), ("deepsleep", "深度睡眠", "\uE708"),
+        ("fanboost", "强冷", "\uE9CA"), ("deepsleep", "深度睡眠", "\uE708"),
         ("gamewhitelist", "游戏白名单", "\uE7FC"), ("cpuadvperf", "解锁BIOS菜单", "\uE7EF"),
         ("taskbarautohide", "任务栏自动隐藏", "\uE7F4"), ("transparency", "系统透明效果", "\uE790"),
-        ("darktheme", "系统深色主题", "\uE793"), ("monitoroff", "息屏（不睡眠）", "\uE7F4"),
+        ("darktheme", "系统深色主题", "\uE793"), ("monitoroff", "息屏", "\uE7F4"),
         ("winupdate", "禁用Win更新", "\uE895")
     };
 
