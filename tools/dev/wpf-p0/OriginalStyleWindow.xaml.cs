@@ -907,18 +907,28 @@ public partial class OriginalStyleWindow : Window
     private static void UpdateModeBorders(ToggleButton selected)
     {
         Brush gray = (Brush)Application.Current.Resources["CardBorderBrush"];
+        Brush normalBackground = (Brush)Application.Current.Resources["ControlBrush"];
+        FontFamily regular = (FontFamily)Application.Current.Resources["AppFontFamily"];
+        FontFamily bold = (FontFamily)Application.Current.Resources["AppFontBoldFamily"];
         foreach (object child in ((UniformGrid)selected.Parent).Children)
         {
             if (child is ToggleButton button)
             {
                 button.BorderBrush = gray;
                 button.BorderThickness = new Thickness(1);
+                button.Background = normalBackground;
+                button.FontFamily = regular;
+                button.FontWeight = FontWeights.Normal;
             }
         }
         if (selected.Tag is string hex)
         {
-            selected.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            Color color = (Color)ColorConverter.ConvertFromString(hex);
+            selected.BorderBrush = new SolidColorBrush(color);
             selected.BorderThickness = new Thickness(3);
+            selected.Background = new SolidColorBrush(Color.FromArgb(0x30, color.R, color.G, color.B));
+            selected.FontFamily = bold;
+            selected.FontWeight = FontWeights.Bold;
         }
     }
 

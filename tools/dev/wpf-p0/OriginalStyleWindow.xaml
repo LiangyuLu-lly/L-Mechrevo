@@ -102,7 +102,6 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#38FFFFFF" />
                                 <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
                                 <Setter Property="FontWeight" Value="Bold" />
                                 <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
