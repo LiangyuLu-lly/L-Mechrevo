@@ -1422,6 +1422,8 @@ public partial class OriginalStyleWindow : Window
         }
         bool on = CalibrationSwitch.IsChecked == true;
         int mode = SelectedCalibrationMode();
+        CalibrationSwitch.IsEnabled = false;
+        StatusText.Text = "屏幕校色下发中…";
         bool ok;
         if (on && mode == 999)
         {
@@ -1461,6 +1463,7 @@ public partial class OriginalStyleWindow : Window
         }
         CalibrationCombo.IsEnabled = CalibrationSwitch.IsChecked == true;
         CalibrationSettingsButton.IsEnabled = CalibrationSwitch.IsChecked == true;
+        CalibrationSwitch.IsEnabled = true;
     }
 
     private async void CalibrationCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1514,6 +1517,8 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool on = DisplayEffectSwitch.IsChecked == true;
+        DisplayEffectSwitch.IsEnabled = false;
+        StatusText.Text = "色彩增强下发中…";
         bool ok = await _backendProbe.SetDisplayEffectSwitchAsync(on);
         if (ok)
         {
@@ -1535,6 +1540,7 @@ public partial class OriginalStyleWindow : Window
         }
         DisplayEffectCombo.IsEnabled = DisplayEffectSwitch.IsChecked == true;
         DisplayEffectEditButton.IsEnabled = DisplayEffectSwitch.IsChecked == true;
+        DisplayEffectSwitch.IsEnabled = true;
     }
 
     private async void DisplayEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
