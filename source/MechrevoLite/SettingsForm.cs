@@ -3876,16 +3876,9 @@ public class SettingsForm : RForm
 					// 老版本会把"自动开着"告诉固件（`SwitchAutoRefreshRate(1)`），那在**固件侧是持久的** ⇒
 					// 本轮改成"恒发 false"后，只有用户再拨一次开关才会送出去。这里在 GCU 可用后主动补送一次 0，
 					// 确保真凶（固件的 GPU_DC_HZ：**息屏/显示恢复时**把用户手选的 100Hz 顶回 180Hz）处于关闭状态。
-					if (!_gcuAutoOffPushed)
-					{
-						MechrevoHw hwGcuOff = Program.hw;
-						if (hwGcuOff != null && hwGcuOff.IsGcuConnected && Program.service != null)
-						{
-							_gcuAutoOffPushed = true;
-							_ = Program.service.SwitchAutoRefreshRate(false);
-							Logger.WriteLine("[hz-gcu-autofix] 已向 GCU 补送 SwitchAutoRefreshRate(false)：确保固件的 GPU_DC_HZ 关闭（它会在息屏/唤醒时顶回刷新率）");
-						}
-					}
+					// 2026-10-24（屏幕一闪一闪）：DcHzSeen 之前服务会直接返回 false，旧代码却先置
+					// _gcuAutoOffPushed=true ⇒ 永不重试，固件 GPU_DC_HZ 一直开着。
+					_ = EnsureGcuAutoRefreshOffAsync();
 				}
 				if (_calibCombo != null)
 		{
@@ -7941,6 +7934,61 @@ public class SettingsForm : RForm
 				_labelGcuStatus.ForeColor = color;
 			}
 			toolTip.SetToolTip(_labelGcuStatus, caption);
+		}
+	}
+
+	private bool _gcuAutoOffInFlight;
+	private long _gcuAutoOffLastAttemptTick;
+
+	/// <summary>关闭固件 GPU_DC_HZ；DcHzSeen 未就绪时等待后续刷新重试。</summary>
+	private async Task EnsureGcuAutoRefreshOffAsync()
+	{
+		if (_gcuAutoOffInFlight)
+		{
+			return;
+		}
+		MechrevoHw hw = Program.hw;
+		MechrevoService svc = Program.service;
+		if (hw == null || svc == null || !hw.IsGcuConnected || !hw.DcHzSeen)
+		{
+			return;
+		}
+		if (!hw.DcHz)
+		{
+			if (!_gcuAutoOffPushed)
+			{
+				_gcuAutoOffPushed = true;
+				Logger.WriteLine("[hz-gcu-autofix] 固件 GPU_DC_HZ 已是关闭状态");
+			}
+			return;
+		}
+		long now = Environment.TickCount64;
+		if (now - _gcuAutoOffLastAttemptTick < 5000)
+		{
+			return;
+		}
+		_gcuAutoOffLastAttemptTick = now;
+		_gcuAutoOffInFlight = true;
+		try
+		{
+			bool ok = await svc.SwitchAutoRefreshRate(false);
+			if (ok)
+			{
+				_gcuAutoOffPushed = true;
+				Logger.WriteLine("[hz-gcu-autofix] 已确认关闭固件 GPU_DC_HZ");
+			}
+			else
+			{
+				Logger.WriteLine("[hz-gcu-autofix] 关闭固件 GPU_DC_HZ 未确认，稍后重试");
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[hz-gcu-autofix] 关闭固件 GPU_DC_HZ 异常：" + ex.Message);
+		}
+		finally
+		{
+			_gcuAutoOffInFlight = false;
 		}
 	}
 
