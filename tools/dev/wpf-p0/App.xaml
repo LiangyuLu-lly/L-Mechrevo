@@ -71,7 +71,9 @@
                                     <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF" />
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
                                     <Setter Property="Foreground" Value="White" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -113,9 +115,9 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="CheckBox">
                             <StackPanel Orientation="Horizontal">
-                                <Border x:Name="Track" Width="34" Height="19" CornerRadius="10"
+                                <Border x:Name="Track" Width="30" Height="16" CornerRadius="8"
                                         Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
-                                    <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White"
+                                    <Ellipse x:Name="Knob" Width="10" Height="10" Fill="White"
                                              HorizontalAlignment="Left" Margin="2,0,0,0" />
                                 </Border>
                                 <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center" />
@@ -124,7 +126,7 @@
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                    <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
+                                    <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

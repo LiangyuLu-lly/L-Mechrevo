@@ -38,6 +38,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Margin" Value="0,0,4,0" />
             <Setter Property="Padding" Value="2,4" />
+            <Setter Property="Height" Value="46" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -428,7 +429,7 @@
                         </UniformGrid>
                         <CheckBox Content="启用无极限充功能(实验性)" Style="{StaticResource RowSwitch}" />
                         <CheckBox Content="关闭 EC 直写充电上限（写入异常时用）" Style="{StaticResource RowSwitch}" />
-                        <Slider Minimum="40" Maximum="100" Value="100" Margin="0,8,0,0" />
+                        <Slider Minimum="40" Maximum="100" Value="100" Margin="0,8,0,0" Style="{StaticResource RoundSlider}" />
                     </StackPanel>
 
                     <!-- 灯光 -->
