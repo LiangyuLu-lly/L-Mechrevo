@@ -1056,6 +1056,26 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = ok ? "Logo 灯效已下发：" + effect : "Logo 灯效下发失败";
     }
 
+    internal bool IsDark => _dark;
+
+    internal bool IsBackgroundEnabled => BackgroundToggle.IsChecked == true;
+
+    internal void ApplyThemeFromSettings(bool dark)
+    {
+        _dark = dark;
+        AppTheme.Apply(_dark);
+        ApplyDarkTitleBar(_dark);
+        ThemeButton.Content = _dark ? "浅色" : "深色";
+        StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
+    }
+
+    internal void SetBackgroundFromSettings(bool on)
+    {
+        BackgroundToggle.IsChecked = on;
+        BackgroundImage.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        BackgroundScrim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
@@ -1074,6 +1094,11 @@ public partial class OriginalStyleWindow : Window
     {
         if (sender is System.Windows.Controls.Button button && button.Tag is string name)
         {
+            if (name == "设置")
+            {
+                new SettingsWindow(this).ShowDialog();
+                return;
+            }
             StatusText.Text = "P0 · " + name;
         }
     }
