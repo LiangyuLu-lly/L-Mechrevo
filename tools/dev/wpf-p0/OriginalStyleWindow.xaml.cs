@@ -275,7 +275,13 @@ public partial class OriginalStyleWindow : Window
         {
             GpuSection.Visibility = (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap) ? Visibility.Visible : Visibility.Collapsed;
             ScreenSection.Visibility = (caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming) ? Visibility.Visible : Visibility.Collapsed;
-            LightingSection.Visibility = (caps.Keyboard || caps.Lightbar || caps.LogoLight) ? Visibility.Visible : Visibility.Collapsed;
+            MechrevoHw? hw = _backendProbe?.Hw;
+            bool hasKeyboard = caps.Keyboard || (hw?.SupportsKeyboard ?? false);
+            bool hasLightbar = caps.Lightbar || (hw?.SupportsLightbar ?? false);
+            bool hasLogo = caps.LogoLight || (hw?.SupportsLogoLight ?? false);
+            LightingSection.Visibility = (hasKeyboard || hasLightbar || hasLogo) ? Visibility.Visible : Visibility.Collapsed;
+            KeyboardLightRow.Visibility = hasKeyboard ? Visibility.Visible : Visibility.Collapsed;
+            LogoLightRow.Visibility = hasLogo ? Visibility.Visible : Visibility.Collapsed;
             bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
             FanTile.Visibility = _backendProbe.SupportsQuick("fanboost") ? Visibility.Visible : Visibility.Collapsed;

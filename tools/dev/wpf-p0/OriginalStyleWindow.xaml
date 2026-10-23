@@ -534,7 +534,7 @@
                             </StackPanel>
                         </Grid>
                         <CheckBox Content="离电自动关闭全部灯效" Style="{StaticResource RowSwitch}" />
-                        <Grid Margin="0,4,0,0">
+                        <Grid x:Name="KeyboardLightRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="70" />
                                 <ColumnDefinition Width="Auto" />
@@ -551,7 +551,7 @@
                             </ComboBox>
                             <Button Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" />
                         </Grid>
-                        <Grid Margin="0,4,0,0">
+                        <Grid x:Name="LogoLightRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="70" />
                                 <ColumnDefinition Width="Auto" />
