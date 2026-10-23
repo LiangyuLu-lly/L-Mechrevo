@@ -260,6 +260,23 @@ public partial class OriginalStyleWindow : Window
         RefreshFromBackend();
     }
 
+    private void UpdateGpuButtons(int mode, bool pending)
+    {
+        ToggleButton[] buttons = { GpuEcoButton, GpuHybridButton, GpuDirectButton };
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            ToggleButton button = buttons[i];
+            button.IsChecked = i == mode;
+            button.ClearValue(BorderBrushProperty);
+            if (i == mode)
+            {
+                button.BorderBrush = pending
+                    ? (Brush)new BrushConverter().ConvertFromString("#F59E0B")!
+                    : (Brush)Application.Current.Resources["AccentBrush"];
+            }
+        }
+    }
+
     private async void GpuMode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
@@ -278,8 +295,17 @@ public partial class OriginalStyleWindow : Window
             item.IsChecked = ReferenceEquals(item, button);
         }
         bool ok = await _backendProbe.SwitchGpuModeAsync(mode);
-        StatusText.Text = ok ? "显卡模式已下发，重启后生效" : "显卡模式下发失败";
         await _backendProbe.RefreshGpuModeAsync();
+        int current = _backendProbe.CurrentGpuMode;
+        if (ok && current != mode)
+        {
+            _backendProbe.MarkGpuRestartPending(mode);
+        }
+        else if (ok)
+        {
+            _backendProbe.ClearGpuRestartPending();
+        }
+        StatusText.Text = ok ? "显卡模式已下发，重启后生效" : "显卡模式下发失败";
         RefreshFromBackend();
     }
 
@@ -736,13 +762,17 @@ public partial class OriginalStyleWindow : Window
         BatteryInfo.Text = "电池 " + hw.BatteryPercent + "% · " + hw.BatteryCapacityText;
         int mode = probe.CurrentMode;
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
-        int gpuMode = probe.CurrentGpuMode;
-        if (gpuMode >= 0 && gpuMode <= 2)
+        int currentGpu = probe.CurrentGpuMode;
+        int pendingGpu = probe.PendingGpuTarget;
+        bool pending = probe.HasPendingGpuRestart && pendingGpu >= 0;
+        int displayGpu = pending ? pendingGpu : currentGpu;
+        if (currentGpu >= 0 && currentGpu == pendingGpu)
         {
-            GpuEcoButton.IsChecked = gpuMode == 0;
-            GpuHybridButton.IsChecked = gpuMode == 1;
-            GpuDirectButton.IsChecked = gpuMode == 2;
+            probe.ClearGpuRestartPending();
+            pending = false;
+            displayGpu = currentGpu;
         }
+        UpdateGpuButtons(displayGpu, pending);
         SilentModeButton.IsChecked = mode == 2;
         BalancedModeButton.IsChecked = mode == 0;
         TurboModeButton.IsChecked = mode == 1;

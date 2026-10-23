@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
+using MechrevoLite;
 using MechrevoLite.Hardware;
 
 namespace L_Mechrevo.WpfP0;
@@ -241,6 +242,30 @@ internal sealed class BackendProbe : IDisposable
         {
             return false;
         }
+    }
+
+    internal bool HasPendingGpuRestart => AppConfig.Is("gpu_restart_pending");
+
+    internal int PendingGpuTarget
+    {
+        get
+        {
+            string? text = AppConfig.GetString("gpu_restart_target");
+            return int.TryParse(text, out int value) && value >= 0 && value <= 2 ? value : -1;
+        }
+    }
+
+    internal void MarkGpuRestartPending(int targetMode)
+    {
+        AppConfig.Set("gpu_restart_pending", 1);
+        AppConfig.Set("gpu_restart_tick", Environment.TickCount64.ToString());
+        AppConfig.Set("gpu_restart_target", targetMode);
+    }
+
+    internal void ClearGpuRestartPending()
+    {
+        AppConfig.Set("gpu_restart_pending", 0);
+        AppConfig.Remove("gpu_restart_tick");
     }
 
     internal int CurrentGpuMode => _service?.CurrentGpuMode ?? -1;
