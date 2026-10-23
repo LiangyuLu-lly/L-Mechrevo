@@ -1364,6 +1364,7 @@ public partial class OriginalStyleWindow : Window
             bool calibrationOn = AppConfig.Exists("calib_enabled") && AppConfig.Is("calib_enabled");
             CalibrationSwitch.IsChecked = calibrationOn;
             CalibrationCombo.IsEnabled = calibrationOn;
+            CalibrationSettingsButton.IsEnabled = calibrationOn;
             CalibrationSwitch.IsEnabled = probe.IsGcuConnected || !probe.IsNonGcuBackend;
         }
         finally
@@ -1459,6 +1460,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = mode == 999 ? "自定义 ICC 文件缺失或应用失败" : "屏幕校色下发失败";
         }
         CalibrationCombo.IsEnabled = CalibrationSwitch.IsChecked == true;
+        CalibrationSettingsButton.IsEnabled = CalibrationSwitch.IsChecked == true;
     }
 
     private async void CalibrationCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1500,8 +1502,8 @@ public partial class OriginalStyleWindow : Window
 
     private void CalibrationSettings_Click(object sender, RoutedEventArgs e)
     {
-        using MechrevoLite.CalibrationStartupForm form = new MechrevoLite.CalibrationStartupForm();
-        form.ShowDialog();
+        CalibrationSettingsWindow dialog = new CalibrationSettingsWindow { Owner = this };
+        dialog.ShowDialog();
         InitScreenColorControls();
     }
 
@@ -1564,10 +1566,8 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "后端未连接，无法编辑色彩增强";
             return;
         }
-        MechrevoLite.Program.hw = probe.Hw;
-        MechrevoLite.Program.service = probe.Service;
-        using MechrevoLite.DisplayEffectEditorForm form = new MechrevoLite.DisplayEffectEditorForm(SelectedDisplayEffectMode());
-        form.ShowDialog();
+        DisplayEffectEditorWindow dialog = new DisplayEffectEditorWindow(SelectedDisplayEffectMode()) { Owner = this };
+        dialog.ShowDialog();
         _ = probe.RequestDisplayEffectStatusAsync();
         InitScreenColorControls();
     }
