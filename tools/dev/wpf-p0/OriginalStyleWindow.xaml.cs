@@ -442,6 +442,38 @@ public partial class OriginalStyleWindow : Window
             RefreshFromBackend();
             return;
         }
+        string modeName = button.Content?.ToString() ?? ("模式 " + mode);
+        if (!_backendProbe.IsBaolongda)
+        {
+            MessageBoxResult choice = MessageBox.Show(
+                "切换到「" + modeName + "」需要重启显卡模式。\n\n" +
+                "是：切换并请求重启\n" +
+                "否：仅切换，稍后手动重启\n" +
+                "取消：不切换",
+                "L-Mechrevo 显卡模式",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+            if (choice == MessageBoxResult.Cancel)
+            {
+                RefreshFromBackend();
+                return;
+            }
+            if (choice == MessageBoxResult.Yes)
+            {
+                bool restartOk = await _backendProbe.RequestGpuModeRestartAsync(mode);
+                if (restartOk)
+                {
+                    _backendProbe.MarkGpuRestartPending(mode);
+                    StatusText.Text = "已请求切换并重启，重启后生效";
+                }
+                else
+                {
+                    StatusText.Text = "重启切换请求失败";
+                }
+                RefreshFromBackend();
+                return;
+            }
+        }
         foreach (ToggleButton item in new[] { GpuEcoButton, GpuHybridButton, GpuDirectButton })
         {
             item.IsChecked = ReferenceEquals(item, button);

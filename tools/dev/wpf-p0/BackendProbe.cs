@@ -327,6 +327,18 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal async Task<bool> RequestGpuModeRestartAsync(int mode)
+    {
+        try
+        {
+            return _service != null && await _service.RequestGpuModeRestartAsync(mode).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task RefreshGpuModeAsync()
     {
         try
