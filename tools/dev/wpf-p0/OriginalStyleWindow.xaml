@@ -38,7 +38,7 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Margin" Value="0,0,3,0" />
             <Setter Property="Padding" Value="2,2" />
-            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="MinHeight" Value="44" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -79,6 +79,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="9,7" />
+            <Setter Property="Height" Value="34" />
             <Setter Property="Margin" Value="0,0,5,0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FontSize" Value="12" />
@@ -248,6 +249,7 @@
 
         <Style x:Key="SmallSegment" TargetType="ToggleButton" BasedOn="{StaticResource BigSegment}">
             <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Height" Value="34" />
             <Setter Property="FontSize" Value="10" />
             <Setter Property="Margin" Value="0,0,4,0" />
         </Style>
