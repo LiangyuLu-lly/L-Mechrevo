@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -28,7 +29,7 @@ public sealed class QuickChoice
 
 public partial class QuickTilePickerWindow : Window
 {
-    private readonly List<QuickChoice> _choices;
+    private readonly ObservableCollection<QuickChoice> _choices;
     private readonly int _maxSlots;
 
     public IReadOnlyList<QuickChoice> SelectedChoices =>
@@ -38,7 +39,7 @@ public partial class QuickTilePickerWindow : Window
     {
         InitializeComponent();
         _maxSlots = Math.Max(1, maxSlots);
-        _choices = choices.ToList();
+        _choices = new ObservableCollection<QuickChoice>(choices);
         ChoicesList.ItemsSource = _choices;
         HintText.Text = "最多 " + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
@@ -46,11 +47,31 @@ public partial class QuickTilePickerWindow : Window
 
     private void Choice_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedChoices.Count > _maxSlots && sender is System.Windows.Controls.CheckBox box)
+        if (sender is not System.Windows.Controls.CheckBox box || box.DataContext is not QuickChoice choice)
         {
+            return;
+        }
+        choice.IsSelected = box.IsChecked == true;
+        if (SelectedChoices.Count > _maxSlots)
+        {
+            choice.IsSelected = false;
             box.IsChecked = false;
             HintText.Text = "最多只能选 " + _maxSlots + " 个";
             return;
+        }
+        int oldIndex = _choices.IndexOf(choice);
+        if (oldIndex >= 0)
+        {
+            _choices.RemoveAt(oldIndex);
+            int selectedCount = 0;
+            foreach (QuickChoice item in _choices)
+            {
+                if (item.IsSelected)
+                {
+                    selectedCount++;
+                }
+            }
+            _choices.Insert(Math.Min(selectedCount, _choices.Count), choice);
         }
         HintText.Text = "最多 " + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
     }

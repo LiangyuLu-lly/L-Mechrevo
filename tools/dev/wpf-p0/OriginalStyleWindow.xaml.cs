@@ -2,19 +2,68 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using MechrevoLite;
 using MechrevoLite.Hardware;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace L_Mechrevo.WpfP0;
 
+internal sealed class DragGhostAdorner : Adorner
+{
+    private readonly VisualBrush _brush;
+    private readonly Size _size;
+    private Point _position;
+
+    public DragGhostAdorner(UIElement adorned, FrameworkElement source)
+        : base(adorned)
+    {
+        _brush = new VisualBrush(source);
+        _size = new Size(Math.Max(1, source.ActualWidth), Math.Max(1, source.ActualHeight));
+        IsHitTestVisible = false;
+    }
+
+    public void SetPosition(Point point)
+    {
+        _position = new Point(point.X - _size.Width / 2, point.Y - _size.Height / 2);
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext drawingContext)
+    {
+        drawingContext.PushOpacity(0.82);
+        drawingContext.DrawRectangle(_brush, null, new Rect(_position, _size));
+        drawingContext.Pop();
+    }
+}
+
 public partial class OriginalStyleWindow : Window
 {
     private bool _dark = true;
     private BackendProbe? _backendProbe;
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+    private const string QuickTilesConfigKey = "perf_quick_tiles";
+    private const string QuickTilesEmptySentinel = "-";
+    private static readonly string[] DefaultQuickTileKeys = { "fanboost", "webcam", "micmute", "winkey", "monitoroff" };
+    private static readonly (string Key, string Label, string Glyph)[] QuickTileCatalog =
+    {
+        ("touchpad", "触摸板", "\uE7C9"), ("touchpadtoggle", "触摸板切换键", "\uE7C9"),
+        ("wifi", "WiFi", "\uE701"), ("bt", "蓝牙", "\uE702"),
+        ("webcam", "摄像头", "\uE722"), ("micmute", "麦克风静音", "\uE720"),
+        ("numpad", "小键盘锁", "\uE765"), ("winkey", "Win键锁", "\uE765"),
+        ("fnkey", "Fn键锁", "\uE765"), ("capslock", "大小写锁定", "\uE8AB"),
+        ("osd", "OSD提示", "\uE7F4"), ("copilot", "Copilot键锁", "\uE8B7"),
+        ("usb", "关机USB供电", "\uE88E"), ("acrecovery", "来电自启", "\uE7E8"),
+        ("highperf", "高性能电源", "\uE945"), ("apuboost", "APU 防缩缸", "\uE9D9"),
+        ("fanboost", "风扇强冷", "\uE9CA"), ("deepsleep", "深度睡眠", "\uE708"),
+        ("gamewhitelist", "游戏白名单", "\uE7FC"), ("cpuadvperf", "解锁BIOS菜单", "\uE7EF"),
+        ("taskbarautohide", "任务栏自动隐藏", "\uE7F4"), ("transparency", "系统透明效果", "\uE790"),
+        ("darktheme", "系统深色主题", "\uE793"), ("monitoroff", "息屏（不睡眠）", "\uE7F4"),
+        ("winupdate", "禁用Win更新", "\uE895")
+    };
 
     public OriginalStyleWindow()
     {
@@ -47,6 +96,7 @@ public partial class OriginalStyleWindow : Window
         Loaded += delegate
         {
             Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
+            ApplySavedQuickTiles();
         };
     }
 
@@ -75,6 +125,8 @@ public partial class OriginalStyleWindow : Window
 
     private ToggleButton? _dragTile;
     private Point _dragStart;
+    private AdornerLayer? _ghostLayer;
+    private DragGhostAdorner? _ghostAdorner;
 
     private void InitializeQuickTileDrag()
     {
@@ -82,6 +134,7 @@ public partial class OriginalStyleWindow : Window
         QuickTileGrid.PreviewMouseMove += QuickTileGrid_PreviewMouseMove;
         QuickTileGrid.DragOver += (_, e) =>
         {
+            _ghostAdorner?.SetPosition(e.GetPosition(QuickTileGrid));
             e.Effects = DragDropEffects.Move;
             e.Handled = true;
         };
@@ -112,7 +165,20 @@ public partial class OriginalStyleWindow : Window
         }
         ToggleButton source = _dragTile;
         _dragTile = null;
-        DragDrop.DoDragDrop(source, source, DragDropEffects.Move);
+        _ghostLayer = AdornerLayer.GetAdornerLayer(QuickTileGrid);
+        _ghostAdorner = new DragGhostAdorner(QuickTileGrid, source);
+        _ghostLayer?.Add(_ghostAdorner);
+        _ghostAdorner.SetPosition(Mouse.GetPosition(QuickTileGrid));
+        try
+        {
+            DragDrop.DoDragDrop(source, source, DragDropEffects.Move);
+        }
+        finally
+        {
+            _ghostLayer?.Remove(_ghostAdorner);
+            _ghostAdorner = null;
+            _ghostLayer = null;
+        }
     }
 
     private void QuickTileGrid_Drop(object sender, DragEventArgs e)
@@ -130,7 +196,8 @@ public partial class OriginalStyleWindow : Window
         int index = QuickTileGrid.Children.IndexOf(target);
         QuickTileGrid.Children.Insert(index < 0 ? 0 : index, source);
         QuickTileGrid.Columns = Math.Max(1, QuickTileGrid.Children.Count);
-        StatusText.Text = "快捷磁贴顺序已调整";
+        SaveCurrentQuickTileOrder();
+        StatusText.Text = "快捷磁贴顺序已保存";
     }
 
     private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
@@ -271,24 +338,8 @@ public partial class OriginalStyleWindow : Window
 
     private void CustomTile_Click(object sender, RoutedEventArgs e)
     {
-        (string Key, string Label, string Glyph)[] all =
-        {
-            ("touchpad", "触摸板", "\uE7C9"), ("touchpadtoggle", "触摸板切换键", "\uE7C9"),
-            ("wifi", "WiFi", "\uE701"), ("bt", "蓝牙", "\uE702"),
-            ("webcam", "摄像头", "\uE722"), ("micmute", "麦克风静音", "\uE720"),
-            ("numpad", "小键盘锁", "\uE765"), ("winkey", "Win键锁", "\uE765"),
-            ("fnkey", "Fn键锁", "\uE765"), ("capslock", "大小写锁定", "\uE8AB"),
-            ("osd", "OSD提示", "\uE7F4"), ("copilot", "Copilot键锁", "\uE8B7"),
-            ("usb", "关机USB供电", "\uE88E"), ("acrecovery", "来电自启", "\uE7E8"),
-            ("highperf", "高性能电源", "\uE945"), ("apuboost", "APU 防缩缸", "\uE9D9"),
-            ("fanboost", "风扇强冷", "\uE9CA"), ("deepsleep", "深度睡眠", "\uE708"),
-            ("gamewhitelist", "游戏白名单", "\uE7FC"), ("cpuadvperf", "解锁BIOS菜单", "\uE7EF"),
-            ("taskbarautohide", "任务栏自动隐藏", "\uE7F4"), ("transparency", "系统透明效果", "\uE790"),
-            ("darktheme", "系统深色主题", "\uE793"), ("monitoroff", "息屏（不睡眠）", "\uE7F4"),
-            ("winupdate", "禁用Win更新", "\uE895")
-        };
         List<QuickChoice> choices = new List<QuickChoice>();
-        foreach ((string key, string label, string glyph) in all)
+        foreach ((string key, string label, string glyph) in QuickTileCatalog)
         {
             if (_backendProbe != null && !_backendProbe.SupportsQuick(key))
             {
@@ -324,7 +375,7 @@ public partial class OriginalStyleWindow : Window
         return false;
     }
 
-    private void RebuildQuickTiles(IReadOnlyList<QuickChoice> selected)
+    private void RebuildQuickTiles(IReadOnlyList<QuickChoice> selected, bool persist = true)
     {
         for (int i = QuickTileGrid.Children.Count - 1; i >= 0; i--)
         {
@@ -367,7 +418,71 @@ public partial class OriginalStyleWindow : Window
         }
         QuickTileGrid.Columns = Math.Max(1, QuickTileGrid.Children.Count);
         UpdateQuickTileStates();
-        StatusText.Text = "快捷磁贴已更新";
+        if (persist)
+        {
+            SaveQuickTileKeys(selected.Select(static c => c.Key).ToList());
+            StatusText.Text = "快捷磁贴已更新";
+        }
+    }
+
+    private void ApplySavedQuickTiles()
+    {
+        string? raw = AppConfig.GetString(QuickTilesConfigKey);
+        List<string> keys;
+        if (raw == null)
+        {
+            keys = DefaultQuickTileKeys.ToList();
+        }
+        else if (raw.Trim() == QuickTilesEmptySentinel)
+        {
+            keys = new List<string>();
+        }
+        else
+        {
+            keys = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        }
+        List<QuickChoice> selected = new List<QuickChoice>();
+        foreach (string key in keys)
+        {
+            if (selected.Count >= 5)
+            {
+                break;
+            }
+            foreach ((string catalogKey, string label, string glyph) in QuickTileCatalog)
+            {
+                if (string.Equals(catalogKey, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    selected.Add(new QuickChoice(catalogKey, label, glyph, true));
+                    break;
+                }
+            }
+        }
+        RebuildQuickTiles(selected, persist: false);
+    }
+
+    private static void SaveQuickTileKeys(IReadOnlyList<string> keys)
+    {
+        if (keys.Count == 0)
+        {
+            AppConfig.Set(QuickTilesConfigKey, QuickTilesEmptySentinel);
+        }
+        else
+        {
+            AppConfig.Set(QuickTilesConfigKey, string.Join(",", keys));
+        }
+    }
+
+    private void SaveCurrentQuickTileOrder()
+    {
+        List<string> keys = new List<string>();
+        foreach (object child in QuickTileGrid.Children)
+        {
+            if (child is ToggleButton tile && tile.Tag is string key)
+            {
+                keys.Add(key);
+            }
+        }
+        SaveQuickTileKeys(keys);
     }
 
     private void BuildMoreSwitches()
