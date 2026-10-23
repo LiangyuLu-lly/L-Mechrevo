@@ -20,13 +20,13 @@
 
             <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-                <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
+                <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
                 <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
             </Style>
 
             <Style TargetType="Label">
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-                <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
+                <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
             </Style>
 
             <Style x:Key="MutedText" TargetType="TextBlock">
