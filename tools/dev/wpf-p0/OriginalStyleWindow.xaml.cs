@@ -387,7 +387,7 @@ public partial class OriginalStyleWindow : Window
                 button.BorderThickness = new Thickness(1);
                 button.Background = normal;
                 button.FontFamily = regular;
-                button.FontWeight = FontWeights.Light;
+                button.FontWeight = FontWeights.Normal;
             }
         }
         Color color = overrideColor ?? ((SolidColorBrush)Application.Current.Resources["AccentBrush"]).Color;
@@ -1073,7 +1073,7 @@ public partial class OriginalStyleWindow : Window
                 button.BorderThickness = new Thickness(1);
                 button.Background = normalBackground;
                 button.FontFamily = regular;
-                button.FontWeight = FontWeights.Light;
+                button.FontWeight = FontWeights.Normal;
             }
         }
         if (selected.Tag is string hex)

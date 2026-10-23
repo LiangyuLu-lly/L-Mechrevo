@@ -22,7 +22,7 @@
             <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
-                <Setter Property="FontWeight" Value="Light" />
+                <Setter Property="FontWeight" Value="Normal" />
                 <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
                 <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
                 <Setter Property="TextOptions.TextHintingMode" Value="Fixed" />
@@ -39,7 +39,7 @@
             <Style TargetType="Label">
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
-                <Setter Property="FontWeight" Value="Light" />
+                <Setter Property="FontWeight" Value="Normal" />
             </Style>
 
             <Style x:Key="MutedText" TargetType="TextBlock">
@@ -85,8 +85,7 @@
                                     <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF" />
-                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
                                     <Setter Property="Foreground" Value="White" />
                                 </Trigger>

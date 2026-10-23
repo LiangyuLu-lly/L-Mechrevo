@@ -8,7 +8,7 @@
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
-        FontWeight="Light"
+        FontWeight="Normal"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType"
         TextOptions.TextHintingMode="Fixed"
