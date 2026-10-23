@@ -69,8 +69,9 @@
             <Setter Property="Margin" Value="0,9,0,0" />
         </Style>
         <Style x:Key="MiniButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
-            <Setter Property="Padding" Value="18,8" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="MinWidth" Value="52" />
         </Style>
         <Style x:Key="ModeSegment" TargetType="ToggleButton">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
@@ -386,7 +387,7 @@
                             <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="100" Style="{StaticResource RoundSlider}" />
                             <TextBlock Grid.Column="2" Text="100%" Style="{StaticResource StatText}" Margin="10,0,0,0" />
                         </Grid>
-                        <Grid Margin="0,8,0,0">
+                        <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -400,7 +401,7 @@
                             </ComboBox>
                             <Button Grid.Column="2" Content="设置" Style="{StaticResource MiniButton}" />
                         </Grid>
-                        <Grid Margin="0,8,0,0">
+                        <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -444,7 +445,7 @@
                             </StackPanel>
                         </Grid>
                         <CheckBox Content="离电自动关闭全部灯效" Style="{StaticResource RowSwitch}" />
-                        <Grid Margin="0,10,0,0">
+                        <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="80" />
                                 <ColumnDefinition Width="*" />
@@ -454,7 +455,7 @@
                             <CheckBox Grid.Column="1" Content="单色" Style="{StaticResource RowSwitch}" />
                             <Button Grid.Column="2" Content="编辑" Style="{StaticResource MiniButton}" />
                         </Grid>
-                        <Grid Margin="0,10,0,0">
+                        <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="80" />
                                 <ColumnDefinition Width="*" />
