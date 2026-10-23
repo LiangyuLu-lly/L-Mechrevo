@@ -107,7 +107,7 @@
                             </MultiTrigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
-                                <Setter Property="FontWeight" Value="Bold" />
+                                <Setter Property="FontWeight" Value="Normal" />
                                 <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
