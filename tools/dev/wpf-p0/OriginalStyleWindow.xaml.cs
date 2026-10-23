@@ -21,9 +21,9 @@ public partial class OriginalStyleWindow : Window
         ApplyDarkTitleBar(_dark);
         _backendTimer.Tick += (_, _) =>
         {
-            if (BackendLine != null && _backendProbe != null)
+            if (_backendProbe != null)
             {
-                BackendLine.Text = _backendProbe.Snapshot();
+                RefreshFromBackend();
             }
         };
         Closed += (_, _) =>
@@ -74,6 +74,98 @@ public partial class OriginalStyleWindow : Window
             selected.IsChecked = true;
             UpdateModeBorders(selected);
             StatusText.Text = "性能模式：" + selected.Content;
+            int mode = selected == SilentModeButton ? 0
+                : selected == BalancedModeButton ? 1
+                : selected == TurboModeButton ? 2
+                : -1;
+            if (mode >= 0 && _backendProbe != null)
+            {
+                _ = SwitchModeAsync(mode);
+            }
+        }
+    }
+
+    private async Task SwitchModeAsync(int mode)
+    {
+        bool ok = await _backendProbe!.SwitchModeAsync(mode);
+        BackendStatus.Text = ok ? "模式已下发" : "模式下发失败";
+        RefreshFromBackend();
+    }
+
+    private async void BatteryMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
+        {
+            return;
+        }
+        foreach (object child in ((UniformGrid)button.Parent).Children)
+        {
+            if (child is ToggleButton other)
+            {
+                other.IsChecked = ReferenceEquals(other, button);
+            }
+        }
+        bool ok = await _backendProbe.SetBatteryModeAsync(int.Parse(text));
+        StatusText.Text = ok ? "电池档位已下发" : "电池档位下发失败";
+    }
+
+    private async void RefreshRate_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
+        {
+            return;
+        }
+        Refresh180Button.IsChecked = text == "180";
+        Refresh60Button.IsChecked = text == "60";
+        bool ok = await _backendProbe.SwitchRefreshRateAsync(int.Parse(text));
+        StatusText.Text = ok ? "刷新率已下发" : "刷新率下发失败";
+    }
+
+    private async void AutoRefresh_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        bool on = AutoRefreshSwitch.IsChecked == true;
+        bool ok = await _backendProbe.SwitchAutoRefreshAsync(on);
+        StatusText.Text = ok ? "自动刷新率已下发" : "自动刷新率下发失败";
+    }
+
+    private async void QuickTile_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton tile || tile.Tag is not string key || _backendProbe == null)
+        {
+            return;
+        }
+        bool ok = await _backendProbe.SwitchQuickAsync(key, tile.IsChecked == true);
+        StatusText.Text = ok ? "快捷开关已下发：" + key : "快捷开关下发失败：" + key;
+    }
+
+    private void RefreshFromBackend()
+    {
+        BackendProbe? probe = _backendProbe;
+        if (probe == null)
+        {
+            return;
+        }
+        BackendLine.Text = probe.Snapshot();
+        if (probe.Hw is not MechrevoHw hw)
+        {
+            return;
+        }
+        CpuStat.Text = "CPU " + hw.CpuTemp + "℃   " + hw.CpuFanRpm + "rpm";
+        GpuStat.Text = "GPU " + hw.GpuTemp + "℃   " + hw.GpuFanRpm + "rpm";
+        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "% · " + hw.BatteryCapacityText;
+        int mode = probe.CurrentMode;
+        SilentModeButton.IsChecked = mode == 0;
+        BalancedModeButton.IsChecked = mode == 1;
+        TurboModeButton.IsChecked = mode == 2;
+        ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
+        int batteryMode = probe.BatteryMode;
+        for (int i = 0; i < batteryButtons.Length; i++)
+        {
+            batteryButtons[i].IsChecked = i == batteryMode;
         }
     }
 

@@ -8,6 +8,7 @@ namespace L_Mechrevo.WpfP0;
 internal sealed class BackendProbe : IDisposable
 {
     private MechrevoHw? _hw;
+    private MechrevoService? _service;
     private bool _disposed;
 
     internal bool Connected { get; private set; }
@@ -20,6 +21,10 @@ internal sealed class BackendProbe : IDisposable
         {
             _hw = new MechrevoHw();
             bool ok = await _hw.ConnectAsync().ConfigureAwait(false);
+            if (ok)
+            {
+                _service = new MechrevoService(_hw);
+            }
             Connected = ok;
             LastError = ok ? "" : "ConnectAsync 返回 false";
             return ok;
@@ -41,6 +46,89 @@ internal sealed class BackendProbe : IDisposable
         try
         {
             return _hw?.SupportsQuickSwitch(key) ?? false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal int CurrentMode => _service?.CurrentMode ?? -1;
+
+    internal int BatteryMode => _hw?.BatteryProtection ?? -1;
+
+    internal int GpuMode => _hw?.GpuMode ?? -1;
+
+    internal async Task<bool> SwitchModeAsync(int mode)
+    {
+        try
+        {
+            if (_service == null)
+            {
+                return false;
+            }
+            await _service.SwitchMode(mode).ConfigureAwait(false);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SetBatteryModeAsync(int mode)
+    {
+        try
+        {
+            return _hw != null && await _hw.SetBatteryProtection(mode).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SwitchAutoRefreshAsync(bool on)
+    {
+        try
+        {
+            return _service != null && await _service.SwitchAutoRefreshRate(on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SwitchRefreshRateAsync(int hz)
+    {
+        try
+        {
+            return _service != null && await _service.SwitchRefreshRate(hz).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SwitchQuickAsync(string key, bool on)
+    {
+        try
+        {
+            return _service != null && await _service.SwitchQuick(key, on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SetColorCalibrationAsync(int mode)
+    {
+        try
+        {
+            return _service != null && await _service.SetColorCalibration(mode).ConfigureAwait(false);
         }
         catch
         {
@@ -84,6 +172,7 @@ internal sealed class BackendProbe : IDisposable
         {
         }
         _hw = null;
+        _service = null;
         Connected = false;
     }
 }
