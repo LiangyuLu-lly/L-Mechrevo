@@ -189,16 +189,16 @@ public partial class OriginalStyleWindow : Window
             {
                 ("usb", "关机USB供电"), ("acrecovery", "来电自启"), ("highperf", "高性能电源"),
                 ("apuboost", "APU 防缩缸"), ("fanboost", "风扇强冷"), ("deepsleep", "深度睡眠"),
-                ("gamewhitelist", "游戏白名单"), ("cpuadvperf", "解锁BIOS高级菜单"),
+                ("gamewhitelist", "游戏白名单"), ("cpuadvperf", "解锁BIOS菜单"),
                 ("taskbarautohide", "任务栏自动隐藏"), ("transparency", "系统透明效果"),
                 ("darktheme", "系统深色主题"), ("monitoroff", "息屏（不睡眠）"),
-                ("winupdate", "禁用Windows更新")
+                ("winupdate", "禁用Win更新")
             }),
             ("睡眠省电", new (string, string)[]
             {
                 ("sleepnetoff", "待机断开网络"), ("sleepaway", "封杀离开模式"),
-                ("sleepsysreq", "忽略系统所需策略"), ("sleeprtcwake", "禁用RTC唤醒定时器"),
-                ("sleepdeep", "启用ACPI深度睡眠"), ("sleephibernate", "30分钟转休眠")
+                ("sleepsysreq", "忽略系统策略"), ("sleeprtcwake", "禁用RTC唤醒"),
+                ("sleepdeep", "ACPI深度睡眠"), ("sleephibernate", "30分钟转休眠")
             })
         };
         foreach ((string title, (string Key, string Label)[] items) in groups)
@@ -216,7 +216,8 @@ public partial class OriginalStyleWindow : Window
                     Style = (Style)FindResource("RowSwitch"),
                     Tag = key,
                     IsChecked = _backendProbe.QuickState(key),
-                    Margin = new Thickness(0, 1, 8, 1),
+                    Margin = new Thickness(0, 1, 4, 1),
+                    FontSize = 9,
                     VerticalAlignment = VerticalAlignment.Center
                 });
             }
