@@ -32,6 +32,8 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal MechrevoHw? Hw => _hw;
+
     internal MechrevoDeviceCapabilities? Capabilities => _hw?.Capabilities;
 
     internal bool SupportsQuick(string key)

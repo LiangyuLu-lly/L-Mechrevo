@@ -367,8 +367,8 @@
                         <UniformGrid x:Name="ModeGrid" Columns="4" Margin="0,2,0,0">
                             <ToggleButton Content="静音" Tag="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
                             <ToggleButton Content="平衡" Tag="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton Content="静音狂暴" Tag="#F59E0B" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton Content="高能狂暴" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" />
+                            <ToggleButton Content="狂暴" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
+                            <ToggleButton x:Name="CustomModeButton" Content="自定义" Tag="#A78BFA" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" />
                         </UniformGrid>
                     </StackPanel>
 
