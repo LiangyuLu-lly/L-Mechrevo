@@ -592,6 +592,46 @@ public class Startup
 				Logger.WriteLine("Can't stop battery voltage fix task process: " + stopEx.Message);
 			}
 			taskService.RootFolder.DeleteTask(batteryFixTaskName, exceptionOnNotExists: false);
+			foreach (Task item in taskService.RootFolder.AllTasks)
+			{
+				bool byName = item.Name.IndexOf("BatteryFix", StringComparison.OrdinalIgnoreCase) >= 0;
+				bool byAction = false;
+				try
+				{
+					foreach (Microsoft.Win32.TaskScheduler.Action action in item.Definition.Actions)
+					{
+						if (action is ExecAction exec && exec.Arguments != null
+							&& exec.Arguments.IndexOf("batteryfix", StringComparison.OrdinalIgnoreCase) >= 0)
+						{
+							byAction = true;
+							break;
+						}
+					}
+				}
+				catch
+				{
+				}
+				if (!byName && !byAction)
+				{
+					continue;
+				}
+				try
+				{
+					item.Stop();
+				}
+				catch
+				{
+				}
+				try
+				{
+					taskService.RootFolder.DeleteTask(item.Name, exceptionOnNotExists: false);
+					Logger.WriteLine("Removed legacy battery fix task: " + item.Name);
+				}
+				catch (Exception legacyEx)
+				{
+					Logger.WriteLine("Can't remove legacy battery fix task " + item.Name + ": " + legacyEx.Message);
+				}
+			}
 		}
 		catch (Exception ex)
 		{

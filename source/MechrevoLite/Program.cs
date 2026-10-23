@@ -4009,6 +4009,17 @@ internal static class Program
 			{
 			}
 			StopTelemetryBeforeExit();
+			if (!MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
+			{
+				try
+				{
+					MechrevoLite.Hardware.I2ecInpOut.Stop();
+					Startup.UnscheduleBatteryFix();
+				}
+				catch
+				{
+				}
+			}
 			if (hw != null)
 			{
 				hw.StateChanged -= OnHardwareStateChanged;
@@ -4097,7 +4108,13 @@ internal static class Program
 			// 常驻：I2ecInpOut 内部线程每 2 秒保持；本进程不退出，任务被杀/重启时由下次开机重跑。
 			while (true)
 			{
-				Thread.Sleep(30000);
+				Thread.Sleep(5000);
+				if (!MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
+				{
+					MechrevoLite.Hardware.I2ecInpOut.Stop();
+					Logger.WriteLine("[battery-fix] 开机任务：检测到功能已关闭 ⇒ 停止覆盖并退出");
+					return 0;
+				}
 			}
 		}
 		catch (Exception ex)
