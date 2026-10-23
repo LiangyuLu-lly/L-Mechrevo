@@ -418,7 +418,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="显卡模式" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Image Source="Assets/Icons/gpu.png" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" OpacityMask="{DynamicResource MutedBrush}" /><TextBlock Text="显卡模式" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock Grid.Column="1" Text="GPU 73℃   90W   4698rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
                         <UniformGrid Columns="3" Margin="0,2,0,0">
