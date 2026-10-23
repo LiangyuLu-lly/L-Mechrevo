@@ -51,6 +51,8 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBatteryLimit;
     private BackendProbe? _backendProbe;
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _backendRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+    private bool _connectAttempting;
     private const string QuickTilesConfigKey = "perf_quick_tiles";
     private const string QuickTilesEmptySentinel = "-";
     private static readonly string[] DefaultQuickTileKeys = { "fanboost", "webcam", "micmute", "winkey", "monitoroff" };
@@ -85,9 +87,21 @@ public partial class OriginalStyleWindow : Window
                 RefreshFromBackend();
             }
         };
+        _backendRetryTimer.Tick += async (_, _) =>
+        {
+            if (_backendProbe == null)
+            {
+                await ConnectBackendAsync();
+            }
+            else
+            {
+                _backendRetryTimer.Stop();
+            }
+        };
         Closed += (_, _) =>
         {
             _backendTimer.Stop();
+            _backendRetryTimer.Stop();
             _backendProbe?.Dispose();
             _backendProbe = null;
         };
@@ -1135,47 +1149,64 @@ public partial class OriginalStyleWindow : Window
 
     private async Task ConnectBackendAsync()
     {
+        if (_connectAttempting)
+        {
+            return;
+        }
         if (_backendProbe != null)
         {
             BackendLine.Text = _backendProbe.Snapshot();
             return;
         }
+        _connectAttempting = true;
         ConnectBackendButton.IsEnabled = false;
-        BackendStatus.Text = "后端连接中…";
-        BackendStatus.Foreground = (Brush)Application.Current.Resources["AccentBrush"];
+        SetBackendStatus("● 后端连接中", "#F59E0B", "正在连接 Mechrevo 后端，最长等待 15 秒；失败会自动重试");
         BackendLine.Text = "正在创建 MechrevoHw 并 ConnectAsync（最长 15 秒）…";
         BackendProbe probe = new BackendProbe();
         _backendProbe = probe;
-        Task<bool> connect = probe.ConnectAsync();
-        Task completed = await Task.WhenAny(connect, Task.Delay(TimeSpan.FromSeconds(15)));
-        if (completed != connect)
+        try
         {
-            BackendStatus.Text = "后端连接超时";
-            BackendStatus.Foreground = (Brush)Application.Current.Resources["MutedBrush"];
-            BackendLine.Text = "15 秒内未完成；MechrevoHw 可能在没有 GCU 服务的机器上等待/无权限。";
-            probe.Dispose();
-            _backendProbe = null;
+            Task<bool> connect = probe.ConnectAsync();
+            Task completed = await Task.WhenAny(connect, Task.Delay(TimeSpan.FromSeconds(15)));
+            if (completed != connect)
+            {
+                SetBackendStatus("● 后端未连接", "#EF4444", "连接超时；MechrevoHw 可能在没有 GCU 服务的机器上等待或没有权限。应用会自动重试");
+                BackendLine.Text = "15 秒内未完成；稍后自动重试，也可手动点「连接后端」。";
+                probe.Dispose();
+                _backendProbe = null;
+                _backendRetryTimer.Start();
+                return;
+            }
+            if (await connect)
+            {
+                SetBackendStatus("● 后端已连接", "#4ADE80", probe.Snapshot());
+                BackendLine.Text = probe.Snapshot();
+                _backendRetryTimer.Stop();
+                await probe.RefreshGpuModeAsync();
+                ApplyCapabilities();
+                _backendTimer.Start();
+            }
+            else
+            {
+                SetBackendStatus("● 后端未连接", "#EF4444", string.IsNullOrWhiteSpace(probe.LastError) ? "连接失败，应用会自动重试" : probe.LastError);
+                BackendLine.Text = probe.LastError;
+                probe.Dispose();
+                _backendProbe = null;
+                _backendRetryTimer.Start();
+            }
+        }
+        finally
+        {
+            _connectAttempting = false;
             ConnectBackendButton.IsEnabled = true;
-            return;
         }
-        if (await connect)
-        {
-            BackendStatus.Text = "后端已连接";
-            BackendStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4ADE80"));
-            BackendLine.Text = probe.Snapshot();
-            await probe.RefreshGpuModeAsync();
-            ApplyCapabilities();
-            _backendTimer.Start();
-        }
-        else
-        {
-            BackendStatus.Text = "后端连接失败";
-            BackendStatus.Foreground = (Brush)Application.Current.Resources["MutedBrush"];
-            BackendLine.Text = probe.LastError;
-            probe.Dispose();
-            _backendProbe = null;
-        }
-        ConnectBackendButton.IsEnabled = true;
+    }
+
+    private void SetBackendStatus(string text, string hex, string tooltip)
+    {
+        BackendStatus.Text = text;
+        BackendStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        BackendStatus.ToolTip = tooltip;
     }
 
     private void ApplyCapabilities()
