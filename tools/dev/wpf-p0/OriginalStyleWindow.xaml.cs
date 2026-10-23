@@ -435,7 +435,7 @@ public partial class OriginalStyleWindow : Window
         {
             System.Windows.Shapes.Path path = new System.Windows.Shapes.Path
             {
-                Data = Geometry.Parse("M8,6.3 A1.7,1.7 0 1 1 8,9.7 A1.7,1.7 0 1 1 8,6.3 Z M8,8 C4.5,8 3,5.5 4.2,4.2 C5.5,3 8,4.5 8,8 Z M8,8 C11.5,8 13,5.5 11.8,4.2 C10.5,3 8,4.5 8,8 Z M8,8 C8,11.5 5.5,13 4.2,11.8 C3,10.5 4.5,8 8,8 Z M8,8 C8,4.5 10.5,3 11.8,4.2 C13,5.5 11.5,8 8,8 Z")
+                Data = Geometry.Parse("M8,8 C6,5 6,2 8,1 C10,2 10,5 8,8 Z M8,8 C11,6 14,7 15,9 C13,11 10,10 8,8 Z M8,8 C10,11 10,14 8,15 C6,14 6,11 8,8 Z M8,8 C5,10 2,9 1,7 C3,5 6,6 8,8 Z M8,7 A1,1 0 1 1 8,9 A1,1 0 1 1 8,7 Z")
             };
             path.SetBinding(System.Windows.Shapes.Shape.FillProperty, new System.Windows.Data.Binding("Foreground")
             {
