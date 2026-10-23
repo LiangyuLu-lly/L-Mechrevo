@@ -163,7 +163,95 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        bool ok = await _backendProbe.SwitchQuickAsync(key, tile.IsChecked == true);
+        bool on = tile.IsChecked == true;
+        if (key == "micmute")
+        {
+            on = !on;
+        }
+        bool ok = await _backendProbe.SwitchQuickAsync(key, on);
+        StatusText.Text = ok ? "快捷开关已下发：" + key : "快捷开关下发失败：" + key;
+    }
+
+    private void UpdateQuickTileStates()
+    {
+        BackendProbe? probe = _backendProbe;
+        if (probe == null)
+        {
+            return;
+        }
+        UpdateQuickTile(FanTile, "fanboost", probe);
+        UpdateQuickTile(CameraTile, "webcam", probe);
+        UpdateQuickTile(MicTile, "micmute", probe);
+        UpdateQuickTile(WinKeyTile, "winkey", probe);
+        UpdateQuickTile(ScreenOffTile, "monitoroff", probe);
+        if (CustomTile?.Tag is string customKey)
+        {
+            UpdateQuickTile(CustomTile, customKey, probe);
+        }
+    }
+
+    private static void UpdateQuickTile(ToggleButton tile, string key, BackendProbe probe)
+    {
+        bool switchOn = probe.QuickState(key);
+        tile.IsChecked = key == "micmute" ? !switchOn : switchOn;
+    }
+
+    private void CustomTile_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        if (CustomTile.Tag is string customKey)
+        {
+            _ = ToggleCustomTileAsync(customKey);
+            return;
+        }
+        ContextMenu menu = new ContextMenu();
+        (string Key, string Label, string Glyph)[] choices =
+        {
+            ("fanboost", "风扇强冷", "\uE9CA"), ("webcam", "摄像头", "\uE722"),
+            ("micmute", "麦克风", "\uE720"), ("winkey", "Win键", "\uE765"),
+            ("monitoroff", "息屏", "\uE7F4"), ("touchpad", "触摸板", "\uE7C9"),
+            ("wifi", "WiFi", "\uE701"), ("bt", "蓝牙", "\uE702")
+        };
+        foreach ((string key, string label, string glyph) in choices)
+        {
+            if (!_backendProbe.SupportsQuick(key))
+            {
+                continue;
+            }
+            MenuItem item = new MenuItem { Header = label, Tag = (key, label, glyph) };
+            item.Click += CustomTileChoice_Click;
+            menu.Items.Add(item);
+        }
+        menu.PlacementTarget = CustomTile;
+        menu.IsOpen = true;
+    }
+
+    private void CustomTileChoice_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item && item.Tag is ValueTuple<string, string, string> choice)
+        {
+            CustomTile.Tag = choice.Item1;
+            CustomTileLabel.Text = choice.Item2;
+            CustomTileIcon.Text = choice.Item3;
+            CustomTile.IsChecked = _backendProbe?.QuickState(choice.Item1) == true;
+        }
+    }
+
+    private async Task ToggleCustomTileAsync(string key)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        bool on = CustomTile.IsChecked == true;
+        bool ok = await _backendProbe.SwitchQuickAsync(key, on);
+        if (!ok)
+        {
+            CustomTile.IsChecked = !on;
+        }
         StatusText.Text = ok ? "快捷开关已下发：" + key : "快捷开关下发失败：" + key;
     }
 
@@ -356,6 +444,7 @@ public partial class OriginalStyleWindow : Window
         {
             batteryButtons[i].IsChecked = i == batteryMode;
         }
+        UpdateQuickTileStates();
         if (MoreGroupsPanel != null)
         {
             foreach (CheckBox box in EnumerateCheckBoxes(MoreGroupsPanel))

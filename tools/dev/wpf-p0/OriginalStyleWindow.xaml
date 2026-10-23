@@ -421,10 +421,10 @@
                                     <TextBlock Text="息屏" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton x:Name="CustomTile" Style="{StaticResource Tile}">
+                            <ToggleButton x:Name="CustomTile" Style="{StaticResource Tile}" Click="CustomTile_Click">
                                 <StackPanel>
-                                    <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="自定义" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock x:Name="CustomTileIcon" Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock x:Name="CustomTileLabel" Text="自定义" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                         </UniformGrid>
