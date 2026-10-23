@@ -177,26 +177,28 @@ public partial class OriginalStyleWindow : Window
         {
             ("输入设备", new (string, string)[]
             {
-                ("touchpad", "触摸板"), ("touchpadtoggle", "触摸板切换键"), ("wifi", "WiFi"),
-                ("bt", "蓝牙"), ("webcam", "摄像头"), ("micmute", "麦克风静音"), ("numpad", "数字键盘")
+                ("touchpad", "触摸板"), ("wifi", "WiFi"), ("bt", "蓝牙"), ("webcam", "摄像头"),
+                ("micmute", "麦克风静音"), ("numpad", "小键盘锁"), ("touchpadtoggle", "触摸板切换键")
             }),
-            ("键盘", new (string, string)[]
+            ("键盘与热键", new (string, string)[]
             {
-                ("winkey", "Win 键锁"), ("fnkey", "Fn 键锁"), ("copilot", "Copilot 键"),
-                ("osd", "OSD 提示"), ("capslock", "大小写锁定")
+                ("winkey", "Win键锁"), ("fnkey", "Fn键锁"), ("capslock", "大小写锁定"),
+                ("osd", "OSD提示"), ("copilot", "Copilot键锁")
             }),
             ("电源与系统", new (string, string)[]
             {
-                ("usb", "USB 充电"), ("highperf", "高性能电源计划"), ("apuboost", "APU 防缩缸"),
-                ("fanboost", "风扇强冷"), ("acrecovery", "接通电源自动开机"), ("cpuadvperf", "CPU 高级性能"),
-                ("gamewhitelist", "游戏白名单"), ("taskbarautohide", "任务栏自动隐藏"),
-                ("transparency", "透明效果"), ("darktheme", "深色主题"), ("deepsleep", "深度睡眠"),
-                ("monitoroff", "关闭显示器"), ("winupdate", "Windows 更新")
+                ("usb", "关机USB供电"), ("acrecovery", "来电自启"), ("highperf", "高性能电源"),
+                ("apuboost", "APU 防缩缸"), ("fanboost", "风扇强冷"), ("deepsleep", "深度睡眠"),
+                ("gamewhitelist", "游戏白名单"), ("cpuadvperf", "解锁BIOS高级菜单"),
+                ("taskbarautohide", "任务栏自动隐藏"), ("transparency", "系统透明效果"),
+                ("darktheme", "系统深色主题"), ("monitoroff", "息屏（不睡眠）"),
+                ("winupdate", "禁用Windows更新")
             }),
-            ("睡眠", new (string, string)[]
+            ("睡眠省电", new (string, string)[]
             {
-                ("sleepnetoff", "睡眠断网"), ("sleepaway", "离开模式"), ("sleepsysreq", "系统请求"),
-                ("sleeprtcwake", "RTC 唤醒"), ("sleepdeep", "深度睡眠策略"), ("sleephibernate", "休眠")
+                ("sleepnetoff", "待机断开网络"), ("sleepaway", "封杀离开模式"),
+                ("sleepsysreq", "忽略系统所需策略"), ("sleeprtcwake", "禁用RTC唤醒定时器"),
+                ("sleepdeep", "启用ACPI深度睡眠"), ("sleephibernate", "30分钟转休眠")
             })
         };
         foreach ((string title, (string Key, string Label)[] items) in groups)
@@ -222,23 +224,55 @@ public partial class OriginalStyleWindow : Window
             {
                 continue;
             }
-            TextBlock header = new TextBlock
+            if (title == "睡眠省电")
             {
-                Text = title,
-                Style = (Style)FindResource("MutedText"),
-                FontSize = 10,
-                Margin = new Thickness(0, 8, 0, 2)
-            };
-            UniformGrid grid = new UniformGrid { Columns = 2, Margin = new Thickness(0) };
+                Grid headerRow = new Grid { Margin = new Thickness(0, 8, 0, 2) };
+                headerRow.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("MutedText"), FontSize = 10 });
+                StackPanel scope = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+                ToggleButton ac = new ToggleButton { Content = "通电时", Style = (Style)FindResource("SmallSegment"), IsChecked = true, Tag = "ac", Margin = new Thickness(0, 0, 4, 0), Height = 24, FontSize = 9 };
+                ToggleButton dc = new ToggleButton { Content = "离电时", Style = (Style)FindResource("SmallSegment"), Tag = "dc", Height = 24, FontSize = 9 };
+                ac.Click += SleepScope_Click;
+                dc.Click += SleepScope_Click;
+                scope.Children.Add(ac);
+                scope.Children.Add(dc);
+                headerRow.Children.Add(scope);
+                MoreGroupsPanel.Children.Add(headerRow);
+            }
+            else
+            {
+                MoreGroupsPanel.Children.Add(new TextBlock
+                {
+                    Text = title,
+                    Style = (Style)FindResource("MutedText"),
+                    FontSize = 10,
+                    Margin = new Thickness(0, 8, 0, 2)
+                });
+            }
+            UniformGrid grid = new UniformGrid { Columns = 3, Margin = new Thickness(0) };
             foreach (CheckBox box in visible)
             {
                 box.Click += MoreSwitch_Click;
                 grid.Children.Add(box);
             }
-            MoreGroupsPanel.Children.Add(header);
             MoreGroupsPanel.Children.Add(grid);
         }
         UpdateMoreSwitchCount();
+    }
+
+    private void SleepScope_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton selected || selected.Parent is not StackPanel parent)
+        {
+            return;
+        }
+        foreach (object child in parent.Children)
+        {
+            if (child is ToggleButton button)
+            {
+                button.IsChecked = ReferenceEquals(button, selected);
+            }
+        }
+        StatusText.Text = "睡眠省电范围：" + selected.Content;
     }
 
     private async void MoreSwitch_Click(object sender, RoutedEventArgs e)
