@@ -355,7 +355,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Ellipse Width="9" Height="9" Fill="#22C55E" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <TextBlock x:Name="BackendStatus" Text="● 后端未连接" Foreground="#9BA6B5" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock x:Name="BackendStatus" Text="● GCU 状态未知" Foreground="#9BA6B5" FontSize="12" FontWeight="SemiBold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="ConnectBackendButton" Content="连接后端" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="ConnectBackend_Click" Margin="0,0,6,0" />

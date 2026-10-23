@@ -1160,7 +1160,7 @@ public partial class OriginalStyleWindow : Window
         }
         _connectAttempting = true;
         ConnectBackendButton.IsEnabled = false;
-        SetBackendStatus("● 后端连接中", "#F59E0B", "正在连接 Mechrevo 后端，最长等待 15 秒；失败会自动重试");
+        SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
         BackendLine.Text = "正在创建 MechrevoHw 并 ConnectAsync（最长 15 秒）…";
         BackendProbe probe = new BackendProbe();
         _backendProbe = probe;
@@ -1170,7 +1170,7 @@ public partial class OriginalStyleWindow : Window
             Task completed = await Task.WhenAny(connect, Task.Delay(TimeSpan.FromSeconds(15)));
             if (completed != connect)
             {
-                SetBackendStatus("● 后端未连接", "#EF4444", "连接超时；MechrevoHw 可能在没有 GCU 服务的机器上等待或没有权限。应用会自动重试");
+                SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
                 BackendLine.Text = "15 秒内未完成；稍后自动重试，也可手动点「连接后端」。";
                 probe.Dispose();
                 _backendProbe = null;
@@ -1179,7 +1179,7 @@ public partial class OriginalStyleWindow : Window
             }
             if (await connect)
             {
-                SetBackendStatus("● 后端已连接", "#4ADE80", probe.Snapshot());
+                UpdateBackendStatus();
                 BackendLine.Text = probe.Snapshot();
                 _backendRetryTimer.Stop();
                 await probe.RefreshGpuModeAsync();
@@ -1188,7 +1188,7 @@ public partial class OriginalStyleWindow : Window
             }
             else
             {
-                SetBackendStatus("● 后端未连接", "#EF4444", string.IsNullOrWhiteSpace(probe.LastError) ? "连接失败，应用会自动重试" : probe.LastError);
+                SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
                 BackendLine.Text = probe.LastError;
                 probe.Dispose();
                 _backendProbe = null;
@@ -1200,6 +1200,35 @@ public partial class OriginalStyleWindow : Window
             _connectAttempting = false;
             ConnectBackendButton.IsEnabled = true;
         }
+    }
+
+    private void UpdateBackendStatus()
+    {
+        BackendProbe? probe = _backendProbe;
+        if (probe == null)
+        {
+            return;
+        }
+        if (probe.IsNonGcuBackend)
+        {
+            bool ready = probe.Connected;
+            SetBackendStatus(
+                ready ? "● 已就绪" : "● 未就绪",
+                ready ? "#4ADE80" : "#F59E0B",
+                "本机使用老机型接口，仅支持三个内置性能档");
+            return;
+        }
+        if (probe.IsGcuConnected)
+        {
+            SetBackendStatus("● GCU 已连接", "#4ADE80", "GCU 服务连接正常（GCUBridge，MQTT 127.0.0.1:13688）");
+            return;
+        }
+        if (probe.IsReconnecting || probe.IsSessionAwaitingSubscribe)
+        {
+            SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
+            return;
+        }
+        SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
     }
 
     private void SetBackendStatus(string text, string hex, string tooltip)

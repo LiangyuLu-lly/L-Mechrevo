@@ -282,6 +282,90 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal MechrevoBackendKind ActiveBackend
+    {
+        get
+        {
+            try
+            {
+                return _hw?.ActiveBackend ?? MechrevoBackendKind.None;
+            }
+            catch
+            {
+                return MechrevoBackendKind.None;
+            }
+        }
+    }
+
+    internal bool IsNonGcuBackend
+    {
+        get
+        {
+            MechrevoBackendKind backend = ActiveBackend;
+            return backend != MechrevoBackendKind.None && backend != MechrevoBackendKind.Gcu;
+        }
+    }
+
+    internal bool IsGcuConnected
+    {
+        get
+        {
+            try
+            {
+                return _hw?.IsGcuConnected ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal bool IsReconnecting
+    {
+        get
+        {
+            try
+            {
+                return _hw?.IsReconnecting ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal bool IsSessionAwaitingSubscribe
+    {
+        get
+        {
+            try
+            {
+                return _hw?.IsSessionAwaitingSubscribe ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal bool EverConnected
+    {
+        get
+        {
+            try
+            {
+                return (_hw?.ConnectionGeneration ?? 0) > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
     internal bool IsBaolongda
     {
         get
