@@ -150,7 +150,15 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
-            return _service != null && await _service.SwitchQuick(key, on).ConfigureAwait(false);
+            if (_service == null)
+            {
+                return false;
+            }
+            if (string.Equals(key, "fanboost", StringComparison.OrdinalIgnoreCase))
+            {
+                return await _service.SwitchFanBoost(on).ConfigureAwait(false);
+            }
+            return await _service.SwitchQuick(key, on).ConfigureAwait(false);
         }
         catch
         {
