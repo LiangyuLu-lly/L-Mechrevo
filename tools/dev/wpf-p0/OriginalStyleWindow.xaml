@@ -31,13 +31,13 @@
             <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
             <Setter Property="Margin" Value="0,0,0,7" />
         </Style>
-        <Style x:Key="RowLabel" TargetType="TextBlock" BasedOn="{StaticResource StatText}">
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-        </Style>
         <Style x:Key="StatText" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="RowLabel" TargetType="TextBlock" BasedOn="{StaticResource StatText}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         </Style>
         <Style x:Key="BigSegment" TargetType="ToggleButton" BasedOn="{StaticResource SegmentButton}">
             <Setter Property="Padding" Value="16,12" />
