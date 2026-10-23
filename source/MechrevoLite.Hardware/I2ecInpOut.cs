@@ -58,6 +58,59 @@ internal static class I2ecInpOut
 		return Path.Combine(dir, "i2ec.lock");
 	}
 
+	/// <summary>2026-10-23（机主：电池 2ms 循环下风扇曲线掉写）：风扇控制器运行期间写一个跨进程标记，
+	/// 电池保持循环看到标记就主动多让路，保证 25Hz 风扇写能拿到 I2EC。</summary>
+	private static string FanPriorityPath()
+	{
+		string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "L-Mechrevo");
+		return Path.Combine(dir, "i2ec.fan");
+	}
+
+	internal static void SetFanWritePriority(bool on)
+	{
+		try
+		{
+			string path = FanPriorityPath();
+			if (on)
+			{
+				Directory.CreateDirectory(Path.GetDirectoryName(path));
+				File.WriteAllText(path, Environment.ProcessId.ToString());
+			}
+			else
+			{
+				File.Delete(path);
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	private static long _nextFanPriorityCheck;
+
+	private static bool _fanPriorityCached;
+
+	private static bool FanPriorityActive()
+	{
+		long now = Environment.TickCount64;
+		if (now < _nextFanPriorityCheck)
+		{
+			return _fanPriorityCached;
+		}
+		_nextFanPriorityCheck = now + 250L;
+		try
+		{
+			FileInfo file = new FileInfo(FanPriorityPath());
+			_fanPriorityCached = file.Exists && (DateTime.UtcNow - file.LastWriteTimeUtc).TotalSeconds < 3.0;
+		}
+		catch
+		{
+			_fanPriorityCached = false;
+		}
+		return _fanPriorityCached;
+	}
+
+
 	private static bool TryEnterEcMutex(out bool held)
 	{
 		held = false;
@@ -463,6 +516,11 @@ internal static class I2ecInpOut
 		if (!EnsureInitialized(out detail))
 		{
 			return false;
+		}
+		if (FanPriorityActive())
+		{
+			// 风扇 25Hz 优先：电池循环在拿锁前多睡 8ms，让出稳定写窗口。
+			Thread.Sleep(8);
 		}
 		lock (Gate)
 		{

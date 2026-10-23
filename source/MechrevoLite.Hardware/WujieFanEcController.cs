@@ -192,6 +192,8 @@ internal sealed class WujieFanEcController : IDisposable
 			_running = true;
 			_channel = channel;
 			_active = this;
+			// 2026-10-23（机主：电池 2ms 下风扇掉写）：风扇运行期间给电池循环一个跨进程优先标记。
+			I2ecInpOut.SetFanWritePriority(channel == WriteChannel.I2ec);
 			_timer.Change(WriteIntervalMs, WriteIntervalMs);
 		}
 		detail = "已启动（" + ChannelName(channel) + " 25Hz 双扇直写 · " + (independent ? "独立控制" : "同步控制") + " · CPU " + _validCpu + " 点 / GPU " + _validGpu + " 点 · 当前 " + temp + "℃）";
@@ -221,6 +223,7 @@ internal sealed class WujieFanEcController : IDisposable
 		{
 			Logger.WriteLine("[fan] 无界 EC 曲线停止：" + reason + "（交还 EC）");
 		}
+		I2ecInpOut.SetFanWritePriority(false);
 		if (ReferenceEquals(_active, this))
 		{
 			_active = null;
@@ -251,6 +254,11 @@ internal sealed class WujieFanEcController : IDisposable
 			{
 				return;
 			}
+		}
+		if (_channel == WriteChannel.I2ec)
+		{
+			// 心跳：让电池保持循环持续看到“风扇正在写”。
+			I2ecInpOut.SetFanWritePriority(true);
 		}
 		try
 		{
