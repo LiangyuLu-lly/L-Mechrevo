@@ -9,7 +9,7 @@
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
-        FontWeight="Medium"
+        FontWeight="Light"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True">
 

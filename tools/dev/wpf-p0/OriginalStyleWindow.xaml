@@ -10,7 +10,7 @@
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
-        FontWeight="Medium"
+        FontWeight="Light"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True">
 
@@ -320,6 +320,12 @@
             <Setter Property="Padding" Value="8,4" />
         </Style>
 
+        <Style x:Key="RefreshSegment" TargetType="ToggleButton" BasedOn="{StaticResource SmallSegment}">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+
         <Style x:Key="BatterySegment" TargetType="ToggleButton" BasedOn="{StaticResource SmallSegment}">
             <Setter Property="Height" Value="28" />
             <Setter Property="Padding" Value="5,2" />
@@ -491,8 +497,8 @@
                             <CheckBox x:Name="AutoRefreshSwitch" Content="自动刷新率" Style="{StaticResource HeaderSwitch}" HorizontalAlignment="Right" Click="AutoRefresh_Click" />
                         </Grid>
                         <UniformGrid Columns="2" Margin="0,0,0,6">
-                            <ToggleButton x:Name="Refresh180Button" Content="180" Style="{StaticResource SmallSegment}" Tag="180" Click="RefreshRate_Click" IsChecked="True" />
-                            <ToggleButton x:Name="Refresh60Button" Content="60" Style="{StaticResource SmallSegment}" Tag="60" Click="RefreshRate_Click" Margin="0" />
+                            <ToggleButton x:Name="Refresh180Button" Content="180" Style="{StaticResource RefreshSegment}" Tag="180" Click="RefreshRate_Click" IsChecked="True" />
+                            <ToggleButton x:Name="Refresh60Button" Content="60" Style="{StaticResource RefreshSegment}" Tag="60" Click="RefreshRate_Click" Margin="0" />
                         </UniformGrid>
                         <Grid Margin="0,2,0,6">
                             <Grid.ColumnDefinitions>
