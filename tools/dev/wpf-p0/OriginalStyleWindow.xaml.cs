@@ -70,6 +70,7 @@ public partial class OriginalStyleWindow : Window
     public OriginalStyleWindow()
     {
         InitializeComponent();
+        FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
         SourceInitialized += (_, _) => HideMinMaxButtons();
         ApplyDarkTitleBar(_dark);

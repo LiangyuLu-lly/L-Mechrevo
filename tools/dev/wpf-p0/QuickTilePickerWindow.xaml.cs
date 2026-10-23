@@ -42,6 +42,7 @@ public partial class QuickTilePickerWindow : Window
     public QuickTilePickerWindow(IEnumerable<QuickChoice> choices, int maxSlots = 5)
     {
         InitializeComponent();
+        FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         _maxSlots = Math.Max(1, maxSlots);
         List<QuickChoice> ordered = choices
             .OrderByDescending(static c => c.IsSelected)

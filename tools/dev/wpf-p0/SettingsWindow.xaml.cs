@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(OriginalStyleWindow owner)
     {
         InitializeComponent();
+        FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         _owner = owner;
         Owner = owner;
         try
