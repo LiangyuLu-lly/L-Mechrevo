@@ -31,6 +31,9 @@
             <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
             <Setter Property="Margin" Value="0,0,0,7" />
         </Style>
+        <Style x:Key="RowLabel" TargetType="TextBlock" BasedOn="{StaticResource StatText}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
         <Style x:Key="StatText" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
             <Setter Property="FontSize" Value="11" />
@@ -557,7 +560,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="亮度" Style="{StaticResource StatText}" Margin="0,0,12,0" />
+                            <TextBlock Text="亮度" Style="{StaticResource RowLabel}" Margin="0,0,12,0" />
                             <Slider x:Name="BrightnessSlider" Grid.Column="1" Minimum="0" Maximum="100" Value="100" Style="{StaticResource RoundSlider}" ValueChanged="Brightness_Changed" />
                             <TextBlock x:Name="BrightnessText" Grid.Column="2" Text="100%" Style="{StaticResource StatText}" Margin="10,0,0,0" />
                         </Grid>
@@ -568,7 +571,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="屏幕校色" Style="{StaticResource StatText}" Margin="0,0,10,0" />
+                            <TextBlock Text="屏幕校色" Style="{StaticResource RowLabel}" Margin="0,0,10,0" />
                             <CheckBox x:Name="CalibrationSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,10,0" VerticalAlignment="Center" Click="CalibrationSwitch_Click" />
                             <ComboBox x:Name="CalibrationCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="CalibrationCombo_SelectionChanged">
                                 <ComboBoxItem Content="默认" />
@@ -584,7 +587,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="色彩增强" Style="{StaticResource StatText}" Margin="0,0,10,0" />
+                            <TextBlock Text="色彩增强" Style="{StaticResource RowLabel}" Margin="0,0,10,0" />
                             <CheckBox x:Name="DisplayEffectSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,10,0" VerticalAlignment="Center" Click="DisplayEffectSwitch_Click" />
                             <ComboBox x:Name="DisplayEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0">
                                 <ComboBoxItem Content="关" />
@@ -630,7 +633,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="键盘" Style="{StaticResource StatText}" />
+                            <TextBlock Text="键盘" Style="{StaticResource RowLabel}" />
                             <CheckBox x:Name="KeyboardLightSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="KeyboardLightSwitch_Click" />
                             <ComboBox x:Name="KeyboardEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="KeyboardEffectCombo_SelectionChanged">
                                 <ComboBoxItem Content="单色" Tag="Single" />
@@ -647,7 +650,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="Logo 灯" Style="{StaticResource StatText}" />
+                            <TextBlock Text="Logo 灯" Style="{StaticResource RowLabel}" />
                             <CheckBox x:Name="LogoLightSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="LogoLightSwitch_Click" />
                             <ComboBox x:Name="LogoEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="LogoEffectCombo_SelectionChanged">
                                 <ComboBoxItem Content="单色" Tag="Single" />
