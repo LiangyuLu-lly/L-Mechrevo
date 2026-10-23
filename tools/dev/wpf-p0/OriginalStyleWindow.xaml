@@ -82,7 +82,12 @@
             <Setter Property="Padding" Value="10,4" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="MinWidth" Value="52" />
-        </Style>
+                <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.35" />
+            </Trigger>
+        </Style.Triggers>
+</Style>
         <Style x:Key="ModeSegment" TargetType="ToggleButton">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
             <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
@@ -262,7 +267,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-        </Style>
+                <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.35" />
+            </Trigger>
+        </Style.Triggers>
+</Style>
 
         <Style x:Key="SmallSegment" TargetType="ToggleButton" BasedOn="{StaticResource BigSegment}">
             <Setter Property="Padding" Value="6,3" />
@@ -320,7 +330,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-        </Style>
+                <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.35" />
+            </Trigger>
+        </Style.Triggers>
+</Style>
 
         <Style x:Key="GpuSegment" TargetType="ToggleButton" BasedOn="{StaticResource SmallSegment}">
             <Setter Property="FontSize" Value="12" />
