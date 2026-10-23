@@ -573,8 +573,9 @@ public static class NvmlHelper
 	/// 8s 已远超过渡窗口；同时短于功耗/占用率 10s 新鲜度 ⇒ 正常情况下界面不会因为保护期而变「—」。</summary>
 	internal const int DisplayChangeGuardMs = 8000;
 
-	/// <summary>电源挂起/恢复（睡眠/唤醒）与亮屏后的保护窗口：驱动重初始化通常需要更久，沿用既有 15s 量级。</summary>
-	internal const int SleepResumeGuardMs = 20000;
+	/// <summary>电源挂起/恢复（睡眠/唤醒）与亮屏后的保护窗口：JIGUANG 唤醒后首个采样在 +17.6s，20s 余量仅 4ms；
+	/// 放宽到 30s，避免驱动重初始化偏慢时踩到下一次原生调用。</summary>
+	internal const int SleepResumeGuardMs = 30000;
 
 	private static long _transitionGuardUntilTicks;
 
