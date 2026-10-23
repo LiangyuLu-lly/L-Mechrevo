@@ -1058,6 +1058,8 @@ public partial class OriginalStyleWindow : Window
 
     internal bool IsDark => _dark;
 
+    internal bool BackendConnected => _backendProbe?.Connected == true;
+
     internal bool IsBackgroundEnabled => BackgroundToggle.IsChecked == true;
 
     internal void ApplyThemeFromSettings(bool dark)
