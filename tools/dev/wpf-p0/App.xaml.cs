@@ -20,14 +20,16 @@ public partial class App : Application
             string dir = Path.Combine(AppContext.BaseDirectory, "Fonts");
             string regular = Path.Combine(dir, "HarmonyOS_Sans_SC_Regular.ttf");
             string bold = Path.Combine(dir, "HarmonyOS_Sans_SC_Bold.ttf");
-            if (File.Exists(regular))
-            {
-                Application.Current.Resources["AppFontFamily"] = new FontFamily(regular + "#HarmonyOS Sans SC");
-            }
-            if (File.Exists(bold))
-            {
-                Application.Current.Resources["AppFontBoldFamily"] = new FontFamily(bold + "#HarmonyOS Sans SC");
-            }
+            bool installed = Fonts.SystemFontFamilies.Any(f =>
+                f.Source.IndexOf("HarmonyOS Sans SC", StringComparison.OrdinalIgnoreCase) >= 0);
+            FontFamily regularFamily = installed || !File.Exists(regular)
+                ? new FontFamily("HarmonyOS Sans SC")
+                : new FontFamily(regular + "#HarmonyOS Sans SC");
+            FontFamily boldFamily = installed || !File.Exists(bold)
+                ? new FontFamily("HarmonyOS Sans SC")
+                : new FontFamily(bold + "#HarmonyOS Sans SC");
+            Application.Current.Resources["AppFontFamily"] = regularFamily;
+            Application.Current.Resources["AppFontBoldFamily"] = boldFamily;
         }
         catch
         {

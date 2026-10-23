@@ -9,7 +9,7 @@
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
         FontWeight="Normal"
-        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextFormattingMode="Ideal"
         UseLayoutRounding="True">
     <Window.Resources>
         <Style TargetType="ComboBoxItem">
