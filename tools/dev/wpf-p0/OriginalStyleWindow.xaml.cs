@@ -1062,9 +1062,14 @@ public partial class OriginalStyleWindow : Window
 
     private void BackgroundToggle_Changed(object sender, RoutedEventArgs e)
     {
-        bool on = BackgroundToggle.IsChecked == true;
-        BackgroundImage.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        BackgroundScrim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        UpdateBackgroundVisibility();
+    }
+
+    private void UpdateBackgroundVisibility()
+    {
+        bool show = _dark && BackgroundToggle.IsChecked == true;
+        BackgroundImage.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        BackgroundScrim.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void ConnectBackend_Click(object sender, RoutedEventArgs e)
@@ -1249,14 +1254,14 @@ public partial class OriginalStyleWindow : Window
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
+        UpdateBackgroundVisibility();
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
     }
 
     internal void SetBackgroundFromSettings(bool on)
     {
         BackgroundToggle.IsChecked = on;
-        BackgroundImage.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        BackgroundScrim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        UpdateBackgroundVisibility();
     }
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
@@ -1265,6 +1270,7 @@ public partial class OriginalStyleWindow : Window
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
+        UpdateBackgroundVisibility();
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
     }
 
