@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="L-Mechrevo · 原版小窗 P0"
         Width="420" Height="860"
-        MinWidth="380" MinHeight="620"
+        MinWidth="420" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -54,7 +54,8 @@
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF" />
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="Bd" Property="Background" Value="#2AFFFFFF" />
                                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -70,6 +71,70 @@
             <Setter Property="Padding" Value="18,8" />
             <Setter Property="FontSize" Value="13" />
         </Style>
+        <Style x:Key="ModeSegment" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,8" />
+            <Setter Property="Margin" Value="0,0,5,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="9" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2AFFFFFF" />
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 原版风格：圆角细滚动条（只用于本小窗） -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Width="8" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Opacity="0" Focusable="False" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{DynamicResource MutedBrush}" Opacity="0.65" CornerRadius="4" Margin="2,0" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0" Focusable="False" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -118,11 +183,11 @@
                             </StackPanel>
                             <TextBlock Grid.Column="1" Text="CPU 85℃   52W   4427rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
-                        <UniformGrid Columns="4" Width="392" Margin="0,2,0,0">
-                            <ToggleButton Content="静音" Style="{StaticResource BigSegment}" />
-                            <ToggleButton Content="平衡" Style="{StaticResource BigSegment}" />
-                            <ToggleButton Content="狂暴" Style="{StaticResource BigSegment}" IsChecked="True" />
-                            <ToggleButton Content="自定义" Style="{StaticResource BigSegment}" Margin="0" />
+                        <UniformGrid x:Name="ModeGrid" Columns="4" Width="392" Margin="0,2,0,0">
+                            <ToggleButton Content="静音" Tag="#22C55E" BorderBrush="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
+                            <ToggleButton Content="平衡" Tag="#3B82F6" BorderBrush="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
+                            <ToggleButton Content="静音狂暴" Tag="#F59E0B" BorderBrush="#F59E0B" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
+                            <ToggleButton Content="高能狂暴" Tag="#EF4444" BorderBrush="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" />
                         </UniformGrid>
                     </StackPanel>
 

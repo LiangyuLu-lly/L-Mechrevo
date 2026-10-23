@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 
 namespace L_Mechrevo.WpfP0;
@@ -12,6 +13,26 @@ public partial class OriginalStyleWindow : Window
     {
         InitializeComponent();
         ApplyDarkTitleBar(_dark);
+        if (ModeGrid != null && ModeGrid.Children.Count > 1 && ModeGrid.Children[1] is ToggleButton defaultMode)
+        {
+            defaultMode.IsChecked = true;
+        }
+    }
+
+    private void ModeButton_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (object child in ModeGrid.Children)
+        {
+            if (child is ToggleButton button)
+            {
+                button.IsChecked = false;
+            }
+        }
+        if (sender is ToggleButton selected)
+        {
+            selected.IsChecked = true;
+            StatusText.Text = "性能模式：" + selected.Content;
+        }
     }
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
