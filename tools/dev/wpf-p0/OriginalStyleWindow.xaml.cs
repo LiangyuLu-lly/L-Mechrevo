@@ -1283,7 +1283,6 @@ public partial class OriginalStyleWindow : Window
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
-        RefreshSegmentHighlights();
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
     }
 
@@ -1300,6 +1299,7 @@ public partial class OriginalStyleWindow : Window
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
+        RefreshSegmentHighlights();
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
     }
 
