@@ -346,7 +346,5 @@
                 </Grid>
             </StackPanel>
         </ScrollViewer>
-
-        <Button Grid.Row="1" Content="关闭" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Margin="0,10,0,0" Click="Close_Click" />
     </Grid>
 </Window>
