@@ -196,10 +196,6 @@ public partial class OriginalStyleWindow : Window
 
     private void CustomTile_Click(object sender, RoutedEventArgs e)
     {
-        if (_backendProbe == null)
-        {
-            return;
-        }
         (string Key, string Label, string Glyph)[] choices =
         {
             ("fanboost", "风扇强冷", "\uE9CA"), ("webcam", "摄像头", "\uE722"),
@@ -210,7 +206,7 @@ public partial class OriginalStyleWindow : Window
         List<QuickChoice> list = new List<QuickChoice>();
         foreach ((string key, string label, string glyph) in choices)
         {
-            if (_backendProbe.SupportsQuick(key) && !HasQuickTile(key))
+            if ((_backendProbe?.SupportsQuick(key) ?? true) && !HasQuickTile(key))
             {
                 list.Add(new QuickChoice(key, label, glyph));
             }
