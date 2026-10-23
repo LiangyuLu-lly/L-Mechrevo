@@ -18,7 +18,7 @@ public partial class App : Application
         try
         {
             string dir = Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts");
-            string regular = Path.Combine(dir, "OPPOSansRegular.ttf");
+            string regular = Path.Combine(dir, "OPPOSansMedium.ttf");
             string bold = Path.Combine(dir, "OPPOSansBold.ttf");
             if (File.Exists(regular))
             {
