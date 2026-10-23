@@ -74,9 +74,10 @@ public partial class OriginalStyleWindow : Window
             selected.IsChecked = true;
             UpdateModeBorders(selected);
             StatusText.Text = "性能模式：" + selected.Content;
-            int mode = selected == SilentModeButton ? 0
-                : selected == BalancedModeButton ? 1
-                : selected == TurboModeButton ? 2
+            int mode = selected == SilentModeButton ? 2
+                : selected == BalancedModeButton ? 0
+                : selected == TurboModeButton ? 1
+                : selected == CustomModeButton ? 3
                 : -1;
             if (mode >= 0 && _backendProbe != null)
             {
@@ -158,9 +159,10 @@ public partial class OriginalStyleWindow : Window
         GpuStat.Text = "GPU " + hw.GpuTemp + "℃   " + hw.GpuFanRpm + "rpm";
         BatteryInfo.Text = "电池 " + hw.BatteryPercent + "% · " + hw.BatteryCapacityText;
         int mode = probe.CurrentMode;
-        SilentModeButton.IsChecked = mode == 0;
-        BalancedModeButton.IsChecked = mode == 1;
-        TurboModeButton.IsChecked = mode == 2;
+        SilentModeButton.IsChecked = mode == 2;
+        BalancedModeButton.IsChecked = mode == 0;
+        TurboModeButton.IsChecked = mode == 1;
+        CustomModeButton.IsChecked = mode == 3 || mode == 4;
         ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         int batteryMode = probe.BatteryMode;
         for (int i = 0; i < batteryButtons.Length; i++)
