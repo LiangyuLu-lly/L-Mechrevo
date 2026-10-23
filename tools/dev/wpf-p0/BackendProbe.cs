@@ -45,7 +45,41 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
-            return _hw?.SupportsQuickSwitch(key) ?? false;
+            if (_hw == null)
+            {
+                return false;
+            }
+            if (_hw.SupportsQuickSwitch(key))
+            {
+                return true;
+            }
+            // 与 LM StaticQuick 对齐：这些项要么是纯 Windows 策略，要么有本机回退通道。
+            switch (key)
+            {
+                case "apuboost":
+                case "capslock":
+                case "highperf":
+                case "monitoroff":
+                case "taskbarautohide":
+                case "transparency":
+                case "darktheme":
+                case "sleepnetoff":
+                case "sleepaway":
+                case "sleepsysreq":
+                case "sleeprtcwake":
+                case "sleepdeep":
+                case "sleephibernate":
+                case "winupdate":
+                    return true;
+                case "numpad":
+                    return _hw.Capabilities.Numpad || _hw.Capabilities.Keyboard;
+                case "acrecovery":
+                    return _hw.Capabilities.AcRecovery;
+                case "fanboost":
+                    return _hw.Capabilities.FanBoost;
+                default:
+                    return false;
+            }
         }
         catch
         {
