@@ -108,6 +108,7 @@ public partial class OriginalStyleWindow : Window
             ApplyMoreSectionState();
             RefreshBrightness();
             InitBatteryControls();
+            NormalizeSegmentDefaults();
         };
     }
 
@@ -222,6 +223,21 @@ public partial class OriginalStyleWindow : Window
             node = System.Windows.Media.VisualTreeHelper.GetParent(node);
         }
         return null;
+    }
+
+    private void NormalizeSegmentDefaults()
+    {
+        GpuEcoButton.IsChecked = false;
+        GpuHybridButton.IsChecked = false;
+        GpuDirectButton.IsChecked = true;
+        HighlightSegment(GpuDirectButton);
+        Refresh180Button.IsChecked = true;
+        Refresh60Button.IsChecked = false;
+        HighlightSegment(Refresh180Button);
+        BatteryLongButton.IsChecked = true;
+        BatteryBalancedButton.IsChecked = false;
+        BatteryWorkButton.IsChecked = false;
+        HighlightSegment(BatteryLongButton);
     }
 
     private void InitBatteryControls()
