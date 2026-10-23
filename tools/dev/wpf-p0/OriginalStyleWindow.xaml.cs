@@ -92,6 +92,14 @@ public partial class OriginalStyleWindow : Window
         new MainWindow().Show();
     }
 
+    private void DockButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button button && button.Tag is string name)
+        {
+            StatusText.Text = "P0 · " + name;
+        }
+    }
+
     private void ApplyDarkTitleBar(bool dark)
     {
         try

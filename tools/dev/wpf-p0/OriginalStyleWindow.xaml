@@ -252,6 +252,29 @@
             <Setter Property="Margin" Value="0,0,4,0" />
         </Style>
 
+        <Style x:Key="DockButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -483,18 +506,45 @@
             <Border Grid.Row="3" Margin="12,0,12,8" Background="#AA10141B" CornerRadius="14" BorderBrush="#33FFFFFF" BorderThickness="1" Padding="8,6">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock x:Name="StatusText" Text="0.293.5 / WPF P0" FontSize="12" />
-                        <TextBlock Text="缩略图 / 设置 / 赞助 / 诊断 / 退出" Style="{StaticResource MutedText}" FontSize="10" />
+                    <StackPanel VerticalAlignment="Center" Margin="2,0,10,0">
+                        <TextBlock x:Name="StatusText" Text="0.293.5" FontSize="12" />
+                        <TextBlock Text="beta23.5" Style="{StaticResource MutedText}" FontSize="10" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button Content="悬浮窗" Style="{StaticResource GhostButton}" FontSize="11" Padding="9,6" Margin="0,0,5,0" />
-                        <Button Content="设置" Style="{StaticResource GhostButton}" FontSize="11" Padding="9,6" Margin="0,0,5,0" />
-                        <Button Content="诊断" Style="{StaticResource GhostButton}" FontSize="11" Padding="9,6" />
-                    </StackPanel>
+                    <UniformGrid Grid.Column="1" Columns="5" VerticalAlignment="Center">
+                        <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
+                            <StackPanel>
+                                <TextBlock Text="◎" FontSize="14" HorizontalAlignment="Center" />
+                                <TextBlock Text="悬浮窗" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="设置">
+                            <StackPanel>
+                                <TextBlock Text="☼" FontSize="14" HorizontalAlignment="Center" />
+                                <TextBlock Text="设置" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="赞助">
+                            <StackPanel>
+                                <TextBlock Text="♡" FontSize="14" HorizontalAlignment="Center" />
+                                <TextBlock Text="赞助" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="诊断">
+                            <StackPanel>
+                                <TextBlock Text="▣" FontSize="14" HorizontalAlignment="Center" />
+                                <TextBlock Text="诊断" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="退出">
+                            <StackPanel>
+                                <TextBlock Text="✕" FontSize="14" HorizontalAlignment="Center" />
+                                <TextBlock Text="退出" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </UniformGrid>
                 </Grid>
             </Border>
         </Grid>
