@@ -260,6 +260,29 @@ public partial class OriginalStyleWindow : Window
         RefreshFromBackend();
     }
 
+    private async void GpuMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
+        {
+            return;
+        }
+        int mode = int.Parse(text);
+        if (!_backendProbe.CanSwitchGpuMode(mode))
+        {
+            StatusText.Text = "当前机型不支持该显卡模式";
+            RefreshFromBackend();
+            return;
+        }
+        foreach (ToggleButton item in new[] { GpuEcoButton, GpuHybridButton, GpuDirectButton })
+        {
+            item.IsChecked = ReferenceEquals(item, button);
+        }
+        bool ok = await _backendProbe.SwitchGpuModeAsync(mode);
+        StatusText.Text = ok ? "显卡模式已下发，重启后生效" : "显卡模式下发失败";
+        await _backendProbe.RefreshGpuModeAsync();
+        RefreshFromBackend();
+    }
+
     private async void BatteryMode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
@@ -708,11 +731,18 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        CpuStat.Text = "CPU " + hw.CpuTemp + "℃   " + hw.CpuFanRpm + "rpm";
-        GpuStat.Text = "GPU " + hw.GpuTemp + "℃   " + hw.GpuFanRpm + "rpm";
+        CpuStat.Text = SensorLine(hw, cpu: true);
+        GpuStat.Text = SensorLine(hw, cpu: false);
         BatteryInfo.Text = "电池 " + hw.BatteryPercent + "% · " + hw.BatteryCapacityText;
         int mode = probe.CurrentMode;
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
+        int gpuMode = probe.CurrentGpuMode;
+        if (gpuMode >= 0 && gpuMode <= 2)
+        {
+            GpuEcoButton.IsChecked = gpuMode == 0;
+            GpuHybridButton.IsChecked = gpuMode == 1;
+            GpuDirectButton.IsChecked = gpuMode == 2;
+        }
         SilentModeButton.IsChecked = mode == 2;
         BalancedModeButton.IsChecked = mode == 0;
         TurboModeButton.IsChecked = mode == 1;
@@ -735,6 +765,43 @@ public partial class OriginalStyleWindow : Window
             }
             UpdateMoreSwitchCount();
         }
+    }
+
+    /// <summary>CPU / GPU 那行读数：温度 + 风扇转速 + 风扇百分比。</summary>
+    private static string SensorLine(MechrevoHw hw, bool cpu)
+    {
+        string line = (cpu ? "CPU " : "GPU ")
+            + (cpu ? hw.CpuTemp : hw.GpuTemp) + "℃   "
+            + (cpu ? hw.CpuFanRpm : hw.GpuFanRpm) + "rpm";
+        string duty = FanDutyText(hw, cpu);
+        return duty.Length == 0 ? line : line + " " + duty;
+    }
+
+    /// <summary>
+    /// 风扇百分比（占空比）。读不到风扇信息、或该后端给不出百分比（只报转速）时不显示。
+    /// </summary>
+    private static string FanDutyText(MechrevoHw hw, bool cpu)
+    {
+        if (!hw.IsFanInfoFresh(MechrevoHw.FanInfoMaximumAge))
+        {
+            return "";
+        }
+        int? duty;
+        int rpmFullPercent = hw.FanRpmMaxForPercent;
+        if (rpmFullPercent > 0)
+        {
+            int rpm = cpu ? hw.CpuFanRpm : hw.GpuFanRpm;
+            duty = rpm > 0 ? (int)Math.Round(rpm * 100.0 / rpmFullPercent) : null;
+        }
+        else
+        {
+            duty = cpu ? hw.CpuFanDuty : hw.GpuFanDuty;
+        }
+        if (!duty.HasValue || duty.GetValueOrDefault() < (hw.FanZeroIsMeaningful ? 0 : 1))
+        {
+            return "";
+        }
+        return duty.GetValueOrDefault() + "%";
     }
 
     private static void UpdateModeBorders(ToggleButton selected)
@@ -792,6 +859,7 @@ public partial class OriginalStyleWindow : Window
             BackendStatus.Text = "后端已连接";
             BackendStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4ADE80"));
             BackendLine.Text = probe.Snapshot();
+            await probe.RefreshGpuModeAsync();
             ApplyCapabilities();
             _backendTimer.Start();
         }

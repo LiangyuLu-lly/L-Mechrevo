@@ -451,9 +451,9 @@
                             <TextBlock x:Name="GpuStat" Grid.Column="1" Text="GPU —" Style="{StaticResource StatText}" />
                         </Grid>
                         <UniformGrid Columns="3" Margin="0,2,0,0">
-                            <ToggleButton Content="核显模式" Style="{StaticResource SmallSegment}" />
-                            <ToggleButton Content="混合模式" Style="{StaticResource SmallSegment}" />
-                            <ToggleButton Content="独显直连" Style="{StaticResource SmallSegment}" IsChecked="True" Margin="0" />
+                            <ToggleButton x:Name="GpuEcoButton" Content="核显模式" Tag="0" Style="{StaticResource SmallSegment}" Click="GpuMode_Click" />
+                            <ToggleButton x:Name="GpuHybridButton" Content="混合模式" Tag="1" Style="{StaticResource SmallSegment}" Click="GpuMode_Click" />
+                            <ToggleButton x:Name="GpuDirectButton" Content="独显直连" Tag="2" Style="{StaticResource SmallSegment}" IsChecked="True" Click="GpuMode_Click" Margin="0" />
                         </UniformGrid>
                     </StackPanel>
 

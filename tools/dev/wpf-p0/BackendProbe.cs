@@ -243,6 +243,46 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal int CurrentGpuMode => _service?.CurrentGpuMode ?? -1;
+
+    internal bool CanSwitchGpuMode(int mode)
+    {
+        try
+        {
+            return _hw?.CanSwitchGpuMode(mode) ?? false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SwitchGpuModeAsync(int mode)
+    {
+        try
+        {
+            return _service != null && await _service.SwitchGpuMode(mode).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task RefreshGpuModeAsync()
+    {
+        try
+        {
+            if (_service != null)
+            {
+                await _service.RefreshGpuModeStatus().ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+        }
+    }
+
     internal bool QuickState(string key)
     {
         if (_hw == null)
