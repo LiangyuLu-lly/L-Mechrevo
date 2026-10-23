@@ -98,9 +98,13 @@
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="False" />
+                                </MultiTrigger.Conditions>
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
-                            </Trigger>
+                            </MultiTrigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
                                 <Setter Property="FontWeight" Value="Bold" />

@@ -91,6 +91,9 @@ public partial class OriginalStyleWindow : Window
         {
             defaultMode.IsChecked = true;
             UpdateModeBorders(defaultMode);
+            HighlightSegment(GpuDirectButton);
+            HighlightSegment(Refresh180Button);
+            HighlightSegment(BatteryLongButton);
         }
         MainScroll.SizeChanged += delegate
         {
@@ -296,6 +299,35 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static void HighlightSegment(ToggleButton selected, Color? overrideColor = null)
+    {
+        if (selected.Parent is not UniformGrid grid)
+        {
+            return;
+        }
+        Brush gray = (Brush)Application.Current.Resources["CardBorderBrush"];
+        Brush normal = (Brush)Application.Current.Resources["ControlBrush"];
+        FontFamily regular = (FontFamily)Application.Current.Resources["AppFontFamily"];
+        FontFamily bold = (FontFamily)Application.Current.Resources["AppFontBoldFamily"];
+        foreach (object child in grid.Children)
+        {
+            if (child is ToggleButton button)
+            {
+                button.BorderBrush = gray;
+                button.BorderThickness = new Thickness(1);
+                button.Background = normal;
+                button.FontFamily = regular;
+                button.FontWeight = FontWeights.Normal;
+            }
+        }
+        Color color = overrideColor ?? ((SolidColorBrush)Application.Current.Resources["AccentBrush"]).Color;
+        selected.BorderBrush = new SolidColorBrush(color);
+        selected.BorderThickness = new Thickness(2);
+        selected.Background = new SolidColorBrush(Color.FromArgb(0x30, color.R, color.G, color.B));
+        selected.FontFamily = bold;
+        selected.FontWeight = FontWeights.Bold;
+    }
+
     private async Task SwitchModeAsync(int mode)
     {
         bool ok = await _backendProbe!.SwitchModeAsync(mode);
@@ -308,15 +340,11 @@ public partial class OriginalStyleWindow : Window
         ToggleButton[] buttons = { GpuEcoButton, GpuHybridButton, GpuDirectButton };
         for (int i = 0; i < buttons.Length; i++)
         {
-            ToggleButton button = buttons[i];
-            button.IsChecked = i == mode;
-            button.ClearValue(BorderBrushProperty);
-            if (i == mode)
-            {
-                button.BorderBrush = pending
-                    ? (Brush)new BrushConverter().ConvertFromString("#F59E0B")!
-                    : (Brush)Application.Current.Resources["AccentBrush"];
-            }
+            buttons[i].IsChecked = i == mode;
+        }
+        if (mode >= 0 && mode < buttons.Length)
+        {
+            HighlightSegment(buttons[mode], pending ? Color.FromRgb(245, 158, 11) : null);
         }
     }
 
@@ -364,6 +392,7 @@ public partial class OriginalStyleWindow : Window
         {
             item.IsChecked = ReferenceEquals(item, button);
         }
+        HighlightSegment(button);
         bool ok = await _backendProbe.SwitchGpuModeAsync(mode);
         await _backendProbe.RefreshGpuModeAsync();
         int current = _backendProbe.CurrentGpuMode;
@@ -392,6 +421,7 @@ public partial class OriginalStyleWindow : Window
                 other.IsChecked = ReferenceEquals(other, button);
             }
         }
+        HighlightSegment(button);
         bool ok = await _backendProbe.SetBatteryModeAsync(int.Parse(text));
         StatusText.Text = ok ? "电池档位已下发" : "电池档位下发失败";
     }
@@ -404,6 +434,7 @@ public partial class OriginalStyleWindow : Window
         }
         Refresh180Button.IsChecked = text == "180";
         Refresh60Button.IsChecked = text == "60";
+        HighlightSegment(button);
         bool ok = await _backendProbe.SwitchRefreshRateAsync(int.Parse(text));
         StatusText.Text = ok ? "刷新率已下发" : "刷新率下发失败";
     }
