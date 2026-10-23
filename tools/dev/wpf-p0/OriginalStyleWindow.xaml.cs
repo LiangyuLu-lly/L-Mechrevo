@@ -1706,11 +1706,11 @@ public partial class OriginalStyleWindow : Window
     {
         int opacity = Math.Clamp(AppConfig.Get("ui_button_opacity", 100), 0, 100);
         Color normal = _dark
-            ? Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF)
-            : Color.FromArgb(0x1A, 0x00, 0x00, 0x00);
-        Color hover = _dark
-            ? Color.FromArgb(0x2A, 0xFF, 0xFF, 0xFF)
+            ? Color.FromArgb(0x4D, 0xFF, 0xFF, 0xFF)
             : Color.FromArgb(0x26, 0x00, 0x00, 0x00);
+        Color hover = _dark
+            ? Color.FromArgb(0x5C, 0xFF, 0xFF, 0xFF)
+            : Color.FromArgb(0x33, 0x00, 0x00, 0x00);
         Application.Current.Resources["ControlBrush"] =
             new SolidColorBrush(Color.FromArgb((byte)(normal.A * opacity / 100), normal.R, normal.G, normal.B));
         Application.Current.Resources["ControlHoverBrush"] =
