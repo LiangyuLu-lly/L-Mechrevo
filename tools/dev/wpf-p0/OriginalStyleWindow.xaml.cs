@@ -175,18 +175,16 @@ public partial class OriginalStyleWindow : Window
     private void UpdateQuickTileStates()
     {
         BackendProbe? probe = _backendProbe;
-        if (probe == null)
+        if (probe == null || QuickTileGrid == null)
         {
             return;
         }
-        UpdateQuickTile(FanTile, "fanboost", probe);
-        UpdateQuickTile(CameraTile, "webcam", probe);
-        UpdateQuickTile(MicTile, "micmute", probe);
-        UpdateQuickTile(WinKeyTile, "winkey", probe);
-        UpdateQuickTile(ScreenOffTile, "monitoroff", probe);
-        if (CustomTile?.Tag is string customKey)
+        foreach (object child in QuickTileGrid.Children)
         {
-            UpdateQuickTile(CustomTile, customKey, probe);
+            if (child is ToggleButton tile && tile.Tag is string key)
+            {
+                UpdateQuickTile(tile, key, probe);
+            }
         }
     }
 
@@ -202,11 +200,6 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        if (CustomTile.Tag is string customKey)
-        {
-            _ = ToggleCustomTileAsync(customKey);
-            return;
-        }
         (string Key, string Label, string Glyph)[] choices =
         {
             ("fanboost", "风扇强冷", "\uE9CA"), ("webcam", "摄像头", "\uE722"),
@@ -217,14 +210,14 @@ public partial class OriginalStyleWindow : Window
         List<QuickChoice> list = new List<QuickChoice>();
         foreach ((string key, string label, string glyph) in choices)
         {
-            if (_backendProbe.SupportsQuick(key))
+            if (_backendProbe.SupportsQuick(key) && !HasQuickTile(key))
             {
                 list.Add(new QuickChoice(key, label, glyph));
             }
         }
         if (list.Count == 0)
         {
-            StatusText.Text = "没有可用的快捷开关";
+            StatusText.Text = "没有可添加的快捷开关";
             return;
         }
         QuickTilePickerWindow picker = new QuickTilePickerWindow(list)
@@ -233,26 +226,63 @@ public partial class OriginalStyleWindow : Window
         };
         if (picker.ShowDialog() == true && picker.SelectedChoice is QuickChoice choice)
         {
-            CustomTile.Tag = choice.Key;
-            CustomTileLabel.Text = choice.Label;
-            CustomTileIcon.Text = choice.Glyph;
-            CustomTile.IsChecked = _backendProbe.QuickState(choice.Key);
+            AddQuickTile(choice);
         }
     }
 
-    private async Task ToggleCustomTileAsync(string key)
+    private bool HasQuickTile(string key)
     {
-        if (_backendProbe == null)
+        foreach (object child in QuickTileGrid.Children)
         {
-            return;
+            if (child is ToggleButton tile && tile.Tag is string existing
+                && string.Equals(existing, key, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
         }
-        bool on = CustomTile.IsChecked == true;
-        bool ok = await _backendProbe.SwitchQuickAsync(key, on);
-        if (!ok)
+        return false;
+    }
+
+    private void AddQuickTile(QuickChoice choice)
+    {
+        ToggleButton tile = new ToggleButton
         {
-            CustomTile.IsChecked = !on;
+            Style = (Style)FindResource("Tile"),
+            Tag = choice.Key,
+            IsChecked = _backendProbe?.QuickState(choice.Key) == true
+        };
+        tile.Click += QuickTile_Click;
+        StackPanel content = new StackPanel();
+        TextBlock icon = new TextBlock
+        {
+            Text = choice.Glyph,
+            FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"),
+            FontSize = 16,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        icon.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+        TextBlock label = new TextBlock
+        {
+            Text = choice.Label,
+            FontSize = 9,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+        content.Children.Add(icon);
+        content.Children.Add(label);
+        tile.Content = content;
+        int customIndex = QuickTileGrid.Children.IndexOf(CustomTile);
+        if (customIndex < 0)
+        {
+            QuickTileGrid.Children.Add(tile);
         }
-        StatusText.Text = ok ? "快捷开关已下发：" + key : "快捷开关下发失败：" + key;
+        else
+        {
+            QuickTileGrid.Children.Insert(customIndex, tile);
+        }
+        QuickTileGrid.Columns = Math.Max(6, QuickTileGrid.Children.Count);
+        StatusText.Text = "已添加快捷开关：" + choice.Label;
     }
 
     private void BuildMoreSwitches()

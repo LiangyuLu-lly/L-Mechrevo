@@ -390,7 +390,7 @@
                     <!-- 快捷开关 -->
                     <StackPanel x:Name="QuickSection" Style="{StaticResource Section}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="快捷开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
-                        <UniformGrid Columns="6" Rows="1">
+                        <UniformGrid x:Name="QuickTileGrid" Columns="6" Rows="1">
                             <ToggleButton x:Name="FanTile" Style="{StaticResource Tile}" Tag="fanboost" Click="QuickTile_Click" IsChecked="True">
                                 <StackPanel>
                                     <TextBlock Text="&#xE9CA;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
