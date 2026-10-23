@@ -113,10 +113,10 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="CheckBox">
                             <StackPanel Orientation="Horizontal">
-                                <Border x:Name="Track" Width="42" Height="24" CornerRadius="12"
+                                <Border x:Name="Track" Width="34" Height="19" CornerRadius="10"
                                         Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
-                                    <Ellipse x:Name="Knob" Width="18" Height="18" Fill="White"
-                                             HorizontalAlignment="Left" Margin="3,0,0,0" />
+                                    <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White"
+                                             HorizontalAlignment="Left" Margin="2,0,0,0" />
                                 </Border>
                                 <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
@@ -124,7 +124,7 @@
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                    <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0" />
+                                    <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

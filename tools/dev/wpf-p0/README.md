@@ -11,7 +11,7 @@
 
 ## 三种形态
 
-- `OriginalStyleWindow`（默认启动）：480×860 DIP，对应机主原版小窗在 150% 缩放下的约 720×1290 物理像素；单列滚动、分区标题、底部 dock。
+- `OriginalStyleWindow`（默认启动）：420×860 DIP，对应机主原版小窗在 150% 缩放下的约 720×1290 物理像素；单列滚动、分区标题、底部 dock。
 - `CompactWindow`：420×529 DIP 的 WinForms 原版最小客户区尺寸。
 - `MainWindow`：1180×800 宽屏仪表盘，用于对比。
 

@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="L-Mechrevo · 原版小窗 P0"
-        Width="480" Height="860"
-        MinWidth="420" MinHeight="700"
+        Width="420" Height="860"
+        MinWidth="380" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -36,9 +36,31 @@
             <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Margin" Value="0,0,8,8" />
-            <Setter Property="Padding" Value="8,9" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Padding" Value="2,4" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="RowSwitch" TargetType="CheckBox" BasedOn="{StaticResource SwitchBox}">
             <Setter Property="FontSize" Value="14" />
@@ -80,7 +102,7 @@
 
             <ScrollViewer x:Name="MainScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly" CanContentScroll="False" Background="Transparent">
-                <StackPanel x:Name="ContentPanel" Width="440" HorizontalAlignment="Left">
+                <StackPanel x:Name="ContentPanel" Width="392" HorizontalAlignment="Left">
 
                     <!-- 性能模式 -->
                     <StackPanel Style="{StaticResource Section}">
@@ -96,7 +118,7 @@
                             </StackPanel>
                             <TextBlock Grid.Column="1" Text="CPU 85℃   52W   4427rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
-                        <UniformGrid Columns="4" Margin="0,2,0,0">
+                        <UniformGrid Columns="4" Width="392" Margin="0,2,0,0">
                             <ToggleButton Content="静音" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="平衡" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="狂暴" Style="{StaticResource BigSegment}" IsChecked="True" />
@@ -107,41 +129,41 @@
                     <!-- 快捷开关 -->
                     <StackPanel Style="{StaticResource Section}">
                         <TextBlock Text="⚙  快捷开关" Style="{StaticResource SectionHeader}" />
-                        <UniformGrid Columns="3" Rows="2">
+                        <UniformGrid Columns="6" Rows="1" Width="392">
                             <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
-                                    <TextBlock Text="⏻" FontSize="22" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="风扇强冷" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                                    <TextBlock Text="⏻" FontSize="17" HorizontalAlignment="Center" Foreground="#F87171" />
+                                    <TextBlock Text="风扇强冷" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
-                                    <TextBlock Text="▣" FontSize="20" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="摄像头" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                                    <TextBlock Text="▣" FontSize="16" HorizontalAlignment="Center" Foreground="#F87171" />
+                                    <TextBlock Text="摄像头" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton Style="{StaticResource Tile}" IsChecked="True" Margin="0,0,0,8">
+                            <ToggleButton Style="{StaticResource Tile}" IsChecked="True" >
                                 <StackPanel>
-                                    <TextBlock Text="⌁" FontSize="22" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="麦克风" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                                    <TextBlock Text="⌁" FontSize="17" HorizontalAlignment="Center" Foreground="#F87171" />
+                                    <TextBlock Text="麦克风" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}">
                                 <StackPanel>
-                                    <TextBlock Text="⌘" FontSize="20" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Win键锁" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                                    <TextBlock Text="⌘" FontSize="16" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Win键锁" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}">
                                 <StackPanel>
-                                    <TextBlock Text="▭" FontSize="20" HorizontalAlignment="Center" />
-                                    <TextBlock Text="息屏" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                                    <TextBlock Text="▭" FontSize="16" HorizontalAlignment="Center" />
+                                    <TextBlock Text="息屏" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton Style="{StaticResource Tile}" Margin="0,0,0,8">
+                            <ToggleButton Style="{StaticResource Tile}" >
                                 <StackPanel>
-                                    <TextBlock Text="+" FontSize="24" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="自定义" FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                                    <TextBlock Text="+" FontSize="20" HorizontalAlignment="Center" Foreground="#F87171" />
+                                    <TextBlock Text="自定义" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                         </UniformGrid>
@@ -157,7 +179,7 @@
                             <TextBlock Text="▣  显卡模式" Style="{StaticResource SectionHeader}" Margin="0" />
                             <TextBlock Grid.Column="1" Text="GPU 73℃   90W   4698rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
-                        <UniformGrid Columns="3" Margin="0,2,0,0">
+                        <UniformGrid Columns="3" Width="392" Margin="0,2,0,0">
                             <ToggleButton Content="核显模式" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="混合模式" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="独显直连" Style="{StaticResource BigSegment}" IsChecked="True" Margin="0" />
@@ -170,7 +192,7 @@
                             <TextBlock Text="▭  屏幕" Style="{StaticResource SectionHeader}" Margin="0" />
                             <CheckBox Content="自动刷新率" Style="{StaticResource RowSwitch}" HorizontalAlignment="Right" FontSize="13" />
                         </Grid>
-                        <UniformGrid Columns="2" Margin="0,0,0,6">
+                        <UniformGrid Columns="2" Width="392" Margin="0,0,0,6">
                             <ToggleButton Content="180" Style="{StaticResource BigSegment}" IsChecked="True" />
                             <ToggleButton Content="60" Style="{StaticResource BigSegment}" Margin="0" />
                         </UniformGrid>
@@ -212,7 +234,7 @@
                             <TextBlock Text="▭  电池" Style="{StaticResource SectionHeader}" Margin="0" />
                             <TextBlock Text="圆口 230/240W · 已充满" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
                         </Grid>
-                        <UniformGrid Columns="3" Margin="0,0,0,10">
+                        <UniformGrid Columns="3" Width="392" Margin="0,0,0,10">
                             <ToggleButton Content="长效模式" Style="{StaticResource BigSegment}" IsChecked="True" />
                             <ToggleButton Content="平衡模式" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="工作站模式" Style="{StaticResource BigSegment}" Margin="0" />
