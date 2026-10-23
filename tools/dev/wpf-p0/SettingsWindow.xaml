@@ -239,6 +239,14 @@
                                 <TextBlock x:Name="BackgroundScrimText" Text="50%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
                             </StackPanel>
                         </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="底栏不透明度" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="DockOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="70"
+                                        VerticalAlignment="Center" ValueChanged="DockOpacity_Changed" />
+                                <TextBlock x:Name="DockOpacityText" Text="70%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </Border>
 

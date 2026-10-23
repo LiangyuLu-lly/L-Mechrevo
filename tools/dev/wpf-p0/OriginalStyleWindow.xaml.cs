@@ -88,6 +88,7 @@ public partial class OriginalStyleWindow : Window
         };
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
+        ApplyDockOpacity();
         _backendTimer.Tick += (_, _) =>
         {
             if (_backendProbe != null)
@@ -1641,6 +1642,7 @@ public partial class OriginalStyleWindow : Window
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
+        ApplyDockOpacity();
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
@@ -1659,6 +1661,7 @@ public partial class OriginalStyleWindow : Window
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
+        ApplyDockOpacity();
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
@@ -1694,6 +1697,15 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
+    }
+
+    internal void ApplyDockOpacity()
+    {
+        int opacity = Math.Clamp(AppConfig.Get("ui_dock_opacity", 70), 0, 100);
+        byte alpha = (byte)(opacity * 255 / 100);
+        Color baseColor = _dark ? Color.FromRgb(0x16, 0x1A, 0x20) : Colors.White;
+        Application.Current.Resources["DockBrush"] =
+            new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
     }
 
     private void UpdateTitleIcon()
