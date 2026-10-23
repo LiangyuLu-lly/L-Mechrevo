@@ -304,6 +304,12 @@
             </Setter>
         </Style>
 
+        <Style x:Key="BatterySegment" TargetType="ToggleButton" BasedOn="{StaticResource SmallSegment}">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="FontSize" Value="10" />
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -348,7 +354,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE9CA;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                <TextBlock Text="&#xE9CA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock Text="性能模式" Style="{StaticResource SectionHeader}" Margin="0" />
                                 <CheckBox Content="GPU 超频" Style="{StaticResource HeaderSwitch}" Margin="14,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
@@ -364,7 +370,7 @@
 
                     <!-- 快捷开关 -->
                     <StackPanel Style="{StaticResource Section}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,6,0" VerticalAlignment="Center" /><TextBlock Text="快捷开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="快捷开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                         <UniformGrid Columns="6" Rows="1">
                             <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
@@ -412,7 +418,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,6,0" VerticalAlignment="Center" /><TextBlock Text="显卡模式" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="显卡模式" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock Grid.Column="1" Text="GPU 73℃   90W   4698rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
                         <UniformGrid Columns="3" Margin="0,2,0,0">
@@ -425,7 +431,7 @@
                     <!-- 屏幕 -->
                     <StackPanel Style="{StaticResource Section}">
                         <Grid>
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,6,0" VerticalAlignment="Center" /><TextBlock Text="屏幕" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="屏幕" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <CheckBox Content="自动刷新率" Style="{StaticResource HeaderSwitch}" HorizontalAlignment="Right" />
                         </Grid>
                         <UniformGrid Columns="2" Margin="0,0,0,6">
@@ -475,13 +481,13 @@
                     <!-- 电池 -->
                     <StackPanel Style="{StaticResource Section}">
                         <Grid>
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE83F;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,6,0" VerticalAlignment="Center" /><TextBlock Text="电池" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE83F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="电池" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock Text="圆口 230/240W · 已充满" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
                         </Grid>
                         <UniformGrid Columns="3" Margin="0,0,0,10">
-                            <ToggleButton Content="长效模式" Style="{StaticResource SmallSegment}" IsChecked="True" />
-                            <ToggleButton Content="平衡模式" Style="{StaticResource SmallSegment}" />
-                            <ToggleButton Content="工作站模式" Style="{StaticResource SmallSegment}" Margin="0" />
+                            <ToggleButton Content="长效模式" Style="{StaticResource BatterySegment}" IsChecked="True" />
+                            <ToggleButton Content="平衡模式" Style="{StaticResource BatterySegment}" />
+                            <ToggleButton Content="工作站模式" Style="{StaticResource BatterySegment}" Margin="0" />
                         </UniformGrid>
                         <CheckBox Content="启用无极限充功能(实验性)" Style="{StaticResource RowSwitch}" />
                         <CheckBox Content="关闭 EC 直写充电上限（写入异常时用）" Style="{StaticResource RowSwitch}" />
@@ -491,7 +497,7 @@
                     <!-- 灯光 -->
                     <StackPanel Style="{StaticResource Section}">
                         <Grid>
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE706;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,6,0" VerticalAlignment="Center" /><TextBlock Text="灯光" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE706;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="灯光" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <TextBlock Text="自动关闭时间" Style="{StaticResource StatText}" Margin="0,0,10,0" />
                                 <Border Background="{DynamicResource ControlBrush}" CornerRadius="8" Padding="12,6">
@@ -525,7 +531,7 @@
                     <!-- 更多开关 -->
                     <StackPanel Style="{StaticResource Section}" Margin="0,0,0,10">
                         <Grid>
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,6,0" VerticalAlignment="Center" /><TextBlock Text="更多开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="更多开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock Text="15/31 开启" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
                         </Grid>
                     </StackPanel>
