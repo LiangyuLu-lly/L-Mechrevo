@@ -4,7 +4,7 @@
         Title="L-Mechrevo · 原版小窗 P0"
         Width="420" Height="720"
         MinWidth="420" MinHeight="620"
-        ResizeMode="CanResize"
+        ResizeMode="NoResize"
         WindowStyle="SingleBorderWindow"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
