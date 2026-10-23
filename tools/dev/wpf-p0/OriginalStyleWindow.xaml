@@ -674,7 +674,7 @@
             </ScrollViewer>
 
             <!-- 底部 dock：模仿原版悬浮底栏 -->
-            <Border Grid.Row="4" Margin="12,0,12,8" Background="{DynamicResource CardBrush}" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,6">
+            <Border Grid.Row="4" Margin="12,0,12,8" Background="{DynamicResource DockBrush}" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,6">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />

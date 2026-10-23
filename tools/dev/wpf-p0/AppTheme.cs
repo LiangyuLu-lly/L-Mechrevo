@@ -12,6 +12,7 @@ internal static class AppTheme
         {
             resources["WindowBgBrush"] = Brush("#0B0D10");
             resources["CardBrush"] = Brush("#FF161A20");
+            resources["DockBrush"] = Brush("#B3161A20");
             resources["CardBorderBrush"] = Brush("#2AFFFFFF");
             resources["ControlBrush"] = Brush("#22FFFFFF");
             resources["ControlHoverBrush"] = Brush("#2AFFFFFF");
@@ -23,6 +24,7 @@ internal static class AppTheme
         {
             resources["WindowBgBrush"] = Brush("#F7F8FA");
             resources["CardBrush"] = Brush("#FFFFFFFF");
+            resources["DockBrush"] = Brush("#CCFFFFFF");
             resources["CardBorderBrush"] = Brush("#33000000");
             resources["ControlBrush"] = Brush("#1A000000");
             resources["ControlHoverBrush"] = Brush("#26000000");
