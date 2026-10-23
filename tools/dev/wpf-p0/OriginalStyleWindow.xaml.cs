@@ -169,40 +169,74 @@ public partial class OriginalStyleWindow : Window
 
     private void BuildMoreSwitches()
     {
-        if (MoreSwitchesGrid == null || MoreSwitchesGrid.Children.Count > 0 || _backendProbe == null)
+        if (MoreGroupsPanel == null || MoreGroupsPanel.Children.Count > 0 || _backendProbe == null)
         {
             return;
         }
-        (string Key, string Label)[] items =
+        (string Title, (string Key, string Label)[] Items)[] groups =
         {
-            ("touchpad", "触摸板"), ("wifi", "WiFi"), ("bt", "蓝牙"), ("webcam", "摄像头"),
-            ("micmute", "麦克风静音"), ("winkey", "Win 键锁"), ("fnkey", "Fn 键锁"),
-            ("numpad", "数字键盘"), ("capslock", "大小写锁定"), ("osd", "OSD 提示"),
-            ("usb", "USB 充电"), ("highperf", "高性能电源计划"), ("apuboost", "APU 防缩缸"),
-            ("fanboost", "风扇强冷"), ("acrecovery", "接通电源自动开机"),
-            ("deepsleep", "深度睡眠"), ("gamewhitelist", "游戏白名单"),
-            ("taskbarautohide", "任务栏自动隐藏"), ("transparency", "透明效果"),
-            ("darktheme", "深色主题"), ("monitoroff", "关闭显示器"), ("winupdate", "Windows 更新")
+            ("输入设备", new (string, string)[]
+            {
+                ("touchpad", "触摸板"), ("touchpadtoggle", "触摸板切换键"), ("wifi", "WiFi"),
+                ("bt", "蓝牙"), ("webcam", "摄像头"), ("micmute", "麦克风静音"), ("numpad", "数字键盘")
+            }),
+            ("键盘", new (string, string)[]
+            {
+                ("winkey", "Win 键锁"), ("fnkey", "Fn 键锁"), ("copilot", "Copilot 键"),
+                ("osd", "OSD 提示"), ("capslock", "大小写锁定")
+            }),
+            ("电源与系统", new (string, string)[]
+            {
+                ("usb", "USB 充电"), ("highperf", "高性能电源计划"), ("apuboost", "APU 防缩缸"),
+                ("fanboost", "风扇强冷"), ("acrecovery", "接通电源自动开机"), ("cpuadvperf", "CPU 高级性能"),
+                ("gamewhitelist", "游戏白名单"), ("taskbarautohide", "任务栏自动隐藏"),
+                ("transparency", "透明效果"), ("darktheme", "深色主题"), ("deepsleep", "深度睡眠"),
+                ("monitoroff", "关闭显示器"), ("winupdate", "Windows 更新")
+            }),
+            ("睡眠", new (string, string)[]
+            {
+                ("sleepnetoff", "睡眠断网"), ("sleepaway", "离开模式"), ("sleepsysreq", "系统请求"),
+                ("sleeprtcwake", "RTC 唤醒"), ("sleepdeep", "深度睡眠策略"), ("sleephibernate", "休眠")
+            })
         };
-        int created = 0;
-        foreach ((string key, string label) in items)
+        foreach ((string title, (string Key, string Label)[] items) in groups)
         {
-            if (!_backendProbe.SupportsQuick(key))
+            List<CheckBox> visible = new List<CheckBox>();
+            foreach ((string key, string label) in items)
+            {
+                if (!_backendProbe.SupportsQuick(key))
+                {
+                    continue;
+                }
+                visible.Add(new CheckBox
+                {
+                    Content = label,
+                    Style = (Style)FindResource("RowSwitch"),
+                    Tag = key,
+                    IsChecked = _backendProbe.QuickState(key),
+                    Margin = new Thickness(0, 1, 8, 1),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+            if (visible.Count == 0)
             {
                 continue;
             }
-            CheckBox toggle = new CheckBox
+            TextBlock header = new TextBlock
             {
-                Content = label,
-                Style = (Style)FindResource("RowSwitch"),
-                Tag = key,
-                IsChecked = _backendProbe.QuickState(key),
-                Margin = new Thickness(0, 2, 8, 2),
-                VerticalAlignment = VerticalAlignment.Center
+                Text = title,
+                Style = (Style)FindResource("MutedText"),
+                FontSize = 10,
+                Margin = new Thickness(0, 8, 0, 2)
             };
-            toggle.Click += MoreSwitch_Click;
-            MoreSwitchesGrid.Children.Add(toggle);
-            created++;
+            UniformGrid grid = new UniformGrid { Columns = 2, Margin = new Thickness(0) };
+            foreach (CheckBox box in visible)
+            {
+                box.Click += MoreSwitch_Click;
+                grid.Children.Add(box);
+            }
+            MoreGroupsPanel.Children.Add(header);
+            MoreGroupsPanel.Children.Add(grid);
         }
         UpdateMoreSwitchCount();
     }
@@ -223,19 +257,41 @@ public partial class OriginalStyleWindow : Window
 
     private void UpdateMoreSwitchCount()
     {
-        if (MoreSwitchCount == null || MoreSwitchesGrid == null)
+        if (MoreSwitchCount == null || MoreGroupsPanel == null)
         {
             return;
         }
         int on = 0;
-        foreach (object child in MoreSwitchesGrid.Children)
+        int total = 0;
+        foreach (object child in EnumerateCheckBoxes(MoreGroupsPanel))
         {
-            if (child is CheckBox box && box.IsChecked == true)
+            if (child is CheckBox box)
             {
-                on++;
+                total++;
+                if (box.IsChecked == true)
+                {
+                    on++;
+                }
             }
         }
-        MoreSwitchCount.Text = on + "/" + MoreSwitchesGrid.Children.Count + " 开启";
+        MoreSwitchCount.Text = on + "/" + total + " 开启";
+    }
+
+    private static IEnumerable<CheckBox> EnumerateCheckBoxes(DependencyObject root)
+    {
+        int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is CheckBox box)
+            {
+                yield return box;
+            }
+            foreach (CheckBox nested in EnumerateCheckBoxes(child))
+            {
+                yield return nested;
+            }
+        }
     }
 
     private void RefreshFromBackend()
@@ -265,11 +321,11 @@ public partial class OriginalStyleWindow : Window
         {
             batteryButtons[i].IsChecked = i == batteryMode;
         }
-        if (MoreSwitchesGrid != null)
+        if (MoreGroupsPanel != null)
         {
-            foreach (object child in MoreSwitchesGrid.Children)
+            foreach (CheckBox box in EnumerateCheckBoxes(MoreGroupsPanel))
             {
-                if (child is CheckBox box && box.Tag is string key)
+                if (box.Tag is string key)
                 {
                     box.IsChecked = probe.QuickState(key);
                 }
