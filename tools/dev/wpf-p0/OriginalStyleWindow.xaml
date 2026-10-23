@@ -180,13 +180,15 @@
         </Style>
 
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Margin" Value="2,1" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="FontSize" Value="10" />
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="{TemplateBinding Padding}">
                             <ContentPresenter />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -203,8 +205,8 @@
         </Style>
 
         <Style x:Key="RoundCombo" TargetType="ComboBox">
-            <Setter Property="Height" Value="27" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Height" Value="25" />
+            <Setter Property="FontSize" Value="10" />
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
             <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
@@ -217,7 +219,7 @@
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="7" />
-                            <ContentPresenter Margin="8,0,24,0" VerticalAlignment="Center"
+                            <ContentPresenter Margin="7,0,20,0" VerticalAlignment="Center"
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               IsHitTestVisible="False" />
@@ -226,8 +228,8 @@
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
                                         <Border Background="Transparent">
-                                            <Path Data="M 0 0 L 4 4 L 8 0" Stroke="{DynamicResource MutedBrush}"
-                                                  StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                            <Path Data="M 0 0 L 3 3 L 6 0" Stroke="{DynamicResource MutedBrush}"
+                                                  StrokeThickness="1.2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" />
                                         </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
@@ -235,7 +237,8 @@
                             <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
                                 <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
-                                        BorderThickness="1" CornerRadius="8" Margin="0,4,0,0" Padding="4">
+                                        BorderThickness="1" CornerRadius="7" Margin="0,3,0,0" Padding="3"
+                                        Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                     <ScrollViewer MaxHeight="220">
                                         <ItemsPresenter />
                                     </ScrollViewer>
