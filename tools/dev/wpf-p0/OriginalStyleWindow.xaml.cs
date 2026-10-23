@@ -461,20 +461,14 @@ public partial class OriginalStyleWindow : Window
         string modeName = button.Content?.ToString() ?? ("模式 " + mode);
         if (!_backendProbe.IsBaolongda)
         {
-            MessageBoxResult choice = MessageBox.Show(
-                "切换到「" + modeName + "」需要重启显卡模式。\n\n" +
-                "是：切换并请求重启\n" +
-                "否：仅切换，稍后手动重启\n" +
-                "取消：不切换",
-                "L-Mechrevo 显卡模式",
-                MessageBoxButton.YesNoCancel,
-                MessageBoxImage.Question);
-            if (choice == MessageBoxResult.Cancel)
+            GpuRestartPromptWindow prompt = new GpuRestartPromptWindow(modeName) { Owner = this };
+            prompt.ShowDialog();
+            if (prompt.Result == GpuPromptResult.Cancel)
             {
                 RefreshFromBackend();
                 return;
             }
-            if (choice == MessageBoxResult.Yes)
+            if (prompt.Result == GpuPromptResult.SwitchAndRestart)
             {
                 bool restartOk = await _backendProbe.RequestGpuModeRestartAsync(mode);
                 if (restartOk)
