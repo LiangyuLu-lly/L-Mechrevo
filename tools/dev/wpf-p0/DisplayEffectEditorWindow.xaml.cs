@@ -62,6 +62,7 @@ public partial class DisplayEffectEditorWindow : Window
 
         Slider slider = new()
         {
+            Style = (Style)Application.Current.Resources["RoundSlider"],
             Minimum = min,
             Maximum = max,
             Value = value,

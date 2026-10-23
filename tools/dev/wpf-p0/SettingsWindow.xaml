@@ -226,7 +226,7 @@
                         <Grid Margin="0,8,0,0">
                             <TextBlock Text="背景不透明度" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Slider x:Name="BackgroundOpacitySlider" Width="150" Minimum="0" Maximum="100" Value="65"
+                                <Slider x:Name="BackgroundOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="65"
                                         VerticalAlignment="Center" ValueChanged="BackgroundOpacity_Changed" />
                                 <TextBlock x:Name="BackgroundOpacityText" Text="65%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
                             </StackPanel>
@@ -234,7 +234,7 @@
                         <Grid Margin="0,6,0,0">
                             <TextBlock Text="背景遮罩" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Slider x:Name="BackgroundScrimSlider" Width="150" Minimum="0" Maximum="100" Value="50"
+                                <Slider x:Name="BackgroundScrimSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="50"
                                         VerticalAlignment="Center" ValueChanged="BackgroundScrim_Changed" />
                                 <TextBlock x:Name="BackgroundScrimText" Text="50%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
                             </StackPanel>
