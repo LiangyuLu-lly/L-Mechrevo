@@ -283,7 +283,7 @@ public partial class OriginalStyleWindow : Window
         {
             selected.IsChecked = true;
             UpdateModeBorders(selected);
-            StatusText.Text = "性能模式：" + selected.Content;
+            StatusText.Text = "性能模式：" + (selected.Content as TextBlock)?.Text;
             int mode = selected == SilentModeButton ? 2
                 : selected == BalancedModeButton ? 0
                 : selected == TurboModeButton ? 1

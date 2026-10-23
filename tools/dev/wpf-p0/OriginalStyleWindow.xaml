@@ -100,9 +100,9 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#2AFFFFFF" />
+                                <Setter TargetName="Bd" Property="Background" Value="#38FFFFFF" />
                                 <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
-                                <Setter Property="FontWeight" Value="Normal" />
+                                <Setter Property="FontWeight" Value="Bold" />
                                 <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -374,10 +374,26 @@
                             <TextBlock x:Name="CpuStat" Grid.Column="1" Text="CPU —" Style="{StaticResource StatText}" />
                         </Grid>
                         <UniformGrid x:Name="ModeGrid" Columns="4" Margin="0,2,0,0">
-                            <ToggleButton x:Name="SilentModeButton" Content="静音" Tag="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton x:Name="BalancedModeButton" Content="平衡" Tag="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton x:Name="TurboModeButton" Content="狂暴" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton x:Name="CustomModeButton" Content="自定义" Tag="#A78BFA" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" />
+                            <ToggleButton x:Name="SilentModeButton" Tag="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
+                                <TextBlock Text="静音" LineHeight="16" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                           FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                           FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </ToggleButton>
+                            <ToggleButton x:Name="BalancedModeButton" Tag="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
+                                <TextBlock Text="平衡" LineHeight="16" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                           FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                           FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </ToggleButton>
+                            <ToggleButton x:Name="TurboModeButton" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
+                                <TextBlock Text="狂暴" LineHeight="16" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                           FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                           FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </ToggleButton>
+                            <ToggleButton x:Name="CustomModeButton" Tag="#A78BFA" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" >
+                                <TextBlock Text="自定义" LineHeight="16" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                           FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                           FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </ToggleButton>
                         </UniformGrid>
                     </StackPanel>
 
