@@ -6,6 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using MechrevoLite;
+using MechrevoLite.Display;
 using MechrevoLite.Hardware;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -43,6 +44,7 @@ internal sealed class DragGhostAdorner : Adorner
 public partial class OriginalStyleWindow : Window
 {
     private bool _dark = true;
+    private bool _syncingBrightness;
     private BackendProbe? _backendProbe;
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
     private const string QuickTilesConfigKey = "perf_quick_tiles";
@@ -98,6 +100,7 @@ public partial class OriginalStyleWindow : Window
             Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
             ApplySavedQuickTiles();
             ApplyMoreSectionState();
+            RefreshBrightness();
         };
     }
 
@@ -212,6 +215,45 @@ public partial class OriginalStyleWindow : Window
             node = System.Windows.Media.VisualTreeHelper.GetParent(node);
         }
         return null;
+    }
+
+    private void RefreshBrightness()
+    {
+        try
+        {
+            if (ScreenBrightness.TryGet(out int brightness))
+            {
+                _syncingBrightness = true;
+                BrightnessSlider.Value = Math.Clamp(brightness, 0, 100);
+                BrightnessText.Text = brightness + "%";
+                _syncingBrightness = false;
+            }
+        }
+        catch
+        {
+            _syncingBrightness = false;
+        }
+    }
+
+    private void Brightness_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (BrightnessText == null)
+        {
+            return;
+        }
+        int value = (int)Math.Round(e.NewValue);
+        BrightnessText.Text = value + "%";
+        if (_syncingBrightness)
+        {
+            return;
+        }
+        try
+        {
+            ScreenBrightness.Set(value);
+        }
+        catch
+        {
+        }
     }
 
     private void UpdateContentWidth()
