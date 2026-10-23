@@ -22,7 +22,5 @@
             <Button Content="恢复默认" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="ResetButton_Click" />
         </Grid>
         <StackPanel x:Name="SliderPanel" Grid.Row="1" Margin="0,14,0,8" />
-        <Button Content="关闭" Style="{StaticResource FlatButton}" MinWidth="80" HorizontalAlignment="Center"
-                Grid.Row="2" Click="CloseButton_Click" />
     </Grid>
 </Window>

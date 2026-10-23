@@ -58,8 +58,5 @@
             <TextBlock Text="开启后，校色下拉列表将出现「自定义」选项，经 Windows 颜色管理应用所选 ICC（不经由 GCU）；关闭则取消所有已应用 ICC。"
                        Style="{StaticResource HintText}" Margin="0,8,0,0" />
         </StackPanel>
-
-        <Button Grid.Row="5" Content="关闭" Style="{StaticResource FlatButton}" MinWidth="80"
-                HorizontalAlignment="Right" Click="CloseButton_Click" />
     </Grid>
 </Window>
