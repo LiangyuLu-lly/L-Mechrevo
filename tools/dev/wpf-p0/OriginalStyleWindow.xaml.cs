@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using MechrevoLite.Hardware;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
@@ -131,6 +132,7 @@ public partial class OriginalStyleWindow : Window
             BackendStatus.Text = "后端已连接";
             BackendStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4ADE80"));
             BackendLine.Text = probe.Snapshot();
+            ApplyCapabilities();
             _backendTimer.Start();
         }
         else
@@ -142,6 +144,28 @@ public partial class OriginalStyleWindow : Window
             _backendProbe = null;
         }
         ConnectBackendButton.IsEnabled = true;
+    }
+
+    private void ApplyCapabilities()
+    {
+        if (_backendProbe?.Capabilities is not MechrevoDeviceCapabilities caps)
+        {
+            return;
+        }
+        try
+        {
+            GpuSection.Visibility = (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap) ? Visibility.Visible : Visibility.Collapsed;
+            ScreenSection.Visibility = (caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming) ? Visibility.Visible : Visibility.Collapsed;
+            LightingSection.Visibility = (caps.Keyboard || caps.Lightbar || caps.LogoLight) ? Visibility.Visible : Visibility.Collapsed;
+            FanTile.Visibility = _backendProbe.SupportsQuick("fanboost") ? Visibility.Visible : Visibility.Collapsed;
+            CameraTile.Visibility = _backendProbe.SupportsQuick("webcam") ? Visibility.Visible : Visibility.Collapsed;
+            MicTile.Visibility = _backendProbe.SupportsQuick("micmute") ? Visibility.Visible : Visibility.Collapsed;
+            WinKeyTile.Visibility = _backendProbe.SupportsQuick("winkey") ? Visibility.Visible : Visibility.Collapsed;
+            ScreenOffTile.Visibility = _backendProbe.SupportsQuick("monitoroff") ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch
+        {
+        }
     }
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)

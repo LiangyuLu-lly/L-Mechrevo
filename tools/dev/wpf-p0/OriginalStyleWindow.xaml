@@ -348,7 +348,7 @@
                 <StackPanel x:Name="ContentPanel" Margin="12,0,5,8" HorizontalAlignment="Left">
 
                     <!-- 性能模式 -->
-                    <StackPanel Style="{StaticResource Section}">
+                    <StackPanel x:Name="PerfSection" Style="{StaticResource Section}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -370,7 +370,7 @@
                     </StackPanel>
 
                     <!-- P1 后端实时（只读） -->
-                    <StackPanel Style="{StaticResource Section}">
+                    <StackPanel x:Name="BackendSection" Style="{StaticResource Section}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -383,40 +383,40 @@
                     </StackPanel>
 
                     <!-- 快捷开关 -->
-                    <StackPanel Style="{StaticResource Section}">
+                    <StackPanel x:Name="QuickSection" Style="{StaticResource Section}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="快捷开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                         <UniformGrid Columns="6" Rows="1">
-                            <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
+                            <ToggleButton x:Name="FanTile" Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
                                     <TextBlock Text="&#xE9CA;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                     <TextBlock Text="强冷" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
+                            <ToggleButton x:Name="CameraTile" Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
                                     <TextBlock Text="&#xE722;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                     <TextBlock Text="摄像头" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton Style="{StaticResource Tile}">
+                            <ToggleButton x:Name="MicTile" Style="{StaticResource Tile}">
                                 <StackPanel>
                                     <TextBlock Text="&#xE720;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                     <TextBlock Text="麦克风" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton Style="{StaticResource Tile}">
+                            <ToggleButton x:Name="WinKeyTile" Style="{StaticResource Tile}">
                                 <StackPanel>
                                     <TextBlock Text="&#xE765;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                     <TextBlock Text="Win键" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton Style="{StaticResource Tile}">
+                            <ToggleButton x:Name="ScreenOffTile" Style="{StaticResource Tile}">
                                 <StackPanel>
                                     <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                     <TextBlock Text="息屏" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton Style="{StaticResource Tile}">
+                            <ToggleButton x:Name="CustomTile" Style="{StaticResource Tile}">
                                 <StackPanel>
                                     <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                     <TextBlock Text="自定义" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
@@ -426,13 +426,18 @@
                     </StackPanel>
 
                     <!-- 显卡模式 -->
-                    <StackPanel Style="{StaticResource Section}">
+                    <StackPanel x:Name="GpuSection" Style="{StaticResource Section}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Image Source="Assets/Icons/gpu.png" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" OpacityMask="{DynamicResource MutedBrush}" /><TextBlock Text="显卡模式" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" Fill="Transparent"
+                                              Data="M3,5 H21 V17 H3 Z M5,8 H9 M5,11 H9 M13.5,8 A3.5,3.5 0 1 0 13.5,15 A3.5,3.5 0 0 0 13.5,8 M7,17 V20 H17 V17" />
+                                    </Canvas>
+                                </Viewbox><TextBlock Text="显卡模式" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock Grid.Column="1" Text="GPU 73℃   90W   4698rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
                         <UniformGrid Columns="3" Margin="0,2,0,0">
@@ -443,7 +448,7 @@
                     </StackPanel>
 
                     <!-- 屏幕 -->
-                    <StackPanel Style="{StaticResource Section}">
+                    <StackPanel x:Name="ScreenSection" Style="{StaticResource Section}">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="屏幕" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <CheckBox Content="自动刷新率" Style="{StaticResource HeaderSwitch}" HorizontalAlignment="Right" />
@@ -493,7 +498,7 @@
                     </StackPanel>
 
                     <!-- 电池 -->
-                    <StackPanel Style="{StaticResource Section}">
+                    <StackPanel x:Name="BatterySection" Style="{StaticResource Section}">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE83F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="电池" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock Text="圆口 230/240W · 已充满" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
@@ -509,7 +514,7 @@
                     </StackPanel>
 
                     <!-- 灯光 -->
-                    <StackPanel Style="{StaticResource Section}">
+                    <StackPanel x:Name="LightingSection" Style="{StaticResource Section}">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE706;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="灯光" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -554,7 +559,7 @@
             </ScrollViewer>
 
             <!-- 底部 dock：模仿原版悬浮底栏 -->
-            <Border Grid.Row="3" Margin="12,0,12,8" Background="#AA10141B" CornerRadius="14" BorderBrush="#33FFFFFF" BorderThickness="1" Padding="8,6">
+            <Border Grid.Row="3" Margin="12,0,12,8" Background="{DynamicResource CardBrush}" CornerRadius="14" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,6">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />

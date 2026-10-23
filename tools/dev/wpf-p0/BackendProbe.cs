@@ -32,6 +32,20 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal MechrevoDeviceCapabilities? Capabilities => _hw?.Capabilities;
+
+    internal bool SupportsQuick(string key)
+    {
+        try
+        {
+            return _hw?.SupportsQuickSwitch(key) ?? false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal string Snapshot()
     {
         MechrevoHw? hw = _hw;
