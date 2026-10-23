@@ -24,7 +24,14 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _owner = owner;
         Owner = owner;
-        LoadState();
+        try
+        {
+            LoadState();
+        }
+        catch (Exception ex)
+        {
+            Status("设置加载异常：" + ex.Message);
+        }
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
     }
 
