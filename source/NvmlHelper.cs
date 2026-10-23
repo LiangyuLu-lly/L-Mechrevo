@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 
 /// <summary>
 /// 2026-10-09（本地功耗采样 NVML 原生崩溃修复）：加固后的 NVML 封装。
@@ -18,6 +19,11 @@ using System.Threading;
 ///       到期做一次探测性重试（退避 60s → 10 分钟封顶），成功后自动恢复；
 ///   (d)(e) 生命周期与降频：结果按 <see cref="SnapshotTtlMs"/> 缓存，1 秒级调用方（悬浮窗）不会把原生调用频率放大。
 /// 另外每次原生调用前都用 <see cref="NativeDriverGuard"/> 确认 nvml.dll 仍映射在初始化时的同一基址。
+///
+/// 2026-10-23（耀世 WER 0xc0000005）追加第 (f) 层：**显示/电源过渡保护** —— 显示设置变化
+/// （分辨率/刷新率/MUX/进入睡眠前的显示重配）后 8s、电源挂起/恢复后 20s 内一律不发 NVML 原生调用
+/// （到期重建）。真机证据：显示设置连续变化（10:53:33.061 起）后 1.3s，采样泵在
+/// nvmlDeviceGetPowerUsage 发生原生 AV；原有防护只覆盖 ConsoleDisplayState 熄屏通知，漏掉了这段过渡窗口。
 /// </summary>
 public static class NvmlHelper
 {
@@ -69,6 +75,12 @@ public static class NvmlHelper
 	private const long QuarantineMaxMs = 600000L;
 
 	private static readonly object _lock = new object();
+
+	static NvmlHelper()
+	{
+		// 2026-10-23（耀世 WER 0xc0000005）：显示/电源过渡保护的事件钩子（失败不影响其余防护）。
+		TryInstallTransitionHooks();
+	}
 
 	private static bool _init;
 
@@ -551,6 +563,23 @@ public static class NvmlHelper
 	// 期间任何 NVML 原生调用都可能踩到失效句柄 ⇒ 熄屏期间完全跳过采样，亮屏后重建再恢复。
 	private static int _displaySuspended;
 
+	// 2026-10-23（耀世 WER 0xc0000005）：显示/电源过渡保护。
+	// 证据：GCU 日志 10:53:33.061 起 SystemEvents_DisplaySettingsChanged 连续 4 次（至 10:53:37.55），
+	//       L-Mechrevo 10:53:34.409 在 nvmlDeviceGetPowerUsage 原生 AV（栈：GetGpuUtilization → RefreshLocked
+	//       ← SampleLocalGpuUsage ← 采样泵）。原有防护只在收到 ConsoleDisplayState「显示器关闭」后暂停，
+	//       而显示设置变化/进入睡眠前的显示重配**先于**该通知发生，采样泵仍会调 NVML ⇒ 这段过渡窗口必须自己挡。
+	// 做法：过渡事件后一段时间内**不发任何 NVML 原生调用**，到期再 Reset 重建（不阻塞事件线程）。
+	/// <summary>显示设置变化（分辨率/刷新率/MUX/全屏切换）后的保护窗口：真机证据里 1.3s 后即崩，
+	/// 8s 已远超过渡窗口；同时短于功耗/占用率 10s 新鲜度 ⇒ 正常情况下界面不会因为保护期而变「—」。</summary>
+	internal const int DisplayChangeGuardMs = 8000;
+
+	/// <summary>电源挂起/恢复（睡眠/唤醒）与亮屏后的保护窗口：驱动重初始化通常需要更久，沿用既有 15s 量级。</summary>
+	internal const int SleepResumeGuardMs = 20000;
+
+	private static long _transitionGuardUntilTicks;
+
+	private static int _transitionHookState;
+
 	/// <summary>2026-10-22（JIGUANG 待机亮屏）：采样泵判定 NVML 卡死 ⇒ 本进程停止一切 NVML 原生调用。
 	/// <para>卡在原生调用里的线程无法安全终止，只能保证不再产生新的调用（不再叠加卡死线程）。</para></summary>
 	internal static void QuarantineAfterNativeHang(string reason)
@@ -572,6 +601,81 @@ public static class NvmlHelper
 		Volatile.Write(ref _displaySuspended, 0);
 		Reset();
 		Logger.WriteLine("NVML: 显示器打开 ⇒ 已请求重建（下次采样重取句柄）");
+		// 2026-10-23：亮屏后驱动仍可能在重初始化 ⇒ 同样进入过渡保护（保护所有调用方，不只是采样泵）。
+		NoteNativeTransition("显示器打开", SleepResumeGuardMs);
+	}
+
+	/// <summary>
+	/// 2026-10-23（耀世 WER 0xc0000005）：安装**显示/电源过渡保护**的事件钩子（只装一次）。
+	/// <para>覆盖：⭐ 显示设置变化（分辨率/刷新率/MUX 切换/进入睡眠前的显示重配）· ⭐ 电源挂起/恢复。
+	/// ⚠️ 失败只记一行：钩子装不上时其余四层防护照旧，⛔ 不影响启动。</para>
+	/// </summary>
+	private static void TryInstallTransitionHooks()
+	{
+		if (Interlocked.CompareExchange(ref _transitionHookState, 1, 0) != 0)
+		{
+			return;
+		}
+		try
+		{
+			Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChangedForNvml;
+			Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChangedForNvml;
+			Logger.WriteLine("NVML: 已启用显示/电源过渡保护（显示变化后 " + (DisplayChangeGuardMs / 1000)
+				+ "s / 睡眠唤醒后 " + (SleepResumeGuardMs / 1000) + "s 内不发原生调用，到期重建）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLineThrottled("nvml-transition-hook", "NVML: 订阅显示/电源事件失败（其余防护不受影响）：" + ex.Message, 60000);
+		}
+	}
+
+	private static void OnDisplaySettingsChangedForNvml(object sender, EventArgs e)
+	{
+		NoteNativeTransition("显示设置变化", DisplayChangeGuardMs);
+	}
+
+	private static void OnPowerModeChangedForNvml(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+	{
+		if (e.Mode == Microsoft.Win32.PowerModes.Suspend || e.Mode == Microsoft.Win32.PowerModes.Resume)
+		{
+			NoteNativeTransition("电源 " + e.Mode, SleepResumeGuardMs);
+		}
+	}
+
+	/// <summary>
+	/// 2026-10-23：⭐ <b>进入显示/电源过渡保护期</b> ✅ —— ⭐ 从现在起 <paramref name="guardMs"/> 内
+	/// <see cref="RefreshLocked" /> 不再发任何 NVML 原生调用；⭐ 到期后自动 <see cref="Reset" /> 重建再恢复。
+	/// <para>⚠️ 事件的连续爆发（显示重配通常 3~5 次）⇒ ⭐ 每次都**延长**保护期，⭐ 只有最后一个事件负责重建
+	/// （旧任务发现保护期已被更新就退出）✅。</para>
+	/// <para>⚠️ 不在事件线程上做任何原生调用/阻塞等待（只置时间戳 + 后台延时）✅。</para>
+	/// </summary>
+	private static void NoteNativeTransition(string reason, int guardMs)
+	{
+		long until = Environment.TickCount64 + guardMs;
+		Interlocked.Exchange(ref _transitionGuardUntilTicks, until);
+		Logger.WriteLineThrottled("nvml-transition",
+			$"NVML: {reason} ⇒ 暂停原生调用 {guardMs / 1000}s（避免显示/驱动过渡期 0xc0000005）", 3000);
+		_ = Task.Run(async delegate
+		{
+			await Task.Delay(guardMs + 1500).ConfigureAwait(continueOnCapturedContext: false);
+			// 期间又有新的过渡 ⇒ 保护期已被延长，由最后一次事件负责重建
+			if (Interlocked.Read(in _transitionGuardUntilTicks) != until)
+			{
+				return;
+			}
+			Reset();
+			Logger.WriteLine("NVML: 显示/电源过渡保护期结束 ⇒ 已请求重建（下次采样重取句柄）");
+		});
+	}
+
+	/// <summary>⭐ 2026-10-23：当前是否处于显示/电源过渡保护期（⭐ 只读，诊断用 ✅）。</summary>
+	internal static bool TransitionGuarded
+	{
+		get
+		{
+			long until = Interlocked.Read(in _transitionGuardUntilTicks);
+			return until != 0L && Environment.TickCount64 < until;
+		}
 	}
 
 	private static void RefreshLocked(uint gpuIndex)
@@ -593,6 +697,12 @@ public static class NvmlHelper
 			return;
 		}
 		if (Volatile.Read(in _displaySuspended) != 0)
+		{
+			InvalidateSnapshotLocked();
+			return;
+		}
+		// 2026-10-23（耀世 WER 0xc0000005）：显示/电源过渡窗口内一次 NVML 原生调用都不发（见 TransitionGuardMs）。
+		if (TransitionGuarded)
 		{
 			InvalidateSnapshotLocked();
 			return;
