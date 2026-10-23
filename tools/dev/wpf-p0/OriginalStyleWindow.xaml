@@ -332,9 +332,10 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Ellipse Width="9" Height="9" Fill="#22C55E" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <TextBlock Text="GCU 已连接" Foreground="#4ADE80" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock x:Name="BackendStatus" Text="后端未连接" Foreground="#9BA6B5" FontSize="13" FontWeight="SemiBold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="ConnectBackendButton" Content="连接后端" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="ConnectBackend_Click" Margin="0,0,6,0" />
                     <Button Content="宽屏" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="WideButton_Click" Margin="0,0,6,0" />
                     <Button x:Name="ThemeButton" Content="浅色" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="ThemeButton_Click" Margin="0,0,6,0" />
                     <CheckBox x:Name="BackgroundToggle" Content="背景图" Style="{StaticResource HeaderSwitch}" FontSize="10" Margin="0,0,0,0" VerticalAlignment="Center"
@@ -366,6 +367,19 @@
                             <ToggleButton Content="静音狂暴" Tag="#F59E0B" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
                             <ToggleButton Content="高能狂暴" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" />
                         </UniformGrid>
+                    </StackPanel>
+
+                    <!-- P1 后端实时（只读） -->
+                    <StackPanel Style="{StaticResource Section}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="后端实时（P1 只读试接）" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="MechrevoHw" Style="{StaticResource MutedText}" FontSize="10" />
+                        </Grid>
+                        <TextBlock x:Name="BackendLine" Text="点右上角「连接后端」读取 CPU/GPU/风扇/电池" Style="{StaticResource MutedText}" FontSize="10" Margin="0,6,0,0" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <!-- 快捷开关 -->

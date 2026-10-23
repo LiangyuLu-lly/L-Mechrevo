@@ -6,7 +6,7 @@
 
 ```powershell
 & 'D:\openLM\dotnet-sdk\dotnet.exe' build 'D:\openLM\tools\dev\wpf-p0\WpfP0.csproj' -c Release
-& 'D:\openLM\tools\dev\wpf-p0\bin\Release\net10.0-windows\L-Mechrevo.WpfP0.exe'
+& 'D:\openLM\tools\dev\wpf-p0\bin\Release\net10.0-windows10.0.19041.0\L-Mechrevo.WpfP0.exe'
 ```
 
 ## 三种形态

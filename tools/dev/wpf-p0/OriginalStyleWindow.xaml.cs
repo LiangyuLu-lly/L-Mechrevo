@@ -4,17 +4,33 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace L_Mechrevo.WpfP0;
 
 public partial class OriginalStyleWindow : Window
 {
     private bool _dark = true;
+    private BackendProbe? _backendProbe;
+    private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
 
     public OriginalStyleWindow()
     {
         InitializeComponent();
         ApplyDarkTitleBar(_dark);
+        _backendTimer.Tick += (_, _) =>
+        {
+            if (BackendLine != null && _backendProbe != null)
+            {
+                BackendLine.Text = _backendProbe.Snapshot();
+            }
+        };
+        Closed += (_, _) =>
+        {
+            _backendTimer.Stop();
+            _backendProbe?.Dispose();
+            _backendProbe = null;
+        };
         if (ModeGrid != null && ModeGrid.Children.Count > 1 && ModeGrid.Children[1] is ToggleButton defaultMode)
         {
             defaultMode.IsChecked = true;
@@ -83,6 +99,49 @@ public partial class OriginalStyleWindow : Window
         bool on = BackgroundToggle.IsChecked == true;
         BackgroundImage.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         BackgroundScrim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void ConnectBackend_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe != null)
+        {
+            BackendLine.Text = _backendProbe.Snapshot();
+            return;
+        }
+        ConnectBackendButton.IsEnabled = false;
+        BackendStatus.Text = "后端连接中…";
+        BackendStatus.Foreground = (Brush)Application.Current.Resources["AccentBrush"];
+        BackendLine.Text = "正在创建 MechrevoHw 并 ConnectAsync（最长 15 秒）…";
+        BackendProbe probe = new BackendProbe();
+        _backendProbe = probe;
+        Task<bool> connect = probe.ConnectAsync();
+        Task completed = await Task.WhenAny(connect, Task.Delay(TimeSpan.FromSeconds(15)));
+        if (completed != connect)
+        {
+            BackendStatus.Text = "后端连接超时";
+            BackendStatus.Foreground = (Brush)Application.Current.Resources["MutedBrush"];
+            BackendLine.Text = "15 秒内未完成；MechrevoHw 可能在没有 GCU 服务的机器上等待/无权限。";
+            probe.Dispose();
+            _backendProbe = null;
+            ConnectBackendButton.IsEnabled = true;
+            return;
+        }
+        if (await connect)
+        {
+            BackendStatus.Text = "后端已连接";
+            BackendStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4ADE80"));
+            BackendLine.Text = probe.Snapshot();
+            _backendTimer.Start();
+        }
+        else
+        {
+            BackendStatus.Text = "后端连接失败";
+            BackendStatus.Foreground = (Brush)Application.Current.Resources["MutedBrush"];
+            BackendLine.Text = probe.LastError;
+            probe.Dispose();
+            _backendProbe = null;
+        }
+        ConnectBackendButton.IsEnabled = true;
     }
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
