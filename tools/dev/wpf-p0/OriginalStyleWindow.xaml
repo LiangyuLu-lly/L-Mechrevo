@@ -4,6 +4,8 @@
         Title="L-Mechrevo · 原版小窗 P0"
         Width="420" Height="720"
         MinWidth="420" MinHeight="620"
+        ResizeMode="CanResize"
+        WindowStyle="SingleBorderWindow"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -360,7 +362,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE9CA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock Text="性能模式" Style="{StaticResource SectionHeader}" Margin="0" />
-                                <CheckBox Content="GPU 超频" Style="{StaticResource HeaderSwitch}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                                <CheckBox x:Name="GpuOverclockSwitch" Content="GPU 超频" Style="{StaticResource HeaderSwitch}" Margin="14,0,0,0" VerticalAlignment="Center" Click="GpuOverclock_Click" />
                             </StackPanel>
                             <TextBlock x:Name="CpuStat" Grid.Column="1" Text="CPU —" Style="{StaticResource StatText}" />
                         </Grid>
@@ -473,30 +475,34 @@
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="屏幕校色" Style="{StaticResource StatText}" Margin="0,0,14,0" />
-                            <ComboBox Grid.Column="1" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,10,0">
+                            <TextBlock Text="屏幕校色" Style="{StaticResource StatText}" Margin="0,0,10,0" />
+                            <CheckBox x:Name="CalibrationSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,10,0" VerticalAlignment="Center" Click="CalibrationSwitch_Click" />
+                            <ComboBox x:Name="CalibrationCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="CalibrationCombo_SelectionChanged">
                                 <ComboBoxItem Content="默认" />
                                 <ComboBoxItem Content="sRGB" />
                                 <ComboBoxItem Content="DCI-P3" />
                             </ComboBox>
-                            <Button Grid.Column="2" Content="设置" Style="{StaticResource MiniButton}" />
+                            <Button Grid.Column="3" Content="设置" Style="{StaticResource MiniButton}" />
                         </Grid>
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="色彩增强" Style="{StaticResource StatText}" Margin="0,0,14,0" />
-                            <ComboBox Grid.Column="1" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,10,0">
+                            <TextBlock Text="色彩增强" Style="{StaticResource StatText}" Margin="0,0,10,0" />
+                            <CheckBox x:Name="DisplayEffectSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,10,0" VerticalAlignment="Center" Click="DisplayEffectSwitch_Click" />
+                            <ComboBox x:Name="DisplayEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0">
                                 <ComboBoxItem Content="关" />
                                 <ComboBoxItem Content="标准" />
                                 <ComboBoxItem Content="鲜艳" />
                             </ComboBox>
-                            <Button Grid.Column="2" Content="编辑" Style="{StaticResource MiniButton}" />
+                            <Button Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" />
                         </Grid>
                     </StackPanel>
 
@@ -530,23 +536,37 @@
                         <CheckBox Content="离电自动关闭全部灯效" Style="{StaticResource RowSwitch}" />
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="键盘" Style="{StaticResource StatText}" />
-                            <CheckBox Grid.Column="1" Content="单色" Style="{StaticResource RowSwitch}" />
-                            <Button Grid.Column="2" Content="编辑" Style="{StaticResource MiniButton}" />
+                            <CheckBox x:Name="KeyboardLightSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="KeyboardLightSwitch_Click" />
+                            <ComboBox x:Name="KeyboardEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="KeyboardEffectCombo_SelectionChanged">
+                                <ComboBoxItem Content="单色" Tag="Single" />
+                                <ComboBoxItem Content="呼吸" Tag="Breathe" />
+                                <ComboBoxItem Content="彩虹" Tag="Rainbow" />
+                                <ComboBoxItem Content="频闪" Tag="Strobe" />
+                            </ComboBox>
+                            <Button Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" />
                         </Grid>
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Logo 灯" Style="{StaticResource StatText}" />
-                            <CheckBox Grid.Column="1" Content="单色" Style="{StaticResource RowSwitch}" />
-                            <Button Grid.Column="2" Content="编辑" Style="{StaticResource MiniButton}" />
+                            <CheckBox x:Name="LogoLightSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="LogoLightSwitch_Click" />
+                            <ComboBox x:Name="LogoEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="LogoEffectCombo_SelectionChanged">
+                                <ComboBoxItem Content="单色" Tag="Single" />
+                                <ComboBoxItem Content="呼吸" Tag="Breathe" />
+                                <ComboBoxItem Content="彩虹" Tag="Rainbow" />
+                                <ComboBoxItem Content="关" Tag="Off" />
+                            </ComboBox>
+                            <Button Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" />
                         </Grid>
                     </StackPanel>
 

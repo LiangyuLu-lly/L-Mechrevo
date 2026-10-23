@@ -136,6 +136,63 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal bool GpuOcSupported
+    {
+        get
+        {
+            MechrevoHw? hw = _hw;
+            return hw != null && (hw.SupportsGpuOverclock || hw.Capabilities?.OverclockSettings == true || hw.GcuGpuOverclockAvailable);
+        }
+    }
+
+    internal async Task<bool> ApplyGpuOverclockAsync(bool on)
+    {
+        try
+        {
+            return _service != null && await _service.ApplyGpuOverclock(on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SetDisplayEffectSwitchAsync(bool on)
+    {
+        try
+        {
+            return _service != null && await _service.SetDisplayEffectSwitch(on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SetKeyboardEffectAsync(string effect)
+    {
+        try
+        {
+            return _service != null && await _service.SetKeyboardEffect(effect, 4, 1, "None", null, true).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SetLogoEffectAsync(string effect)
+    {
+        try
+        {
+            return _service != null && await _service.SetLightEffect("Logo", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal string Snapshot()
     {
         MechrevoHw? hw = _hw;

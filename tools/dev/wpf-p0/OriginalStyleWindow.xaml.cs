@@ -159,6 +159,7 @@ public partial class OriginalStyleWindow : Window
         GpuStat.Text = "GPU " + hw.GpuTemp + "℃   " + hw.GpuFanRpm + "rpm";
         BatteryInfo.Text = "电池 " + hw.BatteryPercent + "% · " + hw.BatteryCapacityText;
         int mode = probe.CurrentMode;
+        GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
         SilentModeButton.IsChecked = mode == 2;
         BalancedModeButton.IsChecked = mode == 0;
         TurboModeButton.IsChecked = mode == 1;
@@ -262,6 +263,99 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
+    }
+
+    private async void GpuOverclock_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        bool on = GpuOverclockSwitch.IsChecked == true;
+        bool ok = await _backendProbe.ApplyGpuOverclockAsync(on);
+        if (!ok)
+        {
+            GpuOverclockSwitch.IsChecked = !on;
+        }
+        StatusText.Text = ok ? "显卡超频：" + (on ? "开" : "关") : "显卡超频下发失败";
+    }
+
+    private async void CalibrationSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        bool on = CalibrationSwitch.IsChecked == true;
+        int mode = on ? Math.Max(0, CalibrationCombo.SelectedIndex) : 0;
+        bool ok = await _backendProbe.SetColorCalibrationAsync(mode);
+        StatusText.Text = ok ? "屏幕校色已下发" : "屏幕校色下发失败";
+    }
+
+    private async void CalibrationCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_backendProbe != null && CalibrationSwitch.IsChecked == true)
+        {
+            await _backendProbe.SetColorCalibrationAsync(Math.Max(0, CalibrationCombo.SelectedIndex));
+        }
+    }
+
+    private async void DisplayEffectSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        bool ok = await _backendProbe.SetDisplayEffectSwitchAsync(DisplayEffectSwitch.IsChecked == true);
+        StatusText.Text = ok ? "色彩增强已下发" : "色彩增强下发失败";
+    }
+
+    private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        await ApplyKeyboardLightAsync();
+    }
+
+    private async void KeyboardEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (KeyboardLightSwitch.IsChecked == true)
+        {
+            await ApplyKeyboardLightAsync();
+        }
+    }
+
+    private async Task ApplyKeyboardLightAsync()
+    {
+        if (_backendProbe == null || KeyboardEffectCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        string effect = KeyboardLightSwitch.IsChecked == true ? (item.Tag as string ?? "Single") : "Off";
+        bool ok = await _backendProbe.SetKeyboardEffectAsync(effect);
+        StatusText.Text = ok ? "键盘灯效已下发：" + effect : "键盘灯效下发失败";
+    }
+
+    private async void LogoLightSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        await ApplyLogoLightAsync();
+    }
+
+    private async void LogoEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (LogoLightSwitch.IsChecked == true)
+        {
+            await ApplyLogoLightAsync();
+        }
+    }
+
+    private async Task ApplyLogoLightAsync()
+    {
+        if (_backendProbe == null || LogoEffectCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        string effect = LogoLightSwitch.IsChecked == true ? (item.Tag as string ?? "Single") : "Off";
+        bool ok = await _backendProbe.SetLogoEffectAsync(effect);
+        StatusText.Text = ok ? "Logo 灯效已下发：" + effect : "Logo 灯效下发失败";
     }
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
