@@ -62,7 +62,6 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                 <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
-                                <Setter TargetName="Bd" Property="Background" Value="#2AFFFFFF" />
                                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>

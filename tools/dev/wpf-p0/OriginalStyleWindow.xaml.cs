@@ -393,7 +393,7 @@ public partial class OriginalStyleWindow : Window
         Color color = overrideColor ?? ((SolidColorBrush)Application.Current.Resources["AccentBrush"]).Color;
         selected.BorderBrush = new SolidColorBrush(color);
         selected.BorderThickness = new Thickness(2);
-        selected.Background = new SolidColorBrush(Color.FromArgb(0x30, color.R, color.G, color.B));
+        selected.Background = normal;
         selected.FontFamily = bold;
         selected.FontWeight = FontWeights.Bold;
     }
@@ -414,7 +414,7 @@ public partial class OriginalStyleWindow : Window
         }
         if (mode >= 0 && mode < buttons.Length)
         {
-            HighlightSegment(buttons[mode], pending ? Color.FromRgb(245, 158, 11) : null);
+            HighlightSegment(buttons[mode], pending ? Color.FromRgb(250, 204, 21) : null);
         }
     }
 
