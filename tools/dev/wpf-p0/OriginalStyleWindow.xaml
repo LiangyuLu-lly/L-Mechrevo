@@ -314,10 +314,10 @@
                         <StackPanel Orientation="Horizontal">
                             <Border x:Name="Track" Width="24" Height="14" CornerRadius="7"
                                     Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
-                                <Ellipse x:Name="Knob" Width="8" Height="8" Fill="White"
-                                           VerticalAlignment="Center"
-                                         HorizontalAlignment="Left" Margin="2,0,0,0" />
-                            </Border>
+                                    <Grid VerticalAlignment="Center">
+                                        <Ellipse x:Name="Knob" Width="8" Height="8" Fill="White"                                            VerticalAlignment="Center"                                          HorizontalAlignment="Left" Margin="2,0,0,0" />
+                                    </Grid>
+                                </Border>
                             <ContentPresenter Margin="6,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                         <ControlTemplate.Triggers>
