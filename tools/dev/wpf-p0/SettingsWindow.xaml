@@ -10,6 +10,8 @@
         FontFamily="{DynamicResource AppFontFamily}"
         FontWeight="Normal"
         TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True">
     <Window.Resources>
         <Style TargetType="ComboBoxItem">

@@ -12,6 +12,8 @@
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="12"
         TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True">
     <Window.Resources>
         <Style x:Key="PromptButton" TargetType="Button">
