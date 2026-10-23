@@ -555,9 +555,9 @@
                             <ToggleButton x:Name="BatteryBalancedButton" Content="平衡模式" Style="{StaticResource BatterySegment}" Tag="1" Click="BatteryMode_Click" />
                             <ToggleButton x:Name="BatteryWorkButton" Content="工作站模式" Style="{StaticResource BatterySegment}" Tag="2" Click="BatteryMode_Click" Margin="0" />
                         </UniformGrid>
-                        <CheckBox Content="启用无极限充功能(实验性)" Style="{StaticResource RowSwitch}" />
-                        <CheckBox Content="关闭 EC 直写充电上限（写入异常时用）" Style="{StaticResource RowSwitch}" />
-                        <Slider Minimum="40" Maximum="100" Value="100" Margin="0,8,0,0" Style="{StaticResource RoundSlider}" />
+                        <CheckBox x:Name="ChargeSliderToggle" Content="启用无极限充功能(实验性)" Style="{StaticResource RowSwitch}" Click="ChargeSliderToggle_Click" />
+                        <CheckBox x:Name="EcDirectOffToggle" Content="关闭 EC 直写充电上限（写入异常时用）" Style="{StaticResource RowSwitch}" Click="EcDirectOffToggle_Click" />
+                        <Slider x:Name="BatteryLimitSlider" Minimum="40" Maximum="100" Value="100" Margin="0,8,0,0" Style="{StaticResource RoundSlider}" ValueChanged="BatteryLimitSlider_Changed" Visibility="Collapsed" />
                     </StackPanel>
 
                     <!-- 灯光 -->

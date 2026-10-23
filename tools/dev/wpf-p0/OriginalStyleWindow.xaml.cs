@@ -6,6 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using MechrevoLite;
+using MechrevoLite.Battery;
 using MechrevoLite.Display;
 using MechrevoLite.Hardware;
 using System.Windows.Interop;
@@ -45,6 +46,7 @@ public partial class OriginalStyleWindow : Window
 {
     private bool _dark = true;
     private bool _syncingBrightness;
+    private bool _syncingBatteryLimit;
     private BackendProbe? _backendProbe;
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
     private const string QuickTilesConfigKey = "perf_quick_tiles";
@@ -105,6 +107,7 @@ public partial class OriginalStyleWindow : Window
             ApplySavedQuickTiles();
             ApplyMoreSectionState();
             RefreshBrightness();
+            InitBatteryControls();
         };
     }
 
@@ -219,6 +222,57 @@ public partial class OriginalStyleWindow : Window
             node = System.Windows.Media.VisualTreeHelper.GetParent(node);
         }
         return null;
+    }
+
+    private void InitBatteryControls()
+    {
+        ChargeSliderToggle.IsChecked = AppConfig.Is("charge_limit_slider");
+        EcDirectOffToggle.IsChecked = string.Equals(AppConfig.GetString("ec_charge_limit"), "0", StringComparison.Ordinal);
+        BatteryLimitSlider.Visibility = ChargeSliderToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        _syncingBatteryLimit = true;
+        BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
+        _syncingBatteryLimit = false;
+    }
+
+    private void ChargeSliderToggle_Click(object sender, RoutedEventArgs e)
+    {
+        bool on = ChargeSliderToggle.IsChecked == true;
+        AppConfig.Set("charge_limit_slider", on ? 1 : 0);
+        BatteryLimitSlider.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        StatusText.Text = on ? "已启用无极限充滑块" : "已关闭无极限充滑块";
+    }
+
+    private void EcDirectOffToggle_Click(object sender, RoutedEventArgs e)
+    {
+        bool on = EcDirectOffToggle.IsChecked == true;
+        if (on)
+        {
+            AppConfig.Set("ec_charge_limit", "0");
+        }
+        else
+        {
+            AppConfig.Remove("ec_charge_limit");
+        }
+        StatusText.Text = on ? "已关闭 EC 直写充电上限" : "EC 直写恢复自动判定";
+    }
+
+    private void BatteryLimitSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncingBatteryLimit || BatteryLimitSlider == null)
+        {
+            return;
+        }
+        int value = (int)Math.Round(e.NewValue);
+        if (!BatteryControl.CaptureChargeLimitGesture() || !BatteryControl.ApplyChargeLimitFromUserGesture(value))
+        {
+            StatusText.Text = "充电上限写入未确认";
+            _syncingBatteryLimit = true;
+            BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
+            _syncingBatteryLimit = false;
+            return;
+        }
+        BatteryControl.SetSelectedModePercent(value);
+        StatusText.Text = "充电上限：" + value + "%";
     }
 
     private void RefreshBrightness()
@@ -860,7 +914,8 @@ public partial class OriginalStyleWindow : Window
         }
         CpuStat.Text = SensorLine(hw, cpu: true);
         GpuStat.Text = SensorLine(hw, cpu: false);
-        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "% · " + hw.BatteryCapacityText;
+        string capacity = string.IsNullOrWhiteSpace(hw.BatteryCapacityText) ? "" : " · " + hw.BatteryCapacityText;
+        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "%" + capacity;
         int mode = probe.CurrentMode;
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
         int currentGpu = probe.CurrentGpuMode;
