@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\background.jpg" />
+    <Resource Include="Assets\Icons\*.png" />
   </ItemGroup>
 
 </Project>

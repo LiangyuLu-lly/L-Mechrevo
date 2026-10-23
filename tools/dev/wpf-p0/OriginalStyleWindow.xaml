@@ -278,8 +278,8 @@
     </Window.Resources>
 
     <Grid>
-        <Image x:Name="BackgroundImage" Source="Assets/background.jpg" Stretch="UniformToFill" Opacity="0.58" />
-        <Rectangle x:Name="BackgroundScrim" Fill="#99000000" Opacity="0.45" />
+        <Image x:Name="BackgroundImage" Source="Assets/background.jpg" Stretch="UniformToFill" Opacity="0.58" Visibility="Collapsed" />
+        <Rectangle x:Name="BackgroundScrim" Fill="#99000000" Opacity="0.45" Visibility="Collapsed" />
 
         <Grid Margin="0">
             <Grid.RowDefinitions>
@@ -301,7 +301,9 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="宽屏" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="WideButton_Click" Margin="0,0,6,0" />
-                    <Button x:Name="ThemeButton" Content="浅色" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="ThemeButton_Click" />
+                    <Button x:Name="ThemeButton" Content="浅色" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="ThemeButton_Click" Margin="0,0,6,0" />
+                    <CheckBox x:Name="BackgroundToggle" Content="背景图" Style="{StaticResource RowSwitch}" FontSize="10" Margin="0,0,0,0" VerticalAlignment="Center"
+                              Checked="BackgroundToggle_Changed" Unchecked="BackgroundToggle_Changed" />
                 </StackPanel>
             </Grid>
 

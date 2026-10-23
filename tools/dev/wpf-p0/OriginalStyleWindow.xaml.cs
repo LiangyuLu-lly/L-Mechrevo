@@ -78,6 +78,13 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private void BackgroundToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        bool on = BackgroundToggle.IsChecked == true;
+        BackgroundImage.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        BackgroundScrim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
