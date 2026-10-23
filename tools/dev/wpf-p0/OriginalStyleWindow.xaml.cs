@@ -18,6 +18,7 @@ public partial class OriginalStyleWindow : Window
     public OriginalStyleWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => HideMinMaxButtons();
         ApplyDarkTitleBar(_dark);
         _backendTimer.Tick += (_, _) =>
         {
@@ -45,6 +46,29 @@ public partial class OriginalStyleWindow : Window
         {
             Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
         };
+    }
+
+    private const int GWL_STYLE = -16;
+    private const int WS_MINIMIZEBOX = 0x00020000;
+    private const int WS_MAXIMIZEBOX = 0x00010000;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint GetWindowLongPtr(nint hWnd, int nIndex);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
+
+    private void HideMinMaxButtons()
+    {
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == 0)
+        {
+            return;
+        }
+        nint style = GetWindowLongPtr(hwnd, GWL_STYLE);
+        long value = style.ToInt64();
+        value &= ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+        SetWindowLongPtr(hwnd, GWL_STYLE, (nint)value);
     }
 
     private void UpdateContentWidth()
