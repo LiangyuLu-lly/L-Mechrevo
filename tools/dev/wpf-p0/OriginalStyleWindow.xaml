@@ -36,9 +36,9 @@
             <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Margin" Value="0,0,4,0" />
-            <Setter Property="Padding" Value="2,4" />
-            <Setter Property="Height" Value="46" />
+            <Setter Property="Margin" Value="0,0,3,0" />
+            <Setter Property="Padding" Value="2,3" />
+            <Setter Property="MinHeight" Value="44" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -313,38 +313,38 @@
                         <UniformGrid Columns="6" Rows="1">
                             <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
-                                    <TextBlock Text="⏻" FontSize="17" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="风扇强冷" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                    <TextBlock Text="⏻" FontSize="15" HorizontalAlignment="Center" Foreground="#F87171" />
+                                    <TextBlock Text="强冷" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
-                                    <TextBlock Text="▣" FontSize="16" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="摄像头" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                    <TextBlock Text="▣" FontSize="14" HorizontalAlignment="Center" Foreground="#F87171" />
+                                    <TextBlock Text="摄像头" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}" IsChecked="True" >
                                 <StackPanel>
-                                    <TextBlock Text="⌁" FontSize="17" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="麦克风" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                    <TextBlock Text="⌁" FontSize="15" HorizontalAlignment="Center" Foreground="#F87171" />
+                                    <TextBlock Text="麦克风" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}">
                                 <StackPanel>
-                                    <TextBlock Text="⌘" FontSize="16" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Win键锁" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                    <TextBlock Text="⌘" FontSize="14" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Win键" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}">
                                 <StackPanel>
-                                    <TextBlock Text="▭" FontSize="16" HorizontalAlignment="Center" />
-                                    <TextBlock Text="息屏" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                    <TextBlock Text="▭" FontSize="14" HorizontalAlignment="Center" />
+                                    <TextBlock Text="息屏" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Tile}" >
                                 <StackPanel>
                                     <TextBlock Text="+" FontSize="20" HorizontalAlignment="Center" Foreground="#F87171" />
-                                    <TextBlock Text="自定义" FontSize="10" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                    <TextBlock Text="自定义" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
                                 </StackPanel>
                             </ToggleButton>
                         </UniformGrid>
