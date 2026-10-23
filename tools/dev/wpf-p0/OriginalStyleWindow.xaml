@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="L-Mechrevo · 原版小窗 P0"
-        Width="420" Height="860"
-        MinWidth="420" MinHeight="620"
+        Width="460" Height="860"
+        MinWidth="460" MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -167,7 +167,7 @@
 
             <ScrollViewer x:Name="MainScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly" CanContentScroll="False" Background="Transparent">
-                <StackPanel x:Name="ContentPanel" Width="392" HorizontalAlignment="Left">
+                <StackPanel x:Name="ContentPanel" HorizontalAlignment="Stretch">
 
                     <!-- 性能模式 -->
                     <StackPanel Style="{StaticResource Section}">
@@ -183,7 +183,7 @@
                             </StackPanel>
                             <TextBlock Grid.Column="1" Text="CPU 85℃   52W   4427rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
-                        <UniformGrid x:Name="ModeGrid" Columns="4" Width="392" Margin="0,2,0,0">
+                        <UniformGrid x:Name="ModeGrid" Columns="4" Margin="0,2,0,0">
                             <ToggleButton Content="静音" Tag="#22C55E" BorderBrush="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
                             <ToggleButton Content="平衡" Tag="#3B82F6" BorderBrush="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
                             <ToggleButton Content="静音狂暴" Tag="#F59E0B" BorderBrush="#F59E0B" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
@@ -194,7 +194,7 @@
                     <!-- 快捷开关 -->
                     <StackPanel Style="{StaticResource Section}">
                         <TextBlock Text="⚙  快捷开关" Style="{StaticResource SectionHeader}" />
-                        <UniformGrid Columns="6" Rows="1" Width="392">
+                        <UniformGrid Columns="6" Rows="1">
                             <ToggleButton Style="{StaticResource Tile}" IsChecked="True">
                                 <StackPanel>
                                     <TextBlock Text="⏻" FontSize="17" HorizontalAlignment="Center" Foreground="#F87171" />
@@ -244,7 +244,7 @@
                             <TextBlock Text="▣  显卡模式" Style="{StaticResource SectionHeader}" Margin="0" />
                             <TextBlock Grid.Column="1" Text="GPU 73℃   90W   4698rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
-                        <UniformGrid Columns="3" Width="392" Margin="0,2,0,0">
+                        <UniformGrid Columns="3" Margin="0,2,0,0">
                             <ToggleButton Content="核显模式" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="混合模式" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="独显直连" Style="{StaticResource BigSegment}" IsChecked="True" Margin="0" />
@@ -257,7 +257,7 @@
                             <TextBlock Text="▭  屏幕" Style="{StaticResource SectionHeader}" Margin="0" />
                             <CheckBox Content="自动刷新率" Style="{StaticResource RowSwitch}" HorizontalAlignment="Right" FontSize="13" />
                         </Grid>
-                        <UniformGrid Columns="2" Width="392" Margin="0,0,0,6">
+                        <UniformGrid Columns="2" Margin="0,0,0,6">
                             <ToggleButton Content="180" Style="{StaticResource BigSegment}" IsChecked="True" />
                             <ToggleButton Content="60" Style="{StaticResource BigSegment}" Margin="0" />
                         </UniformGrid>
@@ -299,7 +299,7 @@
                             <TextBlock Text="▭  电池" Style="{StaticResource SectionHeader}" Margin="0" />
                             <TextBlock Text="圆口 230/240W · 已充满" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
                         </Grid>
-                        <UniformGrid Columns="3" Width="392" Margin="0,0,0,10">
+                        <UniformGrid Columns="3" Margin="0,0,0,10">
                             <ToggleButton Content="长效模式" Style="{StaticResource BigSegment}" IsChecked="True" />
                             <ToggleButton Content="平衡模式" Style="{StaticResource BigSegment}" />
                             <ToggleButton Content="工作站模式" Style="{StaticResource BigSegment}" Margin="0" />

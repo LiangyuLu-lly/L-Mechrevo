@@ -17,6 +17,27 @@ public partial class OriginalStyleWindow : Window
         {
             defaultMode.IsChecked = true;
         }
+        MainScroll.SizeChanged += delegate
+        {
+            UpdateContentWidth();
+        };
+        Loaded += delegate
+        {
+            Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
+        };
+    }
+
+    private void UpdateContentWidth()
+    {
+        double width = MainScroll.ViewportWidth;
+        if (width <= 100)
+        {
+            width = MainScroll.ActualWidth - 8;
+        }
+        if (width > 100)
+        {
+            ContentPanel.Width = width;
+        }
     }
 
     private void ModeButton_Click(object sender, RoutedEventArgs e)
