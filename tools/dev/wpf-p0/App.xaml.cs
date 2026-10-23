@@ -9,13 +9,18 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+        ApplyFont();
         base.OnStartup(e);
+    }
+
+    private static void ApplyFont()
+    {
         try
         {
             string fontPath = Path.Combine(AppContext.BaseDirectory, "Fonts", "HarmonyOS_Sans_SC_Regular.ttf");
             if (File.Exists(fontPath))
             {
-                Resources["AppFontFamily"] = new FontFamily(fontPath + "#HarmonyOS Sans SC");
+                Application.Current.Resources["AppFontFamily"] = new FontFamily(fontPath + "#HarmonyOS Sans SC");
             }
         }
         catch
