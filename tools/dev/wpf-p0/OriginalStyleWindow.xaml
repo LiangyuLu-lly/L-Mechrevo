@@ -324,7 +324,7 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0,-1,2,0" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
