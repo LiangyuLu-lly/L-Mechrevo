@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using Microsoft.Win32;
 using MechrevoLite.Helpers;
 
@@ -44,6 +45,9 @@ internal static class GcuIdentity
 				&& string.Equals(text2, "50", StringComparison.OrdinalIgnoreCase))
 			{
 				Logger.WriteError("[gcu] 变体冲突：注册表 GcuVariant=" + text + " 但实际载荷识别=50 ⇒ 以实际载荷为准（按 50 系处理）");
+				// 2026-10-24（机主：更新载荷为什么不更新注册表）：载荷已经实际换成 50 时，
+				// 把安装标记同步修正，避免每次启动都重复报冲突（下次启动直接读 50）。
+				PersistCorrectedVariant("50");
 				return "50";
 			}
 			if (text.Length != 0)
@@ -51,6 +55,31 @@ internal static class GcuIdentity
 				return text;
 			}
 			return text2;
+		}
+	}
+
+	private static int _correctedVariantPersisted;
+
+	/// <summary>把安装器登记的 GcuVariant 修正为实际载荷变体（只做一次，失败只记日志）。</summary>
+	private static void PersistCorrectedVariant(string variant)
+	{
+		if (Interlocked.Exchange(ref _correctedVariantPersisted, 1) != 0)
+		{
+			return;
+		}
+		try
+		{
+			using RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\L-Mechrevo", writable: true);
+			if (key == null)
+			{
+				return;
+			}
+			key.SetValue("GcuVariant", variant, RegistryValueKind.String);
+			Logger.WriteLine("[gcu] 已同步注册表 GcuVariant=" + variant + "（与实际载荷一致）");
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[gcu] 同步注册表 GcuVariant 失败（忽略）：" + ex.Message);
 		}
 	}
 
