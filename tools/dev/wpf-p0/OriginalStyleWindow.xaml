@@ -385,22 +385,22 @@
                         </Grid>
                         <UniformGrid x:Name="ModeGrid" Columns="4" Margin="0,2,0,0">
                             <ToggleButton x:Name="SilentModeButton" Tag="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
-                                <TextBlock Text="静音" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                <TextBlock Text="静音" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
                             <ToggleButton x:Name="BalancedModeButton" Tag="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
-                                <TextBlock Text="平衡" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                <TextBlock Text="平衡" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
                             <ToggleButton x:Name="TurboModeButton" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
-                                <TextBlock Text="狂暴" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                <TextBlock Text="狂暴" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
                             <ToggleButton x:Name="CustomModeButton" Tag="#A78BFA" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" >
-                                <TextBlock Text="自定义" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                <TextBlock Text="自定义" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
