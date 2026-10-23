@@ -23,12 +23,12 @@ internal static class AppTheme
         {
             resources["WindowBgBrush"] = Brush("#F7F8FA");
             resources["CardBrush"] = Brush("#FFFFFFFF");
-            resources["CardBorderBrush"] = Brush("#26000000");
-            resources["ControlBrush"] = Brush("#14000000");
-            resources["ControlHoverBrush"] = Brush("#22000000");
+            resources["CardBorderBrush"] = Brush("#33000000");
+            resources["ControlBrush"] = Brush("#1A000000");
+            resources["ControlHoverBrush"] = Brush("#26000000");
             resources["TextBrush"] = Brush("#1B2029");
             resources["MutedBrush"] = Brush("#5A6574");
-            resources["TrackBrush"] = Brush("#22000000");
+            resources["TrackBrush"] = Brush("#26000000");
         }
     }
 

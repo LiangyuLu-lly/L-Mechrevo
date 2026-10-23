@@ -705,6 +705,33 @@ public partial class OriginalStyleWindow : Window
 
     private const string MoreOpenConfigKey = "group_quick_open";
 
+    private void RefreshSegmentHighlights()
+    {
+        foreach (object child in ModeGrid.Children)
+        {
+            if (child is ToggleButton mode && mode.IsChecked == true)
+            {
+                UpdateModeBorders(mode);
+                break;
+            }
+        }
+        HighlightChecked(GpuEcoButton, GpuHybridButton, GpuDirectButton);
+        HighlightChecked(Refresh180Button, Refresh60Button);
+        HighlightChecked(BatteryLongButton, BatteryBalancedButton, BatteryWorkButton);
+    }
+
+    private static void HighlightChecked(params ToggleButton[] buttons)
+    {
+        foreach (ToggleButton button in buttons)
+        {
+            if (button.IsChecked == true)
+            {
+                HighlightSegment(button);
+                break;
+            }
+        }
+    }
+
     private void ApplyMoreSectionState()
     {
         bool expanded = AppConfig.Is(MoreOpenConfigKey);
@@ -1255,6 +1282,8 @@ public partial class OriginalStyleWindow : Window
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
+        RefreshSegmentHighlights();
+        RefreshSegmentHighlights();
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
     }
 
