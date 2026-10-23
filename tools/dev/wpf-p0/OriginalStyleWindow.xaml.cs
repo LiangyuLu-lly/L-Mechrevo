@@ -78,7 +78,11 @@ public partial class OriginalStyleWindow : Window
         InitializeComponent();
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
-        SourceInitialized += (_, _) => HideMinMaxButtons();
+        SourceInitialized += (_, _) =>
+        {
+            HideMinMaxButtons();
+            ApplyDarkTitleBar(_dark);
+        };
         ApplyDarkTitleBar(_dark);
         _backendTimer.Tick += (_, _) =>
         {
@@ -125,6 +129,7 @@ public partial class OriginalStyleWindow : Window
             RefreshBrightness();
             InitBatteryControls();
             NormalizeSegmentDefaults();
+            ApplyDarkTitleBar(_dark);
             ReloadBackgroundImage();
             _ = Dispatcher.BeginInvoke(new Action(() => _ = ConnectBackendAsync()), System.Windows.Threading.DispatcherPriority.Background);
         };
@@ -1430,7 +1435,11 @@ public partial class OriginalStyleWindow : Window
         {
             IntPtr hwnd = new WindowInteropHelper(this).Handle;
             int flag = dark ? 1 : 0;
-            DwmSetWindowAttribute(hwnd, 20, ref flag, sizeof(int));
+            int result = DwmSetWindowAttribute(hwnd, 20, ref flag, sizeof(int));
+            if (result != 0)
+            {
+                DwmSetWindowAttribute(hwnd, 19, ref flag, sizeof(int));
+            }
         }
         catch
         {
