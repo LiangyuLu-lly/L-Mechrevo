@@ -258,7 +258,7 @@ public partial class OriginalStyleWindow : Window
 
     private void BatteryLimitSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_syncingBatteryLimit || BatteryLimitSlider == null)
+        if (_syncingBatteryLimit || BatteryLimitSlider == null || !IsLoaded)
         {
             return;
         }
