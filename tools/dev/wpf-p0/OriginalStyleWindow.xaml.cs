@@ -97,6 +97,7 @@ public partial class OriginalStyleWindow : Window
         {
             Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
             ApplySavedQuickTiles();
+            ApplyMoreSectionState();
         };
     }
 
@@ -454,6 +455,23 @@ public partial class OriginalStyleWindow : Window
         };
         text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
         return text;
+    }
+
+    private const string MoreOpenConfigKey = "group_quick_open";
+
+    private void ApplyMoreSectionState()
+    {
+        bool expanded = AppConfig.Is(MoreOpenConfigKey);
+        MoreGroupsPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        MoreArrow.Text = expanded ? "▾" : "▸";
+    }
+
+    private void MoreHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        bool expanded = MoreGroupsPanel.Visibility != Visibility.Visible;
+        MoreGroupsPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        MoreArrow.Text = expanded ? "▾" : "▸";
+        AppConfig.Set(MoreOpenConfigKey, expanded ? 1 : 0);
     }
 
     private void ApplySavedQuickTiles()

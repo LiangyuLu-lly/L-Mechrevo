@@ -577,11 +577,13 @@
 
                     <!-- 更多开关 -->
                     <StackPanel x:Name="MoreSection" Style="{StaticResource Section}" Margin="0,0,0,10">
-                        <Grid>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="更多开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                        <Grid x:Name="MoreHeader" Cursor="Hand" MouseLeftButtonUp="MoreHeader_MouseLeftButtonUp">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="MoreArrow" Text="▸" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="更多开关" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock x:Name="MoreSwitchCount" Text="—" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
                         </Grid>
-                    <StackPanel x:Name="MoreGroupsPanel" Margin="0,4,0,0" />
+                    <StackPanel x:Name="MoreGroupsPanel" Margin="0,4,0,0" Visibility="Collapsed" />
                     </StackPanel>
 
                 </StackPanel>

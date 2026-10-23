@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using MechrevoLite.Hardware;
 
@@ -9,6 +10,8 @@ internal sealed class BackendProbe : IDisposable
 {
     private MechrevoHw? _hw;
     private MechrevoService? _service;
+    private static readonly Type? ShellType = typeof(MechrevoHw).Assembly.GetType("MechrevoLite.Helpers.ShellPersonalization");
+    private static readonly Type? SleepType = typeof(MechrevoHw).Assembly.GetType("MechrevoLite.Helpers.PowerSleepGuard");
     private bool _disposed;
 
     internal bool Connected { get; private set; }
@@ -154,6 +157,11 @@ internal sealed class BackendProbe : IDisposable
             {
                 return false;
             }
+            bool? systemResult = SetSystemQuick(key, on);
+            if (systemResult.HasValue)
+            {
+                return systemResult.Value;
+            }
             if (string.Equals(key, "fanboost", StringComparison.OrdinalIgnoreCase))
             {
                 return await _service.SwitchFanBoost(on).ConfigureAwait(false);
@@ -241,11 +249,85 @@ internal sealed class BackendProbe : IDisposable
         {
             return false;
         }
+        bool? system = ReadSystemQuick(key);
+        if (system.HasValue)
+        {
+            return system.Value;
+        }
         if (string.Equals(key, "fanboost", StringComparison.OrdinalIgnoreCase))
         {
             return _hw.FanBoost;
         }
         return _hw.QuickSwitches.TryGetValue(key, out bool value) && value;
+    }
+
+    private static bool? ReadSystemQuick(string key)
+    {
+        try
+        {
+            switch (key)
+            {
+                case "taskbarautohide":
+                    return InvokeBool(ShellType, "IsTaskbarAutoHide");
+                case "transparency":
+                    return InvokeBool(ShellType, "IsTransparencyEnabled");
+                case "darktheme":
+                    return InvokeBool(ShellType, "IsDarkTheme");
+            }
+            if (key.StartsWith("sleep", StringComparison.OrdinalIgnoreCase))
+            {
+                return InvokeSleepRead(key, true);
+            }
+        }
+        catch
+        {
+        }
+        return null;
+    }
+
+    private static bool? SetSystemQuick(string key, bool on)
+    {
+        try
+        {
+            switch (key)
+            {
+                case "taskbarautohide":
+                    return InvokeBool(ShellType, "SetTaskbarAutoHide", on);
+                case "transparency":
+                    return InvokeBool(ShellType, "SetTransparencyEnabled", on);
+                case "darktheme":
+                    return InvokeBool(ShellType, "SetDarkTheme", on);
+            }
+            if (key.StartsWith("sleep", StringComparison.OrdinalIgnoreCase))
+            {
+                MethodInfo? method = SleepType?.GetMethod("TrySetEnabled", BindingFlags.Public | BindingFlags.Static);
+                if (method == null)
+                {
+                    return null;
+                }
+                object?[] args = { key, on, true, null };
+                object? result = method.Invoke(null, args);
+                return result is bool ok && ok;
+            }
+        }
+        catch
+        {
+        }
+        return null;
+    }
+
+    private static bool? InvokeBool(Type? type, string name, params object?[] args)
+    {
+        MethodInfo? method = type?.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
+        object? result = method?.Invoke(null, args);
+        return result is bool value ? value : null;
+    }
+
+    private static bool? InvokeSleepRead(string key, bool ac)
+    {
+        MethodInfo? method = SleepType?.GetMethod("ReadEnabled", BindingFlags.Public | BindingFlags.Static);
+        object? result = method?.Invoke(null, new object?[] { key, ac });
+        return result is bool value ? value : null;
     }
 
     internal string Snapshot()
