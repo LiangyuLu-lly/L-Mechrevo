@@ -89,6 +89,7 @@ public partial class OriginalStyleWindow : Window
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
         ApplyDockOpacity();
+        ApplyButtonOpacity();
         _backendTimer.Tick += (_, _) =>
         {
             if (_backendProbe != null)
@@ -1643,6 +1644,7 @@ public partial class OriginalStyleWindow : Window
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
         ApplyDockOpacity();
+        ApplyButtonOpacity();
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
@@ -1662,6 +1664,7 @@ public partial class OriginalStyleWindow : Window
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
         ApplyDockOpacity();
+        ApplyButtonOpacity();
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
@@ -1697,6 +1700,21 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
+    }
+
+    internal void ApplyButtonOpacity()
+    {
+        int opacity = Math.Clamp(AppConfig.Get("ui_button_opacity", 100), 0, 100);
+        Color normal = _dark
+            ? Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF)
+            : Color.FromArgb(0x1A, 0x00, 0x00, 0x00);
+        Color hover = _dark
+            ? Color.FromArgb(0x2A, 0xFF, 0xFF, 0xFF)
+            : Color.FromArgb(0x26, 0x00, 0x00, 0x00);
+        Application.Current.Resources["ControlBrush"] =
+            new SolidColorBrush(Color.FromArgb((byte)(normal.A * opacity / 100), normal.R, normal.G, normal.B));
+        Application.Current.Resources["ControlHoverBrush"] =
+            new SolidColorBrush(Color.FromArgb((byte)(hover.A * opacity / 100), hover.R, hover.G, hover.B));
     }
 
     internal void ApplyDockOpacity()

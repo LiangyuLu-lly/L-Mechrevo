@@ -79,6 +79,8 @@ public partial class SettingsWindow : Window
         BackgroundScrimText.Text = (int)BackgroundScrimSlider.Value + "%";
         DockOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_dock_opacity", 70), 0, 100);
         DockOpacityText.Text = (int)DockOpacitySlider.Value + "%";
+        ButtonOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_button_opacity", 100), 0, 100);
+        ButtonOpacityText.Text = (int)ButtonOpacitySlider.Value + "%";
         _syncing = false;
     }
 
@@ -270,6 +272,19 @@ public partial class SettingsWindow : Window
         BackgroundPathText.Text = string.IsNullOrWhiteSpace(path)
             ? "未选择"
             : System.IO.Path.GetFileName(path);
+    }
+
+    private void ButtonOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncing || ButtonOpacityText == null)
+        {
+            return;
+        }
+        int value = (int)Math.Round(e.NewValue);
+        ButtonOpacityText.Text = value + "%";
+        AppConfig.Set("ui_button_opacity", value);
+        AppConfig.Flush();
+        _owner.ApplyButtonOpacity();
     }
 
     private void DockOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
