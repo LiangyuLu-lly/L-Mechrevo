@@ -207,7 +207,6 @@ public partial class OriginalStyleWindow : Window
             _ = ToggleCustomTileAsync(customKey);
             return;
         }
-        ContextMenu menu = new ContextMenu();
         (string Key, string Label, string Glyph)[] choices =
         {
             ("fanboost", "风扇强冷", "\uE9CA"), ("webcam", "摄像头", "\uE722"),
@@ -215,28 +214,29 @@ public partial class OriginalStyleWindow : Window
             ("monitoroff", "息屏", "\uE7F4"), ("touchpad", "触摸板", "\uE7C9"),
             ("wifi", "WiFi", "\uE701"), ("bt", "蓝牙", "\uE702")
         };
+        List<QuickChoice> list = new List<QuickChoice>();
         foreach ((string key, string label, string glyph) in choices)
         {
-            if (!_backendProbe.SupportsQuick(key))
+            if (_backendProbe.SupportsQuick(key))
             {
-                continue;
+                list.Add(new QuickChoice(key, label, glyph));
             }
-            MenuItem item = new MenuItem { Header = label, Tag = (key, label, glyph) };
-            item.Click += CustomTileChoice_Click;
-            menu.Items.Add(item);
         }
-        menu.PlacementTarget = CustomTile;
-        menu.IsOpen = true;
-    }
-
-    private void CustomTileChoice_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is MenuItem item && item.Tag is ValueTuple<string, string, string> choice)
+        if (list.Count == 0)
         {
-            CustomTile.Tag = choice.Item1;
-            CustomTileLabel.Text = choice.Item2;
-            CustomTileIcon.Text = choice.Item3;
-            CustomTile.IsChecked = _backendProbe?.QuickState(choice.Item1) == true;
+            StatusText.Text = "没有可用的快捷开关";
+            return;
+        }
+        QuickTilePickerWindow picker = new QuickTilePickerWindow(list)
+        {
+            Owner = this
+        };
+        if (picker.ShowDialog() == true && picker.SelectedChoice is QuickChoice choice)
+        {
+            CustomTile.Tag = choice.Key;
+            CustomTileLabel.Text = choice.Label;
+            CustomTileIcon.Text = choice.Glyph;
+            CustomTile.IsChecked = _backendProbe.QuickState(choice.Key);
         }
     }
 
