@@ -193,6 +193,11 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal bool QuickState(string key)
+    {
+        return _hw != null && _hw.QuickSwitches.TryGetValue(key, out bool value) && value;
+    }
+
     internal string Snapshot()
     {
         MechrevoHw? hw = _hw;

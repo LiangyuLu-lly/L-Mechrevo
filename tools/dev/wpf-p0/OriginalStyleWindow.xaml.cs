@@ -167,6 +167,77 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = ok ? "快捷开关已下发：" + key : "快捷开关下发失败：" + key;
     }
 
+    private void BuildMoreSwitches()
+    {
+        if (MoreSwitchesGrid == null || MoreSwitchesGrid.Children.Count > 0 || _backendProbe == null)
+        {
+            return;
+        }
+        (string Key, string Label)[] items =
+        {
+            ("touchpad", "触摸板"), ("wifi", "WiFi"), ("bt", "蓝牙"), ("webcam", "摄像头"),
+            ("micmute", "麦克风静音"), ("winkey", "Win 键锁"), ("fnkey", "Fn 键锁"),
+            ("numpad", "数字键盘"), ("capslock", "大小写锁定"), ("osd", "OSD 提示"),
+            ("usb", "USB 充电"), ("highperf", "高性能电源计划"), ("apuboost", "APU 防缩缸"),
+            ("fanboost", "风扇强冷"), ("acrecovery", "接通电源自动开机"),
+            ("deepsleep", "深度睡眠"), ("gamewhitelist", "游戏白名单"),
+            ("taskbarautohide", "任务栏自动隐藏"), ("transparency", "透明效果"),
+            ("darktheme", "深色主题"), ("monitoroff", "关闭显示器"), ("winupdate", "Windows 更新")
+        };
+        int created = 0;
+        foreach ((string key, string label) in items)
+        {
+            if (!_backendProbe.SupportsQuick(key))
+            {
+                continue;
+            }
+            CheckBox toggle = new CheckBox
+            {
+                Content = label,
+                Style = (Style)FindResource("RowSwitch"),
+                Tag = key,
+                IsChecked = _backendProbe.QuickState(key),
+                Margin = new Thickness(0, 2, 8, 2),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            toggle.Click += MoreSwitch_Click;
+            MoreSwitchesGrid.Children.Add(toggle);
+            created++;
+        }
+        UpdateMoreSwitchCount();
+    }
+
+    private async void MoreSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox box && box.Tag is string key && _backendProbe != null)
+        {
+            bool ok = await _backendProbe.SwitchQuickAsync(key, box.IsChecked == true);
+            if (!ok)
+            {
+                box.IsChecked = !(box.IsChecked == true);
+            }
+            StatusText.Text = ok ? "已切换：" + key : "切换失败：" + key;
+            UpdateMoreSwitchCount();
+        }
+    }
+
+    private void UpdateMoreSwitchCount()
+    {
+        if (MoreSwitchCount == null || MoreSwitchesGrid == null)
+        {
+            return;
+        }
+        int on = 0;
+        foreach (object child in MoreSwitchesGrid.Children)
+        {
+            if (child is CheckBox box && box.IsChecked == true)
+            {
+                on++;
+            }
+        }
+        MoreSwitchCount.Text = on + "/" + MoreSwitchesGrid.Children.Count + " 开启";
+    }
+
     private void RefreshFromBackend()
     {
         BackendProbe? probe = _backendProbe;
@@ -193,6 +264,17 @@ public partial class OriginalStyleWindow : Window
         for (int i = 0; i < batteryButtons.Length; i++)
         {
             batteryButtons[i].IsChecked = i == batteryMode;
+        }
+        if (MoreSwitchesGrid != null)
+        {
+            foreach (object child in MoreSwitchesGrid.Children)
+            {
+                if (child is CheckBox box && box.Tag is string key)
+                {
+                    box.IsChecked = probe.QuickState(key);
+                }
+            }
+            UpdateMoreSwitchCount();
         }
     }
 
@@ -284,6 +366,7 @@ public partial class OriginalStyleWindow : Window
             LogoLightRow.Visibility = hasLogo ? Visibility.Visible : Visibility.Collapsed;
             bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
+            BuildMoreSwitches();
             FanTile.Visibility = _backendProbe.SupportsQuick("fanboost") ? Visibility.Visible : Visibility.Collapsed;
             CameraTile.Visibility = _backendProbe.SupportsQuick("webcam") ? Visibility.Visible : Visibility.Collapsed;
             MicTile.Visibility = _backendProbe.SupportsQuick("micmute") ? Visibility.Visible : Visibility.Collapsed;
