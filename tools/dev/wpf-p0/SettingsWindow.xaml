@@ -213,6 +213,15 @@
                                 <Button Content="默认" Style="{StaticResource FlatButton}" Click="DefaultAccent_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="背景图" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock x:Name="BackgroundPathText" Text="未选择" MaxWidth="170" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MutedBrush}" />
+                                <Button Content="选择..." Style="{StaticResource FlatButton}" Click="PickBackground_Click" />
+                                <Button Content="清除" Style="{StaticResource FlatButton}" Click="ClearBackground_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </Border>
 

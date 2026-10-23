@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -5,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using MechrevoLite;
 using MechrevoLite.Battery;
 using MechrevoLite.Display;
@@ -109,6 +111,8 @@ public partial class OriginalStyleWindow : Window
             RefreshBrightness();
             InitBatteryControls();
             NormalizeSegmentDefaults();
+            ReloadBackgroundImage();
+            _ = Dispatcher.BeginInvoke(new Action(() => _ = ConnectBackendAsync()), System.Windows.Threading.DispatcherPriority.Background);
         };
     }
 
@@ -1092,6 +1096,31 @@ public partial class OriginalStyleWindow : Window
         UpdateBackgroundVisibility();
     }
 
+    internal void ReloadBackgroundImage()
+    {
+        try
+        {
+            string path = AppConfig.GetString("ui_bg_image") ?? "";
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                BitmapImage bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                bitmap.EndInit();
+                BackgroundImage.Source = bitmap;
+            }
+            else
+            {
+                BackgroundImage.Source = new BitmapImage(new Uri("pack://application:,,,/Assets/background.jpg", UriKind.Absolute));
+            }
+        }
+        catch
+        {
+            BackgroundImage.Source = null;
+        }
+    }
+
     private void UpdateBackgroundVisibility()
     {
         bool show = _dark && BackgroundToggle.IsChecked == true;
@@ -1100,6 +1129,11 @@ public partial class OriginalStyleWindow : Window
     }
 
     private async void ConnectBackend_Click(object sender, RoutedEventArgs e)
+    {
+        await ConnectBackendAsync();
+    }
+
+    private async Task ConnectBackendAsync()
     {
         if (_backendProbe != null)
         {

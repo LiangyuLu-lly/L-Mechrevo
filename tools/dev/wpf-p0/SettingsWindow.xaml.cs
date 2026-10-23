@@ -258,6 +258,43 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void RefreshBackgroundPathText()
+    {
+        string path = AppConfig.GetString("ui_bg_image") ?? "";
+        BackgroundPathText.Text = string.IsNullOrWhiteSpace(path)
+            ? "未选择"
+            : System.IO.Path.GetFileName(path);
+    }
+
+    private void PickBackground_Click(object sender, RoutedEventArgs e)
+    {
+        OpenFileDialog dialog = new OpenFileDialog
+        {
+            Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+        AppConfig.Set("ui_bg_image", dialog.FileName);
+        AppConfig.Flush();
+        RefreshBackgroundPathText();
+        _owner.ReloadBackgroundImage();
+        _owner.SetBackgroundFromSettings(true);
+        Status("已应用背景图：" + System.IO.Path.GetFileName(dialog.FileName));
+    }
+
+    private void ClearBackground_Click(object sender, RoutedEventArgs e)
+    {
+        AppConfig.Set("ui_bg_image", "");
+        AppConfig.Flush();
+        RefreshBackgroundPathText();
+        _owner.ReloadBackgroundImage();
+        _owner.SetBackgroundFromSettings(false);
+        Status("已清除背景图");
+    }
+
     private void RefreshOfficialConsole()
     {
         var status = OfficialConsoleIsolation.GetStatus(_owner.BackendConnected);
