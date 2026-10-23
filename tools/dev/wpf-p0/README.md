@@ -9,6 +9,12 @@
 & 'D:\openLM\tools\dev\wpf-p0\bin\Release\net10.0-windows\L-Mechrevo.WpfP0.exe'
 ```
 
+## 三种形态
+
+- `OriginalStyleWindow`（默认启动）：480×860 DIP，对应机主原版小窗在 150% 缩放下的约 720×1290 物理像素；单列滚动、分区标题、底部 dock。
+- `CompactWindow`：420×529 DIP 的 WinForms 原版最小客户区尺寸。
+- `MainWindow`：1180×800 宽屏仪表盘，用于对比。
+
 ## P0 验证点
 
 - 背景图 `Image Stretch=UniformToFill` 铺满窗口；
@@ -25,4 +31,4 @@
 
 ## 截图
 
-`preview.png`（2026-10-23 运行截图，1180×800）。
+`preview-original.png`（原版小窗形态）、`preview-compact.png`、`preview.png`（宽屏）。

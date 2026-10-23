@@ -13,7 +13,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        ApplyTheme(dark: true);
+        AppTheme.Apply(true);
         BackgroundImage.Opacity = 0.78;
         BackgroundScrim.Opacity = 0.35;
         BackgroundOpacitySlider.Value = 78;
@@ -26,10 +26,15 @@ public partial class MainWindow : Window
         ApplyDarkTitleBar(_dark);
     }
 
+    private void CompactButton_Click(object sender, RoutedEventArgs e)
+    {
+        new CompactWindow().Show();
+    }
+
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
-        ApplyTheme(_dark);
+        AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? "切换浅色" : "切换深色";
         StatusText.Text = "L-Mechrevo WPF P0 · " + (_dark ? "深色" : "浅色") + "主题 · 资源字典即时切换";
@@ -70,38 +75,6 @@ public partial class MainWindow : Window
         {
             ScrimLabel.Text = Math.Round(e.NewValue) + "%";
         }
-    }
-
-    private void ApplyTheme(bool dark)
-    {
-        ResourceDictionary resources = Application.Current.Resources;
-        if (dark)
-        {
-            resources["WindowBgBrush"] = Brush("#12151B");
-            resources["CardBrush"] = Brush("#B81B2029");
-            resources["CardBorderBrush"] = Brush("#33FFFFFF");
-            resources["ControlBrush"] = Brush("#22FFFFFF");
-            resources["ControlHoverBrush"] = Brush("#33FFFFFF");
-            resources["TextBrush"] = Brush("#F3F5F8");
-            resources["MutedBrush"] = Brush("#9BA6B5");
-            resources["TrackBrush"] = Brush("#35FFFFFF");
-        }
-        else
-        {
-            resources["WindowBgBrush"] = Brush("#EDF1F6");
-            resources["CardBrush"] = Brush("#D9FFFFFF");
-            resources["CardBorderBrush"] = Brush("#33000000");
-            resources["ControlBrush"] = Brush("#14000000");
-            resources["ControlHoverBrush"] = Brush("#22000000");
-            resources["TextBrush"] = Brush("#1B2029");
-            resources["MutedBrush"] = Brush("#5A6574");
-            resources["TrackBrush"] = Brush("#22000000");
-        }
-    }
-
-    private static SolidColorBrush Brush(string hex)
-    {
-        return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
     private void ApplyDarkTitleBar(bool dark)
