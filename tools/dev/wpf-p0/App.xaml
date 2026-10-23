@@ -128,10 +128,10 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="CheckBox">
                             <StackPanel Orientation="Horizontal">
-                                <Border x:Name="Track" Width="32" Height="18" CornerRadius="9"
+                                <Border x:Name="Track" Width="36" Height="20" CornerRadius="10"
                                         Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
                                     <Grid VerticalAlignment="Center">
-                                        <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"                                            VerticalAlignment="Center"                                              HorizontalAlignment="Left" Margin="2,0,0,0" />
+                                        <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White"                                            VerticalAlignment="Center"                                              HorizontalAlignment="Left" Margin="2,0,0,0" />
                                     </Grid>
                                 </Border>
                                 <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center" />
@@ -140,7 +140,7 @@
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                    <Setter TargetName="Knob" Property="Margin" Value="0,-1,3,0" />
+                                    <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -265,7 +265,7 @@
                             <Border x:Name="Track" Width="26" Height="16" CornerRadius="8"
                                     Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
                                     <Grid VerticalAlignment="Center">
-                                        <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"                                            VerticalAlignment="Center"                                          HorizontalAlignment="Left" Margin="2,0,0,0" />
+                                        <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White"                                            VerticalAlignment="Center"                                          HorizontalAlignment="Left" Margin="2,0,0,0" />
                                     </Grid>
                                 </Border>
                             <ContentPresenter Margin="6,0,0,0" VerticalAlignment="Center" />
@@ -274,7 +274,7 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                <Setter TargetName="Knob" Property="Margin" Value="0,-1,2,0" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
