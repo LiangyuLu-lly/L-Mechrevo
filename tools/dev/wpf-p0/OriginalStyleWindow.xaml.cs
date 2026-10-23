@@ -29,10 +29,10 @@ public partial class OriginalStyleWindow : Window
 
     private void UpdateContentWidth()
     {
-        double width = MainScroll.ViewportWidth;
+        double width = MainScroll.ViewportWidth - 22;
         if (width <= 100)
         {
-            width = MainScroll.ActualWidth - 8;
+            width = MainScroll.ActualWidth - 30;
         }
         if (width > 100)
         {

@@ -141,7 +141,7 @@
         <Image x:Name="BackgroundImage" Source="Assets/background.jpg" Stretch="UniformToFill" Opacity="0.58" />
         <Rectangle x:Name="BackgroundScrim" Fill="#99000000" Opacity="0.45" />
 
-        <Grid Margin="16,12,16,10">
+        <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="10" />
@@ -150,7 +150,7 @@
             </Grid.RowDefinitions>
 
             <!-- 顶部状态：模仿原版「GCU 已连接」 -->
-            <Grid Grid.Row="0">
+            <Grid Grid.Row="0" Margin="16,12,16,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -167,7 +167,7 @@
 
             <ScrollViewer x:Name="MainScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly" CanContentScroll="False" Background="Transparent">
-                <StackPanel x:Name="ContentPanel" HorizontalAlignment="Stretch">
+                <StackPanel x:Name="ContentPanel" Margin="16,0,6,10" HorizontalAlignment="Left">
 
                     <!-- 性能模式 -->
                     <StackPanel Style="{StaticResource Section}">
@@ -355,7 +355,7 @@
             </ScrollViewer>
 
             <!-- 底部 dock：模仿原版悬浮底栏 -->
-            <Border Grid.Row="3" Background="#AA10141B" CornerRadius="16" BorderBrush="#33FFFFFF" BorderThickness="1" Padding="10,8">
+            <Border Grid.Row="3" Margin="16,0,16,10" Background="#AA10141B" CornerRadius="16" BorderBrush="#33FFFFFF" BorderThickness="1" Padding="10,8">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
