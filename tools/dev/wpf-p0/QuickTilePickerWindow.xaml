@@ -11,8 +11,6 @@
         FontFamily="{DynamicResource AppFontFamily}"
         FontWeight="Normal"
         TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType"
-        TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True">
 
     <Window.Resources>
