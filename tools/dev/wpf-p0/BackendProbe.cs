@@ -237,7 +237,15 @@ internal sealed class BackendProbe : IDisposable
 
     internal bool QuickState(string key)
     {
-        return _hw != null && _hw.QuickSwitches.TryGetValue(key, out bool value) && value;
+        if (_hw == null)
+        {
+            return false;
+        }
+        if (string.Equals(key, "fanboost", StringComparison.OrdinalIgnoreCase))
+        {
+            return _hw.FanBoost;
+        }
+        return _hw.QuickSwitches.TryGetValue(key, out bool value) && value;
     }
 
     internal string Snapshot()
