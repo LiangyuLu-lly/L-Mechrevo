@@ -354,7 +354,6 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Ellipse Width="9" Height="9" Fill="#22C55E" VerticalAlignment="Center" Margin="0,0,8,0" />
                     <TextBlock x:Name="BackendStatus" Text="● GCU 状态未知" Foreground="#9BA6B5" FontSize="12" FontWeight="SemiBold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
