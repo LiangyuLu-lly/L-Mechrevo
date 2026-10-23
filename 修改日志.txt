@@ -1,3 +1,12 @@
+r82（2026-10-23 · 0.293.5.1 beta23.5.1 稳定性补丁 · 旧UI）
+
+一、稳定性
+- NVML 显示/电源过渡保护：显示设置变化后 8s、电源挂起/恢复后 30s 内不调用 NVML 原生接口，修 `nvmlDeviceGetPowerUsage` 0xc0000005（耀世/旷世诊断包）。
+- 宝龙达 Logo 灯行恢复：只隐藏无独立通路的灯带行，Logo 行按 caps.LogoLight / SupportsLogoLight 显示。
+- 诊断包 WER 取证保留：Application Error 1000/1026、LocalDumps、ReportArchive。
+
+说明：本包仍是旧 WinForms UI；WPF 原型尚未合并。
+
 r81（2026-10-23 · 0.293.5 beta23.5 宝龙达 Logo 修复）
 
 一、灯光
