@@ -9,8 +9,6 @@
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
         TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType"
-        TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True">
     <Window.Resources>
         <Style TargetType="ComboBoxItem">
