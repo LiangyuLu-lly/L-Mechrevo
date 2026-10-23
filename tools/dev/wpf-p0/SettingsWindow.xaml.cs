@@ -145,24 +145,20 @@ public partial class SettingsWindow : Window
 
     private void PickAccent_Click(object sender, RoutedEventArgs e)
     {
-        ContextMenu menu = new ContextMenu();
-        Color[] palette =
+        using System.Windows.Forms.ColorDialog dialog = new System.Windows.Forms.ColorDialog
         {
-            Color.FromRgb(59, 130, 246), Color.FromRgb(34, 197, 94), Color.FromRgb(239, 68, 68),
-            Color.FromRgb(245, 158, 11), Color.FromRgb(168, 85, 247), Color.FromRgb(14, 165, 233)
+            FullOpen = true,
+            Color = System.Drawing.Color.FromArgb(
+                (Application.Current.Resources["AccentColor"] as Color? ?? Color.FromRgb(59, 130, 246)).R,
+                (Application.Current.Resources["AccentColor"] as Color? ?? Color.FromRgb(59, 130, 246)).G,
+                (Application.Current.Resources["AccentColor"] as Color? ?? Color.FromRgb(59, 130, 246)).B)
         };
-        foreach (Color color in palette)
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
         {
-            MenuItem item = new MenuItem { Header = color.ToString(), Tag = color };
-            item.Click += (_, _) =>
-            {
-                ApplyAccent((Color)item.Tag, save: true);
-                Status("主题色已保存");
-            };
-            menu.Items.Add(item);
+            return;
         }
-        menu.PlacementTarget = (UIElement)sender;
-        menu.IsOpen = true;
+        ApplyAccent(Color.FromArgb(dialog.Color.A, dialog.Color.R, dialog.Color.G, dialog.Color.B), save: true);
+        Status("主题色已保存");
     }
 
     private void DefaultAccent_Click(object sender, RoutedEventArgs e)
