@@ -43,6 +43,8 @@ internal sealed class BackendProbe : IDisposable
 
     internal MechrevoHw? Hw => _hw;
 
+    internal MechrevoService? Service => _service;
+
     internal MechrevoDeviceCapabilities? Capabilities => _hw?.Capabilities;
 
     internal bool SupportsQuick(string key)
@@ -96,6 +98,79 @@ internal sealed class BackendProbe : IDisposable
     internal int BatteryMode => _hw?.BatteryProtection ?? -1;
 
     internal int GpuMode => _hw?.GpuMode ?? -1;
+
+    internal bool SupportsColorCalibration
+    {
+        get
+        {
+            try
+            {
+                return _hw?.SupportsColorCalibration ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal int ColorCalibrationLevel
+    {
+        get
+        {
+            try
+            {
+                int level = _hw?.MqttColorCalibrationLevel ?? _hw?.Capabilities?.ColorCalibrationLevel ?? 1;
+                return Math.Clamp(level, 1, 4);
+            }
+            catch
+            {
+                return 1;
+            }
+        }
+    }
+
+    internal bool HasDisplayEffectProfile(string mode)
+    {
+        try
+        {
+            return !string.IsNullOrWhiteSpace(mode) && _hw != null && _hw.DisplayEffectProfiles.ContainsKey(mode);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> ApplyDisplayEffectProfileAsync(string mode)
+    {
+        try
+        {
+            if (_service == null || _hw == null || !_hw.DisplayEffectProfiles.TryGetValue(mode, out DisplayEffectProfile? profile))
+            {
+                return false;
+            }
+            return await _service.ApplyDisplayEffectProfile(profile).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task RequestDisplayEffectStatusAsync()
+    {
+        try
+        {
+            if (_service != null)
+            {
+                await _service.RequestDisplayEffectStatus().ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+        }
+    }
 
     internal async Task<bool> SwitchModeAsync(int mode)
     {

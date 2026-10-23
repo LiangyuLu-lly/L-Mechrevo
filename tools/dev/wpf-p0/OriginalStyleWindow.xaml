@@ -560,7 +560,7 @@
                                 <ComboBoxItem Content="sRGB" />
                                 <ComboBoxItem Content="DCI-P3" />
                             </ComboBox>
-                            <Button Grid.Column="3" Content="设置" Style="{StaticResource MiniButton}" />
+                            <Button x:Name="CalibrationSettingsButton" Grid.Column="3" Content="设置" Style="{StaticResource MiniButton}" Click="CalibrationSettings_Click" />
                         </Grid>
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
@@ -576,7 +576,7 @@
                                 <ComboBoxItem Content="标准" />
                                 <ComboBoxItem Content="鲜艳" />
                             </ComboBox>
-                            <Button Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" />
+                            <Button x:Name="DisplayEffectEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="DisplayEffectEdit_Click" />
                         </Grid>
                     </StackPanel>
 

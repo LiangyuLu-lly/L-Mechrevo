@@ -48,6 +48,8 @@ public partial class OriginalStyleWindow : Window
 {
     private bool _dark = true;
     private bool _syncingBrightness;
+    private bool _syncingCalibration;
+    private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private BackendProbe? _backendProbe;
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -1211,6 +1213,8 @@ public partial class OriginalStyleWindow : Window
             {
                 UpdateBackendStatus();
                 BackendLine.Text = probe.Snapshot();
+                Program.hw = probe.Hw;
+                Program.service = probe.Service!;
                 _backendRetryTimer.Stop();
                 await probe.RefreshGpuModeAsync();
                 ApplyCapabilities();
@@ -1294,6 +1298,7 @@ public partial class OriginalStyleWindow : Window
             MicTile.Visibility = probe.SupportsQuick("micmute") ? Visibility.Visible : Visibility.Collapsed;
             WinKeyTile.Visibility = probe.SupportsQuick("winkey") ? Visibility.Visible : Visibility.Collapsed;
             ScreenOffTile.Visibility = probe.SupportsQuick("monitoroff") ? Visibility.Visible : Visibility.Collapsed;
+            InitScreenColorControls();
         }
         catch
         {
@@ -1315,34 +1320,256 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = ok ? "显卡超频：" + (on ? "开" : "关") : "显卡超频下发失败";
     }
 
+    private void InitScreenColorControls()
+    {
+        BackendProbe? probe = _backendProbe;
+        if (probe == null)
+        {
+            return;
+        }
+        _syncingCalibration = true;
+        try
+        {
+            int level = probe.ColorCalibrationLevel;
+            int selected = AppConfig.Exists("calib_mode") ? AppConfig.Get("calib_mode") : 1;
+            CalibrationCombo.Items.Clear();
+            CalibrationCombo.Items.Add(new ComboBoxItem { Content = "默认", Tag = 1 });
+            if (level >= 2)
+            {
+                CalibrationCombo.Items.Add(new ComboBoxItem { Content = "sRGB", Tag = 2 });
+            }
+            if (level >= 3)
+            {
+                CalibrationCombo.Items.Add(new ComboBoxItem { Content = "P3", Tag = 3 });
+            }
+            if (level >= 4)
+            {
+                CalibrationCombo.Items.Add(new ComboBoxItem { Content = "AdobeRGB", Tag = 4 });
+            }
+            bool customAvailable = AppConfig.Is("calib_custom_on") || IccHelper.ListCustomIccFiles().Count > 0;
+            if (customAvailable)
+            {
+                CalibrationCombo.Items.Add(new ComboBoxItem { Content = "自定义校色", Tag = 999 });
+            }
+            int index = 0;
+            for (int i = 0; i < CalibrationCombo.Items.Count; i++)
+            {
+                if (CalibrationCombo.Items[i] is ComboBoxItem item && (int)item.Tag == selected)
+                {
+                    index = i;
+                    break;
+                }
+            }
+            CalibrationCombo.SelectedIndex = index;
+            bool calibrationOn = AppConfig.Exists("calib_enabled") && AppConfig.Is("calib_enabled");
+            CalibrationSwitch.IsChecked = calibrationOn;
+            CalibrationCombo.IsEnabled = calibrationOn;
+            CalibrationSwitch.IsEnabled = probe.IsGcuConnected || !probe.IsNonGcuBackend;
+        }
+        finally
+        {
+            _syncingCalibration = false;
+        }
+
+        _syncingDisplayEffect = true;
+        try
+        {
+            DisplayEffectCombo.Items.Clear();
+            string[] modes = { "VibrantMode", "InternetMode", "VideoMode", "LowBlueMode", "CinemaMode", "PhotoMode" };
+            string[] labels = { "多彩", "上网", "视频", "低蓝光", "影院", "照片" };
+            for (int i = 0; i < modes.Length; i++)
+            {
+                DisplayEffectCombo.Items.Add(new ComboBoxItem { Content = labels[i], Tag = modes[i] });
+            }
+            string selectedMode = AppConfig.GetString("display_effect_mode") ?? "";
+            int index = 0;
+            for (int i = 0; i < DisplayEffectCombo.Items.Count; i++)
+            {
+                if (DisplayEffectCombo.Items[i] is ComboBoxItem item && string.Equals(item.Tag as string, selectedMode, StringComparison.OrdinalIgnoreCase))
+                {
+                    index = i;
+                    break;
+                }
+            }
+            DisplayEffectCombo.SelectedIndex = index;
+            bool effectOn = AppConfig.Is("display_effect");
+            DisplayEffectSwitch.IsChecked = effectOn;
+            DisplayEffectCombo.IsEnabled = effectOn;
+            DisplayEffectEditButton.IsEnabled = effectOn;
+        }
+        finally
+        {
+            _syncingDisplayEffect = false;
+        }
+    }
+
+    private int SelectedCalibrationMode()
+    {
+        return CalibrationCombo.SelectedItem is ComboBoxItem item && item.Tag is int mode ? mode : 1;
+    }
+
+    private string SelectedDisplayEffectMode()
+    {
+        return DisplayEffectCombo.SelectedItem is ComboBoxItem item ? item.Tag as string ?? "" : "";
+    }
+
     private async void CalibrationSwitch_Click(object sender, RoutedEventArgs e)
     {
-        if (_backendProbe == null)
+        if (_syncingCalibration || _backendProbe == null)
         {
             return;
         }
         bool on = CalibrationSwitch.IsChecked == true;
-        int mode = on ? Math.Max(0, CalibrationCombo.SelectedIndex) : 0;
-        bool ok = await _backendProbe.SetColorCalibrationAsync(mode);
-        StatusText.Text = ok ? "屏幕校色已下发" : "屏幕校色下发失败";
+        int mode = SelectedCalibrationMode();
+        bool ok;
+        if (on && mode == 999)
+        {
+            string iccName = AppConfig.GetString("calib_custom_icc") ?? "";
+            string iccPath = string.IsNullOrWhiteSpace(iccName) ? "" : System.IO.Path.Combine(IccHelper.CustomIccDir, iccName);
+            if (!string.IsNullOrWhiteSpace(iccPath) && File.Exists(iccPath))
+            {
+                ok = await Task.Run(() => IccHelper.ApplyIcc(iccPath));
+            }
+            else
+            {
+                ok = false;
+            }
+        }
+        else if (!on && AppConfig.Get("calib_mode") == 999)
+        {
+            await Task.Run(IccHelper.ClearAllIcc);
+            ok = true;
+        }
+        else
+        {
+            ok = await _backendProbe.SetColorCalibrationAsync(on ? mode : 0);
+        }
+        if (ok)
+        {
+            AppConfig.Set("calib_mode", mode);
+            AppConfig.Set("calib_enabled", on ? 1 : 0);
+            AppConfig.Flush();
+            StatusText.Text = on ? "屏幕校色已开启" : "屏幕校色已关闭";
+        }
+        else
+        {
+            _syncingCalibration = true;
+            CalibrationSwitch.IsChecked = !on;
+            _syncingCalibration = false;
+            StatusText.Text = mode == 999 ? "自定义 ICC 文件缺失或应用失败" : "屏幕校色下发失败";
+        }
+        CalibrationCombo.IsEnabled = CalibrationSwitch.IsChecked == true;
     }
 
     private async void CalibrationCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_backendProbe != null && CalibrationSwitch.IsChecked == true)
+        if (_syncingCalibration || _backendProbe == null || CalibrationSwitch.IsChecked != true)
         {
-            await _backendProbe.SetColorCalibrationAsync(Math.Max(0, CalibrationCombo.SelectedIndex));
+            return;
         }
+        int mode = SelectedCalibrationMode();
+        bool ok;
+        if (mode == 999)
+        {
+            string iccName = AppConfig.GetString("calib_custom_icc") ?? "";
+            string iccPath = string.IsNullOrWhiteSpace(iccName) ? "" : System.IO.Path.Combine(IccHelper.CustomIccDir, iccName);
+            ok = !string.IsNullOrWhiteSpace(iccPath) && File.Exists(iccPath)
+                && await Task.Run(() => IccHelper.ApplyIcc(iccPath));
+        }
+        else
+        {
+            if (AppConfig.Get("calib_mode") == 999)
+            {
+                await Task.Run(IccHelper.ClearAllIcc);
+            }
+            ok = await _backendProbe.SetColorCalibrationAsync(mode);
+        }
+        if (ok)
+        {
+            AppConfig.Set("calib_mode", mode);
+            AppConfig.Set("calib_enabled", 1);
+            AppConfig.Flush();
+            StatusText.Text = "屏幕校色档位：" + (CalibrationCombo.SelectedItem as ComboBoxItem)?.Content;
+        }
+        else
+        {
+            StatusText.Text = mode == 999 ? "自定义 ICC 文件缺失或应用失败" : "屏幕校色档位下发失败";
+            InitScreenColorControls();
+        }
+    }
+
+    private void CalibrationSettings_Click(object sender, RoutedEventArgs e)
+    {
+        using MechrevoLite.CalibrationStartupForm form = new MechrevoLite.CalibrationStartupForm();
+        form.ShowDialog();
+        InitScreenColorControls();
     }
 
     private async void DisplayEffectSwitch_Click(object sender, RoutedEventArgs e)
     {
-        if (_backendProbe == null)
+        if (_syncingDisplayEffect || _backendProbe == null)
         {
             return;
         }
-        bool ok = await _backendProbe.SetDisplayEffectSwitchAsync(DisplayEffectSwitch.IsChecked == true);
-        StatusText.Text = ok ? "色彩增强已下发" : "色彩增强下发失败";
+        bool on = DisplayEffectSwitch.IsChecked == true;
+        bool ok = await _backendProbe.SetDisplayEffectSwitchAsync(on);
+        if (ok)
+        {
+            AppConfig.Set("display_effect", on ? 1 : 0);
+            AppConfig.Flush();
+            if (on)
+            {
+                await _backendProbe.ApplyDisplayEffectProfileAsync(SelectedDisplayEffectMode());
+            }
+            await _backendProbe.RequestDisplayEffectStatusAsync();
+            StatusText.Text = on ? "色彩增强已开启" : "色彩增强已关闭";
+        }
+        else
+        {
+            _syncingDisplayEffect = true;
+            DisplayEffectSwitch.IsChecked = !on;
+            _syncingDisplayEffect = false;
+            StatusText.Text = "色彩增强下发失败";
+        }
+        DisplayEffectCombo.IsEnabled = DisplayEffectSwitch.IsChecked == true;
+        DisplayEffectEditButton.IsEnabled = DisplayEffectSwitch.IsChecked == true;
+    }
+
+    private async void DisplayEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingDisplayEffect || _backendProbe == null || DisplayEffectSwitch.IsChecked != true)
+        {
+            return;
+        }
+        string mode = SelectedDisplayEffectMode();
+        bool ok = await _backendProbe.ApplyDisplayEffectProfileAsync(mode);
+        if (ok)
+        {
+            AppConfig.Set("display_effect_mode", mode);
+            AppConfig.Flush();
+            await _backendProbe.RequestDisplayEffectStatusAsync();
+            StatusText.Text = "色彩增强档位：" + (DisplayEffectCombo.SelectedItem as ComboBoxItem)?.Content;
+        }
+        else
+        {
+            StatusText.Text = "色彩增强档位下发失败";
+        }
+    }
+
+    private void DisplayEffectEdit_Click(object sender, RoutedEventArgs e)
+    {
+        BackendProbe? probe = _backendProbe;
+        if (probe?.Service == null)
+        {
+            StatusText.Text = "后端未连接，无法编辑色彩增强";
+            return;
+        }
+        MechrevoLite.Program.hw = probe.Hw;
+        MechrevoLite.Program.service = probe.Service;
+        using MechrevoLite.DisplayEffectEditorForm form = new MechrevoLite.DisplayEffectEditorForm(SelectedDisplayEffectMode());
+        form.ShowDialog();
+        _ = probe.RequestDisplayEffectStatusAsync();
+        InitScreenColorControls();
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)
