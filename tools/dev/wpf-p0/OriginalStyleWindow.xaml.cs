@@ -82,8 +82,10 @@ public partial class OriginalStyleWindow : Window
         {
             HideMinMaxButtons();
             ApplyDarkTitleBar(_dark);
+            ApplyRoundedCorners();
         };
         ApplyDarkTitleBar(_dark);
+        UpdateTitleIcon();
         _backendTimer.Tick += (_, _) =>
         {
             if (_backendProbe != null)
@@ -130,6 +132,7 @@ public partial class OriginalStyleWindow : Window
             InitBatteryControls();
             NormalizeSegmentDefaults();
             ApplyDarkTitleBar(_dark);
+            ApplyRoundedCorners();
             ReloadBackgroundImage();
             _ = Dispatcher.BeginInvoke(new Action(() => _ = ConnectBackendAsync()), System.Windows.Threading.DispatcherPriority.Background);
         };
@@ -144,6 +147,19 @@ public partial class OriginalStyleWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
+
+    private void TitleClose_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 1)
+        {
+            DragMove();
+        }
+    }
 
     private void HideMinMaxButtons()
     {
@@ -1388,6 +1404,7 @@ public partial class OriginalStyleWindow : Window
         _dark = dark;
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
+        UpdateTitleIcon();
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
@@ -1405,6 +1422,7 @@ public partial class OriginalStyleWindow : Window
         _dark = !_dark;
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
+        UpdateTitleIcon();
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
@@ -1427,6 +1445,25 @@ public partial class OriginalStyleWindow : Window
             }
             StatusText.Text = "P0 · " + name;
         }
+    }
+
+    private void ApplyRoundedCorners()
+    {
+        try
+        {
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            int preference = 2;
+            DwmSetWindowAttribute(hwnd, 33, ref preference, sizeof(int));
+        }
+        catch
+        {
+        }
+    }
+
+    private void UpdateTitleIcon()
+    {
+        TitleIconBorder.Background = _dark ? Brushes.White : new SolidColorBrush(Color.FromRgb(17, 17, 17));
+        TitleIconText.Foreground = _dark ? Brushes.Black : Brushes.White;
     }
 
     private void ApplyDarkTitleBar(bool dark)

@@ -1,11 +1,12 @@
 <Window x:Class="L_Mechrevo.WpfP0.OriginalStyleWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="L-Mechrevo · 原版小窗 P0"
         Width="420" Height="560"
         MinWidth="420" MaxWidth="420" MinHeight="300"
         ResizeMode="CanResize"
-        WindowStyle="SingleBorderWindow"
+        WindowStyle="None"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -15,6 +16,10 @@
         TextOptions.TextRenderingMode="ClearType"
         TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="34" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <Style x:Key="Section" TargetType="StackPanel">
@@ -342,14 +347,44 @@
 
         <Grid Margin="0">
             <Grid.RowDefinitions>
+                <RowDefinition Height="34" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="10" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
+            <!-- 自绘标题栏：标题 + 关闭 -->
+            <Grid Grid.Row="0" Background="{DynamicResource WindowBgBrush}"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Border x:Name="TitleIconBorder" Width="18" Height="18" CornerRadius="4" Background="White" Margin="0,0,8,0">
+                        <TextBlock x:Name="TitleIconText" Text="L" FontSize="11" FontWeight="Bold" Foreground="#111111"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="L-Mechrevo · 原版小窗" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+                <Button x:Name="TitleCloseButton" Content="✕" Width="44" Height="34" HorizontalAlignment="Right"
+                        Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}"
+                        FontSize="14" Cursor="Hand" Click="TitleClose_Click"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#E81123" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+
             <!-- 顶部状态：模仿原版「GCU 已连接」 -->
-            <Grid Grid.Row="0" Margin="12,8,12,0">
+            <Grid Grid.Row="1" Margin="12,8,12,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -366,7 +401,7 @@
                 </StackPanel>
             </Grid>
 
-            <ScrollViewer x:Name="MainScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+            <ScrollViewer x:Name="MainScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly" CanContentScroll="False" Background="Transparent">
                 <StackPanel x:Name="ContentPanel" Margin="12,0,5,8" HorizontalAlignment="Left">
 
@@ -624,7 +659,7 @@
             </ScrollViewer>
 
             <!-- 底部 dock：模仿原版悬浮底栏 -->
-            <Border Grid.Row="3" Margin="12,0,12,8" Background="{DynamicResource CardBrush}" CornerRadius="14" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,6">
+            <Border Grid.Row="4" Margin="12,0,12,8" Background="{DynamicResource CardBrush}" CornerRadius="14" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,6">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
