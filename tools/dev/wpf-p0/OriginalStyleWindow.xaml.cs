@@ -1169,9 +1169,12 @@ public partial class OriginalStyleWindow : Window
 
     private void UpdateBackgroundVisibility()
     {
-        bool show = _dark && BackgroundToggle.IsChecked == true;
+        bool show = BackgroundToggle.IsChecked == true;
         BackgroundImage.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         BackgroundScrim.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        BackgroundScrim.Fill = _dark
+            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
+            : new SolidColorBrush(Color.FromArgb(0x66, 255, 255, 255));
     }
 
     private async void ConnectBackend_Click(object sender, RoutedEventArgs e)
