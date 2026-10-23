@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using MechrevoLite.Hardware;
 using System.Windows.Interop;
@@ -18,6 +19,7 @@ public partial class OriginalStyleWindow : Window
     public OriginalStyleWindow()
     {
         InitializeComponent();
+        InitializeQuickTileDrag();
         SourceInitialized += (_, _) => HideMinMaxButtons();
         ApplyDarkTitleBar(_dark);
         _backendTimer.Tick += (_, _) =>
@@ -69,6 +71,79 @@ public partial class OriginalStyleWindow : Window
         long value = style.ToInt64();
         value &= ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
         SetWindowLongPtr(hwnd, GWL_STYLE, (nint)value);
+    }
+
+    private ToggleButton? _dragTile;
+    private Point _dragStart;
+
+    private void InitializeQuickTileDrag()
+    {
+        QuickTileGrid.PreviewMouseLeftButtonDown += QuickTileGrid_PreviewMouseLeftButtonDown;
+        QuickTileGrid.PreviewMouseMove += QuickTileGrid_PreviewMouseMove;
+        QuickTileGrid.DragOver += (_, e) =>
+        {
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+        };
+        QuickTileGrid.Drop += QuickTileGrid_Drop;
+    }
+
+    private void QuickTileGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragTile = FindAncestor<ToggleButton>(e.OriginalSource as DependencyObject);
+        if (_dragTile == CustomTile)
+        {
+            _dragTile = null;
+            return;
+        }
+        _dragStart = e.GetPosition(QuickTileGrid);
+    }
+
+    private void QuickTileGrid_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragTile == null || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+        Point now = e.GetPosition(QuickTileGrid);
+        if (Math.Abs(now.X - _dragStart.X) < 8 && Math.Abs(now.Y - _dragStart.Y) < 8)
+        {
+            return;
+        }
+        ToggleButton source = _dragTile;
+        _dragTile = null;
+        DragDrop.DoDragDrop(source, source, DragDropEffects.Move);
+    }
+
+    private void QuickTileGrid_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(ToggleButton)) is not ToggleButton source || source == CustomTile)
+        {
+            return;
+        }
+        ToggleButton? target = FindAncestor<ToggleButton>(e.OriginalSource as DependencyObject);
+        if (target == null || target == CustomTile || target == source)
+        {
+            return;
+        }
+        QuickTileGrid.Children.Remove(source);
+        int index = QuickTileGrid.Children.IndexOf(target);
+        QuickTileGrid.Children.Insert(index < 0 ? 0 : index, source);
+        QuickTileGrid.Columns = Math.Max(1, QuickTileGrid.Children.Count);
+        StatusText.Text = "快捷磁贴顺序已调整";
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
+    {
+        while (node != null)
+        {
+            if (node is T typed)
+            {
+                return typed;
+            }
+            node = System.Windows.Media.VisualTreeHelper.GetParent(node);
+        }
+        return null;
     }
 
     private void UpdateContentWidth()
