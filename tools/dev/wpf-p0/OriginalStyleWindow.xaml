@@ -76,10 +76,10 @@
             <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,8" />
+            <Setter Property="Padding" Value="8,6" />
             <Setter Property="Margin" Value="0,0,5,0" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
@@ -129,6 +129,114 @@
                                     <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0" Focusable="False" />
                                 </Track.IncreaseRepeatButton>
                             </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RoundSlider" TargetType="Slider">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Track x:Name="PART_Track" Orientation="Horizontal">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" CornerRadius="2" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="16" Height="16" Cursor="Hand">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="White" Stroke="{DynamicResource AccentBrush}" StrokeThickness="3" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" CornerRadius="2" Background="{DynamicResource TrackBrush}" VerticalAlignment="Center" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="2,1" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RoundCombo" TargetType="ComboBox">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8" />
+                            <ContentPresenter Margin="10,0,28,0" VerticalAlignment="Center"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              IsHitTestVisible="False" />
+                            <ToggleButton Focusable="False" ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent">
+                                            <Path Data="M 0 0 L 4 4 L 8 0" Stroke="{DynamicResource MutedBrush}"
+                                                  StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
+                                <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+                                        BorderThickness="1" CornerRadius="8" Margin="0,4,0,0" Padding="4">
+                                    <ScrollViewer MaxHeight="220">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
@@ -268,7 +376,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="亮度" Style="{StaticResource StatText}" Margin="0,0,12,0" />
-                            <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="100" />
+                            <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="100" Style="{StaticResource RoundSlider}" />
                             <TextBlock Grid.Column="2" Text="100%" Style="{StaticResource StatText}" Margin="10,0,0,0" />
                         </Grid>
                         <Grid Margin="0,8,0,0">
@@ -278,7 +386,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="屏幕校色" Style="{StaticResource StatText}" Margin="0,0,14,0" />
-                            <CheckBox Grid.Column="1" Content="默认" Style="{StaticResource RowSwitch}" />
+                            <ComboBox Grid.Column="1" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,10,0">
+                                <ComboBoxItem Content="默认" />
+                                <ComboBoxItem Content="sRGB" />
+                                <ComboBoxItem Content="DCI-P3" />
+                            </ComboBox>
                             <Button Grid.Column="2" Content="设置" Style="{StaticResource MiniButton}" />
                         </Grid>
                         <Grid Margin="0,8,0,0">
@@ -288,7 +400,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="色彩增强" Style="{StaticResource StatText}" Margin="0,0,14,0" />
-                            <CheckBox Grid.Column="1" Content="关" Style="{StaticResource RowSwitch}" />
+                            <ComboBox Grid.Column="1" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,10,0">
+                                <ComboBoxItem Content="关" />
+                                <ComboBoxItem Content="标准" />
+                                <ComboBoxItem Content="鲜艳" />
+                            </ComboBox>
                             <Button Grid.Column="2" Content="编辑" Style="{StaticResource MiniButton}" />
                         </Grid>
                     </StackPanel>

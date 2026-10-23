@@ -34,3 +34,5 @@
 ## 截图
 
 `preview-original.png`（原版小窗形态）、`preview-compact.png`、`preview.png`（宽屏）。
+
+- 原版小窗补充：圆头滑块、圆角下拉框、显卡/电池分段按钮缩小。
