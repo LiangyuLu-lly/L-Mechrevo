@@ -656,7 +656,7 @@ public partial class OriginalStyleWindow : Window
             TextBlock label = new TextBlock
             {
                 Text = choice.Label,
-                FontSize = 9,
+                FontSize = 11,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 2, 0, 0)
             };
@@ -857,7 +857,7 @@ public partial class OriginalStyleWindow : Window
                     Tag = key,
                     IsChecked = _backendProbe.QuickState(key),
                     Margin = new Thickness(0, 1, 4, 1),
-                    FontSize = 9,
+                    FontSize = 11,
                     VerticalAlignment = VerticalAlignment.Center
                 });
             }
@@ -870,8 +870,8 @@ public partial class OriginalStyleWindow : Window
                 Grid headerRow = new Grid { Margin = new Thickness(0, 8, 0, 2) };
                 headerRow.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("MutedText"), FontSize = 10 });
                 StackPanel scope = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-                ToggleButton ac = new ToggleButton { Content = "通电时", Style = (Style)FindResource("SmallSegment"), IsChecked = true, Tag = "ac", Margin = new Thickness(0, 0, 4, 0), Height = 24, FontSize = 9 };
-                ToggleButton dc = new ToggleButton { Content = "离电时", Style = (Style)FindResource("SmallSegment"), Tag = "dc", Height = 24, FontSize = 9 };
+                ToggleButton ac = new ToggleButton { Content = "通电时", Style = (Style)FindResource("SmallSegment"), IsChecked = true, Tag = "ac", Margin = new Thickness(0, 0, 4, 0), Height = 24, FontSize = 11 };
+                ToggleButton dc = new ToggleButton { Content = "离电时", Style = (Style)FindResource("SmallSegment"), Tag = "dc", Height = 24, FontSize = 11 };
                 ac.Click += SleepScope_Click;
                 dc.Click += SleepScope_Click;
                 scope.Children.Add(ac);

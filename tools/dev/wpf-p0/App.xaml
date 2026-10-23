@@ -23,7 +23,7 @@
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
                 <Setter Property="FontWeight" Value="Normal" />
-                <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
                 <Style.Triggers>
                     <Trigger Property="FontWeight" Value="SemiBold">
                         <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />

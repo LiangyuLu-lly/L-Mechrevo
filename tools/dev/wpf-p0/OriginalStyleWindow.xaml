@@ -11,7 +11,7 @@
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
         FontWeight="Normal"
-        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextFormattingMode="Ideal"
         UseLayoutRounding="True">
 
     <Window.Resources>
@@ -353,7 +353,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Ellipse Width="9" Height="9" Fill="#22C55E" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <TextBlock x:Name="BackendStatus" Text="后端未连接" Foreground="#9BA6B5" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock x:Name="BackendStatus" Text="后端未连接" Foreground="#9BA6B5" FontSize="12" FontWeight="SemiBold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="ConnectBackendButton" Content="连接后端" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="ConnectBackend_Click" Margin="0,0,6,0" />
@@ -431,37 +431,37 @@
                                               Data="M8,8 C6,5 6,2 8,1 C10,2 10,5 8,8 Z M8,8 C11,6 14,7 15,9 C13,11 10,10 8,8 Z M8,8 C10,11 10,14 8,15 C6,14 6,11 8,8 Z M8,8 C5,10 2,9 1,7 C3,5 6,6 8,8 Z M8,7 A1,1 0 1 1 8,9 A1,1 0 1 1 8,7 Z" />
                                     </Canvas>
                                 </Viewbox>
-                                    <TextBlock Text="强冷" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="强冷" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="CameraTile" Style="{StaticResource Tile}" Tag="webcam" Click="QuickTile_Click" IsChecked="True">
                                 <StackPanel>
                                     <TextBlock Text="&#xE722;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="摄像头" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="摄像头" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="MicTile" Style="{StaticResource Tile}" Tag="micmute" Click="QuickTile_Click">
                                 <StackPanel>
                                     <TextBlock Text="&#xE720;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="麦克风" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="麦克风" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="WinKeyTile" Style="{StaticResource Tile}" Tag="winkey" Click="QuickTile_Click">
                                 <StackPanel>
                                     <TextBlock Text="&#xE765;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="Win键" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="Win键" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="ScreenOffTile" Style="{StaticResource Tile}" Tag="monitoroff" Click="QuickTile_Click">
                                 <StackPanel>
                                     <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="息屏" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="息屏" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="CustomTile" Style="{StaticResource Tile}" Click="CustomTile_Click">
                                 <StackPanel>
                                     <TextBlock x:Name="CustomTileIcon" Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock x:Name="CustomTileLabel" Text="自定义" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock x:Name="CustomTileLabel" Text="自定义" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                         </UniformGrid>
@@ -566,7 +566,7 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <TextBlock Text="自动关闭时间" Style="{StaticResource StatText}" Margin="0,0,10,0" />
                                 <Border Background="{DynamicResource ControlBrush}" CornerRadius="8" Padding="12,6">
-                                    <TextBlock Text="关" FontSize="13" />
+                                    <TextBlock Text="关" FontSize="12" />
                                 </Border>
                             </StackPanel>
                         </Grid>
@@ -636,31 +636,31 @@
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
                             <StackPanel>
                                 <TextBlock Text="◎" FontSize="14" HorizontalAlignment="Center" />
-                                <TextBlock Text="悬浮窗" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                <TextBlock Text="悬浮窗" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="设置">
                             <StackPanel>
                                 <TextBlock Text="☼" FontSize="14" HorizontalAlignment="Center" />
-                                <TextBlock Text="设置" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                <TextBlock Text="设置" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="赞助">
                             <StackPanel>
                                 <TextBlock Text="♡" FontSize="14" HorizontalAlignment="Center" />
-                                <TextBlock Text="赞助" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                <TextBlock Text="赞助" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="诊断">
                             <StackPanel>
                                 <TextBlock Text="▣" FontSize="14" HorizontalAlignment="Center" />
-                                <TextBlock Text="诊断" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                <TextBlock Text="诊断" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="退出">
                             <StackPanel>
                                 <TextBlock Text="✕" FontSize="14" HorizontalAlignment="Center" />
-                                <TextBlock Text="退出" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                <TextBlock Text="退出" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                     </UniformGrid>
