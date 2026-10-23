@@ -7,6 +7,7 @@ using System.Security;
 using System.Security.Permissions;
 
 [assembly: InternalsVisibleTo("MechrevoLite.Tests")]
+[assembly: InternalsVisibleTo("L-Mechrevo.WpfP0")]
 [assembly: DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
 [assembly: AssemblyCompany("L-Mechrevo")]
 [assembly: AssemblyConfiguration("Release")]

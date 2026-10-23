@@ -282,6 +282,39 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal bool IsBaolongda
+    {
+        get
+        {
+            try
+            {
+                return _hw?.UsesBaolongda ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal bool SwitchGpuModeBaolongda(int mode, out bool confirmed)
+    {
+        confirmed = false;
+        try
+        {
+            if (_hw == null)
+            {
+                return false;
+            }
+            int backendMode = mode == 2 ? BaolongdaWmi.GpuModeDiscrete : BaolongdaWmi.GpuModeHybrid;
+            return _hw.TrySetGpuModeViaBackend(backendMode, out confirmed);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> SwitchGpuModeAsync(int mode)
     {
         try

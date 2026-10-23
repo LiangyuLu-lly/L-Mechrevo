@@ -290,6 +290,33 @@ public partial class OriginalStyleWindow : Window
             RefreshFromBackend();
             return;
         }
+        if (_backendProbe.IsBaolongda)
+        {
+            if (mode == 0)
+            {
+                StatusText.Text = "宝龙达不支持核显模式";
+                RefreshFromBackend();
+                return;
+            }
+            if (_backendProbe.CurrentGpuMode == mode)
+            {
+                _backendProbe.ClearGpuRestartPending();
+                RefreshFromBackend();
+                return;
+            }
+            bool bdOk = _backendProbe.SwitchGpuModeBaolongda(mode, out bool confirmed);
+            if (bdOk)
+            {
+                _backendProbe.MarkGpuRestartPending(mode);
+                StatusText.Text = confirmed ? "已切到目标模式，重启后生效" : "已请求切换，回读未确认，重启后确认";
+            }
+            else
+            {
+                StatusText.Text = "宝龙达显卡模式写入失败";
+            }
+            RefreshFromBackend();
+            return;
+        }
         foreach (ToggleButton item in new[] { GpuEcoButton, GpuHybridButton, GpuDirectButton })
         {
             item.IsChecked = ReferenceEquals(item, button);
@@ -924,11 +951,12 @@ public partial class OriginalStyleWindow : Window
             bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
             BuildMoreSwitches();
-            FanTile.Visibility = _backendProbe.SupportsQuick("fanboost") ? Visibility.Visible : Visibility.Collapsed;
-            CameraTile.Visibility = _backendProbe.SupportsQuick("webcam") ? Visibility.Visible : Visibility.Collapsed;
-            MicTile.Visibility = _backendProbe.SupportsQuick("micmute") ? Visibility.Visible : Visibility.Collapsed;
-            WinKeyTile.Visibility = _backendProbe.SupportsQuick("winkey") ? Visibility.Visible : Visibility.Collapsed;
-            ScreenOffTile.Visibility = _backendProbe.SupportsQuick("monitoroff") ? Visibility.Visible : Visibility.Collapsed;
+            BackendProbe probe = _backendProbe;
+            FanTile.Visibility = probe.SupportsQuick("fanboost") ? Visibility.Visible : Visibility.Collapsed;
+            CameraTile.Visibility = probe.SupportsQuick("webcam") ? Visibility.Visible : Visibility.Collapsed;
+            MicTile.Visibility = probe.SupportsQuick("micmute") ? Visibility.Visible : Visibility.Collapsed;
+            WinKeyTile.Visibility = probe.SupportsQuick("winkey") ? Visibility.Visible : Visibility.Collapsed;
+            ScreenOffTile.Visibility = probe.SupportsQuick("monitoroff") ? Visibility.Visible : Visibility.Collapsed;
         }
         catch
         {
