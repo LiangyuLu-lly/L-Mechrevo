@@ -1128,11 +1128,20 @@ public partial class OriginalStyleWindow : Window
             {
                 BackgroundImage.Source = new BitmapImage(new Uri("pack://application:,,,/Assets/background.jpg", UriKind.Absolute));
             }
+            ApplyBackgroundAppearance();
         }
         catch
         {
             BackgroundImage.Source = null;
         }
+    }
+
+    internal void ApplyBackgroundAppearance()
+    {
+        int opacity = Math.Clamp(AppConfig.Get("ui_bg_opacity", 65), 0, 100);
+        int scrim = Math.Clamp(AppConfig.Get("ui_bg_scrim", 50), 0, 100);
+        BackgroundImage.Opacity = opacity / 100.0;
+        BackgroundScrim.Opacity = scrim / 100.0;
     }
 
     private void UpdateBackgroundVisibility()

@@ -73,6 +73,10 @@ public partial class SettingsWindow : Window
 
         RefreshOfficialConsole();
         RefreshPawnIO();
+        BackgroundOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_bg_opacity", 65), 0, 100);
+        BackgroundScrimSlider.Value = Math.Clamp(AppConfig.Get("ui_bg_scrim", 50), 0, 100);
+        BackgroundOpacityText.Text = (int)BackgroundOpacitySlider.Value + "%";
+        BackgroundScrimText.Text = (int)BackgroundScrimSlider.Value + "%";
         _syncing = false;
     }
 
@@ -264,6 +268,32 @@ public partial class SettingsWindow : Window
         BackgroundPathText.Text = string.IsNullOrWhiteSpace(path)
             ? "未选择"
             : System.IO.Path.GetFileName(path);
+    }
+
+    private void BackgroundOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncing || BackgroundOpacityText == null)
+        {
+            return;
+        }
+        int value = (int)Math.Round(e.NewValue);
+        BackgroundOpacityText.Text = value + "%";
+        AppConfig.Set("ui_bg_opacity", value);
+        AppConfig.Flush();
+        _owner.ApplyBackgroundAppearance();
+    }
+
+    private void BackgroundScrim_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncing || BackgroundScrimText == null)
+        {
+            return;
+        }
+        int value = (int)Math.Round(e.NewValue);
+        BackgroundScrimText.Text = value + "%";
+        AppConfig.Set("ui_bg_scrim", value);
+        AppConfig.Flush();
+        _owner.ApplyBackgroundAppearance();
     }
 
     private void PickBackground_Click(object sender, RoutedEventArgs e)
