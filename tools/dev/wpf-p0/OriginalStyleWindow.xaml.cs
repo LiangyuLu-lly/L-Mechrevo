@@ -325,7 +325,7 @@ public partial class OriginalStyleWindow : Window
         selected.BorderThickness = new Thickness(2);
         selected.Background = new SolidColorBrush(Color.FromArgb(0x30, color.R, color.G, color.B));
         selected.FontFamily = bold;
-        selected.FontWeight = FontWeights.Normal;
+        selected.FontWeight = FontWeights.Bold;
     }
 
     private async Task SwitchModeAsync(int mode)
@@ -959,7 +959,7 @@ public partial class OriginalStyleWindow : Window
             selected.BorderThickness = new Thickness(3);
             selected.Background = new SolidColorBrush(Color.FromArgb(0x30, color.R, color.G, color.B));
             selected.FontFamily = bold;
-            selected.FontWeight = FontWeights.Normal;
+            selected.FontWeight = FontWeights.Bold;
         }
     }
 

@@ -22,6 +22,7 @@
             <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+                <Setter Property="FontWeight" Value="Medium" />
                 <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
                 <Style.Triggers>
                     <Trigger Property="FontWeight" Value="SemiBold">
@@ -36,6 +37,7 @@
             <Style TargetType="Label">
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+                <Setter Property="FontWeight" Value="Medium" />
             </Style>
 
             <Style x:Key="MutedText" TargetType="TextBlock">

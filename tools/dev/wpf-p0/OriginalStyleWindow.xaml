@@ -10,6 +10,7 @@
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="Medium"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True">
 
@@ -105,7 +106,7 @@
                             </MultiTrigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Bd" Property="BorderThickness" Value="3" />
-                                <Setter Property="FontWeight" Value="Normal" />
+                                <Setter Property="FontWeight" Value="Bold" />
                                 <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
