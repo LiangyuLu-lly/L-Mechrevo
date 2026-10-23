@@ -17,8 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\Fonts\OPPOSansR.ttf" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\Fonts\OPPOSansB.ttf" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\source\MechrevoLite.UI\Fonts\HarmonyOS_Sans_SC_Regular.ttf" Link="Fonts\HarmonyOS_Sans_SC_Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\source\MechrevoLite.UI\Fonts\HarmonyOS_Sans_SC_Bold.ttf" Link="Fonts\HarmonyOS_Sans_SC_Bold.ttf" CopyToOutputDirectory="PreserveNewest" />
     <Resource Include="Assets\background.jpg" />

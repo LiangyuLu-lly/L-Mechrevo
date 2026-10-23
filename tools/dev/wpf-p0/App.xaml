@@ -7,7 +7,6 @@
 
             <!-- P0 主题令牌：先在 App 级定义，运行时由 MainWindow 动态替换。 -->
             <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
-            <FontFamily x:Key="AppFontBoldFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
             <Color x:Key="AccentColor">#3B82F6</Color>
             <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
             <SolidColorBrush x:Key="WindowBgBrush" Color="#12151B" />
@@ -23,14 +22,6 @@
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
                 <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
                 <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
-                <Style.Triggers>
-                    <Trigger Property="FontWeight" Value="SemiBold">
-                        <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
-                    </Trigger>
-                    <Trigger Property="FontWeight" Value="Bold">
-                        <Setter Property="FontFamily" Value="{DynamicResource AppFontBoldFamily}" />
-                    </Trigger>
-                </Style.Triggers>
             </Style>
 
             <Style TargetType="Label">

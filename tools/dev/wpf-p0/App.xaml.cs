@@ -17,16 +17,10 @@ public partial class App : Application
     {
         try
         {
-            string dir = Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts");
-            string regular = Path.Combine(dir, "OPPOSansR.ttf");
-            string bold = Path.Combine(dir, "OPPOSansB.ttf");
-            if (File.Exists(regular))
+            string fontPath = Path.Combine(AppContext.BaseDirectory, "Fonts", "HarmonyOS_Sans_SC_Regular.ttf");
+            if (File.Exists(fontPath))
             {
-                Application.Current.Resources["AppFontFamily"] = new FontFamily(regular + "#OPPOSans");
-            }
-            if (File.Exists(bold))
-            {
-                Application.Current.Resources["AppFontBoldFamily"] = new FontFamily(bold + "#OPPOSans B");
+                Application.Current.Resources["AppFontFamily"] = new FontFamily(fontPath + "#HarmonyOS Sans SC");
             }
         }
         catch
