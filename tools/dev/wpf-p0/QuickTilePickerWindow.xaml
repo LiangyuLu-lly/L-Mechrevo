@@ -81,7 +81,7 @@
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="ChoicesList">
+            <ItemsControl x:Name="ChoicesList" AllowDrop="True">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <CheckBox Style="{StaticResource PickerCheck}"

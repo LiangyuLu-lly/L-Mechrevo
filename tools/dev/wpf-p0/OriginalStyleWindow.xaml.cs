@@ -338,6 +338,14 @@ public partial class OriginalStyleWindow : Window
 
     private void CustomTile_Click(object sender, RoutedEventArgs e)
     {
+        List<string> currentOrder = new List<string>();
+        foreach (object child in QuickTileGrid.Children)
+        {
+            if (child is ToggleButton tile && tile.Tag is string currentKey)
+            {
+                currentOrder.Add(currentKey);
+            }
+        }
         List<QuickChoice> choices = new List<QuickChoice>();
         foreach ((string key, string label, string glyph) in QuickTileCatalog)
         {
@@ -347,6 +355,9 @@ public partial class OriginalStyleWindow : Window
             }
             choices.Add(new QuickChoice(key, label, glyph, HasQuickTile(key)));
         }
+        choices = choices
+            .OrderBy(c => currentOrder.IndexOf(c.Key) is int i && i >= 0 ? i : int.MaxValue)
+            .ToList();
         if (choices.Count == 0)
         {
             StatusText.Text = "没有可用的快捷开关";
