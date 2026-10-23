@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Interop;
 
 namespace L_Mechrevo.WpfP0;
@@ -16,6 +18,7 @@ public partial class OriginalStyleWindow : Window
         if (ModeGrid != null && ModeGrid.Children.Count > 1 && ModeGrid.Children[1] is ToggleButton defaultMode)
         {
             defaultMode.IsChecked = true;
+            UpdateModeBorders(defaultMode);
         }
         MainScroll.SizeChanged += delegate
         {
@@ -52,7 +55,26 @@ public partial class OriginalStyleWindow : Window
         if (sender is ToggleButton selected)
         {
             selected.IsChecked = true;
+            UpdateModeBorders(selected);
             StatusText.Text = "性能模式：" + selected.Content;
+        }
+    }
+
+    private static void UpdateModeBorders(ToggleButton selected)
+    {
+        Brush gray = (Brush)Application.Current.Resources["CardBorderBrush"];
+        foreach (object child in ((UniformGrid)selected.Parent).Children)
+        {
+            if (child is ToggleButton button)
+            {
+                button.BorderBrush = gray;
+                button.BorderThickness = new Thickness(1);
+            }
+        }
+        if (selected.Tag is string hex)
+        {
+            selected.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            selected.BorderThickness = new Thickness(3);
         }
     }
 

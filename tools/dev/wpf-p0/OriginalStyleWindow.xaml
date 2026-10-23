@@ -76,10 +76,10 @@
             <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0,0,5,0" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,0,6,0" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
@@ -243,6 +243,12 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SmallSegment" TargetType="ToggleButton" BasedOn="{StaticResource BigSegment}">
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Margin" Value="0,0,5,0" />
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -292,10 +298,10 @@
                             <TextBlock Grid.Column="1" Text="CPU 85℃   52W   4427rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
                         <UniformGrid x:Name="ModeGrid" Columns="4" Margin="0,2,0,0">
-                            <ToggleButton Content="静音" Tag="#22C55E" BorderBrush="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton Content="平衡" Tag="#3B82F6" BorderBrush="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton Content="静音狂暴" Tag="#F59E0B" BorderBrush="#F59E0B" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
-                            <ToggleButton Content="高能狂暴" Tag="#EF4444" BorderBrush="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" />
+                            <ToggleButton Content="静音" Tag="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
+                            <ToggleButton Content="平衡" Tag="#3B82F6" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
+                            <ToggleButton Content="静音狂暴" Tag="#F59E0B" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" />
+                            <ToggleButton Content="高能狂暴" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" />
                         </UniformGrid>
                     </StackPanel>
 
@@ -353,9 +359,9 @@
                             <TextBlock Grid.Column="1" Text="GPU 73℃   90W   4698rpm 100%" Style="{StaticResource StatText}" />
                         </Grid>
                         <UniformGrid Columns="3" Margin="0,2,0,0">
-                            <ToggleButton Content="核显模式" Style="{StaticResource BigSegment}" />
-                            <ToggleButton Content="混合模式" Style="{StaticResource BigSegment}" />
-                            <ToggleButton Content="独显直连" Style="{StaticResource BigSegment}" IsChecked="True" Margin="0" />
+                            <ToggleButton Content="核显模式" Style="{StaticResource SmallSegment}" />
+                            <ToggleButton Content="混合模式" Style="{StaticResource SmallSegment}" />
+                            <ToggleButton Content="独显直连" Style="{StaticResource SmallSegment}" IsChecked="True" Margin="0" />
                         </UniformGrid>
                     </StackPanel>
 
@@ -366,8 +372,8 @@
                             <CheckBox Content="自动刷新率" Style="{StaticResource RowSwitch}" HorizontalAlignment="Right" FontSize="13" />
                         </Grid>
                         <UniformGrid Columns="2" Margin="0,0,0,6">
-                            <ToggleButton Content="180" Style="{StaticResource BigSegment}" IsChecked="True" />
-                            <ToggleButton Content="60" Style="{StaticResource BigSegment}" Margin="0" />
+                            <ToggleButton Content="180" Style="{StaticResource SmallSegment}" IsChecked="True" />
+                            <ToggleButton Content="60" Style="{StaticResource SmallSegment}" Margin="0" />
                         </UniformGrid>
                         <Grid Margin="0,2,0,6">
                             <Grid.ColumnDefinitions>
@@ -416,9 +422,9 @@
                             <TextBlock Text="圆口 230/240W · 已充满" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
                         </Grid>
                         <UniformGrid Columns="3" Margin="0,0,0,10">
-                            <ToggleButton Content="长效模式" Style="{StaticResource BigSegment}" IsChecked="True" />
-                            <ToggleButton Content="平衡模式" Style="{StaticResource BigSegment}" />
-                            <ToggleButton Content="工作站模式" Style="{StaticResource BigSegment}" Margin="0" />
+                            <ToggleButton Content="长效模式" Style="{StaticResource SmallSegment}" IsChecked="True" />
+                            <ToggleButton Content="平衡模式" Style="{StaticResource SmallSegment}" />
+                            <ToggleButton Content="工作站模式" Style="{StaticResource SmallSegment}" Margin="0" />
                         </UniformGrid>
                         <CheckBox Content="启用无极限充功能(实验性)" Style="{StaticResource RowSwitch}" />
                         <CheckBox Content="关闭 EC 直写充电上限（写入异常时用）" Style="{StaticResource RowSwitch}" />
