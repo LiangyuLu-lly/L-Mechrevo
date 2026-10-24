@@ -12,6 +12,18 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
         UseLayoutRounding="True">
+    <Window.Resources>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style x:Key="MiniButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="MinWidth" Value="52" />
+        </Style>
+    </Window.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
