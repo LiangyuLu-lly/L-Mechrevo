@@ -508,21 +508,6 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = on ? "已关闭 EC 直写充电上限" : "EC 直写恢复自动判定";
     }
 
-    private void BatteryFull_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            BatteryControl.ToggleBatteryLimitFull();
-            _syncingBatteryLimit = true;
-            BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
-            _syncingBatteryLimit = false;
-            StatusText.Text = "已切换充电上限";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "切换充满失败：" + ex.Message;
-        }
-    }
 
     private void BatteryLimitSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
