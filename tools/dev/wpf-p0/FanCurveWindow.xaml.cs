@@ -60,7 +60,8 @@ public partial class FanCurveWindow : Window
             await _hw.SetFanCurve(0, cpu).ConfigureAwait(true);
             await _hw.SetFanCurve(1, gpu).ConfigureAwait(true);
             PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
-            StatusText.Text = "风扇曲线已下发";
+            PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
+            StatusText.Text = "风扇曲线已下发，并已记录为当前档风扇曲线";
         }
         catch (Exception ex)
         {
