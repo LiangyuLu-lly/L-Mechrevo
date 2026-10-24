@@ -627,18 +627,25 @@
                             <CheckBox x:Name="ChargeLimitSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" VerticalAlignment="Center" Click="ChargeLimitSwitch_Click" />
                             <Button x:Name="ChargeLimitApplyButton" Grid.Column="3" Content="保存阈值" Style="{StaticResource MiniButton}" Click="ChargeLimitApply_Click" />
                         </Grid>
-                        <Grid Margin="0,4,0,0">
+                        <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="56" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="56" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="起充 %" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                            <TextBox x:Name="ChargeLimitLowBox" Grid.Column="1" Text="60" Height="24" VerticalContentAlignment="Center" Background="{DynamicResource InputBrush}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="4,0" />
-                            <TextBlock Text="停充 %" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="10,0,6,0" />
-                            <TextBox x:Name="ChargeLimitHighBox" Grid.Column="3" Text="80" Height="24" VerticalContentAlignment="Center" Background="{DynamicResource InputBrush}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="4,0" />
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="起充 %" Style="{StaticResource MutedText}" Margin="0,0,0,3" />
+                                <TextBox x:Name="ChargeLimitLowBox" Text="60" Width="72" Height="26" HorizontalAlignment="Left"
+                                         VerticalContentAlignment="Center" Background="{DynamicResource InputBrush}"
+                                         Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+                                         BorderThickness="1" Padding="6,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="停充 %" Style="{StaticResource MutedText}" Margin="0,0,0,3" />
+                                <TextBox x:Name="ChargeLimitHighBox" Text="80" Width="72" Height="26" HorizontalAlignment="Left"
+                                         VerticalContentAlignment="Center" Background="{DynamicResource InputBrush}"
+                                         Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+                                         BorderThickness="1" Padding="6,0" />
+                            </StackPanel>
                         </Grid>
                         <TextBlock x:Name="ChargeLimitStatus" Text="读取充电阈值状态…" Style="{StaticResource MutedText}" FontSize="10" TextWrapping="Wrap" />
                         <CheckBox x:Name="ChargeSliderToggle" Content="启用无极限充功能(实验性)" Style="{StaticResource RowSwitch}" Click="ChargeSliderToggle_Click" />
