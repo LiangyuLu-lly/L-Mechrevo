@@ -11,10 +11,8 @@ using System.Threading.Tasks;
 namespace MechrevoLite.Hardware;
 
 /// <summary>
-/// 无界（8000 系）电池电压修复的<b>内置</b>实现：直接调用本机已安装的 inpoutx64 驱动
+/// 无界（8000 系）风扇/EC 的内置 I2EC 读写通道：直接调用本机已安装的 inpoutx64 驱动
 /// （P/Invoke <c>Inp32/Out32</c>）访问 IT5571 的 I2EC 接口（0x681 地址高 / 0x682 地址低 / 0x683 数据）。
-/// <para>不依赖外部脚本；驱动与 DLL 由用户机器提供（LM 只加载、使用安装包自带文件）。</para>
-/// <para>只用于覆盖 EC 辅助老化降额：desired/queued = 17600mV、电流 2816mA、解停充门；停止时恢复原值。</para>
 /// </summary>
 internal static class I2ecInpOut
 {
@@ -23,24 +21,6 @@ internal static class I2ecInpOut
 	private const short PortAddrLow = 0x682;
 
 	private const short PortData = 0x683;
-
-	private const int ExpectedBaseVoltageMv = 17600;
-
-	private const int ChargeCurrentMa = 2816;
-
-	private const int InputCurrentSourceMa = 2304;
-
-	private const int AddrDesiredVoltage = 0x0522;
-
-	private const int AddrQueuedVoltage = 0x0836;
-
-	private const int AddrDesiredCurrent = 0x0520;
-
-	private const int AddrQueuedCurrent = 0x0834;
-
-	private const int AddrQueuedInputCurrent = 0x083A;
-
-	private const int AddrStopGate = 0x0574;
 
 	private static readonly object Gate = new object();
 
@@ -166,90 +146,6 @@ internal static class I2ecInpOut
 	// 2026-10-22（fanctl README 风险提示）：进程被强杀时内存里的“原值”会丢，
 	// 下次启动若把已覆盖值当原值，关闭功能就无法恢复。首次写 EC 前把原值落盘，
 	// 正常停止/关闭功能时恢复并删除；崩溃/断电后下次启动优先用落盘原值。
-	private static string OriginalsPath()
-	{
-		string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "L-Mechrevo");
-		Directory.CreateDirectory(dir);
-		return Path.Combine(dir, "i2ec-originals.txt");
-	}
-
-	private static void SaveOriginals()
-	{
-		try
-		{
-			string text = "version=3\ndesiredV=" + _origDesiredV + "\nqueuedV=" + _origQueuedV
-				+ "\ndesiredI=" + _origDesiredI + "\nqueuedI=" + _origQueuedI
-				+ "\nqueuedInputI=" + _origQueuedInputI + "\ngate=" + _origGate + "\n";
-			File.WriteAllText(OriginalsPath(), text);
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("[battery-fix] 保存 EC 原值失败（已吞掉）：" + ex.Message);
-		}
-	}
-
-	private static bool TryLoadOriginals()
-	{
-		try
-		{
-			string path = OriginalsPath();
-			if (!File.Exists(path))
-			{
-				return false;
-			}
-			Dictionary<string, int> values = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-			foreach (string line in File.ReadAllLines(path))
-			{
-				int index = line.IndexOf('=');
-				if (index > 0 && int.TryParse(line.Substring(index + 1).Trim(), out int value))
-				{
-					values[line.Substring(0, index).Trim()] = value;
-				}
-			}
-			if (!(values.ContainsKey("version") && values["version"] >= 3
-				&& values.ContainsKey("desiredV") && values.ContainsKey("queuedV") && values.ContainsKey("desiredI")
-				&& values.ContainsKey("queuedI") && values.ContainsKey("queuedInputI") && values.ContainsKey("gate")))
-			{
-				// 旧版（小端）写下的原值不可信 ⇒ 删掉，按当前 EC 重新取。
-				DeleteOriginals();
-				return false;
-			}
-			if (values["desiredV"] < MinimumPlausibleVoltageMv || values["desiredV"] > MaximumPlausibleVoltageMv
-				|| values["queuedV"] < MinimumPlausibleVoltageMv || values["queuedV"] > MaximumPlausibleVoltageMv)
-			{
-				DeleteOriginals();
-				return false;
-			}
-			_origDesiredV = values["desiredV"];
-			_origQueuedV = values["queuedV"];
-			_origDesiredI = values["desiredI"];
-			_origQueuedI = values["queuedI"];
-			_origQueuedInputI = values["queuedInputI"];
-			_origGate = values["gate"];
-			_originalsCaptured = true;
-			return true;
-		}
-		catch
-		{
-			return false;
-		}
-	}
-
-	private static void DeleteOriginals()
-	{
-		try
-		{
-			string path = OriginalsPath();
-			if (File.Exists(path))
-			{
-				File.Delete(path);
-			}
-		}
-		catch
-		{
-		}
-	}
-
 	private static readonly string[] DllSearchDirs =
 	{
 		AppContext.BaseDirectory,
@@ -278,42 +174,6 @@ internal static class I2ecInpOut
 	private static Out32Delegate _out32;
 
 	private static IsInpOutDriverOpenDelegate _isOpen;
-
-	private static CancellationTokenSource _cts;
-
-	private static Task _loop;
-
-	private static int _origDesiredV;
-
-	private static int _origQueuedV;
-
-	private static int _origDesiredI;
-
-	private static int _origQueuedI;
-
-	private static int _origQueuedInputI;
-
-	private static int _origGate;
-
-	private static bool _originalsCaptured;
-
-	// 2026-10-22（机主：电池电压修复影响快充）：不压低原厂快充电流，只把偏低的值补到 2816；
-	// 输入限流按参考脚本 60s 复查，EC 改成其它 PD 值时退出覆盖，避免和充电协商打架。
-
-
-	private static bool _inputOverrideActive;
-
-	private static long _nextInputCheckTick;
-
-	private static long _lastStatusLogTick;
-
-	private static int _batteryLoopCount;
-
-	private static bool _interlockStopRequested;
-
-	private static volatile bool _running;
-
-	internal static bool IsRunning => _running;
 
 	internal static string InitDetail => _initDetail;
 
@@ -376,7 +236,7 @@ internal static class I2ecInpOut
 				_available = true;
 				_initDetail = "inpoutx64 可用（" + _dllPath + "）";
 				detail = _initDetail;
-				Logger.WriteLine("[battery-fix] " + _initDetail);
+				Logger.WriteLine("[i2ec] " + _initDetail);
 				return true;
 			}
 			catch (Exception ex)
@@ -472,35 +332,7 @@ internal static class I2ecInpOut
 		_out32(PortData, value & 0xFF);
 	}
 
-	/// <summary>2026-10-22（机主：改电压上限黑屏重启）：只有基础目标 0x030E 是**大端**；desired/queued/current/pack 是**小端**（与电池脚本一致）。
-	/// 实测 0x030E 基础目标=0x44C0=17600mV；按小端会读成 0xC044=49220mV（校验误判）。</summary>
-	private static int ReadBe16(int address) => (ReadByte(address) << 8) | ReadByte(address + 1);
-
-	private static void WriteBe16(int address, int value)
-	{
-		WriteByte(address, (value >> 8) & 0xFF);
-		WriteByte(address + 1, value & 0xFF);
-	}
-
-	private static int ReadLe16(int address) => ReadByte(address) | (ReadByte(address + 1) << 8);
-
-	private static void WriteLe16(int address, int value)
-	{
-		WriteByte(address, value & 0xFF);
-		WriteByte(address + 1, (value >> 8) & 0xFF);
-	}
-
-	private const int MinimumPlausibleVoltageMv = 12000;
-
-	private const int MaximumPlausibleVoltageMv = 18000;
-
-	private static int PlausibleVoltage(int value, int fallback) => (value >= MinimumPlausibleVoltageMv && value <= MaximumPlausibleVoltageMv) ? value : fallback;
-
-	private static int PlausibleCurrent(int value, int fallback) => (value >= 0 && value <= 6000) ? value : fallback;
-
-	private static int ReadCells() => ((ReadByte(0x0491) & 0xC0) == 0xC0) ? 4 : (((ReadByte(0x0491) & 0xC0) == 0x80) ? 3 : 2);
-
-	/// <summary>2026-10-22（无界风扇曲线）：I2EC 通道是否可用（inpoutx64 已装且导出齐全）。</summary>
+	/// <summary>2026-10-22（无界风扇曲线）：通用 I2EC 单字节读（走 0x681/0x682/0x683 窗口）。</summary>
 	internal static bool IsAvailable
 	{
 		get
@@ -587,336 +419,10 @@ internal static class I2ecInpOut
 	}
 
 	/// <summary>只读状态文本（内置）。</summary>
-	internal static bool TryReadStatus(out string detail)
-	{
-		detail = string.Empty;
-		if (!EnsureInitialized(out string init))
-		{
-			detail = init;
-			return false;
-		}
-		try
-		{
-			int mode = ReadByte(0x200D);
-			int id = ReadByte(0x0454);
-			int baseV = ReadBe16(0x030E);
-			int desiredV = ReadLe16(AddrDesiredVoltage);
-			int queuedV = ReadLe16(AddrQueuedVoltage);
-			int desiredI = ReadLe16(AddrDesiredCurrent);
-			int queuedI = ReadLe16(AddrQueuedCurrent);
-			int queuedInput = ReadLe16(AddrQueuedInputCurrent);
-			int gate = ReadByte(AddrStopGate);
-			int soc = ReadByte(0x04AB);
-			int packV = ReadLe16(0x0438);
-			int current = ReadLe16(0x050A);
-			if ((current & 0x8000) != 0)
-			{
-				current -= 0x10000;
-			}
-			StringBuilder sb = new StringBuilder();
-			sb.AppendLine("[内置] I2EC 可用（inpoutx64）");
-			sb.AppendLine(string.Format("0x200D=0x{0:X2}（模式位={1}）· 0x0454=0x{2:X2}（身份=0x{3:X2}）", mode, (mode & 3) == 3, id, id & 0xFD));
-			sb.AppendLine("基础电压=" + baseV + "mV · desired=" + desiredV + "mV · queued=" + queuedV + "mV · pack=" + packV + "mV");
-			sb.AppendLine("电流：battery=" + current + "mA · desired=" + desiredI + "mA · queued=" + queuedI + "mA · input=" + queuedInput + "mA");
-			sb.AppendLine("停充门 0x0574=0x" + gate.ToString("X2") + " · SOC=" + soc + "% · cells=" + ReadCells());
-			detail = sb.ToString().TrimEnd();
-			return true;
-		}
-		catch (Exception ex)
-		{
-			detail = "内置状态读取异常：" + ex.GetType().Name + " " + ex.Message;
-			return false;
-		}
-	}
 
 	/// <summary>启动内置覆盖：周期保持 17600mV/2816mA + 解停充门；停止时恢复原值。</summary>
-	internal static bool TryStart(out string detail)
-	{
-		detail = string.Empty;
-		if (!EnsureInitialized(out string init))
-		{
-			detail = init;
-			return false;
-		}
-		lock (Gate)
-		{
-			if (_running)
-			{
-				detail = "内置覆盖已在运行";
-				return true;
-			}
-			try
-			{
-				int mode = ReadByte(0x200D);
-				if ((mode & 0x03) != 0x03)
-				{
-					detail = "I2EC 当前不是读写模式（0x200D=0x" + mode.ToString("X2") + "）⇒ 不启动";
-					return false;
-				}
-				Logger.WriteLine("[battery-fix] 字节序=base:BE / desired/current:LE（与参考脚本一致）");
-				int baseV = ReadBe16(0x030E);
-				int cells = ReadCells();
-				if (cells != 4)
-				{
-					detail = "EC 报告 " + cells + "S ≠ 4S ⇒ 不启动";
-					return false;
-				}
-				if (baseV != ExpectedBaseVoltageMv)
-				{
-					detail = "基础目标 " + baseV + "mV ≠ 已验证的 " + ExpectedBaseVoltageMv + "mV ⇒ 不启动";
-					return false;
-				}
-				// 2026-10-22（机主：改电压黑屏重启）：不同批次 EC 的 desired/queued 字节序可能不同。
-				// 启动前先确认当前 desired/queued 是合理电压；读出来不像电压（如 49.2V）⇒ 拒绝写入，避免过压。
-				int currentDesiredCheck = ReadLe16(AddrDesiredVoltage);
-				int currentQueuedCheck = ReadLe16(AddrQueuedVoltage);
-				if (currentDesiredCheck < MinimumPlausibleVoltageMv || currentDesiredCheck > MaximumPlausibleVoltageMv
-					|| currentQueuedCheck < MinimumPlausibleVoltageMv || currentQueuedCheck > MaximumPlausibleVoltageMv)
-				{
-					// 旧版“全部按大端”写 17600 会在 LE 寄存器里留下 [44,C0]，
-					// 按 LE 读成 0xC044=49220；交换回来若落在合理范围，说明是已知旧版错位值，
-					// 允许启动并用正确的 LE 17600 覆盖；其它未知值一律拒绝。
-					int swappedDesired = ((currentDesiredCheck & 0xFF) << 8) | ((currentDesiredCheck >> 8) & 0xFF);
-					int swappedQueued = ((currentQueuedCheck & 0xFF) << 8) | ((currentQueuedCheck >> 8) & 0xFF);
-					bool knownCorruption = swappedDesired >= MinimumPlausibleVoltageMv && swappedDesired <= MaximumPlausibleVoltageMv
-						&& swappedQueued >= MinimumPlausibleVoltageMv && swappedQueued <= MaximumPlausibleVoltageMv;
-					if (!knownCorruption)
-					{
-						detail = "EC 当前 desired/queued=" + currentDesiredCheck + "/" + currentQueuedCheck
-							+ "mV 不在合理范围且不是已知旧版错位 ⇒ 拒绝写入（未改任何寄存器）";
-						return false;
-					}
-					Logger.WriteError("[battery-fix] 检测到旧版字节序遗留值 desiredV=" + currentDesiredCheck + "mV（交换后=" + swappedDesired
-						+ "mV）⇒ 允许启动并用正确的 17600mV 覆盖");
-				}
-					if (!TryLoadOriginals())
-					{
-						int currentDesiredV = ReadLe16(AddrDesiredVoltage);
-						int currentQueuedV = ReadLe16(AddrQueuedVoltage);
-						if (currentDesiredV > MaximumPlausibleVoltageMv || currentQueuedV > MaximumPlausibleVoltageMv)
-						{
-							// 旧版本按小端写 17600 会变成 49220mV（过压），这里明确记录并按 17600 修正。
-							Logger.WriteError("[battery-fix] EC 当前目标电压异常（desiredV=" + currentDesiredV + "mV / queuedV=" + currentQueuedV
-								+ "mV，疑似旧版字节序错误）⇒ 按 17600mV 修正");
-						}
-						_origDesiredV = PlausibleVoltage(currentDesiredV, ExpectedBaseVoltageMv);
-						_origQueuedV = PlausibleVoltage(currentQueuedV, ExpectedBaseVoltageMv);
-						_origDesiredI = PlausibleCurrent(ReadLe16(AddrDesiredCurrent), ChargeCurrentMa);
-						_origQueuedI = PlausibleCurrent(ReadLe16(AddrQueuedCurrent), ChargeCurrentMa);
-						_origQueuedInputI = PlausibleCurrent(ReadLe16(AddrQueuedInputCurrent), InputCurrentSourceMa);
-						_origGate = ReadByte(AddrStopGate);
-						_originalsCaptured = true;
-						SaveOriginals();
-					}
-				_inputOverrideActive = _origQueuedInputI == InputCurrentSourceMa;
-				_nextInputCheckTick = Environment.TickCount64 + 60000L;
-		_lastStatusLogTick = Environment.TickCount64;
-				_cts = new CancellationTokenSource();
-				CancellationToken token = _cts.Token;
-				_running = true;
-				_loop = Task.Run(() => Loop(token));
-				AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
-				detail = "内置覆盖已启动（原值 desiredV=" + _origDesiredV + "/queuedV=" + _origQueuedV
-					+ " gate=" + _origGate + "；停止时恢复）";
-				Logger.WriteLine("[battery-fix] " + detail);
-				return true;
-			}
-			catch (Exception ex)
-			{
-				_running = false;
-				detail = "启动失败：" + ex.GetType().Name + " " + ex.Message;
-				return false;
-			}
-		}
-	}
 
-	private static void Loop(CancellationToken token)
-	{
-		try
-		{
-			while (!token.IsCancellationRequested)
-			{
-				try
-				{
-					lock (Gate)
-					{
-						if (!TryEnterEcMutex(out bool held))
-						{
-							continue;
-						}
-						try
-						{
-							WriteLe16(AddrDesiredVoltage, ExpectedBaseVoltageMv);
-							WriteLe16(AddrQueuedVoltage, ExpectedBaseVoltageMv);
-							WriteLe16(AddrDesiredCurrent, ChargeCurrentMa);
-							WriteLe16(AddrQueuedCurrent, ChargeCurrentMa);
-							int queuedInput = ReadLe16(AddrQueuedInputCurrent);
-							long nowTick = Environment.TickCount64;
-							if (_inputOverrideActive)
-							{
-								if (queuedInput == InputCurrentSourceMa || queuedInput == ChargeCurrentMa)
-								{
-									WriteLe16(AddrQueuedInputCurrent, ChargeCurrentMa);
-								}
-								else
-								{
-									// 与参考脚本一致：OEM 改写了输入限流 ⇒ 停止覆盖，60s 后再判断。
-									_inputOverrideActive = false;
-									_nextInputCheckTick = nowTick + 60000L;
-									Logger.WriteLine("[battery-fix] 输入限流=" + queuedInput + "mA（非 2304/2816）⇒ 停止覆盖，60s 后复查");
-								}
-							}
-							else if (nowTick >= _nextInputCheckTick)
-							{
-								_nextInputCheckTick = nowTick + 60000L;
-								if (queuedInput == InputCurrentSourceMa)
-								{
-									_inputOverrideActive = true;
-									Logger.WriteLine("[battery-fix] 输入限流=2304mA ⇒ 60s 复查后恢复覆盖");
-								}
-							}
-							WriteByte(AddrStopGate, 0);
-					// 2026-10-22（机主：AIDA 电流一会有一会没有）：改成 1s 采样，抓完整充/放波形。
-					// 2026-10-23（机主）：开关关闭 / 与非 100% 限充、非长效模式互斥 —— 运行中一旦发生，立即停止并恢复原值。
-					if (!BatteryVoltageFix.Enabled)
-					{
-						Logger.WriteLine("[battery-fix] 开关已关闭 ⇒ 停止覆盖并恢复原值");
-						_interlockStopRequested = true;
-						break;
-					}
-					if (!BatteryVoltageFix.IsChargeLimitNeutral(out string interlock))
-					{
-						Logger.WriteError("[battery-fix] 检测到限充/非长效模式（" + interlock + "）⇒ 停止覆盖并恢复原值");
-						_interlockStopRequested = true;
-						break;
-					}
-					if (nowTick - _lastStatusLogTick >= 1000L)
-					{
-						_lastStatusLogTick = nowTick;
-						int stateDesiredV = ReadLe16(AddrDesiredVoltage);
-						int stateQueuedV = ReadLe16(AddrQueuedVoltage);
-						int statePackV = ReadLe16(0x0438);
-						int stateCurrent = ReadLe16(0x050A);
-						if ((stateCurrent & 0x8000) != 0)
-						{
-							stateCurrent -= 0x10000;
-						}
-						int stateSoc = ReadByte(0x04AB);
-						Logger.WriteLine("[battery-fix] 状态：desired/queued=" + stateDesiredV + "/" + stateQueuedV
-							+ "mV · pack=" + statePackV + "mV · 电流=" + stateCurrent + "mA · SOC=" + stateSoc
-							+ "% · 输入限流=" + queuedInput + "mA");
-						if (stateDesiredV != ExpectedBaseVoltageMv || stateQueuedV != ExpectedBaseVoltageMv)
-						{
-							Logger.WriteError("[battery-fix] 写入未保持：desired/queued=" + stateDesiredV + "/" + stateQueuedV
-								+ "mV（期望 " + ExpectedBaseVoltageMv + "mV）⇒ EC 可能回写/通道被占用");
-						}
-					}
-						}
-						finally
-						{
-							ExitEcMutex(held);
-						}
-					}
-				}
-				catch (Exception ex)
-				{
-					Logger.WriteError("[battery-fix] 内置覆盖写入异常（继续重试）：" + ex.GetType().Name + " " + ex.Message);
-				}
-				// 与参考脚本一致：每 2ms 重新写一遍（脚本 time.sleep(0.002)），
-				// 否则 2s 间隔里 EC 会回写/中断充电，表现为电流一会有一会没有。
-				Thread.Sleep(2);
-				// 2026-10-22（机主：预防风扇竞争）：电池 500Hz 循环每 8 轮额外让出 2ms，
-				// 保证风扇 25Hz 写有窗口，不会被 2ms 电池写长期抢占 I2EC 锁。
-				if ((++_batteryLoopCount % 8) == 0)
-				{
-					Thread.Sleep(2);
-				}
-			}
-		}
-		finally
-		{
-			_running = false;
-			if (_interlockStopRequested)
-			{
-				_interlockStopRequested = false;
-				_ = Task.Run(delegate
-				{
-					try
-					{
-						Stop();
-					}
-					catch (Exception ex)
-					{
-						Logger.WriteLine("[battery-fix] 互斥停止异常（已吞掉）：" + ex.Message);
-					}
-				});
-			}
-		}
-	}
 
 	/// <summary>停止内置覆盖并恢复原值（幂等）。</summary>
-	internal static void Stop()
-	{
-		lock (Gate)
-		{
-			if (_cts == null && !_originalsCaptured && !TryLoadOriginals())
-			{
-				return;
-			}
-			try
-			{
-				_cts?.Cancel();
-			}
-			catch
-			{
-			}
-			try
-			{
-				_loop?.Wait(TimeSpan.FromSeconds(3.0));
-			}
-			catch
-			{
-			}
-			_loop = null;
-			_cts = null;
-			_running = false;
-			if (!_originalsCaptured && !TryLoadOriginals())
-			{
-				return;
-			}
-			TryEnterEcMutex(out bool held);
-			try
-			{
-				WriteLe16(AddrDesiredVoltage, _origDesiredV);
-				WriteLe16(AddrQueuedVoltage, _origQueuedV);
-				WriteLe16(AddrDesiredCurrent, _origDesiredI);
-				WriteLe16(AddrQueuedCurrent, _origQueuedI);
-				WriteLe16(AddrQueuedInputCurrent, _origQueuedInputI);
-				WriteByte(AddrStopGate, _origGate);
-				Logger.WriteLine("[battery-fix] 内置覆盖已停止并恢复原值（desiredV=" + _origDesiredV
-					+ " / queuedV=" + _origQueuedV + " / gate=" + _origGate + "）");
-				DeleteOriginals();
-			}
-			catch (Exception ex)
-			{
-				Logger.WriteError("[battery-fix] 恢复原值失败（已吞掉）：" + ex.GetType().Name + " " + ex.Message);
-			}
-			finally
-			{
-				ExitEcMutex(held);
-			}
-			_originalsCaptured = false;
-		}
-	}
 
-	private static void OnProcessExit(object sender, EventArgs e)
-	{
-		try
-		{
-			Stop();
-		}
-		catch
-		{
-		}
-	}
 }

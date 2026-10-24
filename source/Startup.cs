@@ -24,9 +24,6 @@ public class Startup
 
 	private static string chargeTaskName = taskName + "Charge";
 
-	// 2026-10-22（无界电池电压修复）：开机保持任务（SYSTEM；防止 EC 老化降额重启后弹回）
-	private static string batteryFixTaskName = taskName + "BatteryFix";
-
 	private static readonly string strExeFilePath = ResolvePersistentExecutablePath();
 
 	private static readonly string currentUserSid = ResolveCurrentUserSid();
@@ -540,102 +537,6 @@ public class Startup
 		catch (Exception ex2)
 		{
 			Logger.WriteLine("Charge task location prompt dispatch failed: " + ex2.Message);
-		}
-	}
-
-	/// <summary>2026-10-22：注册/更新无界电池电压修复的开机保持任务（SYSTEM 常驻，防 EC 重启后弹回）。</summary>
-	public static void ScheduleBatteryFix()
-	{
-		if (strExeFilePath == null || !ProcessHelper.IsUserAdministrator())
-		{
-			return;
-		}
-		try
-		{
-			using TaskDefinition taskDefinition = TaskService.Instance.NewTask();
-			taskDefinition.RegistrationInfo.Description = "L-Mechrevo Battery Voltage Fix";
-			taskDefinition.Triggers.Add(new BootTrigger());
-			taskDefinition.Triggers.Add(new EventTrigger
-			{
-				Subscription = "<QueryList><Query Id='0' Path='System'><Select Path='System'>*[System[Provider[@Name='Microsoft-Windows-Kernel-Boot'] and EventID=27]]</Select></Query></QueryList>"
-			});
-			taskDefinition.Actions.Add(strExeFilePath, "batteryfix");
-			taskDefinition.Principal.UserId = "SYSTEM";
-			taskDefinition.Principal.LogonType = TaskLogonType.ServiceAccount;
-			taskDefinition.Principal.RunLevel = TaskRunLevel.Highest;
-			taskDefinition.Settings.MultipleInstances = TaskInstancesPolicy.IgnoreNew;
-			taskDefinition.Settings.StopIfGoingOnBatteries = false;
-			taskDefinition.Settings.DisallowStartIfOnBatteries = false;
-			taskDefinition.Settings.ExecutionTimeLimit = TimeSpan.Zero;
-			TaskService.Instance.RootFolder.RegisterTaskDefinition(batteryFixTaskName, taskDefinition);
-			Logger.WriteLine("Battery voltage fix task scheduled: " + strExeFilePath);
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("Can't create a battery voltage fix task: " + ex.Message);
-		}
-	}
-
-	/// <summary>移除电池电压修复开机任务（关闭功能时调用）。</summary>
-	public static void UnscheduleBatteryFix()
-	{
-		try
-		{
-			using TaskService taskService = new TaskService();
-			Task running = taskService.GetTask(batteryFixTaskName);
-			try
-			{
-				running?.Stop();
-			}
-			catch (Exception stopEx)
-			{
-				Logger.WriteLine("Can't stop battery voltage fix task process: " + stopEx.Message);
-			}
-			taskService.RootFolder.DeleteTask(batteryFixTaskName, exceptionOnNotExists: false);
-			foreach (Task item in taskService.RootFolder.AllTasks)
-			{
-				bool byName = item.Name.IndexOf("BatteryFix", StringComparison.OrdinalIgnoreCase) >= 0;
-				bool byAction = false;
-				try
-				{
-					foreach (Microsoft.Win32.TaskScheduler.Action action in item.Definition.Actions)
-					{
-						if (action is ExecAction exec && exec.Arguments != null
-							&& exec.Arguments.IndexOf("batteryfix", StringComparison.OrdinalIgnoreCase) >= 0)
-						{
-							byAction = true;
-							break;
-						}
-					}
-				}
-				catch
-				{
-				}
-				if (!byName && !byAction)
-				{
-					continue;
-				}
-				try
-				{
-					item.Stop();
-				}
-				catch
-				{
-				}
-				try
-				{
-					taskService.RootFolder.DeleteTask(item.Name, exceptionOnNotExists: false);
-					Logger.WriteLine("Removed legacy battery fix task: " + item.Name);
-				}
-				catch (Exception legacyEx)
-				{
-					Logger.WriteLine("Can't remove legacy battery fix task " + item.Name + ": " + legacyEx.Message);
-				}
-			}
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("Can't remove battery voltage fix task: " + ex.Message);
 		}
 	}
 

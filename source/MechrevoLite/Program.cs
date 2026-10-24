@@ -683,14 +683,6 @@ internal static class Program
 		//   L-Mechrevo.exe --gcu-variant-family [输出.txt]
 		// WinExe 没有控制台，故结论同时写文件（给了路径就用它，否则落 %TEMP%\lm-gcu-variant-family.txt）
 		// 与 Logger（log.txt）；退出码 = 0 全通过 / 1 有失败。
-		// 2026-10-21（电池电压修复 · 通道探测）：`--i2ec-port-probe`
-		//   只读探测 PawnIO LpcIO 是否放行 I2EC 端口 0x681/0x682/0x683；结果写桌面报告。
-		case "--i2ec-port-probe":
-		{
-			bool allowWrite = args.Skip(1).Any((string a) => string.Equals(a, "--allow-write-probe", StringComparison.OrdinalIgnoreCase));
-			Environment.ExitCode = I2ecPortProbe.Run(allowWrite);
-			return;
-		}
 		case "--gcu-variant-family":
 		{
 			string familyReport = MechrevoLite.Hardware.GcuVariantFamily.RunSelfTest();
@@ -896,13 +888,6 @@ internal static class Program
 			string sampleReport = MechrevoLite.Hardware.WujieFanMapProbe.Run(sampleSeconds, samplePath);
 			Console.WriteLine(sampleReport);
 			Logger.WriteLine("[wujie-fan-map] " + sampleReport.Replace("\r\n", " | "));
-			Logger.Close();
-			return;
-		}
-		if (text == "batteryfix")
-		{
-			// 2026-10-22（无界电池电压修复）：SYSTEM 开机任务入口 —— 常驻保持 EC 目标，防止重启/断电后弹回。
-			Environment.ExitCode = RunBatteryFixDaemon();
 			Logger.Close();
 			return;
 		}
@@ -3855,7 +3840,6 @@ internal static class Program
 					try
 					{
 						await warmPerf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(continueOnCapturedContext: false);
-			MechrevoLite.Hardware.BatteryVoltageFix.RunOnStartupIfEnabled();
 				warmPerf.ApplyApuAntiDegradeOnStartup();
 				try
 				{
@@ -4009,17 +3993,6 @@ internal static class Program
 			{
 			}
 			StopTelemetryBeforeExit();
-			if (!MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
-			{
-				try
-				{
-					MechrevoLite.Hardware.I2ecInpOut.Stop();
-					Startup.UnscheduleBatteryFix();
-				}
-				catch
-				{
-				}
-			}
 			if (hw != null)
 			{
 				hw.StateChanged -= OnHardwareStateChanged;
@@ -4073,54 +4046,6 @@ internal static class Program
 		catch (Exception ex)
 		{
 			Logger.WriteLine("System_OFF on exit failed: " + ex.Message);
-		}
-	}
-
-	/// <summary>2026-10-22（无界电池电压修复）：SYSTEM 开机任务常驻 —— 启动内置保持循环后不退出，断电重启由任务重跑。</summary>
-	private static int RunBatteryFixDaemon()
-	{
-		try
-		{
-			if (!MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
-			{
-				Logger.WriteLine("[battery-fix] 开机任务：功能未启用 ⇒ 退出");
-				return 0;
-			}
-			string model = MechrevoDeviceCapabilities.Current.Model ?? "";
-			bool wujie = model.IndexOf("WUJIE", StringComparison.OrdinalIgnoreCase) >= 0
-				|| model.IndexOf("无界", StringComparison.OrdinalIgnoreCase) >= 0;
-			if (!wujie)
-			{
-				Logger.WriteLine("[battery-fix] 开机任务：非无界机型（model=" + model + "）⇒ 退出");
-				return 0;
-			}
-			while (true)
-			{
-				MechrevoLite.Hardware.InpOutDriverInstaller.TryEnsureInstalled(out string drvDetail);
-				if (MechrevoLite.Hardware.I2ecInpOut.TryStart(out string startDetail))
-				{
-					Logger.WriteLine("[battery-fix] 开机任务已启动内置保持：" + startDetail + " · 驱动=" + drvDetail);
-					break;
-				}
-				Logger.WriteLine("[battery-fix] 开机任务启动失败：" + startDetail + " ⇒ 10 秒后重试");
-				Thread.Sleep(10000);
-			}
-			// 常驻：I2ecInpOut 内部线程每 2 秒保持；本进程不退出，任务被杀/重启时由下次开机重跑。
-			while (true)
-			{
-				Thread.Sleep(5000);
-				if (!MechrevoLite.Hardware.BatteryVoltageFix.Enabled)
-				{
-					MechrevoLite.Hardware.I2ecInpOut.Stop();
-					Logger.WriteLine("[battery-fix] 开机任务：检测到功能已关闭 ⇒ 停止覆盖并退出");
-					return 0;
-				}
-			}
-		}
-		catch (Exception ex)
-		{
-			Logger.WriteLine("[battery-fix] 开机任务异常：" + ex.GetType().Name + " " + ex.Message);
-			return 1;
 		}
 	}
 
