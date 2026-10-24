@@ -53,6 +53,8 @@ public partial class OriginalStyleWindow : Window
     private OverlayWindow? _overlayWindow;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
+    private bool _lightingPowerSuspended;
+    private bool _lightingPowerBusy;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private bool _batteryLimitLoaded;
@@ -2107,6 +2109,7 @@ public partial class OriginalStyleWindow : Window
 
     private void CheckLightingIdle()
     {
+        _ = ReconcileLightingPowerAsync();
         BackendProbe? probe = _backendProbe;
         if (probe?.Connected != true)
         {
@@ -2139,7 +2142,59 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private async void LightStripSwitch_Click(object sender, RoutedEventArgs e)
+    private async Task ReconcileLightingPowerAsync()
+    {
+        if (_lightingPowerBusy || _backendProbe == null)
+        {
+            return;
+        }
+        _lightingPowerBusy = true;
+        try
+        {
+            bool onBattery = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                != System.Windows.Forms.PowerLineStatus.Online;
+            bool shouldSuspend = AppConfig.Is("lighting_off_on_battery") && onBattery;
+            if (shouldSuspend == _lightingPowerSuspended)
+            {
+                return;
+            }
+            _lightingPowerSuspended = shouldSuspend;
+            if (shouldSuspend)
+            {
+                await TurnOffAllLightsAsync();
+            }
+            else
+            {
+                await ApplyKeyboardLightAsync();
+                await ApplyLogoLightAsync();
+                await ApplyLightStripLightAsync();
+                await ApplyHingeLightAsync();
+                await ApplySyncLightAsync();
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _lightingPowerBusy = false;
+        }
+    }
+
+    private async Task TurnOffAllLightsAsync()
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        await _backendProbe.SetKeyboardPowerAsync(false);
+        await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
+        await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
+        await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
+        await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
+    }
+
+    private async Task ApplyLightStripLightAsync()
     {
         if (_backendProbe == null)
         {
@@ -2147,10 +2202,60 @@ public partial class OriginalStyleWindow : Window
         }
         bool on = LightStripSwitch.IsChecked == true;
         string effect = (LightStripEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
-        bool ok = on
-            ? await _backendProbe.SetLightbarEffectAsync(effect)
-            : await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
-        StatusText.Text = ok ? (on ? "灯带已下发：" + effect : "灯带已关闭") : "灯带下发失败";
+        if (on)
+        {
+            await _backendProbe.SetLightbarEffectAsync(effect);
+        }
+        else
+        {
+            await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
+        }
+    }
+
+    private async Task ApplyHingeLightAsync()
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        bool on = LightHingeSwitch.IsChecked == true;
+        string effect = (LightHingeEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        if (on)
+        {
+            await _backendProbe.SetHingeEffectAsync(effect);
+        }
+        else
+        {
+            await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
+        }
+    }
+
+    private async Task ApplySyncLightAsync()
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        bool on = LightSyncSwitch.IsChecked == true;
+        string effect = (LightSyncEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        if (on)
+        {
+            await _backendProbe.SetSyncEffectAsync(effect);
+        }
+        else
+        {
+            await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
+        }
+    }
+
+    private async void LightStripSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        await ApplyLightStripLightAsync();
+        StatusText.Text = "灯带状态已下发";
     }
 
     private async void LightStripEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2203,12 +2308,8 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        bool on = LightHingeSwitch.IsChecked == true;
-        string effect = (LightHingeEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
-        bool ok = on
-            ? await _backendProbe.SetHingeEffectAsync(effect)
-            : await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
-        StatusText.Text = ok ? (on ? "铰链灯已下发：" + effect : "铰链灯已关闭") : "铰链灯下发失败";
+        await ApplyHingeLightAsync();
+        StatusText.Text = "铰链灯状态已下发";
     }
 
     private async void LightHingeEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2239,12 +2340,8 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        bool on = LightSyncSwitch.IsChecked == true;
-        string effect = (LightSyncEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
-        bool ok = on
-            ? await _backendProbe.SetSyncEffectAsync(effect)
-            : await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
-        StatusText.Text = ok ? (on ? "同步灯已下发：" + effect : "同步灯已关闭") : "同步灯下发失败";
+        await ApplySyncLightAsync();
+        StatusText.Text = "同步灯状态已下发";
     }
 
     private async void LightSyncEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
