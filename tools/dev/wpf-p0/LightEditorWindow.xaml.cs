@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MechrevoLite;
 using MechrevoLite.Hardware;
 
@@ -18,6 +19,9 @@ public partial class LightEditorWindow : Window
     private int _colorArgb;
     private int[] _mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
     private bool _gradeBrightness;
+    private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
+    private bool _suppressAutoApply;
+    private bool _applying;
 
     public LightEditorWindow(string topic, string title, (string Effect, string Name)[] effects)
     {
@@ -45,9 +49,28 @@ public partial class LightEditorWindow : Window
             _mixColors = (int[])mix.Clone();
         }
         PowerCheck.IsChecked = _settings.PowerOn;
+        _suppressAutoApply = true;
         NetSliderValues();
         LoadEffects();
         RefreshColorUi();
+        _suppressAutoApply = false;
+        PowerCheck.Checked += (_, _) => ScheduleAutoApply();
+        PowerCheck.Unchecked += (_, _) => ScheduleAutoApply();
+        _applyTimer.Tick += async (_, _) =>
+        {
+            _applyTimer.Stop();
+            await ApplyCoreAsync(fromAuto: true);
+        };
+    }
+
+    private void ScheduleAutoApply()
+    {
+        if (_suppressAutoApply || !IsLoaded)
+        {
+            return;
+        }
+        _applyTimer.Stop();
+        _applyTimer.Start();
     }
 
     private void NetSliderValues()
@@ -116,6 +139,7 @@ public partial class LightEditorWindow : Window
     private void Effect_Changed(object sender, SelectionChangedEventArgs e)
     {
         RefreshColorUi();
+        ScheduleAutoApply();
     }
 
     private void Light_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -127,6 +151,7 @@ public partial class LightEditorWindow : Window
         {
             LightText.Text = ((int)e.NewValue).ToString();
         }
+        ScheduleAutoApply();
     }
 
     private void Speed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -136,6 +161,7 @@ public partial class LightEditorWindow : Window
         {
             SpeedText.Text = ((int)e.NewValue).ToString();
         }
+        ScheduleAutoApply();
     }
 
     private void Mix_Click(object sender, RoutedEventArgs e)
@@ -157,6 +183,7 @@ public partial class LightEditorWindow : Window
         System.Drawing.Color c = dialog.Color;
         button.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B));
         button.ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+        ScheduleAutoApply();
     }
 
     private void Color_Click(object sender, RoutedEventArgs e)
@@ -170,11 +197,23 @@ public partial class LightEditorWindow : Window
         {
             _colorArgb = dialog.Color.ToArgb();
             UpdateColorButton();
+            ScheduleAutoApply();
         }
     }
 
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
+        _applyTimer.Stop();
+        await ApplyCoreAsync(fromAuto: false);
+    }
+
+    private async Task<bool> ApplyCoreAsync(bool fromAuto)
+    {
+        if (_applying)
+        {
+            return false;
+        }
+        _applying = true;
         try
         {
             string effect = SelectedEffect;
@@ -192,8 +231,11 @@ public partial class LightEditorWindow : Window
             _settings = next;
             if (Program.service == null)
             {
-                StatusText.Text = "保存成功，但后端未连接，未下发";
-                return;
+                if (!fromAuto)
+                {
+                    StatusText.Text = "保存成功，但后端未连接，未下发";
+                }
+                return false;
             }
             bool ok = true;
             if (power)
@@ -208,11 +250,23 @@ public partial class LightEditorWindow : Window
             {
                 ok = await Program.service.SetLightPower(_topic, false);
             }
-            StatusText.Text = ok ? "已保存并下发" : "已保存，但设备未确认";
+            if (!fromAuto || !ok)
+            {
+                StatusText.Text = ok ? "已保存并下发" : "已保存，但设备未确认";
+            }
+            return ok;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "应用失败：" + ex.Message;
+            if (!fromAuto)
+            {
+                StatusText.Text = "应用失败：" + ex.Message;
+            }
+            return false;
+        }
+        finally
+        {
+            _applying = false;
         }
     }
 
