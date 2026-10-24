@@ -128,10 +128,16 @@ public partial class OverlayWindow : Window
                     return text;
                 }
             }
-            if (sample != null)
+            int raw = sample?.BiosInfo3Raw ?? -1;
+            if (raw >= 0)
             {
                 // 同方机型不在功率表里时，直接显示 EC 原始读数。
-                return "外接电源（EC 0x" + sample.BiosInfo3Raw.ToString("X2") + "）";
+                return "外接电源（EC 0x" + raw.ToString("X2") + "）";
+            }
+            decimal? rate = MechrevoLite.HardwareControl.batteryRate;
+            if (rate.HasValue)
+            {
+                return "外接电源（EC " + rate.Value.ToString("0.0") + "W）";
             }
         }
         catch
