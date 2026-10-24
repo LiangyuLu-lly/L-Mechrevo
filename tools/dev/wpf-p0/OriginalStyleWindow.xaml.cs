@@ -422,7 +422,7 @@ public partial class OriginalStyleWindow : Window
 
     private static void HighlightSegment(ToggleButton selected, Color? overrideColor = null)
     {
-        if (selected.Parent is not UniformGrid grid)
+        if (selected.Parent is not Panel grid)
         {
             return;
         }
@@ -561,7 +561,7 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        foreach (object child in ((UniformGrid)button.Parent).Children)
+        foreach (object child in ((Panel)button.Parent).Children)
         {
             if (child is ToggleButton other)
             {
@@ -1116,7 +1116,7 @@ public partial class OriginalStyleWindow : Window
         Brush normalBackground = (Brush)Application.Current.Resources["ControlBrush"];
         FontFamily regular = (FontFamily)Application.Current.Resources["AppFontFamily"];
         FontFamily bold = (FontFamily)Application.Current.Resources["AppFontBoldFamily"];
-        foreach (object child in ((UniformGrid)selected.Parent).Children)
+        foreach (object child in ((Panel)selected.Parent).Children)
         {
             if (child is ToggleButton button)
             {
