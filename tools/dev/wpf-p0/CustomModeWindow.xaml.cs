@@ -14,6 +14,9 @@ public partial class CustomModeWindow : Window
 {
     private readonly List<MechrevoLite.Mode.PerfModeDefinition> _modes = new();
     private bool _suppressPlanApply;
+    private bool _firmwareMode;
+    private int _firmwareVisualMode;
+    private int _firmwareProfileIndex;
     private MechrevoLite.Mode.PerfModeDefinition? _current;
     private MechrevoLite.Mode.PerfModeSettings _settings = MechrevoLite.Mode.PerfModeSettings.Default;
 
@@ -32,6 +35,12 @@ public partial class CustomModeWindow : Window
 
     private void LoadModes(string? selectedId)
     {
+        _firmwareMode = false;
+        ModeCombo.IsEnabled = true;
+        NewButton.IsEnabled = true;
+        RenameButton.IsEnabled = true;
+        DeleteButton.IsEnabled = true;
+        ApplyButton.IsEnabled = true;
         _modes.Clear();
         _modes.AddRange(MechrevoLite.Mode.PerfModeStore.Load());
         string target = selectedId ?? MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId
@@ -113,6 +122,53 @@ public partial class CustomModeWindow : Window
         if (ModeCombo.SelectedItem is ComboBoxItem item && item.Tag is string id)
         {
             ApplyMode(id);
+        }
+    }
+
+    public void BindFirmwareProfile(int visualMode, int profileIndex)
+    {
+        try
+        {
+            _firmwareMode = true;
+            _firmwareVisualMode = visualMode;
+            _firmwareProfileIndex = Math.Clamp(profileIndex, 0, MechrevoLite.Mode.VendorModeDefaults.MaxProfileCount - 1);
+            MechrevoLite.Mode.PerfModeKind kind = visualMode switch
+            {
+                2 => MechrevoLite.Mode.PerfModeKind.Silent,
+                1 => MechrevoLite.Mode.PerfModeKind.Turbo,
+                _ => MechrevoLite.Mode.PerfModeKind.Balanced
+            };
+            string storeId = "fw" + visualMode + "p" + _firmwareProfileIndex;
+            MechrevoLite.Mode.PerfModeSettings stored = MechrevoLite.Mode.PerfModeStore.LoadSettings(storeId);
+            if (stored.IsUntouched)
+            {
+                stored = MechrevoLite.Mode.VendorModeDefaults.ComposeProfile(kind, Program.hw, _firmwareProfileIndex);
+            }
+            MechrevoLite.Mode.PerfModeDefinition mode = new(
+                MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind), kind, null, stored);
+            _modes.Clear();
+            _modes.Add(mode);
+            _current = mode;
+            _settings = stored;
+            ModeCombo.Items.Clear();
+            ModeCombo.Items.Add(new ComboBoxItem
+            {
+                Content = ModeName(mode) + " · 配置 " + (_firmwareProfileIndex + 1),
+                Tag = mode.Id
+            });
+            ModeCombo.SelectedIndex = 0;
+            ModeCombo.IsEnabled = false;
+            NewButton.IsEnabled = false;
+            RenameButton.IsEnabled = false;
+            DeleteButton.IsEnabled = false;
+            ApplyButton.IsEnabled = false;
+            LoadSettingsToUi(stored);
+            Title = "性能模式 · " + ModeName(mode) + " · 配置 " + (_firmwareProfileIndex + 1);
+            StatusText.Text = "30 系固件配置档（只读预览）";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "绑定固件配置失败：" + ex.Message;
         }
     }
 

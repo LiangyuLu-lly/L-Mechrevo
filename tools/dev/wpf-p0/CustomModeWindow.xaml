@@ -55,9 +55,9 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="模式" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <ComboBox x:Name="ModeCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" SelectionChanged="ModeCombo_SelectionChanged" />
-                <Button Content="新建" Grid.Column="2" Style="{StaticResource MiniButton}" Click="New_Click" Margin="8,0,0,0" />
-                <Button Content="重命名" Grid.Column="3" Style="{StaticResource MiniButton}" Click="Rename_Click" Margin="6,0,0,0" />
-                <Button Content="删除" Grid.Column="4" Style="{StaticResource MiniButton}" Click="Delete_Click" Margin="6,0,0,0" />
+                <Button x:Name="NewButton" Content="新建" Grid.Column="2" Style="{StaticResource MiniButton}" Click="New_Click" Margin="8,0,0,0" />
+                <Button x:Name="RenameButton" Content="重命名" Grid.Column="3" Style="{StaticResource MiniButton}" Click="Rename_Click" Margin="6,0,0,0" />
+                <Button x:Name="DeleteButton" Content="删除" Grid.Column="4" Style="{StaticResource MiniButton}" Click="Delete_Click" Margin="6,0,0,0" />
             </Grid>
             <TextBlock x:Name="StatusText" Text="" Style="{StaticResource MutedText}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,8" />
         </StackPanel>

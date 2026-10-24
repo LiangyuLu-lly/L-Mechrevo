@@ -2270,16 +2270,15 @@ public partial class OriginalStyleWindow : Window
             Program.hw = _backendProbe.Hw;
             Program.service = _backendProbe.Service!;
             int visualMode = _backendProbe.Service?.CurrentMode ?? 0;
-            if (_legacyCustomModeForm == null || _legacyCustomModeForm.IsDisposed)
+            int profileIndex = MechrevoLite.Mode.ModeProfileConfig.Get(visualMode);
+            if (_customModeForm == null || !_customModeForm.IsVisible)
             {
-                _legacyCustomModeForm = new CustomModeForm();
+                _customModeForm = new CustomModeWindow { Owner = this };
             }
-            _legacyCustomModeForm.BindFirmwareProfile(visualMode, MechrevoLite.Mode.ModeProfileConfig.Get(visualMode));
-            if (!_legacyCustomModeForm.Visible)
-            {
-                _legacyCustomModeForm.Show();
-            }
-            _legacyCustomModeForm.Activate();
+            _customModeForm.SetDark(_dark);
+            _customModeForm.BindFirmwareProfile(visualMode, profileIndex);
+            _customModeForm.Show();
+            _customModeForm.Activate();
         }
         catch (Exception ex)
         {
