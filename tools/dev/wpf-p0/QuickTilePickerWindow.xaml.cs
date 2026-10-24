@@ -29,6 +29,8 @@ public sealed class QuickChoice
     public string Glyph { get; }
 
     public bool IsSelected { get; set; }
+
+    public bool IsFanBoost => string.Equals(Key, "fanboost", StringComparison.OrdinalIgnoreCase);
 }
 
 public partial class QuickTilePickerWindow : Window

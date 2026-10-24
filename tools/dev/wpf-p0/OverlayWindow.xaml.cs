@@ -40,7 +40,7 @@ public partial class OverlayWindow : Window
         try
         {
             _displayMode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
-            Opacity = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 100), 30, 100) / 100.0;
+            Opacity = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 80), 30, 100) / 100.0;
             _timer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(MechrevoLite.AppConfig.Get("overlay_interval_ms", 1000), 500, 10000));
         }
         catch
@@ -232,8 +232,10 @@ public partial class OverlayWindow : Window
         CpuFanText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
         GpuDetailText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
         GpuFanText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
+        InfoGrid.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
         RamText.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
-        BatteryText.Visibility = Visibility.Visible;
+        BatteryText.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
+        BatteryDetailText.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void CycleDisplayMode()

@@ -92,11 +92,26 @@
                                   IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                   Click="Choice_Click">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets" FontSize="16"
-                                           Width="24" VerticalAlignment="Center" />
+                                <Grid Width="24" Height="18" VerticalAlignment="Center">
+                                    <TextBlock x:Name="GlyphIcon" Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Viewbox x:Name="FanBoostIcon" Width="16" Height="16" Visibility="Collapsed"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Canvas Width="16" Height="16">
+                                            <Path Fill="{DynamicResource TextBrush}"
+                                                  Data="M8,8 C6,5 6,2 8,1 C10,2 10,5 8,8 Z M8,8 C11,6 14,7 15,9 C13,11 10,10 8,8 Z M8,8 C10,11 10,14 8,15 C6,14 6,11 8,8 Z M8,8 C5,10 2,9 1,7 C3,5 6,6 8,8 Z M8,7 A1,1 0 1 1 8,9 A1,1 0 1 1 8,7 Z" />
+                                        </Canvas>
+                                    </Viewbox>
+                                </Grid>
                                 <TextBlock Text="{Binding Label}" FontSize="12" VerticalAlignment="Center" />
                             </StackPanel>
                         </CheckBox>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsFanBoost}" Value="True">
+                                <Setter TargetName="GlyphIcon" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="FanBoostIcon" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
