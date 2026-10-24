@@ -4,6 +4,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:local="clr-namespace:L_Mechrevo.WpfP0"
         Title="L-Mechrevo · 原版小窗 P0"
+        Icon="Assets/Icons/app.png"
         Width="420" Height="560"
         MinWidth="420" MaxWidth="420" MinHeight="300"
         ResizeMode="CanResize"
@@ -378,10 +379,7 @@
             <Grid Grid.Row="0" Background="Transparent"
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <Border x:Name="TitleIconBorder" Width="18" Height="18" CornerRadius="4" Background="White" Margin="0,0,8,0">
-                        <TextBlock x:Name="TitleIconText" Text="L" FontSize="11" FontWeight="Bold" Foreground="#111111"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Image x:Name="TitleIconImage" Source="Assets/Icons/app.png" Width="18" Height="18" Margin="0,0,8,0" />
                     <TextBlock Text="L-Mechrevo · 原版小窗" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </StackPanel>
                 <Button x:Name="TitleCloseButton" Content="✕" Width="44" Height="34" HorizontalAlignment="Right"
@@ -816,31 +814,31 @@
                     <UniformGrid Grid.Column="1" Columns="5" VerticalAlignment="Center">
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
                             <StackPanel>
-                                <TextBlock Text="◎" FontSize="14" HorizontalAlignment="Center" />
+                                <Image Source="Assets/Icons/ui-overlay.png" Width="15" Height="15" HorizontalAlignment="Center" />
                                 <TextBlock Text="悬浮窗" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="设置">
                             <StackPanel>
-                                <TextBlock Text="☼" FontSize="14" HorizontalAlignment="Center" />
+                                <Image Source="Assets/Icons/ui-settings.png" Width="15" Height="15" HorizontalAlignment="Center" />
                                 <TextBlock Text="设置" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="赞助">
                             <StackPanel>
-                                <TextBlock Text="♡" FontSize="14" HorizontalAlignment="Center" />
+                                <Image Source="Assets/Icons/ui-donate.png" Width="15" Height="15" HorizontalAlignment="Center" />
                                 <TextBlock Text="赞助" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="诊断">
                             <StackPanel>
-                                <TextBlock Text="▣" FontSize="14" HorizontalAlignment="Center" />
+                                <Image Source="Assets/Icons/ui-diag.png" Width="15" Height="15" HorizontalAlignment="Center" />
                                 <TextBlock Text="诊断" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="退出">
                             <StackPanel>
-                                <TextBlock Text="✕" FontSize="14" HorizontalAlignment="Center" />
+                                <Image Source="Assets/Icons/ui-quit.png" Width="15" Height="15" HorizontalAlignment="Center" />
                                 <TextBlock Text="退出" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>

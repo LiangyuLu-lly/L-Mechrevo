@@ -6,7 +6,8 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
-        FontFamily="{DynamicResource AppFontFamily}">
+        FontFamily="{DynamicResource AppFontFamily}"
+        Icon="Assets/Icons/app.png">
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

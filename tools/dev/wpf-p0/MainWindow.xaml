@@ -14,7 +14,8 @@
         FontFamily="Segoe UI Variable Text, Segoe UI"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True">
+        SnapsToDevicePixels="True"
+        Icon="Assets/Icons/app.png">
 
     <Grid>
         <!-- P0：真实背景图（cover）+ 可调压暗层；卡片/控件全部半透明，滚动由 ScrollViewer 合成平移。 -->

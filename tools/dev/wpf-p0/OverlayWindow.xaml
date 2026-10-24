@@ -15,7 +15,8 @@
         TextOptions.TextRenderingMode="ClearType"
         UseLayoutRounding="True"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
-        MouseRightButtonDown="Window_MouseRightButtonDown">
+        MouseRightButtonDown="Window_MouseRightButtonDown"
+        Icon="Assets/Icons/app.png">
     <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="12" Padding="12,8">
         <StackPanel>

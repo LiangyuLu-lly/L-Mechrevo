@@ -3421,8 +3421,10 @@ public partial class OriginalStyleWindow : Window
 
     private void UpdateTitleIcon()
     {
-        TitleIconBorder.Background = _dark ? Brushes.White : new SolidColorBrush(Color.FromRgb(17, 17, 17));
-        TitleIconText.Foreground = _dark ? Brushes.Black : Brushes.White;
+        if (TitleIconImage != null)
+        {
+            TitleIconImage.Opacity = _dark ? 1.0 : 0.88;
+        }
     }
 
     private void ApplyDarkTitleBar(bool dark)

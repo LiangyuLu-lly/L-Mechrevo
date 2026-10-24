@@ -9,7 +9,8 @@
         Foreground="{DynamicResource TextBrush}"
         FontFamily="Segoe UI Variable Text, Segoe UI"
         TextOptions.TextFormattingMode="Display"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
 
     <Window.Resources>
         <Style x:Key="CompactCard" TargetType="Border" BasedOn="{StaticResource Card}">

@@ -10,7 +10,8 @@
         FontSize="12"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
     <Window.Resources>
         <Style x:Key="TitleText" TargetType="TextBlock">
             <Setter Property="FontSize" Value="15" />

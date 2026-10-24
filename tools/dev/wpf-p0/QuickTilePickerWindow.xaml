@@ -13,7 +13,8 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
         TextOptions.TextHintingMode="Fixed"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
 
     <Window.Resources>
         <Style x:Key="PickerButton" TargetType="Button">

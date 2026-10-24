@@ -12,7 +12,8 @@
         FontSize="12"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />

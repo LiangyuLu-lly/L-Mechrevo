@@ -13,7 +13,8 @@
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
         TextOptions.TextHintingMode="Fixed"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
     <Window.Resources>
         <Style TargetType="ComboBoxItem">
             <Setter Property="Padding" Value="6,3" />

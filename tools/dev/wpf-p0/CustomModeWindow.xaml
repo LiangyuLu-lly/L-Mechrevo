@@ -11,7 +11,8 @@
         FontWeight="Normal"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="ClearType"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
     <Window.Resources>
         <Style x:Key="CardTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13" />

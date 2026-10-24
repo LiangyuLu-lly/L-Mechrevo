@@ -9,7 +9,8 @@
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{DynamicResource AppFontFamily}"
         FontSize="12"
-        TextOptions.TextFormattingMode="Ideal">
+        TextOptions.TextFormattingMode="Ideal"
+        Icon="Assets/Icons/app.png">
     <StackPanel Margin="16">
         <TextBlock x:Name="PromptText" Text="输入：" Margin="0,0,0,8" TextWrapping="Wrap" />
         <TextBox x:Name="ValueBox" Height="28" VerticalContentAlignment="Center"
