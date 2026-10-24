@@ -26,6 +26,8 @@
                 <CheckBox x:Name="AutoApplyCheck" Content="开机自动应用" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Click="AutoApply_Click" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="保存快照" Style="{StaticResource FlatButton}" Click="SaveSnapshot_Click" Margin="0,0,8,0" />
+                <Button Content="读取快照" Style="{StaticResource FlatButton}" Click="LoadSnapshot_Click" Margin="0,0,8,0" />
                 <Button Content="高级选项" Style="{StaticResource FlatButton}" Click="Advanced_Click" Margin="0,0,8,0" />
                 <Button Content="重置" Style="{StaticResource FlatButton}" Click="Reset_Click" Margin="0,0,8,0" />
                 <Button Content="关闭" Style="{StaticResource FlatButton}" Click="Close_Click" />

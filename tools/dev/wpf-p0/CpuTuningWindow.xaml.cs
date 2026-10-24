@@ -14,6 +14,8 @@ namespace L_Mechrevo.WpfP0;
 public partial class CpuTuningWindow : Window
 {
     private readonly List<(CpuTuningOption Option, Slider Slider, TextBlock Value)> _rows = new();
+    private Slider? _fmaxSlider;
+    private readonly List<Slider> _perCoreSliders = new();
 
     public CpuTuningWindow()
     {
@@ -46,6 +48,8 @@ public partial class CpuTuningWindow : Window
             }
             OptionsPanel.Children.Clear();
             _rows.Clear();
+            _perCoreSliders.Clear();
+            _fmaxSlider = null;
             if (probe.Options.Count == 0)
             {
                 OptionsPanel.Children.Add(new TextBlock
@@ -147,7 +151,7 @@ public partial class CpuTuningWindow : Window
             Margin = new Thickness(0, 12, 0, 6)
         });
         IReadOnlyList<int?> saved = RuntimeCpuTuning.LoadSavedPerCore(coreCount);
-        List<Slider> sliders = new();
+        List<Slider> sliders = _perCoreSliders;
         for (int core = 0; core < coreCount; core++)
         {
             Grid row = new() { Margin = new Thickness(0, 0, 0, 4) };
@@ -236,6 +240,7 @@ public partial class CpuTuningWindow : Window
         };
         Grid.SetColumn(slider, 1);
         row.Children.Add(slider);
+        _fmaxSlider = slider;
         TextBlock valueText = new()
         {
             Text = ((int)slider.Value).ToString(),
@@ -303,6 +308,58 @@ public partial class CpuTuningWindow : Window
         catch (Exception ex)
         {
             StatusText.Text = "重置失败：" + ex.Message;
+        }
+    }
+
+    private async void SaveSnapshot_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_perCoreSliders.Count > 0)
+            {
+                int[] values = _perCoreSliders.Select(s => (int)Math.Round(s.Value)).ToArray();
+                int allCore = RuntimeCpuTuning.LoadSavedAllCore() ?? values.FirstOrDefault();
+                RuntimeCpuTuning.SaveSettings(values, allCore);
+            }
+            if (_fmaxSlider != null && RuntimeCpuTuning.Instance.FMaxWritableCapability)
+            {
+                RuntimeCpuTuning.SaveFMax((int)_fmaxSlider.Value);
+            }
+            StatusText.Text = "快照已保存";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "保存快照失败：" + ex.Message;
+        }
+        await Task.CompletedTask;
+    }
+
+    private async void LoadSnapshot_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            int coreCount = RuntimeCpuTuning.PerCoreCapacity;
+            IReadOnlyList<int?> saved = RuntimeCpuTuning.LoadSavedPerCore(coreCount);
+            if (saved.Count == 0 || saved.All(v => !v.HasValue))
+            {
+                StatusText.Text = "没有可读取的每核 CO 快照";
+                return;
+            }
+            int[] values = saved.Select((v, i) => v ?? 0).ToArray();
+            CpuTuningResult co = await Task.Run(() => RuntimeCpuTuning.Instance.ApplyPerCore(values));
+            string detail = co.Detail;
+            int? fmax = RuntimeCpuTuning.LoadSavedFMax();
+            if (fmax.HasValue && RuntimeCpuTuning.Instance.FMaxWritableCapability)
+            {
+                CpuTuningResult fr = await Task.Run(() => RuntimeCpuTuning.Instance.ApplyFMax(fmax.Value));
+                detail += "；FMax：" + fr.Detail;
+            }
+            StatusText.Text = detail;
+            LoadProbe();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "读取快照失败：" + ex.Message;
         }
     }
 
