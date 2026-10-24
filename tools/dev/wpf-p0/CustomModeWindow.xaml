@@ -119,9 +119,15 @@
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="GPU 动态加速" VerticalAlignment="Center" />
-                            <CheckBox x:Name="DbSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <CheckBox x:Name="DbSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="DbSwitch_Changed" Unchecked="DbSwitch_Changed" />
                             <Slider x:Name="DbSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="30" Value="25" ValueChanged="Db_Changed" />
                             <TextBlock x:Name="DbText" Grid.Column="3" Text="25" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="GPU 功耗上限 TGP (W)" VerticalAlignment="Center" />
+                            <Slider x:Name="GpuTgpSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="GpuTgp_Changed" />
+                            <TextBlock x:Name="GpuTgpText" Grid.Column="2" Text="100" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                     </StackPanel>
                 </Border>

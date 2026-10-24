@@ -128,6 +128,12 @@ public partial class CustomModeWindow : Window
         SetSlider(TccSlider, TccText, s.TccTarget ?? 95);
         DbSwitch.IsChecked = s.GpuDynamicBoostOn == true;
         SetSlider(DbSlider, DbText, s.GpuDynamicBoost ?? 25);
+        SetSlider(GpuTgpSlider, GpuTgpText, s.GpuTgp ?? 100);
+        DbSlider.IsEnabled = DbSwitch.IsChecked == true;
+        TccSlider.IsEnabled = TccSwitch.IsChecked == true;
+        FanSensitivitySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true;
+        CoreOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
+        MemoryOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
         FanSensitivitySwitch.IsChecked = s.FanSwitchSpeedOn == true;
         SetSlider(FanSensitivitySlider, FanSensitivityText, s.FanSwitchSpeedMs ?? 0);
         SetSlider(FanDelaySlider, FanDelayText, s.FanSwitchSpeedMs ?? 300);
@@ -213,6 +219,8 @@ public partial class CustomModeWindow : Window
     private void Pl4_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (Pl4Text != null) Pl4Text.Text = ((int)e.NewValue).ToString(); }
     private void Tcc_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (TccText != null) TccText.Text = ((int)e.NewValue).ToString(); }
     private void Db_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (DbText != null) DbText.Text = ((int)e.NewValue).ToString(); }
+    private void GpuTgp_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuTgpText != null) GpuTgpText.Text = ((int)e.NewValue).ToString(); }
+    private void DbSwitch_Changed(object sender, RoutedEventArgs e) { if (DbSlider != null && DbSwitch != null) DbSlider.IsEnabled = DbSwitch.IsChecked == true; }
     private void FanSensitivity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (FanSensitivityText != null) FanSensitivityText.Text = ((int)e.NewValue).ToString(); }
     private void FanDelay_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (FanDelayText != null) FanDelayText.Text = ((int)e.NewValue).ToString(); }
     private void CoreOffset_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (CoreOffsetText != null) CoreOffsetText.Text = ((int)e.NewValue).ToString(); }
@@ -243,15 +251,16 @@ public partial class CustomModeWindow : Window
                 Pl1 = (int)Pl1Slider.Value,
                 Pl2 = (int)Pl2Slider.Value,
                 Pl4 = (int)Pl4Slider.Value,
-                TccOn = TccSwitch.IsChecked == true ? true : (bool?)null,
-                TccTarget = TccSwitch.IsChecked == true ? (int)TccSlider.Value : (int?)null,
-                GpuDynamicBoostOn = DbSwitch.IsChecked == true ? true : (bool?)null,
-                GpuDynamicBoost = DbSwitch.IsChecked == true ? (int)DbSlider.Value : (int?)null,
-                FanSwitchSpeedOn = FanSensitivitySwitch.IsChecked == true ? true : (bool?)null,
-                FanSwitchSpeedMs = FanSensitivitySwitch.IsChecked == true ? (int)FanDelaySlider.Value : (int?)null,
-                GpuOverclockOn = GpuOcSwitch.IsChecked == true ? true : (bool?)null,
-                GpuCoreOffset = GpuOcSwitch.IsChecked == true ? (int)CoreOffsetSlider.Value : (int?)null,
-                GpuMemoryOffset = GpuOcSwitch.IsChecked == true ? (int)MemoryOffsetSlider.Value : (int?)null,
+                TccOn = TccSwitch.IsChecked == true,
+                TccTarget = (int)TccSlider.Value,
+                GpuDynamicBoostOn = DbSwitch.IsChecked == true,
+                GpuDynamicBoost = (int)DbSlider.Value,
+                GpuTgp = (int)GpuTgpSlider.Value,
+                FanSwitchSpeedOn = FanSensitivitySwitch.IsChecked == true,
+                FanSwitchSpeedMs = (int)FanDelaySlider.Value,
+                GpuOverclockOn = GpuOcSwitch.IsChecked == true,
+                GpuCoreOffset = (int)CoreOffsetSlider.Value,
+                GpuMemoryOffset = (int)MemoryOffsetSlider.Value,
                 WindowsPowerMode = ReadInt(PowerModeCombo),
                 CpuBoost = ReadInt(CpuBoostCombo),
                 FanBoost = FanBoostCombo.SelectedItem is ComboBoxItem fb && fb.Tag is string fbText && int.TryParse(fbText, out int fbValue)
