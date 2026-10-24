@@ -51,8 +51,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
-    private CustomModeWindow? _customModeForm;
-    private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
+    private MechrevoLite.CustomModeForm? _customModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
     private bool _lightingPowerSuspended;
@@ -752,7 +751,7 @@ public partial class OriginalStyleWindow : Window
 
     private void SyncCustomWindowMode(int mode)
     {
-        if (_customModeForm == null || !_customModeForm.IsVisible)
+        if (_customModeForm == null || !_customModeForm.Visible)
         {
             return;
         }
@@ -764,11 +763,10 @@ public partial class OriginalStyleWindow : Window
             3 or 4 => ResolveCustomModeId(),
             _ => ""
         };
-        if (string.IsNullOrWhiteSpace(id) || string.Equals(id, _customWindowModeId, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(id))
         {
             return;
         }
-        _customWindowModeId = id;
         _customModeForm.BindMode(id);
     }
 
@@ -2085,16 +2083,16 @@ public partial class OriginalStyleWindow : Window
             Program.hw = _backendProbe.Hw;
             Program.service = _backendProbe.Service!;
             int visualMode = _backendProbe.Service?.CurrentMode ?? 0;
-            if (_legacyCustomModeForm == null || _legacyCustomModeForm.IsDisposed)
+            if (_customModeForm == null || _customModeForm.IsDisposed)
             {
-                _legacyCustomModeForm = new CustomModeForm();
+                _customModeForm = new CustomModeForm();
             }
-            _legacyCustomModeForm.BindFirmwareProfile(visualMode, MechrevoLite.Mode.ModeProfileConfig.Get(visualMode));
-            if (!_legacyCustomModeForm.Visible)
+            _customModeForm.BindFirmwareProfile(visualMode, MechrevoLite.Mode.ModeProfileConfig.Get(visualMode));
+            if (!_customModeForm.Visible)
             {
-                _legacyCustomModeForm.Show();
+                _customModeForm.Show();
             }
-            _legacyCustomModeForm.Activate();
+            _customModeForm.Activate();
         }
         catch (Exception ex)
         {
@@ -2143,19 +2141,16 @@ public partial class OriginalStyleWindow : Window
             }
             Program.hw = _backendProbe.Hw;
             Program.service = _backendProbe.Service!;
-            string customId = ResolveCustomModeId();
-            if (_customModeForm == null)
+            if (_customModeForm == null || _customModeForm.IsDisposed)
             {
-                _customModeForm = new CustomModeWindow(customId) { Owner = this };
-                _customModeForm.SetDark(_dark);
-                _customModeForm.Closed += (_, _) => _customModeForm = null;
+                _customModeForm = new CustomModeForm();
             }
-            if (!_customModeForm.IsVisible)
+            string customId = ResolveCustomModeId();
+            if (!_customModeForm.Visible)
             {
                 _customModeForm.Show();
             }
             _customModeForm.Activate();
-            _customWindowModeId = customId;
             if (switchMode)
             {
                 if (!await _customModeForm.SelectModeAsync(customId))
