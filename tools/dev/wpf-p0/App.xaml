@@ -129,10 +129,10 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="CheckBox">
                             <StackPanel Orientation="Horizontal">
-                                <Border x:Name="Track" Width="36" Height="20" CornerRadius="10"
+                                <Border x:Name="Track" Width="32" Height="16" CornerRadius="8"
                                         Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
                                     <Grid VerticalAlignment="Center">
-                                        <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White"                                            VerticalAlignment="Center"                                              HorizontalAlignment="Left" Margin="2,0,0,0" />
+                                        <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"                                            VerticalAlignment="Center"                                              HorizontalAlignment="Left" Margin="2,0,0,0" />
                                     </Grid>
                                 </Border>
                                 <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center" />
@@ -266,7 +266,7 @@
                             <Border x:Name="Track" Width="26" Height="16" CornerRadius="8"
                                     Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
                                     <Grid VerticalAlignment="Center">
-                                        <Ellipse x:Name="Knob" Width="14" Height="14" Fill="White"                                            VerticalAlignment="Center"                                          HorizontalAlignment="Left" Margin="2,0,0,0" />
+                                        <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"                                            VerticalAlignment="Center"                                          HorizontalAlignment="Left" Margin="2,0,0,0" />
                                     </Grid>
                                 </Border>
                             <ContentPresenter Margin="6,0,0,0" VerticalAlignment="Center" />

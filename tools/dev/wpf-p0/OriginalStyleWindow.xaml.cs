@@ -51,6 +51,8 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
+    private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+    private bool _lightingIdleSuspended;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private BackendProbe? _backendProbe;
@@ -99,6 +101,8 @@ public partial class OriginalStyleWindow : Window
                 RefreshFromBackend();
             }
         };
+        _lightingIdleTimer.Tick += (_, _) => CheckLightingIdle();
+        _lightingIdleTimer.Start();
         _backendRetryTimer.Tick += async (_, _) =>
         {
             if (_backendProbe == null)
@@ -114,6 +118,7 @@ public partial class OriginalStyleWindow : Window
         {
             _backendTimer.Stop();
             _backendRetryTimer.Stop();
+            _lightingIdleTimer.Stop();
             _backendProbe?.Dispose();
             _backendProbe = null;
         };
@@ -1641,6 +1646,40 @@ public partial class OriginalStyleWindow : Window
         MechrevoLite.Program.hw = _backendProbe.Hw;
         MechrevoLite.Program.service = _backendProbe.Service!;
         new MechrevoLite.LightForm("HidLightbar_Logo/Ctrl", "Logo 灯光", MechrevoLite.LightForm.CurrentLogoEffects()).ShowDialog();
+    }
+
+    private void CheckLightingIdle()
+    {
+        BackendProbe? probe = _backendProbe;
+        if (probe?.Connected != true)
+        {
+            return;
+        }
+        int timeoutSeconds = AppConfig.Get("lighting_idle_seconds", 0);
+        if (timeoutSeconds <= 0)
+        {
+            if (_lightingIdleSuspended)
+            {
+                _lightingIdleSuspended = false;
+                _ = ApplyKeyboardLightAsync();
+                _ = ApplyLogoLightAsync();
+            }
+            return;
+        }
+        double idleSeconds = NativeMethods.GetIdleTime().TotalSeconds;
+        if (!_lightingIdleSuspended && idleSeconds >= timeoutSeconds)
+        {
+            _lightingIdleSuspended = true;
+            _ = probe.SetKeyboardEffectAsync("Off");
+            _ = probe.SetLogoEffectAsync("Off");
+            return;
+        }
+        if (_lightingIdleSuspended && idleSeconds < Math.Max(5, timeoutSeconds / 2))
+        {
+            _lightingIdleSuspended = false;
+            _ = ApplyKeyboardLightAsync();
+            _ = ApplyLogoLightAsync();
+        }
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)
