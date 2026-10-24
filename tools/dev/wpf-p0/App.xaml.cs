@@ -11,12 +11,14 @@ public partial class App : Application
     private const string InstanceMutexName = @"Local\L-Mechrevo.WpfP0";
     private const string ShowMainEventName = @"Local\L-Mechrevo.WpfP0.ShowMain";
     private Mutex? _instanceMutex;
+    private bool _ownsInstanceMutex;
     private EventWaitHandle? _showMainEvent;
     private RegisteredWaitHandle? _showMainWait;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         _instanceMutex = new Mutex(initiallyOwned: true, InstanceMutexName, out bool createdNew);
+        _ownsInstanceMutex = createdNew;
         if (!createdNew)
         {
             try
@@ -59,7 +61,16 @@ public partial class App : Application
     {
         _showMainWait?.Unregister(null);
         _showMainEvent?.Dispose();
-        _instanceMutex?.ReleaseMutex();
+        if (_ownsInstanceMutex)
+        {
+            try
+            {
+                _instanceMutex?.ReleaseMutex();
+            }
+            catch
+            {
+            }
+        }
         _instanceMutex?.Dispose();
         base.OnExit(e);
     }

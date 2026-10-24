@@ -16,6 +16,8 @@ public partial class CustomModeWindow : Window
     private bool _suppressPlanApply;
     private bool _firmwareMode;
     private int _modeComboSyncDepth;
+    private bool _loadingUi;
+    private bool _dirty;
     private int _firmwareVisualMode;
     private int _firmwareProfileIndex;
     private MechrevoLite.Mode.PerfModeDefinition? _current;
@@ -25,6 +27,14 @@ public partial class CustomModeWindow : Window
     {
         InitializeComponent();
         MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(true);
+        AddHandler(Slider.ValueChangedEvent,
+            new RoutedPropertyChangedEventHandler<double>((_, _) => MarkDirty()), true);
+        AddHandler(CheckBox.CheckedEvent,
+            new RoutedEventHandler((_, _) => MarkDirty()), true);
+        AddHandler(CheckBox.UncheckedEvent,
+            new RoutedEventHandler((_, _) => MarkDirty()), true);
+        AddHandler(ComboBox.SelectionChangedEvent,
+            new SelectionChangedEventHandler((_, _) => MarkDirty()), true);
         LoadModes(initialModeId);
     }
 
@@ -101,6 +111,21 @@ public partial class CustomModeWindow : Window
             _modeComboSyncDepth--;
         }
 }
+
+    private void MarkDirty()
+    {
+        if (_loadingUi || _firmwareMode || _current == null)
+        {
+            return;
+        }
+        if (_dirty)
+        {
+            return;
+        }
+        _dirty = true;
+        ApplyButton.Content = "应用 *";
+        StatusText.Text = "有未应用修改";
+    }
 
     private static string ModeName(MechrevoLite.Mode.PerfModeDefinition mode)
     {
@@ -227,6 +252,9 @@ public partial class CustomModeWindow : Window
 
     private void LoadSettingsToUi(MechrevoLite.Mode.PerfModeSettings s)
     {
+        _loadingUi = true;
+        try
+        {
         SetSlider(Pl1Slider, Pl1Text, s.Pl1 ?? 65);
         SetSlider(Pl2Slider, Pl2Text, s.Pl2 ?? 65);
         SetSlider(Pl4Slider, Pl4Text, s.Pl4 ?? 100);
@@ -288,7 +316,13 @@ public partial class CustomModeWindow : Window
         Pl4Row.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
         FanBoostRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
         FanCard.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
-    }
+    
+        }
+        finally
+        {
+            _loadingUi = false;
+        }
+}
 
     private void LoadLiveHardware(MechrevoHw hw)
     {
@@ -573,9 +607,26 @@ public partial class CustomModeWindow : Window
                     ? fbValue == 1 : (bool?)null,
                 RefreshHz = ReadInt(RefreshCombo)
             };
-            await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");
-            _settings = edited;
-            StatusText.Text = "已应用：" + ModeName(_current);
+            MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");
+            if (outcome == null)
+            {
+                StatusText.Text = "应用失败：没有返回下发结果";
+                return;
+            }
+            _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
+            bool amd = Program.hw?.UsesAmdPowerFields == true;
+            string summary = MechrevoLite.Mode.PerfModeText.Summary(outcome);
+            string failure = outcome.AnyFailed
+                ? " · 失败：" + MechrevoLite.Mode.PerfModeText.FailedItems(outcome, amd)
+                : "";
+            string stale = MechrevoLite.Mode.PerfModeText.StaleNote(outcome);
+            StatusText.Text = "已应用：" + ModeName(_current) + " · " + summary + failure + stale;
+            ToolTip = MechrevoLite.Mode.PerfModeText.Details(outcome, amd);
+            if (!outcome.AnyFailed)
+            {
+                _dirty = false;
+                ApplyButton.Content = "应用";
+            }
         }
         catch (Exception ex)
         {
