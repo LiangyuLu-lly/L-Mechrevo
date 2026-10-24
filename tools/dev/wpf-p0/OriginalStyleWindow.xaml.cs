@@ -65,6 +65,8 @@ public partial class OriginalStyleWindow : Window
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
     private bool _syncingLighting;
+    private bool? _pendingKeyboardPower;
+    private long _pendingKeyboardPowerTick;
     private bool _syncingPerfConfig;
     private int _pendingMode = -1;
     private int _modeRequestId;
@@ -3024,10 +3026,20 @@ public partial class OriginalStyleWindow : Window
         _syncingLighting = true;
         try
         {
-            bool keyboardOn = hw.UsesBaolongda
-                ? hw.KeyboardPower
-                : MechrevoLite.KeyboardLightingDecision.ShouldWrite(hw.IsConnected, hw.KeyboardPower);
-            KeyboardLightSwitch.IsChecked = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(keyboardOn, suspended);
+            if (_pendingKeyboardPower is bool pendingPower
+                && Environment.TickCount64 - _pendingKeyboardPowerTick < 5000
+                && hw.KeyboardPower != pendingPower)
+            {
+                // 等 GCU 回读追上用户刚点的状态，避免开关立即回弹
+            }
+            else
+            {
+                _pendingKeyboardPower = null;
+                bool keyboardOn = hw.UsesBaolongda
+                    ? hw.KeyboardPower
+                    : MechrevoLite.KeyboardLightingDecision.ShouldWrite(hw.IsConnected, hw.KeyboardPower);
+                KeyboardLightSwitch.IsChecked = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(keyboardOn, suspended);
+            }
             SetSwitchFromQuick(hw, "lightbar", LightStripSwitch, suspended);
             SetSwitchFromQuick(hw, "logolight", LogoLightSwitch, suspended);
             SetSwitchFromQuick(hw, "hingelight", LightHingeSwitch, suspended);
@@ -3416,6 +3428,8 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
+        _pendingKeyboardPower = KeyboardLightSwitch.IsChecked == true;
+        _pendingKeyboardPowerTick = Environment.TickCount64;
         await ApplyKeyboardLightAsync();
         if (_backendProbe?.Hw?.IsConnected == true)
         {
