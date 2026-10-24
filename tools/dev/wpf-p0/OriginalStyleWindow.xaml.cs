@@ -60,6 +60,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingLiquid;
     private bool _syncingPerfConfig;
     private int _pendingMode = -1;
+    private int _modeRequestId;
     private long _pendingModeTick;
     private int _lastDbVisualMode = int.MinValue;
     private string _customWindowModeId = "";
@@ -799,8 +800,24 @@ public partial class OriginalStyleWindow : Window
 
     private async Task SwitchModeAsync(int mode)
     {
-        bool ok = await _backendProbe!.SwitchModeAsync(mode);
+        int request = ++_modeRequestId;
+        _pendingMode = mode;
+        _pendingModeTick = Environment.TickCount64;
+        MechrevoService.ModeSwitchResult result = await _backendProbe!.SwitchModeResultAsync(mode);
+        if (request != _modeRequestId)
+        {
+            return;
+        }
+        if (result == MechrevoService.ModeSwitchResult.Superseded)
+        {
+            return;
+        }
+        bool ok = result == MechrevoService.ModeSwitchResult.Ok;
         BackendStatus.Text = ok ? "模式已下发" : "模式下发失败";
+        if (!ok)
+        {
+            _pendingMode = -1;
+        }
         if (ok)
         {
             SyncGpuDbForMode(mode, "WPF 切档");

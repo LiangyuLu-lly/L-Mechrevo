@@ -215,21 +215,25 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
-    internal async Task<bool> SwitchModeAsync(int mode)
+    internal async Task<MechrevoService.ModeSwitchResult> SwitchModeResultAsync(int mode)
     {
         try
         {
             if (_service == null)
             {
-                return false;
+                return MechrevoService.ModeSwitchResult.Failed;
             }
-            await _service.SwitchMode(mode).ConfigureAwait(false);
-            return true;
+            return await _service.SwitchMode(mode).ConfigureAwait(false);
         }
         catch
         {
-            return false;
+            return MechrevoService.ModeSwitchResult.Failed;
         }
+    }
+
+    internal async Task<bool> SwitchModeAsync(int mode)
+    {
+        return await SwitchModeResultAsync(mode).ConfigureAwait(false) == MechrevoService.ModeSwitchResult.Ok;
     }
 
     internal async Task<bool> SetBatteryModeAsync(int mode)
