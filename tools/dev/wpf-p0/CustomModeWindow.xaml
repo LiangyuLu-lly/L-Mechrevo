@@ -120,13 +120,13 @@
                         <TextBlock Text="CPU 功耗" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="CPU 功耗墙 PL1 (W)" VerticalAlignment="Center" />
+                            <TextBlock x:Name="Pl1Label" Text="CPU 功耗墙 PL1 (W)" VerticalAlignment="Center" />
                             <Slider x:Name="Pl1Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="200" Value="65" ValueChanged="Pl1_Changed" />
                             <TextBlock x:Name="Pl1Text" Grid.Column="2" Text="65" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="CPU 功耗墙 PL2 (W)" VerticalAlignment="Center" />
+                            <TextBlock x:Name="Pl2Label" Text="CPU 功耗墙 PL2 (W)" VerticalAlignment="Center" />
                             <Slider x:Name="Pl2Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="200" Value="65" ValueChanged="Pl2_Changed" />
                             <TextBlock x:Name="Pl2Text" Grid.Column="2" Text="65" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
@@ -168,7 +168,7 @@
                         <TextBlock Text="温度 / GPU 动态加速" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="CPU 温度墙" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TccLabel" Text="CPU 温度墙" VerticalAlignment="Center" />
                             <CheckBox x:Name="TccSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" />
                             <Slider x:Name="TccSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="75" Maximum="100" Value="95" ValueChanged="Tcc_Changed" />
                             <TextBlock x:Name="TccText" Grid.Column="3" Text="95" TextAlignment="Right" VerticalAlignment="Center" />

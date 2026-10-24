@@ -18,6 +18,8 @@ public partial class CustomModeWindow : Window
     private int _modeComboSyncDepth;
     private bool _loadingUi;
     private bool _dirty;
+    private const string UnsetMark = "（未设置）";
+    private const string PowerWallUnsetHint = "本机协议读不回功耗墙的当前值（只写不读）。标题带「（未设置）」= 本次运行还没下发过，不代表机器上没设过。拖动滑块并点【应用】后，这里显示的就是我们下发的值。";
     private int _firmwareVisualMode;
     private int _firmwareProfileIndex;
     private MechrevoLite.Mode.PerfModeDefinition? _current;
@@ -462,6 +464,36 @@ public partial class CustomModeWindow : Window
             StatusText.Text = "电源计划失败：" + ex.Message;
         }
         await Task.CompletedTask;
+    }
+
+    private void ApplyPowerWallVisuals(MechrevoHw? hw)
+    {
+        if (hw == null || (!hw.UsesBaolongda && !hw.WujieSmuApu))
+        {
+            Pl1Label.Text = "CPU 功耗墙 PL1 (W)";
+            Pl2Label.Text = "CPU 功耗墙 PL2 (W)";
+            TccLabel.Text = "CPU 温度墙";
+            return;
+        }
+        bool pl1Unset = hw.BaolongdaPl1Unset;
+        bool pl2Unset = hw.BaolongdaPl2Unset;
+        bool tccUnset = hw.BaolongdaTempWallUnset;
+        Pl1Label.Text = "CPU 功耗墙 PL1 (W)" + (pl1Unset ? UnsetMark : "");
+        Pl2Label.Text = "CPU 功耗墙 PL2 (W)" + (pl2Unset ? UnsetMark : "");
+        TccLabel.Text = "CPU 温度墙" + (tccUnset ? UnsetMark : "");
+        Pl1Label.ToolTip = pl1Unset ? PowerWallUnsetHint : null;
+        Pl2Label.ToolTip = pl2Unset ? PowerWallUnsetHint : null;
+        TccLabel.ToolTip = tccUnset ? PowerWallUnsetHint : null;
+        if (_current?.IsCustom == true && _settings.IsUntouched)
+        {
+            Pl1Slider.Value = Pl1Slider.Minimum;
+            Pl2Slider.Value = Pl2Slider.Minimum;
+            TccSwitch.IsChecked = false;
+            TccSlider.Value = TccSlider.Minimum;
+            GpuOcSwitch.IsChecked = false;
+            CoreOffsetSlider.Value = 0;
+            MemoryOffsetSlider.Value = 0;
+        }
     }
 
     private void RefreshGpuPowerLimit(int? savedWatts)
