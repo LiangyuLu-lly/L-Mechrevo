@@ -1757,6 +1757,14 @@ public partial class OriginalStyleWindow : Window
         }
         UpdateGpuButtons(displayGpu, pending);
         bool skipModeUi = false;
+        CurrentModeText.Text = "当前：" + (mode switch
+        {
+            2 => "静音",
+            1 => "狂暴",
+            0 => "平衡",
+            3 or 4 => "自定义",
+            _ => "—"
+        });
         if (_pendingMode >= 0)
         {
             if (mode == _pendingMode || Environment.TickCount64 - _pendingModeTick > 4000)

@@ -435,7 +435,10 @@
                                 <CheckBox x:Name="GpuOverclockSwitch" Content="GPU 超频" Style="{StaticResource HeaderSwitch}" Margin="14,0,0,0" VerticalAlignment="Center" Click="GpuOverclock_Click" />
                                 <Button x:Name="PerfConfigEditButton" Content="配置编辑" Style="{StaticResource MiniButton}" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" Click="PerfConfigEdit_Click" />
                             </StackPanel>
-                            <TextBlock x:Name="CpuStat" Grid.Column="1" Text="CPU —" Style="{StaticResource StatText}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="CurrentModeText" Text="当前：—" Style="{StaticResource StatText}" Margin="0,0,10,0" />
+                                <TextBlock x:Name="CpuStat" Text="CPU —" Style="{StaticResource StatText}" />
+                            </StackPanel>
                         </Grid>
                         <local:AdaptivePanel x:Name="ModeGrid" Margin="0,2,0,0">
                             <ToggleButton x:Name="SilentModeButton" Tag="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
