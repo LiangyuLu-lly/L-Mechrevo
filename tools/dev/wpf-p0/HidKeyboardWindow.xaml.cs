@@ -137,6 +137,127 @@ public partial class HidKeyboardWindow : Window
                 ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "样式", 0, 10, _rgb.MatrixStyle);
                 break;
         }
+        RefreshMultiColors(mode);
+    }
+
+    private void RefreshMultiColors(int mode)
+    {
+        ColorCountRow.Visibility = Visibility.Collapsed;
+        MultiColorPanel.Visibility = Visibility.Collapsed;
+        if (mode == 7)
+        {
+            ColorCountRow.Visibility = Visibility.Visible;
+            MultiColorPanel.Visibility = Visibility.Visible;
+            ColorCountLabel.Text = "雨滴颜色数";
+            ColorCountSlider.Minimum = 1;
+            ColorCountSlider.Maximum = 5;
+            ColorCountSlider.Value = Math.Clamp(_rgb.RainColorCount, 1, 5);
+            MultiColorLabel.Text = "雨滴颜色";
+            BuildMultiColors(_rgb.RainColors, 5);
+        }
+        else if (mode == 8)
+        {
+            ColorCountRow.Visibility = Visibility.Visible;
+            MultiColorPanel.Visibility = Visibility.Visible;
+            ColorCountLabel.Text = "矩阵颜色数";
+            ColorCountSlider.Minimum = 1;
+            ColorCountSlider.Maximum = 3;
+            ColorCountSlider.Value = Math.Clamp(_rgb.MatrixColorCount, 1, 3);
+            MultiColorLabel.Text = "矩阵颜色";
+            BuildMultiColors(_rgb.MatrixColors, 3);
+        }
+        else if (mode == 9)
+        {
+            ColorCountRow.Visibility = Visibility.Visible;
+            MultiColorPanel.Visibility = Visibility.Visible;
+            ColorCountLabel.Text = "静态分区数";
+            ColorCountSlider.Minimum = 1;
+            ColorCountSlider.Maximum = 10;
+            ColorCountSlider.Value = Math.Clamp(_rgb.StaticZones, 1, 10);
+            MultiColorLabel.Text = "分区颜色";
+            BuildMultiColors(_rgb.StaticColors, 10);
+        }
+    }
+
+    private void BuildMultiColors(System.Drawing.Color[] colors, int max)
+    {
+        MultiColorGrid.Children.Clear();
+        int count = Math.Clamp((int)ColorCountSlider.Value, 1, max);
+        for (int i = 0; i < count; i++)
+        {
+            int index = i;
+            System.Drawing.Color c = colors[Math.Clamp(index, 0, colors.Length - 1)];
+            Button button = new()
+            {
+                Height = 26,
+                Margin = new Thickness(2),
+                Padding = new Thickness(0),
+                Tag = index,
+                Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
+                ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}"
+            };
+            button.Click += MultiColor_Click;
+            MultiColorGrid.Children.Add(button);
+        }
+    }
+
+    private void ColorCount_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (ColorCountText != null)
+        {
+            ColorCountText.Text = ((int)e.NewValue).ToString();
+        }
+        if (MultiColorGrid != null)
+        {
+            int mode = SelectedMode;
+            if (mode == 7)
+            {
+                BuildMultiColors(_rgb.RainColors, 5);
+            }
+            else if (mode == 8)
+            {
+                BuildMultiColors(_rgb.MatrixColors, 3);
+            }
+            else if (mode == 9)
+            {
+                BuildMultiColors(_rgb.StaticColors, 10);
+            }
+        }
+    }
+
+    private void MultiColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: int index } button)
+        {
+            return;
+        }
+        int mode = SelectedMode;
+        System.Drawing.Color current = mode switch
+        {
+            7 => _rgb.RainColors[Math.Clamp(index, 0, _rgb.RainColors.Length - 1)],
+            8 => _rgb.MatrixColors[Math.Clamp(index, 0, _rgb.MatrixColors.Length - 1)],
+            _ => _rgb.StaticColors[Math.Clamp(index, 0, _rgb.StaticColors.Length - 1)]
+        };
+        using System.Windows.Forms.ColorDialog dialog = new() { FullOpen = true, Color = current };
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+        {
+            return;
+        }
+        if (mode == 7)
+        {
+            _rgb.RainColors[Math.Clamp(index, 0, _rgb.RainColors.Length - 1)] = dialog.Color;
+        }
+        else if (mode == 8)
+        {
+            _rgb.MatrixColors[Math.Clamp(index, 0, _rgb.MatrixColors.Length - 1)] = dialog.Color;
+        }
+        else
+        {
+            _rgb.StaticColors[Math.Clamp(index, 0, _rgb.StaticColors.Length - 1)] = dialog.Color;
+        }
+        button.Background = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromArgb(dialog.Color.A, dialog.Color.R, dialog.Color.G, dialog.Color.B));
     }
 
     private void Extra1_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -249,10 +370,17 @@ public partial class HidKeyboardWindow : Window
                 _rgb.LightningConcurrent = Math.Clamp(extra2, 1, 5);
                 break;
             case 6: _rgb.FlameSmooth = extra1; break;
-            case 7: _rgb.RainDensity = extra1; break;
+            case 7:
+                _rgb.RainDensity = extra1;
+                _rgb.RainColorCount = Math.Clamp((int)ColorCountSlider.Value, 1, 5);
+                break;
             case 8:
                 _rgb.MatrixDensity = extra1;
                 _rgb.MatrixStyle = extra2;
+                _rgb.MatrixColorCount = Math.Clamp((int)ColorCountSlider.Value, 1, 3);
+                break;
+            case 9:
+                _rgb.StaticZones = Math.Clamp((int)ColorCountSlider.Value, 1, 10);
                 break;
         }
     }
