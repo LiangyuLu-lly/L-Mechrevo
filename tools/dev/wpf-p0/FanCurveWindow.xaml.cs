@@ -66,18 +66,29 @@ public partial class FanCurveWindow : Window
             CpuCurve.Load(_hw.CpuCurveUpT, cpuSaved.Select(v => (byte)Math.Clamp(v, 0, 100)).ToArray());
             GpuCurve.Load(_hw.GpuCurveUpT, gpuSaved.Select(v => (byte)Math.Clamp(v, 0, 100)).ToArray());
         }
+        else if (_modeId.StartsWith("custom", StringComparison.Ordinal)
+            || _modeId.StartsWith("fw", StringComparison.Ordinal))
+        {
+            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
+            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
+            PersistHardwareCurveIfMissing(cpuSaved, gpuSaved);
+        }
         else if (_hw.CpuCurveDuty.Length >= 16 && _hw.GpuCurveDuty.Length >= 16
             && _hw.CpuCurveUpT.Length >= 16 && _hw.GpuCurveUpT.Length >= 16)
         {
             CpuCurve.Load(_hw.CpuCurveUpT, _hw.CpuCurveDuty);
             GpuCurve.Load(_hw.GpuCurveUpT, _hw.GpuCurveDuty);
-            PersistHardwareCurveIfMissing(cpuSaved, gpuSaved);
         }
         else if (_hw.TryGetBuiltInDefaultFanCurve(out byte[] cpuTemps, out byte[] cpuDuties,
                      out byte[] gpuTemps, out byte[] gpuDuties))
         {
             CpuCurve.Load(cpuTemps, cpuDuties);
             GpuCurve.Load(gpuTemps, gpuDuties);
+        }
+        else
+        {
+            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
+            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
         }
     }
 
@@ -141,12 +152,8 @@ public partial class FanCurveWindow : Window
         {
             return;
         }
-        if (_hw.CpuCurveDuty.Length < 16 || _hw.GpuCurveDuty.Length < 16)
-        {
-            return;
-        }
-        int[] cpu = _hw.CpuCurveDuty.Take(16).Select(v => v == 255 ? 0 : (int)v).ToArray();
-        int[] gpu = _hw.GpuCurveDuty.Take(16).Select(v => v == 255 ? 0 : (int)v).ToArray();
+        int[] cpu = CpuCurve.Duties.ToArray();
+        int[] gpu = GpuCurve.Duties.ToArray();
         MechrevoLite.Mode.PerfModeSettings settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_modeId) with
         {
             CpuFanDuty = cpu,
@@ -171,14 +178,23 @@ public partial class FanCurveWindow : Window
 
     private void Restore_Click(object sender, RoutedEventArgs e)
     {
-        if (_hw == null || !_hw.TryGetBuiltInDefaultFanCurve(out byte[] cpuTemps, out byte[] cpuDuties,
-                out byte[] gpuTemps, out byte[] gpuDuties))
+        if (_modeId.StartsWith("custom", StringComparison.Ordinal)
+            || _modeId.StartsWith("fw", StringComparison.Ordinal))
         {
-            StatusText.Text = "读不到内置默认曲线";
-            return;
+            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
+            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
         }
-        CpuCurve.Load(cpuTemps, cpuDuties);
-        GpuCurve.Load(gpuTemps, gpuDuties);
+        else if (_hw != null && _hw.TryGetBuiltInDefaultFanCurve(out byte[] cpuTemps, out byte[] cpuDuties,
+                     out byte[] gpuTemps, out byte[] gpuDuties))
+        {
+            CpuCurve.Load(cpuTemps, cpuDuties);
+            GpuCurve.Load(gpuTemps, gpuDuties);
+        }
+        else
+        {
+            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
+            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
+        }
         _dirty = true;
         StatusText.Text = "已恢复默认曲线，点应用后下发";
     }

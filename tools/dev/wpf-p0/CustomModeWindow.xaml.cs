@@ -610,7 +610,9 @@ public partial class CustomModeWindow : Window
                     FanSwitchSpeedMs = 300,
                     GpuOverclockOn = false,
                     GpuCoreOffset = 0,
-                    GpuMemoryOffset = 0
+                    GpuMemoryOffset = 0,
+                    CpuFanDuty = FanCurveDefaults.CpuDuties.ToArray(),
+                    GpuFanDuty = FanCurveDefaults.GpuDuties.ToArray()
                 });
             }
             LoadModes(mode.Id);
