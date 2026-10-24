@@ -53,6 +53,7 @@ public partial class OriginalStyleWindow : Window
     private OverlayWindow? _overlayWindow;
     private TrayIconService? _trayIcon;
     private HotkeyService? _hotkeyService;
+    private bool _firstRunChecked;
     private CustomModeWindow? _customModeForm;
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -143,6 +144,8 @@ public partial class OriginalStyleWindow : Window
             _hotkeyService?.Dispose();
             _hotkeyService = null;
         };
+        MechrevoLite.Helpers.ToastForm.FailureCallback = message => ToastService.Show(message, failure: true);
+        MechrevoLite.Helpers.ToastForm.NoticeCallback = message => ToastService.Show(message);
         _trayIcon = new TrayIconService();
         _trayIcon.ShowRequested += ShowFromTray;
         _trayIcon.SettingsRequested += () => new SettingsWindow(this).ShowDialog();
@@ -1841,6 +1844,55 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private void ShowFirstRunGuidesIfNeeded()
+    {
+        if (_firstRunChecked)
+        {
+            return;
+        }
+        _firstRunChecked = true;
+        try
+        {
+            if (AppConfig.Get("onboarding_version", 0) < 1)
+            {
+                MechrevoHw? hw = _backendProbe?.Hw;
+                if (!(hw?.UsesBaolongda ?? false))
+                {
+                    AppConfig.Set("igpu_only_asked", 1);
+                    AppConfig.Flush();
+                }
+                OriginalFormHostWindow host = new(new MechrevoLite.FirstRunGuideForm(), "首次使用引导")
+                {
+                    Owner = this
+                };
+                host.ShowDialog();
+                AppConfig.Set("onboarding_version", 1);
+                AppConfig.Flush();
+                return;
+            }
+            if (AppConfig.Get("igpu_only_asked", 0) != 1)
+            {
+                MechrevoHw? hw = _backendProbe?.Hw;
+                bool baolongda = hw?.UsesBaolongda ?? false;
+                bool needAsk = !baolongda && (hw == null || (hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.Gen30 && !hw.HasReliableIgpuOnlyCapability));
+                if (needAsk)
+                {
+                    AppConfig.Set("igpu_only_asked", 1);
+                    AppConfig.Flush();
+                    OriginalFormHostWindow host = new(new MechrevoLite.FirstRunGuideForm(igpuOnlyStepOnly: true), "核显模式")
+                    {
+                        Owner = this
+                    };
+                    host.ShowDialog();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "首次引导显示失败：" + ex.Message;
+        }
+    }
+
     private async Task ConnectBackendAsync()
     {
         if (_connectAttempting)
@@ -1890,6 +1942,7 @@ public partial class OriginalStyleWindow : Window
                 SyncGpuDbForMode(probe.CurrentMode, "WPF 启动同步");
                 await probe.RefreshGpuModeAsync();
                 ApplyCapabilities();
+                ShowFirstRunGuidesIfNeeded();
                 _backendTimer.Start();
             }
             else

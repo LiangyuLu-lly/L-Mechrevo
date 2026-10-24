@@ -550,6 +550,22 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void OpenFeedback_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            OriginalFormHostWindow host = new(new MechrevoLite.FeedbackForm(), "反馈")
+            {
+                Owner = this
+            };
+            host.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Status("打开反馈失败：" + ex.Message);
+        }
+    }
+
     private void OpenIssues_Click(object sender, RoutedEventArgs e)
     {
         try
