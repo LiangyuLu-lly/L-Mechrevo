@@ -3204,7 +3204,7 @@ public partial class OriginalStyleWindow : Window
             OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
             return;
         }
-        new RgbForm(rgb).ShowDialog();
+        new HidKeyboardWindow(rgb, () => new RgbForm(rgb).ShowDialog()) { Owner = this }.ShowDialog();
     }
 
     private void LogoLightEdit_Click(object sender, RoutedEventArgs e)
