@@ -52,6 +52,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
     private TrayIconService? _trayIcon;
+    private HotkeyService? _hotkeyService;
     private CustomModeWindow? _customModeForm;
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -139,6 +140,8 @@ public partial class OriginalStyleWindow : Window
             _backendProbe = null;
             _trayIcon?.Dispose();
             _trayIcon = null;
+            _hotkeyService?.Dispose();
+            _hotkeyService = null;
         };
         _trayIcon = new TrayIconService();
         _trayIcon.ShowRequested += ShowFromTray;
@@ -149,15 +152,21 @@ public partial class OriginalStyleWindow : Window
             Close();
             Application.Current.Shutdown();
         };
-        _trayIcon.ModeRequested += mode =>
+        _trayIcon.ModeRequested += RequestMode;
+        SourceInitialized += (_, _) =>
         {
-            if (_backendProbe == null)
+            try
             {
-                return;
+                _hotkeyService = new HotkeyService(this);
+                _hotkeyService.ModeRequested += RequestMode;
+                _hotkeyService.OverlayRequested += ToggleTrayOverlay;
+                _hotkeyService.SettingsRequested += () => new SettingsWindow(this).ShowDialog();
+                _hotkeyService.ShowRequested += ShowFromTray;
             }
-            _pendingMode = mode;
-            _pendingModeTick = Environment.TickCount64;
-            _ = SwitchModeAsync(mode);
+            catch (Exception ex)
+            {
+                StatusText.Text = "全局热键注册失败：" + ex.Message;
+            }
         };
         if (ModeGrid != null && ModeGrid.Children.Count > 1 && ModeGrid.Children[1] is ToggleButton defaultMode)
         {
@@ -200,6 +209,17 @@ public partial class OriginalStyleWindow : Window
     private void TitleClose_Click(object sender, RoutedEventArgs e)
     {
         Hide();
+    }
+
+    private void RequestMode(int mode)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        _pendingMode = mode;
+        _pendingModeTick = Environment.TickCount64;
+        _ = SwitchModeAsync(mode);
     }
 
     private void ShowFromTray()
