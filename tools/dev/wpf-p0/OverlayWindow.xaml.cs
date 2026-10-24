@@ -106,21 +106,38 @@ public partial class OverlayWindow : Window
 
     private static string FormatPowerSource(bool acOnline)
     {
+        if (!acOnline)
+        {
+            return "电池供电";
+        }
         try
         {
-            MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(
-                MechrevoLite.HardwareControl.PowerInput, acOnline);
-            string text = MechrevoLite.SettingsForm.PowerSourceHeadline(
-                kind, MechrevoLite.HardwareControl.PowerInput?.AdapterWatts);
-            if (!string.IsNullOrWhiteSpace(text))
+            if (MechrevoLite.Program.hw?.UsesBaolongda == true)
             {
-                return text;
+                // 宝龙达没有适配器功率表，保持原版「外接电源」，不显示“未识别”。
+                return "外接电源";
+            }
+            MechrevoLite.Hardware.PowerInputSample? sample = MechrevoLite.HardwareControl.PowerInput;
+            MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(
+                sample, acOnline);
+            if (sample?.AdapterWatts is int watts)
+            {
+                string text = MechrevoLite.SettingsForm.PowerSourceHeadline(kind, watts);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+            if (sample != null)
+            {
+                // 同方机型不在功率表里时，直接显示 EC 原始读数。
+                return "外接电源（EC 0x" + sample.BiosInfo3Raw.ToString("X2") + "）";
             }
         }
         catch
         {
         }
-        return acOnline ? "外接电源（功率未识别）" : "电池供电";
+        return "外接电源";
     }
 
     private static string FormatFan(int rpm, int duty)
