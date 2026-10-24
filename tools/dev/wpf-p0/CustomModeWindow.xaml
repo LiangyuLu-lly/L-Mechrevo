@@ -130,6 +130,30 @@
                             <Slider x:Name="Pl4Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="Pl4_Changed" />
                             <TextBlock x:Name="Pl4Text" Grid.Column="2" Text="100" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
+                        <Grid x:Name="StapmTimeRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="STAPM 时间窗 (s)" VerticalAlignment="Center" />
+                            <Slider x:Name="StapmTimeSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="28" ValueChanged="StapmTime_Changed" />
+                            <TextBlock x:Name="StapmTimeText" Grid.Column="2" Text="28" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="SmuSlowLimitRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="SMU 慢速限制 (W)" VerticalAlignment="Center" />
+                            <Slider x:Name="SmuSlowLimitSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="65" ValueChanged="SmuSlowLimit_Changed" />
+                            <TextBlock x:Name="SmuSlowLimitText" Grid.Column="2" Text="65" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="SmuSlowTimeRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="SMU 慢速时间 (s)" VerticalAlignment="Center" />
+                            <Slider x:Name="SmuSlowTimeSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="28" ValueChanged="SmuSlowTime_Changed" />
+                            <TextBlock x:Name="SmuSlowTimeText" Grid.Column="2" Text="28" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="SmuFastTimeRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="SMU 快速时间 (s)" VerticalAlignment="Center" />
+                            <Slider x:Name="SmuFastTimeSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="5" ValueChanged="SmuFastTime_Changed" />
+                            <TextBlock x:Name="SmuFastTimeText" Grid.Column="2" Text="5" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

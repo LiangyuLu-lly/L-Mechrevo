@@ -219,6 +219,10 @@ public partial class CustomModeWindow : Window
         SelectComboBool(FanBoostCombo, s.FanBoost);
         RefreshOptions(s.RefreshHz);
         LoadPowerPlans(s.PowerPlanGuid);
+        SetSlider(StapmTimeSlider, StapmTimeText, s.StapmTimeSeconds ?? 28);
+        SetSlider(SmuSlowLimitSlider, SmuSlowLimitText, s.SmuSlowLimit ?? 65);
+        SetSlider(SmuSlowTimeSlider, SmuSlowTimeText, s.SmuSlowTimeSeconds ?? 28);
+        SetSlider(SmuFastTimeSlider, SmuFastTimeText, s.SmuFastTimeSeconds ?? 5);
         if (!_firmwareMode && _current?.IsCustom != true && Program.hw is MechrevoHw liveHw)
         {
             LoadLiveHardware(liveHw);
@@ -227,6 +231,15 @@ public partial class CustomModeWindow : Window
         if (Program.hw is MechrevoHw limitsHw)
         {
             ApplyHardwareControlLimits(limitsHw);
+            bool smuPower = MechrevoLite.Mode.PerfModeCapabilities.UsesSmuForCustomPower(
+                limitsHw.UsesBaolongda,
+                limitsHw.IsBaolongda30Series,
+                MechrevoLite.Hardware.SmuAvailability.IsReady,
+                limitsHw.WujieSmuApu);
+            StapmTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
+            SmuSlowLimitRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
+            SmuSlowTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
+            SmuFastTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
         }
         bool locked = Program.hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
@@ -471,6 +484,10 @@ public partial class CustomModeWindow : Window
     private void Tcc_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (TccText != null) TccText.Text = ((int)e.NewValue).ToString(); }
     private void Db_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (DbText != null) DbText.Text = ((int)e.NewValue).ToString(); }
     private void GpuTgp_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuTgpText != null) GpuTgpText.Text = ((int)e.NewValue).ToString(); }
+    private void StapmTime_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (StapmTimeText != null) StapmTimeText.Text = ((int)e.NewValue).ToString(); }
+    private void SmuSlowLimit_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (SmuSlowLimitText != null) SmuSlowLimitText.Text = ((int)e.NewValue).ToString(); }
+    private void SmuSlowTime_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (SmuSlowTimeText != null) SmuSlowTimeText.Text = ((int)e.NewValue).ToString(); }
+    private void SmuFastTime_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (SmuFastTimeText != null) SmuFastTimeText.Text = ((int)e.NewValue).ToString(); }
     private void DbSwitch_Changed(object sender, RoutedEventArgs e) { if (DbSlider != null && DbSwitch != null) DbSlider.IsEnabled = DbSwitch.IsChecked == true; }
     private void GpuPowerLimit_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuPowerLimitText != null) GpuPowerLimitText.Text = ((int)e.NewValue).ToString(); }
     private void FanDelay_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (FanDelayText != null) FanDelayText.Text = ((int)e.NewValue).ToString(); }
@@ -508,6 +525,10 @@ public partial class CustomModeWindow : Window
                 GpuDynamicBoostOn = DbSwitch.IsChecked == true,
                 GpuDynamicBoost = (int)DbSlider.Value,
                 GpuTgp = (int)GpuTgpSlider.Value,
+                StapmTimeSeconds = StapmTimeRow.Visibility == Visibility.Visible ? (int)StapmTimeSlider.Value : (int?)null,
+                SmuSlowLimit = SmuSlowLimitRow.Visibility == Visibility.Visible ? (int)SmuSlowLimitSlider.Value : (int?)null,
+                SmuSlowTimeSeconds = SmuSlowTimeRow.Visibility == Visibility.Visible ? (int)SmuSlowTimeSlider.Value : (int?)null,
+                SmuFastTimeSeconds = SmuFastTimeRow.Visibility == Visibility.Visible ? (int)SmuFastTimeSlider.Value : (int?)null,
                 FanSwitchSpeedOn = FanSensitivitySwitch.IsChecked == true,
                 FanSwitchSpeedMs = (int)FanDelaySlider.Value,
                 GpuOverclockOn = GpuOcSwitch.IsChecked == true,
