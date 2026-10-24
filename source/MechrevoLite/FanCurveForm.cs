@@ -467,7 +467,10 @@ public class FanCurveForm : RForm
 		_respectiveChk = new RCheckBox
 		{
 			Text = Strings.FanIndependentControl,
-			Checked = (Program.hw?.FanRespective ?? false),
+			// 2026-10-24（机主：无界独立控制默认关）：无界只认 LM 自己的 wujie_fan_independent（缺省 = 关）。
+			Checked = (Program.hw?.WujieSmuApu == true)
+				? AppConfig.Is("wujie_fan_independent")
+				: (Program.hw?.FanRespective ?? false),
 			ForeColor = UiVisualStyle.Text,
 			BackColor = UiVisualStyle.Window,
 			AutoSize = true,
@@ -860,9 +863,9 @@ public class FanCurveForm : RForm
 				return;
 			}
 			_syncingRespective = true;
-			_respectiveChk.Checked = Program.hw?.FanRespective ?? false;
+			_respectiveChk.Checked = (Program.hw?.WujieSmuApu == true) ? AppConfig.Is("wujie_fan_independent") : (Program.hw?.FanRespective ?? false);
 			_syncingRespective = false;
-			bool visible = Program.UiAuditMode || (Program.hw?.SupportsFanRespective ?? false);
+			bool visible = Program.UiAuditMode || (Program.hw?.SupportsFanRespective ?? false) || (Program.hw?.WujieSmuApu == true);
 			_respectiveChk.Visible = visible;
 			if (_respectiveHint != null)
 			{
@@ -913,7 +916,7 @@ public class FanCurveForm : RForm
 			if (!IsDisposed && _respectiveChk != null)
 			{
 				_syncingRespective = true;
-				_respectiveChk.Checked = Program.hw?.FanRespective ?? false;
+				_respectiveChk.Checked = (Program.hw?.WujieSmuApu == true) ? AppConfig.Is("wujie_fan_independent") : (Program.hw?.FanRespective ?? false);
 				_syncingRespective = false;
 				_respectiveChk.Enabled = true;
 				_status.Text = (flag ? Strings.FanIndepDefaultOn : Strings.FanIndepUnconfirmed);
