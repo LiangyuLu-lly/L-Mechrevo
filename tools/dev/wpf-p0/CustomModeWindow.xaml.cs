@@ -157,7 +157,7 @@ public partial class CustomModeWindow : Window
         SelectComboInt(CpuBoostCombo, s.CpuBoost);
         SelectComboBool(FanBoostCombo, s.FanBoost);
         RefreshOptions(s.RefreshHz);
-        if (_current?.IsCustom != true && Program.hw is MechrevoHw liveHw)
+        if (Program.hw is MechrevoHw liveHw)
         {
             LoadLiveHardware(liveHw);
         }
