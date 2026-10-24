@@ -1555,9 +1555,44 @@ public partial class OriginalStyleWindow : Window
             : new SolidColorBrush(Color.FromArgb(0x66, 255, 255, 255));
     }
 
-    private async void ConnectBackend_Click(object sender, RoutedEventArgs e)
+
+    private async void BackendStatus_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        await ConnectBackendAsync();
+        try
+        {
+            if (GcuPackageImport.ShouldOffer())
+            {
+                using GcuOwnerWindow owner = new(this);
+                await GcuPackageImport.OfferAsync(owner);
+            }
+            if (_backendProbe == null)
+            {
+                await ConnectBackendAsync();
+                return;
+            }
+            UpdateBackendStatus();
+            RefreshFromBackend();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "GCU 状态检查失败：" + ex.Message;
+        }
+    }
+
+    private sealed class GcuOwnerWindow : System.Windows.Forms.IWin32Window, IDisposable
+    {
+        private readonly WindowInteropHelper _helper;
+
+        public GcuOwnerWindow(Window window)
+        {
+            _helper = new WindowInteropHelper(window);
+        }
+
+        public nint Handle => _helper.Handle;
+
+        public void Dispose()
+        {
+        }
     }
 
     private async Task ConnectBackendAsync()
@@ -1572,7 +1607,6 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         _connectAttempting = true;
-        ConnectBackendButton.IsEnabled = false;
         SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
         BackendLine.Text = "正在创建 MechrevoHw 并 ConnectAsync（最长 15 秒）…";
         BackendProbe probe = new BackendProbe();
@@ -1584,7 +1618,7 @@ public partial class OriginalStyleWindow : Window
             if (completed != connect)
             {
                 SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
-                BackendLine.Text = "15 秒内未完成；稍后自动重试，也可手动点「连接后端」。";
+                BackendLine.Text = "15 秒内未完成；应用会自动重试，点上方状态可重新检查。";
                 probe.Dispose();
                 _backendProbe = null;
                 _backendRetryTimer.Start();
@@ -1613,7 +1647,6 @@ public partial class OriginalStyleWindow : Window
         finally
         {
             _connectAttempting = false;
-            ConnectBackendButton.IsEnabled = true;
         }
     }
 
