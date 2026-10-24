@@ -516,7 +516,7 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            new MechrevoLite.FanCurveForm().Show();
+            new OriginalFormHostWindow(new MechrevoLite.FanCurveForm()).Show();
         }
         catch (Exception ex)
         {
@@ -528,7 +528,7 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            new MechrevoLite.CpuTuningForm().Show();
+            new OriginalFormHostWindow(new MechrevoLite.CpuTuningForm()).Show();
         }
         catch (Exception ex)
         {

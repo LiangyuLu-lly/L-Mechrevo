@@ -2627,7 +2627,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "键盘 RGB 设备未连接，无法打开键盘灯光编辑";
             return;
         }
-        new RgbForm(rgb).ShowDialog();
+        new OriginalFormHostWindow(new RgbForm(rgb)).ShowDialog();
     }
 
     private void LogoLightEdit_Click(object sender, RoutedEventArgs e)
@@ -2813,7 +2813,7 @@ public partial class OriginalStyleWindow : Window
         }
         Program.hw = _backendProbe.Hw;
         Program.service = _backendProbe.Service!;
-        new LightForm("HidLightbar/Ctrl", "灯带灯光").ShowDialog();
+        new OriginalFormHostWindow(new LightForm("HidLightbar/Ctrl", "灯带灯光")).ShowDialog();
     }
 
     private KeyboardRgb? EnsureKeyboardRgb()
@@ -2866,7 +2866,7 @@ public partial class OriginalStyleWindow : Window
         }
         Program.hw = _backendProbe.Hw;
         Program.service = _backendProbe.Service!;
-        new LightForm("HidLightbar_Hinge/Ctrl", "铰链灯光", LightForm.HingeEffects).ShowDialog();
+        new OriginalFormHostWindow(new LightForm("HidLightbar_Hinge/Ctrl", "铰链灯光", LightForm.HingeEffects)).ShowDialog();
     }
 
     private async void LightSyncSwitch_Click(object sender, RoutedEventArgs e)
@@ -2898,7 +2898,7 @@ public partial class OriginalStyleWindow : Window
         }
         Program.hw = _backendProbe.Hw;
         Program.service = _backendProbe.Service!;
-        new LightForm("HidLightbar_Sync/Ctrl", "同步灯光", LightForm.SyncEffects).ShowDialog();
+        new OriginalFormHostWindow(new LightForm("HidLightbar_Sync/Ctrl", "同步灯光", LightForm.SyncEffects)).ShowDialog();
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)
