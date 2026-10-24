@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MechrevoLite.Hardware;
 using MechrevoLite.Properties;
+using PawnIO;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -57,6 +58,10 @@ public partial class CpuTuningWindow : Window
             foreach (CpuTuningOption option in probe.Options)
             {
                 AddOptionRow(option);
+            }
+            if (probe.FMax is { Capability: FMaxCapability.ReadOnly or FMaxCapability.ReadWrite or FMaxCapability.WriteNoReadback } fmax)
+            {
+                AddFMaxRow(fmax);
             }
         }
         catch (Exception ex)
@@ -120,6 +125,67 @@ public partial class CpuTuningWindow : Window
 
         OptionsPanel.Children.Add(row);
         _rows.Add((option, slider, valueText));
+    }
+
+    private void AddFMaxRow(CpuFMaxProbe fmax)
+    {
+        Grid row = new() { Margin = new Thickness(0, 8, 0, 8) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(new TextBlock
+        {
+            Text = "FMax (MHz)",
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        decimal start = fmax.Current ?? RuntimeCpuTuning.LoadSavedFMax() ?? 0m;
+        double minimum = (double)RuntimeCpuTuning.FMaxMinimum;
+        double maximum = (double)RuntimeCpuTuning.FMaxMaximum;
+        Slider slider = new()
+        {
+            Minimum = minimum,
+            Maximum = maximum,
+            Value = Math.Clamp((double)start, minimum, maximum),
+            IsEnabled = RuntimeCpuTuning.Instance.FMaxWritableCapability,
+            Margin = new Thickness(8, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Style = (Style)FindResource("RoundSlider")
+        };
+        Grid.SetColumn(slider, 1);
+        row.Children.Add(slider);
+        TextBlock valueText = new()
+        {
+            Text = ((int)slider.Value).ToString(),
+            VerticalAlignment = VerticalAlignment.Center,
+            TextAlignment = TextAlignment.Right
+        };
+        Grid.SetColumn(valueText, 2);
+        row.Children.Add(valueText);
+        slider.ValueChanged += (_, e) => valueText.Text = ((int)e.NewValue).ToString();
+        Button apply = new()
+        {
+            Content = "应用",
+            IsEnabled = RuntimeCpuTuning.Instance.FMaxWritableCapability,
+            Margin = new Thickness(8, 0, 0, 0),
+            Style = (Style)FindResource("FlatButton")
+        };
+        Grid.SetColumn(apply, 3);
+        apply.Click += async (_, _) =>
+        {
+            try
+            {
+                decimal mhz = (decimal)slider.Value;
+                CpuTuningResult result = await Task.Run(() => RuntimeCpuTuning.Instance.ApplyFMax(mhz));
+                StatusText.Text = result.Detail;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "FMax 应用失败：" + ex.Message;
+            }
+        };
+        row.Children.Add(apply);
+        OptionsPanel.Children.Add(row);
     }
 
     private async Task ApplyOptionAsync(CpuTuningOption option, Slider slider)

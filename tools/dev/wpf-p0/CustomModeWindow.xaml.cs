@@ -509,8 +509,15 @@ public partial class CustomModeWindow : Window
         bool pl1Unset = hw.BaolongdaPl1Unset;
         bool pl2Unset = hw.BaolongdaPl2Unset;
         bool tccUnset = hw.BaolongdaTempWallUnset;
-        Pl1Label.Text = "CPU 功耗墙 PL1 (W)" + (pl1Unset ? UnsetMark : "");
-        Pl2Label.Text = "CPU 功耗墙 PL2 (W)" + (pl2Unset ? UnsetMark : "");
+        bool smu = MechrevoLite.Mode.PerfModeCapabilities.UsesSmuForCustomPower(
+            hw.UsesBaolongda,
+            hw.IsBaolongda30Series,
+            MechrevoLite.Hardware.SmuAvailability.IsReady,
+            hw.WujieSmuApu);
+        string pl1Base = smu ? MechrevoLite.Properties.Strings.SmuStapmLimitLabel : "CPU 功耗墙 PL1 (W)";
+        string pl2Base = smu ? MechrevoLite.Properties.Strings.SmuFastLimitLabel : "CPU 功耗墙 PL2 (W)";
+        Pl1Label.Text = pl1Base + (pl1Unset ? UnsetMark : "");
+        Pl2Label.Text = pl2Base + (pl2Unset ? UnsetMark : "");
         TccLabel.Text = "CPU 温度墙" + (tccUnset ? UnsetMark : "");
         Pl1Label.ToolTip = pl1Unset ? PowerWallUnsetHint : null;
         Pl2Label.ToolTip = pl2Unset ? PowerWallUnsetHint : null;
