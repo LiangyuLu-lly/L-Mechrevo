@@ -15,6 +15,7 @@ public partial class CustomModeWindow : Window
     private readonly List<MechrevoLite.Mode.PerfModeDefinition> _modes = new();
     private bool _suppressPlanApply;
     private bool _firmwareMode;
+    private int _modeComboSyncDepth;
     private int _firmwareVisualMode;
     private int _firmwareProfileIndex;
     private MechrevoLite.Mode.PerfModeDefinition? _current;
@@ -35,6 +36,9 @@ public partial class CustomModeWindow : Window
 
     private void LoadModes(string? selectedId)
     {
+        _modeComboSyncDepth++;
+        try
+        {
         _firmwareMode = false;
         ModeCombo.IsEnabled = true;
         NewButton.IsEnabled = true;
@@ -90,7 +94,13 @@ public partial class CustomModeWindow : Window
                 return;
             }
         }
-    }
+    
+        }
+        finally
+        {
+            _modeComboSyncDepth--;
+        }
+}
 
     private static string ModeName(MechrevoLite.Mode.PerfModeDefinition mode)
     {
@@ -121,15 +131,32 @@ public partial class CustomModeWindow : Window
         }
     }
 
-    private void ModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_firmwareMode)
+        if (_firmwareMode || _modeComboSyncDepth > 0)
         {
             return;
         }
-        if (ModeCombo.SelectedItem is ComboBoxItem item && item.Tag is string id)
+        if (ModeCombo.SelectedItem is not ComboBoxItem item || item.Tag is not string id)
         {
-            ApplyMode(id);
+            return;
+        }
+        if (_current != null && string.Equals(_current.Id, id, StringComparison.Ordinal))
+        {
+            return;
+        }
+        _modeComboSyncDepth++;
+        try
+        {
+            await SelectModeAsync(id);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "切换模式失败：" + ex.Message;
+        }
+        finally
+        {
+            _modeComboSyncDepth--;
         }
     }
 
