@@ -23,6 +23,7 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            MechrevoLite.Hardware.GcuIdentity.Prewarm();
             _hw = new MechrevoHw();
             bool ok = await _hw.ConnectAsync().ConfigureAwait(false);
             if (ok)
