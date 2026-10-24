@@ -3666,34 +3666,8 @@ public partial class OriginalStyleWindow : Window
                 return;
 
             case "悬浮窗":
-                if (_overlayWindow != null)
-                {
-                    _overlayWindow.Close();
-                    _overlayWindow = null;
-                    StatusText.Text = "悬浮窗已关闭";
-                    return;
-                }
-                try
-                {
-                    HardwareControl.EnableLocalMonitoring();
-                }
-                catch
-                {
-                }
-                _overlayWindow = new OverlayWindow(GetOverlaySnapshot);
-                _overlayWindow.Closed += (_, _) =>
-                {
-                    _overlayWindow = null;
-                    try
-                    {
-                        HardwareControl.DisableLocalMonitoring();
-                    }
-                    catch
-                    {
-                    }
-                };
-                _overlayWindow.Show();
-                StatusText.Text = "悬浮窗已打开";
+                ToggleTrayOverlay();
+                StatusText.Text = _overlayWindow?.IsVisible == true ? "悬浮窗已打开" : "悬浮窗已关闭";
                 return;
 
             case "赞助":
