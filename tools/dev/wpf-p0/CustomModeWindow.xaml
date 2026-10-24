@@ -79,6 +79,11 @@
                         </Grid>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="电源计划" VerticalAlignment="Center" />
+                            <ComboBox x:Name="PowerPlanCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" SelectionChanged="PowerPlan_SelectionChanged" />
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <TextBlock Text="CPU 睿频模式" VerticalAlignment="Center" />
                             <ComboBox x:Name="CpuBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
                                 <ComboBoxItem Content="不改变" Tag="" />
@@ -150,6 +155,12 @@
                             <TextBlock Text="GPU 功耗上限 TGP (W)" VerticalAlignment="Center" />
                             <Slider x:Name="GpuTgpSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="GpuTgp_Changed" />
                             <TextBlock x:Name="GpuTgpText" Grid.Column="2" Text="100" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="GpuPowerLimitRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="GPU 功耗上限 (W)" VerticalAlignment="Center" />
+                            <Slider x:Name="GpuPowerLimitSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="0" ValueChanged="GpuPowerLimit_Changed" />
+                            <TextBlock x:Name="GpuPowerLimitText" Grid.Column="2" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                     </StackPanel>
                 </Border>

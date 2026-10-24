@@ -13,6 +13,7 @@ namespace L_Mechrevo.WpfP0;
 public partial class CustomModeWindow : Window
 {
     private readonly List<MechrevoLite.Mode.PerfModeDefinition> _modes = new();
+    private bool _suppressPlanApply;
     private MechrevoLite.Mode.PerfModeDefinition? _current;
     private MechrevoLite.Mode.PerfModeSettings _settings = MechrevoLite.Mode.PerfModeSettings.Default;
 
@@ -153,10 +154,12 @@ public partial class CustomModeWindow : Window
         SelectComboInt(CpuBoostCombo, s.CpuBoost);
         SelectComboBool(FanBoostCombo, s.FanBoost);
         RefreshOptions(s.RefreshHz);
+        LoadPowerPlans(s.PowerPlanGuid);
         if (_current?.IsCustom != true && Program.hw is MechrevoHw liveHw)
         {
             LoadLiveHardware(liveHw);
         }
+        RefreshGpuPowerLimit(s.GpuPowerLimitW);
         bool locked = Program.hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
             && MechrevoLite.CustomModeForm.IsGen40Plus(lockHw)
@@ -183,6 +186,10 @@ public partial class CustomModeWindow : Window
         if (hw.TccTarget > 0) SetSlider(TccSlider, TccText, hw.TccTarget);
         TccSwitch.IsChecked = hw.TccSwitch;
         if (hw.GpuTgp > 0) SetSlider(GpuTgpSlider, GpuTgpText, hw.GpuTgp);
+        if (hw.UsesBaolongda && NvmlHelper.TryGetPowerLimitBounds(out _, out _, out int nvmlCurrent) && nvmlCurrent > 0)
+        {
+            SetSlider(GpuPowerLimitSlider, GpuPowerLimitText, nvmlCurrent);
+        }
         DbSwitch.IsChecked = hw.GpuDbSwitch;
         if (hw.GpuDb > 0) SetSlider(DbSlider, DbText, hw.GpuDb);
         FanSensitivitySwitch.IsChecked = hw.FanSwitchSpeedEnabled;
@@ -196,6 +203,96 @@ public partial class CustomModeWindow : Window
         FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true;
         CoreOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
         MemoryOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
+    }
+
+    private void LoadPowerPlans(string? selectedGuid)
+    {
+        _suppressPlanApply = true;
+        try
+        {
+            PowerPlanCombo.Items.Clear();
+            PowerPlanCombo.Items.Add(new ComboBoxItem { Content = "不改变", Tag = "" });
+            foreach ((string guid, string name) in MechrevoLite.Hardware.WinPowerPlan.GetPlans())
+            {
+                PowerPlanCombo.Items.Add(new ComboBoxItem { Content = name, Tag = guid });
+            }
+            int index = 0;
+            if (!string.IsNullOrWhiteSpace(selectedGuid))
+            {
+                for (int i = 1; i < PowerPlanCombo.Items.Count; i++)
+                {
+                    if (PowerPlanCombo.Items[i] is ComboBoxItem item && string.Equals(item.Tag as string, selectedGuid, StringComparison.OrdinalIgnoreCase))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+            PowerPlanCombo.SelectedIndex = index;
+        }
+        finally
+        {
+            _suppressPlanApply = false;
+        }
+    }
+
+    private async void PowerPlan_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressPlanApply || _current == null)
+        {
+            return;
+        }
+        if (PowerPlanCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        if (item.Tag is not string guid)
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(guid))
+        {
+            return;
+        }
+        try
+        {
+            bool ok = MechrevoLite.Hardware.WinPowerPlan.SetActivePlan(guid);
+            if (ok)
+            {
+                _settings = _settings with { PowerPlanGuid = guid };
+                MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, _settings);
+                StatusText.Text = "电源计划已切换";
+            }
+            else
+            {
+                StatusText.Text = "电源计划未确认，未保存";
+                LoadPowerPlans(_settings.PowerPlanGuid);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "电源计划失败：" + ex.Message;
+        }
+        await Task.CompletedTask;
+    }
+
+    private void RefreshGpuPowerLimit(int? savedWatts)
+    {
+        int minW = 0;
+        int maxW = 0;
+        int currentW = 0;
+        bool visible = Program.hw?.UsesBaolongda == true
+            && NvmlHelper.TryGetPowerLimitBounds(out minW, out maxW, out currentW)
+            && maxW > minW;
+        GpuPowerLimitRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!visible)
+        {
+            return;
+        }
+        GpuPowerLimitSlider.Minimum = minW;
+        GpuPowerLimitSlider.Maximum = maxW;
+        int value = savedWatts is >= 0 && savedWatts <= maxW && savedWatts >= minW ? savedWatts.Value : currentW;
+        SetSlider(GpuPowerLimitSlider, GpuPowerLimitText, value);
     }
 
     private void RefreshOptions(int? current)
@@ -273,6 +370,7 @@ public partial class CustomModeWindow : Window
     private void Db_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (DbText != null) DbText.Text = ((int)e.NewValue).ToString(); }
     private void GpuTgp_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuTgpText != null) GpuTgpText.Text = ((int)e.NewValue).ToString(); }
     private void DbSwitch_Changed(object sender, RoutedEventArgs e) { if (DbSlider != null && DbSwitch != null) DbSlider.IsEnabled = DbSwitch.IsChecked == true; }
+    private void GpuPowerLimit_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuPowerLimitText != null) GpuPowerLimitText.Text = ((int)e.NewValue).ToString(); }
     private void FanDelay_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (FanDelayText != null) FanDelayText.Text = ((int)e.NewValue).ToString(); }
     private void FanSensitivitySwitch_Changed(object sender, RoutedEventArgs e) { if (FanDelaySlider != null && FanSensitivitySwitch != null) FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true; }
     private void CoreOffset_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (CoreOffsetText != null) CoreOffsetText.Text = ((int)e.NewValue).ToString(); }
@@ -314,6 +412,8 @@ public partial class CustomModeWindow : Window
                 GpuCoreOffset = (int)CoreOffsetSlider.Value,
                 GpuMemoryOffset = (int)MemoryOffsetSlider.Value,
                 WindowsPowerMode = ReadInt(PowerModeCombo),
+                PowerPlanGuid = PowerPlanCombo.SelectedItem is ComboBoxItem plan && plan.Tag is string planTag && !string.IsNullOrWhiteSpace(planTag) ? planTag : null,
+                GpuPowerLimitW = GpuPowerLimitRow.Visibility == Visibility.Visible ? (int)GpuPowerLimitSlider.Value : (int?)null,
                 CpuBoost = ReadInt(CpuBoostCombo),
                 FanBoost = FanBoostCombo.SelectedItem is ComboBoxItem fb && fb.Tag is string fbText && int.TryParse(fbText, out int fbValue)
                     ? fbValue == 1 : (bool?)null,
