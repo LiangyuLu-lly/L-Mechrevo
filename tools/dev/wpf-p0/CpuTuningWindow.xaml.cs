@@ -377,15 +377,6 @@ public partial class CpuTuningWindow : Window
         StatusText.Text = enabled ? "已开启开机自动应用" : "已关闭开机自动应用";
     }
 
-    private void Advanced_Click(object sender, RoutedEventArgs e)
-    {
-        new OriginalFormHostWindow(new MechrevoLite.CpuTuningForm(), "CPU 调节（高级）")
-        {
-            Owner = this
-        }.ShowDialog();
-        LoadProbe();
-    }
-
     private void Close_Click(object sender, RoutedEventArgs e)
     {
         Close();
