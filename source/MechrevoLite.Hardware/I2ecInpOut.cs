@@ -26,7 +26,7 @@ internal static class I2ecInpOut
 
 	// 2026-10-22（fanctl README 的坑：两个 EC 句柄并发会把地址窗口改掉 ⇒ 静默读错寄存器）：
 	// I2EC 是三步端口操作（地址高→地址低→数据），必须**跨进程**串行化。
-	// UI 风扇曲线控制器 与 SYSTEM 电池修复常驻任务各一个进程，进程内 lock 挡不住对方，故加全局互斥体。
+	// UI 风扇曲线控制器与其它进程共享 I2EC 时，进程内 lock 挡不住对方，故加全局互斥体。
 	// 2026-10-22：跨进程互斥改用**文件锁**（FileShare.None）—— 不需要 ACL 配置，
 	// SYSTEM 的电池保持任务与管理员 UI 进程都能访问 %ProgramData%\L-Mechrevo\i2ec.lock。
 	private static FileStream _ecLockStream;
