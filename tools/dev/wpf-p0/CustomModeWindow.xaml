@@ -91,7 +91,7 @@
                             <TextBlock Text="屏幕刷新率" VerticalAlignment="Center" />
                             <ComboBox x:Name="RefreshCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" />
                         </Grid>
-                        <Grid Margin="0,6,0,0">
+                        <Grid x:Name="FanBoostRow" Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <TextBlock Text="风扇增强" VerticalAlignment="Center" />
                             <ComboBox x:Name="FanBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
@@ -119,7 +119,7 @@
                             <Slider x:Name="Pl2Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="200" Value="65" ValueChanged="Pl2_Changed" />
                             <TextBlock x:Name="Pl2Text" Grid.Column="2" Text="65" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
-                        <Grid Margin="0,4,0,0">
+                        <Grid x:Name="Pl4Row" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="CPU 峰值功耗 fPPT (W)" VerticalAlignment="Center" />
                             <Slider x:Name="Pl4Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="Pl4_Changed" />

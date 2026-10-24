@@ -167,6 +167,12 @@ public partial class CustomModeWindow : Window
         CpuPowerCard.Opacity = locked ? 0.45 : 1.0;
         TempGpuCard.Opacity = locked ? 0.45 : 1.0;
         FanCard.Opacity = locked ? 0.45 : 1.0;
+        MechrevoHw? hwForRows = Program.hw;
+        bool apuOrNoDgpu = hwForRows != null
+            && (hwForRows.WujieSmuApu || hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu);
+        Pl4Row.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
+        FanBoostRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
+        FanCard.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void LoadLiveHardware(MechrevoHw hw)
@@ -343,16 +349,29 @@ public partial class CustomModeWindow : Window
         StatusText.Text = "已恢复默认：" + ModeName(_current);
     }
 
-    private void New_Click(object sender, RoutedEventArgs e)
+    private async void New_Click(object sender, RoutedEventArgs e)
     {
-        MechrevoLite.Mode.PerfModeDefinition? mode = MechrevoLite.Mode.PerfModeStore.AddCustom(_current?.Id);
-        if (mode == null)
+        try
         {
-            StatusText.Text = "新建自定义模式失败";
-            return;
+            string? seedFrom = (Program.hw?.UsesBaolongda == true) ? null : _current?.Id;
+            MechrevoLite.Mode.PerfModeDefinition? mode = MechrevoLite.Mode.PerfModeStore.AddCustom(seedFrom);
+            if (mode == null)
+            {
+                StatusText.Text = "新建自定义模式失败（已达到上限或没有可用序号）";
+                return;
+            }
+            LoadModes(mode.Id);
+            StatusText.Text = "已新建：" + ModeName(mode);
+            MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+            if (perf != null)
+            {
+                await perf.ActivateAsync(mode.Id, "wpf-editor-new", forceParameters: true);
+            }
         }
-        LoadModes(mode.Id);
-        StatusText.Text = "已新建：" + ModeName(mode);
+        catch (Exception ex)
+        {
+            StatusText.Text = "新建失败：" + ex.Message;
+        }
     }
 
     private void Rename_Click(object sender, RoutedEventArgs e)
