@@ -10,6 +10,8 @@ public partial class ColorPickerWindow : Window
 {
     public System.Drawing.Color? Result { get; private set; }
 
+    public int? PresetIndex { get; private set; }
+
     public ColorPickerWindow(System.Drawing.Color initial)
     {
         InitializeComponent();
@@ -30,6 +32,7 @@ public partial class ColorPickerWindow : Window
             button.Click += (_, _) =>
             {
                 Result = palette[index];
+                PresetIndex = index + 1;
                 DialogResult = true;
             };
             PresetGrid.Children.Add(button);
@@ -47,6 +50,7 @@ public partial class ColorPickerWindow : Window
         if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
         {
             Result = dialog.Color;
+            PresetIndex = null;
             DialogResult = true;
         }
     }

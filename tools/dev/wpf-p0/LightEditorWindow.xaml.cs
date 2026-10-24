@@ -20,10 +20,13 @@ public partial class LightEditorWindow : Window
     private int _breathingIndex = 1;
     private int[] _manualIndexes = (int[])LightChannelSettings.DefaultManualIndexes.Clone();
     private int _colorArgb;
+    private int _monochromeIndex = 4;
+    private bool _usePresetColor;
     private int[] _mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
     private bool _gradeBrightness;
     private readonly bool _keyboard;
     private bool _gradeColors;
+    private bool _wujieWhite;
     private bool _logoGrade;
     private int _lightMax = 4;
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
@@ -54,16 +57,26 @@ public partial class LightEditorWindow : Window
         if (_keyboard)
         {
             bool bd = hw?.UsesBaolongda == true;
-            bool wujieWhite = hw?.WujieSmuApu == true
+            _wujieWhite = hw?.WujieSmuApu == true
                 && hw.KeyboardStatusSeen
                 && string.Equals(hw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
-            _lightMax = wujieWhite ? 2 : (bd ? Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
-            LightSlider.Minimum = bd || wujieWhite ? 1 : 0;
+            _lightMax = _wujieWhite ? 2 : (bd ? Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
+            LightSlider.Minimum = bd || _wujieWhite ? 1 : 0;
             LightSlider.Maximum = _lightMax;
         }
         _settings = LightingSettingsStore.Load(topic, effects.Length > 0 ? effects[0].Effect : "Single");
         _light = Math.Clamp(_settings.Light, (int)LightSlider.Minimum, (int)LightSlider.Maximum);
+        if (_keyboard && _wujieWhite)
+        {
+            _light = Math.Clamp(MechrevoLite.AppConfig.Get("wujie_kbd_level", 2), 1, 2);
+            if (MechrevoLite.Hardware.EcKeyboardLight.TryGet(out bool ecOn, out int ecLevel) && ecOn && ecLevel >= 1 && ecLevel <= 2)
+            {
+                _light = ecLevel;
+            }
+        }
         _speed = Math.Clamp(_settings.Speed, 0, 4);
+        _monochromeIndex = Math.Clamp(_settings.MonochromeIndex, 1, 29);
+        _usePresetColor = _settings.UsePresetColor;
         _colorArgb = _settings.EffectiveColorArgb();
         if (_settings.ManualIndexes is { Length: >= 6 } manual)
         {
@@ -112,7 +125,7 @@ public partial class LightEditorWindow : Window
         if (_keyboard)
         {
             LightSlider.Value = _light;
-            LightText.Text = _light + "/" + _lightMax;
+            LightText.Text = _wujieWhite ? (_light >= 2 ? "亮" : "暗") : (_light + "/" + _lightMax);
             SpeedSlider.Value = _speed;
             SpeedText.Text = _speed + "/4";
             return;
@@ -364,7 +377,7 @@ public partial class LightEditorWindow : Window
             _light = Math.Clamp((int)Math.Round(e.NewValue), (int)LightSlider.Minimum, _lightMax);
             if (LightText != null)
             {
-                LightText.Text = _light + "/" + _lightMax;
+                LightText.Text = _wujieWhite ? (_light >= 2 ? "亮" : "暗") : (_light + "/" + _lightMax);
             }
             ScheduleAutoApply();
             return;
@@ -431,6 +444,8 @@ public partial class LightEditorWindow : Window
         if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
         {
             _colorArgb = picked.ToArgb();
+            _usePresetColor = picker.PresetIndex.HasValue;
+            _monochromeIndex = picker.PresetIndex ?? 0;
             UpdateColorButton();
             ScheduleAutoApply();
         }
@@ -462,7 +477,8 @@ public partial class LightEditorWindow : Window
                 Light = _light,
                 Speed = applySpeed,
                 ColorArgb = _colorArgb,
-                UsePresetColor = false,
+                UsePresetColor = _usePresetColor,
+                MonochromeIndex = _monochromeIndex,
                 MixColors = (int[])_mixColors.Clone(),
                 ManualIndexes = (int[])_manualIndexes.Clone(),
                 BreathingIndex = _breathingIndex,
@@ -484,6 +500,11 @@ public partial class LightEditorWindow : Window
                 if (power)
                 {
                     await Program.service.SetKeyboardPower(true);
+                    if (_wujieWhite)
+                    {
+                        ok = await Program.service.SetKeyboardBrightnessPreservingEffect(_light);
+                        return ok;
+                    }
                     bool baolongda = Program.hw?.UsesBaolongda == true;
                     System.Drawing.Color? color = baolongda
                         ? System.Drawing.Color.FromArgb(Program.hw != null ? _settings.EffectiveColorArgb() : _colorArgb)

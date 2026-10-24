@@ -19,7 +19,7 @@ public partial class HidKeyboardWindow : Window
         _rgb = rgb;
         _effects = MechrevoLite.RgbForm.VisibleHidEffects(Program.hw?.Capabilities.KeyboardType ?? 0);
         PowerCheck.IsChecked = _rgb.KbPowerOn;
-        BrightnessSlider.Value = Math.Clamp(_rgb.Brightness, 1, 100);
+        BrightnessSlider.Value = Math.Clamp(_rgb.Brightness, 0, 100);
         BrightnessText.Text = ((int)BrightnessSlider.Value) + "%";
         BrightnessSlider.ValueChanged += (_, e) => BrightnessText.Text = ((int)e.NewValue) + "%";
         int selected = 0;
@@ -71,7 +71,22 @@ public partial class HidKeyboardWindow : Window
             8 => _rgb.MatrixSpeed,
             _ => 5
         };
-        SpeedSlider.Value = Math.Clamp(speed, 1, 10);
+        (double speedMin, double speedMax) = mode switch
+        {
+            0 => (1, 30),
+            1 => (1, 20),
+            2 => (1, 20),
+            3 => (5, 60),
+            4 => (1, 20),
+            5 => (1, 20),
+            6 => (1, 20),
+            7 => (1, 5),
+            8 => (1, 5),
+            _ => (1, 10)
+        };
+        SpeedSlider.Minimum = speedMin;
+        SpeedSlider.Maximum = speedMax;
+        SpeedSlider.Value = Math.Clamp(speed, speedMin, speedMax);
         SpeedText.Text = ((int)SpeedSlider.Value).ToString();
         AngleSlider.Value = Math.Clamp(_rgb.WaveAngle, 0, 360);
         AngleText.Text = ((int)AngleSlider.Value) + "°";
@@ -102,11 +117,11 @@ public partial class HidKeyboardWindow : Window
                 break;
             case 2:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 0, 20, _rgb.SparkleDensity);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 1, 20, _rgb.SparkleDensity);
                 break;
             case 3:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "时长", 4, 100, _rgb.ReactiveDuration);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "时长", 5, 60, _rgb.ReactiveDuration);
                 ExtraCheck.Visibility = Visibility.Visible;
                 ExtraCheck.Content = "随机颜色";
                 ExtraCheck.IsChecked = _rgb.ReactiveRandom;
@@ -118,29 +133,29 @@ public partial class HidKeyboardWindow : Window
                 break;
             case 5:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "宽度", 1, 10, _rgb.LightningWidth);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "宽度", 1, 4, _rgb.LightningWidth);
                 Extra2Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "并发", 1, 5, _rgb.LightningConcurrent);
+                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "并发", 1, 4, _rgb.LightningConcurrent);
                 Extra3Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra3Slider, Extra3Label, Extra3Text, "平滑", 0, 100, _rgb.LightningSmooth);
+                ConfigureExtra(Extra3Slider, Extra3Label, Extra3Text, "平滑", 1, 40, _rgb.LightningSmooth);
                 break;
             case 6:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 0, 100, _rgb.FlameSmooth);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 1, 40, _rgb.FlameSmooth);
                 break;
             case 7:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 0, 10, _rgb.RainDensity);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 1, 5, _rgb.RainDensity);
                 break;
             case 8:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 0, 10, _rgb.MatrixDensity);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 1, 5, _rgb.MatrixDensity);
                 Extra2Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "样式", 0, 10, _rgb.MatrixStyle);
+                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "样式", 0, 3, _rgb.MatrixStyle);
                 break;
             case 9:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "布局", 0, 10, _rgb.StaticLayout);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "布局", 0, 1, _rgb.StaticLayout);
                 break;
         }
         RefreshMultiColors(mode);
@@ -380,9 +395,9 @@ public partial class HidKeyboardWindow : Window
                 break;
             case 4: _rgb.WheelReverse = check; break;
             case 5:
-                _rgb.LightningWidth = Math.Clamp(extra1, 1, 10);
-                _rgb.LightningConcurrent = Math.Clamp(extra2, 1, 5);
-                _rgb.LightningSmooth = Math.Clamp((int)Math.Round(Extra3Slider.Value), 0, 100);
+                _rgb.LightningWidth = Math.Clamp(extra1, 1, 4);
+                _rgb.LightningConcurrent = Math.Clamp(extra2, 1, 4);
+                _rgb.LightningSmooth = Math.Clamp((int)Math.Round(Extra3Slider.Value), 1, 40);
                 break;
             case 6: _rgb.FlameSmooth = extra1; break;
             case 7:
@@ -396,7 +411,7 @@ public partial class HidKeyboardWindow : Window
                 break;
             case 9:
                 _rgb.StaticZones = Math.Clamp((int)ColorCountSlider.Value, 1, 10);
-                _rgb.StaticLayout = Math.Clamp(extra1, 0, 10);
+                _rgb.StaticLayout = Math.Clamp(extra1, 0, 1);
                 break;
         }
     }

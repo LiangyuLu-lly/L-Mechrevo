@@ -2399,6 +2399,7 @@ public partial class OriginalStyleWindow : Window
             LogoLightRow.Visibility = hasLogo ? Visibility.Visible : Visibility.Collapsed;
             FillKeyboardEffects();
   FillLightChannelEffects();
+  FillLightIdleOptions();
   SyncLightSwitchesFromHardware();
   bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
@@ -3097,6 +3098,7 @@ public partial class OriginalStyleWindow : Window
             FillEffects(LogoEffectCombo, CurrentLogoEffectsForBackend(), "HidLightbar_Logo/Ctrl");
             FillEffects(LightHingeEffectCombo, EffectsForCurrentBackend(LightForm.HingeEffects), "HidLightbar_Hinge/Ctrl");
             FillEffects(LightSyncEffectCombo, EffectsForCurrentBackend(LightForm.SyncEffects), "HidLightbar_Sync/Ctrl");
+            ApplyLightChannelBackendVisibility();
         }
         finally
         {
@@ -3106,10 +3108,39 @@ public partial class OriginalStyleWindow : Window
 
     private static bool IsHidKeyboard(MechrevoHw? hw)
     {
-        return hw != null
-            && !hw.UsesBaolongda
-            && !hw.WujieSmuApu
-            && !MechrevoLite.Hardware.KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType);
+        if (hw == null
+            || hw.UsesBaolongda
+            || hw.WujieSmuApu
+            || MechrevoLite.Hardware.KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType))
+        {
+            return false;
+        }
+        // 与原版 ShouldUseGcuKeyboardFallback 一致：HID 不可用/亮度未生效时回 GCU 固件面板。
+        KeyboardRgb? rgb = Program.rgb;
+        if (rgb != null
+            && MechrevoLite.Hardware.KeyboardLightPathPolicy.ShouldUseGcuKeyboardFallback(
+                rgb.ControllerAvailability,
+                rgb.IsConnected,
+                Program.service != null && hw.IsConnected,
+                hidBrightnessTookEffect: true))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    private void ApplyLightChannelBackendVisibility()
+    {
+        bool baolongda = Program.hw?.UsesBaolongda == true;
+        Visibility visibility = baolongda ? Visibility.Collapsed : Visibility.Visible;
+        LightStripEffectCombo.Visibility = visibility;
+        LightStripEditButton.Visibility = visibility;
+        LogoEffectCombo.Visibility = visibility;
+        LogoLightEditButton.Visibility = visibility;
+        LightHingeEffectCombo.Visibility = visibility;
+        LightHingeEditButton.Visibility = visibility;
+        LightSyncEffectCombo.Visibility = visibility;
+        LightSyncEditButton.Visibility = visibility;
     }
 
     private void FillKeyboardEffects()
@@ -3229,26 +3260,75 @@ public partial class OriginalStyleWindow : Window
         LogoLightSwitch.IsChecked = LoadChannelPower("HidLightbar_Logo/Ctrl", CurrentLogoEffectsForBackend()[0].Effect);
         LightHingeSwitch.IsChecked = LoadChannelPower("HidLightbar_Hinge/Ctrl", LightForm.HingeEffects[0].Effect);
         LightSyncSwitch.IsChecked = LoadChannelPower("HidLightbar_Sync/Ctrl", LightForm.SyncEffects[0].Effect);
-        int seconds = AppConfig.Get("lighting_idle_seconds", 0);
-        foreach (object item in LightIdleCombo.Items)
+        FillLightIdleOptions();
+    }
+
+    private void FillLightIdleOptions()
+    {
+        _syncingLighting = true;
+        try
         {
-            if (item is ComboBoxItem comboItem && int.TryParse(comboItem.Tag as string, out int value) && value == seconds)
+            LightIdleCombo.Items.Clear();
+            bool baolongda = Program.hw?.UsesBaolongda == true;
+            int current;
+            if (baolongda)
             {
-                LightIdleCombo.SelectedItem = comboItem;
-                return;
+                current = MechrevoHw.GetKeyboardAutoOffSeconds();
+                foreach ((string Label, int Seconds) option in MechrevoLite.SettingsForm.KeyboardAutoOffOptions)
+                {
+                    LightIdleCombo.Items.Add(new ComboBoxItem { Content = option.Label, Tag = option.Seconds.ToString() });
+                }
+            }
+            else
+            {
+                current = AppConfig.Get("lighting_idle_seconds", 0);
+                foreach ((string Label, int Mins, int IdleSeconds) option in MechrevoLite.SettingsForm.LightingCloseTimerOptions)
+                {
+                    LightIdleCombo.Items.Add(new ComboBoxItem { Content = option.Label, Tag = option.IdleSeconds.ToString() });
+                }
+            }
+            LightIdleCombo.SelectedIndex = 0;
+            foreach (object item in LightIdleCombo.Items)
+            {
+                if (item is ComboBoxItem comboItem && int.TryParse(comboItem.Tag as string, out int value) && value == current)
+                {
+                    LightIdleCombo.SelectedItem = comboItem;
+                    break;
+                }
             }
         }
-        LightIdleCombo.SelectedIndex = 0;
+        finally
+        {
+            _syncingLighting = false;
+        }
     }
 
     private void LightIdleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (LightIdleCombo.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag as string, out int seconds))
+        if (_syncingLighting)
         {
-            AppConfig.Set("lighting_idle_seconds", seconds);
-            AppConfig.Flush();
-            StatusText.Text = seconds <= 0 ? "灯光自动关闭：关" : "灯光自动关闭：" + (seconds / 60) + " 分钟";
+            return;
         }
+        if (LightIdleCombo.SelectedItem is not ComboBoxItem item || !int.TryParse(item.Tag as string, out int seconds))
+        {
+            return;
+        }
+        if (Program.hw?.UsesBaolongda == true)
+        {
+            MechrevoHw.SetKeyboardAutoOffSeconds(seconds);
+            Program.hw.ApplyKeyboardAutoOffSetting();
+            StatusText.Text = seconds <= 0 ? "宝龙达键盘自动关闭：关" : "宝龙达键盘自动关闭：" + seconds + " 秒";
+            return;
+        }
+        AppConfig.Set("lighting_idle_seconds", seconds);
+        AppConfig.Flush();
+        if (Program.rgb != null)
+        {
+            Program.rgb.CloseTimerMinutes = seconds / 60;
+            Program.rgb.SaveConfig();
+        }
+        _ = ReconcileLightingPowerAsync();
+        StatusText.Text = seconds <= 0 ? "灯光自动关闭：关" : "灯光自动关闭：" + (seconds >= 60 ? (seconds / 60) + " 分钟" : seconds + " 秒");
     }
 
     private void LightOffOnBattery_Click(object sender, RoutedEventArgs e)
@@ -3302,6 +3382,10 @@ public partial class OriginalStyleWindow : Window
     private void CheckLightingIdle()
     {
         _ = ReconcileLightingPowerAsync();
+        if (Program.hw?.UsesBaolongda == true)
+        {
+            return;
+        }
         BackendProbe? probe = _backendProbe;
         if (probe?.Connected != true)
         {
@@ -3336,6 +3420,83 @@ public partial class OriginalStyleWindow : Window
         {
             _lightingIdleSuspended = false;
             _ = RestoreAllLightsAsync();
+        }
+    }
+
+    private async Task RestoreLightingOnStartupAsync()
+    {
+        if (_backendProbe == null || !MechrevoLite.Hardware.LightingSettingsStore.HasUserLightingIntent())
+        {
+            return;
+        }
+        try
+        {
+            LightChannelSettings keyboard = MechrevoLite.Hardware.LightingSettingsStore.Load("Keyboard/Ctrl", "Single");
+            if (keyboard.PowerExplicit)
+            {
+                _syncingLighting = true;
+                KeyboardLightSwitch.IsChecked = keyboard.PowerOn;
+                _syncingLighting = false;
+                if (keyboard.PowerOn)
+                {
+                    await ApplyKeyboardLightAsync();
+                }
+                else
+                {
+                    await _backendProbe.SetKeyboardPowerAsync(false);
+                }
+            }
+            await RestoreSavedChannelAsync("HidLightbar/Ctrl", LightStripSwitch);
+            await RestoreSavedChannelAsync("HidLightbar_Logo/Ctrl", LogoLightSwitch);
+            await RestoreSavedChannelAsync("HidLightbar_Hinge/Ctrl", LightHingeSwitch);
+            await RestoreSavedChannelAsync("HidLightbar_Sync/Ctrl", LightSyncSwitch);
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task RestoreSavedChannelAsync(string topic, CheckBox powerSwitch)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        string defaultEffect = topic switch
+        {
+            "HidLightbar/Ctrl" => LightForm.LightbarEffects[0].Effect,
+            "HidLightbar_Logo/Ctrl" => CurrentLogoEffectsForBackend()[0].Effect,
+            "HidLightbar_Hinge/Ctrl" => LightForm.HingeEffects[0].Effect,
+            _ => LightForm.SyncEffects[0].Effect
+        };
+        LightChannelSettings saved = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, defaultEffect);
+        if (!saved.PowerExplicit)
+        {
+            return;
+        }
+        _syncingLighting = true;
+        powerSwitch.IsChecked = saved.PowerOn;
+        _syncingLighting = false;
+        if (!saved.PowerOn)
+        {
+            await _backendProbe.SetLightPowerAsync(topic, false);
+            return;
+        }
+        await _backendProbe.SetLightPowerAsync(topic, true);
+        switch (topic)
+        {
+            case "HidLightbar/Ctrl":
+                await _backendProbe.SetLightbarEffectAsync(saved.Effect);
+                break;
+            case "HidLightbar_Logo/Ctrl":
+                await _backendProbe.SetLogoEffectAsync(saved.Effect);
+                break;
+            case "HidLightbar_Hinge/Ctrl":
+                await _backendProbe.SetHingeEffectAsync(saved.Effect);
+                break;
+            default:
+                await _backendProbe.SetSyncEffectAsync(saved.Effect);
+                break;
         }
     }
 
@@ -3784,6 +3945,9 @@ public partial class OriginalStyleWindow : Window
                 return false;
             }
             rgb.Brightness = Math.Clamp(rgb.Brightness, 1, 100);
+            MechrevoLite.Program.NotifyLightingUserIntent();
+            rgb.ReInitCustomMode();
+            MechrevoLite.Program.MarkKeyboardCustomStatusBaseline();
             rgb.KbHidMode = mode;
             rgb.StartMode(mode);
             rgb.ApplyBrightnessToDevice();
