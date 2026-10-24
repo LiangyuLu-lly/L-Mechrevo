@@ -88,7 +88,7 @@ public partial class OverlayWindow : Window
             _acOnline = s.AcOnline;
             GpuTempText.Text = FormatTemp(s.GpuTemp);
             GpuFreqText.Text = FormatFreq(s.GpuCoreFreq);
-            GpuFanText.Text = FormatRpm(s.GpuFanRpm);
+            GpuFanText.Text = FormatFan(s.GpuFanRpm, s.GpuFanDuty);
             GpuPowerText.Text = FormatPower(s.GpuPower);
             GpuUsageText.Text = FormatPercent(s.GpuUsage);
             GpuUsageBar.Value = Math.Clamp(s.GpuUsage, 0, 100);
@@ -97,7 +97,7 @@ public partial class OverlayWindow : Window
 
             CpuTempText.Text = FormatTemp(s.CpuTemp);
             CpuFreqText.Text = FormatFreq(s.CpuFrequency);
-            CpuFanText.Text = FormatRpm(s.CpuFanRpm);
+            CpuFanText.Text = FormatFan(s.CpuFanRpm, s.CpuFanDuty);
             CpuPowerText.Text = FormatPower(s.CpuPower);
             CpuUsageText.Text = FormatPercent(s.CpuUsage);
             CpuUsageBar.Value = Math.Clamp(s.CpuUsage, 0, 100);
@@ -121,7 +121,15 @@ public partial class OverlayWindow : Window
 
     private static string FormatFreq(int mhz) => mhz > 0 ? (mhz / 1000.0).ToString("0.0") + "G" : "—";
 
-    private static string FormatRpm(int rpm) => rpm > 0 ? rpm + " RPM" : "— RPM";
+    private static string FormatFan(int rpm, int duty)
+    {
+        string speed = rpm > 0 ? rpm + " RPM" : "— RPM";
+        if (duty < 0)
+        {
+            return speed;
+        }
+        return speed + " · " + duty + "%";
+    }
 
     private static string FormatPower(float watts) => watts > 0 ? watts.ToString("0.0") + "W" : "—";
 
