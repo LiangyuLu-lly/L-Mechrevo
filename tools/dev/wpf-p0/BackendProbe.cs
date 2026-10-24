@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Reflection;
 using System.Threading.Tasks;
 using MechrevoLite;
@@ -371,7 +372,8 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
-            return _service != null && await _service.SetKeyboardEffect(effect, 4, 1, "None", null, true).ConfigureAwait(false);
+            (int light, int speed, Color? color) = ReadLightArgs("Keyboard/Ctrl", effect, keyboard: true);
+            return _service != null && await _service.SetKeyboardEffect(effect, light, speed, "None", color, true).ConfigureAwait(false);
         }
         catch
         {
@@ -398,11 +400,31 @@ internal sealed class BackendProbe : IDisposable
 
     internal bool SupportsSyncLight => _hw?.SupportsSyncLight == true;
 
+    private static (int Light, int Speed, Color? Color) ReadLightArgs(string topic, string effect, bool keyboard)
+    {
+        try
+        {
+            MechrevoLite.Hardware.LightChannelSettings settings = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effect);
+            bool colorMeaningful = keyboard
+                ? MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect)
+                : MechrevoLite.LightForm.LightEffectColorMode(effect) == 1;
+            Color? color = colorMeaningful
+                ? Color.FromArgb(settings.EffectiveColorArgb())
+                : null;
+            return (settings.Light, settings.Speed, color);
+        }
+        catch
+        {
+            return (4, 1, null);
+        }
+    }
+
     internal async Task<bool> SetHingeEffectAsync(string effect)
     {
         try
         {
-            return _service != null && await _service.SetLightEffect("HidLightbar_Hinge/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+            (int light, int speed, Color? color) = ReadLightArgs("HidLightbar_Hinge/Ctrl", effect, keyboard: false);
+            return _service != null && await _service.SetLightEffect("HidLightbar_Hinge/Ctrl", effect, light, speed, "None", color, true).ConfigureAwait(false);
         }
         catch
         {
@@ -414,7 +436,8 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
-            return _service != null && await _service.SetLightEffect("HidLightbar_Sync/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+            (int light, int speed, Color? color) = ReadLightArgs("HidLightbar_Sync/Ctrl", effect, keyboard: false);
+            return _service != null && await _service.SetLightEffect("HidLightbar_Sync/Ctrl", effect, light, speed, "None", color, true).ConfigureAwait(false);
         }
         catch
         {
@@ -426,7 +449,8 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
-            return _service != null && await _service.SetLightEffect("HidLightbar/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+            (int light, int speed, Color? color) = ReadLightArgs("HidLightbar/Ctrl", effect, keyboard: false);
+            return _service != null && await _service.SetLightEffect("HidLightbar/Ctrl", effect, light, speed, "None", color, true).ConfigureAwait(false);
         }
         catch
         {
@@ -438,7 +462,8 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
-            return _service != null && await _service.SetLightEffect("HidLightbar_Logo/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+            (int light, int speed, Color? color) = ReadLightArgs("HidLightbar_Logo/Ctrl", effect, keyboard: false);
+            return _service != null && await _service.SetLightEffect("HidLightbar_Logo/Ctrl", effect, light, speed, "None", color, true).ConfigureAwait(false);
         }
         catch
         {
