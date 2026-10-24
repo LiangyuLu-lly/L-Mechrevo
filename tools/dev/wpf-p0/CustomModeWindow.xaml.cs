@@ -131,11 +131,10 @@ public partial class CustomModeWindow : Window
         SetSlider(GpuTgpSlider, GpuTgpText, s.GpuTgp ?? 100);
         DbSlider.IsEnabled = DbSwitch.IsChecked == true;
         TccSlider.IsEnabled = TccSwitch.IsChecked == true;
-        FanSensitivitySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true;
+        FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true;
         CoreOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
         MemoryOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
         FanSensitivitySwitch.IsChecked = s.FanSwitchSpeedOn == true;
-        SetSlider(FanSensitivitySlider, FanSensitivityText, s.FanSwitchSpeedMs ?? 0);
         SetSlider(FanDelaySlider, FanDelayText, s.FanSwitchSpeedMs ?? 300);
         GpuOcSwitch.IsChecked = s.GpuOverclockOn == true;
         SetSlider(CoreOffsetSlider, CoreOffsetText, s.GpuCoreOffset ?? 0);
@@ -221,8 +220,8 @@ public partial class CustomModeWindow : Window
     private void Db_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (DbText != null) DbText.Text = ((int)e.NewValue).ToString(); }
     private void GpuTgp_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuTgpText != null) GpuTgpText.Text = ((int)e.NewValue).ToString(); }
     private void DbSwitch_Changed(object sender, RoutedEventArgs e) { if (DbSlider != null && DbSwitch != null) DbSlider.IsEnabled = DbSwitch.IsChecked == true; }
-    private void FanSensitivity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (FanSensitivityText != null) FanSensitivityText.Text = ((int)e.NewValue).ToString(); }
     private void FanDelay_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (FanDelayText != null) FanDelayText.Text = ((int)e.NewValue).ToString(); }
+    private void FanSensitivitySwitch_Changed(object sender, RoutedEventArgs e) { if (FanDelaySlider != null && FanSensitivitySwitch != null) FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true; }
     private void CoreOffset_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (CoreOffsetText != null) CoreOffsetText.Text = ((int)e.NewValue).ToString(); }
     private void MemoryOffset_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (MemoryOffsetText != null) MemoryOffsetText.Text = ((int)e.NewValue).ToString(); }
 

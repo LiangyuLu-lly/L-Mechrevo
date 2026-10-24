@@ -23,6 +23,18 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="MinWidth" Value="52" />
         </Style>
+        <Style x:Key="FooterButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="MinWidth" Value="108" />
+            <Setter Property="Padding" Value="18,6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style x:Key="ApplyButton" TargetType="Button" BasedOn="{StaticResource FooterButton}">
+            <Setter Property="Background" Value="#C62828" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#C62828" />
+        </Style>
     </Window.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
@@ -138,15 +150,9 @@
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="风扇转换灵敏度" VerticalAlignment="Center" />
-                            <CheckBox x:Name="FanSensitivitySwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <Slider x:Name="FanSensitivitySlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="10" Value="0" ValueChanged="FanSensitivity_Changed" />
-                            <TextBlock x:Name="FanSensitivityText" Grid.Column="3" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
-                        </Grid>
-                        <Grid Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="换挡延迟 (ms)" VerticalAlignment="Center" />
-                            <Slider x:Name="FanDelaySlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="1000" Value="300" ValueChanged="FanDelay_Changed" />
-                            <TextBlock x:Name="FanDelayText" Grid.Column="2" Text="300" TextAlignment="Right" VerticalAlignment="Center" />
+                            <CheckBox x:Name="FanSensitivitySwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="FanSensitivitySwitch_Changed" Unchecked="FanSensitivitySwitch_Changed" />
+                            <Slider x:Name="FanDelaySlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="1000" Value="300" ValueChanged="FanDelay_Changed" />
+                            <TextBlock x:Name="FanDelayText" Grid.Column="3" Text="300" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
@@ -180,11 +186,11 @@
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="ApplyButton" Content="应用" Style="{StaticResource FlatButton}" Click="Apply_Click" Margin="0,0,8,0" />
-            <Button Content="恢复出厂" Style="{StaticResource FlatButton}" Click="Restore_Click" Margin="0,0,8,0" />
-            <Button Content="风扇曲线" Style="{StaticResource FlatButton}" Click="FanCurve_Click" Margin="0,0,8,0" />
-            <Button Content="CPU 调节" Style="{StaticResource FlatButton}" Click="CpuTuning_Click" />
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+            <Button x:Name="ApplyButton" Content="应用" Style="{StaticResource ApplyButton}" Click="Apply_Click" />
+            <Button Content="恢复出厂" Style="{StaticResource FooterButton}" Click="Restore_Click" />
+            <Button Content="风扇曲线" Style="{StaticResource FooterButton}" Click="FanCurve_Click" />
+            <Button Content="CPU 调节" Style="{StaticResource FooterButton}" Click="CpuTuning_Click" />
         </StackPanel>
     </Grid>
 </Window>
