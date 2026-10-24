@@ -51,6 +51,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
+    private TrayIconService? _trayIcon;
     private CustomModeWindow? _customModeForm;
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -136,6 +137,27 @@ public partial class OriginalStyleWindow : Window
             _lightingIdleTimer.Stop();
             _backendProbe?.Dispose();
             _backendProbe = null;
+            _trayIcon?.Dispose();
+            _trayIcon = null;
+        };
+        _trayIcon = new TrayIconService();
+        _trayIcon.ShowRequested += ShowFromTray;
+        _trayIcon.SettingsRequested += () => new SettingsWindow(this).ShowDialog();
+        _trayIcon.OverlayRequested += ToggleTrayOverlay;
+        _trayIcon.ExitRequested += () =>
+        {
+            Close();
+            Application.Current.Shutdown();
+        };
+        _trayIcon.ModeRequested += mode =>
+        {
+            if (_backendProbe == null)
+            {
+                return;
+            }
+            _pendingMode = mode;
+            _pendingModeTick = Environment.TickCount64;
+            _ = SwitchModeAsync(mode);
         };
         if (ModeGrid != null && ModeGrid.Children.Count > 1 && ModeGrid.Children[1] is ToggleButton defaultMode)
         {
@@ -177,7 +199,30 @@ public partial class OriginalStyleWindow : Window
 
     private void TitleClose_Click(object sender, RoutedEventArgs e)
     {
-        Close();
+        Hide();
+    }
+
+    private void ShowFromTray()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+        Activate();
+    }
+
+    private void ToggleTrayOverlay()
+    {
+        if (_overlayWindow != null)
+        {
+            _overlayWindow.Close();
+            _overlayWindow = null;
+            return;
+        }
+        _overlayWindow = new OverlayWindow(GetOverlaySnapshot);
+        _overlayWindow.Closed += (_, _) => _overlayWindow = null;
+        _overlayWindow.Show();
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1526,6 +1571,7 @@ public partial class OriginalStyleWindow : Window
             CustomModeButton.IsChecked = mode == 3 || mode == 4;
             RefreshModeHighlights();
         }
+        _trayIcon?.SetMode(mode);
         SyncRefreshRateState();
         RefreshPerfConfigVisibility(mode);
         RefreshPerfConfigSelections();
