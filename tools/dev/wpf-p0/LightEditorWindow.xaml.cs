@@ -22,6 +22,8 @@ public partial class LightEditorWindow : Window
     private int _colorArgb;
     private int[] _mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
     private bool _gradeBrightness;
+    private readonly bool _keyboard;
+    private int _lightMax = 4;
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private bool _suppressAutoApply;
     private bool _applying;
@@ -31,20 +33,32 @@ public partial class LightEditorWindow : Window
         InitializeComponent();
         _topic = topic;
         _effects = effects;
+        _keyboard = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
         Title = title;
         TitleText.Text = title;
         MechrevoHw? hw = Program.hw;
-        _gradeBrightness = hw != null
+        _gradeBrightness = _keyboard || (hw != null
             && !hw.UsesBaolongda
             && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
             && (string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
-                || string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal));
+                || string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal)));
         if (_gradeBrightness)
         {
+            LightSlider.Minimum = 0;
             LightSlider.Maximum = 4;
         }
+        if (_keyboard)
+        {
+            bool bd = hw?.UsesBaolongda == true;
+            bool wujie = hw?.WujieSmuApu == true;
+            _lightMax = wujie ? 2 : 4;
+            LightSlider.Minimum = bd || wujie ? 1 : 0;
+            LightSlider.Maximum = _lightMax;
+            SpeedSlider.Minimum = 0;
+            SpeedSlider.Maximum = 4;
+        }
         _settings = LightingSettingsStore.Load(topic, effects.Length > 0 ? effects[0].Effect : "Single");
-        _light = Math.Clamp(_settings.Light, 0, 4);
+        _light = Math.Clamp(_settings.Light, (int)LightSlider.Minimum, (int)LightSlider.Maximum);
         _speed = Math.Clamp(_settings.Speed, 0, 4);
         _colorArgb = _settings.EffectiveColorArgb();
         if (_settings.ManualIndexes is { Length: >= 6 } manual)
@@ -85,6 +99,14 @@ public partial class LightEditorWindow : Window
 
     private void NetSliderValues()
     {
+        if (_keyboard)
+        {
+            LightSlider.Value = _light;
+            LightText.Text = _light + "/" + _lightMax;
+            SpeedSlider.Value = _speed;
+            SpeedText.Text = _speed + "/4";
+            return;
+        }
         LightSlider.Value = _gradeBrightness ? _light : _light * 25;
         LightText.Text = ((int)LightSlider.Value).ToString();
         SpeedSlider.Value = _speed * 25;
@@ -115,6 +137,21 @@ public partial class LightEditorWindow : Window
     private void RefreshColorUi()
     {
         int mode = LightForm.LightEffectColorMode(SelectedEffect);
+        if (_keyboard)
+        {
+            // 键盘通道没有七色混色；呼吸只有固定四色，彩虹不可改颜色。
+            MixRow.Visibility = Visibility.Collapsed;
+            string keyboardEffect = SelectedEffect;
+            bool keyboardManual = string.Equals(keyboardEffect, "Manual", StringComparison.Ordinal);
+            bool keyboardBreathing = string.Equals(keyboardEffect, "Breathing", StringComparison.Ordinal);
+            bool keyboardRainbow = string.Equals(keyboardEffect, "Rainbow", StringComparison.Ordinal);
+            ColorRow.Visibility = mode == 1 && !keyboardBreathing && !keyboardRainbow && !keyboardManual
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            UpdateColorButton();
+            RefreshKeyboardUi();
+            return;
+        }
         ColorRow.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
         MixRow.Visibility = mode == 7 ? Visibility.Visible : Visibility.Collapsed;
         if (mode == 7)
@@ -295,6 +332,16 @@ public partial class LightEditorWindow : Window
 
     private void Light_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (_keyboard)
+        {
+            _light = Math.Clamp((int)Math.Round(e.NewValue), (int)LightSlider.Minimum, _lightMax);
+            if (LightText != null)
+            {
+                LightText.Text = _light + "/" + _lightMax;
+            }
+            ScheduleAutoApply();
+            return;
+        }
         _light = _gradeBrightness
             ? Math.Clamp((int)Math.Round(e.NewValue), 0, 4)
             : Math.Clamp((int)Math.Round(e.NewValue * 4 / 100.0), 0, 4);
@@ -307,6 +354,16 @@ public partial class LightEditorWindow : Window
 
     private void Speed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (_keyboard)
+        {
+            _speed = Math.Clamp((int)Math.Round(e.NewValue), 0, 4);
+            if (SpeedText != null)
+            {
+                SpeedText.Text = _speed + "/4";
+            }
+            ScheduleAutoApply();
+            return;
+        }
         _speed = Math.Clamp((int)Math.Round(e.NewValue / 25.0), 0, 4);
         if (SpeedText != null)
         {

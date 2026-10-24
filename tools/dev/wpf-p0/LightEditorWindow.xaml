@@ -71,11 +71,11 @@
                 </Grid>
                 <StackPanel x:Name="ManualPalettePanel" Margin="0,6,0,0">
                     <TextBlock Text="切换颜色（六段）" Style="{DynamicResource MutedText}" Margin="0,0,0,4" />
-                    <UniformGrid x:Name="ManualPaletteGrid" Columns="6" />
+                    <UniformGrid x:Name="ManualPaletteGrid" Columns="6" Width="240" Height="34" HorizontalAlignment="Left" />
                 </StackPanel>
                 <StackPanel x:Name="BreathPanel" Margin="0,6,0,0">
                     <TextBlock Text="呼吸颜色" Style="{DynamicResource MutedText}" Margin="0,0,0,4" />
-                    <UniformGrid x:Name="BreathGrid" Columns="4" />
+                    <UniformGrid x:Name="BreathGrid" Columns="4" Width="200" Height="34" HorizontalAlignment="Left" />
                 </StackPanel>
             </StackPanel>
         </Grid>
