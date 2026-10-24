@@ -59,7 +59,9 @@ public partial class FanCurveWindow : Window
             return;
         }
         MechrevoLite.Mode.PerfModeSettings saved = MechrevoLite.Mode.PerfModeStore.LoadSettings(_modeId);
-        if (saved.CpuFanDuty is { Length: >= 2 } cpuSaved && saved.GpuFanDuty is { Length: >= 2 } gpuSaved)
+        int[]? cpuSaved = saved.CpuFanDuty is { Length: >= 2 } cpuDuty ? cpuDuty : null;
+        int[]? gpuSaved = saved.GpuFanDuty is { Length: >= 2 } gpuDuty ? gpuDuty : null;
+        if (cpuSaved != null && gpuSaved != null)
         {
             CpuCurve.Load(_hw.CpuCurveUpT, cpuSaved.Select(v => (byte)Math.Clamp(v, 0, 100)).ToArray());
             GpuCurve.Load(_hw.GpuCurveUpT, gpuSaved.Select(v => (byte)Math.Clamp(v, 0, 100)).ToArray());
@@ -69,6 +71,7 @@ public partial class FanCurveWindow : Window
         {
             CpuCurve.Load(_hw.CpuCurveUpT, _hw.CpuCurveDuty);
             GpuCurve.Load(_hw.GpuCurveUpT, _hw.GpuCurveDuty);
+            PersistHardwareCurveIfMissing(cpuSaved, gpuSaved);
         }
         else if (_hw.TryGetBuiltInDefaultFanCurve(out byte[] cpuTemps, out byte[] cpuDuties,
                      out byte[] gpuTemps, out byte[] gpuDuties))
@@ -97,7 +100,8 @@ public partial class FanCurveWindow : Window
                 && CurveMatches(gpu, _hw.GpuCurveDuty, _hw.GpuCurveUpT);
             if (confirmed)
             {
-                if (_modeId.StartsWith("fw", StringComparison.Ordinal))
+                if (_modeId.StartsWith("fw", StringComparison.Ordinal)
+                    || _modeId.StartsWith("custom", StringComparison.Ordinal))
                 {
                     MechrevoLite.Mode.PerfModeSettings settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_modeId) with
                     {
@@ -124,6 +128,31 @@ public partial class FanCurveWindow : Window
         {
             StatusText.Text = "应用失败：" + ex.Message;
         }
+    }
+
+    private void PersistHardwareCurveIfMissing(int[]? cpuSaved, int[]? gpuSaved)
+    {
+        if (_hw == null || (!_modeId.StartsWith("custom", StringComparison.Ordinal)
+            && !_modeId.StartsWith("fw", StringComparison.Ordinal)))
+        {
+            return;
+        }
+        if (cpuSaved is { Length: >= 2 } && gpuSaved is { Length: >= 2 })
+        {
+            return;
+        }
+        if (_hw.CpuCurveDuty.Length < 16 || _hw.GpuCurveDuty.Length < 16)
+        {
+            return;
+        }
+        int[] cpu = _hw.CpuCurveDuty.Take(16).Select(v => v == 255 ? 0 : (int)v).ToArray();
+        int[] gpu = _hw.GpuCurveDuty.Take(16).Select(v => v == 255 ? 0 : (int)v).ToArray();
+        MechrevoLite.Mode.PerfModeSettings settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_modeId) with
+        {
+            CpuFanDuty = cpu,
+            GpuFanDuty = gpu
+        };
+        MechrevoLite.Mode.PerfModeStore.SaveSettings(_modeId, settings);
     }
 
     private static bool CurveMatches(int[] request, byte[] actual, byte[] temps)
