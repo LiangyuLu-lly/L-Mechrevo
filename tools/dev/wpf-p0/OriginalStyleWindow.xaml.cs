@@ -61,6 +61,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingPerfConfig;
     private int _pendingMode = -1;
     private long _pendingModeTick;
+    private int _lastDbVisualMode = int.MinValue;
     private bool _perfConfigBuilt;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
@@ -747,10 +748,36 @@ public partial class OriginalStyleWindow : Window
         selected.FontWeight = FontWeights.Bold;
     }
 
+    private void SyncGpuDbForMode(int mode, string reason)
+    {
+        try
+        {
+            if (mode < 0 || _backendProbe?.Hw == null || !_backendProbe.Hw.IsGcuConnected)
+            {
+                return;
+            }
+            Program.hw = _backendProbe.Hw;
+            Program.service = _backendProbe.Service!;
+            if (mode == _lastDbVisualMode)
+            {
+                return;
+            }
+            _lastDbVisualMode = mode;
+            MechrevoLite.Hardware.GpuDbControl.SyncForVisualMode(mode, reason);
+        }
+        catch
+        {
+        }
+    }
+
     private async Task SwitchModeAsync(int mode)
     {
         bool ok = await _backendProbe!.SwitchModeAsync(mode);
         BackendStatus.Text = ok ? "模式已下发" : "模式下发失败";
+        if (ok)
+        {
+            SyncGpuDbForMode(mode, "WPF 切档");
+        }
         RefreshFromBackend();
     }
 
@@ -1457,6 +1484,7 @@ public partial class OriginalStyleWindow : Window
         SyncRefreshRateState();
         RefreshPerfConfigVisibility(mode);
         RefreshPerfConfigSelections();
+        SyncGpuDbForMode(mode, "WPF 后端模式同步");
         ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         int batteryMode = probe.BatteryMode;
         for (int i = 0; i < batteryButtons.Length; i++)
@@ -1678,6 +1706,7 @@ public partial class OriginalStyleWindow : Window
                 {
                 }
                 _backendRetryTimer.Stop();
+                SyncGpuDbForMode(probe.CurrentMode, "WPF 启动同步");
                 await probe.RefreshGpuModeAsync();
                 ApplyCapabilities();
                 _backendTimer.Start();
