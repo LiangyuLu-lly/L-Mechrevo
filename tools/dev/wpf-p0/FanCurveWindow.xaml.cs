@@ -97,14 +97,27 @@ public partial class FanCurveWindow : Window
                 && CurveMatches(gpu, _hw.GpuCurveDuty, _hw.GpuCurveUpT);
             if (confirmed)
             {
-                PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
-                PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
+                if (_modeId.StartsWith("fw", StringComparison.Ordinal))
+                {
+                    MechrevoLite.Mode.PerfModeSettings settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_modeId) with
+                    {
+                        CpuFanDuty = cpu,
+                        GpuFanDuty = gpu,
+                        FanCurveOn = true
+                    };
+                    MechrevoLite.Mode.PerfModeStore.SaveSettings(_modeId, settings);
+                }
+                else
+                {
+                    PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
+                    PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
+                }
                 _dirty = false;
-                StatusText.Text = "风扇曲线已下发并回读确认，已写入当前档配置";
+                StatusText.Text = "风扇曲线已下发并回读确认，已写入当前配置档";
             }
             else
             {
-                StatusText.Text = "风扇曲线回读未确认，未写入当前档配置";
+                StatusText.Text = "风扇曲线回读未确认，未写入当前配置档";
             }
         }
         catch (Exception ex)

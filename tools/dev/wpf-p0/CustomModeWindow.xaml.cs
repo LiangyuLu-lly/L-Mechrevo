@@ -655,7 +655,10 @@ public partial class CustomModeWindow : Window
             MechrevoHw? hw = Program.hw;
             if (hw != null && hw.IsGcuConnected && !hw.UsesBaolongda && !hw.WujieSmuApu)
             {
-                new FanCurveWindow(_current?.Id ?? "balanced") { Owner = this }.Show();
+                string targetId = _firmwareMode
+                    ? "fw" + _firmwareVisualMode + "p" + _firmwareProfileIndex
+                    : (_current?.Id ?? "balanced");
+                new FanCurveWindow(targetId) { Owner = this }.Show();
             }
             else
             {
