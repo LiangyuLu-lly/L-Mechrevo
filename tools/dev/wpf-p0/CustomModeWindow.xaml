@@ -60,7 +60,8 @@
                 <Button x:Name="DeleteButton" Content="删除" Grid.Column="4" Style="{StaticResource MiniButton}" Click="Delete_Click" Margin="6,0,0,0" />
             </Grid>
             <TextBlock x:Name="StatusText" Text="" Style="{StaticResource MutedText}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,2" />
-            <TextBlock x:Name="RouteHintText" Text="" Style="{StaticResource MutedText}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,8" />
+            <TextBlock x:Name="RouteHintText" Text="" Style="{StaticResource MutedText}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,2" />
+            <TextBlock x:Name="PowerWallStatusText" Text="" Style="{StaticResource MutedText}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" />
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 using MechrevoLite;
 using MechrevoLite.Hardware;
@@ -18,6 +19,7 @@ public partial class CustomModeWindow : Window
     private int _modeComboSyncDepth;
     private bool _loadingUi;
     private bool _dirty;
+    private readonly DispatcherTimer _powerWallTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private const string UnsetMark = "（未设置）";
     private const string PowerWallUnsetHint = "本机协议读不回功耗墙的当前值（只写不读）。标题带「（未设置）」= 本次运行还没下发过，不代表机器上没设过。拖动滑块并点【应用】后，这里显示的就是我们下发的值。";
     private int _firmwareVisualMode;
@@ -37,6 +39,9 @@ public partial class CustomModeWindow : Window
             new RoutedEventHandler((_, _) => MarkDirty()), true);
         AddHandler(ComboBox.SelectionChangedEvent,
             new SelectionChangedEventHandler((_, _) => MarkDirty()), true);
+        _powerWallTimer.Tick += (_, _) => UpdatePowerWallStatus();
+        Loaded += (_, _) => _powerWallTimer.Start();
+        Closed += (_, _) => _powerWallTimer.Stop();
         LoadModes(initialModeId);
     }
 
@@ -127,6 +132,32 @@ public partial class CustomModeWindow : Window
         _dirty = true;
         ApplyButton.Content = "应用 *";
         StatusText.Text = "有未应用修改";
+    }
+
+    private void UpdatePowerWallStatus()
+    {
+        try
+        {
+            MechrevoLite.HardwareControl.SampleLocalPower();
+            string text;
+            if (MechrevoLite.HardwareControl.LocalPowerSamplingUnavailable)
+            {
+                text = MechrevoLite.Hardware.PowerWallVerifier.UnavailableText;
+            }
+            else
+            {
+                MechrevoLite.Hardware.PowerWallVerdict verdict = MechrevoLite.HardwareControl.powerWall.Evaluate(DateTime.Now);
+                text = verdict is MechrevoLite.Hardware.PowerWallVerdict.Enforced or MechrevoLite.Hardware.PowerWallVerdict.NotEnforced
+                    ? MechrevoLite.HardwareControl.powerWall.Describe(DateTime.Now)
+                    : "";
+            }
+            PowerWallStatusText.Text = text;
+            PowerWallStatusText.Visibility = string.IsNullOrWhiteSpace(text) ? Visibility.Collapsed : Visibility.Visible;
+        }
+        catch
+        {
+            PowerWallStatusText.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void UpdateRouteHint(MechrevoLite.Mode.PerfModeDefinition mode)
