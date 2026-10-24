@@ -3103,27 +3103,60 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static bool IsHidKeyboard(MechrevoHw? hw)
+    {
+        return hw != null
+            && !hw.UsesBaolongda
+            && !hw.WujieSmuApu
+            && !MechrevoLite.Hardware.KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType);
+    }
+
     private void FillKeyboardEffects()
     {
         _syncingLighting = true;
         try
         {
-        KeyboardEffectCombo.Items.Clear();
-        (string Effect, string Name)[] effects = KeyboardEffectsForCurrent();
-        string selected = MechrevoLite.Hardware.LightingSettingsStore.Load("Keyboard/Ctrl", effects.Length > 0 ? effects[0].Effect : "Single").Effect;
-        int selectedIndex = 0;
-        for (int i = 0; i < effects.Length; i++)
-        {
-            KeyboardEffectCombo.Items.Add(new ComboBoxItem { Content = effects[i].Name, Tag = effects[i].Effect });
-            if (string.Equals(effects[i].Effect, selected, StringComparison.Ordinal))
+            KeyboardEffectCombo.Items.Clear();
+            MechrevoHw? hw = Program.hw;
+            if (IsHidKeyboard(hw))
             {
-                selectedIndex = i;
+                (int Mode, string Name)[] hidEffects = MechrevoLite.RgbForm.VisibleHidEffects(
+                    hw?.Capabilities.KeyboardType ?? 0);
+                int selectedMode = Program.rgb?.KbHidMode ?? (hidEffects.Length > 0 ? hidEffects[0].Mode : 1);
+                int hidIndex = 0;
+                for (int i = 0; i < hidEffects.Length; i++)
+                {
+                    KeyboardEffectCombo.Items.Add(new ComboBoxItem
+                    {
+                        Content = hidEffects[i].Name,
+                        Tag = "hid:" + hidEffects[i].Mode
+                    });
+                    if (hidEffects[i].Mode == selectedMode)
+                    {
+                        hidIndex = i;
+                    }
+                }
+                if (KeyboardEffectCombo.Items.Count > 0)
+                {
+                    KeyboardEffectCombo.SelectedIndex = hidIndex;
+                }
+                return;
             }
-        }
-        if (KeyboardEffectCombo.Items.Count > 0)
-        {
-            KeyboardEffectCombo.SelectedIndex = selectedIndex;
-        }
+            (string Effect, string Name)[] effects = KeyboardEffectsForCurrent();
+            string selected = MechrevoLite.Hardware.LightingSettingsStore.Load("Keyboard/Ctrl", effects.Length > 0 ? effects[0].Effect : "Single").Effect;
+            int selectedIndex = 0;
+            for (int i = 0; i < effects.Length; i++)
+            {
+                KeyboardEffectCombo.Items.Add(new ComboBoxItem { Content = effects[i].Name, Tag = effects[i].Effect });
+                if (string.Equals(effects[i].Effect, selected, StringComparison.Ordinal))
+                {
+                    selectedIndex = i;
+                }
+            }
+            if (KeyboardEffectCombo.Items.Count > 0)
+            {
+                KeyboardEffectCombo.SelectedIndex = selectedIndex;
+            }
         }
         finally
         {
@@ -3238,9 +3271,11 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         MechrevoHw? hw = _backendProbe.Hw;
-        bool singleZone = hw != null
-            && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleZoneRgb(hw.Capabilities.KeyboardType);
-        if (hw != null && (hw.UsesBaolongda || hw.WujieSmuApu || singleZone))
+        bool firmwareKeyboard = hw != null
+            && (hw.UsesBaolongda
+                || hw.WujieSmuApu
+                || MechrevoLite.Hardware.KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType));
+        if (firmwareKeyboard)
         {
             OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
             return;
@@ -3353,70 +3388,76 @@ public partial class OriginalStyleWindow : Window
         await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
     }
 
-    private async Task ApplyLightStripLightAsync(bool restoreEffect = false)
+    private async Task<bool> ApplyLightStripLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null)
         {
-            return;
+            return false;
         }
         bool on = LightStripSwitch.IsChecked == true;
         string effect = (LightStripEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        bool ok;
         if (on)
         {
-            await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", true);
-            if (restoreEffect)
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", true);
+            if (ok && restoreEffect)
             {
-                await _backendProbe.SetLightbarEffectAsync(effect);
+                ok = await _backendProbe.SetLightbarEffectAsync(effect);
             }
         }
         else
         {
-            await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
         }
+        return ok;
     }
 
-    private async Task ApplyHingeLightAsync(bool restoreEffect = false)
+    private async Task<bool> ApplyHingeLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null)
         {
-            return;
+            return false;
         }
         bool on = LightHingeSwitch.IsChecked == true;
         string effect = (LightHingeEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        bool ok;
         if (on)
         {
-            await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", true);
-            if (restoreEffect)
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", true);
+            if (ok && restoreEffect)
             {
-                await _backendProbe.SetHingeEffectAsync(effect);
+                ok = await _backendProbe.SetHingeEffectAsync(effect);
             }
         }
         else
         {
-            await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
         }
+        return ok;
     }
 
-    private async Task ApplySyncLightAsync(bool restoreEffect = false)
+    private async Task<bool> ApplySyncLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null)
         {
-            return;
+            return false;
         }
         bool on = LightSyncSwitch.IsChecked == true;
         string effect = (LightSyncEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        bool ok;
         if (on)
         {
-            await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", true);
-            if (restoreEffect)
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", true);
+            if (ok && restoreEffect)
             {
-                await _backendProbe.SetSyncEffectAsync(effect);
+                ok = await _backendProbe.SetSyncEffectAsync(effect);
             }
         }
         else
         {
-            await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
         }
+        return ok;
     }
 
     private async void LightStripSwitch_Click(object sender, RoutedEventArgs e)
@@ -3425,10 +3466,19 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        await ApplyLightStripLightAsync();
+        bool requested = LightStripSwitch.IsChecked == true;
+        bool ok = await ApplyLightStripLightAsync();
+        if (!ok)
+        {
+            _syncingLighting = true;
+            LightStripSwitch.IsChecked = !requested;
+            _syncingLighting = false;
+            StatusText.Text = "灯带写入失败，开关已回弹";
+            return;
+        }
         if (_backendProbe.Hw?.IsConnected == true)
         {
-            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar/Ctrl", LightStripSwitch.IsChecked == true, "用户点击「灯光」开关");
+            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar/Ctrl", requested, "用户点击「灯光」开关");
         }
         StatusText.Text = "灯带状态已下发";
     }
@@ -3492,10 +3542,19 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        await ApplyHingeLightAsync();
+        bool requested = LightHingeSwitch.IsChecked == true;
+        bool ok = await ApplyHingeLightAsync();
+        if (!ok)
+        {
+            _syncingLighting = true;
+            LightHingeSwitch.IsChecked = !requested;
+            _syncingLighting = false;
+            StatusText.Text = "铰链灯写入失败，开关已回弹";
+            return;
+        }
         if (_backendProbe.Hw?.IsConnected == true)
         {
-            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Hinge/Ctrl", LightHingeSwitch.IsChecked == true, "用户点击「灯光」开关");
+            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Hinge/Ctrl", requested, "用户点击「灯光」开关");
         }
         StatusText.Text = "铰链灯状态已下发";
     }
@@ -3538,10 +3597,19 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        await ApplySyncLightAsync();
+        bool requested = LightSyncSwitch.IsChecked == true;
+        bool ok = await ApplySyncLightAsync();
+        if (!ok)
+        {
+            _syncingLighting = true;
+            LightSyncSwitch.IsChecked = !requested;
+            _syncingLighting = false;
+            StatusText.Text = "同步灯写入失败，开关已回弹";
+            return;
+        }
         if (_backendProbe.Hw?.IsConnected == true)
         {
-            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Sync/Ctrl", LightSyncSwitch.IsChecked == true, "用户点击「灯光」开关");
+            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Sync/Ctrl", requested, "用户点击「灯光」开关");
         }
         StatusText.Text = "同步灯状态已下发";
     }
@@ -3584,12 +3652,22 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        _pendingKeyboardPower = KeyboardLightSwitch.IsChecked == true;
+        bool requested = KeyboardLightSwitch.IsChecked == true;
+        _pendingKeyboardPower = requested;
         _pendingKeyboardPowerTick = Environment.TickCount64;
-        await ApplyKeyboardLightAsync();
+        bool ok = await ApplyKeyboardLightAsync();
+        if (!ok)
+        {
+            _pendingKeyboardPower = null;
+            _syncingLighting = true;
+            KeyboardLightSwitch.IsChecked = !requested;
+            _syncingLighting = false;
+            StatusText.Text = "键盘灯光写入失败，开关已回弹";
+            return;
+        }
         if (_backendProbe?.Hw?.IsConnected == true)
         {
-            MechrevoLite.Hardware.LightingSettingsStore.SavePower("Keyboard/Ctrl", KeyboardLightSwitch.IsChecked == true, "用户点击键盘灯光开关");
+            MechrevoLite.Hardware.LightingSettingsStore.SavePower("Keyboard/Ctrl", requested, "用户点击键盘灯光开关");
         }
     }
 
@@ -3612,6 +3690,21 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         string effect = item.Tag as string ?? "Single";
+        if (effect.StartsWith("hid:", StringComparison.Ordinal))
+        {
+            int hidMode = int.TryParse(effect.AsSpan(4), out int parsedHidMode) ? parsedHidMode : 1;
+            if (KeyboardLightSwitch.IsChecked != true)
+            {
+                if (Program.rgb != null)
+                {
+                    Program.rgb.KbHidMode = hidMode;
+                    Program.rgb.QueueSaveConfig();
+                }
+                return;
+            }
+            await ApplyHidKeyboardAsync(hidMode, on: true);
+            return;
+        }
         if (KeyboardLightSwitch.IsChecked != true)
         {
             SaveChannelEffect("Keyboard/Ctrl", effect);
@@ -3620,14 +3713,59 @@ public partial class OriginalStyleWindow : Window
         await ApplyKeyboardLightAsync();
     }
 
-    private async Task ApplyKeyboardLightAsync()
+    private async Task<bool> ApplyHidKeyboardAsync(int mode, bool on)
+    {
+        KeyboardRgb? rgb = EnsureKeyboardRgb();
+        if (rgb == null)
+        {
+            StatusText.Text = "键盘 RGB 设备未连接";
+            return false;
+        }
+        try
+        {
+            rgb.KbPowerOn = on;
+            if (!on)
+            {
+                rgb.StopCurrentEffect();
+                rgb.ApplyBrightnessToDevice();
+                rgb.SaveConfig();
+                StatusText.Text = "键盘灯光已关闭";
+                return true;
+            }
+            bool ready = rgb.IsConnected || await rgb.EnsureHidReadyAsync() || rgb.Connect();
+            if (!ready)
+            {
+                StatusText.Text = "键盘 HID 连接失败：" + rgb.LastError;
+                return false;
+            }
+            rgb.Brightness = Math.Clamp(rgb.Brightness, 1, 100);
+            rgb.KbHidMode = mode;
+            rgb.StartMode(mode);
+            rgb.ApplyBrightnessToDevice();
+            rgb.SaveConfig();
+            StatusText.Text = "键盘 HID 灯效已下发：" + mode;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "键盘 HID 下发失败：" + ex.Message;
+            return false;
+        }
+    }
+
+    private async Task<bool> ApplyKeyboardLightAsync()
     {
         if (_backendProbe == null || KeyboardEffectCombo.SelectedItem is not ComboBoxItem item)
         {
-            return;
+            return false;
         }
         bool on = KeyboardLightSwitch.IsChecked == true;
         string effect = item.Tag as string ?? "Single";
+        if (effect.StartsWith("hid:", StringComparison.Ordinal))
+        {
+            int hidMode = int.TryParse(effect.AsSpan(4), out int parsedHidMode) ? parsedHidMode : 1;
+            return await ApplyHidKeyboardAsync(hidMode, on);
+        }
         bool ok;
         if (on)
         {
@@ -3637,7 +3775,7 @@ public partial class OriginalStyleWindow : Window
                 if (!powerOk)
                 {
                     StatusText.Text = "键盘灯上电失败";
-                    return;
+                    return false;
                 }
             }
             ok = await _backendProbe.SetKeyboardEffectAsync(effect);
@@ -3652,6 +3790,7 @@ public partial class OriginalStyleWindow : Window
             ok = await _backendProbe.SetKeyboardPowerAsync(false);
         }
         StatusText.Text = ok ? (on ? "键盘灯效已下发：" + effect : "键盘灯光已关闭") : "键盘灯效下发失败";
+        return ok;
     }
 
     private async void LogoLightSwitch_Click(object sender, RoutedEventArgs e)
@@ -3660,10 +3799,19 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        await ApplyLogoLightAsync();
+        bool requested = LogoLightSwitch.IsChecked == true;
+        bool ok = await ApplyLogoLightAsync();
+        if (!ok)
+        {
+            _syncingLighting = true;
+            LogoLightSwitch.IsChecked = !requested;
+            _syncingLighting = false;
+            StatusText.Text = "Logo 灯写入失败，开关已回弹";
+            return;
+        }
         if (_backendProbe?.Hw?.IsConnected == true)
         {
-            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Logo/Ctrl", LogoLightSwitch.IsChecked == true, "用户点击「灯光」开关");
+            MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Logo/Ctrl", requested, "用户点击「灯光」开关");
         }
     }
 
@@ -3682,25 +3830,29 @@ public partial class OriginalStyleWindow : Window
         await ApplyLogoLightAsync();
     }
 
-    private async Task ApplyLogoLightAsync(bool restoreEffect = false)
+    private async Task<bool> ApplyLogoLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null || LogoEffectCombo.SelectedItem is not ComboBoxItem item)
         {
-            return;
+            return false;
         }
         bool on = LogoLightSwitch.IsChecked == true;
         string effect = item.Tag as string ?? "Single";
         bool ok;
         if (on)
         {
-            await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", true);
-            ok = !restoreEffect || await _backendProbe.SetLogoEffectAsync(effect);
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", true);
+            if (ok && restoreEffect)
+            {
+                ok = await _backendProbe.SetLogoEffectAsync(effect);
+            }
         }
         else
         {
             ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
         }
         StatusText.Text = ok ? (on ? "Logo 灯效已下发：" + effect : "Logo 灯已关闭") : "Logo 灯效下发失败";
+        return ok;
     }
 
     internal bool SupportsLcdOverdrive => _backendProbe?.SupportsLcdOverdrive == true;
