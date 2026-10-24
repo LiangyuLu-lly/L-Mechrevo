@@ -127,6 +127,36 @@ public partial class CustomModeWindow : Window
         StatusText.Text = "有未应用修改";
     }
 
+    private void UpdateRouteHint(MechrevoLite.Mode.PerfModeDefinition mode)
+    {
+        try
+        {
+            MechrevoHw? hw = Program.hw;
+            if (hw?.UsesBaolongda == true || hw?.WujieSmuApu == true)
+            {
+                RouteHintText.Text = MechrevoLite.Properties.Strings.PerfModeHintLocalApply;
+                return;
+            }
+            int? slot = MechrevoLite.Mode.PerfModeService.Instance?.SlotOf(mode.Id);
+            if (!mode.IsCustom)
+            {
+                RouteHintText.Text = mode.IsEmulatedBuiltIn
+                    ? string.Format(MechrevoLite.Properties.Strings.PerfModeHintEmulated, slot.HasValue ? (slot.Value + 1).ToString() : "?")
+                    : MechrevoLite.Properties.Strings.PerfModeHintVendor;
+            }
+            else
+            {
+                RouteHintText.Text = slot.HasValue
+                    ? string.Format(MechrevoLite.Properties.Strings.PerfModeHintCustom, slot.Value + 1)
+                    : MechrevoLite.Properties.Strings.PerfModeHintCustomUnassigned;
+            }
+        }
+        catch
+        {
+            RouteHintText.Text = "";
+        }
+    }
+
     private static string ModeName(MechrevoLite.Mode.PerfModeDefinition mode)
     {
         return MechrevoLite.Mode.PerfModeText.Name(mode);
@@ -248,6 +278,7 @@ public partial class CustomModeWindow : Window
         LoadSettingsToUi(_settings);
         Title = "性能模式 · " + ModeName(mode);
         StatusText.Text = "当前模式：" + ModeName(mode);
+        UpdateRouteHint(mode);
     }
 
     private void LoadSettingsToUi(MechrevoLite.Mode.PerfModeSettings s)
