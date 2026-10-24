@@ -56,7 +56,7 @@ public partial class CustomModeWindow : Window
                     continue;
                 }
             }
-            else if (!string.Equals(mode.Id, target, StringComparison.Ordinal))
+            else if (mode.IsCustom)
             {
                 continue;
             }
