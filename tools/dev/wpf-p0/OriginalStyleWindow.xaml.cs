@@ -293,12 +293,165 @@ public partial class OriginalStyleWindow : Window
 
     private void InitBatteryControls()
     {
+        _ = InitBatteryLimitControlsAsync();
         ChargeSliderToggle.IsChecked = AppConfig.Is("charge_limit_slider");
         EcDirectOffToggle.IsChecked = string.Equals(AppConfig.GetString("ec_charge_limit"), "0", StringComparison.Ordinal);
         BatteryLimitSlider.Visibility = ChargeSliderToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         _syncingBatteryLimit = true;
         BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
         _syncingBatteryLimit = false;
+    }
+
+    private async Task InitBatteryLimitControlsAsync()
+    {
+        try
+        {
+            (bool ok, int high, int low, int mode) = await Task.Run(() =>
+            {
+                bool read = BatteryLimitWriter.TryReadState(out int h, out int l, out int m, out _);
+                return (read, h, l, m);
+            });
+            if (ok)
+            {
+                ChargeLimitLowBox.Text = Math.Clamp(low, 1, 99).ToString();
+                ChargeLimitHighBox.Text = Math.Clamp(high, 2, 100).ToString();
+                ChargeLimitSwitch.IsChecked = mode == BatteryLimitWriter.ModeActive;
+                ChargeLimitStatus.Text = mode == BatteryLimitWriter.ModeActive
+                    ? "限制充电已生效（停充 " + high + "% / 起充 " + low + "%）"
+                    : "限制充电未启用";
+            }
+            else
+            {
+                ChargeLimitSwitch.IsEnabled = false;
+                ChargeLimitApplyButton.IsEnabled = false;
+                ChargeLimitLowBox.IsEnabled = false;
+                ChargeLimitHighBox.IsEnabled = false;
+                ChargeLimitStatus.Text = "读取充电阈值失败：需要 PawnIO 驱动或本机型不支持";
+            }
+        }
+        catch (Exception ex)
+        {
+            ChargeLimitSwitch.IsEnabled = false;
+            ChargeLimitApplyButton.IsEnabled = false;
+            ChargeLimitStatus.Text = "读取充电阈值异常：" + ex.Message;
+        }
+    }
+
+    private void RefreshBatteryLimitState()
+    {
+        try
+        {
+            if (BatteryLimitWriter.TryReadState(out int high, out int low, out int mode, out _))
+            {
+                ChargeLimitSwitch.IsChecked = mode == BatteryLimitWriter.ModeActive;
+                ChargeLimitStatus.Text = mode == BatteryLimitWriter.ModeActive
+                    ? "限制充电已生效（停充 " + high + "% / 起充 " + low + "%）"
+                    : "限制充电未启用";
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private void ChargeLimitSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        bool enable = ChargeLimitSwitch.IsChecked == true;
+        try
+        {
+            bool ok;
+            if (enable)
+            {
+                if (!TryReadChargeThreshold(out int low, out int high, out string error))
+                {
+                    ChargeLimitStatus.Text = error;
+                    ChargeLimitSwitch.IsChecked = false;
+                    return;
+                }
+                ok = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: true, out string detail);
+                if (ok)
+                {
+                    BatteryLimitRestore.SaveConfig(true, low, high);
+                    ChargeLimitStatus.Text = "限制充电已启用（停充 " + high + "% / 起充 " + low + "%）";
+                }
+                else
+                {
+                    ChargeLimitStatus.Text = "启用失败：" + detail;
+                }
+            }
+            else
+            {
+                ok = BatteryLimitWriter.TryDisable(out string detail);
+                if (ok)
+                {
+                    BatteryLimitRestore.SaveConfig(false, 0, 0);
+                    ChargeLimitStatus.Text = "限制充电已关闭";
+                }
+                else
+                {
+                    ChargeLimitStatus.Text = "关闭失败：" + detail;
+                }
+            }
+            if (!ok)
+            {
+                RefreshBatteryLimitState();
+            }
+        }
+        catch (Exception ex)
+        {
+            ChargeLimitStatus.Text = "操作异常：" + ex.Message;
+            RefreshBatteryLimitState();
+        }
+    }
+
+    private void ChargeLimitApply_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadChargeThreshold(out int low, out int high, out string error))
+        {
+            ChargeLimitStatus.Text = error;
+            return;
+        }
+        try
+        {
+            bool ok = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: true, out string detail);
+            if (ok)
+            {
+                BatteryLimitRestore.SaveConfig(true, low, high);
+                ChargeLimitSwitch.IsChecked = true;
+                ChargeLimitStatus.Text = "阈值已保存（停充 " + high + "% / 起充 " + low + "%）";
+            }
+            else
+            {
+                ChargeLimitStatus.Text = "保存失败：" + detail;
+            }
+        }
+        catch (Exception ex)
+        {
+            ChargeLimitStatus.Text = "保存异常：" + ex.Message;
+        }
+    }
+
+    private bool TryReadChargeThreshold(out int low, out int high, out string error)
+    {
+        low = 60;
+        high = 80;
+        error = "";
+        if (!int.TryParse(ChargeLimitLowBox.Text.Trim(), out low) || low < 1 || low > 99)
+        {
+            error = "起充阈值需为 1~99";
+            return false;
+        }
+        if (!int.TryParse(ChargeLimitHighBox.Text.Trim(), out high) || high < 2 || high > 100)
+        {
+            error = "停充阈值需为 2~100";
+            return false;
+        }
+        if (low >= high)
+        {
+            error = "起充阈值必须小于停充阈值";
+            return false;
+        }
+        return true;
     }
 
     private void ChargeSliderToggle_Click(object sender, RoutedEventArgs e)
@@ -1035,7 +1188,8 @@ public partial class OriginalStyleWindow : Window
         CpuStat.Text = SensorLine(hw, cpu: true);
         GpuStat.Text = SensorLine(hw, cpu: false);
         string capacity = string.IsNullOrWhiteSpace(hw.BatteryCapacityText) ? "" : " · " + hw.BatteryCapacityText;
-        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "%" + capacity;
+        string cycles = hw.BatteryCycleCount >= 0 ? " · " + hw.BatteryCycleCount + " 次循环" : "";
+        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "%" + capacity + cycles;
         int mode = probe.CurrentMode;
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
         int currentGpu = probe.CurrentGpuMode;
