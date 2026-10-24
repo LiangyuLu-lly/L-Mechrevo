@@ -119,6 +119,10 @@ public partial class CustomModeWindow : Window
 
     private void ModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_firmwareMode)
+        {
+            return;
+        }
         if (ModeCombo.SelectedItem is ComboBoxItem item && item.Tag is string id)
         {
             ApplyMode(id);
@@ -174,6 +178,10 @@ public partial class CustomModeWindow : Window
 
     private void ApplyMode(string id)
     {
+        if (_firmwareMode)
+        {
+            return;
+        }
         MechrevoLite.Mode.PerfModeDefinition? mode = _modes.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.Ordinal));
         if (mode == null)
         {
@@ -211,7 +219,7 @@ public partial class CustomModeWindow : Window
         SelectComboBool(FanBoostCombo, s.FanBoost);
         RefreshOptions(s.RefreshHz);
         LoadPowerPlans(s.PowerPlanGuid);
-        if (_current?.IsCustom != true && Program.hw is MechrevoHw liveHw)
+        if (!_firmwareMode && _current?.IsCustom != true && Program.hw is MechrevoHw liveHw)
         {
             LoadLiveHardware(liveHw);
         }
