@@ -12,6 +12,7 @@ public partial class FanCurveWindow : Window
 {
     private readonly string _modeId;
     private readonly MechrevoHw? _hw;
+    private bool _dirty;
 
     public FanCurveWindow(string modeId)
     {
@@ -23,7 +24,30 @@ public partial class FanCurveWindow : Window
         {
             HintText.Text = "当前平台请使用原版风扇曲线窗口。";
         }
+        CpuCurve.Changed += MarkDirty;
+        GpuCurve.Changed += MarkDirty;
+        Closing += OnClosing;
         LoadFromHardware();
+    }
+
+    private void MarkDirty()
+    {
+        _dirty = true;
+        StatusText.Text = "有未应用的修改";
+    }
+
+    private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (!_dirty)
+        {
+            return;
+        }
+        MessageBoxResult result = MessageBox.Show(this, "风扇曲线还有未应用的修改，确定关闭？", "L-Mechrevo",
+            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            e.Cancel = true;
+        }
     }
 
     private void LoadFromHardware()
@@ -61,6 +85,7 @@ public partial class FanCurveWindow : Window
             await _hw.SetFanCurve(1, gpu).ConfigureAwait(true);
             PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
             PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
+            _dirty = false;
             StatusText.Text = "风扇曲线已下发，并已记录为当前档风扇曲线";
         }
         catch (Exception ex)
@@ -79,6 +104,7 @@ public partial class FanCurveWindow : Window
         }
         CpuCurve.Load(cpuTemps, cpuDuties);
         GpuCurve.Load(gpuTemps, gpuDuties);
+        _dirty = true;
         StatusText.Text = "已恢复默认曲线，点应用后下发";
     }
 
