@@ -92,19 +92,20 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal">
-                            <Border x:Name="Track" Width="28" Height="16" CornerRadius="8"
+                            <Border x:Name="Track" Width="32" Height="18" CornerRadius="9" Padding="1"
                                     Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
-                                    <Grid VerticalAlignment="Center">
-                                        <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"                                            VerticalAlignment="Center"                                          HorizontalAlignment="Left" Margin="2,0,0,0" />
-                                    </Grid>
-                                </Border>
+                                <Grid>
+                                    <Ellipse x:Name="Knob" Width="16" Height="16" Fill="White"
+                                             VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                </Grid>
+                            </Border>
                             <ContentPresenter Margin="6,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
