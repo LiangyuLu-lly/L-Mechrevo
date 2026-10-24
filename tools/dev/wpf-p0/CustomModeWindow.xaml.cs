@@ -71,6 +71,7 @@ public partial class CustomModeWindow : Window
             if (ModeCombo.Items[i] is ComboBoxItem item && string.Equals(item.Tag as string, target, StringComparison.Ordinal))
             {
                 ModeCombo.SelectedIndex = i;
+                ApplyMode(target);
                 return;
             }
         }
@@ -107,10 +108,14 @@ public partial class CustomModeWindow : Window
 
     private void ModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ModeCombo.SelectedItem is not ComboBoxItem item || item.Tag is not string id)
+        if (ModeCombo.SelectedItem is ComboBoxItem item && item.Tag is string id)
         {
-            return;
+            ApplyMode(id);
         }
+    }
+
+    private void ApplyMode(string id)
+    {
         MechrevoLite.Mode.PerfModeDefinition? mode = _modes.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.Ordinal));
         if (mode == null)
         {
