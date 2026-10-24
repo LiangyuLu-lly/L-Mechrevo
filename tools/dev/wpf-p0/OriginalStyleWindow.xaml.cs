@@ -51,6 +51,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
+    private bool _overlayPreloaded;
     private TrayIconService? _trayIcon;
     private HotkeyService? _hotkeyService;
     private bool _firstRunChecked;
@@ -158,6 +159,7 @@ public partial class OriginalStyleWindow : Window
             Application.Current.Shutdown();
         };
         _trayIcon.ModeRequested += RequestMode;
+        Dispatcher.BeginInvoke(new Action(PreloadOverlayWindow), DispatcherPriority.Background);
         SourceInitialized += (_, _) =>
         {
             try
@@ -316,17 +318,46 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private void ToggleTrayOverlay()
+    private void EnsureOverlayWindow()
     {
         if (_overlayWindow != null)
         {
-            _overlayWindow.Close();
-            _overlayWindow = null;
             return;
         }
         _overlayWindow = new OverlayWindow(GetOverlaySnapshot);
         _overlayWindow.Closed += (_, _) => _overlayWindow = null;
+    }
+
+    private void PreloadOverlayWindow()
+    {
+        if (_overlayPreloaded)
+        {
+            return;
+        }
+        _overlayPreloaded = true;
+        try
+        {
+            EnsureOverlayWindow();
+        }
+        catch
+        {
+        }
+    }
+
+    private void ToggleTrayOverlay()
+    {
+        EnsureOverlayWindow();
+        if (_overlayWindow == null)
+        {
+            return;
+        }
+        if (_overlayWindow.IsVisible)
+        {
+            _overlayWindow.Hide();
+            return;
+        }
         _overlayWindow.Show();
+        _overlayWindow.Activate();
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

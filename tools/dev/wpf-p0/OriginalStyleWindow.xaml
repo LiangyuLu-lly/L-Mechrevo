@@ -480,18 +480,7 @@
                         </Grid>
                     </StackPanel>
 
-                    <!-- P1 后端实时（只读） -->
-                    <StackPanel x:Name="BackendSection" Style="{StaticResource Section}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="后端实时（P1 只读试接）" FontSize="12" FontWeight="SemiBold" />
-                            <TextBlock Grid.Column="1" Text="MechrevoHw" Style="{StaticResource MutedText}" FontSize="10" />
-                        </Grid>
-                        <TextBlock x:Name="BackendLine" Text="自动连接 GCU 服务；点上方状态可检查/导入 GCU 组件" Style="{StaticResource MutedText}" FontSize="10" Margin="0,6,0,0" TextWrapping="Wrap" />
-                    </StackPanel>
+                    <TextBlock x:Name="BackendLine" Visibility="Collapsed" />
 
                     <!-- 快捷开关 -->
                     <StackPanel x:Name="QuickSection" Style="{StaticResource Section}">

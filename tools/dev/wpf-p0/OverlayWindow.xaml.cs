@@ -31,12 +31,30 @@ public partial class OverlayWindow : Window
         _provider = provider;
         Loaded += (_, _) =>
         {
-            Rect area = SystemParameters.WorkArea;
-            Left = Math.Max(area.Left + 12, area.Right - Width - 24);
-            Top = area.Top + 24;
+            if (Left <= 0 || Top <= 0)
+            {
+                Rect area = SystemParameters.WorkArea;
+                Left = Math.Max(area.Left + 12, area.Right - Width - 24);
+                Top = area.Top + 24;
+            }
             Refresh();
             _timer.Tick += (_, _) => Refresh();
-            _timer.Start();
+            if (IsVisible)
+            {
+                _timer.Start();
+            }
+        };
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible)
+            {
+                Refresh();
+                _timer.Start();
+            }
+            else
+            {
+                _timer.Stop();
+            }
         };
         Closed += (_, _) => _timer.Stop();
     }
@@ -100,6 +118,6 @@ public partial class OverlayWindow : Window
 
     private void Window_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        Close();
+        Hide();
     }
 }
