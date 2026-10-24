@@ -3175,18 +3175,21 @@ public partial class OriginalStyleWindow : Window
         _syncingLighting = true;
         try
         {
+            bool effectiveKeyboardPower = IsHidKeyboard(hw)
+                ? (Program.rgb?.KbPowerOn ?? hw.KeyboardPower)
+                : hw.KeyboardPower;
             if (_pendingKeyboardPower is bool pendingPower
                 && Environment.TickCount64 - _pendingKeyboardPowerTick < 5000
-                && hw.KeyboardPower != pendingPower)
+                && effectiveKeyboardPower != pendingPower)
             {
-                // 等 GCU 回读追上用户刚点的状态，避免开关立即回弹
+                // 等硬件/ HID 回读追上用户刚点的状态，避免开关立即回弹
             }
             else
             {
                 _pendingKeyboardPower = null;
                 bool keyboardOn = hw.UsesBaolongda
-                    ? hw.KeyboardPower
-                    : MechrevoLite.KeyboardLightingDecision.ShouldWrite(hw.IsConnected, hw.KeyboardPower);
+                    ? effectiveKeyboardPower
+                    : MechrevoLite.KeyboardLightingDecision.ShouldWrite(hw.IsConnected, effectiveKeyboardPower);
                 KeyboardLightSwitch.IsChecked = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(keyboardOn, suspended);
             }
             SetSwitchFromQuick(hw, "lightbar", LightStripSwitch, suspended);
@@ -3264,12 +3267,6 @@ public partial class OriginalStyleWindow : Window
         }
         MechrevoLite.Program.hw = _backendProbe.Hw;
         MechrevoLite.Program.service = _backendProbe.Service!;
-        KeyboardRgb? rgb = EnsureKeyboardRgb();
-        if (rgb == null)
-        {
-            StatusText.Text = "键盘 RGB 设备未连接，无法打开键盘灯光编辑";
-            return;
-        }
         MechrevoHw? hw = _backendProbe.Hw;
         bool firmwareKeyboard = hw != null
             && (hw.UsesBaolongda
@@ -3278,6 +3275,12 @@ public partial class OriginalStyleWindow : Window
         if (firmwareKeyboard)
         {
             OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
+            return;
+        }
+        KeyboardRgb? rgb = EnsureKeyboardRgb();
+        if (rgb == null)
+        {
+            StatusText.Text = "键盘 RGB 设备未连接，无法打开键盘灯光编辑";
             return;
         }
         new HidKeyboardWindow(rgb) { Owner = this }.ShowDialog();

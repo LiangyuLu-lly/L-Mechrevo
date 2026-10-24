@@ -154,10 +154,12 @@ public partial class LightEditorWindow : Window
             bool keyboardManual = string.Equals(effect, "Manual", StringComparison.Ordinal);
             bool keyboardBreathing = string.Equals(effect, "Breathing", StringComparison.Ordinal);
             bool keyboardRainbow = string.Equals(effect, "Rainbow", StringComparison.Ordinal);
-            ColorRow.Visibility = !wujie && !keyboardManual && !keyboardBreathing && !keyboardRainbow
-                && KeyboardFirmwareEffects.IsSingleColorEffect(effect)
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            bool singleZone = Program.hw != null
+                && KeyboardFirmwareEffects.IsSingleZoneRgb(Program.hw.Capabilities.KeyboardType);
+            bool colorVisible = !wujie && !keyboardManual && !keyboardRainbow
+                && (!keyboardBreathing || !singleZone)
+                && KeyboardFirmwareEffects.IsSingleColorEffect(effect);
+            ColorRow.Visibility = colorVisible ? Visibility.Visible : Visibility.Collapsed;
             UpdateColorButton();
             RefreshKeyboardUi();
             return;
