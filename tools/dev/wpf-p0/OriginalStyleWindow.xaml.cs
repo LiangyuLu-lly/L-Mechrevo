@@ -51,6 +51,8 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
+    private MechrevoLite.CustomModeForm? _customModeForm;
+    private MechrevoLite.FanCurveForm? _fanCurveForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
     private bool _lightingPowerSuspended;
@@ -686,6 +688,10 @@ public partial class OriginalStyleWindow : Window
                 : selected == TurboModeButton ? 1
                 : selected == CustomModeButton ? 3
                 : -1;
+            if (ReferenceEquals(selected, CustomModeButton))
+            {
+                OpenCustomModeForm();
+            }
             if (mode >= 0 && _backendProbe != null)
             {
                 _ = SwitchModeAsync(mode);
@@ -1770,6 +1776,60 @@ public partial class OriginalStyleWindow : Window
             return Visibility.Collapsed;
         }
         return supported ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void FanCurve_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_backendProbe == null)
+            {
+                StatusText.Text = "后端未连接，无法打开风扇曲线";
+                return;
+            }
+            Program.hw = _backendProbe.Hw;
+            Program.service = _backendProbe.Service!;
+            if (_fanCurveForm == null || _fanCurveForm.IsDisposed)
+            {
+                _fanCurveForm = new FanCurveForm();
+            }
+            if (!_fanCurveForm.Visible)
+            {
+                _fanCurveForm.Show();
+            }
+            _fanCurveForm.Activate();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "打开风扇曲线失败：" + ex.Message;
+        }
+    }
+
+    private void OpenCustomModeForm()
+    {
+        try
+        {
+            if (_backendProbe == null)
+            {
+                StatusText.Text = "后端未连接，无法打开自定义模式";
+                return;
+            }
+            Program.hw = _backendProbe.Hw;
+            Program.service = _backendProbe.Service!;
+            if (_customModeForm == null || _customModeForm.IsDisposed)
+            {
+                _customModeForm = new CustomModeForm();
+            }
+            if (!_customModeForm.Visible)
+            {
+                _customModeForm.Show();
+            }
+            _customModeForm.Activate();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "打开自定义模式失败：" + ex.Message;
+        }
     }
 
     private async void GpuOverclock_Click(object sender, RoutedEventArgs e)
