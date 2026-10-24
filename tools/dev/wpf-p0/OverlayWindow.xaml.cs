@@ -14,6 +14,8 @@ public readonly record struct OverlaySnapshot(
     int GpuCoreFreq,
     int CpuFanRpm,
     int GpuFanRpm,
+    int CpuFanDuty,
+    int GpuFanDuty,
     int RamUsage,
     double RamUsedGb,
     int BatteryPercent,
@@ -68,7 +70,8 @@ public partial class OverlayWindow : Window
             CpuDetailText.Text = FormatCpuDetail(s);
             GpuText.Text = s.GpuTemp >= 0 ? "GPU " + s.GpuTemp + "℃" : "GPU —";
             GpuDetailText.Text = FormatGpuDetail(s);
-            FanText.Text = FormatFans(s.CpuFanRpm, s.GpuFanRpm);
+            CpuFanText.Text = FormatFan(s.CpuFanRpm, s.CpuFanDuty);
+            GpuFanText.Text = FormatFan(s.GpuFanRpm, s.GpuFanDuty);
             RamText.Text = s.RamUsage >= 0
                 ? "内存 " + s.RamUsage + "%" + (s.RamUsedGb > 0 ? " · " + s.RamUsedGb.ToString("0.0") + "GB" : "")
                 : "内存 —";
@@ -95,17 +98,11 @@ public partial class OverlayWindow : Window
         return usage + " · " + freq + " · " + power;
     }
 
-    private static string FormatFans(int cpu, int gpu)
+    private static string FormatFan(int rpm, int duty)
     {
-        if (cpu < 0 && gpu < 0)
-        {
-            return "风扇 —";
-        }
-        if (gpu >= 0 && gpu != cpu)
-        {
-            return "风扇 " + Math.Max(0, cpu) + "/" + gpu + " rpm";
-        }
-        return "风扇 " + Math.Max(0, cpu) + " rpm";
+        string speed = rpm > 0 ? rpm + "rpm" : "—";
+        string percent = duty >= 0 ? duty + "%" : "—";
+        return speed + " " + percent;
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

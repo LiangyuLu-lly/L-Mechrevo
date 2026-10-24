@@ -3678,6 +3678,8 @@ public partial class OriginalStyleWindow : Window
             HardwareControl.gpuCoreFreq > 0 ? HardwareControl.gpuCoreFreq : (hw?.GpuCoreFreq ?? -1),
             HardwareControl.cpuFanRPM > 0 ? HardwareControl.cpuFanRPM : (hw?.CpuFanRpm ?? -1),
             HardwareControl.gpuFanRPM > 0 ? HardwareControl.gpuFanRPM : (hw?.GpuFanRpm ?? -1),
+            HardwareControl.cpuFan is int cpuDuty ? cpuDuty : (hw?.CpuFanDuty ?? -1),
+            HardwareControl.gpuFan is int gpuDuty ? gpuDuty : (hw?.GpuFanDuty ?? -1),
             HardwareControl.ramUsage ?? hw?.RamUsage ?? -1,
             HardwareControl.ramUsedMb.HasValue ? HardwareControl.ramUsedMb.Value / 1024.0 : (hw?.RamUsedGb ?? -1),
             battery,
