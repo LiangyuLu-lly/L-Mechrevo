@@ -301,6 +301,19 @@ public partial class OriginalStyleWindow : Window
         Activate();
     }
 
+    private void OpenLightEditor(string topic, string title, (string Effect, string Name)[] effects)
+    {
+        try
+        {
+            new LightEditorWindow(topic, title, effects) { Owner = this }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "打开灯光编辑器失败，回退原版：" + ex.Message;
+            new OriginalFormHostWindow(new LightForm(topic, title, effects)).ShowDialog();
+        }
+    }
+
     private void ToggleTrayOverlay()
     {
         if (_overlayWindow != null)
@@ -2865,7 +2878,7 @@ public partial class OriginalStyleWindow : Window
         }
         Program.hw = _backendProbe.Hw;
         Program.service = _backendProbe.Service!;
-        new OriginalFormHostWindow(new LightForm("HidLightbar/Ctrl", "灯带灯光")).ShowDialog();
+        OpenLightEditor("HidLightbar/Ctrl", "灯带灯光", LightForm.LightbarEffects);
     }
 
     private KeyboardRgb? EnsureKeyboardRgb()
@@ -2918,7 +2931,7 @@ public partial class OriginalStyleWindow : Window
         }
         Program.hw = _backendProbe.Hw;
         Program.service = _backendProbe.Service!;
-        new OriginalFormHostWindow(new LightForm("HidLightbar_Hinge/Ctrl", "铰链灯光", LightForm.HingeEffects)).ShowDialog();
+        OpenLightEditor("HidLightbar_Hinge/Ctrl", "铰链灯光", LightForm.HingeEffects);
     }
 
     private async void LightSyncSwitch_Click(object sender, RoutedEventArgs e)
@@ -2950,7 +2963,7 @@ public partial class OriginalStyleWindow : Window
         }
         Program.hw = _backendProbe.Hw;
         Program.service = _backendProbe.Service!;
-        new OriginalFormHostWindow(new LightForm("HidLightbar_Sync/Ctrl", "同步灯光", LightForm.SyncEffects)).ShowDialog();
+        OpenLightEditor("HidLightbar_Sync/Ctrl", "同步灯光", LightForm.SyncEffects);
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)
