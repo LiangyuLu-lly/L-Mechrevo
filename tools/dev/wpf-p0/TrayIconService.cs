@@ -17,7 +17,9 @@ internal sealed record TrayMenuState(
     bool GpuVisible,
     int GpuMode,
     bool KeyboardLightVisible,
-    bool OverlayOn);
+    bool OverlayOn,
+    bool SilentTurboVisible,
+    bool SilentTurboOn);
 
 /// <summary>托盘图标与菜单。菜单每次打开前按主窗口最新状态重建。</summary>
 internal sealed class TrayIconService : IDisposable
@@ -39,6 +41,7 @@ internal sealed class TrayIconService : IDisposable
     internal event Action<int>? ModeRequested;
     internal event Action<int>? GpuModeRequested;
     internal event Action<string>? CustomModeRequested;
+    internal event Action? SilentTurboRequested;
 
     internal TrayIconService()
     {
@@ -77,7 +80,15 @@ internal sealed class TrayIconService : IDisposable
             _menu.Items.Add(DisabledTitle("性能模式"));
             _menu.Items.Add(MenuItem("静音", mode == 2, () => ModeRequested?.Invoke(2)));
             _menu.Items.Add(MenuItem("平衡", mode == 0, () => ModeRequested?.Invoke(0)));
-            _menu.Items.Add(MenuItem("狂暴", mode == 1, () => ModeRequested?.Invoke(1)));
+            if (state?.SilentTurboVisible == true)
+            {
+                _menu.Items.Add(MenuItem("静音狂暴", mode == 1 && state.SilentTurboOn, () => SilentTurboRequested?.Invoke()));
+            }
+            _menu.Items.Add(MenuItem("狂暴", mode == 1 && state?.SilentTurboOn != true, () => ModeRequested?.Invoke(1)));
+            if (state?.FanBoostVisible == true)
+            {
+                _menu.Items.Add(MenuItem("强冷", state.FanBoostOn, () => FanBoostRequested?.Invoke()));
+            }
 
             ToolStripMenuItem customRoot = new(state?.CustomRootText ?? "自定义")
             {
@@ -100,10 +111,6 @@ internal sealed class TrayIconService : IDisposable
             _menu.Items.Add(customRoot);
 
             _menu.Items.Add(new ToolStripSeparator());
-            if (state?.FanBoostVisible == true)
-            {
-                _menu.Items.Add(MenuItem("强冷", state.FanBoostOn, () => FanBoostRequested?.Invoke()));
-            }
             if (state?.GpuVisible == true)
             {
                 ToolStripMenuItem gpu = new("显卡模式");
@@ -111,14 +118,14 @@ internal sealed class TrayIconService : IDisposable
                 gpu.DropDownItems.Add(MenuItem("混合模式", state.GpuMode == 1, () => GpuModeRequested?.Invoke(1)));
                 gpu.DropDownItems.Add(MenuItem("独显直连", state.GpuMode == 2, () => GpuModeRequested?.Invoke(2)));
                 _menu.Items.Add(gpu);
+                _menu.Items.Add(new ToolStripSeparator());
             }
             if (state?.KeyboardLightVisible == true)
             {
                 _menu.Items.Add(MenuItem("键盘灯光", false, () => KeyboardLightingRequested?.Invoke()));
             }
             _menu.Items.Add(MenuItem("悬浮窗", state?.OverlayOn == true, () => OverlayRequested?.Invoke()));
-            _menu.Items.Add(MenuItem("设置", false, () => SettingsRequested?.Invoke()));
-            _menu.Items.Add(MenuItem("显示主界面", false, () => ShowRequested?.Invoke()));
+            _menu.Items.Add(MenuItem("打开主界面", false, () => ShowRequested?.Invoke()));
             _menu.Items.Add(MenuItem("导出诊断包", false, () => DiagnosticsRequested?.Invoke()));
             _menu.Items.Add(new ToolStripSeparator());
             _menu.Items.Add(MenuItem("退出", false, () => ExitRequested?.Invoke()));

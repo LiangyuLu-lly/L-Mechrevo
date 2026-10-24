@@ -185,6 +185,7 @@ public partial class OriginalStyleWindow : Window
             }
         };
         _trayIcon.CustomModeRequested += id => _ = ActivateTrayCustomAsync(id);
+        _trayIcon.SilentTurboRequested += () => _ = TraySilentTurboAsync();
         Dispatcher.BeginInvoke(new Action(PreloadOverlayWindow), DispatcherPriority.Background);
         SourceInitialized += (_, _) =>
         {
@@ -407,7 +408,26 @@ public partial class OriginalStyleWindow : Window
             GpuSection.Visibility == Visibility.Visible,
             probe?.CurrentGpuMode ?? -1,
             KeyboardLightRow.Visibility == Visibility.Visible,
-            _overlayWindow?.IsVisible == true);
+            _overlayWindow?.IsVisible == true,
+            probe?.Capabilities?.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported,
+            MechrevoLite.Hardware.MechrevoService.IsSilentTurboActive);
+    }
+
+    private async Task TraySilentTurboAsync()
+    {
+        if (_backendProbe?.Service == null)
+        {
+            return;
+        }
+        await SwitchModeAsync(1);
+        try
+        {
+            await _backendProbe.Service.SwitchTurboSubMode(silent: true);
+        }
+        catch
+        {
+        }
+        RefreshFromBackend();
     }
 
     private async Task ActivateTrayCustomAsync(string id)
