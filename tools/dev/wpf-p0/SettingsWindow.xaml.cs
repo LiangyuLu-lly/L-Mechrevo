@@ -81,14 +81,29 @@ public partial class SettingsWindow : Window
 
     private (int Mode, int Opacity, int Interval) OverlayValues()
     {
-        int mode = (OverlayModeCombo.SelectedItem as ComboBoxItem)?.Tag is string ms && int.TryParse(ms, out int m) ? m : 1;
-        int interval = (OverlayIntervalCombo.SelectedItem as ComboBoxItem)?.Tag is string is_ && int.TryParse(is_, out int i) ? i : 1000;
-        return (mode, (int)Math.Round(OverlayOpacitySlider.Value), interval);
+        int mode = 1;
+        int interval = 1000;
+        double opacity = 80;
+        if (OverlayModeCombo?.SelectedItem is ComboBoxItem modeItem
+            && modeItem.Tag is string modeText && int.TryParse(modeText, out int parsedMode))
+        {
+            mode = parsedMode;
+        }
+        if (OverlayIntervalCombo?.SelectedItem is ComboBoxItem intervalItem
+            && intervalItem.Tag is string intervalText && int.TryParse(intervalText, out int parsedInterval))
+        {
+            interval = parsedInterval;
+        }
+        if (OverlayOpacitySlider != null)
+        {
+            opacity = OverlayOpacitySlider.Value;
+        }
+        return (mode, (int)Math.Round(opacity), interval);
     }
 
     private void ApplyOverlayValues(bool resetPosition = false)
     {
-        if (_overlaySyncing)
+        if (_overlaySyncing || _owner == null || OverlayOpacitySlider == null)
         {
             return;
         }
