@@ -606,17 +606,12 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private static void HighlightSegment(ToggleButton selected, Color? overrideColor = null)
+    private static void ClearSegmentBorders(Panel panel)
     {
-        if (selected.Parent is not Panel grid)
-        {
-            return;
-        }
         Brush gray = (Brush)Application.Current.Resources["CardBorderBrush"];
         Brush normal = (Brush)Application.Current.Resources["ControlBrush"];
         FontFamily regular = (FontFamily)Application.Current.Resources["AppFontFamily"];
-        FontFamily bold = (FontFamily)Application.Current.Resources["AppFontBoldFamily"];
-        foreach (object child in grid.Children)
+        foreach (object child in panel.Children)
         {
             if (child is ToggleButton button)
             {
@@ -627,6 +622,19 @@ public partial class OriginalStyleWindow : Window
                 button.FontWeight = FontWeights.Normal;
             }
         }
+    }
+
+    private static void HighlightSegment(ToggleButton selected, Color? overrideColor = null)
+    {
+        if (selected.Parent is not Panel grid)
+        {
+            return;
+        }
+        ClearSegmentBorders(grid);
+        Brush gray = (Brush)Application.Current.Resources["CardBorderBrush"];
+        Brush normal = (Brush)Application.Current.Resources["ControlBrush"];
+        FontFamily regular = (FontFamily)Application.Current.Resources["AppFontFamily"];
+        FontFamily bold = (FontFamily)Application.Current.Resources["AppFontBoldFamily"];
         Color color = overrideColor ?? ((SolidColorBrush)Application.Current.Resources["AccentBrush"]).Color;
         selected.BorderBrush = new SolidColorBrush(color);
         selected.BorderThickness = new Thickness(2);
@@ -959,6 +967,10 @@ public partial class OriginalStyleWindow : Window
 
     private static void HighlightChecked(params ToggleButton[] buttons)
     {
+        if (buttons.Length > 0 && buttons[0].Parent is Panel panel)
+        {
+            ClearSegmentBorders(panel);
+        }
         foreach (ToggleButton button in buttons)
         {
             if (button.IsChecked == true)
@@ -1263,6 +1275,7 @@ public partial class OriginalStyleWindow : Window
         {
             batteryButtons[i].IsChecked = i == batteryMode;
         }
+        HighlightChecked(batteryButtons);
         UpdateQuickTileStates();
         if (MoreGroupsPanel != null)
         {
