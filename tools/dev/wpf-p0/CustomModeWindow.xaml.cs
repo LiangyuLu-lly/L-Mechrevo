@@ -224,6 +224,10 @@ public partial class CustomModeWindow : Window
             LoadLiveHardware(liveHw);
         }
         RefreshGpuPowerLimit(s.GpuPowerLimitW);
+        if (Program.hw is MechrevoHw limitsHw)
+        {
+            ApplyHardwareControlLimits(limitsHw);
+        }
         bool locked = Program.hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
             && MechrevoLite.CustomModeForm.IsGen40Plus(lockHw)
@@ -357,6 +361,40 @@ public partial class CustomModeWindow : Window
         GpuPowerLimitSlider.Maximum = maxW;
         int value = savedWatts is >= 0 && savedWatts <= maxW && savedWatts >= minW ? savedWatts.Value : currentW;
         SetSlider(GpuPowerLimitSlider, GpuPowerLimitText, value);
+    }
+
+    private static void SetSliderRange(System.Windows.Controls.Slider slider, int min, int max)
+    {
+        if (min >= 0 && max > min)
+        {
+            slider.Minimum = min;
+            slider.Maximum = max;
+        }
+    }
+
+    private void ApplyHardwareControlLimits(MechrevoHw hw)
+    {
+        SetSliderRange(Pl1Slider, hw.Pl1Minimum, hw.Pl1Maximum);
+        SetSliderRange(Pl2Slider, hw.Pl2Minimum, hw.Pl2Maximum);
+        SetSliderRange(Pl4Slider, hw.Pl4Minimum, hw.Pl4Maximum);
+        SetSliderRange(TccSlider, hw.TccMinimum, hw.TccMaximum);
+        SetSliderRange(GpuTgpSlider, hw.GpuTgpMinimum, hw.GpuTgpMaximum);
+        SetSliderRange(DbSlider, hw.GpuDbMinimum, hw.GpuDbMaximum);
+        SetSliderRange(FanDelaySlider, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum);
+        TccSwitch.IsEnabled = hw.TccAdjustable;
+        DbSwitch.IsEnabled = hw.GpuDynamicBoostAdjustable;
+        GpuTgpSlider.IsEnabled = hw.GpuTgpAdjustable;
+        FanSensitivitySwitch.IsEnabled = hw.SupportsFanSwitchSpeed;
+        GpuOcSwitch.IsEnabled = hw.SupportsGpuOverclock;
+        if (!hw.GpuTgpAdjustable)
+        {
+            GpuTgpSlider.Opacity = 0.45;
+        }
+        if (!hw.GpuDynamicBoostAdjustable)
+        {
+            DbSwitch.Opacity = 0.45;
+            DbSlider.Opacity = 0.45;
+        }
     }
 
     private void RefreshOptions(int? current)
