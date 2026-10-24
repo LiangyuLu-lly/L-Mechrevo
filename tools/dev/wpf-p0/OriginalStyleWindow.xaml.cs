@@ -1237,7 +1237,23 @@ public partial class OriginalStyleWindow : Window
         GpuStat.Text = SensorLine(hw, cpu: false);
         string health = MechrevoLite.SettingsForm.BatteryHealthText(hw);
         string abnormal = hw.BatteryAbnormal ? " · 电池异常" : "";
-        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "%" + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
+        string powerState = "";
+        try
+        {
+            System.Windows.Forms.PowerStatus power = System.Windows.Forms.SystemInformation.PowerStatus;
+            if (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online)
+            {
+                powerState = power.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.Charging) ? " · 充电中" : " · 外接电源";
+            }
+            else
+            {
+                powerState = " · 电池供电";
+            }
+        }
+        catch
+        {
+        }
+        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "%" + powerState + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
         BatteryInfo.ToolTip = health;
         int mode = probe.CurrentMode;
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
