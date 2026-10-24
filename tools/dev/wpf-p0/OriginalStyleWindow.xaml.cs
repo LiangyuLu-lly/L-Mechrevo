@@ -151,6 +151,7 @@ public partial class OriginalStyleWindow : Window
         MechrevoLite.Helpers.ToastForm.FailureCallback = message => ToastService.Show(message, failure: true);
         MechrevoLite.Helpers.ToastForm.NoticeCallback = message => ToastService.Show(message);
         _trayIcon = new TrayIconService();
+        _trayIcon.SetTheme(_dark);
         _trayIcon.ShowRequested += ShowFromTray;
         _trayIcon.SettingsRequested += () => new SettingsWindow(this).ShowDialog();
         _trayIcon.OverlayRequested += ToggleTrayOverlay;
@@ -3539,6 +3540,7 @@ public partial class OriginalStyleWindow : Window
         UpdateTitleIcon();
         ApplyDockOpacity();
         ApplyButtonOpacity();
+        _trayIcon?.SetTheme(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
@@ -3561,6 +3563,7 @@ public partial class OriginalStyleWindow : Window
         UpdateTitleIcon();
         ApplyDockOpacity();
         ApplyButtonOpacity();
+        _trayIcon?.SetTheme(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();

@@ -54,7 +54,28 @@ internal sealed class TrayIconService : IDisposable
         };
         _icon.DoubleClick += (_, _) => ShowRequested?.Invoke();
         _menu.Opening += (_, _) => RebuildMenu();
+        _menu.ShowCheckMargin = true;
+        _menu.ShowImageMargin = false;
+        _menu.ImageScalingSize = new Size(16, 16);
+        _menu.Padding = new Padding(5);
+        _menu.DropShadowEnabled = true;
+        _menu.Renderer = new MechrevoLite.UI.CustomMenuRenderer();
+        SetTheme(dark: true);
         RebuildMenu();
+    }
+
+    internal void SetTheme(bool dark)
+    {
+        try
+        {
+            _menu.BackColor = dark ? Color.FromArgb(22, 27, 35) : Color.FromArgb(248, 249, 251);
+            _menu.ForeColor = dark ? Color.FromArgb(243, 245, 248) : Color.FromArgb(28, 32, 38);
+            _menu.Font = MechrevoLite.UI.UiVisualStyle.Font(9f);
+            _menu.Renderer = new MechrevoLite.UI.CustomMenuRenderer();
+        }
+        catch
+        {
+        }
     }
 
     private void RebuildMenu()
