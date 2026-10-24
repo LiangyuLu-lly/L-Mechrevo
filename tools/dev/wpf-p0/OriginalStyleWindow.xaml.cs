@@ -51,7 +51,8 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
-    private MechrevoLite.CustomModeForm? _customModeForm;
+    private CustomModeWindow? _customModeForm;
+    private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
     private bool _lightingPowerSuspended;
@@ -1985,16 +1986,16 @@ public partial class OriginalStyleWindow : Window
             Program.hw = _backendProbe.Hw;
             Program.service = _backendProbe.Service!;
             int visualMode = _backendProbe.Service?.CurrentMode ?? 0;
-            if (_customModeForm == null || _customModeForm.IsDisposed)
+            if (_legacyCustomModeForm == null || _legacyCustomModeForm.IsDisposed)
             {
-                _customModeForm = new CustomModeForm();
+                _legacyCustomModeForm = new CustomModeForm();
             }
-            _customModeForm.BindFirmwareProfile(visualMode, MechrevoLite.Mode.ModeProfileConfig.Get(visualMode));
-            if (!_customModeForm.Visible)
+            _legacyCustomModeForm.BindFirmwareProfile(visualMode, MechrevoLite.Mode.ModeProfileConfig.Get(visualMode));
+            if (!_legacyCustomModeForm.Visible)
             {
-                _customModeForm.Show();
+                _legacyCustomModeForm.Show();
             }
-            _customModeForm.Activate();
+            _legacyCustomModeForm.Activate();
         }
         catch (Exception ex)
         {
@@ -2043,12 +2044,14 @@ public partial class OriginalStyleWindow : Window
             }
             Program.hw = _backendProbe.Hw;
             Program.service = _backendProbe.Service!;
-            if (_customModeForm == null || _customModeForm.IsDisposed)
-            {
-                _customModeForm = new CustomModeForm();
-            }
             string customId = ResolveCustomModeId();
-            if (!_customModeForm.Visible)
+            if (_customModeForm == null)
+            {
+                _customModeForm = new CustomModeWindow(customId) { Owner = this };
+                _customModeForm.SetDark(_dark);
+                _customModeForm.Closed += (_, _) => _customModeForm = null;
+            }
+            if (!_customModeForm.IsVisible)
             {
                 _customModeForm.Show();
             }
