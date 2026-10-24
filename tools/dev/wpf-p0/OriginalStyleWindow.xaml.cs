@@ -62,6 +62,7 @@ public partial class OriginalStyleWindow : Window
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
+    private bool[]? _lightingIdleSwitchSnapshot;
     private bool _lightingPowerSuspended;
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
@@ -3320,6 +3321,14 @@ public partial class OriginalStyleWindow : Window
         if (!_lightingIdleSuspended && idleSeconds >= timeoutSeconds)
         {
             _lightingIdleSuspended = true;
+            _lightingIdleSwitchSnapshot = new[]
+            {
+                KeyboardLightSwitch.IsChecked == true,
+                LightStripSwitch.IsChecked == true,
+                LogoLightSwitch.IsChecked == true,
+                LightHingeSwitch.IsChecked == true,
+                LightSyncSwitch.IsChecked == true
+            };
             _ = TurnOffAllLightsAsync();
             return;
         }
@@ -3332,6 +3341,17 @@ public partial class OriginalStyleWindow : Window
 
     private async Task RestoreAllLightsAsync()
     {
+        if (_lightingIdleSwitchSnapshot is { Length: 5 } snapshot)
+        {
+            _syncingLighting = true;
+            KeyboardLightSwitch.IsChecked = snapshot[0];
+            LightStripSwitch.IsChecked = snapshot[1];
+            LogoLightSwitch.IsChecked = snapshot[2];
+            LightHingeSwitch.IsChecked = snapshot[3];
+            LightSyncSwitch.IsChecked = snapshot[4];
+            _syncingLighting = false;
+            _lightingIdleSwitchSnapshot = null;
+        }
         await ApplyKeyboardLightAsync();
         await ApplyLogoLightAsync(restoreEffect: true);
         await ApplyLightStripLightAsync(restoreEffect: true);
@@ -3384,7 +3404,16 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        await _backendProbe.SetKeyboardPowerAsync(false);
+        if (IsHidKeyboard(_backendProbe.Hw) && Program.rgb != null)
+        {
+            Program.rgb.StopCurrentEffect();
+            Program.rgb.KbPowerOn = false;
+            Program.rgb.SaveConfig();
+        }
+        else
+        {
+            await _backendProbe.SetKeyboardPowerAsync(false);
+        }
         await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
         await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
         await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
@@ -3503,6 +3532,10 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool ok = await _backendProbe.SetLightbarEffectAsync(effect);
+        if (ok)
+        {
+            SaveChannelEffect("HidLightbar/Ctrl", effect);
+        }
         StatusText.Text = ok ? "灯带效果已下发：" + effect : "灯带效果下发失败";
     }
 
@@ -3579,6 +3612,10 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool ok = await _backendProbe.SetHingeEffectAsync(effect);
+        if (ok)
+        {
+            SaveChannelEffect("HidLightbar_Hinge/Ctrl", effect);
+        }
         StatusText.Text = ok ? "铰链灯效果已下发" : "铰链灯效果下发失败";
     }
 
@@ -3634,6 +3671,10 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool ok = await _backendProbe.SetSyncEffectAsync(effect);
+        if (ok)
+        {
+            SaveChannelEffect("HidLightbar_Sync/Ctrl", effect);
+        }
         StatusText.Text = ok ? "同步灯效果已下发" : "同步灯效果下发失败";
     }
 
@@ -3738,6 +3779,7 @@ public partial class OriginalStyleWindow : Window
             bool ready = rgb.IsConnected || await rgb.EnsureHidReadyAsync() || rgb.Connect();
             if (!ready)
             {
+                rgb.KbPowerOn = !on;
                 StatusText.Text = "键盘 HID 连接失败：" + rgb.LastError;
                 return false;
             }
@@ -3751,6 +3793,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
+            rgb.KbPowerOn = !on;
             StatusText.Text = "键盘 HID 下发失败：" + ex.Message;
             return false;
         }
@@ -3830,7 +3873,12 @@ public partial class OriginalStyleWindow : Window
             SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
             return;
         }
-        await ApplyLogoLightAsync();
+        bool logoOk = await _backendProbe.SetLogoEffectAsync(effect);
+        if (logoOk)
+        {
+            SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
+        }
+        StatusText.Text = logoOk ? "Logo 灯效已下发：" + effect : "Logo 灯效下发失败";
     }
 
     private async Task<bool> ApplyLogoLightAsync(bool restoreEffect = false)

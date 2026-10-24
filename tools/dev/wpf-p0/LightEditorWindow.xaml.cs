@@ -483,9 +483,13 @@ public partial class LightEditorWindow : Window
             {
                 if (power)
                 {
-                    System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
-                        ? System.Drawing.Color.FromArgb(_colorArgb)
-                        : null;
+                    await Program.service.SetKeyboardPower(true);
+                    bool baolongda = Program.hw?.UsesBaolongda == true;
+                    System.Drawing.Color? color = baolongda
+                        ? System.Drawing.Color.FromArgb(Program.hw != null ? _settings.EffectiveColorArgb() : _colorArgb)
+                        : (string.Equals(effect, "Single", StringComparison.Ordinal)
+                            ? System.Drawing.Color.FromArgb(_colorArgb)
+                            : null);
                     ok = await Program.service.SetKeyboardEffect(effect, _light, applySpeed, "None", color, save: true);
                 }
                 else
@@ -495,6 +499,7 @@ public partial class LightEditorWindow : Window
             }
             else if (power)
             {
+                await Program.service.SetLightPower(_topic, true);
                 System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
                     ? System.Drawing.Color.FromArgb(_colorArgb)
                     : null;

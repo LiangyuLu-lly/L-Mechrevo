@@ -405,12 +405,24 @@ internal sealed class BackendProbe : IDisposable
         try
         {
             MechrevoLite.Hardware.LightChannelSettings settings = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effect);
-            // 原版 LightForm.SendAsync 对所有通道统一用 IsSingleColorEffect 判断是否带单色；
-            // Breathing/Impact 等单色系效果也必须把用户颜色带上，不能只认 LightEffectColorMode==1。
-            bool colorMeaningful = MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect);
-            Color? color = colorMeaningful
-                ? Color.FromArgb(settings.EffectiveColorArgb())
-                : null;
+            // 键盘：宝龙达用实际 ARGB；非宝龙达只有 Single 带颜色（原版 SettingsForm/RgbForm 逐字如此）。
+            // 灯带/Logo/铰链/同步：原版 LightForm 对所有单色系效果带颜色。
+            bool baolongda = MechrevoLite.Program.hw?.UsesBaolongda == true;
+            Color? color;
+            if (keyboard)
+            {
+                color = baolongda
+                    ? Color.FromArgb(settings.EffectiveColorArgb())
+                    : (string.Equals(effect, "Single", StringComparison.Ordinal)
+                        ? Color.FromArgb(settings.ColorArgb)
+                        : null);
+            }
+            else
+            {
+                color = MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect)
+                    ? Color.FromArgb(settings.ColorArgb)
+                    : null;
+            }
             return (settings.Light, settings.Speed, color);
         }
         catch
