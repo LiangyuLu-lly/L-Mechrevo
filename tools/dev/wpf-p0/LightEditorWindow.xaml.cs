@@ -17,6 +17,7 @@ public partial class LightEditorWindow : Window
     private int _speed;
     private int _colorArgb;
     private int[] _mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
+    private bool _gradeBrightness;
 
     public LightEditorWindow(string topic, string title, (string Effect, string Name)[] effects)
     {
@@ -25,6 +26,16 @@ public partial class LightEditorWindow : Window
         _effects = effects;
         Title = title;
         TitleText.Text = title;
+        MechrevoHw? hw = Program.hw;
+        _gradeBrightness = hw != null
+            && !hw.UsesBaolongda
+            && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
+            && (string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+                || string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal));
+        if (_gradeBrightness)
+        {
+            LightSlider.Maximum = 4;
+        }
         _settings = LightingSettingsStore.Load(topic, effects.Length > 0 ? effects[0].Effect : "Single");
         _light = Math.Clamp(_settings.Light, 0, 4);
         _speed = Math.Clamp(_settings.Speed, 0, 4);
@@ -41,7 +52,7 @@ public partial class LightEditorWindow : Window
 
     private void NetSliderValues()
     {
-        LightSlider.Value = _light * 25;
+        LightSlider.Value = _gradeBrightness ? _light : _light * 25;
         LightText.Text = ((int)LightSlider.Value).ToString();
         SpeedSlider.Value = _speed * 25;
         SpeedText.Text = ((int)SpeedSlider.Value).ToString();
@@ -109,7 +120,9 @@ public partial class LightEditorWindow : Window
 
     private void Light_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        _light = Math.Clamp((int)Math.Round(e.NewValue / 25.0), 0, 4);
+        _light = _gradeBrightness
+            ? Math.Clamp((int)Math.Round(e.NewValue), 0, 4)
+            : Math.Clamp((int)Math.Round(e.NewValue * 4 / 100.0), 0, 4);
         if (LightText != null)
         {
             LightText.Text = ((int)e.NewValue).ToString();
