@@ -66,6 +66,10 @@ public partial class CustomModeWindow : Window
                     continue;
                 }
             }
+            else if (mode.IsCustom)
+            {
+                continue;
+            }
             else if (!string.Equals(mode.Id, target, StringComparison.Ordinal)
                 && !MechrevoLite.CustomModeForm.IsOffered(mode, Program.hw))
             {
@@ -626,7 +630,16 @@ public partial class CustomModeWindow : Window
         }
         if (MechrevoLite.Mode.PerfModeStore.RemoveCustom(_current.Id))
         {
-            LoadModes(null);
+            MechrevoLite.Mode.PerfModeDefinition? next = MechrevoLite.Mode.PerfModeStore.Load()
+                .FirstOrDefault(m => m.IsCustom);
+            if (next != null)
+            {
+                LoadModes(next.Id);
+            }
+            else
+            {
+                LoadModes(null);
+            }
             StatusText.Text = "已删除";
         }
         else
