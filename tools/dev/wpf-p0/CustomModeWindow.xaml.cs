@@ -313,9 +313,20 @@ public partial class CustomModeWindow : Window
         MechrevoHw? hwForRows = Program.hw;
         bool apuOrNoDgpu = hwForRows != null
             && (hwForRows.WujieSmuApu || hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu);
-        Pl4Row.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
+        bool wujieApu = hwForRows?.WujieSmuApu == true;
+        bool smuPowerRows = hwForRows != null && MechrevoLite.Mode.PerfModeCapabilities.UsesSmuForCustomPower(
+            hwForRows.UsesBaolongda,
+            hwForRows.IsBaolongda30Series,
+            MechrevoLite.Hardware.SmuAvailability.IsReady,
+            wujieApu);
+        bool pl4Supported = hwForRows != null && hwForRows.Pl4Minimum >= 0 && hwForRows.Pl4Maximum > hwForRows.Pl4Minimum;
+        Pl4Row.Visibility = !apuOrNoDgpu && pl4Supported ? Visibility.Visible : Visibility.Collapsed;
         FanBoostRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
         FanCard.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
+        StapmTimeRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
+        SmuSlowLimitRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
+        SmuSlowTimeRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
+        SmuFastTimeRow.Visibility = Visibility.Collapsed;
     
         }
         finally
@@ -452,8 +463,20 @@ public partial class CustomModeWindow : Window
 
     private void ApplyHardwareControlLimits(MechrevoHw hw)
     {
-        SetSliderRange(Pl1Slider, hw.Pl1Minimum, hw.Pl1Maximum);
-        SetSliderRange(Pl2Slider, hw.Pl2Minimum, hw.Pl2Maximum);
+        if (hw.WujieSmuApu)
+        {
+            Pl1Slider.Minimum = MechrevoLite.Hardware.WujieSmuGate.PlMinWatts;
+            Pl1Slider.Maximum = MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts;
+            Pl2Slider.Minimum = MechrevoLite.Hardware.WujieSmuGate.PlMinWatts;
+            Pl2Slider.Maximum = MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts;
+            TccSlider.Minimum = MechrevoLite.Hardware.WujieSmuGate.TccMinCelsius;
+            TccSlider.Maximum = MechrevoLite.Hardware.WujieSmuGate.TccMaxCelsius;
+        }
+        else
+        {
+            SetSliderRange(Pl1Slider, hw.Pl1Minimum, hw.Pl1Maximum);
+            SetSliderRange(Pl2Slider, hw.Pl2Minimum, hw.Pl2Maximum);
+        }
         SetSliderRange(Pl4Slider, hw.Pl4Minimum, hw.Pl4Maximum);
         SetSliderRange(TccSlider, hw.TccMinimum, hw.TccMaximum);
         SetSliderRange(GpuTgpSlider, hw.GpuTgpMinimum, hw.GpuTgpMaximum);
