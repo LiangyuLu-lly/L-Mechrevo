@@ -1312,10 +1312,50 @@ public partial class OriginalStyleWindow : Window
             WinKeyTile.Visibility = probe.SupportsQuick("winkey") ? Visibility.Visible : Visibility.Collapsed;
             ScreenOffTile.Visibility = probe.SupportsQuick("monitoroff") ? Visibility.Visible : Visibility.Collapsed;
             InitScreenColorControls();
+            ApplyUiVisibilityFromConfig();
         }
         catch
         {
         }
+    }
+
+    internal void ApplyUiVisibilityFromConfig()
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        MechrevoHw? hw = _backendProbe.Hw;
+        MechrevoDeviceCapabilities? caps = _backendProbe.Capabilities;
+        string igpuMode = AppConfig.GetString("igpu_only_ui") ?? "auto";
+        bool igpuSupported = (caps?.IgpuOnly ?? false) || (hw?.SupportsIgpuOnly ?? false);
+        GpuEcoButton.Visibility = ResolveRowVisibility(igpuMode, igpuSupported);
+        if (GpuEcoButton.Visibility == Visibility.Visible)
+        {
+            GpuSection.Visibility = Visibility.Visible;
+        }
+        bool keyboard = (caps?.Keyboard ?? false) || (hw?.SupportsKeyboard ?? false);
+        bool hasStrip = (caps?.Lightbar ?? false) || (hw?.SupportsLightbar ?? false);
+        bool hasLogo = (caps?.LogoLight ?? false) || (hw?.SupportsLogoLight ?? false);
+        KeyboardLightRow.Visibility = keyboard ? Visibility.Visible : Visibility.Collapsed;
+        LightStripRow.Visibility = ResolveRowVisibility(AppConfig.GetString("light_strip_ui") ?? "auto", hasStrip);
+        LogoLightRow.Visibility = ResolveRowVisibility(AppConfig.GetString("light_logo_ui") ?? "auto", hasLogo);
+        LightingSection.Visibility = (KeyboardLightRow.Visibility == Visibility.Visible
+            || LightStripRow.Visibility == Visibility.Visible
+            || LogoLightRow.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static Visibility ResolveRowVisibility(string mode, bool supported)
+    {
+        if (string.Equals(mode, "show", StringComparison.OrdinalIgnoreCase))
+        {
+            return Visibility.Visible;
+        }
+        if (string.Equals(mode, "hide", StringComparison.OrdinalIgnoreCase))
+        {
+            return Visibility.Collapsed;
+        }
+        return supported ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void GpuOverclock_Click(object sender, RoutedEventArgs e)
@@ -1680,6 +1720,42 @@ public partial class OriginalStyleWindow : Window
             _ = ApplyKeyboardLightAsync();
             _ = ApplyLogoLightAsync();
         }
+    }
+
+    private async void LightStripSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        string effect = LightStripSwitch.IsChecked == true
+            ? (LightStripEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single"
+            : "Off";
+        bool ok = await _backendProbe.SetLightbarEffectAsync(effect);
+        StatusText.Text = ok ? "灯带已下发：" + effect : "灯带下发失败";
+    }
+
+    private async void LightStripEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_backendProbe == null || LightStripSwitch.IsChecked != true || LightStripEffectCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        string effect = item.Tag as string ?? "Single";
+        bool ok = await _backendProbe.SetLightbarEffectAsync(effect);
+        StatusText.Text = ok ? "灯带效果已下发：" + effect : "灯带效果下发失败";
+    }
+
+    private void LightStripEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            StatusText.Text = "后端未连接，无法编辑灯带";
+            return;
+        }
+        Program.hw = _backendProbe.Hw;
+        Program.service = _backendProbe.Service!;
+        new LightForm("HidLightbar/Ctrl", "灯带灯光").ShowDialog();
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)

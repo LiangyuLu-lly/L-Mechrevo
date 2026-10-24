@@ -349,6 +349,33 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal bool SupportsLightbar
+    {
+        get
+        {
+            try
+            {
+                return _hw?.SupportsLightbar ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal async Task<bool> SetLightbarEffectAsync(string effect)
+    {
+        try
+        {
+            return _service != null && await _service.SetLightEffect("HidLightbar/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> SetLogoEffectAsync(string effect)
     {
         try

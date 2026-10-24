@@ -245,6 +245,8 @@ public partial class SettingsWindow : Window
         {
             CheckOnly(button);
             AppConfig.Set("igpu_only_ui", value);
+            AppConfig.Flush();
+            _owner.ApplyUiVisibilityFromConfig();
             Status("核显模式显示：" + value);
         }
     }
@@ -255,6 +257,8 @@ public partial class SettingsWindow : Window
         {
             CheckOnly(button);
             AppConfig.Set("light_strip_ui", value);
+            AppConfig.Flush();
+            _owner.ApplyUiVisibilityFromConfig();
             Status("灯带行显示：" + value);
         }
     }
@@ -265,6 +269,8 @@ public partial class SettingsWindow : Window
         {
             CheckOnly(button);
             AppConfig.Set("light_logo_ui", value);
+            AppConfig.Flush();
+            _owner.ApplyUiVisibilityFromConfig();
             Status("Logo 灯行显示：" + value);
         }
     }

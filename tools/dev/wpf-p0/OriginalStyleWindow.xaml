@@ -648,6 +648,23 @@
                             </ComboBox>
                             <Button x:Name="KeyboardLightEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="KeyboardLightEdit_Click" />
                         </Grid>
+                        <Grid x:Name="LightStripRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="灯带" Style="{StaticResource RowLabel}" />
+                            <CheckBox x:Name="LightStripSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="LightStripSwitch_Click" />
+                            <ComboBox x:Name="LightStripEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="LightStripEffectCombo_SelectionChanged">
+                                <ComboBoxItem Content="单色" Tag="Single" />
+                                <ComboBoxItem Content="呼吸" Tag="Breathe" />
+                                <ComboBoxItem Content="彩虹" Tag="Rainbow" />
+                                <ComboBoxItem Content="关" Tag="Off" />
+                            </ComboBox>
+                            <Button x:Name="LightStripEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="LightStripEdit_Click" />
+                        </Grid>
                         <Grid x:Name="LogoLightRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="70" />
