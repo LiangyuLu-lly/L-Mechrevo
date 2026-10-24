@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="键盘灯效"
-        Width="500" Height="660"
+        Width="500" Height="720"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -78,12 +78,17 @@
                 <TextBlock x:Name="MultiColorLabel" Text="颜色" Style="{DynamicResource MutedText}" Margin="0,0,0,4" />
                 <UniformGrid x:Name="MultiColorGrid" Columns="5" />
             </StackPanel>
+            <Grid x:Name="Extra3Row" Margin="0,0,0,8" Visibility="Collapsed">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                <TextBlock x:Name="Extra3Label" Text="附加" VerticalAlignment="Center" />
+                <Slider x:Name="Extra3Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="100" Value="0" ValueChanged="Extra3_Changed" />
+                <TextBlock x:Name="Extra3Text" Grid.Column="2" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
             <CheckBox x:Name="ExtraCheck" Content="附加选项" Style="{DynamicResource HeaderSwitch}" Margin="0,0,0,8" />
             <TextBlock x:Name="StatusText" Style="{DynamicResource MutedText}" TextWrapping="Wrap" VerticalAlignment="Top" />
         </StackPanel>
         <Grid Grid.Row="5" Margin="0,10,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="高级参数" Style="{StaticResource FlatButton}" Click="Advanced_Click" Margin="0,0,8,0" />
                 <Button Content="应用" Style="{StaticResource FlatButton}" Click="Apply_Click" Margin="0,0,8,0" />
                 <Button Content="关闭" Style="{StaticResource FlatButton}" Click="Close_Click" />
             </StackPanel>

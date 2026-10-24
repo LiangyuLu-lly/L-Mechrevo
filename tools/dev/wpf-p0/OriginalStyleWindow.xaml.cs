@@ -344,8 +344,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开灯光编辑器失败，回退原版：" + ex.Message;
-            new OriginalFormHostWindow(new LightForm(topic, title, effects)).ShowDialog();
+            StatusText.Text = "打开灯光编辑器失败：" + ex.Message;
         }
     }
 
@@ -3234,7 +3233,7 @@ public partial class OriginalStyleWindow : Window
             OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
             return;
         }
-        new HidKeyboardWindow(rgb, () => new RgbForm(rgb).ShowDialog()) { Owner = this }.ShowDialog();
+        new HidKeyboardWindow(rgb) { Owner = this }.ShowDialog();
     }
 
     private void LogoLightEdit_Click(object sender, RoutedEventArgs e)

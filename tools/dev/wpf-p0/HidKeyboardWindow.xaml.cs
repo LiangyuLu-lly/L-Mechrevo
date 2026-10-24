@@ -9,15 +9,14 @@ namespace L_Mechrevo.WpfP0;
 public partial class HidKeyboardWindow : Window
 {
     private readonly KeyboardRgb _rgb;
-    private readonly Action _openAdvanced;
+
     private readonly (int Mode, string Name)[] _effects;
     private System.Drawing.Color _color = System.Drawing.Color.FromArgb(0, 120, 255);
 
-    public HidKeyboardWindow(KeyboardRgb rgb, Action openAdvanced)
+    public HidKeyboardWindow(KeyboardRgb rgb)
     {
         InitializeComponent();
         _rgb = rgb;
-        _openAdvanced = openAdvanced;
         _effects = MechrevoLite.RgbForm.VisibleHidEffects(Program.hw?.Capabilities.KeyboardType ?? 0);
         PowerCheck.IsChecked = _rgb.KbPowerOn;
         BrightnessSlider.Value = Math.Clamp(_rgb.Brightness, 1, 100);
@@ -92,6 +91,7 @@ public partial class HidKeyboardWindow : Window
     {
         Extra1Row.Visibility = Visibility.Collapsed;
         Extra2Row.Visibility = Visibility.Collapsed;
+        Extra3Row.Visibility = Visibility.Collapsed;
         ExtraCheck.Visibility = Visibility.Collapsed;
         ExtraCheck.IsChecked = false;
         switch (mode)
@@ -121,6 +121,8 @@ public partial class HidKeyboardWindow : Window
                 ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "宽度", 1, 10, _rgb.LightningWidth);
                 Extra2Row.Visibility = Visibility.Visible;
                 ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "并发", 1, 5, _rgb.LightningConcurrent);
+                Extra3Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra3Slider, Extra3Label, Extra3Text, "平滑", 0, 100, _rgb.LightningSmooth);
                 break;
             case 6:
                 Extra1Row.Visibility = Visibility.Visible;
@@ -135,6 +137,10 @@ public partial class HidKeyboardWindow : Window
                 ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 0, 10, _rgb.MatrixDensity);
                 Extra2Row.Visibility = Visibility.Visible;
                 ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "样式", 0, 10, _rgb.MatrixStyle);
+                break;
+            case 9:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "布局", 0, 10, _rgb.StaticLayout);
                 break;
         }
         RefreshMultiColors(mode);
@@ -276,6 +282,14 @@ public partial class HidKeyboardWindow : Window
         }
     }
 
+    private void Extra3_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (Extra3Text != null)
+        {
+            Extra3Text.Text = ((int)e.NewValue).ToString();
+        }
+    }
+
     private void UpdateColorButton()
     {
         ColorButton.Content = $"#{_color.R:X2}{_color.G:X2}{_color.B:X2}";
@@ -368,6 +382,7 @@ public partial class HidKeyboardWindow : Window
             case 5:
                 _rgb.LightningWidth = Math.Clamp(extra1, 1, 10);
                 _rgb.LightningConcurrent = Math.Clamp(extra2, 1, 5);
+                _rgb.LightningSmooth = Math.Clamp((int)Math.Round(Extra3Slider.Value), 0, 100);
                 break;
             case 6: _rgb.FlameSmooth = extra1; break;
             case 7:
@@ -381,6 +396,7 @@ public partial class HidKeyboardWindow : Window
                 break;
             case 9:
                 _rgb.StaticZones = Math.Clamp((int)ColorCountSlider.Value, 1, 10);
+                _rgb.StaticLayout = Math.Clamp(extra1, 0, 10);
                 break;
         }
     }
@@ -420,18 +436,6 @@ public partial class HidKeyboardWindow : Window
         catch (Exception ex)
         {
             StatusText.Text = "应用失败：" + ex.Message;
-        }
-    }
-
-    private void Advanced_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            _openAdvanced();
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "打开高级参数失败：" + ex.Message;
         }
     }
 
