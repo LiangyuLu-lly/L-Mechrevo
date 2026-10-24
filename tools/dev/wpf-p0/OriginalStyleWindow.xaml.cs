@@ -1433,6 +1433,7 @@ public partial class OriginalStyleWindow : Window
         CustomModeButton.IsChecked = mode == 3 || mode == 4;
         RefreshModeHighlights();
         SyncRefreshRateState();
+        RefreshPerfConfigVisibility(mode);
         RefreshPerfConfigSelections();
         ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         int batteryMode = probe.BatteryMode;
@@ -1775,9 +1776,7 @@ public partial class OriginalStyleWindow : Window
         LightSyncRow.Visibility = hasSync ? Visibility.Visible : Visibility.Collapsed;
         InitPerfConfigRow();
         bool gen30 = hw?.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
-        bool profileConfig = hw?.SupportsModeProfileConfig == true;
-        PerfConfigRow.Visibility = profileConfig ? Visibility.Visible : Visibility.Collapsed;
-        PerfConfigEditButton.Visibility = profileConfig ? Visibility.Visible : Visibility.Collapsed;
+        RefreshPerfConfigVisibility(_backendProbe?.CurrentMode ?? -1);
         ChargeSliderToggle.Visibility = gen30 ? Visibility.Collapsed : Visibility.Visible;
         EcDirectOffToggle.Visibility = gen30 ? Visibility.Collapsed : Visibility.Visible;
         if (gen30)
@@ -1927,6 +1926,15 @@ public partial class OriginalStyleWindow : Window
             }
         }
         _syncingPerfConfig = false;
+    }
+
+    private void RefreshPerfConfigVisibility(int currentMode)
+    {
+        MechrevoHw? hw = _backendProbe?.Hw;
+        bool profileConfig = hw?.SupportsModeProfileConfig == true;
+        bool show = profileConfig && currentMode >= 0 && currentMode <= 2;
+        PerfConfigRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        PerfConfigEditButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RefreshPerfConfigSelections()
