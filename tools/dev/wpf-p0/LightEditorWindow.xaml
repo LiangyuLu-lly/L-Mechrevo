@@ -45,10 +45,10 @@
                 <Slider x:Name="LightSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="100" Value="100" ValueChanged="Light_Changed" />
                 <TextBlock x:Name="LightText" Grid.Column="2" Text="100" TextAlignment="Right" VerticalAlignment="Center" />
             </Grid>
-            <Grid Grid.Row="3" Margin="0,0,0,8">
+            <Grid x:Name="SpeedRow" Grid.Row="3" Margin="0,0,0,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                 <TextBlock Text="速度" VerticalAlignment="Center" />
-                <Slider x:Name="SpeedSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="100" Value="20" ValueChanged="Speed_Changed" />
+                <Slider x:Name="SpeedSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="4" Value="1" ValueChanged="Speed_Changed" />
                 <TextBlock x:Name="SpeedText" Grid.Column="2" Text="20" TextAlignment="Right" VerticalAlignment="Center" />
             </Grid>
             <Grid x:Name="ColorRow" Grid.Row="4" Margin="0,0,0,8">

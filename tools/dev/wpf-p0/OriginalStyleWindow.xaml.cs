@@ -3262,8 +3262,7 @@ public partial class OriginalStyleWindow : Window
             if (_lightingIdleSuspended)
             {
                 _lightingIdleSuspended = false;
-                _ = ApplyKeyboardLightAsync();
-                _ = ApplyLogoLightAsync();
+                _ = RestoreAllLightsAsync();
             }
             return;
         }
@@ -3271,16 +3270,23 @@ public partial class OriginalStyleWindow : Window
         if (!_lightingIdleSuspended && idleSeconds >= timeoutSeconds)
         {
             _lightingIdleSuspended = true;
-            _ = probe.SetKeyboardEffectAsync("Off");
-            _ = probe.SetLogoEffectAsync("Off");
+            _ = TurnOffAllLightsAsync();
             return;
         }
         if (_lightingIdleSuspended && idleSeconds < Math.Max(5, timeoutSeconds / 2))
         {
             _lightingIdleSuspended = false;
-            _ = ApplyKeyboardLightAsync();
-            _ = ApplyLogoLightAsync();
+            _ = RestoreAllLightsAsync();
         }
+    }
+
+    private async Task RestoreAllLightsAsync()
+    {
+        await ApplyKeyboardLightAsync();
+        await ApplyLogoLightAsync(restoreEffect: true);
+        await ApplyLightStripLightAsync(restoreEffect: true);
+        await ApplyHingeLightAsync(restoreEffect: true);
+        await ApplySyncLightAsync(restoreEffect: true);
     }
 
     private async Task ReconcileLightingPowerAsync()
@@ -3335,7 +3341,7 @@ public partial class OriginalStyleWindow : Window
         await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
     }
 
-    private async Task ApplyLightStripLightAsync()
+    private async Task ApplyLightStripLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null)
         {
@@ -3346,7 +3352,10 @@ public partial class OriginalStyleWindow : Window
         if (on)
         {
             await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", true);
-            await _backendProbe.SetLightbarEffectAsync(effect);
+            if (restoreEffect)
+            {
+                await _backendProbe.SetLightbarEffectAsync(effect);
+            }
         }
         else
         {
@@ -3354,7 +3363,7 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private async Task ApplyHingeLightAsync()
+    private async Task ApplyHingeLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null)
         {
@@ -3365,7 +3374,10 @@ public partial class OriginalStyleWindow : Window
         if (on)
         {
             await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", true);
-            await _backendProbe.SetHingeEffectAsync(effect);
+            if (restoreEffect)
+            {
+                await _backendProbe.SetHingeEffectAsync(effect);
+            }
         }
         else
         {
@@ -3373,7 +3385,7 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private async Task ApplySyncLightAsync()
+    private async Task ApplySyncLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null)
         {
@@ -3384,7 +3396,10 @@ public partial class OriginalStyleWindow : Window
         if (on)
         {
             await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", true);
-            await _backendProbe.SetSyncEffectAsync(effect);
+            if (restoreEffect)
+            {
+                await _backendProbe.SetSyncEffectAsync(effect);
+            }
         }
         else
         {
@@ -3620,7 +3635,7 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private async Task ApplyLogoLightAsync()
+    private async Task ApplyLogoLightAsync(bool restoreEffect = false)
     {
         if (_backendProbe == null || LogoEffectCombo.SelectedItem is not ComboBoxItem item)
         {
@@ -3632,7 +3647,7 @@ public partial class OriginalStyleWindow : Window
         if (on)
         {
             await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", true);
-            ok = await _backendProbe.SetLogoEffectAsync(effect);
+            ok = !restoreEffect || await _backendProbe.SetLogoEffectAsync(effect);
         }
         else
         {

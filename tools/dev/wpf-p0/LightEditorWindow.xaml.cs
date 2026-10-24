@@ -23,6 +23,8 @@ public partial class LightEditorWindow : Window
     private int[] _mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
     private bool _gradeBrightness;
     private readonly bool _keyboard;
+    private bool _gradeColors;
+    private bool _logoGrade;
     private int _lightMax = 4;
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private bool _suppressAutoApply;
@@ -37,25 +39,24 @@ public partial class LightEditorWindow : Window
         Title = title;
         TitleText.Text = title;
         MechrevoHw? hw = Program.hw;
-        _gradeBrightness = _keyboard || (hw != null
+        bool gen40 = hw != null
             && !hw.UsesBaolongda
-            && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
-            && (string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
-                || string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal)));
-        if (_gradeBrightness)
-        {
-            LightSlider.Minimum = 0;
-            LightSlider.Maximum = 4;
-        }
+            && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+        _logoGrade = gen40 && string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal);
+        bool lightbarGrade = gen40 && string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal);
+        _gradeColors = _logoGrade || lightbarGrade;
+        _gradeBrightness = _keyboard || _logoGrade;
+        LightSlider.Minimum = 0;
+        LightSlider.Maximum = _gradeBrightness ? 4 : 100;
+        SpeedSlider.Minimum = 0;
+        SpeedSlider.Maximum = 4;
         if (_keyboard)
         {
             bool bd = hw?.UsesBaolongda == true;
             bool wujie = hw?.WujieSmuApu == true;
-            _lightMax = wujie ? 2 : 4;
+            _lightMax = wujie ? 2 : (bd ? Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
             LightSlider.Minimum = bd || wujie ? 1 : 0;
             LightSlider.Maximum = _lightMax;
-            SpeedSlider.Minimum = 0;
-            SpeedSlider.Maximum = 4;
         }
         _settings = LightingSettingsStore.Load(topic, effects.Length > 0 ? effects[0].Effect : "Single");
         _light = Math.Clamp(_settings.Light, (int)LightSlider.Minimum, (int)LightSlider.Maximum);
@@ -109,8 +110,8 @@ public partial class LightEditorWindow : Window
         }
         LightSlider.Value = _gradeBrightness ? _light : _light * 25;
         LightText.Text = ((int)LightSlider.Value).ToString();
-        SpeedSlider.Value = _speed * 25;
-        SpeedText.Text = ((int)SpeedSlider.Value).ToString();
+        SpeedSlider.Value = _speed;
+        SpeedText.Text = _speed.ToString();
     }
 
     private void LoadEffects()
@@ -136,42 +137,54 @@ public partial class LightEditorWindow : Window
 
     private void RefreshColorUi()
     {
-        int mode = LightForm.LightEffectColorMode(SelectedEffect);
+        string effect = SelectedEffect;
         if (_keyboard)
         {
-            // 键盘通道没有七色混色；呼吸只有固定四色，彩虹不可改颜色。
             MixRow.Visibility = Visibility.Collapsed;
-            string keyboardEffect = SelectedEffect;
-            bool keyboardManual = string.Equals(keyboardEffect, "Manual", StringComparison.Ordinal);
-            bool keyboardBreathing = string.Equals(keyboardEffect, "Breathing", StringComparison.Ordinal);
-            bool keyboardRainbow = string.Equals(keyboardEffect, "Rainbow", StringComparison.Ordinal);
-            ColorRow.Visibility = mode == 1 && !keyboardBreathing && !keyboardRainbow && !keyboardManual
+            bool wujie = Program.hw?.WujieSmuApu == true;
+            bool keyboardManual = string.Equals(effect, "Manual", StringComparison.Ordinal);
+            bool keyboardBreathing = string.Equals(effect, "Breathing", StringComparison.Ordinal);
+            bool keyboardRainbow = string.Equals(effect, "Rainbow", StringComparison.Ordinal);
+            ColorRow.Visibility = !wujie && !keyboardManual && !keyboardBreathing && !keyboardRainbow
+                && KeyboardFirmwareEffects.IsSingleColorEffect(effect)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             UpdateColorButton();
             RefreshKeyboardUi();
             return;
         }
-        ColorRow.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
-        MixRow.Visibility = mode == 7 ? Visibility.Visible : Visibility.Collapsed;
-        if (mode == 7)
+        if (_gradeColors)
         {
-            MixGrid.Children.Clear();
-            for (int i = 0; i < 7; i++)
+            int mode = LightForm.LightEffectColorMode(effect);
+            ColorRow.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
+            MixRow.Visibility = mode == 7 ? Visibility.Visible : Visibility.Collapsed;
+            if (mode == 7)
             {
-                System.Drawing.Color c = System.Drawing.Color.FromArgb(_mixColors[i]);
-                Button swatch = new()
+                MixGrid.Children.Clear();
+                for (int i = 0; i < 7; i++)
                 {
-                    Height = 26,
-                    Margin = new Thickness(2),
-                    Padding = new Thickness(0),
-                    Tag = i,
-                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
-                    ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}"
-                };
-                swatch.Click += Mix_Click;
-                MixGrid.Children.Add(swatch);
+                    System.Drawing.Color c = System.Drawing.Color.FromArgb(_mixColors[i]);
+                    Button swatch = new()
+                    {
+                        Height = 26,
+                        Margin = new Thickness(2),
+                        Padding = new Thickness(0),
+                        Tag = i,
+                        Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
+                        ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}"
+                    };
+                    swatch.Click += Mix_Click;
+                    MixGrid.Children.Add(swatch);
+                }
             }
+        }
+        else
+        {
+            // 非 Gen40 普通灯带/Logo/铰链/同步：颜色按单色系效果判断，没有七色混色。
+            ColorRow.Visibility = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            MixRow.Visibility = Visibility.Collapsed;
         }
         UpdateColorButton();
         RefreshKeyboardUi();
@@ -235,6 +248,7 @@ public partial class LightEditorWindow : Window
         string effect = SelectedEffect;
         bool manual = string.Equals(effect, "Manual", StringComparison.Ordinal);
         bool breathing = string.Equals(effect, "Breathing", StringComparison.Ordinal);
+        SpeedRow.Visibility = Visibility.Collapsed;
         PerKeyPanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
         ManualPalettePanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
         BreathPanel.Visibility = breathing ? Visibility.Visible : Visibility.Collapsed;
@@ -364,10 +378,10 @@ public partial class LightEditorWindow : Window
             ScheduleAutoApply();
             return;
         }
-        _speed = Math.Clamp((int)Math.Round(e.NewValue / 25.0), 0, 4);
+        _speed = Math.Clamp((int)Math.Round(e.NewValue), 0, 4);
         if (SpeedText != null)
         {
-            SpeedText.Text = ((int)e.NewValue).ToString();
+            SpeedText.Text = _speed.ToString();
         }
         ScheduleAutoApply();
     }
