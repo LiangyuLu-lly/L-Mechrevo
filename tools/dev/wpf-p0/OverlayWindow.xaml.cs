@@ -28,11 +28,24 @@ public partial class OverlayWindow : Window
 {
     private readonly Func<OverlaySnapshot> _provider;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private int _displayMode = 1;
+    private Point _pressPoint;
+    private bool _pressed;
+    private bool _dragging;
 
     public OverlayWindow(Func<OverlaySnapshot> provider)
     {
         InitializeComponent();
         _provider = provider;
+        try
+        {
+            _displayMode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
+        }
+        catch
+        {
+            _displayMode = 1;
+        }
+        ApplyDisplayMode();
         Loaded += (_, _) =>
         {
             if (Left <= 0 || Top <= 0)
@@ -153,11 +166,77 @@ public partial class OverlayWindow : Window
         return speed + " " + percent;
     }
 
+    private void ApplyDisplayMode()
+    {
+        bool standard = _displayMode >= 1;
+        bool complete = _displayMode >= 2;
+        CpuDetailText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
+        CpuFanText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
+        GpuDetailText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
+        GpuFanText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
+        RamText.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
+        BatteryText.Visibility = Visibility.Visible;
+    }
+
+    private void CycleDisplayMode()
+    {
+        _displayMode = (_displayMode + 1) % 3;
+        try
+        {
+            MechrevoLite.AppConfig.Set("overlay_wpf_mode", _displayMode);
+        }
+        catch
+        {
+        }
+        ApplyDisplayMode();
+    }
+
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed)
+        if (e.ButtonState != MouseButtonState.Pressed)
         {
-            DragMove();
+            return;
+        }
+        _pressed = true;
+        _dragging = false;
+        _pressPoint = e.GetPosition(this);
+        CaptureMouse();
+    }
+
+    private void Window_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_pressed || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+        Point now = e.GetPosition(this);
+        if (Math.Abs(now.X - _pressPoint.X) > 5 || Math.Abs(now.Y - _pressPoint.Y) > 5)
+        {
+            _dragging = true;
+            _pressed = false;
+            ReleaseMouseCapture();
+            try
+            {
+                DragMove();
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_pressed)
+        {
+            return;
+        }
+        _pressed = false;
+        ReleaseMouseCapture();
+        Point now = e.GetPosition(this);
+        if (!_dragging && Math.Abs(now.X - _pressPoint.X) <= 5 && Math.Abs(now.Y - _pressPoint.Y) <= 5)
+        {
+            CycleDisplayMode();
         }
     }
 
