@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MechrevoLite;
 using MechrevoLite.Battery;
+using MechrevoLite.Diagnostics;
 using MechrevoLite.Display;
 using MechrevoLite.Hardware;
 using System.Windows.Interop;
@@ -49,6 +50,7 @@ public partial class OriginalStyleWindow : Window
     private bool _dark = true;
     private bool _syncingBrightness;
     private bool _syncingCalibration;
+    private OverlayWindow? _overlayWindow;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private BackendProbe? _backendProbe;
@@ -1676,16 +1678,94 @@ public partial class OriginalStyleWindow : Window
         new MainWindow().Show();
     }
 
-    private void DockButton_Click(object sender, RoutedEventArgs e)
+    private async void DockButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is System.Windows.Controls.Button button && button.Tag is string name)
+        if (sender is not System.Windows.Controls.Button button || button.Tag is not string name)
         {
-            if (name == "设置")
-            {
+            return;
+        }
+        switch (name)
+        {
+            case "设置":
                 new SettingsWindow(this).ShowDialog();
                 return;
+
+            case "悬浮窗":
+                if (_overlayWindow != null)
+                {
+                    _overlayWindow.Close();
+                    _overlayWindow = null;
+                    StatusText.Text = "悬浮窗已关闭";
+                    return;
+                }
+                _overlayWindow = new OverlayWindow(GetOverlaySnapshot);
+                _overlayWindow.Closed += (_, _) => _overlayWindow = null;
+                _overlayWindow.Show();
+                StatusText.Text = "悬浮窗已打开";
+                return;
+
+            case "赞助":
+                new SponsorWindow { Owner = this }.ShowDialog();
+                return;
+
+            case "诊断":
+                await ExportDiagnosticPackAsync();
+                return;
+
+            case "退出":
+                Close();
+                Application.Current.Shutdown();
+                return;
+        }
+    }
+
+    private OverlaySnapshot GetOverlaySnapshot()
+    {
+        MechrevoHw? hw = _backendProbe?.Hw;
+        double? power = null;
+        return new OverlaySnapshot(
+            hw?.CpuTemp ?? -1,
+            hw?.GpuTemp ?? -1,
+            hw?.CpuFanRpm ?? -1,
+            power,
+            hw?.BatteryPercent ?? -1);
+    }
+
+    private async Task ExportDiagnosticPackAsync()
+    {
+        Microsoft.Win32.SaveFileDialog dialog = new()
+        {
+            Title = "导出诊断包",
+            Filter = "Zip 压缩包 (*.zip)|*.zip",
+            DefaultExt = "zip",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = DiagnosticPackExporter.BuildFileName(Program.ReleaseVersion, DateTime.Now)
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+        StatusText.Text = "正在导出诊断包…";
+        try
+        {
+            DiagnosticPackInputs inputs = DiagnosticPackCapture.Capture();
+            DiagnosticPackResult result = await DiagnosticPackRunner.ExportAsync(dialog.FileName, inputs);
+            StatusText.Text = "诊断包已导出：" + System.IO.Path.GetFileName(result.ZipPath);
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "/select,\"" + result.ZipPath + "\"")
+                {
+                    UseShellExecute = true
+                });
             }
-            StatusText.Text = "P0 · " + name;
+            catch
+            {
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "诊断包导出失败：" + ex.Message;
         }
     }
 
