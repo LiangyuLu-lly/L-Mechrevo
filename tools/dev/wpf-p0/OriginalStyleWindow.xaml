@@ -538,11 +538,16 @@
                                 </Viewbox><TextBlock Text="显卡模式" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock x:Name="GpuStat" Grid.Column="1" Text="GPU —" Style="{StaticResource StatText}" />
                         </Grid>
-                        <UniformGrid Columns="3" Margin="0,2,0,0">
-                            <ToggleButton x:Name="GpuEcoButton" Content="核显模式" Tag="0" Style="{StaticResource GpuSegment}" Click="GpuMode_Click" />
-                            <ToggleButton x:Name="GpuHybridButton" Content="混合模式" Tag="1" Style="{StaticResource GpuSegment}" Click="GpuMode_Click" />
-                            <ToggleButton x:Name="GpuDirectButton" Content="独显直连" Tag="2" Style="{StaticResource GpuSegment}" IsChecked="True" Click="GpuMode_Click" Margin="0" />
-                        </UniformGrid>
+                        <Grid Margin="0,2,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="GpuEcoColumn" Width="*" />
+                                <ColumnDefinition x:Name="GpuHybridColumn" Width="*" />
+                                <ColumnDefinition x:Name="GpuDirectColumn" Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ToggleButton x:Name="GpuEcoButton" Grid.Column="0" Content="核显模式" Tag="0" Style="{StaticResource GpuSegment}" Click="GpuMode_Click" />
+                            <ToggleButton x:Name="GpuHybridButton" Grid.Column="1" Content="混合模式" Tag="1" Style="{StaticResource GpuSegment}" Click="GpuMode_Click" />
+                            <ToggleButton x:Name="GpuDirectButton" Grid.Column="2" Content="独显直连" Tag="2" Style="{StaticResource GpuSegment}" IsChecked="True" Click="GpuMode_Click" Margin="0" />
+                        </Grid>
                     </StackPanel>
 
                     <!-- 屏幕 -->

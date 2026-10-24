@@ -1330,6 +1330,9 @@ public partial class OriginalStyleWindow : Window
         string igpuMode = AppConfig.GetString("igpu_only_ui") ?? "auto";
         bool igpuSupported = (caps?.IgpuOnly ?? false) || (hw?.SupportsIgpuOnly ?? false);
         GpuEcoButton.Visibility = ResolveRowVisibility(igpuMode, igpuSupported);
+        GpuEcoColumn.Width = GpuEcoButton.Visibility == Visibility.Visible
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(0);
         if (GpuEcoButton.Visibility == Visibility.Visible)
         {
             GpuSection.Visibility = Visibility.Visible;
