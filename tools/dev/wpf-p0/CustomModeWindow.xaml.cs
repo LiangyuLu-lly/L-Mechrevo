@@ -354,7 +354,9 @@ public partial class CustomModeWindow : Window
         try
         {
             string? seedFrom = (Program.hw?.UsesBaolongda == true) ? null : _current?.Id;
-            MechrevoLite.Mode.PerfModeDefinition? mode = MechrevoLite.Mode.PerfModeStore.AddCustom(seedFrom);
+            MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+            MechrevoLite.Mode.PerfModeDefinition? mode = perf?.AddCustom(seedFrom)
+                ?? MechrevoLite.Mode.PerfModeStore.AddCustom(seedFrom);
             if (mode == null)
             {
                 StatusText.Text = "新建自定义模式失败（已达到上限或没有可用序号）";
@@ -362,7 +364,6 @@ public partial class CustomModeWindow : Window
             }
             LoadModes(mode.Id);
             StatusText.Text = "已新建：" + ModeName(mode);
-            MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
             if (perf != null)
             {
                 await perf.ActivateAsync(mode.Id, "wpf-editor-new", forceParameters: true);
