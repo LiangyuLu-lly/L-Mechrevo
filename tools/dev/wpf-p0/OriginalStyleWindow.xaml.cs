@@ -3800,6 +3800,8 @@ public partial class OriginalStyleWindow : Window
             HardwareControl.gpuTemp > 0 ? HardwareControl.gpuTemp : (hw?.GpuTemp ?? -1),
             HardwareControl.gpuUsage ?? hw?.GpuUsage ?? -1,
             HardwareControl.gpuCoreFreq > 0 ? HardwareControl.gpuCoreFreq : (hw?.GpuCoreFreq ?? -1),
+            HardwareControl.vramUsedMb ?? (hw != null && hw.VramUsedMb > 0 ? hw.VramUsedMb : -1),
+            HardwareControl.vramUsage ?? -1,
             HardwareControl.cpuFanRPM > 0 ? HardwareControl.cpuFanRPM : (hw?.CpuFanRpm ?? -1),
             HardwareControl.gpuFanRPM > 0 ? HardwareControl.gpuFanRPM : (hw?.GpuFanRpm ?? -1),
             HardwareControl.cpuFan is int cpuDuty ? cpuDuty : (hw?.CpuFanDuty ?? -1),

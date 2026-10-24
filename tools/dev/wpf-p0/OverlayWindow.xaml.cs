@@ -12,6 +12,8 @@ public readonly record struct OverlaySnapshot(
     int GpuTemp,
     int GpuUsage,
     int GpuCoreFreq,
+    int GpuVramUsedMb,
+    int GpuVramUsage,
     int CpuFanRpm,
     int GpuFanRpm,
     int CpuFanDuty,
@@ -32,6 +34,7 @@ public partial class OverlayWindow : Window
     private Point _pressPoint;
     private bool _pressed;
     private bool _dragging;
+    private bool _acOnline;
 
     public OverlayWindow(Func<OverlaySnapshot> provider)
     {
@@ -82,39 +85,52 @@ public partial class OverlayWindow : Window
         try
         {
             OverlaySnapshot s = _provider();
-            CpuText.Text = s.CpuTemp >= 0 ? "CPU " + s.CpuTemp + "℃" : "CPU —";
-            CpuDetailText.Text = FormatCpuDetail(s);
-            GpuText.Text = s.GpuTemp >= 0 ? "GPU " + s.GpuTemp + "℃" : "GPU —";
-            GpuDetailText.Text = FormatGpuDetail(s);
-            CpuFanText.Text = FormatFan(s.CpuFanRpm, s.CpuFanDuty);
-            GpuFanText.Text = FormatFan(s.GpuFanRpm, s.GpuFanDuty);
-            RamText.Text = s.RamUsage >= 0
-                ? "内存 " + s.RamUsage + "%" + (s.RamUsedGb > 0 ? " · " + s.RamUsedGb.ToString("0.0") + "GB" : "")
-                : "内存 —";
+            _acOnline = s.AcOnline;
+            GpuTempText.Text = FormatTemp(s.GpuTemp);
+            GpuFreqText.Text = FormatFreq(s.GpuCoreFreq);
+            GpuFanText.Text = FormatRpm(s.GpuFanRpm);
+            GpuPowerText.Text = FormatPower(s.GpuPower);
+            GpuUsageText.Text = FormatPercent(s.GpuUsage);
+            GpuUsageBar.Value = Math.Clamp(s.GpuUsage, 0, 100);
+            GpuMemoryText.Text = s.GpuVramUsedMb > 0 ? (s.GpuVramUsedMb / 1024.0).ToString("0.0") + "GB" : "—";
+            GpuMemoryBar.Value = Math.Clamp(s.GpuVramUsage, 0, 100);
+
+            CpuTempText.Text = FormatTemp(s.CpuTemp);
+            CpuFreqText.Text = FormatFreq(s.CpuFrequency);
+            CpuFanText.Text = FormatRpm(s.CpuFanRpm);
+            CpuPowerText.Text = FormatPower(s.CpuPower);
+            CpuUsageText.Text = FormatPercent(s.CpuUsage);
+            CpuUsageBar.Value = Math.Clamp(s.CpuUsage, 0, 100);
+            CpuMemoryText.Text = s.RamUsage >= 0
+                ? (s.RamUsedGb > 0 ? s.RamUsedGb.ToString("0.0") + "GB" : s.RamUsage + "%")
+                : "—";
+            CpuMemoryBar.Value = Math.Clamp(s.RamUsage, 0, 100);
+
             string source = FormatPowerSource(s.AcOnline);
             string state = s.Charging ? "充电中" : (s.AcOnline ? (s.BatteryPercent >= 99 ? "已充满" : "未充电") : "放电中");
             BatteryText.Text = s.BatteryPercent >= 0 ? "电池 " + s.BatteryPercent + "%" : "电池 —";
             BatteryDetailText.Text = s.BatteryPercent >= 0 ? source + " · " + state : "";
+            UpdateBatteryVisibility();
         }
         catch
         {
         }
     }
 
-    private static string FormatCpuDetail(OverlaySnapshot s)
-    {
-        string usage = s.CpuUsage >= 0 ? s.CpuUsage + "%" : "—";
-        string freq = s.CpuFrequency > 0 ? (s.CpuFrequency / 1000.0).ToString("0.0") + "GHz" : "—";
-        string power = s.CpuPower > 0 ? s.CpuPower.ToString("0.0") + "W" : "—";
-        return power + " · " + freq + " · " + usage;
-    }
+    private static string FormatTemp(int temp) => temp > 0 ? temp + "°" : "—";
 
-    private static string FormatGpuDetail(OverlaySnapshot s)
+    private static string FormatFreq(int mhz) => mhz > 0 ? (mhz / 1000.0).ToString("0.0") + "G" : "—";
+
+    private static string FormatRpm(int rpm) => rpm > 0 ? rpm + " RPM" : "— RPM";
+
+    private static string FormatPower(float watts) => watts > 0 ? watts.ToString("0.0") + "W" : "—";
+
+    private static string FormatPercent(int value) => value >= 0 ? value + "%" : "—";
+
+    private void UpdateBatteryVisibility()
     {
-        string usage = s.GpuUsage >= 0 ? s.GpuUsage + "%" : "—";
-        string freq = s.GpuCoreFreq > 0 ? (s.GpuCoreFreq / 1000.0).ToString("0.0") + "GHz" : "—";
-        string power = s.GpuPower > 0 ? s.GpuPower.ToString("0.0") + "W" : "—";
-        return power + " · " + freq + " · " + usage;
+        bool showBattery = !_acOnline;
+        BatteryPanel.Visibility = showBattery ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static string FormatPowerSource(bool acOnline)
@@ -127,12 +143,10 @@ public partial class OverlayWindow : Window
         {
             if (MechrevoLite.Program.hw?.UsesBaolongda == true)
             {
-                // 宝龙达没有适配器功率表，保持原版「外接电源」，不显示“未识别”。
                 return "外接电源";
             }
             MechrevoLite.Hardware.PowerInputSample? sample = MechrevoLite.HardwareControl.PowerInput;
-            MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(
-                sample, acOnline);
+            MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(sample, acOnline);
             if (sample?.AdapterWatts is int watts)
             {
                 string text = MechrevoLite.SettingsForm.PowerSourceHeadline(kind, watts);
@@ -144,7 +158,6 @@ public partial class OverlayWindow : Window
             int raw = sample?.BiosInfo3Raw ?? -1;
             if (raw >= 0)
             {
-                // 同方机型不在功率表里时，直接显示 EC 原始读数。
                 return "外接电源（EC 0x" + raw.ToString("X2") + "）";
             }
             decimal? rate = MechrevoLite.HardwareControl.batteryRate;
@@ -157,13 +170,6 @@ public partial class OverlayWindow : Window
         {
         }
         return "外接电源";
-    }
-
-    private static string FormatFan(int rpm, int duty)
-    {
-        string speed = rpm > 0 ? rpm + "rpm" : "—";
-        string percent = duty >= 0 ? duty + "%" : "—";
-        return speed + " " + percent;
     }
 
     internal void ApplyAppearance(double opacity, int mode, int intervalMs, bool resetPosition)
@@ -228,14 +234,20 @@ public partial class OverlayWindow : Window
     {
         bool standard = _displayMode >= 1;
         bool complete = _displayMode >= 2;
-        CpuDetailText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
-        CpuFanText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
-        GpuDetailText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
-        GpuFanText.Visibility = standard ? Visibility.Visible : Visibility.Collapsed;
-        InfoGrid.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
-        RamText.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
-        BatteryText.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
-        BatteryDetailText.Visibility = complete ? Visibility.Visible : Visibility.Collapsed;
+        Visibility standardVisibility = standard ? Visibility.Visible : Visibility.Collapsed;
+        Visibility completeVisibility = complete ? Visibility.Visible : Visibility.Collapsed;
+
+        GpuPowerText.Visibility = standardVisibility;
+        GpuUsageText.Visibility = standardVisibility;
+        GpuUsageBar.Visibility = standardVisibility;
+        GpuMemoryText.Visibility = completeVisibility;
+        GpuMemoryBar.Visibility = completeVisibility;
+        CpuPowerText.Visibility = standardVisibility;
+        CpuUsageText.Visibility = standardVisibility;
+        CpuUsageBar.Visibility = standardVisibility;
+        CpuMemoryText.Visibility = completeVisibility;
+        CpuMemoryBar.Visibility = completeVisibility;
+        UpdateBatteryVisibility();
     }
 
     private void CycleDisplayMode()
