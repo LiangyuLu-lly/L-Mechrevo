@@ -3661,10 +3661,21 @@ public partial class OriginalStyleWindow : Window
         try
         {
             double pct = HardwareControl.GetBatteryChargePercentage();
-            if (pct >= 0)
+            if (battery < 0 && pct >= 0)
             {
                 battery = (int)Math.Round(pct);
             }
+        }
+        catch
+        {
+        }
+        bool acOnline = false;
+        bool charging = false;
+        try
+        {
+            System.Windows.Forms.PowerStatus power = System.Windows.Forms.SystemInformation.PowerStatus;
+            acOnline = power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+            charging = power.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.Charging);
         }
         catch
         {
@@ -3683,6 +3694,8 @@ public partial class OriginalStyleWindow : Window
             HardwareControl.ramUsage ?? hw?.RamUsage ?? -1,
             HardwareControl.ramUsedMb.HasValue ? HardwareControl.ramUsedMb.Value / 1024.0 : (hw?.RamUsedGb ?? -1),
             battery,
+            acOnline,
+            charging,
             HardwareControl.cpuPower ?? 0f,
             HardwareControl.gpuPower ?? 0f);
     }

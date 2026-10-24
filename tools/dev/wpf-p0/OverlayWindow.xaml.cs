@@ -19,6 +19,8 @@ public readonly record struct OverlaySnapshot(
     int RamUsage,
     double RamUsedGb,
     int BatteryPercent,
+    bool AcOnline,
+    bool Charging,
     float CpuPower,
     float GpuPower);
 
@@ -75,7 +77,8 @@ public partial class OverlayWindow : Window
             RamText.Text = s.RamUsage >= 0
                 ? "内存 " + s.RamUsage + "%" + (s.RamUsedGb > 0 ? " · " + s.RamUsedGb.ToString("0.0") + "GB" : "")
                 : "内存 —";
-            BatteryText.Text = s.BatteryPercent >= 0 ? "电池 " + s.BatteryPercent + "%" : "电池 —";
+            string powerState = s.AcOnline ? (s.Charging ? " · 充电中" : " · 外接电源") : " · 电池供电";
+            BatteryText.Text = s.BatteryPercent >= 0 ? "电池 " + s.BatteryPercent + "%" + powerState : "电池 —";
         }
         catch
         {
@@ -87,7 +90,7 @@ public partial class OverlayWindow : Window
         string usage = s.CpuUsage >= 0 ? s.CpuUsage + "%" : "—";
         string freq = s.CpuFrequency > 0 ? (s.CpuFrequency / 1000.0).ToString("0.0") + "GHz" : "—";
         string power = s.CpuPower > 0 ? s.CpuPower.ToString("0.0") + "W" : "—";
-        return usage + " · " + freq + " · " + power;
+        return power + " · " + freq + " · " + usage;
     }
 
     private static string FormatGpuDetail(OverlaySnapshot s)
@@ -95,7 +98,7 @@ public partial class OverlayWindow : Window
         string usage = s.GpuUsage >= 0 ? s.GpuUsage + "%" : "—";
         string freq = s.GpuCoreFreq > 0 ? (s.GpuCoreFreq / 1000.0).ToString("0.0") + "GHz" : "—";
         string power = s.GpuPower > 0 ? s.GpuPower.ToString("0.0") + "W" : "—";
-        return usage + " · " + freq + " · " + power;
+        return power + " · " + freq + " · " + usage;
     }
 
     private static string FormatFan(int rpm, int duty)

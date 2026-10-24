@@ -27,9 +27,10 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="CpuText" Text="CPU —" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" />
-                <TextBlock x:Name="CpuFanText" Grid.Column="1" Text="—" Style="{StaticResource MutedText}" FontSize="10"
+                <TextBlock x:Name="CpuDetailText" Grid.Column="1" Text="—" Foreground="{DynamicResource TextBrush}" FontSize="12"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <TextBlock x:Name="CpuDetailText" Grid.Column="2" Text="—" Style="{StaticResource MutedText}" FontSize="10" VerticalAlignment="Center" />
+                <TextBlock x:Name="CpuFanText" Grid.Column="2" Text="—" Foreground="{DynamicResource TextBrush}" FontSize="12"
+                           VerticalAlignment="Center" />
             </Grid>
             <Grid Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
@@ -38,9 +39,10 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="GpuText" Text="GPU —" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" />
-                <TextBlock x:Name="GpuFanText" Grid.Column="1" Text="—" Style="{StaticResource MutedText}" FontSize="10"
+                <TextBlock x:Name="GpuDetailText" Grid.Column="1" Text="—" Foreground="{DynamicResource TextBrush}" FontSize="12"
                            HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <TextBlock x:Name="GpuDetailText" Grid.Column="2" Text="—" Style="{StaticResource MutedText}" FontSize="10" VerticalAlignment="Center" />
+                <TextBlock x:Name="GpuFanText" Grid.Column="2" Text="—" Foreground="{DynamicResource TextBrush}" FontSize="12"
+                           VerticalAlignment="Center" />
             </Grid>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
                 <TextBlock x:Name="RamText" Text="内存 —" Style="{StaticResource MutedText}" FontSize="10" Margin="0,0,10,0" />
