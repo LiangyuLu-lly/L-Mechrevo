@@ -3017,6 +3017,18 @@ public partial class OriginalStyleWindow : Window
         InitScreenColorControls();
     }
 
+    private static (string Effect, string Name)[] CurrentLogoEffectsForBackend()
+    {
+        MechrevoHw? hw = Program.hw;
+        if (hw != null && !hw.UsesBaolongda
+            && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
+                || hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40))
+        {
+            return EffectsForCurrentBackend(MechrevoLite.LightForm.LogoEffectsGen40);
+        }
+        return EffectsForCurrentBackend(MechrevoLite.LightForm.CurrentLogoEffects());
+    }
+
     private static (string Effect, string Name)[] EffectsForCurrentBackend((string Effect, string Name)[] effects)
     {
         if (Program.hw?.UsesBaolongda == true)
@@ -3081,7 +3093,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             FillEffects(LightStripEffectCombo, EffectsForCurrentBackend(LightForm.LightbarEffects), "HidLightbar/Ctrl");
-            FillEffects(LogoEffectCombo, EffectsForCurrentBackend(LightForm.CurrentLogoEffects()), "HidLightbar_Logo/Ctrl");
+            FillEffects(LogoEffectCombo, CurrentLogoEffectsForBackend(), "HidLightbar_Logo/Ctrl");
             FillEffects(LightHingeEffectCombo, EffectsForCurrentBackend(LightForm.HingeEffects), "HidLightbar_Hinge/Ctrl");
             FillEffects(LightSyncEffectCombo, EffectsForCurrentBackend(LightForm.SyncEffects), "HidLightbar_Sync/Ctrl");
         }
@@ -3177,7 +3189,7 @@ public partial class OriginalStyleWindow : Window
             KeyboardLightSwitch.IsChecked = false;
         }
         LightStripSwitch.IsChecked = LoadChannelPower("HidLightbar/Ctrl", LightForm.LightbarEffects[0].Effect);
-        LogoLightSwitch.IsChecked = LoadChannelPower("HidLightbar_Logo/Ctrl", LightForm.CurrentLogoEffects()[0].Effect);
+        LogoLightSwitch.IsChecked = LoadChannelPower("HidLightbar_Logo/Ctrl", CurrentLogoEffectsForBackend()[0].Effect);
         LightHingeSwitch.IsChecked = LoadChannelPower("HidLightbar_Hinge/Ctrl", LightForm.HingeEffects[0].Effect);
         LightSyncSwitch.IsChecked = LoadChannelPower("HidLightbar_Sync/Ctrl", LightForm.SyncEffects[0].Effect);
         int seconds = AppConfig.Get("lighting_idle_seconds", 0);
@@ -3245,7 +3257,7 @@ public partial class OriginalStyleWindow : Window
         }
         MechrevoLite.Program.hw = _backendProbe.Hw;
         MechrevoLite.Program.service = _backendProbe.Service!;
-        OpenLightEditor("HidLightbar_Logo/Ctrl", "Logo 灯光", EffectsForCurrentBackend(MechrevoLite.LightForm.CurrentLogoEffects()));
+        OpenLightEditor("HidLightbar_Logo/Ctrl", "Logo 灯光", CurrentLogoEffectsForBackend());
     }
 
     private void CheckLightingIdle()

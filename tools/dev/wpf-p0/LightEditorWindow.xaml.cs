@@ -41,7 +41,8 @@ public partial class LightEditorWindow : Window
         MechrevoHw? hw = Program.hw;
         bool gen40 = hw != null
             && !hw.UsesBaolongda
-            && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+            && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
+                || hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40);
         _logoGrade = gen40 && string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal);
         bool lightbarGrade = gen40 && string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal);
         _gradeColors = _logoGrade || lightbarGrade;
