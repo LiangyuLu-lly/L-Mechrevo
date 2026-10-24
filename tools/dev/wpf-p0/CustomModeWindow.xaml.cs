@@ -32,29 +32,46 @@ public partial class CustomModeWindow : Window
     {
         _modes.Clear();
         _modes.AddRange(MechrevoLite.Mode.PerfModeStore.Load());
+        string target = selectedId ?? MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId
+            ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId;
+        MechrevoLite.Mode.PerfModeDefinition? targetMode = _modes.FirstOrDefault(m => string.Equals(m.Id, target, StringComparison.Ordinal));
+        if (targetMode == null)
+        {
+            targetMode = _modes.FirstOrDefault(m => m.IsCustom) ?? _modes.FirstOrDefault();
+        }
+        if (targetMode == null)
+        {
+            return;
+        }
+        target = targetMode.Id;
+        bool customOnly = targetMode.IsCustom;
         ModeCombo.Items.Clear();
         foreach (MechrevoLite.Mode.PerfModeDefinition mode in _modes)
         {
+            if (customOnly)
+            {
+                if (!mode.IsCustom)
+                {
+                    continue;
+                }
+            }
+            else if (!string.Equals(mode.Id, target, StringComparison.Ordinal))
+            {
+                continue;
+            }
             ModeCombo.Items.Add(new ComboBoxItem
             {
                 Content = ModeName(mode),
                 Tag = mode.Id
             });
         }
-        string target = selectedId ?? MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId
-            ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId;
-        int index = _modes.FindIndex(m => string.Equals(m.Id, target, StringComparison.Ordinal));
-        if (index < 0)
+        for (int i = 0; i < ModeCombo.Items.Count; i++)
         {
-            index = _modes.FindIndex(m => m.IsCustom);
-        }
-        if (index < 0)
-        {
-            index = 0;
-        }
-        if (index >= 0 && ModeCombo.Items.Count > index)
-        {
-            ModeCombo.SelectedIndex = index;
+            if (ModeCombo.Items[i] is ComboBoxItem item && string.Equals(item.Tag as string, target, StringComparison.Ordinal))
+            {
+                ModeCombo.SelectedIndex = i;
+                return;
+            }
         }
     }
 
@@ -76,11 +93,7 @@ public partial class CustomModeWindow : Window
 
     public void BindMode(string id)
     {
-        int index = _modes.FindIndex(m => string.Equals(m.Id, id, StringComparison.Ordinal));
-        if (index >= 0 && index < ModeCombo.Items.Count)
-        {
-            ModeCombo.SelectedIndex = index;
-        }
+        LoadModes(id);
     }
 
     public async Task<bool> SelectModeAsync(string id)
