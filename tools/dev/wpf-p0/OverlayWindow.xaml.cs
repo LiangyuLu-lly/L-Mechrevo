@@ -92,9 +92,8 @@ public partial class OverlayWindow : Window
                 : "内存 —";
             string source = FormatPowerSource(s.AcOnline);
             string state = s.Charging ? "充电中" : (s.AcOnline ? (s.BatteryPercent >= 99 ? "已充满" : "未充电") : "放电中");
-            BatteryText.Text = s.BatteryPercent >= 0
-                ? "电池 " + s.BatteryPercent + "% · " + source + " · " + state
-                : "电池 —";
+            BatteryText.Text = s.BatteryPercent >= 0 ? "电池 " + s.BatteryPercent + "%" : "电池 —";
+            BatteryDetailText.Text = s.BatteryPercent >= 0 ? source + " · " + state : "";
         }
         catch
         {

@@ -47,10 +47,16 @@
                 <TextBlock x:Name="GpuFanText" Grid.Column="2" Text="—" Foreground="{DynamicResource TextBrush}" FontSize="12"
                            Margin="12,0,0,0" VerticalAlignment="Center" />
             </Grid>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
-                <TextBlock x:Name="RamText" Text="内存 —" Style="{StaticResource MutedText}" FontSize="10" Margin="0,0,10,0" />
-                <TextBlock x:Name="BatteryText" Text="电池 —" Style="{StaticResource MutedText}" FontSize="10" />
-            </StackPanel>
+            <Grid Margin="0,4,0,0">
+                <TextBlock x:Name="RamText" Text="内存 —" Style="{StaticResource MutedText}" FontSize="10"
+                           HorizontalAlignment="Left" VerticalAlignment="Center" />
+                <StackPanel HorizontalAlignment="Right">
+                    <TextBlock x:Name="BatteryText" Text="电池 —" Style="{StaticResource MutedText}" FontSize="10"
+                               HorizontalAlignment="Right" />
+                    <TextBlock x:Name="BatteryDetailText" Text="" Style="{StaticResource MutedText}" FontSize="10"
+                               HorizontalAlignment="Right" Margin="0,1,0,0" />
+                </StackPanel>
+            </Grid>
         </StackPanel>
     </Border>
 </Window>
