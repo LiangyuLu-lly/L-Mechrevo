@@ -33,7 +33,11 @@ public partial class SettingsWindow : Window
         {
             Status("设置加载异常：" + ex.Message);
         }
-        SourceInitialized += (_, _) => ApplyDarkTitleBar();
+        SourceInitialized += (_, _) =>
+  {
+      ApplyDarkTitleBar();
+      RemoveMinMaxButtons();
+  };
   Loaded += (_, _) => PositionAdjacentToOwner();
     }
 
@@ -534,6 +538,23 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void RemoveMinMaxButtons()
+    {
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == 0)
+        {
+            return;
+        }
+        const int GWL_STYLE = -16;
+        const int WS_MINIMIZEBOX = 0x00020000;
+        const int WS_MAXIMIZEBOX = 0x00010000;
+        nint style = GetWindowLongPtr(hwnd, GWL_STYLE);
+        long value = style.ToInt64();
+        value &= ~(long)(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+        SetWindowLongPtr(hwnd, GWL_STYLE, new nint(value));
+        SetWindowPos(hwnd, nint.Zero, 0, 0, 0, 0, 0x0027);
+    }
+
     private void PositionAdjacentToOwner()
     {
         if (Owner is not Window owner || owner.WindowState == WindowState.Minimized)
@@ -594,4 +615,13 @@ public partial class SettingsWindow : Window
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(nint hwnd, int attr, ref int value, int size);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern nint GetWindowLongPtr(nint hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
 }
