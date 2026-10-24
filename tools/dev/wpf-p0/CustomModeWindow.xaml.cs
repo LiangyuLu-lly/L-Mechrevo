@@ -881,17 +881,15 @@ public partial class CustomModeWindow : Window
         try
         {
             MechrevoHw? hw = Program.hw;
-            if (hw != null && hw.IsGcuConnected && !hw.UsesBaolongda && !hw.WujieSmuApu)
+            if (hw == null)
             {
-                string targetId = _firmwareMode
-                    ? "fw" + _firmwareVisualMode + "p" + _firmwareProfileIndex
-                    : (_current?.Id ?? "balanced");
-                new FanCurveWindow(targetId) { Owner = this }.Show();
+                StatusText.Text = "后端未连接，无法打开风扇曲线";
+                return;
             }
-            else
-            {
-                new OriginalFormHostWindow(new MechrevoLite.FanCurveForm()).Show();
-            }
+            string targetId = _firmwareMode
+                ? "fw" + _firmwareVisualMode + "p" + _firmwareProfileIndex
+                : (_current?.Id ?? "balanced");
+            new FanCurveWindow(targetId) { Owner = this }.Show();
         }
         catch (Exception ex)
         {

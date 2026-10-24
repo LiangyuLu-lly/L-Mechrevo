@@ -15,16 +15,17 @@ public partial class FanCurveWindow : Window
     private readonly string _modeId;
     private readonly MechrevoHw? _hw;
     private bool _dirty;
+    private WujieFanEcController? _wujieController;
 
     public FanCurveWindow(string modeId)
     {
         InitializeComponent();
         _modeId = modeId;
         _hw = Program.hw;
-        bool supported = _hw != null && _hw.IsGcuConnected && !_hw.UsesBaolongda && !_hw.WujieSmuApu;
+        bool supported = _hw != null && (_hw.IsGcuConnected || _hw.UsesBaolongda || _hw.WujieSmuApu);
         if (!supported)
         {
-            HintText.Text = "当前平台请使用原版风扇曲线窗口。";
+            HintText.Text = "后端未连接，无法读取风扇曲线。";
         }
         CpuCurve.Changed += MarkDirty;
         GpuCurve.Changed += MarkDirty;
@@ -56,6 +57,22 @@ public partial class FanCurveWindow : Window
     {
         if (_hw == null)
         {
+            return;
+        }
+        if (_hw.UsesBaolongda)
+        {
+            BaolongdaFanCurveSettings curve = _hw.LoadBaolongdaFanCurve(_modeId);
+            CpuCurve.Load(TempsToBytes(curve.Channel1Temperatures),
+                RpmsToPercent(curve.Channel1Rpms, curve.MaxRpm));
+            GpuCurve.Load(TempsToBytes(curve.Channel0Temperatures),
+                RpmsToPercent(curve.Channel0Rpms, curve.MaxRpm));
+            return;
+        }
+        if (_hw.WujieSmuApu && _hw.CpuCurveDuty.Length >= 16 && _hw.GpuCurveDuty.Length >= 16
+            && _hw.CpuCurveUpT.Length >= 16 && _hw.GpuCurveUpT.Length >= 16)
+        {
+            CpuCurve.Load(_hw.CpuCurveUpT, _hw.CpuCurveDuty);
+            GpuCurve.Load(_hw.GpuCurveUpT, _hw.GpuCurveDuty);
             return;
         }
         MechrevoLite.Mode.PerfModeSettings saved = MechrevoLite.Mode.PerfModeStore.LoadSettings(_modeId);
@@ -97,6 +114,58 @@ public partial class FanCurveWindow : Window
         if (_hw == null || !_hw.IsGcuConnected)
         {
             StatusText.Text = "GCU 未连接，无法下发风扇曲线";
+            return;
+        }
+        if (_hw.UsesBaolongda)
+        {
+            try
+            {
+                int[] cpu = CpuCurve.Duties;
+                int[] gpu = GpuCurve.Duties;
+                int maxRpm = Math.Max(1, _hw.FanRpmMaxForPercent);
+                BaolongdaFanCurveSettings curve = new()
+                {
+                    Enabled = true,
+                    FormatVersion = BaolongdaFanCurveSettings.CurrentFormatVersion,
+                    SyncEnabled = true,
+                    HysteresisC = FanCurveEngine.DefaultHysteresisC,
+                    IntervalMs = BaolongdaFanCurveSettings.DefaultIntervalMs,
+                    MinRpm = BaolongdaFanCurveSettings.DefaultMinRpm,
+                    MaxRpm = maxRpm,
+                    Channel1Temperatures = TempsToInts(CpuCurve.Temperatures),
+                    Channel1Rpms = PercentToRpms(cpu, maxRpm),
+                    Channel0Temperatures = TempsToInts(GpuCurve.Temperatures),
+                    Channel0Rpms = PercentToRpms(gpu, maxRpm)
+                };
+                bool ok = _hw.SaveBaolongdaFanCurve(_modeId, curve);
+                _dirty = false;
+                StatusText.Text = ok ? "宝龙达风扇曲线已保存并应用" : "宝龙达风扇曲线保存失败";
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "应用失败：" + ex.Message;
+            }
+            return;
+        }
+        if (_hw.WujieSmuApu)
+        {
+            try
+            {
+                int[] cpu = CpuCurve.Duties;
+                int[] gpu = GpuCurve.Duties;
+                _wujieController ??= new WujieFanEcController();
+                byte[] cpuTemps = CpuCurve.Temperatures;
+                byte[] gpuTemps = GpuCurve.Temperatures;
+                bool ok = _wujieController.Start(cpuTemps, cpu, independent: false, gpuTemps, gpu, out string detail);
+                PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
+                SaveWujieTemps(cpuTemps, gpuTemps);
+                _dirty = false;
+                StatusText.Text = ok ? "无界 EC 曲线已启动：" + detail : "无界 EC 曲线启动失败：" + detail;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "应用失败：" + ex.Message;
+            }
             return;
         }
         try
@@ -178,7 +247,20 @@ public partial class FanCurveWindow : Window
 
     private void Restore_Click(object sender, RoutedEventArgs e)
     {
-        if (_modeId.StartsWith("custom", StringComparison.Ordinal)
+        if (_hw != null && _hw.UsesBaolongda)
+        {
+            BaolongdaFanCurveSettings curve = _hw.LoadBaolongdaFanCurve(_modeId);
+            CpuCurve.Load(TempsToBytes(BaolongdaFanCurveSettings.DefaultTemperatures()),
+                RpmsToPercent(BaolongdaFanCurveSettings.DefaultRpms(_hw.FanRpmMaxForPercent), _hw.FanRpmMaxForPercent));
+            GpuCurve.Load(TempsToBytes(BaolongdaFanCurveSettings.DefaultTemperatures()),
+                RpmsToPercent(BaolongdaFanCurveSettings.DefaultRpms(_hw.FanRpmMaxForPercent), _hw.FanRpmMaxForPercent));
+        }
+        else if (_hw != null && _hw.WujieSmuApu)
+        {
+            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
+            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
+        }
+        else if (_modeId.StartsWith("custom", StringComparison.Ordinal)
             || _modeId.StartsWith("fw", StringComparison.Ordinal))
         {
             CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
@@ -199,8 +281,65 @@ public partial class FanCurveWindow : Window
         StatusText.Text = "已恢复默认曲线，点应用后下发";
     }
 
+    private void SaveWujieTemps(byte[] cpuTemps, byte[] gpuTemps)
+    {
+        try
+        {
+            string key = string.IsNullOrWhiteSpace(_modeId) ? "active" : _modeId;
+            MechrevoLite.AppConfig.Set("wujie_fan_cputemps_" + key, string.Join(",", cpuTemps));
+            MechrevoLite.AppConfig.Set("wujie_fan_gputemps_" + key, string.Join(",", gpuTemps));
+        }
+        catch
+        {
+        }
+    }
+
+    private static byte[] TempsToBytes(int[] temps)
+    {
+        byte[] bytes = new byte[16];
+        for (int i = 0; i < bytes.Length && i < temps.Length; i++)
+        {
+            bytes[i] = (byte)Math.Clamp(temps[i], 0, 255);
+        }
+        return bytes;
+    }
+
+    private static int[] TempsToInts(byte[] temps)
+    {
+        int[] ints = new int[16];
+        for (int i = 0; i < ints.Length && i < temps.Length; i++)
+        {
+            ints[i] = temps[i];
+        }
+        return ints;
+    }
+
+    private static byte[] RpmsToPercent(int[] rpms, int maxRpm)
+    {
+        byte[] duties = new byte[16];
+        int max = Math.Max(1, maxRpm);
+        for (int i = 0; i < duties.Length && i < rpms.Length; i++)
+        {
+            duties[i] = (byte)Math.Clamp((int)Math.Round(rpms[i] * 100.0 / max), 0, 100);
+        }
+        return duties;
+    }
+
+    private static int[] PercentToRpms(int[] duties, int maxRpm)
+    {
+        int[] rpms = new int[16];
+        for (int i = 0; i < rpms.Length && i < duties.Length; i++)
+        {
+            rpms[i] = (int)Math.Round(duties[i] * maxRpm / 100.0);
+        }
+        return rpms;
+    }
+
     private void Close_Click(object sender, RoutedEventArgs e)
     {
+        _wujieController?.Stop("窗口关闭");
+        _wujieController?.Dispose();
+        _wujieController = null;
         Close();
     }
 }
