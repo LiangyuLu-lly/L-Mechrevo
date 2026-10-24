@@ -389,6 +389,44 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
+                        <TextBlock Text="悬浮窗" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="显示内容" VerticalAlignment="Center" />
+                            <ComboBox x:Name="OverlayModeCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
+                                      SelectionChanged="OverlayMode_Changed">
+                                <ComboBoxItem Content="极简" Tag="0" />
+                                <ComboBoxItem Content="标准" Tag="1" />
+                                <ComboBoxItem Content="完整" Tag="2" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="不透明度" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="OverlayOpacitySlider" Width="130" Style="{DynamicResource RoundSlider}" Minimum="30" Maximum="100" Value="100"
+                                        VerticalAlignment="Center" ValueChanged="OverlayOpacity_Changed" />
+                                <TextBlock x:Name="OverlayOpacityText" Text="100%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="刷新间隔" VerticalAlignment="Center" />
+                            <ComboBox x:Name="OverlayIntervalCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
+                                      SelectionChanged="OverlayInterval_Changed">
+                                <ComboBoxItem Content="0.5 秒" Tag="500" />
+                                <ComboBoxItem Content="1 秒" Tag="1000" />
+                                <ComboBoxItem Content="2 秒" Tag="2000" />
+                                <ComboBoxItem Content="5 秒" Tag="5000" />
+                            </ComboBox>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="打开/关闭悬浮窗" Style="{StaticResource FlatButton}" Click="OverlayToggle_Click" />
+                            <Button Content="重置位置" Style="{StaticResource FlatButton}" Click="OverlayReset_Click" Margin="0" />
+                        </StackPanel>
+                        <TextBlock Text="桌面左键单击切换显示档；拖动可移动，位置会自动保存" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
                         <TextBlock Text="关于" Style="{StaticResource CardTitle}" />
                         <TextBlock x:Name="AboutVersionText" Text="L-Mechrevo" Style="{StaticResource Hint}" />
                         <TextBlock Text="界面与功能持续从原版 L-Mechrevo 移植；反馈请附带诊断包。" Style="{StaticResource Hint}" TextWrapping="Wrap" />

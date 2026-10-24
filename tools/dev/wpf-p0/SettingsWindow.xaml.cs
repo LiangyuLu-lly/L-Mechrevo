@@ -17,6 +17,7 @@ public partial class SettingsWindow : Window
 {
     private readonly OriginalStyleWindow _owner;
     private bool _syncing;
+    private bool _overlaySyncing;
     private bool _isolated;
 
     public SettingsWindow(OriginalStyleWindow owner)
@@ -28,6 +29,7 @@ public partial class SettingsWindow : Window
         try
         {
             LoadState();
+            LoadOverlayState();
         }
         catch (Exception ex)
         {
@@ -39,6 +41,93 @@ public partial class SettingsWindow : Window
       RemoveMinMaxButtons();
   };
   Loaded += (_, _) => PositionAdjacentToOwner();
+    }
+
+    private void LoadOverlayState()
+    {
+        _overlaySyncing = true;
+        try
+        {
+            int mode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
+            int opacity = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 100), 30, 100);
+            int interval = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_interval_ms", 1000), 500, 10000);
+            foreach (ComboBoxItem item in OverlayModeCombo.Items)
+            {
+                if (item.Tag as string == mode.ToString())
+                {
+                    OverlayModeCombo.SelectedItem = item;
+                    break;
+                }
+            }
+            OverlayOpacitySlider.Value = opacity;
+            OverlayOpacityText.Text = opacity + "%";
+            foreach (ComboBoxItem item in OverlayIntervalCombo.Items)
+            {
+                if (item.Tag as string == interval.ToString())
+                {
+                    OverlayIntervalCombo.SelectedItem = item;
+                    break;
+                }
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _overlaySyncing = false;
+        }
+    }
+
+    private (int Mode, int Opacity, int Interval) OverlayValues()
+    {
+        int mode = (OverlayModeCombo.SelectedItem as ComboBoxItem)?.Tag is string ms && int.TryParse(ms, out int m) ? m : 1;
+        int interval = (OverlayIntervalCombo.SelectedItem as ComboBoxItem)?.Tag is string is_ && int.TryParse(is_, out int i) ? i : 1000;
+        return (mode, (int)Math.Round(OverlayOpacitySlider.Value), interval);
+    }
+
+    private void ApplyOverlayValues(bool resetPosition = false)
+    {
+        if (_overlaySyncing)
+        {
+            return;
+        }
+        (int mode, int opacity, int interval) = OverlayValues();
+        MechrevoLite.AppConfig.Set("overlay_wpf_mode", mode);
+        MechrevoLite.AppConfig.Set("overlay_opacity", opacity);
+        MechrevoLite.AppConfig.Set("overlay_interval_ms", interval);
+        _owner.ApplyOverlayAppearance(opacity, mode, interval, resetPosition);
+    }
+
+    private void OverlayMode_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyOverlayValues();
+    }
+
+    private void OverlayOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (OverlayOpacityText != null)
+        {
+            OverlayOpacityText.Text = ((int)Math.Round(e.NewValue)) + "%";
+        }
+        ApplyOverlayValues();
+    }
+
+    private void OverlayInterval_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyOverlayValues();
+    }
+
+    private void OverlayToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _owner.ToggleOverlayFromSettings();
+        Status("悬浮窗状态已切换");
+    }
+
+    private void OverlayReset_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyOverlayValues(resetPosition: true);
+        Status("悬浮窗位置已重置");
     }
 
     private void LoadState()

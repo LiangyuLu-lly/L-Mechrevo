@@ -459,6 +459,17 @@ public partial class OriginalStyleWindow : Window
         RefreshFromBackend();
     }
 
+    internal void ToggleOverlayFromSettings()
+    {
+        ToggleTrayOverlay();
+    }
+
+    internal void ApplyOverlayAppearance(double opacity, int mode, int intervalMs, bool resetPosition)
+    {
+        EnsureOverlayWindow();
+        _overlayWindow?.ApplyAppearance(opacity, mode, intervalMs, resetPosition);
+    }
+
     private void ToggleTrayOverlay()
     {
         EnsureOverlayWindow();

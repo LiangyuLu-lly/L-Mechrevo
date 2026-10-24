@@ -40,6 +40,8 @@ public partial class OverlayWindow : Window
         try
         {
             _displayMode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
+            Opacity = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 100), 30, 100) / 100.0;
+            _timer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(MechrevoLite.AppConfig.Get("overlay_interval_ms", 1000), 500, 10000));
         }
         catch
         {
@@ -48,11 +50,10 @@ public partial class OverlayWindow : Window
         ApplyDisplayMode();
         Loaded += (_, _) =>
         {
-            if (Left <= 0 || Top <= 0)
+            RestorePosition();
+            if (double.IsNaN(Left) || double.IsNaN(Top) || Left <= 0 || Top <= 0)
             {
-                Rect area = SystemParameters.WorkArea;
-                Left = Math.Max(area.Left + 12, area.Right - Width - 24);
-                Top = area.Top + 24;
+                ResetPosition();
             }
             Refresh();
             _timer.Tick += (_, _) => Refresh();
@@ -165,6 +166,64 @@ public partial class OverlayWindow : Window
         return speed + " " + percent;
     }
 
+    internal void ApplyAppearance(double opacity, int mode, int intervalMs, bool resetPosition)
+    {
+        Opacity = Math.Clamp(opacity, 30, 100) / 100.0;
+        _displayMode = Math.Clamp(mode, 0, 2);
+        _timer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(intervalMs, 500, 10000));
+        ApplyDisplayMode();
+        if (resetPosition)
+        {
+            ResetPosition();
+            SavePosition();
+        }
+        try
+        {
+            MechrevoLite.AppConfig.Set("overlay_opacity", (int)Math.Round(opacity));
+            MechrevoLite.AppConfig.Set("overlay_interval_ms", intervalMs);
+            MechrevoLite.AppConfig.Set("overlay_wpf_mode", _displayMode);
+        }
+        catch
+        {
+        }
+    }
+
+    internal int DisplayMode => _displayMode;
+
+    private void ResetPosition()
+    {
+        Rect area = SystemParameters.WorkArea;
+        Left = Math.Max(area.Left + 12, area.Right - Width - 24);
+        Top = area.Top + 24;
+    }
+
+    private void RestorePosition()
+    {
+        try
+        {
+            if (MechrevoLite.AppConfig.Exists("overlay_wpf_left") && MechrevoLite.AppConfig.Exists("overlay_wpf_top"))
+            {
+                Left = MechrevoLite.AppConfig.Get("overlay_wpf_left", (int)Math.Round(Left));
+                Top = MechrevoLite.AppConfig.Get("overlay_wpf_top", (int)Math.Round(Top));
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private void SavePosition()
+    {
+        try
+        {
+            MechrevoLite.AppConfig.Set("overlay_wpf_left", (int)Math.Round(Left));
+            MechrevoLite.AppConfig.Set("overlay_wpf_top", (int)Math.Round(Top));
+        }
+        catch
+        {
+        }
+    }
+
     private void ApplyDisplayMode()
     {
         bool standard = _displayMode >= 1;
@@ -217,6 +276,7 @@ public partial class OverlayWindow : Window
             try
             {
                 DragMove();
+                SavePosition();
             }
             catch
             {
