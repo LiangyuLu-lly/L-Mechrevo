@@ -11,6 +11,7 @@ public partial class HidKeyboardWindow : Window
     private readonly KeyboardRgb _rgb;
     private readonly Action _openAdvanced;
     private readonly (int Mode, string Name)[] _effects;
+    private System.Drawing.Color _color = System.Drawing.Color.FromArgb(0, 120, 255);
 
     public HidKeyboardWindow(KeyboardRgb rgb, Action openAdvanced)
     {
@@ -32,6 +33,123 @@ public partial class HidKeyboardWindow : Window
             }
         }
         EffectCombo.SelectedIndex = selected;
+        RefreshParams();
+    }
+
+    private static bool HasColor(int mode) => mode is 0 or 3 or 9;
+    private static bool HasSpeed(int mode) => mode is 0 or 1 or 2 or 4 or 5 or 6 or 7 or 8;
+
+    private void Effect_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        RefreshParams();
+    }
+
+    private void RefreshParams()
+    {
+        int mode = SelectedMode;
+        ColorRow.Visibility = HasColor(mode) ? Visibility.Visible : Visibility.Collapsed;
+        SpeedRow.Visibility = HasSpeed(mode) ? Visibility.Visible : Visibility.Collapsed;
+        AngleRow.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
+        if (HasColor(mode))
+        {
+            _color = mode switch
+            {
+                0 => _rgb.BreathColor,
+                3 => _rgb.ReactiveColor,
+                _ => _rgb.StaticColor
+            };
+            UpdateColorButton();
+        }
+        int speed = mode switch
+        {
+            0 => _rgb.BreathSpeed,
+            1 => _rgb.WaveSpeed,
+            2 => _rgb.SparkleSpeed,
+            4 => _rgb.WheelSpeed,
+            5 => _rgb.LightningSpeed,
+            6 => _rgb.FlameSpeed,
+            7 => _rgb.RainSpeed,
+            8 => _rgb.MatrixSpeed,
+            _ => 5
+        };
+        SpeedSlider.Value = Math.Clamp(speed, 1, 10);
+        SpeedText.Text = ((int)SpeedSlider.Value).ToString();
+        AngleSlider.Value = Math.Clamp(_rgb.WaveAngle, 0, 360);
+        AngleText.Text = ((int)AngleSlider.Value) + "°";
+    }
+
+    private void UpdateColorButton()
+    {
+        ColorButton.Content = $"#{_color.R:X2}{_color.G:X2}{_color.B:X2}";
+        ColorButton.Foreground = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromArgb(_color.A, _color.R, _color.G, _color.B));
+    }
+
+    private void Color_Click(object sender, RoutedEventArgs e)
+    {
+        using System.Windows.Forms.ColorDialog dialog = new() { FullOpen = true, Color = _color };
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            _color = dialog.Color;
+            UpdateColorButton();
+        }
+    }
+
+    private void Speed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (SpeedText != null)
+        {
+            SpeedText.Text = ((int)e.NewValue).ToString();
+        }
+    }
+
+    private void Angle_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (AngleText != null)
+        {
+            AngleText.Text = ((int)e.NewValue) + "°";
+        }
+    }
+
+    private void ApplyEffectParams(int mode)
+    {
+        int speed = Math.Clamp((int)Math.Round(SpeedSlider.Value), 1, 10);
+        switch (mode)
+        {
+            case 0:
+                _rgb.BreathColor = _color;
+                _rgb.BreathSpeed = speed;
+                break;
+            case 1:
+                _rgb.WaveAngle = Math.Clamp((int)Math.Round(AngleSlider.Value), 0, 360);
+                _rgb.WaveSpeed = speed;
+                break;
+            case 2:
+                _rgb.SparkleSpeed = speed;
+                break;
+            case 3:
+                _rgb.ReactiveColor = _color;
+                _rgb.ReactiveDuration = Math.Clamp(speed * 4, 4, 100);
+                break;
+            case 4:
+                _rgb.WheelSpeed = speed;
+                break;
+            case 5:
+                _rgb.LightningSpeed = speed;
+                break;
+            case 6:
+                _rgb.FlameSpeed = speed;
+                break;
+            case 7:
+                _rgb.RainSpeed = speed;
+                break;
+            case 8:
+                _rgb.MatrixSpeed = speed;
+                break;
+            case 9:
+                _rgb.StaticColor = _color;
+                break;
+        }
     }
 
     private int SelectedMode =>
@@ -59,6 +177,7 @@ public partial class HidKeyboardWindow : Window
                 StatusText.Text = "HID 连接失败：" + _rgb.LastError;
                 return;
             }
+            ApplyEffectParams(SelectedMode);
             _rgb.KbHidMode = SelectedMode;
             _rgb.StartMode(SelectedMode);
             _rgb.ApplyBrightnessToDevice();
