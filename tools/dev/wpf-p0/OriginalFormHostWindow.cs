@@ -16,12 +16,10 @@ internal sealed class OriginalFormHostWindow : Window
 {
     private readonly WinForms.Form _form;
     private readonly WindowsFormsHost _host;
-    private readonly bool _fitContent;
 
     internal OriginalFormHostWindow(WinForms.Form form, string? title = null)
     {
         _form = form;
-        _fitContent = form is MechrevoLite.RgbForm;
         Title = title ?? form.Text;
         Width = Math.Max(form.Width + 16, 480);
         Height = Math.Max(form.Height + 40, 320);
@@ -47,24 +45,9 @@ internal sealed class OriginalFormHostWindow : Window
         }
         _form.TopLevel = false;
         _form.FormBorderStyle = WinForms.FormBorderStyle.None;
-        _form.Dock = _fitContent ? WinForms.DockStyle.None : WinForms.DockStyle.Fill;
+        _form.Dock = WinForms.DockStyle.Fill;
         _host.Child = _form;
         _form.Show();
-        if (_fitContent)
-        {
-            _form.SizeChanged += (_, _) => FitWindowToForm();
-            FitWindowToForm();
-        }
-    }
-
-    private void FitWindowToForm()
-    {
-        if (_form.IsDisposed || !_form.IsHandleCreated)
-        {
-            return;
-        }
-        Width = Math.Max(_form.Width + 16, 480);
-        Height = Math.Max(_form.Height + 40, 240);
     }
 
     private void DetachForm()
