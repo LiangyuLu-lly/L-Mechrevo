@@ -2671,9 +2671,39 @@ public partial class OriginalStyleWindow : Window
         InitScreenColorControls();
     }
 
+    private void FillKeyboardEffects()
+    {
+        KeyboardEffectCombo.Items.Clear();
+        int keyboardType = _backendProbe?.Capabilities?.KeyboardType ?? 0;
+        (string Id, string Label)[] effects = MechrevoLite.Hardware.KeyboardFirmwareEffects.Visible(keyboardType);
+        string selected = MechrevoLite.Hardware.LightingSettingsStore.Load("Keyboard/Ctrl", effects.Length > 0 ? effects[0].Id : "Single").Effect;
+        int selectedIndex = 0;
+        for (int i = 0; i < effects.Length; i++)
+        {
+            KeyboardEffectCombo.Items.Add(new ComboBoxItem { Content = effects[i].Label, Tag = effects[i].Id });
+            if (string.Equals(effects[i].Id, selected, StringComparison.Ordinal))
+            {
+                selectedIndex = i;
+            }
+        }
+        if (KeyboardEffectCombo.Items.Count > 0)
+        {
+            KeyboardEffectCombo.SelectedIndex = selectedIndex;
+        }
+    }
+
     private void InitLightingControls()
     {
         LightOffOnBatteryCheck.IsChecked = AppConfig.Is("lighting_off_on_battery");
+        FillKeyboardEffects();
+        try
+        {
+            KeyboardLightSwitch.IsChecked = _backendProbe?.Hw?.KeyboardPower == true;
+        }
+        catch
+        {
+            KeyboardLightSwitch.IsChecked = false;
+        }
         int seconds = AppConfig.Get("lighting_idle_seconds", 0);
         foreach (object item in LightIdleCombo.Items)
         {
@@ -3014,9 +3044,29 @@ public partial class OriginalStyleWindow : Window
         }
         bool on = KeyboardLightSwitch.IsChecked == true;
         string effect = item.Tag as string ?? "Single";
-        bool ok = on
-            ? await _backendProbe.SetKeyboardEffectAsync(effect)
-            : await _backendProbe.SetKeyboardPowerAsync(false);
+        bool ok;
+        if (on)
+        {
+            if (_backendProbe.Hw?.KeyboardPower != true)
+            {
+                bool powerOk = await _backendProbe.SetKeyboardPowerAsync(true);
+                if (!powerOk)
+                {
+                    StatusText.Text = "键盘灯上电失败";
+                    return;
+                }
+            }
+            ok = await _backendProbe.SetKeyboardEffectAsync(effect);
+            if (ok)
+            {
+                MechrevoLite.Hardware.LightingSettingsStore.Save("Keyboard/Ctrl",
+                    MechrevoLite.Hardware.LightingSettingsStore.Load("Keyboard/Ctrl", effect) with { Effect = effect });
+            }
+        }
+        else
+        {
+            ok = await _backendProbe.SetKeyboardPowerAsync(false);
+        }
         StatusText.Text = ok ? (on ? "键盘灯效已下发：" + effect : "键盘灯光已关闭") : "键盘灯效下发失败";
     }
 
