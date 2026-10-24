@@ -85,6 +85,7 @@ public partial class OriginalStyleWindow : Window
     public OriginalStyleWindow()
     {
         InitializeComponent();
+        MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
         SourceInitialized += (_, _) =>
@@ -2438,6 +2439,7 @@ public partial class OriginalStyleWindow : Window
     internal void ApplyThemeFromSettings(bool dark)
     {
         _dark = dark;
+        MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
@@ -2458,6 +2460,7 @@ public partial class OriginalStyleWindow : Window
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
+        MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
