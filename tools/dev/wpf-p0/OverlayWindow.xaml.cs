@@ -77,8 +77,11 @@ public partial class OverlayWindow : Window
             RamText.Text = s.RamUsage >= 0
                 ? "内存 " + s.RamUsage + "%" + (s.RamUsedGb > 0 ? " · " + s.RamUsedGb.ToString("0.0") + "GB" : "")
                 : "内存 —";
-            string powerState = s.AcOnline ? (s.Charging ? " · 充电中" : " · 外接电源") : " · 电池供电";
-            BatteryText.Text = s.BatteryPercent >= 0 ? "电池 " + s.BatteryPercent + "%" + powerState : "电池 —";
+            string source = FormatPowerSource(s.AcOnline);
+            string state = s.Charging ? "充电中" : (s.AcOnline ? (s.BatteryPercent >= 99 ? "已充满" : "未充电") : "放电中");
+            BatteryText.Text = s.BatteryPercent >= 0
+                ? "电池 " + s.BatteryPercent + "% · " + source + " · " + state
+                : "电池 —";
         }
         catch
         {
@@ -99,6 +102,25 @@ public partial class OverlayWindow : Window
         string freq = s.GpuCoreFreq > 0 ? (s.GpuCoreFreq / 1000.0).ToString("0.0") + "GHz" : "—";
         string power = s.GpuPower > 0 ? s.GpuPower.ToString("0.0") + "W" : "—";
         return power + " · " + freq + " · " + usage;
+    }
+
+    private static string FormatPowerSource(bool acOnline)
+    {
+        try
+        {
+            MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(
+                MechrevoLite.HardwareControl.PowerInput, acOnline);
+            string text = MechrevoLite.SettingsForm.PowerSourceHeadline(
+                kind, MechrevoLite.HardwareControl.PowerInput?.AdapterWatts);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return text;
+            }
+        }
+        catch
+        {
+        }
+        return acOnline ? "外接电源" : "电池供电";
     }
 
     private static string FormatFan(int rpm, int duty)

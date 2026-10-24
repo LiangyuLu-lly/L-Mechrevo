@@ -1839,6 +1839,25 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static string FormatPowerSource(bool acOnline)
+    {
+        try
+        {
+            MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(
+                MechrevoLite.HardwareControl.PowerInput, acOnline);
+            string text = MechrevoLite.SettingsForm.PowerSourceHeadline(
+                kind, MechrevoLite.HardwareControl.PowerInput?.AdapterWatts);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return text;
+            }
+        }
+        catch
+        {
+        }
+        return acOnline ? "外接电源" : "电池供电";
+    }
+
     private void RefreshFromBackend()
     {
         BackendProbe? probe = _backendProbe;
@@ -1859,14 +1878,14 @@ public partial class OriginalStyleWindow : Window
         try
         {
             System.Windows.Forms.PowerStatus power = System.Windows.Forms.SystemInformation.PowerStatus;
-            if (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online)
-            {
-                powerState = power.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.Charging) ? " · 充电中" : " · 外接电源";
-            }
-            else
-            {
-                powerState = " · 电池供电";
-            }
+            bool charging = power.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.Charging);
+            string source = FormatPowerSource(power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online);
+            string state = charging
+                ? "充电中"
+                : (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online
+                    ? (hw.BatteryPercent >= 99 ? "已充满" : "未充电")
+                    : "放电中");
+            powerState = " · " + source + " · " + state;
         }
         catch
         {
