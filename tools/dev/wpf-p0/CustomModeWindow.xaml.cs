@@ -589,6 +589,30 @@ public partial class CustomModeWindow : Window
                 StatusText.Text = "新建自定义模式失败（已达到上限或没有可用序号）";
                 return;
             }
+            MechrevoHw? newModeHw = Program.hw;
+            bool gcuMachine = newModeHw != null
+                && newModeHw.IsGcuConnected
+                && !newModeHw.UsesBaolongda
+                && !newModeHw.WujieSmuApu;
+            if (gcuMachine)
+            {
+                MechrevoLite.Mode.PerfModeStore.SaveSettings(mode.Id, new MechrevoLite.Mode.PerfModeSettings
+                {
+                    Pl1 = 65,
+                    Pl2 = 65,
+                    Pl4 = 100,
+                    TccOn = false,
+                    TccTarget = 95,
+                    GpuTgp = 115,
+                    GpuDynamicBoostOn = true,
+                    GpuDynamicBoost = 25,
+                    FanSwitchSpeedOn = false,
+                    FanSwitchSpeedMs = 300,
+                    GpuOverclockOn = false,
+                    GpuCoreOffset = 0,
+                    GpuMemoryOffset = 0
+                });
+            }
             LoadModes(mode.Id);
             StatusText.Text = "已新建：" + ModeName(mode);
             if (perf != null)
