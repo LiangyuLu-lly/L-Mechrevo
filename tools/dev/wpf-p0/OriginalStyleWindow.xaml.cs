@@ -1769,6 +1769,9 @@ public partial class OriginalStyleWindow : Window
         LogoLightRow.Visibility = ResolveRowVisibility(AppConfig.GetString("light_logo_ui") ?? "auto", hasLogo);
         LightHingeRow.Visibility = hasHinge ? Visibility.Visible : Visibility.Collapsed;
         LightSyncRow.Visibility = hasSync ? Visibility.Visible : Visibility.Collapsed;
+        bool liquidSupported = (caps?.LiquidCooling ?? false) || (hw?.SupportsLiquidCooling ?? false);
+        LiquidSection.Visibility = (AppConfig.Is("force_liquid_cooling_menu") || liquidSupported) ? Visibility.Visible : Visibility.Collapsed;
+        RefreshLiquidCoolingUi();
         LightingSection.Visibility = (KeyboardLightRow.Visibility == Visibility.Visible
             || LightStripRow.Visibility == Visibility.Visible
             || LogoLightRow.Visibility == Visibility.Visible
@@ -1787,6 +1790,103 @@ public partial class OriginalStyleWindow : Window
             return Visibility.Collapsed;
         }
         return supported ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void RefreshLiquidCoolingUi()
+    {
+        try
+        {
+            MechrevoHw? hw = _backendProbe?.Hw;
+            bool connected = hw?.LcReportedConnected == true;
+            bool supported = hw?.SupportsLiquidCooling == true;
+            if (!supported)
+            {
+                LiquidStatusButton.Content = "未连接";
+                LiquidPumpCombo.IsEnabled = false;
+                LiquidFanCombo.IsEnabled = false;
+                return;
+            }
+            LiquidStatusButton.Content = connected ? "水冷已连接" : "水冷未连接";
+            LiquidPumpCombo.IsEnabled = true;
+            LiquidFanCombo.IsEnabled = true;
+            SelectComboByTag(LiquidPumpCombo, hw!.LcPumpControl);
+            SelectComboByTag(LiquidFanCombo, hw.LcFanControl);
+        }
+        catch
+        {
+        }
+    }
+
+    private static void SelectComboByTag(ComboBox combo, int value)
+    {
+        if (combo == null)
+        {
+            return;
+        }
+        foreach (object item in combo.Items)
+        {
+            if (item is ComboBoxItem comboItem
+                && int.TryParse(comboItem.Tag as string, out int tag)
+                && tag == value)
+            {
+                int index = combo.Items.IndexOf(comboItem);
+                if (combo.SelectedIndex != index)
+                {
+                    combo.SelectedIndex = index;
+                }
+                return;
+            }
+        }
+    }
+
+    private async void LiquidStatus_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe?.Service == null)
+        {
+            StatusText.Text = "后端未连接";
+            return;
+        }
+        try
+        {
+            LiquidStatusButton.IsEnabled = false;
+            await _backendProbe.Service.RefreshLiquidCoolingStatus();
+            RefreshLiquidCoolingUi();
+            StatusText.Text = "水冷状态已刷新";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "刷新水冷状态失败：" + ex.Message;
+        }
+        finally
+        {
+            LiquidStatusButton.IsEnabled = true;
+        }
+    }
+
+    private async void LiquidPump_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_backendProbe?.Service == null || LiquidPumpCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        int profile = int.TryParse(item.Tag as string, out int parsed) ? parsed : -1;
+        bool ok = profile < 0
+            ? await _backendProbe.Service.SwitchLcFanAuto()
+            : await _backendProbe.Service.SwitchLcPump(profile);
+        StatusText.Text = ok ? "水泵档位已下发" : "水泵档位下发失败";
+    }
+
+    private async void LiquidFan_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_backendProbe?.Service == null || LiquidFanCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        int profile = int.TryParse(item.Tag as string, out int parsed) ? parsed : -1;
+        bool ok = profile < 0
+            ? await _backendProbe.Service.SwitchLcFanAuto()
+            : await _backendProbe.Service.SwitchLcFan(profile);
+        StatusText.Text = ok ? "水冷风扇档位已下发" : "水冷风扇档位下发失败";
     }
 
     private void FanCurve_Click(object sender, RoutedEventArgs e)
