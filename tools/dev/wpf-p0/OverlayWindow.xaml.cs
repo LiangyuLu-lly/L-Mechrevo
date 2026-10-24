@@ -7,9 +7,15 @@ namespace L_Mechrevo.WpfP0;
 
 public readonly record struct OverlaySnapshot(
     int CpuTemp,
+    int CpuUsage,
+    int CpuFrequency,
     int GpuTemp,
-    int FanRpm,
-    double? PowerW,
+    int GpuUsage,
+    int GpuCoreFreq,
+    int CpuFanRpm,
+    int GpuFanRpm,
+    int RamUsage,
+    double RamUsedGb,
     int BatteryPercent);
 
 public partial class OverlayWindow : Window
@@ -37,16 +43,47 @@ public partial class OverlayWindow : Window
     {
         try
         {
-            OverlaySnapshot snapshot = _provider();
-            CpuText.Text = snapshot.CpuTemp >= 0 ? snapshot.CpuTemp + " ℃" : "—";
-            GpuText.Text = snapshot.GpuTemp >= 0 ? snapshot.GpuTemp + " ℃" : "—";
-            FanText.Text = snapshot.FanRpm > 0 ? "风扇 " + snapshot.FanRpm + " rpm" : "风扇 —";
-            PowerText.Text = snapshot.PowerW.HasValue ? "功耗 " + snapshot.PowerW.Value.ToString("0.0") + " W" : "功耗 —";
-            BatteryText.Text = snapshot.BatteryPercent >= 0 ? "电池 " + snapshot.BatteryPercent + "%" : "电池 —";
+            OverlaySnapshot s = _provider();
+            CpuText.Text = s.CpuTemp >= 0 ? "CPU " + s.CpuTemp + "℃" : "CPU —";
+            CpuDetailText.Text = FormatCpuDetail(s);
+            GpuText.Text = s.GpuTemp >= 0 ? "GPU " + s.GpuTemp + "℃" : "GPU —";
+            GpuDetailText.Text = FormatGpuDetail(s);
+            FanText.Text = FormatFans(s.CpuFanRpm, s.GpuFanRpm);
+            RamText.Text = s.RamUsage >= 0
+                ? "内存 " + s.RamUsage + "%" + (s.RamUsedGb > 0 ? " · " + s.RamUsedGb.ToString("0.0") + "GB" : "")
+                : "内存 —";
+            BatteryText.Text = s.BatteryPercent >= 0 ? "电池 " + s.BatteryPercent + "%" : "电池 —";
         }
         catch
         {
         }
+    }
+
+    private static string FormatCpuDetail(OverlaySnapshot s)
+    {
+        string usage = s.CpuUsage >= 0 ? s.CpuUsage + "%" : "—";
+        string freq = s.CpuFrequency > 0 ? (s.CpuFrequency / 1000.0).ToString("0.0") + "GHz" : "—";
+        return usage + " · " + freq;
+    }
+
+    private static string FormatGpuDetail(OverlaySnapshot s)
+    {
+        string usage = s.GpuUsage >= 0 ? s.GpuUsage + "%" : "—";
+        string freq = s.GpuCoreFreq > 0 ? (s.GpuCoreFreq / 1000.0).ToString("0.0") + "GHz" : "—";
+        return usage + " · " + freq;
+    }
+
+    private static string FormatFans(int cpu, int gpu)
+    {
+        if (cpu < 0 && gpu < 0)
+        {
+            return "风扇 —";
+        }
+        if (gpu >= 0 && gpu != cpu)
+        {
+            return "风扇 " + Math.Max(0, cpu) + "/" + gpu + " rpm";
+        }
+        return "风扇 " + Math.Max(0, cpu) + " rpm";
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -57,7 +94,7 @@ public partial class OverlayWindow : Window
         }
     }
 
-    private void Close_Click(object sender, RoutedEventArgs e)
+    private void Window_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         Close();
     }

@@ -1722,12 +1722,17 @@ public partial class OriginalStyleWindow : Window
     private OverlaySnapshot GetOverlaySnapshot()
     {
         MechrevoHw? hw = _backendProbe?.Hw;
-        double? power = null;
         return new OverlaySnapshot(
             hw?.CpuTemp ?? -1,
+            hw?.CpuUsage ?? -1,
+            hw?.CpuFrequency ?? -1,
             hw?.GpuTemp ?? -1,
+            hw?.GpuUsage ?? -1,
+            hw?.GpuCoreFreq ?? -1,
             hw?.CpuFanRpm ?? -1,
-            power,
+            hw?.GpuFanRpm ?? -1,
+            hw?.RamUsage ?? -1,
+            hw?.RamUsedGb ?? -1,
             hw?.BatteryPercent ?? -1);
     }
 
