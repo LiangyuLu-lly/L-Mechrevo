@@ -76,6 +76,83 @@ public partial class HidKeyboardWindow : Window
         SpeedText.Text = ((int)SpeedSlider.Value).ToString();
         AngleSlider.Value = Math.Clamp(_rgb.WaveAngle, 0, 360);
         AngleText.Text = ((int)AngleSlider.Value) + "°";
+        RefreshExtras(mode);
+    }
+
+    private void ConfigureExtra(Slider slider, TextBlock label, TextBlock value, string text, double min, double max, double current)
+    {
+        label.Text = text;
+        slider.Minimum = min;
+        slider.Maximum = max;
+        slider.Value = Math.Clamp(current, min, max);
+        value.Text = ((int)slider.Value).ToString();
+    }
+
+    private void RefreshExtras(int mode)
+    {
+        Extra1Row.Visibility = Visibility.Collapsed;
+        Extra2Row.Visibility = Visibility.Collapsed;
+        ExtraCheck.Visibility = Visibility.Collapsed;
+        ExtraCheck.IsChecked = false;
+        switch (mode)
+        {
+            case 0:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 0, 100, _rgb.BreathSmooth);
+                break;
+            case 2:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 0, 20, _rgb.SparkleDensity);
+                break;
+            case 3:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "时长", 4, 100, _rgb.ReactiveDuration);
+                ExtraCheck.Visibility = Visibility.Visible;
+                ExtraCheck.Content = "随机颜色";
+                ExtraCheck.IsChecked = _rgb.ReactiveRandom;
+                break;
+            case 4:
+                ExtraCheck.Visibility = Visibility.Visible;
+                ExtraCheck.Content = "反向";
+                ExtraCheck.IsChecked = _rgb.WheelReverse;
+                break;
+            case 5:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "宽度", 1, 10, _rgb.LightningWidth);
+                Extra2Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "并发", 1, 5, _rgb.LightningConcurrent);
+                break;
+            case 6:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 0, 100, _rgb.FlameSmooth);
+                break;
+            case 7:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 0, 10, _rgb.RainDensity);
+                break;
+            case 8:
+                Extra1Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 0, 10, _rgb.MatrixDensity);
+                Extra2Row.Visibility = Visibility.Visible;
+                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "样式", 0, 10, _rgb.MatrixStyle);
+                break;
+        }
+    }
+
+    private void Extra1_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (Extra1Text != null)
+        {
+            Extra1Text.Text = ((int)e.NewValue).ToString();
+        }
+    }
+
+    private void Extra2_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (Extra2Text != null)
+        {
+            Extra2Text.Text = ((int)e.NewValue).ToString();
+        }
     }
 
     private void UpdateColorButton()
@@ -148,6 +225,34 @@ public partial class HidKeyboardWindow : Window
                 break;
             case 9:
                 _rgb.StaticColor = _color;
+                break;
+        }
+        ApplyExtras(mode);
+    }
+
+    private void ApplyExtras(int mode)
+    {
+        int extra1 = (int)Math.Round(Extra1Slider.Value);
+        int extra2 = (int)Math.Round(Extra2Slider.Value);
+        bool check = ExtraCheck.IsChecked == true;
+        switch (mode)
+        {
+            case 0: _rgb.BreathSmooth = extra1; break;
+            case 2: _rgb.SparkleDensity = extra1; break;
+            case 3:
+                _rgb.ReactiveDuration = Math.Clamp(extra1, 4, 100);
+                _rgb.ReactiveRandom = check;
+                break;
+            case 4: _rgb.WheelReverse = check; break;
+            case 5:
+                _rgb.LightningWidth = Math.Clamp(extra1, 1, 10);
+                _rgb.LightningConcurrent = Math.Clamp(extra2, 1, 5);
+                break;
+            case 6: _rgb.FlameSmooth = extra1; break;
+            case 7: _rgb.RainDensity = extra1; break;
+            case 8:
+                _rgb.MatrixDensity = extra1;
+                _rgb.MatrixStyle = extra2;
                 break;
         }
     }
