@@ -9769,6 +9769,31 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		Pl1Maximum = OptionalInt(o, Pl1Maximum, "CPU_AmdSPLMaximum", "CPU_AmdSPLMax", "CPU_AmdSPL_Maximum", "CPU_AmdSPL_Max", "CPU_PL1Maximum");
 		Pl2Minimum = OptionalInt(o, Pl2Minimum, "CPU_AmdSPPTMinimum", "CPU_AmdSPPTMin", "CPU_AmdSPPT_Minimum", "CPU_AmdSPPT_Min", "CPU_PL2Minimum");
 		Pl2Maximum = OptionalInt(o, Pl2Maximum, "CPU_AmdSPPTMaximum", "CPU_AmdSPPTMax", "CPU_AmdSPPT_Maximum", "CPU_AmdSPPT_Max", "CPU_PL2Maximum");
+
+		// 部分 Intel + GCU 机型只在 Status 里给当前 PL 值，不给上下限（ItemSupport 仍声明 CPU 性能菜单支持）
+		// ⇒ 用当前值兜出可调范围，避免自定义页 PL1/PL2 行被当成不可用而隐藏/禁灰。
+		if (IsGcuConnected && !UsesAmdPowerFields && Capabilities.CpuPerformanceTuning)
+		{
+			if (Pl1 > 0 && !(Pl1Minimum >= 0 && Pl1Maximum > Pl1Minimum))
+			{
+				Pl1Minimum = 5;
+				Pl1Maximum = Math.Max(200, Pl1);
+				Logger.WriteLine("[caps] Intel GCU 未上报 PL1 范围 ⇒ 按当前值回退 5.." + Pl1Maximum + "W（当前=" + Pl1 + "）");
+			}
+			if (Pl2 > 0 && !(Pl2Minimum >= 0 && Pl2Maximum > Pl2Minimum))
+			{
+				Pl2Minimum = 5;
+				Pl2Maximum = Math.Max(200, Pl2);
+				Logger.WriteLine("[caps] Intel GCU 未上报 PL2 范围 ⇒ 按当前值回退 5.." + Pl2Maximum + "W（当前=" + Pl2 + "）");
+			}
+			if (Pl4 > 0 && !(Pl4Minimum >= 0 && Pl4Maximum > Pl4Minimum))
+			{
+				Pl4Minimum = 5;
+				Pl4Maximum = Math.Max(250, Pl4);
+				Logger.WriteLine("[caps] Intel GCU 未上报 PL4 范围 ⇒ 按当前值回退 5.." + Pl4Maximum + "W（当前=" + Pl4 + "）");
+			}
+		}
+
 		TccRawMinimum = OptionalInt(o, "CPU_TccOffsetMinimum", TccRawMinimum);
 		TccRawMaximum = OptionalInt(o, "CPU_TccOffsetMaximum", TccRawMaximum);
 		GpuTgpMinimum = OptionalInt(o, "GPU_ConfigurableTGPMinimum", GpuTgpMinimum);
