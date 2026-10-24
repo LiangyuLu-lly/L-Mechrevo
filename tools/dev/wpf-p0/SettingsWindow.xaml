@@ -287,6 +287,21 @@
                                       Click="Overdrive_Click" />
                         </Grid>
                         <TextBlock Text="开启后降低 LCD 响应时间；部分面板可能增加轻微过冲。" Style="{StaticResource Hint}" />
+                        <Grid x:Name="MiniledRow" Margin="0,6,0,0">
+                            <TextBlock Text="MiniLED 分区控光" VerticalAlignment="Center" />
+                            <CheckBox x:Name="MiniledCheck" Content="开启" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" Click="Miniled_Click" />
+                        </Grid>
+                        <Grid x:Name="HdrControlRow" Margin="0,6,0,0">
+                            <TextBlock Text="HDR Color Control" VerticalAlignment="Center" />
+                            <CheckBox x:Name="HdrControlCheck" Content="开启" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" Click="HdrControl_Click" />
+                        </Grid>
+                        <Grid x:Name="FhdRow" Margin="0,6,0,0">
+                            <TextBlock Text="屏幕分辨率模式" VerticalAlignment="Center" />
+                            <Button x:Name="FhdButton" Content="FHD" Style="{StaticResource FlatButton}"
+                                    HorizontalAlignment="Right" Click="Fhd_Click" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

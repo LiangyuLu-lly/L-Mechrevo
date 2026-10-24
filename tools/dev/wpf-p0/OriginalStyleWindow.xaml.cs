@@ -222,6 +222,72 @@ public partial class OriginalStyleWindow : Window
         _ = SwitchModeAsync(mode);
     }
 
+    internal bool SupportsMiniled => _backendProbe?.Hw?.SupportsLocalDimming == true;
+
+    internal bool MiniledOn => _backendProbe?.Hw?.LocalDimming == true;
+
+    internal bool SupportsFhd => Program.acpi?.DeviceGet(327708u) >= 0;
+
+    internal bool FhdOn => Program.acpi?.DeviceGet(327708u) > 0;
+
+    internal bool SupportsHdrControl => Program.acpi?.DeviceGet(327793u) >= 0;
+
+    internal bool HdrControlOn => Program.acpi?.DeviceGet(327793u) > 0;
+
+    internal void ToggleMiniled()
+    {
+        try
+        {
+            if (Program.acpi == null)
+            {
+                return;
+            }
+            int primary = Program.acpi.DeviceGet(327710u);
+            int secondary = Program.acpi.DeviceGet(327726u);
+            int value = primary == 1 ? 0 : (primary >= 0 ? 1 : (secondary == 1 ? 2 : (secondary == 2 ? 0 : 1)));
+            AppConfig.Set("miniled", value);
+            AppConfig.Flush();
+            StatusText.Text = "MiniLED 分区控光已切换";
+            RefreshFromBackend();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "MiniLED 切换失败：" + ex.Message;
+        }
+    }
+
+    internal void ToggleHdrControl()
+    {
+        try
+        {
+            if (Program.acpi == null)
+            {
+                return;
+            }
+            int current = Program.acpi.DeviceGet(327793u);
+            AppConfig.Set("hdr_control", current == 1 ? 0 : 1);
+            AppConfig.Flush();
+            StatusText.Text = "HDR Color Control 已切换";
+            RefreshFromBackend();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "HDR Color Control 切换失败：" + ex.Message;
+        }
+    }
+
+    internal void ToggleFhd()
+    {
+        try
+        {
+            MechrevoLite.Display.ScreenControl.ToogleFHD();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "FHD 切换失败：" + ex.Message;
+        }
+    }
+
     private void ShowFromTray()
     {
         Show();

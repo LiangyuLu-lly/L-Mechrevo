@@ -49,8 +49,16 @@ public partial class SettingsWindow : Window
         FollowSystemCheck.IsChecked = AppConfig.Is("ui_theme_follow_system");
         StartupCheck.IsChecked = Startup.IsScheduled();
         WaterCoolingCheck.IsChecked = AppConfig.Is("force_liquid_cooling_menu");
-        DisplayCard.Visibility = _owner.SupportsLcdOverdrive ? Visibility.Visible : Visibility.Collapsed;
+        DisplayCard.Visibility = _owner.SupportsLcdOverdrive || _owner.SupportsMiniled || _owner.SupportsFhd || _owner.SupportsHdrControl
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         OverdriveCheck.IsChecked = _owner.LcdOverdrive;
+        MiniledRow.Visibility = _owner.SupportsMiniled ? Visibility.Visible : Visibility.Collapsed;
+        MiniledCheck.IsChecked = _owner.MiniledOn;
+        HdrControlRow.Visibility = _owner.SupportsHdrControl ? Visibility.Visible : Visibility.Collapsed;
+        HdrControlCheck.IsChecked = _owner.HdrControlOn;
+        FhdRow.Visibility = _owner.SupportsFhd ? Visibility.Visible : Visibility.Collapsed;
+        FhdButton.Content = _owner.FhdOn ? "UHD" : "FHD";
         AboutVersionText.Text = "L-Mechrevo " + Program.ReleaseVersion + " " + Program.ReleaseLabel;
 
         string language = AppConfig.GetString("language") ?? "zh-CN";
@@ -478,6 +486,35 @@ public partial class SettingsWindow : Window
         {
             Status("导入失败：" + ex.Message);
         }
+    }
+
+    private void Miniled_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncing)
+        {
+            return;
+        }
+        _owner.ToggleMiniled();
+        MiniledCheck.IsChecked = _owner.MiniledOn;
+    }
+
+    private void HdrControl_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncing)
+        {
+            return;
+        }
+        _owner.ToggleHdrControl();
+        HdrControlCheck.IsChecked = _owner.HdrControlOn;
+    }
+
+    private void Fhd_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncing)
+        {
+            return;
+        }
+        _owner.ToggleFhd();
     }
 
     private async void Overdrive_Click(object sender, RoutedEventArgs e)
