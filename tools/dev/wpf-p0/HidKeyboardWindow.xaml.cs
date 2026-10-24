@@ -80,8 +80,8 @@ public partial class HidKeyboardWindow : Window
             4 => (1, 20),
             5 => (1, 20),
             6 => (1, 20),
-            7 => (1, 5),
-            8 => (1, 5),
+            7 => (1, 20),
+            8 => (1, 20),
             _ => (1, 10)
         };
         SpeedSlider.Minimum = speedMin;
@@ -113,7 +113,7 @@ public partial class HidKeyboardWindow : Window
         {
             case 0:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 0, 100, _rgb.BreathSmooth);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 2, 100, _rgb.BreathSmooth);
                 break;
             case 2:
                 Extra1Row.Visibility = Visibility.Visible;

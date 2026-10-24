@@ -474,7 +474,7 @@ public partial class LightEditorWindow : Window
             LightChannelSettings next = _settings with
             {
                 Effect = effect,
-                Light = _light,
+                Light = _wujieWhite ? (_light >= 2 ? 4 : 2) : _light,
                 Speed = applySpeed,
                 ColorArgb = _colorArgb,
                 UsePresetColor = _usePresetColor,
@@ -484,7 +484,12 @@ public partial class LightEditorWindow : Window
                 BreathingIndex = _breathingIndex,
                 PowerOn = power
             };
+            bool powerChanged = _settings.PowerOn != power;
             LightingSettingsStore.Save(_topic, next);
+            if (powerChanged)
+            {
+                LightingSettingsStore.SavePower(_topic, power, "用户编辑灯光电源");
+            }
             _settings = next;
             if (Program.service == null)
             {
@@ -502,7 +507,7 @@ public partial class LightEditorWindow : Window
                     await Program.service.SetKeyboardPower(true);
                     if (_wujieWhite)
                     {
-                        ok = await Program.service.SetKeyboardBrightnessPreservingEffect(_light);
+                        ok = await Program.service.SetKeyboardBrightnessPreservingEffect(_light >= 2 ? 4 : 2);
                         return ok;
                     }
                     bool baolongda = Program.hw?.UsesBaolongda == true;

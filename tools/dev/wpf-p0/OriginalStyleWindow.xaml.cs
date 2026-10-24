@@ -2400,6 +2400,7 @@ public partial class OriginalStyleWindow : Window
             FillKeyboardEffects();
   FillLightChannelEffects();
   FillLightIdleOptions();
+  Program.hw?.ApplyKeyboardAutoOffSetting();
   SyncLightSwitchesFromHardware();
   bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
@@ -3349,10 +3350,7 @@ public partial class OriginalStyleWindow : Window
         MechrevoLite.Program.hw = _backendProbe.Hw;
         MechrevoLite.Program.service = _backendProbe.Service!;
         MechrevoHw? hw = _backendProbe.Hw;
-        bool firmwareKeyboard = hw != null
-            && (hw.UsesBaolongda
-                || hw.WujieSmuApu
-                || MechrevoLite.Hardware.KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType));
+        bool firmwareKeyboard = hw != null && !IsHidKeyboard(hw);
         if (firmwareKeyboard)
         {
             OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
@@ -3365,6 +3363,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         new HidKeyboardWindow(rgb) { Owner = this }.ShowDialog();
+        FillKeyboardEffects();
     }
 
     private void LogoLightEdit_Click(object sender, RoutedEventArgs e)
@@ -3568,8 +3567,8 @@ public partial class OriginalStyleWindow : Window
         if (IsHidKeyboard(_backendProbe.Hw) && Program.rgb != null)
         {
             Program.rgb.StopCurrentEffect();
-            Program.rgb.KbPowerOn = false;
-            Program.rgb.SaveConfig();
+            Program.rgb.KbPowerSyncFromHardware(false);
+            Program.rgb.QueueSaveConfig();
         }
         else
         {
