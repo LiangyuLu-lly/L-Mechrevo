@@ -1,26 +1,44 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace L_Mechrevo.WpfP0;
 
-/// <summary>
-/// 托盘图标与菜单。只负责壳和点击转发，模式/设置逻辑仍由主窗口处理。
-/// </summary>
+internal sealed record TrayCustomItem(string Id, string Label, bool Checked);
+
+internal sealed record TrayMenuState(
+    int CurrentMode,
+    string CustomRootText,
+    IReadOnlyList<TrayCustomItem> CustomItems,
+    bool FanBoostVisible,
+    bool FanBoostOn,
+    bool GpuVisible,
+    int GpuMode,
+    bool KeyboardLightVisible,
+    bool OverlayOn);
+
+/// <summary>托盘图标与菜单。菜单每次打开前按主窗口最新状态重建。</summary>
 internal sealed class TrayIconService : IDisposable
 {
     private readonly NotifyIcon _icon;
-    private readonly ToolStripMenuItem _silentItem;
-    private readonly ToolStripMenuItem _balancedItem;
-    private readonly ToolStripMenuItem _turboItem;
-    private readonly ToolStripMenuItem _customItem;
+    private readonly ContextMenuStrip _menu = new();
+    private bool _rebuilding;
     private bool _disposed;
+
+    internal Func<TrayMenuState>? StateProvider { get; set; }
 
     internal event Action? ShowRequested;
     internal event Action? SettingsRequested;
     internal event Action? OverlayRequested;
     internal event Action? ExitRequested;
+    internal event Action? KeyboardLightingRequested;
+    internal event Action? DiagnosticsRequested;
+    internal event Action? FanBoostRequested;
     internal event Action<int>? ModeRequested;
+    internal event Action<int>? GpuModeRequested;
+    internal event Action<string>? CustomModeRequested;
 
     internal TrayIconService()
     {
@@ -28,37 +46,99 @@ internal sealed class TrayIconService : IDisposable
         {
             Icon = LoadIcon(),
             Text = "L-Mechrevo",
-            Visible = true
+            Visible = true,
+            ContextMenuStrip = _menu
         };
         _icon.DoubleClick += (_, _) => ShowRequested?.Invoke();
-
-        ContextMenuStrip menu = new();
-        menu.Items.Add(new ToolStripMenuItem("显示主界面", null, (_, _) => ShowRequested?.Invoke()));
-        menu.Items.Add(new ToolStripSeparator());
-
-        _silentItem = new ToolStripMenuItem("静音", null, (_, _) => ModeRequested?.Invoke(2));
-        _balancedItem = new ToolStripMenuItem("平衡", null, (_, _) => ModeRequested?.Invoke(0));
-        _turboItem = new ToolStripMenuItem("狂暴", null, (_, _) => ModeRequested?.Invoke(1));
-        _customItem = new ToolStripMenuItem("自定义", null, (_, _) => ModeRequested?.Invoke(3));
-        menu.Items.Add(_silentItem);
-        menu.Items.Add(_balancedItem);
-        menu.Items.Add(_turboItem);
-        menu.Items.Add(_customItem);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("悬浮窗", null, (_, _) => OverlayRequested?.Invoke()));
-        menu.Items.Add(new ToolStripMenuItem("设置", null, (_, _) => SettingsRequested?.Invoke()));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("退出", null, (_, _) => ExitRequested?.Invoke()));
-
-        _icon.ContextMenuStrip = menu;
+        _menu.Opening += (_, _) => RebuildMenu();
+        RebuildMenu();
     }
 
-    internal void SetMode(int visualMode)
+    private void RebuildMenu()
     {
-        _silentItem.Checked = visualMode == 2;
-        _balancedItem.Checked = visualMode == 0;
-        _turboItem.Checked = visualMode == 1;
-        _customItem.Checked = visualMode >= 3;
+        if (_rebuilding || _disposed)
+        {
+            return;
+        }
+        _rebuilding = true;
+        try
+        {
+            _menu.Items.Clear();
+            TrayMenuState? state = null;
+            try
+            {
+                state = StateProvider?.Invoke();
+            }
+            catch
+            {
+            }
+            int mode = state?.CurrentMode ?? -1;
+            _menu.Items.Add(new ToolStripSeparator());
+            _menu.Items.Add(DisabledTitle("性能模式"));
+            _menu.Items.Add(MenuItem("静音", mode == 2, () => ModeRequested?.Invoke(2)));
+            _menu.Items.Add(MenuItem("平衡", mode == 0, () => ModeRequested?.Invoke(0)));
+            _menu.Items.Add(MenuItem("狂暴", mode == 1, () => ModeRequested?.Invoke(1)));
+
+            ToolStripMenuItem customRoot = new(state?.CustomRootText ?? "自定义")
+            {
+                Checked = state?.CustomItems.Any(i => i.Checked) == true
+            };
+            if (state?.CustomItems != null)
+            {
+                foreach (TrayCustomItem item in state.CustomItems)
+                {
+                    TrayCustomItem copy = item;
+                    ToolStripMenuItem sub = MenuItem(copy.Label, copy.Checked, () => CustomModeRequested?.Invoke(copy.Id));
+                    customRoot.DropDownItems.Add(sub);
+                }
+            }
+            if (customRoot.DropDownItems.Count == 0)
+            {
+                ToolStripMenuItem empty = new("暂无自定义档") { Enabled = false };
+                customRoot.DropDownItems.Add(empty);
+            }
+            _menu.Items.Add(customRoot);
+
+            _menu.Items.Add(new ToolStripSeparator());
+            if (state?.FanBoostVisible == true)
+            {
+                _menu.Items.Add(MenuItem("强冷", state.FanBoostOn, () => FanBoostRequested?.Invoke()));
+            }
+            if (state?.GpuVisible == true)
+            {
+                ToolStripMenuItem gpu = new("显卡模式");
+                gpu.DropDownItems.Add(MenuItem("核显模式", state.GpuMode == 0, () => GpuModeRequested?.Invoke(0)));
+                gpu.DropDownItems.Add(MenuItem("混合模式", state.GpuMode == 1, () => GpuModeRequested?.Invoke(1)));
+                gpu.DropDownItems.Add(MenuItem("独显直连", state.GpuMode == 2, () => GpuModeRequested?.Invoke(2)));
+                _menu.Items.Add(gpu);
+            }
+            if (state?.KeyboardLightVisible == true)
+            {
+                _menu.Items.Add(MenuItem("键盘灯光", false, () => KeyboardLightingRequested?.Invoke()));
+            }
+            _menu.Items.Add(MenuItem("悬浮窗", state?.OverlayOn == true, () => OverlayRequested?.Invoke()));
+            _menu.Items.Add(MenuItem("设置", false, () => SettingsRequested?.Invoke()));
+            _menu.Items.Add(MenuItem("显示主界面", false, () => ShowRequested?.Invoke()));
+            _menu.Items.Add(MenuItem("导出诊断包", false, () => DiagnosticsRequested?.Invoke()));
+            _menu.Items.Add(new ToolStripSeparator());
+            _menu.Items.Add(MenuItem("退出", false, () => ExitRequested?.Invoke()));
+        }
+        finally
+        {
+            _rebuilding = false;
+        }
+    }
+
+    private static ToolStripMenuItem MenuItem(string text, bool isChecked, Action action)
+    {
+        ToolStripMenuItem item = new(text) { Checked = isChecked };
+        item.Click += (_, _) => action();
+        return item;
+    }
+
+    private static ToolStripMenuItem DisabledTitle(string text)
+    {
+        return new ToolStripMenuItem(text) { Enabled = false };
     }
 
     private static Icon LoadIcon()
@@ -92,6 +172,7 @@ internal sealed class TrayIconService : IDisposable
         {
             _icon.Visible = false;
             _icon.Dispose();
+            _menu.Dispose();
         }
         catch
         {

@@ -160,6 +160,31 @@ public partial class OriginalStyleWindow : Window
             Application.Current.Shutdown();
         };
         _trayIcon.ModeRequested += RequestMode;
+        _trayIcon.StateProvider = BuildTrayMenuState;
+        _trayIcon.FanBoostRequested += () =>
+        {
+            if (_backendProbe?.Hw != null)
+            {
+                _ = _backendProbe.SwitchQuickAsync("fanboost", !(_backendProbe.Hw.FanBoost));
+            }
+        };
+        _trayIcon.KeyboardLightingRequested += () => KeyboardLightEdit_Click(this, new RoutedEventArgs());
+        _trayIcon.DiagnosticsRequested += () => _ = ExportDiagnosticPackAsync();
+        _trayIcon.GpuModeRequested += mode =>
+        {
+            ToggleButton? target = mode switch
+            {
+                0 => GpuEcoButton,
+                1 => GpuHybridButton,
+                2 => GpuDirectButton,
+                _ => null
+            };
+            if (target != null)
+            {
+                GpuMode_Click(target, new RoutedEventArgs());
+            }
+        };
+        _trayIcon.CustomModeRequested += id => _ = ActivateTrayCustomAsync(id);
         Dispatcher.BeginInvoke(new Action(PreloadOverlayWindow), DispatcherPriority.Background);
         SourceInitialized += (_, _) =>
         {
@@ -343,6 +368,72 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
+    }
+
+    private TrayMenuState BuildTrayMenuState()
+    {
+        BackendProbe? probe = _backendProbe;
+        int mode = probe != null ? ResolveDisplayMode(probe) : VisualModeForId(MechrevoLite.Mode.PerfModeStore.ActiveModeId);
+        MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+        List<TrayCustomItem> customs = new();
+        string customRoot = "自定义";
+        try
+        {
+            if (perf != null)
+            {
+                foreach (MechrevoLite.Mode.PerfModeDefinition custom in perf.Modes.Where(m => m.IsCustom))
+                {
+                    bool active = string.Equals(perf.DisplayedModeId, custom.Id, StringComparison.Ordinal);
+                    string label = string.IsNullOrWhiteSpace(custom.UserName)
+                        ? MechrevoLite.Mode.PerfModeText.Name(custom)
+                        : custom.UserName;
+                    customs.Add(new TrayCustomItem(custom.Id, label, active));
+                    if (active)
+                    {
+                        customRoot = "自定义：" + label;
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+        return new TrayMenuState(
+            mode,
+            customRoot,
+            customs,
+            probe?.SupportsQuick("fanboost") == true,
+            probe?.Hw?.FanBoost == true,
+            GpuSection.Visibility == Visibility.Visible,
+            probe?.CurrentGpuMode ?? -1,
+            KeyboardLightRow.Visibility == Visibility.Visible,
+            _overlayWindow?.IsVisible == true);
+    }
+
+    private async Task ActivateTrayCustomAsync(string id)
+    {
+        try
+        {
+            MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+            if (perf == null)
+            {
+                return;
+            }
+            MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "tray");
+            if (outcome?.AnyFailed == true)
+            {
+                ToastService.Show("切换自定义模式失败", failure: true);
+            }
+            else
+            {
+                StatusText.Text = "模式已下发";
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Show("切换自定义模式失败：" + ex.Message, failure: true);
+        }
+        RefreshFromBackend();
     }
 
     private void ToggleTrayOverlay()
@@ -1800,7 +1891,6 @@ public partial class OriginalStyleWindow : Window
             CustomModeButton.IsChecked = mode is 3 or 4;
             RefreshModeHighlights();
         }
-        _trayIcon?.SetMode(mode);
         SyncLightSwitchesFromHardware();
         SyncRefreshRateState();
         RefreshPerfConfigVisibility(mode);
