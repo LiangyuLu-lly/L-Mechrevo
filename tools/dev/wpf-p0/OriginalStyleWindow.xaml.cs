@@ -734,6 +734,55 @@ public partial class OriginalStyleWindow : Window
         RefreshFromBackend();
     }
 
+    private void RefreshModeHighlights()
+    {
+        foreach (object child in ModeGrid.Children)
+        {
+            if (child is ToggleButton button && button.IsChecked == true)
+            {
+                UpdateModeBorders(button);
+                return;
+            }
+        }
+        ClearSegmentBorders(ModeGrid);
+    }
+
+    private int _refreshHighHz = 180;
+
+    private void SyncRefreshRateState()
+    {
+        try
+        {
+            AutoRefreshSwitch.IsChecked = AppConfig.Is("screen_auto");
+            int min = ScreenControl.MIN_RATE > 0 ? ScreenControl.MIN_RATE : 60;
+            int max = 0;
+            try
+            {
+                max = ScreenNative.GetMaxRefreshRate(ScreenNative.FindLaptopScreen(false));
+            }
+            catch
+            {
+            }
+            if (max <= min)
+            {
+                max = 180;
+            }
+            _refreshHighHz = max;
+            Refresh180Button.Tag = max.ToString();
+            Refresh180Button.Content = max + "Hz";
+            Refresh60Button.Tag = min.ToString();
+            Refresh60Button.Content = min + "Hz";
+            int current = ScreenNative.GetRefreshRate(ScreenNative.FindLaptopScreen(false));
+            bool high = current > min;
+            Refresh180Button.IsChecked = high;
+            Refresh60Button.IsChecked = !high;
+            HighlightSegment(high ? Refresh180Button : Refresh60Button);
+        }
+        catch
+        {
+        }
+    }
+
     private void UpdateGpuButtons(int mode, bool pending)
     {
         ToggleButton[] buttons = { GpuEcoButton, GpuHybridButton, GpuDirectButton };
@@ -744,6 +793,10 @@ public partial class OriginalStyleWindow : Window
         if (mode >= 0 && mode < buttons.Length)
         {
             HighlightSegment(buttons[mode], pending ? Color.FromRgb(250, 204, 21) : null);
+        }
+        else if (buttons[0].Parent is Panel panel)
+        {
+            ClearSegmentBorders(panel);
         }
     }
 
@@ -862,8 +915,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        Refresh180Button.IsChecked = text == "180";
-        Refresh60Button.IsChecked = text == "60";
+        AutoRefreshSwitch.IsChecked = false;
+        AppConfig.Set("screen_auto", 0);
+        ScreenControl.SetAutoRefresh(0);
+        int requested = int.Parse(text);
+        Refresh180Button.IsChecked = requested >= _refreshHighHz;
+        Refresh60Button.IsChecked = requested < _refreshHighHz;
         HighlightSegment(button);
         bool ok = await _backendProbe.SwitchRefreshRateAsync(int.Parse(text));
         StatusText.Text = ok ? "刷新率已下发" : "刷新率下发失败";
@@ -877,6 +934,9 @@ public partial class OriginalStyleWindow : Window
         }
         bool on = AutoRefreshSwitch.IsChecked == true;
         bool ok = await _backendProbe.SwitchAutoRefreshAsync(on);
+        AppConfig.Set("screen_auto", on ? 1 : 0);
+        AppConfig.Flush();
+        SyncRefreshRateState();
         StatusText.Text = ok ? "自动刷新率已下发" : "自动刷新率下发失败";
     }
 
@@ -1358,6 +1418,8 @@ public partial class OriginalStyleWindow : Window
         BalancedModeButton.IsChecked = mode == 0;
         TurboModeButton.IsChecked = mode == 1;
         CustomModeButton.IsChecked = mode == 3 || mode == 4;
+        RefreshModeHighlights();
+        SyncRefreshRateState();
         ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         int batteryMode = probe.BatteryMode;
         for (int i = 0; i < batteryButtons.Length; i++)
