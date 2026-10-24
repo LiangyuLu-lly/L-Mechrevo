@@ -667,11 +667,7 @@ public partial class SettingsWindow : Window
                 Status("已是最新版本：" + Program.ReleaseVersion);
                 return;
             }
-            OriginalFormHostWindow host = new(new MechrevoLite.Update.UpdateForm(info), "检查更新")
-            {
-                Owner = this
-            };
-            host.ShowDialog();
+            new UpdateWindow(info) { Owner = this }.ShowDialog();
         }
         catch (Exception ex)
         {
@@ -695,11 +691,7 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            OriginalFormHostWindow host = new(new MechrevoLite.FeedbackForm(), "反馈")
-            {
-                Owner = this
-            };
-            host.ShowDialog();
+            new FeedbackWindow(_owner) { Owner = this }.ShowDialog();
         }
         catch (Exception ex)
         {

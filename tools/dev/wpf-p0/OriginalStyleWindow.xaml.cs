@@ -3749,6 +3749,11 @@ public partial class OriginalStyleWindow : Window
             HardwareControl.gpuPower ?? 0f);
     }
 
+    internal Task ExportDiagnosticPackForFeedbackAsync()
+    {
+        return ExportDiagnosticPackAsync();
+    }
+
     private async Task ExportDiagnosticPackAsync()
     {
         Microsoft.Win32.SaveFileDialog dialog = new()
