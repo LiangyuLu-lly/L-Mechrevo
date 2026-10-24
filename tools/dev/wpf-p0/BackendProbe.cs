@@ -405,9 +405,9 @@ internal sealed class BackendProbe : IDisposable
         try
         {
             MechrevoLite.Hardware.LightChannelSettings settings = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effect);
-            bool colorMeaningful = keyboard
-                ? MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect)
-                : MechrevoLite.LightForm.LightEffectColorMode(effect) == 1;
+            // 原版 LightForm.SendAsync 对所有通道统一用 IsSingleColorEffect 判断是否带单色；
+            // Breathing/Impact 等单色系效果也必须把用户颜色带上，不能只认 LightEffectColorMode==1。
+            bool colorMeaningful = MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect);
             Color? color = colorMeaningful
                 ? Color.FromArgb(settings.EffectiveColorArgb())
                 : null;

@@ -3439,11 +3439,16 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        if (_backendProbe == null || LightStripSwitch.IsChecked != true || LightStripEffectCombo.SelectedItem is not ComboBoxItem item)
+        if (LightStripEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
         string effect = item.Tag as string ?? "Single";
+        if (_backendProbe == null || LightStripSwitch.IsChecked != true)
+        {
+            SaveChannelEffect("HidLightbar/Ctrl", effect);
+            return;
+        }
         bool ok = await _backendProbe.SetLightbarEffectAsync(effect);
         StatusText.Text = ok ? "灯带效果已下发：" + effect : "灯带效果下发失败";
     }
@@ -3501,11 +3506,17 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        if (_backendProbe == null || LightHingeSwitch.IsChecked != true || LightHingeEffectCombo.SelectedItem is not ComboBoxItem item)
+        if (LightHingeEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
-        bool ok = await _backendProbe.SetHingeEffectAsync(item.Tag as string ?? "Single");
+        string effect = item.Tag as string ?? "Single";
+        if (_backendProbe == null || LightHingeSwitch.IsChecked != true)
+        {
+            SaveChannelEffect("HidLightbar_Hinge/Ctrl", effect);
+            return;
+        }
+        bool ok = await _backendProbe.SetHingeEffectAsync(effect);
         StatusText.Text = ok ? "铰链灯效果已下发" : "铰链灯效果下发失败";
     }
 
@@ -3541,11 +3552,17 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        if (_backendProbe == null || LightSyncSwitch.IsChecked != true || LightSyncEffectCombo.SelectedItem is not ComboBoxItem item)
+        if (LightSyncEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
-        bool ok = await _backendProbe.SetSyncEffectAsync(item.Tag as string ?? "Single");
+        string effect = item.Tag as string ?? "Single";
+        if (_backendProbe == null || LightSyncSwitch.IsChecked != true)
+        {
+            SaveChannelEffect("HidLightbar_Sync/Ctrl", effect);
+            return;
+        }
+        bool ok = await _backendProbe.SetSyncEffectAsync(effect);
         StatusText.Text = ok ? "同步灯效果已下发" : "同步灯效果下发失败";
     }
 
@@ -3576,16 +3593,31 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static void SaveChannelEffect(string topic, string effect)
+    {
+        try
+        {
+            LightChannelSettings current = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effect);
+            MechrevoLite.Hardware.LightingSettingsStore.Save(topic, current with { Effect = effect });
+        }
+        catch
+        {
+        }
+    }
+
     private async void KeyboardEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_syncingLighting)
+        if (_syncingLighting || KeyboardEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
-        if (KeyboardLightSwitch.IsChecked == true)
+        string effect = item.Tag as string ?? "Single";
+        if (KeyboardLightSwitch.IsChecked != true)
         {
-            await ApplyKeyboardLightAsync();
+            SaveChannelEffect("Keyboard/Ctrl", effect);
+            return;
         }
+        await ApplyKeyboardLightAsync();
     }
 
     private async Task ApplyKeyboardLightAsync()
@@ -3637,14 +3669,17 @@ public partial class OriginalStyleWindow : Window
 
     private async void LogoEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_syncingLighting)
+        if (_syncingLighting || LogoEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
-        if (LogoLightSwitch.IsChecked == true)
+        string effect = item.Tag as string ?? "Single";
+        if (LogoLightSwitch.IsChecked != true)
         {
-            await ApplyLogoLightAsync();
+            SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
+            return;
         }
+        await ApplyLogoLightAsync();
     }
 
     private async Task ApplyLogoLightAsync(bool restoreEffect = false)

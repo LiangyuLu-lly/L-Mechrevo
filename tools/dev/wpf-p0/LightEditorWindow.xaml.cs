@@ -71,7 +71,8 @@ public partial class LightEditorWindow : Window
         }
         _manualInterval = Math.Clamp(_settings.Speed, 2, 10);
         _breathingIndex = Math.Clamp(_settings.BreathingIndex, 1, 4);
-        if (_settings.MixColors is { Length: 7 } mix)
+        LightChannelSettings mixSettings = LightingSettingsStore.Load(topic, "ColorMarquee");
+        if (mixSettings.MixColors is { Length: 7 } mix)
         {
             _mixColors = (int[])mix.Clone();
         }
@@ -411,6 +412,14 @@ public partial class LightEditorWindow : Window
         System.Drawing.Color c = picked;
         button.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B));
         button.ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+        try
+        {
+            LightChannelSettings mixSettings = LightingSettingsStore.Load(_topic, "ColorMarquee");
+            LightingSettingsStore.Save(_topic, mixSettings with { MixColors = (int[])_mixColors.Clone() });
+        }
+        catch
+        {
+        }
         ScheduleAutoApply();
     }
 
@@ -442,14 +451,14 @@ public partial class LightEditorWindow : Window
         {
             string effect = SelectedEffect;
             bool power = PowerCheck.IsChecked == true;
+            bool manualKeyboard = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal)
+                && string.Equals(effect, "Manual", StringComparison.Ordinal);
+            int applySpeed = manualKeyboard ? _manualInterval : _speed;
             LightChannelSettings next = _settings with
             {
                 Effect = effect,
                 Light = _light,
-                Speed = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal)
-                    && string.Equals(effect, "Manual", StringComparison.Ordinal)
-                    ? _manualInterval
-                    : _speed,
+                Speed = applySpeed,
                 ColorArgb = _colorArgb,
                 UsePresetColor = false,
                 MixColors = (int[])_mixColors.Clone(),
@@ -472,11 +481,10 @@ public partial class LightEditorWindow : Window
             {
                 if (power)
                 {
-                    int colorMode = LightForm.LightEffectColorMode(effect);
-                    System.Drawing.Color? color = colorMode == 1
+                    System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
                         ? System.Drawing.Color.FromArgb(_colorArgb)
                         : null;
-                    ok = await Program.service.SetKeyboardEffect(effect, _light, _speed, "None", color, save: true);
+                    ok = await Program.service.SetKeyboardEffect(effect, _light, applySpeed, "None", color, save: true);
                 }
                 else
                 {
@@ -485,8 +493,7 @@ public partial class LightEditorWindow : Window
             }
             else if (power)
             {
-                int colorMode = LightForm.LightEffectColorMode(effect);
-                System.Drawing.Color? color = colorMode == 1
+                System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
                     ? System.Drawing.Color.FromArgb(_colorArgb)
                     : null;
                 ok = await Program.service.SetLightEffect(_topic, effect, _light, _speed, "None", color);
