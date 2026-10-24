@@ -56,7 +56,8 @@ public partial class CustomModeWindow : Window
                     continue;
                 }
             }
-            else if (!string.Equals(mode.Id, target, StringComparison.Ordinal))
+            else if (!string.Equals(mode.Id, target, StringComparison.Ordinal)
+                && !MechrevoLite.CustomModeForm.IsOffered(mode, Program.hw))
             {
                 continue;
             }
@@ -156,13 +157,16 @@ public partial class CustomModeWindow : Window
         {
             LoadLiveHardware(liveHw);
         }
-        bool editable = _current?.IsCustom == true;
-        CpuPowerCard.IsEnabled = editable;
-        TempGpuCard.IsEnabled = editable;
-        FanCard.IsEnabled = editable;
-        CpuPowerCard.Opacity = editable ? 1.0 : 0.45;
-        TempGpuCard.Opacity = editable ? 1.0 : 0.45;
-        FanCard.Opacity = editable ? 1.0 : 0.45;
+        bool locked = Program.hw is MechrevoHw lockHw
+            && lockHw.IsGcuConnected
+            && MechrevoLite.CustomModeForm.IsGen40Plus(lockHw)
+            && _current?.IsCustom != true;
+        CpuPowerCard.IsEnabled = !locked;
+        TempGpuCard.IsEnabled = !locked;
+        FanCard.IsEnabled = !locked;
+        CpuPowerCard.Opacity = locked ? 0.45 : 1.0;
+        TempGpuCard.Opacity = locked ? 0.45 : 1.0;
+        FanCard.Opacity = locked ? 0.45 : 1.0;
     }
 
     private void LoadLiveHardware(MechrevoHw hw)
