@@ -865,7 +865,7 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            new OriginalFormHostWindow(new MechrevoLite.CpuTuningForm()).Show();
+            new CpuTuningWindow { Owner = this }.Show();
         }
         catch (Exception ex)
         {
