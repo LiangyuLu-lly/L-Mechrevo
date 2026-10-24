@@ -62,6 +62,7 @@ public partial class OriginalStyleWindow : Window
     private int _pendingMode = -1;
     private long _pendingModeTick;
     private int _lastDbVisualMode = int.MinValue;
+    private string _customWindowModeId = "";
     private bool _perfConfigBuilt;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
@@ -748,6 +749,28 @@ public partial class OriginalStyleWindow : Window
         selected.FontWeight = FontWeights.Bold;
     }
 
+    private void SyncCustomWindowMode(int mode)
+    {
+        if (_customModeForm == null || !_customModeForm.IsVisible)
+        {
+            return;
+        }
+        string id = mode switch
+        {
+            2 => MechrevoLite.Mode.PerfModeDefinition.BuiltInId(MechrevoLite.Mode.PerfModeKind.Silent),
+            1 => MechrevoLite.Mode.PerfModeDefinition.BuiltInId(MechrevoLite.Mode.PerfModeKind.Turbo),
+            0 => MechrevoLite.Mode.PerfModeDefinition.BuiltInId(MechrevoLite.Mode.PerfModeKind.Balanced),
+            3 or 4 => ResolveCustomModeId(),
+            _ => ""
+        };
+        if (string.IsNullOrWhiteSpace(id) || string.Equals(id, _customWindowModeId, StringComparison.Ordinal))
+        {
+            return;
+        }
+        _customWindowModeId = id;
+        _customModeForm.BindMode(id);
+    }
+
     private void SyncGpuDbForMode(int mode, string reason)
     {
         try
@@ -781,6 +804,7 @@ public partial class OriginalStyleWindow : Window
         if (ok)
         {
             SyncGpuDbForMode(mode, "WPF 切档");
+            SyncCustomWindowMode(mode);
         }
         RefreshFromBackend();
     }
@@ -1489,6 +1513,10 @@ public partial class OriginalStyleWindow : Window
         RefreshPerfConfigVisibility(mode);
         RefreshPerfConfigSelections();
         SyncGpuDbForMode(mode, "WPF 后端模式同步");
+        if (!skipModeUi)
+        {
+            SyncCustomWindowMode(mode);
+        }
         ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         int batteryMode = probe.BatteryMode;
         for (int i = 0; i < batteryButtons.Length; i++)
@@ -2110,6 +2138,7 @@ public partial class OriginalStyleWindow : Window
                 _customModeForm.Show();
             }
             _customModeForm.Activate();
+            _customWindowModeId = customId;
             if (switchMode)
             {
                 if (!await _customModeForm.SelectModeAsync(customId))

@@ -130,6 +130,7 @@ public partial class CustomModeWindow : Window
         _current = mode;
         _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(id);
         LoadSettingsToUi(_settings);
+        Title = "性能模式 · " + ModeName(mode);
         StatusText.Text = "当前模式：" + ModeName(mode);
     }
 
