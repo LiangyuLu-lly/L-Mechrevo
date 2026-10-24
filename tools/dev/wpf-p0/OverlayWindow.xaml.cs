@@ -120,7 +120,7 @@ public partial class OverlayWindow : Window
         catch
         {
         }
-        return acOnline ? "外接电源" : "电池供电";
+        return acOnline ? "外接电源（功率未识别）" : "电池供电";
     }
 
     private static string FormatFan(int rpm, int duty)

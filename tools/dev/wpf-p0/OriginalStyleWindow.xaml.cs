@@ -1855,7 +1855,7 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
-        return acOnline ? "外接电源" : "电池供电";
+        return acOnline ? "外接电源（功率未识别）" : "电池供电";
     }
 
     private void RefreshFromBackend()
@@ -1890,7 +1890,22 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
-        BatteryInfo.Text = "电池 " + hw.BatteryPercent + "%" + powerState + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
+        int batteryPercent = hw.BatteryPercent;
+        if (batteryPercent < 0)
+        {
+            try
+            {
+                float life = System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent;
+                if (life >= 0f && life <= 1f)
+                {
+                    batteryPercent = (int)Math.Round(life * 100f);
+                }
+            }
+            catch
+            {
+            }
+        }
+        BatteryInfo.Text = "电池 " + batteryPercent + "%" + powerState + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
         BatteryInfo.ToolTip = health;
         int mode = ResolveDisplayMode(probe);
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
