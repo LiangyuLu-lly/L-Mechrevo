@@ -52,6 +52,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
     private bool _overlayPreloaded;
+    private bool _wideMode;
     private TrayIconService? _trayIcon;
     private HotkeyService? _hotkeyService;
     private bool _firstRunChecked;
@@ -978,10 +979,39 @@ public partial class OriginalStyleWindow : Window
         {
             width = MainScroll.ActualWidth - 30;
         }
-        if (width > 100)
+        if (width <= 100)
         {
-            ContentPanel.Width = width;
+            return;
         }
+        ContentPanel.Width = width;
+        double childWidth = _wideMode ? Math.Max(340, (width - 8) / 2) : width;
+        foreach (object child in ContentPanel.Children)
+        {
+            if (child is FrameworkElement element)
+            {
+                element.Width = childWidth;
+            }
+        }
+    }
+
+    private void ApplyWideMode(bool wide)
+    {
+        _wideMode = wide;
+        if (wide)
+        {
+            MaxWidth = 1600;
+            MinWidth = 920;
+            Width = Math.Min(1100, SystemParameters.WorkArea.Width - 40);
+            WideButton.Content = "窄屏";
+        }
+        else
+        {
+            MaxWidth = 420;
+            MinWidth = 420;
+            Width = 420;
+            WideButton.Content = "宽屏";
+        }
+        Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private async void ModeButton_Click(object sender, RoutedEventArgs e)
@@ -3669,7 +3699,7 @@ public partial class OriginalStyleWindow : Window
 
     private void WideButton_Click(object sender, RoutedEventArgs e)
     {
-        new MainWindow().Show();
+        ApplyWideMode(!_wideMode);
     }
 
     private async void DockButton_Click(object sender, RoutedEventArgs e)

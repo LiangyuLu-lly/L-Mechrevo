@@ -411,7 +411,7 @@
                     <TextBlock x:Name="BackendStatus" Text="● GCU 状态未知" Foreground="#9BA6B5" FontSize="12" FontWeight="SemiBold" Cursor="Hand" MouseLeftButtonUp="BackendStatus_MouseLeftButtonUp" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="宽屏" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="WideButton_Click" Margin="0,0,6,0" />
+                    <Button x:Name="WideButton" Content="宽屏" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="WideButton_Click" Margin="0,0,6,0" />
                     <Button x:Name="ThemeButton" Content="浅色" Style="{StaticResource GhostButton}" FontSize="10" Padding="8,4" Click="ThemeButton_Click" Margin="0,0,6,0" />
                     <CheckBox x:Name="BackgroundToggle" Content="背景图" Style="{StaticResource HeaderSwitch}" FontSize="10" Margin="0,0,0,0" VerticalAlignment="Center"
                               Checked="BackgroundToggle_Changed" Unchecked="BackgroundToggle_Changed" />
@@ -420,7 +420,7 @@
 
             <ScrollViewer x:Name="MainScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly" CanContentScroll="False" Background="Transparent">
-                <StackPanel x:Name="ContentPanel" Margin="12,0,5,8" HorizontalAlignment="Left">
+                <WrapPanel x:Name="ContentPanel" Margin="12,0,5,8" HorizontalAlignment="Left" Orientation="Horizontal">
 
                     <!-- 性能模式 -->
                     <StackPanel x:Name="PerfSection" Style="{StaticResource Section}">
@@ -789,7 +789,7 @@
                     <StackPanel x:Name="MoreGroupsPanel" Margin="0,4,0,0" Visibility="Collapsed" />
                     </StackPanel>
 
-                </StackPanel>
+                </WrapPanel>
             </ScrollViewer>
 
             <!-- 底部 dock：模仿原版悬浮底栏 -->
