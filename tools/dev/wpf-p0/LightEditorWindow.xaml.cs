@@ -16,6 +16,9 @@ public partial class LightEditorWindow : Window
     private LightChannelSettings _settings;
     private int _light;
     private int _speed;
+    private int _manualInterval = 5;
+    private int _breathingIndex = 1;
+    private int[] _manualIndexes = (int[])LightChannelSettings.DefaultManualIndexes.Clone();
     private int _colorArgb;
     private int[] _mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
     private bool _gradeBrightness;
@@ -44,6 +47,12 @@ public partial class LightEditorWindow : Window
         _light = Math.Clamp(_settings.Light, 0, 4);
         _speed = Math.Clamp(_settings.Speed, 0, 4);
         _colorArgb = _settings.EffectiveColorArgb();
+        if (_settings.ManualIndexes is { Length: >= 6 } manual)
+        {
+            _manualIndexes = (int[])manual.Clone();
+        }
+        _manualInterval = Math.Clamp(_settings.Speed, 2, 10);
+        _breathingIndex = Math.Clamp(_settings.BreathingIndex, 1, 4);
         if (_settings.MixColors is { Length: 7 } mix)
         {
             _mixColors = (int[])mix.Clone();
@@ -53,6 +62,7 @@ public partial class LightEditorWindow : Window
         NetSliderValues();
         LoadEffects();
         RefreshColorUi();
+        BuildKeyboardExtra();
         _suppressAutoApply = false;
         PowerCheck.Checked += (_, _) => ScheduleAutoApply();
         PowerCheck.Unchecked += (_, _) => ScheduleAutoApply();
@@ -127,6 +137,147 @@ public partial class LightEditorWindow : Window
             }
         }
         UpdateColorButton();
+        RefreshKeyboardUi();
+    }
+
+    private void BuildKeyboardExtra()
+    {
+        if (!string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+        {
+            return;
+        }
+        ManualPaletteGrid.Children.Clear();
+        for (int i = 0; i < 6; i++)
+        {
+            int index = i;
+            System.Drawing.Color c = System.Drawing.Color.FromArgb(
+                LightChannelSettings.ManualPalette[Math.Clamp(_manualIndexes[i], 1, 29) - 1]);
+            Button button = new()
+            {
+                Height = 26,
+                Margin = new Thickness(2),
+                Padding = new Thickness(0),
+                Tag = index,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
+                ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}"
+            };
+            button.Click += ManualColor_Click;
+            ManualPaletteGrid.Children.Add(button);
+        }
+        BreathGrid.Children.Clear();
+        for (int i = 0; i < 4; i++)
+        {
+            int index = i;
+            System.Drawing.Color c = System.Drawing.Color.FromArgb(LightChannelSettings.BreathingPalette[i]);
+            Button button = new()
+            {
+                Height = 26,
+                Margin = new Thickness(2),
+                Padding = new Thickness(0),
+                Tag = index + 1,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
+                ToolTip = "呼吸颜色 " + (index + 1)
+            };
+            button.Click += BreathColor_Click;
+            BreathGrid.Children.Add(button);
+        }
+    }
+
+    private void RefreshKeyboardUi()
+    {
+        if (KeyboardExtraRow == null)
+        {
+            return;
+        }
+        bool keyboard = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal);
+        KeyboardExtraRow.Visibility = keyboard ? Visibility.Visible : Visibility.Collapsed;
+        if (!keyboard)
+        {
+            return;
+        }
+        string effect = SelectedEffect;
+        bool manual = string.Equals(effect, "Manual", StringComparison.Ordinal);
+        bool breathing = string.Equals(effect, "Breathing", StringComparison.Ordinal);
+        PerKeyPanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
+        ManualPalettePanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
+        BreathPanel.Visibility = breathing ? Visibility.Visible : Visibility.Collapsed;
+        if (manual && PerKeySlider.Value != _manualInterval)
+        {
+            PerKeySlider.Value = _manualInterval;
+        }
+        PerKeyText.Text = _manualInterval + "/10";
+        for (int i = 0; i < ManualPaletteGrid.Children.Count; i++)
+        {
+            if (ManualPaletteGrid.Children[i] is Button button)
+            {
+                System.Drawing.Color c = System.Drawing.Color.FromArgb(
+                    LightChannelSettings.ManualPalette[Math.Clamp(_manualIndexes[i], 1, 29) - 1]);
+                button.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B));
+                button.ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+            }
+        }
+        for (int i = 0; i < BreathGrid.Children.Count; i++)
+        {
+            if (BreathGrid.Children[i] is Button button)
+            {
+                button.BorderThickness = new Thickness(i + 1 == _breathingIndex ? 2 : 0);
+            }
+        }
+    }
+
+    private void PerKey_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _manualInterval = Math.Clamp((int)Math.Round(e.NewValue), 2, 10);
+        if (PerKeyText != null)
+        {
+            PerKeyText.Text = _manualInterval + "/10";
+        }
+        ScheduleAutoApply();
+    }
+
+    private void BreathColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: int index })
+        {
+            _breathingIndex = Math.Clamp(index, 1, 4);
+            RefreshKeyboardUi();
+            ScheduleAutoApply();
+        }
+    }
+
+    private void ManualColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: int index })
+        {
+            return;
+        }
+        System.Drawing.Color current = System.Drawing.Color.FromArgb(
+            LightChannelSettings.ManualPalette[Math.Clamp(_manualIndexes[index], 1, 29) - 1]);
+        using System.Windows.Forms.ColorDialog dialog = new() { FullOpen = true, Color = current };
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+        {
+            return;
+        }
+        _manualIndexes[index] = NearestPaletteIndex(dialog.Color);
+        RefreshKeyboardUi();
+        ScheduleAutoApply();
+    }
+
+    private static int NearestPaletteIndex(System.Drawing.Color color)
+    {
+        int best = 1;
+        int bestDistance = int.MaxValue;
+        for (int i = 0; i < LightChannelSettings.ManualPalette.Length; i++)
+        {
+            System.Drawing.Color c = System.Drawing.Color.FromArgb(LightChannelSettings.ManualPalette[i]);
+            int distance = (c.R - color.R) * (c.R - color.R) + (c.G - color.G) * (c.G - color.G) + (c.B - color.B) * (c.B - color.B);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = i + 1;
+            }
+        }
+        return best;
     }
 
     private void UpdateColorButton()
@@ -222,9 +373,14 @@ public partial class LightEditorWindow : Window
             {
                 Effect = effect,
                 Light = _light,
-                Speed = _speed,
+                Speed = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal)
+                    && string.Equals(effect, "Manual", StringComparison.Ordinal)
+                    ? _manualInterval
+                    : _speed,
                 ColorArgb = _colorArgb,
                 MixColors = (int[])_mixColors.Clone(),
+                ManualIndexes = (int[])_manualIndexes.Clone(),
+                BreathingIndex = _breathingIndex,
                 PowerOn = power
             };
             LightingSettingsStore.Save(_topic, next);

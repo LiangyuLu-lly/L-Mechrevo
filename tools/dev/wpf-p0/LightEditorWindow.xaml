@@ -25,7 +25,8 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
@@ -61,6 +62,22 @@
                     <UniformGrid x:Name="MixGrid" Columns="7" />
                 </StackPanel>
             </Border>
+            <StackPanel x:Name="KeyboardExtraRow" Grid.Row="6" Margin="0,8,0,0" Visibility="Collapsed">
+                <Grid x:Name="PerKeyPanel">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                    <TextBlock Text="每键显示时间" VerticalAlignment="Center" />
+                    <Slider x:Name="PerKeySlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="2" Maximum="10" Value="5" ValueChanged="PerKey_Changed" />
+                    <TextBlock x:Name="PerKeyText" Grid.Column="2" Text="5/10" TextAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+                <StackPanel x:Name="ManualPalettePanel" Margin="0,6,0,0">
+                    <TextBlock Text="切换颜色（六段）" Style="{DynamicResource MutedText}" Margin="0,0,0,4" />
+                    <UniformGrid x:Name="ManualPaletteGrid" Columns="6" />
+                </StackPanel>
+                <StackPanel x:Name="BreathPanel" Margin="0,6,0,0">
+                    <TextBlock Text="呼吸颜色" Style="{DynamicResource MutedText}" Margin="0,0,0,4" />
+                    <UniformGrid x:Name="BreathGrid" Columns="4" />
+                </StackPanel>
+            </StackPanel>
         </Grid>
         <Grid Grid.Row="2" Margin="0,10,0,0">
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{DynamicResource MutedText}" TextWrapping="Wrap" />

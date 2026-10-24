@@ -3197,7 +3197,9 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         MechrevoHw? hw = _backendProbe.Hw;
-        if (hw != null && (hw.UsesBaolongda || hw.WujieSmuApu))
+        bool singleZone = hw != null
+            && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleZoneRgb(hw.Capabilities.KeyboardType);
+        if (hw != null && (hw.UsesBaolongda || hw.WujieSmuApu || singleZone))
         {
             OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
             return;
