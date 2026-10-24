@@ -1,33 +1,41 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using MechrevoLite;
 
 namespace L_Mechrevo.WpfP0;
 
-/// <summary>
-/// 全局热键：Ctrl+Alt+1..4 切性能模式，Ctrl+Alt+O 悬浮窗，
-/// Ctrl+Alt+S 设置，Ctrl+Alt+M 显示主界面。
-/// </summary>
+/// <summary>全局热键：绑定保存在 config，支持设置页修改。</summary>
 internal sealed class HotkeyService : IDisposable
 {
     private const int WmHotkey = 0x0312;
-    private const uint ModAlt = 0x0001;
-    private const uint ModControl = 0x0002;
+    internal const uint ModAlt = 0x0001;
+    internal const uint ModControl = 0x0002;
+    internal const uint ModShift = 0x0004;
+    internal const uint ModWin = 0x0008;
     private const uint ModNoRepeat = 0x4000;
-    private const uint Vk1 = 0x31;
-    private const uint Vk2 = 0x32;
-    private const uint Vk3 = 0x33;
-    private const uint Vk4 = 0x34;
-    private const uint VkO = 0x4F;
-    private const uint VkS = 0x53;
-    private const uint VkM = 0x4D;
+
+    internal readonly record struct HotkeyAction(int Id, string ConfigKey, string Label, uint DefaultModifiers, uint DefaultKey);
+
+    internal static readonly HotkeyAction[] Actions =
+    {
+        new(1, "mode_silent", "静音", ModControl | ModAlt, 0x31),
+        new(2, "mode_balanced", "平衡", ModControl | ModAlt, 0x32),
+        new(3, "mode_turbo", "狂暴", ModControl | ModAlt, 0x33),
+        new(4, "mode_custom", "自定义", ModControl | ModAlt, 0x34),
+        new(5, "overlay", "悬浮窗", ModControl | ModAlt, 0x4F),
+        new(6, "settings", "设置", ModControl | ModAlt, 0x53),
+        new(7, "show_main", "显示主界面", ModControl | ModAlt, 0x4D)
+    };
 
     private readonly HwndSource _source;
     private readonly HwndSourceHook _hook;
-    private readonly uint _modifiers = ModControl | ModAlt | ModNoRepeat;
-    private BigIntegerBits _registered;
+    private readonly HashSet<int> _registered = new();
     private bool _disposed;
+
+    internal static HotkeyService? Current { get; private set; }
 
     internal event Action<int>? ModeRequested;
     internal event Action? OverlayRequested;
@@ -40,13 +48,96 @@ internal sealed class HotkeyService : IDisposable
         _source = HwndSource.FromHwnd(handle) ?? throw new InvalidOperationException("HWND 未就绪");
         _hook = WndProc;
         _source.AddHook(_hook);
-        Register(1, Vk1);
-        Register(2, Vk2);
-        Register(3, Vk3);
-        Register(4, Vk4);
-        Register(5, VkO);
-        Register(6, VkS);
-        Register(7, VkM);
+        Current = this;
+        Reload();
+    }
+
+    internal void Reload()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+        foreach (int id in _registered)
+        {
+            UnregisterHotKey(_source.Handle, id);
+        }
+        _registered.Clear();
+        if (AppConfig.Get("hotkey_enabled", 1) == 0)
+        {
+            return;
+        }
+        foreach (HotkeyAction action in Actions)
+        {
+            (uint modifiers, uint key) = ReadGesture(action);
+            if (modifiers == 0 || key == 0)
+            {
+                continue;
+            }
+            if (RegisterHotKey(_source.Handle, action.Id, modifiers | ModNoRepeat, key))
+            {
+                _registered.Add(action.Id);
+            }
+        }
+    }
+
+    private static (uint Modifiers, uint Key) ReadGesture(HotkeyAction action)
+    {
+        string? text = AppConfig.GetString("hotkey_" + action.ConfigKey);
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            string[] parts = text.Split(',');
+            if (parts.Length == 2
+                && uint.TryParse(parts[0], out uint modifiers)
+                && uint.TryParse(parts[1], out uint key)
+                && key != 0)
+            {
+                return (modifiers, key);
+            }
+        }
+        return (action.DefaultModifiers, action.DefaultKey);
+    }
+
+    internal static (uint Modifiers, uint Key) GetGesture(HotkeyAction action) => ReadGesture(action);
+
+    internal static void SetGesture(HotkeyAction action, uint modifiers, uint key)
+    {
+        AppConfig.Set("hotkey_" + action.ConfigKey, modifiers + "," + key);
+        AppConfig.Flush();
+        Current?.Reload();
+    }
+
+    internal static void ResetGestures()
+    {
+        foreach (HotkeyAction action in Actions)
+        {
+            AppConfig.Remove("hotkey_" + action.ConfigKey);
+        }
+        AppConfig.Set("hotkey_enabled", 1);
+        AppConfig.Flush();
+        Current?.Reload();
+    }
+
+    internal static string Describe(uint modifiers, uint key)
+    {
+        List<string> parts = new();
+        if ((modifiers & ModControl) != 0) parts.Add("Ctrl");
+        if ((modifiers & ModAlt) != 0) parts.Add("Alt");
+        if ((modifiers & ModShift) != 0) parts.Add("Shift");
+        if ((modifiers & ModWin) != 0) parts.Add("Win");
+        string keyText = key switch
+        {
+            0x31 => "1",
+            0x32 => "2",
+            0x33 => "3",
+            0x34 => "4",
+            0x4F => "O",
+            0x53 => "S",
+            0x4D => "M",
+            _ => ((char)key).ToString()
+        };
+        parts.Add(keyText);
+        return string.Join("+", parts);
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -67,22 +158,6 @@ internal sealed class HotkeyService : IDisposable
         return IntPtr.Zero;
     }
 
-    private void Register(int id, uint vk)
-    {
-        if (RegisterHotKey(_source.Handle, id, _modifiers, vk))
-        {
-            _registered.Set(id);
-        }
-    }
-
-    private void Unregister(int id)
-    {
-        if (_registered.Has(id))
-        {
-            UnregisterHotKey(_source.Handle, id);
-        }
-    }
-
     public void Dispose()
     {
         if (_disposed)
@@ -92,14 +167,19 @@ internal sealed class HotkeyService : IDisposable
         _disposed = true;
         try
         {
-            for (int id = 1; id <= 7; id++)
+            foreach (int id in _registered)
             {
-                Unregister(id);
+                UnregisterHotKey(_source.Handle, id);
             }
+            _registered.Clear();
             _source.RemoveHook(_hook);
         }
         catch
         {
+        }
+        if (ReferenceEquals(Current, this))
+        {
+            Current = null;
         }
     }
 
@@ -108,11 +188,4 @@ internal sealed class HotkeyService : IDisposable
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
-    private struct BigIntegerBits
-    {
-        private int _bits;
-        internal void Set(int id) => _bits |= 1 << id;
-        internal bool Has(int id) => (_bits & (1 << id)) != 0;
-    }
 }

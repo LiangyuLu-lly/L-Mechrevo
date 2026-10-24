@@ -272,6 +272,7 @@
                 <Grid Margin="0,2,0,8">
                     <TextBlock Text="系统" Style="{StaticResource CardTitle}" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="快捷键" Style="{StaticResource FlatButton}" Click="Hotkeys_Click" Margin="0,0,12,0" />
                         <CheckBox x:Name="StartupCheck" Content="开机自启动" Style="{DynamicResource HeaderSwitch}"
                                   Margin="0,0,12,0" Click="Startup_Click" />
                         <CheckBox x:Name="WaterCoolingCheck" Content="强制启用水冷菜单" Style="{DynamicResource HeaderSwitch}" Click="WaterCooling_Click" />

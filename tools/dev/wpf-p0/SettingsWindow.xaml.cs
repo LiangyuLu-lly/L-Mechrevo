@@ -589,6 +589,11 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void Hotkeys_Click(object sender, RoutedEventArgs e)
+    {
+        new HotkeySettingsWindow { Owner = this }.ShowDialog();
+    }
+
     private void OpenFeedback_Click(object sender, RoutedEventArgs e)
     {
         try
