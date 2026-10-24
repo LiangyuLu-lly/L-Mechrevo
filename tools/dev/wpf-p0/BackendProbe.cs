@@ -99,6 +99,48 @@ internal sealed class BackendProbe : IDisposable
 
     internal int GpuMode => _hw?.GpuMode ?? -1;
 
+    internal bool SupportsLcdOverdrive
+    {
+        get
+        {
+            try
+            {
+                return _hw?.SupportsLcdOverdrive ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal bool LcdOverdrive
+    {
+        get
+        {
+            try
+            {
+                return _hw?.LcdOverdrive ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal async Task<bool> SetLcdOverdriveAsync(bool on)
+    {
+        try
+        {
+            return _service != null && await _service.SwitchLcdOverdrive(on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal bool SupportsColorCalibration
     {
         get

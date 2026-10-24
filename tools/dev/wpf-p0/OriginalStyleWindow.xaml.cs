@@ -1730,6 +1730,15 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = ok ? "Logo 灯效已下发：" + effect : "Logo 灯效下发失败";
     }
 
+    internal bool SupportsLcdOverdrive => _backendProbe?.SupportsLcdOverdrive == true;
+
+    internal bool LcdOverdrive => _backendProbe?.LcdOverdrive == true;
+
+    internal async Task<bool> SetLcdOverdriveAsync(bool on)
+    {
+        return _backendProbe != null && await _backendProbe.SetLcdOverdriveAsync(on);
+    }
+
     internal bool IsDark => _dark;
 
     internal bool BackendConnected => _backendProbe?.Connected == true;

@@ -44,6 +44,9 @@ public partial class SettingsWindow : Window
         FollowSystemCheck.IsChecked = AppConfig.Is("ui_theme_follow_system");
         StartupCheck.IsChecked = Startup.IsScheduled();
         WaterCoolingCheck.IsChecked = AppConfig.Is("force_liquid_cooling_menu");
+        DisplayCard.Visibility = _owner.SupportsLcdOverdrive ? Visibility.Visible : Visibility.Collapsed;
+        OverdriveCheck.IsChecked = _owner.LcdOverdrive;
+        AboutVersionText.Text = "L-Mechrevo " + Program.ReleaseVersion + " " + Program.ReleaseLabel;
 
         string language = AppConfig.GetString("language") ?? "zh-CN";
         LanguageCombo.SelectedIndex = language.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
@@ -461,6 +464,67 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             Status("导入失败：" + ex.Message);
+        }
+    }
+
+    private async void Overdrive_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncing)
+        {
+            return;
+        }
+        bool requested = OverdriveCheck.IsChecked == true;
+        OverdriveCheck.IsEnabled = false;
+        try
+        {
+            bool ok = await _owner.SetLcdOverdriveAsync(requested);
+            if (!ok)
+            {
+                _syncing = true;
+                OverdriveCheck.IsChecked = _owner.LcdOverdrive;
+                _syncing = false;
+                Status("显示响应加速切换失败");
+            }
+            else
+            {
+                Status(requested ? "显示响应加速已开启" : "显示响应加速已关闭");
+            }
+        }
+        catch (Exception ex)
+        {
+            Status("显示响应加速异常：" + ex.Message);
+        }
+        finally
+        {
+            OverdriveCheck.IsEnabled = true;
+        }
+    }
+
+    private void OpenIssues_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://github.com/LiangyuLu-lly/L-Mechrevo/issues")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Status("打开链接失败：" + ex.Message);
+        }
+    }
+
+    private void OpenLicenses_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            using MechrevoLite.AboutLicensesForm form = new();
+            form.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Status("打开许可证失败：" + ex.Message);
         }
     }
 

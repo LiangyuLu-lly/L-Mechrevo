@@ -276,6 +276,18 @@
                     </StackPanel>
                 </Grid>
 
+                <Border x:Name="DisplayCard" Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
+                            <CheckBox x:Name="OverdriveCheck" Content="显示响应加速 (LCD Overdrive)"
+                                      Style="{DynamicResource HeaderSwitch}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Click="Overdrive_Click" />
+                        </Grid>
+                        <TextBlock Text="开启后降低 LCD 响应时间；部分面板可能增加轻微过冲。" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
@@ -353,6 +365,18 @@
                             <Button Content="导入设置..." Style="{StaticResource FlatButton}" Click="ImportBackup_Click" Margin="0" />
                         </StackPanel>
                         <TextBlock Text="只含用户设置（不含日志）；导入前自动备份现有设置，导入后需重启 L-Mechrevo。" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="关于" Style="{StaticResource CardTitle}" />
+                        <TextBlock x:Name="AboutVersionText" Text="L-Mechrevo" Style="{StaticResource Hint}" />
+                        <TextBlock Text="界面与功能持续从原版 L-Mechrevo 移植；反馈请附带诊断包。" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="项目主页 / 问题反馈" Style="{StaticResource FlatButton}" Click="OpenIssues_Click" />
+                            <Button Content="许可证" Style="{StaticResource FlatButton}" Click="OpenLicenses_Click" Margin="0" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
