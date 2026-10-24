@@ -66,31 +66,6 @@ internal static class I2ecInpOut
 		}
 	}
 
-	private static long _nextFanPriorityCheck;
-
-	private static bool _fanPriorityCached;
-
-	private static bool FanPriorityActive()
-	{
-		long now = Environment.TickCount64;
-		if (now < _nextFanPriorityCheck)
-		{
-			return _fanPriorityCached;
-		}
-		_nextFanPriorityCheck = now + 250L;
-		try
-		{
-			FileInfo file = new FileInfo(FanPriorityPath());
-			_fanPriorityCached = file.Exists && (DateTime.UtcNow - file.LastWriteTimeUtc).TotalSeconds < 3.0;
-		}
-		catch
-		{
-			_fanPriorityCached = false;
-		}
-		return _fanPriorityCached;
-	}
-
-
 	private static bool TryEnterEcMutex(out bool held)
 	{
 		held = false;
@@ -348,11 +323,6 @@ internal static class I2ecInpOut
 		if (!EnsureInitialized(out detail))
 		{
 			return false;
-		}
-		if (FanPriorityActive())
-		{
-			// 风扇 25Hz 优先：电池循环在拿锁前多睡 8ms，让出稳定写窗口。
-			Thread.Sleep(8);
 		}
 		lock (Gate)
 		{
