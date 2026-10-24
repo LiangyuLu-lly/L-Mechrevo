@@ -88,6 +88,7 @@ public partial class OriginalStyleWindow : Window
     {
         InitializeComponent();
         MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
+        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
         SourceInitialized += (_, _) =>
@@ -1639,6 +1640,16 @@ public partial class OriginalStyleWindow : Window
                 BackendLine.Text = probe.Snapshot();
                 Program.hw = probe.Hw;
                 Program.service = probe.Service!;
+                try
+                {
+                    if (MechrevoLite.Mode.PerfModeService.Instance == null)
+                    {
+                        MechrevoLite.Mode.PerfModeService.Create(probe.Service!, probe.Hw);
+                    }
+                }
+                catch
+                {
+                }
                 _backendRetryTimer.Stop();
                 await probe.RefreshGpuModeAsync();
                 ApplyCapabilities();
@@ -2500,6 +2511,7 @@ public partial class OriginalStyleWindow : Window
     {
         _dark = dark;
         MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
+        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
@@ -2521,6 +2533,7 @@ public partial class OriginalStyleWindow : Window
     {
         _dark = !_dark;
         MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
+        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
