@@ -619,13 +619,17 @@
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE706;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="灯光" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock Text="自动关闭时间" Style="{StaticResource StatText}" Margin="0,0,10,0" />
-                                <Border Background="{DynamicResource ControlBrush}" CornerRadius="8" Padding="12,6">
-                                    <TextBlock Text="关" FontSize="12" />
-                                </Border>
+                                <TextBlock Text="自动关闭时间" Style="{StaticResource StatText}" Margin="0,0,8,0" />
+                                <ComboBox x:Name="LightIdleCombo" Width="96" Style="{StaticResource RoundCombo}" SelectionChanged="LightIdleCombo_SelectionChanged">
+                                    <ComboBoxItem Content="关" Tag="0" />
+                                    <ComboBoxItem Content="1 分钟" Tag="60" />
+                                    <ComboBoxItem Content="5 分钟" Tag="300" />
+                                    <ComboBoxItem Content="10 分钟" Tag="600" />
+                                    <ComboBoxItem Content="30 分钟" Tag="1800" />
+                                </ComboBox>
                             </StackPanel>
                         </Grid>
-                        <CheckBox Content="离电自动关闭全部灯效" Style="{StaticResource RowSwitch}" />
+                        <CheckBox x:Name="LightOffOnBatteryCheck" Content="离电自动关闭全部灯效" Style="{StaticResource RowSwitch}" Click="LightOffOnBattery_Click" />
                         <Grid x:Name="KeyboardLightRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="70" />
@@ -641,7 +645,7 @@
                                 <ComboBoxItem Content="彩虹" Tag="Rainbow" />
                                 <ComboBoxItem Content="频闪" Tag="Strobe" />
                             </ComboBox>
-                            <Button Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" />
+                            <Button x:Name="KeyboardLightEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="KeyboardLightEdit_Click" />
                         </Grid>
                         <Grid x:Name="LogoLightRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
@@ -658,7 +662,7 @@
                                 <ComboBoxItem Content="彩虹" Tag="Rainbow" />
                                 <ComboBoxItem Content="关" Tag="Off" />
                             </ComboBox>
-                            <Button Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" />
+                            <Button x:Name="LogoLightEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="LogoLightEdit_Click" />
                         </Grid>
                     </StackPanel>
 

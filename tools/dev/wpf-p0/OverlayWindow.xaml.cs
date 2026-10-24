@@ -16,7 +16,9 @@ public readonly record struct OverlaySnapshot(
     int GpuFanRpm,
     int RamUsage,
     double RamUsedGb,
-    int BatteryPercent);
+    int BatteryPercent,
+    float CpuPower,
+    float GpuPower);
 
 public partial class OverlayWindow : Window
 {
@@ -63,14 +65,16 @@ public partial class OverlayWindow : Window
     {
         string usage = s.CpuUsage >= 0 ? s.CpuUsage + "%" : "—";
         string freq = s.CpuFrequency > 0 ? (s.CpuFrequency / 1000.0).ToString("0.0") + "GHz" : "—";
-        return usage + " · " + freq;
+        string power = s.CpuPower > 0 ? s.CpuPower.ToString("0.0") + "W" : "—";
+        return usage + " · " + freq + " · " + power;
     }
 
     private static string FormatGpuDetail(OverlaySnapshot s)
     {
         string usage = s.GpuUsage >= 0 ? s.GpuUsage + "%" : "—";
         string freq = s.GpuCoreFreq > 0 ? (s.GpuCoreFreq / 1000.0).ToString("0.0") + "GHz" : "—";
-        return usage + " · " + freq;
+        string power = s.GpuPower > 0 ? s.GpuPower.ToString("0.0") + "W" : "—";
+        return usage + " · " + freq + " · " + power;
     }
 
     private static string FormatFans(int cpu, int gpu)

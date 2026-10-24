@@ -136,6 +136,7 @@ public partial class OriginalStyleWindow : Window
             ApplyMoreSectionState();
             RefreshBrightness();
             InitBatteryControls();
+            InitLightingControls();
             NormalizeSegmentDefaults();
             ApplyDarkTitleBar(_dark);
             ApplyRoundedCorners();
@@ -1585,6 +1586,63 @@ public partial class OriginalStyleWindow : Window
         InitScreenColorControls();
     }
 
+    private void InitLightingControls()
+    {
+        LightOffOnBatteryCheck.IsChecked = AppConfig.Is("lighting_off_on_battery");
+        int seconds = AppConfig.Get("lighting_idle_seconds", 0);
+        foreach (object item in LightIdleCombo.Items)
+        {
+            if (item is ComboBoxItem comboItem && int.TryParse(comboItem.Tag as string, out int value) && value == seconds)
+            {
+                LightIdleCombo.SelectedItem = comboItem;
+                return;
+            }
+        }
+        LightIdleCombo.SelectedIndex = 0;
+    }
+
+    private void LightIdleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (LightIdleCombo.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag as string, out int seconds))
+        {
+            AppConfig.Set("lighting_idle_seconds", seconds);
+            AppConfig.Flush();
+            StatusText.Text = seconds <= 0 ? "灯光自动关闭：关" : "灯光自动关闭：" + (seconds / 60) + " 分钟";
+        }
+    }
+
+    private void LightOffOnBattery_Click(object sender, RoutedEventArgs e)
+    {
+        bool on = LightOffOnBatteryCheck.IsChecked == true;
+        AppConfig.Set("lighting_off_on_battery", on ? 1 : 0);
+        AppConfig.Flush();
+        StatusText.Text = on ? "离电自动关闭灯效：开" : "离电自动关闭灯效：关";
+    }
+
+    private void KeyboardLightEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            StatusText.Text = "后端未连接，无法编辑键盘灯光";
+            return;
+        }
+        MechrevoLite.Program.hw = _backendProbe.Hw;
+        MechrevoLite.Program.service = _backendProbe.Service!;
+        new MechrevoLite.LightForm("HidLightbar/Ctrl", "键盘灯光").ShowDialog();
+    }
+
+    private void LogoLightEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            StatusText.Text = "后端未连接，无法编辑 Logo 灯光";
+            return;
+        }
+        MechrevoLite.Program.hw = _backendProbe.Hw;
+        MechrevoLite.Program.service = _backendProbe.Service!;
+        new MechrevoLite.LightForm("HidLightbar_Logo/Ctrl", "Logo 灯光", MechrevoLite.LightForm.CurrentLogoEffects()).ShowDialog();
+    }
+
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)
     {
         await ApplyKeyboardLightAsync();
@@ -1698,8 +1756,25 @@ public partial class OriginalStyleWindow : Window
                     StatusText.Text = "悬浮窗已关闭";
                     return;
                 }
+                try
+                {
+                    HardwareControl.EnableLocalMonitoring();
+                }
+                catch
+                {
+                }
                 _overlayWindow = new OverlayWindow(GetOverlaySnapshot);
-                _overlayWindow.Closed += (_, _) => _overlayWindow = null;
+                _overlayWindow.Closed += (_, _) =>
+                {
+                    _overlayWindow = null;
+                    try
+                    {
+                        HardwareControl.DisableLocalMonitoring();
+                    }
+                    catch
+                    {
+                    }
+                };
                 _overlayWindow.Show();
                 StatusText.Text = "悬浮窗已打开";
                 return;
@@ -1721,19 +1796,40 @@ public partial class OriginalStyleWindow : Window
 
     private OverlaySnapshot GetOverlaySnapshot()
     {
+        try
+        {
+            HardwareControl.ReadSensorsOverlay();
+        }
+        catch
+        {
+        }
         MechrevoHw? hw = _backendProbe?.Hw;
+        int battery = hw?.BatteryPercent ?? -1;
+        try
+        {
+            double pct = HardwareControl.GetBatteryChargePercentage();
+            if (pct >= 0)
+            {
+                battery = (int)Math.Round(pct);
+            }
+        }
+        catch
+        {
+        }
         return new OverlaySnapshot(
-            hw?.CpuTemp ?? -1,
-            hw?.CpuUsage ?? -1,
-            hw?.CpuFrequency ?? -1,
-            hw?.GpuTemp ?? -1,
-            hw?.GpuUsage ?? -1,
-            hw?.GpuCoreFreq ?? -1,
-            hw?.CpuFanRpm ?? -1,
-            hw?.GpuFanRpm ?? -1,
-            hw?.RamUsage ?? -1,
-            hw?.RamUsedGb ?? -1,
-            hw?.BatteryPercent ?? -1);
+            HardwareControl.cpuTemp > 0 ? HardwareControl.cpuTemp : (hw?.CpuTemp ?? -1),
+            HardwareControl.cpuUsage ?? hw?.CpuUsage ?? -1,
+            HardwareControl.cpuFrequency > 0 ? HardwareControl.cpuFrequency : (hw?.CpuFrequency ?? -1),
+            HardwareControl.gpuTemp > 0 ? HardwareControl.gpuTemp : (hw?.GpuTemp ?? -1),
+            HardwareControl.gpuUsage ?? hw?.GpuUsage ?? -1,
+            HardwareControl.gpuCoreFreq > 0 ? HardwareControl.gpuCoreFreq : (hw?.GpuCoreFreq ?? -1),
+            HardwareControl.cpuFanRPM > 0 ? HardwareControl.cpuFanRPM : (hw?.CpuFanRpm ?? -1),
+            HardwareControl.gpuFanRPM > 0 ? HardwareControl.gpuFanRPM : (hw?.GpuFanRpm ?? -1),
+            HardwareControl.ramUsage ?? hw?.RamUsage ?? -1,
+            HardwareControl.ramUsedMb.HasValue ? HardwareControl.ramUsedMb.Value / 1024.0 : (hw?.RamUsedGb ?? -1),
+            battery,
+            HardwareControl.cpuPower ?? 0f,
+            HardwareControl.gpuPower ?? 0f);
     }
 
     private async Task ExportDiagnosticPackAsync()
