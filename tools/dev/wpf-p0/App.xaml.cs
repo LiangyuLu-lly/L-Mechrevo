@@ -8,8 +8,11 @@ namespace L_Mechrevo.WpfP0;
 
 public partial class App : Application
 {
-    private const string InstanceMutexName = @"Local\L-Mechrevo.WpfP0";
-    private const string ShowMainEventName = @"Local\L-Mechrevo.WpfP0.ShowMain";
+    private static readonly string InstanceMutexName =
+        Environment.GetEnvironmentVariable("L_MECHREVO_WPF_INSTANCE") is { Length: > 0 } customInstance
+            ? @"Local\" + customInstance
+            : @"Local\L-Mechrevo.WpfP0";
+    private static readonly string ShowMainEventName = InstanceMutexName + ".ShowMain";
     private Mutex? _instanceMutex;
     private bool _ownsInstanceMutex;
     private EventWaitHandle? _showMainEvent;
