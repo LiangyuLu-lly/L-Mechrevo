@@ -57,6 +57,7 @@ public partial class OriginalStyleWindow : Window
     private bool _lightingIdleSuspended;
     private bool _lightingPowerSuspended;
     private bool _lightingPowerBusy;
+    private bool _syncingLiquid;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private bool _batteryLimitLoaded;
@@ -1809,8 +1810,10 @@ public partial class OriginalStyleWindow : Window
             LiquidStatusButton.Content = connected ? "水冷已连接" : "水冷未连接";
             LiquidPumpCombo.IsEnabled = true;
             LiquidFanCombo.IsEnabled = true;
+            _syncingLiquid = true;
             SelectComboByTag(LiquidPumpCombo, hw!.LcPumpControl);
             SelectComboByTag(LiquidFanCombo, hw.LcFanControl);
+            _syncingLiquid = false;
         }
         catch
         {
@@ -1865,7 +1868,7 @@ public partial class OriginalStyleWindow : Window
 
     private async void LiquidPump_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_backendProbe?.Service == null || LiquidPumpCombo.SelectedItem is not ComboBoxItem item)
+        if (_syncingLiquid || _backendProbe?.Service == null || LiquidPumpCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
@@ -1878,7 +1881,7 @@ public partial class OriginalStyleWindow : Window
 
     private async void LiquidFan_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_backendProbe?.Service == null || LiquidFanCombo.SelectedItem is not ComboBoxItem item)
+        if (_syncingLiquid || _backendProbe?.Service == null || LiquidFanCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
         }
