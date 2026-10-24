@@ -54,9 +54,11 @@ public partial class LightEditorWindow : Window
         if (_keyboard)
         {
             bool bd = hw?.UsesBaolongda == true;
-            bool wujie = hw?.WujieSmuApu == true;
-            _lightMax = wujie ? 2 : (bd ? Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
-            LightSlider.Minimum = bd || wujie ? 1 : 0;
+            bool wujieWhite = hw?.WujieSmuApu == true
+                && hw.KeyboardStatusSeen
+                && string.Equals(hw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
+            _lightMax = wujieWhite ? 2 : (bd ? Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
+            LightSlider.Minimum = bd || wujieWhite ? 1 : 0;
             LightSlider.Maximum = _lightMax;
         }
         _settings = LightingSettingsStore.Load(topic, effects.Length > 0 ? effects[0].Effect : "Single");
@@ -253,7 +255,9 @@ public partial class LightEditorWindow : Window
         }
         string effect = SelectedEffect;
         bool manual = string.Equals(effect, "Manual", StringComparison.Ordinal);
-        bool breathing = string.Equals(effect, "Breathing", StringComparison.Ordinal);
+        bool breathing = string.Equals(effect, "Breathing", StringComparison.Ordinal)
+            && Program.hw != null
+            && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleZoneRgb(Program.hw.Capabilities.KeyboardType);
         SpeedRow.Visibility = Visibility.Collapsed;
         PerKeyPanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
         ManualPalettePanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
@@ -447,6 +451,7 @@ public partial class LightEditorWindow : Window
                     ? _manualInterval
                     : _speed,
                 ColorArgb = _colorArgb,
+                UsePresetColor = false,
                 MixColors = (int[])_mixColors.Clone(),
                 ManualIndexes = (int[])_manualIndexes.Clone(),
                 BreathingIndex = _breathingIndex,
