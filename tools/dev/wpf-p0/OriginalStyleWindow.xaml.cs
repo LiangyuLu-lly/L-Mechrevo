@@ -62,6 +62,7 @@ public partial class OriginalStyleWindow : Window
     private bool _lightingPowerSuspended;
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
+    private bool _syncingLighting;
     private bool _syncingPerfConfig;
     private int _pendingMode = -1;
     private int _modeRequestId;
@@ -2053,7 +2054,9 @@ public partial class OriginalStyleWindow : Window
             LightingSection.Visibility = (hasKeyboard || hasLightbar || hasLogo) ? Visibility.Visible : Visibility.Collapsed;
             KeyboardLightRow.Visibility = hasKeyboard ? Visibility.Visible : Visibility.Collapsed;
             LogoLightRow.Visibility = hasLogo ? Visibility.Visible : Visibility.Collapsed;
-            bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
+            FillKeyboardEffects();
+  FillLightChannelEffects();
+  bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
             BuildMoreSwitches();
             BackendProbe probe = _backendProbe;
@@ -2704,14 +2707,25 @@ public partial class OriginalStyleWindow : Window
 
     private void FillLightChannelEffects()
     {
-        FillEffects(LightStripEffectCombo, LightForm.LightbarEffects, "HidLightbar/Ctrl");
-        FillEffects(LogoEffectCombo, LightForm.CurrentLogoEffects(), "HidLightbar_Logo/Ctrl");
-        FillEffects(LightHingeEffectCombo, LightForm.HingeEffects, "HidLightbar_Hinge/Ctrl");
-        FillEffects(LightSyncEffectCombo, LightForm.SyncEffects, "HidLightbar_Sync/Ctrl");
+        _syncingLighting = true;
+        try
+        {
+            FillEffects(LightStripEffectCombo, LightForm.LightbarEffects, "HidLightbar/Ctrl");
+            FillEffects(LogoEffectCombo, LightForm.CurrentLogoEffects(), "HidLightbar_Logo/Ctrl");
+            FillEffects(LightHingeEffectCombo, LightForm.HingeEffects, "HidLightbar_Hinge/Ctrl");
+            FillEffects(LightSyncEffectCombo, LightForm.SyncEffects, "HidLightbar_Sync/Ctrl");
+        }
+        finally
+        {
+            _syncingLighting = false;
+        }
     }
 
     private void FillKeyboardEffects()
     {
+        _syncingLighting = true;
+        try
+        {
         KeyboardEffectCombo.Items.Clear();
         int keyboardType = _backendProbe?.Capabilities?.KeyboardType ?? 0;
         (string Id, string Label)[] effects = MechrevoLite.Hardware.KeyboardFirmwareEffects.Visible(keyboardType);
@@ -2728,6 +2742,11 @@ public partial class OriginalStyleWindow : Window
         if (KeyboardEffectCombo.Items.Count > 0)
         {
             KeyboardEffectCombo.SelectedIndex = selectedIndex;
+        }
+        }
+        finally
+        {
+            _syncingLighting = false;
         }
     }
 
@@ -2964,6 +2983,10 @@ public partial class OriginalStyleWindow : Window
 
     private async void LightStripEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_syncingLighting)
+        {
+            return;
+        }
         if (_backendProbe == null || LightStripSwitch.IsChecked != true || LightStripEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
@@ -3018,6 +3041,10 @@ public partial class OriginalStyleWindow : Window
 
     private async void LightHingeEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_syncingLighting)
+        {
+            return;
+        }
         if (_backendProbe == null || LightHingeSwitch.IsChecked != true || LightHingeEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
@@ -3050,6 +3077,10 @@ public partial class OriginalStyleWindow : Window
 
     private async void LightSyncEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_syncingLighting)
+        {
+            return;
+        }
         if (_backendProbe == null || LightSyncSwitch.IsChecked != true || LightSyncEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return;
@@ -3077,6 +3108,10 @@ public partial class OriginalStyleWindow : Window
 
     private async void KeyboardEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_syncingLighting)
+        {
+            return;
+        }
         if (KeyboardLightSwitch.IsChecked == true)
         {
             await ApplyKeyboardLightAsync();
@@ -3124,6 +3159,10 @@ public partial class OriginalStyleWindow : Window
 
     private async void LogoEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_syncingLighting)
+        {
+            return;
+        }
         if (LogoLightSwitch.IsChecked == true)
         {
             await ApplyLogoLightAsync();
