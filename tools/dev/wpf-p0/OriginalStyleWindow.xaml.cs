@@ -2145,11 +2145,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        string effect = LightStripSwitch.IsChecked == true
-            ? (LightStripEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single"
-            : "Off";
-        bool ok = await _backendProbe.SetLightbarEffectAsync(effect);
-        StatusText.Text = ok ? "灯带已下发：" + effect : "灯带下发失败";
+        bool on = LightStripSwitch.IsChecked == true;
+        string effect = (LightStripEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        bool ok = on
+            ? await _backendProbe.SetLightbarEffectAsync(effect)
+            : await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
+        StatusText.Text = ok ? (on ? "灯带已下发：" + effect : "灯带已关闭") : "灯带下发失败";
     }
 
     private async void LightStripEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2202,11 +2203,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        string effect = LightHingeSwitch.IsChecked == true
-            ? (LightHingeEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single"
-            : "Off";
-        bool ok = await _backendProbe.SetHingeEffectAsync(effect);
-        StatusText.Text = ok ? "铰链灯已下发：" + effect : "铰链灯下发失败";
+        bool on = LightHingeSwitch.IsChecked == true;
+        string effect = (LightHingeEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        bool ok = on
+            ? await _backendProbe.SetHingeEffectAsync(effect)
+            : await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
+        StatusText.Text = ok ? (on ? "铰链灯已下发：" + effect : "铰链灯已关闭") : "铰链灯下发失败";
     }
 
     private async void LightHingeEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2237,11 +2239,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        string effect = LightSyncSwitch.IsChecked == true
-            ? (LightSyncEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single"
-            : "Off";
-        bool ok = await _backendProbe.SetSyncEffectAsync(effect);
-        StatusText.Text = ok ? "同步灯已下发：" + effect : "同步灯下发失败";
+        bool on = LightSyncSwitch.IsChecked == true;
+        string effect = (LightSyncEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+        bool ok = on
+            ? await _backendProbe.SetSyncEffectAsync(effect)
+            : await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
+        StatusText.Text = ok ? (on ? "同步灯已下发：" + effect : "同步灯已关闭") : "同步灯下发失败";
     }
 
     private async void LightSyncEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2285,9 +2288,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        string effect = KeyboardLightSwitch.IsChecked == true ? (item.Tag as string ?? "Single") : "Off";
-        bool ok = await _backendProbe.SetKeyboardEffectAsync(effect);
-        StatusText.Text = ok ? "键盘灯效已下发：" + effect : "键盘灯效下发失败";
+        bool on = KeyboardLightSwitch.IsChecked == true;
+        string effect = item.Tag as string ?? "Single";
+        bool ok = on
+            ? await _backendProbe.SetKeyboardEffectAsync(effect)
+            : await _backendProbe.SetKeyboardPowerAsync(false);
+        StatusText.Text = ok ? (on ? "键盘灯效已下发：" + effect : "键盘灯光已关闭") : "键盘灯效下发失败";
     }
 
     private async void LogoLightSwitch_Click(object sender, RoutedEventArgs e)
@@ -2309,9 +2315,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        string effect = LogoLightSwitch.IsChecked == true ? (item.Tag as string ?? "Single") : "Off";
-        bool ok = await _backendProbe.SetLogoEffectAsync(effect);
-        StatusText.Text = ok ? "Logo 灯效已下发：" + effect : "Logo 灯效下发失败";
+        bool on = LogoLightSwitch.IsChecked == true;
+        string effect = item.Tag as string ?? "Single";
+        bool ok = on
+            ? await _backendProbe.SetLogoEffectAsync(effect)
+            : await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
+        StatusText.Text = ok ? (on ? "Logo 灯效已下发：" + effect : "Logo 灯已关闭") : "Logo 灯效下发失败";
     }
 
     internal bool SupportsLcdOverdrive => _backendProbe?.SupportsLcdOverdrive == true;

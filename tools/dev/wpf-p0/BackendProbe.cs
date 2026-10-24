@@ -337,6 +337,30 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal async Task<bool> SetKeyboardPowerAsync(bool on)
+    {
+        try
+        {
+            return _service != null && await _service.SetKeyboardPower(on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SetLightPowerAsync(string topic, bool on)
+    {
+        try
+        {
+            return _service != null && await _service.SetLightPower(topic, on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> SetKeyboardEffectAsync(string effect)
     {
         try
