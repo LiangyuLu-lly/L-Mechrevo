@@ -618,7 +618,15 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            new OriginalFormHostWindow(new MechrevoLite.FanCurveForm()).Show();
+            MechrevoHw? hw = Program.hw;
+            if (hw != null && hw.IsGcuConnected && !hw.UsesBaolongda && !hw.WujieSmuApu)
+            {
+                new FanCurveWindow(_current?.Id ?? "balanced") { Owner = this }.Show();
+            }
+            else
+            {
+                new OriginalFormHostWindow(new MechrevoLite.FanCurveForm()).Show();
+            }
         }
         catch (Exception ex)
         {
