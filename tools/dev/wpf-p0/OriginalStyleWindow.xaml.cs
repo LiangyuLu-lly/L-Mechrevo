@@ -54,6 +54,7 @@ public partial class OriginalStyleWindow : Window
     private TrayIconService? _trayIcon;
     private HotkeyService? _hotkeyService;
     private bool _firstRunChecked;
+    private bool _updateCheckStarted;
     private CustomModeWindow? _customModeForm;
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -1857,6 +1858,29 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private async void StartSilentUpdateCheckIfAllowed()
+    {
+        if (_updateCheckStarted
+            || !MechrevoLite.Update.UpdateChecker.AutoCheckEnabled
+            || MechrevoLite.Update.UpdateForm.TemporarilyHidden)
+        {
+            return;
+        }
+        _updateCheckStarted = true;
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(8));
+            MechrevoLite.Update.UpdateInfo? info = await MechrevoLite.Update.UpdateChecker.CheckAsync();
+            if (info?.UpdateAvailable == true)
+            {
+                Dispatcher.BeginInvoke(() => ToastService.Show("发现新版本：" + (info.LatestVersion ?? "") + "，可在设置中检查更新"));
+            }
+        }
+        catch
+        {
+        }
+    }
+
     private void ShowFirstRunGuidesIfNeeded()
     {
         if (_firstRunChecked)
@@ -1956,6 +1980,7 @@ public partial class OriginalStyleWindow : Window
                 await probe.RefreshGpuModeAsync();
                 ApplyCapabilities();
                 ShowFirstRunGuidesIfNeeded();
+                StartSilentUpdateCheckIfAllowed();
                 _backendTimer.Start();
             }
             else

@@ -97,6 +97,9 @@ public partial class SettingsWindow : Window
         DockOpacityText.Text = (int)DockOpacitySlider.Value + "%";
         ButtonOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_button_opacity", 100), 0, 100);
         ButtonOpacityText.Text = (int)ButtonOpacitySlider.Value + "%";
+        CheckUpdateButton.Visibility = MechrevoLite.Update.UpdateForm.TemporarilyHidden
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         _syncing = false;
     }
 
@@ -552,6 +555,11 @@ public partial class SettingsWindow : Window
 
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
+        if (MechrevoLite.Update.UpdateForm.TemporarilyHidden)
+        {
+            Status("当前版本已按原版策略关闭在线更新");
+            return;
+        }
         Button? updateButton = sender as Button;
         if (updateButton != null)
         {
