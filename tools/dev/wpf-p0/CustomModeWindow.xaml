@@ -64,7 +64,7 @@
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
-                <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+                <Border x:Name="SystemCard" Style="{StaticResource Card}" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="系统" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
@@ -91,10 +91,20 @@
                             <TextBlock Text="屏幕刷新率" VerticalAlignment="Center" />
                             <ComboBox x:Name="RefreshCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" />
                         </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="风扇增强" VerticalAlignment="Center" />
+                            <ComboBox x:Name="FanBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
+                                <ComboBoxItem Content="不改变" Tag="" />
+                                <ComboBoxItem Content="开启" Tag="1" />
+                                <ComboBoxItem Content="关闭" Tag="0" />
+                            </ComboBox>
+                        </Grid>
+
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+                <Border x:Name="CpuPowerCard" Style="{StaticResource Card}" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="CPU 功耗" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
@@ -118,7 +128,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+                <Border x:Name="TempGpuCard" Style="{StaticResource Card}" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="温度 / GPU 动态加速" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
@@ -144,7 +154,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+                <Border x:Name="FanCard" Style="{StaticResource Card}" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="风扇 / 超频" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
@@ -153,15 +163,6 @@
                             <CheckBox x:Name="FanSensitivitySwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="FanSensitivitySwitch_Changed" Unchecked="FanSensitivitySwitch_Changed" />
                             <Slider x:Name="FanDelaySlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="1000" Value="300" ValueChanged="FanDelay_Changed" />
                             <TextBlock x:Name="FanDelayText" Grid.Column="3" Text="300" TextAlignment="Right" VerticalAlignment="Center" />
-                        </Grid>
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="风扇增强" VerticalAlignment="Center" />
-                            <ComboBox x:Name="FanBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
-                                <ComboBoxItem Content="不改变" Tag="" />
-                                <ComboBoxItem Content="开启" Tag="1" />
-                                <ComboBoxItem Content="关闭" Tag="0" />
-                            </ComboBox>
                         </Grid>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>

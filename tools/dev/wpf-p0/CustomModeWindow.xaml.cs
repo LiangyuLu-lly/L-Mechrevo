@@ -142,12 +142,12 @@ public partial class CustomModeWindow : Window
         DbSwitch.IsChecked = s.GpuDynamicBoostOn == true;
         SetSlider(DbSlider, DbText, s.GpuDynamicBoost ?? 25);
         SetSlider(GpuTgpSlider, GpuTgpText, s.GpuTgp ?? 100);
+        FanSensitivitySwitch.IsChecked = s.FanSwitchSpeedOn == true;
         DbSlider.IsEnabled = DbSwitch.IsChecked == true;
         TccSlider.IsEnabled = TccSwitch.IsChecked == true;
         FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true;
         CoreOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
         MemoryOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
-        FanSensitivitySwitch.IsChecked = s.FanSwitchSpeedOn == true;
         SetSlider(FanDelaySlider, FanDelayText, s.FanSwitchSpeedMs ?? 300);
         GpuOcSwitch.IsChecked = s.GpuOverclockOn == true;
         SetSlider(CoreOffsetSlider, CoreOffsetText, s.GpuCoreOffset ?? 0);
@@ -156,6 +156,13 @@ public partial class CustomModeWindow : Window
         SelectComboInt(CpuBoostCombo, s.CpuBoost);
         SelectComboBool(FanBoostCombo, s.FanBoost);
         RefreshOptions(s.RefreshHz);
+        bool editable = _current?.IsCustom == true;
+        CpuPowerCard.IsEnabled = editable;
+        TempGpuCard.IsEnabled = editable;
+        FanCard.IsEnabled = editable;
+        CpuPowerCard.Opacity = editable ? 1.0 : 0.45;
+        TempGpuCard.Opacity = editable ? 1.0 : 0.45;
+        FanCard.Opacity = editable ? 1.0 : 0.45;
     }
 
     private void RefreshOptions(int? current)

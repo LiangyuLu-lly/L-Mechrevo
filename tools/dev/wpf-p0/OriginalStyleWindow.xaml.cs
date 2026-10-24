@@ -59,6 +59,8 @@ public partial class OriginalStyleWindow : Window
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
     private bool _syncingPerfConfig;
+    private int _pendingMode = -1;
+    private long _pendingModeTick;
     private bool _perfConfigBuilt;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
@@ -694,11 +696,15 @@ public partial class OriginalStyleWindow : Window
                 : -1;
             if (ReferenceEquals(selected, CustomModeButton))
             {
+                _pendingMode = 3;
+                _pendingModeTick = Environment.TickCount64;
                 await OpenCustomModeFormAsync(switchMode: true);
                 return;
             }
             if (mode >= 0 && _backendProbe != null)
             {
+                _pendingMode = mode;
+                _pendingModeTick = Environment.TickCount64;
                 _ = SwitchModeAsync(mode);
             }
         }
@@ -1428,11 +1434,26 @@ public partial class OriginalStyleWindow : Window
             displayGpu = currentGpu;
         }
         UpdateGpuButtons(displayGpu, pending);
-        SilentModeButton.IsChecked = mode == 2;
-        BalancedModeButton.IsChecked = mode == 0;
-        TurboModeButton.IsChecked = mode == 1;
-        CustomModeButton.IsChecked = mode == 3 || mode == 4;
-        RefreshModeHighlights();
+        bool skipModeUi = false;
+        if (_pendingMode >= 0)
+        {
+            if (mode == _pendingMode || Environment.TickCount64 - _pendingModeTick > 4000)
+            {
+                _pendingMode = -1;
+            }
+            else
+            {
+                skipModeUi = true;
+            }
+        }
+        if (!skipModeUi)
+        {
+            SilentModeButton.IsChecked = mode == 2;
+            BalancedModeButton.IsChecked = mode == 0;
+            TurboModeButton.IsChecked = mode == 1;
+            CustomModeButton.IsChecked = mode == 3 || mode == 4;
+            RefreshModeHighlights();
+        }
         SyncRefreshRateState();
         RefreshPerfConfigVisibility(mode);
         RefreshPerfConfigSelections();
