@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 
@@ -7,10 +8,60 @@ namespace L_Mechrevo.WpfP0;
 
 public partial class App : Application
 {
+    private const string InstanceMutexName = @"Local\L-Mechrevo.WpfP0";
+    private const string ShowMainEventName = @"Local\L-Mechrevo.WpfP0.ShowMain";
+    private Mutex? _instanceMutex;
+    private EventWaitHandle? _showMainEvent;
+    private RegisteredWaitHandle? _showMainWait;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        _instanceMutex = new Mutex(initiallyOwned: true, InstanceMutexName, out bool createdNew);
+        if (!createdNew)
+        {
+            try
+            {
+                if (EventWaitHandle.TryOpenExisting(ShowMainEventName, out EventWaitHandle? existing))
+                {
+                    existing.Set();
+                    existing.Dispose();
+                }
+            }
+            catch
+            {
+            }
+            Shutdown();
+            return;
+        }
+        _showMainEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowMainEventName);
+        _showMainWait = ThreadPool.RegisterWaitForSingleObject(
+            _showMainEvent,
+            (_, _) => Dispatcher.BeginInvoke(() =>
+            {
+                if (MainWindow is Window window)
+                {
+                    window.Show();
+                    if (window.WindowState == WindowState.Minimized)
+                    {
+                        window.WindowState = WindowState.Normal;
+                    }
+                    window.Activate();
+                }
+            }),
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
         ApplyFont();
         base.OnStartup(e);
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _showMainWait?.Unregister(null);
+        _showMainEvent?.Dispose();
+        _instanceMutex?.ReleaseMutex();
+        _instanceMutex?.Dispose();
+        base.OnExit(e);
     }
 
     private static void ApplyFont()
