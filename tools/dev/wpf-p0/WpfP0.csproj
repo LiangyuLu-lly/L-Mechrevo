@@ -20,6 +20,7 @@
   <ItemGroup>
     <Content Include="..\..\..\source\MechrevoLite.UI\Fonts\HarmonyOS_Sans_SC_Regular.ttf" Link="Fonts\HarmonyOS_Sans_SC_Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\source\MechrevoLite.UI\Fonts\HarmonyOS_Sans_SC_Bold.ttf" Link="Fonts\HarmonyOS_Sans_SC_Bold.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\LICENSES\**\*" Link="LICENSES\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Resources\qrcode1.jpg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Resources\qrcode2.jpg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Resources\qrcode3.png" CopyToOutputDirectory="PreserveNewest" />

@@ -1,0 +1,61 @@
+<Window x:Class="L_Mechrevo.WpfP0.LicensesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="许可证与鸣谢"
+        Width="680" Height="620"
+        MinWidth="560" MinHeight="420"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBgBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontSize="12"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="许可证与鸣谢" FontSize="20" FontWeight="Bold" />
+                <TextBlock Text="L-Mechrevo 以 GPL-3.0-only 分发；下列为本项目使用的第三方项目与许可摘要。完整文本见程序目录 LICENSES。"
+                           Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,14" />
+
+                <TextBlock Text="派生自" FontWeight="Bold" Margin="0,4,0,6" />
+                <TextBlock Text="G-Helper（含 AMD SMU 层） — GPL-3.0" TextWrapping="Wrap" />
+                <TextBlock Text="irusanov/ZenStates-Core — GPL-3.0" TextWrapping="Wrap" />
+
+                <TextBlock Text="随程序分发" FontWeight="Bold" Margin="0,14,0,6" />
+                <TextBlock Text="PawnIO.Modules RyzenSMU.bin / IntelMSR.bin — LGPL-2.1-or-later" TextWrapping="Wrap" />
+                <TextBlock Text="usbmmidd_v2 虚拟显示器驱动 — Amyuni（见驱动自带 License.txt）" TextWrapping="Wrap" />
+
+                <TextBlock Text="协议参考（未复制代码）" FontWeight="Bold" Margin="0,14,0,6" />
+                <TextBlock Text="leogx9r/ryzen_smu — GPL-2.0" />
+                <TextBlock Text="FlyGoat/RyzenAdj — LGPL-3.0" />
+                <TextBlock Text="JamesCJ60/Universal-x86-Tuning-Utility — GPL-3.0" />
+                <TextBlock Text="kitsunyan/intel-undervolt — GPL-3.0" />
+                <TextBlock Text="tomups/watercooler-manager — GPL-3.0" />
+                <TextBlock Text="irusanov/SMUDebugTool — GPL-3.0" />
+                <TextBlock Text="Leo-stro/mechrevo-charge-limit — MIT" />
+                <TextBlock Text="IYATT-yx/NullSignal — MIT" />
+                <TextBlock Text="Zcodeoooo/JiaoLong16Pro-Battery-threshold — 无 LICENSE（协议事实参考）" TextWrapping="Wrap" />
+                <TextBlock Text="GaoXanSheng/JiaolongControl — MIT" />
+                <TextBlock Text="KanzakiK/DOUZHANZHE-Control — GPL-3.0" />
+
+                <TextBlock Text="Copyright (C) 2026 L-Mechrevo contributors；原项目：LiangyuLu-lly/L-Mechrevo；本版维护：xiaohan (xmsjx)。"
+                           Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,16,0,0" />
+                <TextBlock Text="本程序按 GPL-3.0 提供，不附任何担保；详见根目录 LICENSE。"
+                           Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="打开 LICENSES 文件夹" Style="{StaticResource FlatButton}" Click="OpenFolder_Click" />
+            <Button Content="关闭" Style="{StaticResource FlatButton}" Click="Close_Click" Margin="0" />
+        </StackPanel>
+    </Grid>
+</Window>

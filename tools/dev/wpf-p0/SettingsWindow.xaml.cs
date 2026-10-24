@@ -34,6 +34,7 @@ public partial class SettingsWindow : Window
             Status("设置加载异常：" + ex.Message);
         }
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
+  Loaded += (_, _) => PositionAdjacentToOwner();
     }
 
     private void LoadState()
@@ -525,13 +526,33 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            using MechrevoLite.AboutLicensesForm form = new();
-            form.ShowDialog();
+            new LicensesWindow { Owner = this }.ShowDialog();
         }
         catch (Exception ex)
         {
             Status("打开许可证失败：" + ex.Message);
         }
+    }
+
+    private void PositionAdjacentToOwner()
+    {
+        if (Owner is not Window owner || owner.WindowState == WindowState.Minimized)
+        {
+            return;
+        }
+        Rect area = SystemParameters.WorkArea;
+        double targetLeft = owner.Left - Width - 10;
+        if (targetLeft < area.Left)
+        {
+            targetLeft = owner.Left + owner.Width + 10;
+        }
+        if (targetLeft + Width > area.Right)
+        {
+            targetLeft = Math.Max(area.Left, area.Right - Width - 8);
+        }
+        double targetTop = Math.Min(Math.Max(area.Top, owner.Top), area.Bottom - Height - 8);
+        Left = targetLeft;
+        Top = targetTop;
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)
