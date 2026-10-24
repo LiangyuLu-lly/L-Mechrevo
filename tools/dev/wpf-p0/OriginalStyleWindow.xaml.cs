@@ -3196,6 +3196,12 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "键盘 RGB 设备未连接，无法打开键盘灯光编辑";
             return;
         }
+        MechrevoHw? hw = _backendProbe.Hw;
+        if (hw != null && (hw.UsesBaolongda || hw.WujieSmuApu))
+        {
+            OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
+            return;
+        }
         new RgbForm(rgb).ShowDialog();
     }
 

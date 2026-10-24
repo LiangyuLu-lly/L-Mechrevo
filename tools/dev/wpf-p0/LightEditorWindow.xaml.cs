@@ -238,7 +238,22 @@ public partial class LightEditorWindow : Window
                 return false;
             }
             bool ok = true;
-            if (power)
+            if (string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+            {
+                if (power)
+                {
+                    int colorMode = LightForm.LightEffectColorMode(effect);
+                    System.Drawing.Color? color = colorMode == 1
+                        ? System.Drawing.Color.FromArgb(_colorArgb)
+                        : null;
+                    ok = await Program.service.SetKeyboardEffect(effect, _light, _speed, "None", color, save: true);
+                }
+                else
+                {
+                    ok = await Program.service.SetKeyboardPower(false);
+                }
+            }
+            else if (power)
             {
                 int colorMode = LightForm.LightEffectColorMode(effect);
                 System.Drawing.Color? color = colorMode == 1
