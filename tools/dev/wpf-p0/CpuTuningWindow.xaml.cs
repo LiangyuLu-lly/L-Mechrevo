@@ -63,6 +63,7 @@ public partial class CpuTuningWindow : Window
             {
                 AddFMaxRow(fmax);
             }
+            AddPerCoreSection(probe);
         }
         catch (Exception ex)
         {
@@ -125,6 +126,87 @@ public partial class CpuTuningWindow : Window
 
         OptionsPanel.Children.Add(row);
         _rows.Add((option, slider, valueText));
+    }
+
+    private void AddPerCoreSection(CpuTuningProbe probe)
+    {
+        CpuTuningOption? option = probe.Options.FirstOrDefault(o => o.PerCoreWrite);
+        if (option == null)
+        {
+            return;
+        }
+        int coreCount = RuntimeCpuTuning.PerCoreCapacity;
+        if (coreCount <= 0)
+        {
+            return;
+        }
+        OptionsPanel.Children.Add(new TextBlock
+        {
+            Text = "每核 CO（Curve Optimizer）",
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 12, 0, 6)
+        });
+        IReadOnlyList<int?> saved = RuntimeCpuTuning.LoadSavedPerCore(coreCount);
+        List<Slider> sliders = new();
+        for (int core = 0; core < coreCount; core++)
+        {
+            Grid row = new() { Margin = new Thickness(0, 0, 0, 4) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
+            row.Children.Add(new TextBlock { Text = "Core " + core, VerticalAlignment = VerticalAlignment.Center });
+            decimal start = saved.Count > core && saved[core].HasValue
+                ? saved[core]!.Value
+                : (option.CoreReadback != null && option.CoreReadback.Count > core ? option.CoreReadback[core] : 0);
+            Slider slider = new()
+            {
+                Minimum = (double)option.Minimum,
+                Maximum = (double)option.Maximum,
+                Value = Math.Clamp((double)start, (double)option.Minimum, (double)option.Maximum),
+                Margin = new Thickness(8, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)FindResource("RoundSlider")
+            };
+            Grid.SetColumn(slider, 1);
+            row.Children.Add(slider);
+            TextBlock valueText = new()
+            {
+                Text = ((int)slider.Value).ToString(),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Right
+            };
+            Grid.SetColumn(valueText, 2);
+            row.Children.Add(valueText);
+            slider.ValueChanged += (_, e) => valueText.Text = ((int)e.NewValue).ToString();
+            sliders.Add(slider);
+            OptionsPanel.Children.Add(row);
+        }
+        Button apply = new()
+        {
+            Content = "应用每核 CO",
+            Style = (Style)FindResource("FlatButton"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 6, 0, 10)
+        };
+        apply.Click += async (_, _) =>
+        {
+            int[] values = sliders.Select(s => (int)Math.Round(s.Value)).ToArray();
+            try
+            {
+                CpuTuningResult result = await Task.Run(() => RuntimeCpuTuning.Instance.ApplyPerCore(values));
+                StatusText.Text = result.Detail;
+                if (result.Success)
+                {
+                    int allCore = RuntimeCpuTuning.LoadSavedAllCore() ?? values.FirstOrDefault();
+                    RuntimeCpuTuning.SaveSettings(values, allCore);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "每核 CO 应用失败：" + ex.Message;
+            }
+        };
+        OptionsPanel.Children.Add(apply);
     }
 
     private void AddFMaxRow(CpuFMaxProbe fmax)
