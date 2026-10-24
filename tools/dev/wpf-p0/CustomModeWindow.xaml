@@ -74,6 +74,11 @@
                                 <ComboBoxItem Content="关闭" Tag="0" />
                             </ComboBox>
                         </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="屏幕刷新率" VerticalAlignment="Center" />
+                            <ComboBox x:Name="RefreshCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 
@@ -145,11 +150,6 @@
                                 <ComboBoxItem Content="开启" Tag="1" />
                                 <ComboBoxItem Content="关闭" Tag="0" />
                             </ComboBox>
-                        </Grid>
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="屏幕刷新率" VerticalAlignment="Center" />
-                            <ComboBox x:Name="RefreshCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" />
                         </Grid>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
