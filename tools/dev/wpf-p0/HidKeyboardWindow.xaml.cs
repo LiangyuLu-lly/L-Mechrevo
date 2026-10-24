@@ -245,25 +245,25 @@ public partial class HidKeyboardWindow : Window
             8 => _rgb.MatrixColors[Math.Clamp(index, 0, _rgb.MatrixColors.Length - 1)],
             _ => _rgb.StaticColors[Math.Clamp(index, 0, _rgb.StaticColors.Length - 1)]
         };
-        using System.Windows.Forms.ColorDialog dialog = new() { FullOpen = true, Color = current };
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+        ColorPickerWindow picker = new(current) { Owner = this };
+        if (picker.ShowDialog() != true || picker.Result is not System.Drawing.Color picked)
         {
             return;
         }
         if (mode == 7)
         {
-            _rgb.RainColors[Math.Clamp(index, 0, _rgb.RainColors.Length - 1)] = dialog.Color;
+            _rgb.RainColors[Math.Clamp(index, 0, _rgb.RainColors.Length - 1)] = picked;
         }
         else if (mode == 8)
         {
-            _rgb.MatrixColors[Math.Clamp(index, 0, _rgb.MatrixColors.Length - 1)] = dialog.Color;
+            _rgb.MatrixColors[Math.Clamp(index, 0, _rgb.MatrixColors.Length - 1)] = picked;
         }
         else
         {
-            _rgb.StaticColors[Math.Clamp(index, 0, _rgb.StaticColors.Length - 1)] = dialog.Color;
+            _rgb.StaticColors[Math.Clamp(index, 0, _rgb.StaticColors.Length - 1)] = picked;
         }
         button.Background = new System.Windows.Media.SolidColorBrush(
-            System.Windows.Media.Color.FromArgb(dialog.Color.A, dialog.Color.R, dialog.Color.G, dialog.Color.B));
+            System.Windows.Media.Color.FromArgb(picked.A, picked.R, picked.G, picked.B));
     }
 
     private void Extra1_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -299,10 +299,10 @@ public partial class HidKeyboardWindow : Window
 
     private void Color_Click(object sender, RoutedEventArgs e)
     {
-        using System.Windows.Forms.ColorDialog dialog = new() { FullOpen = true, Color = _color };
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        ColorPickerWindow picker = new(_color) { Owner = this };
+        if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
         {
-            _color = dialog.Color;
+            _color = picked;
             UpdateColorButton();
         }
     }

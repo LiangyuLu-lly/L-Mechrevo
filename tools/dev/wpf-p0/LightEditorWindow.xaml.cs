@@ -74,6 +74,11 @@ public partial class LightEditorWindow : Window
             _mixColors = (int[])mix.Clone();
         }
         PowerCheck.IsChecked = _settings.PowerOn;
+        if (_keyboard)
+        {
+            HintText.Text = "单分区键盘：呼吸四色、彩虹不可改色、亮度为 x/4、Manual 每键时间 2~10。";
+            StatusText.Text = "单分区键盘模式";
+        }
         _suppressAutoApply = true;
         NetSliderValues();
         LoadEffects();
@@ -305,12 +310,12 @@ public partial class LightEditorWindow : Window
         }
         System.Drawing.Color current = System.Drawing.Color.FromArgb(
             LightChannelSettings.ManualPalette[Math.Clamp(_manualIndexes[index], 1, 29) - 1]);
-        using System.Windows.Forms.ColorDialog dialog = new() { FullOpen = true, Color = current };
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+        ColorPickerWindow picker = new(current) { Owner = this };
+        if (picker.ShowDialog() != true || picker.Result is not System.Drawing.Color picked)
         {
             return;
         }
-        _manualIndexes[index] = NearestPaletteIndex(dialog.Color);
+        _manualIndexes[index] = NearestPaletteIndex(picked);
         RefreshKeyboardUi();
         ScheduleAutoApply();
     }
@@ -393,17 +398,13 @@ public partial class LightEditorWindow : Window
         {
             return;
         }
-        using System.Windows.Forms.ColorDialog dialog = new()
-        {
-            FullOpen = true,
-            Color = System.Drawing.Color.FromArgb(_mixColors[index])
-        };
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+        ColorPickerWindow picker = new(System.Drawing.Color.FromArgb(_mixColors[index])) { Owner = this };
+        if (picker.ShowDialog() != true || picker.Result is not System.Drawing.Color picked)
         {
             return;
         }
-        _mixColors[index] = dialog.Color.ToArgb();
-        System.Drawing.Color c = dialog.Color;
+        _mixColors[index] = picked.ToArgb();
+        System.Drawing.Color c = picked;
         button.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B));
         button.ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
         ScheduleAutoApply();
@@ -411,14 +412,10 @@ public partial class LightEditorWindow : Window
 
     private void Color_Click(object sender, RoutedEventArgs e)
     {
-        using System.Windows.Forms.ColorDialog dialog = new()
+        ColorPickerWindow picker = new(System.Drawing.Color.FromArgb(_colorArgb)) { Owner = this };
+        if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
         {
-            FullOpen = true,
-            Color = System.Drawing.Color.FromArgb(_colorArgb)
-        };
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-        {
-            _colorArgb = dialog.Color.ToArgb();
+            _colorArgb = picked.ToArgb();
             UpdateColorButton();
             ScheduleAutoApply();
         }
