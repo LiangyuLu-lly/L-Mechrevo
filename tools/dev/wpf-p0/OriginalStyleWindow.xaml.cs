@@ -1039,6 +1039,14 @@ public partial class OriginalStyleWindow : Window
 
     private static int ResolveDisplayMode(BackendProbe probe)
     {
+        // 自定义档在大多数 GCU 上不会回读成一个独立视觉档；以 PerfModeService
+        // 的当前显示档为准，避免切到自定义后主界面又回落到内置档高亮。
+        string displayedId = MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId
+            ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId;
+        if (displayedId?.StartsWith("custom", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return 3;
+        }
         MechrevoHw? hw = probe.Hw;
         // 宝龙达 / 无界没有原生自定义固件档：ActiveModeId 才是权威。
         if (hw?.UsesBaolongda == true || hw?.WujieSmuApu == true)
