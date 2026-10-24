@@ -880,8 +880,6 @@ public partial class OriginalStyleWindow : Window
                 : -1;
             if (ReferenceEquals(selected, CustomModeButton))
             {
-                selected.IsChecked = false;
-                RefreshModeHighlights();
                 _pendingMode = 3;
                 _pendingModeTick = Environment.TickCount64;
                 await OpenCustomModeFormAsync(switchMode: true);
@@ -1781,7 +1779,7 @@ public partial class OriginalStyleWindow : Window
             SilentModeButton.IsChecked = mode == 2;
             BalancedModeButton.IsChecked = mode == 0;
             TurboModeButton.IsChecked = mode == 1;
-            CustomModeButton.IsChecked = false;
+            CustomModeButton.IsChecked = mode is 3 or 4;
             RefreshModeHighlights();
         }
         _trayIcon?.SetMode(mode);
