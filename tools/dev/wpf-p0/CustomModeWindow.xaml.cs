@@ -78,18 +78,7 @@ public partial class CustomModeWindow : Window
 
     private static string ModeName(MechrevoLite.Mode.PerfModeDefinition mode)
     {
-        if (!string.IsNullOrWhiteSpace(mode.UserName))
-        {
-            return mode.UserName!;
-        }
-        return mode.Kind switch
-        {
-            MechrevoLite.Mode.PerfModeKind.Silent => "静音",
-            MechrevoLite.Mode.PerfModeKind.Balanced => "平衡",
-            MechrevoLite.Mode.PerfModeKind.Turbo => "狂暴",
-            MechrevoLite.Mode.PerfModeKind.SilentTurbo => "静音狂暴",
-            _ => "自定义"
-        };
+        return MechrevoLite.Mode.PerfModeText.Name(mode);
     }
 
     public void BindMode(string id)
