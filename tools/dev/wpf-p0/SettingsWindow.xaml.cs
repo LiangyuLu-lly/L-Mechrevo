@@ -550,6 +550,45 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        Button? updateButton = sender as Button;
+        if (updateButton != null)
+        {
+            updateButton.IsEnabled = false;
+        }
+        try
+        {
+            MechrevoLite.Update.UpdateInfo? info = await MechrevoLite.Update.UpdateChecker.CheckAsync(force: true);
+            if (info == null)
+            {
+                Status("检查更新失败：没有返回结果");
+                return;
+            }
+            if (!info.UpdateAvailable)
+            {
+                Status("已是最新版本：" + Program.ReleaseVersion);
+                return;
+            }
+            OriginalFormHostWindow host = new(new MechrevoLite.Update.UpdateForm(info), "检查更新")
+            {
+                Owner = this
+            };
+            host.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Status("检查更新失败：" + ex.Message);
+        }
+        finally
+        {
+            if (updateButton != null)
+            {
+                updateButton.IsEnabled = true;
+            }
+        }
+    }
+
     private void OpenFeedback_Click(object sender, RoutedEventArgs e)
     {
         try
