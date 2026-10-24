@@ -435,7 +435,7 @@
                                 <TextBlock Text="&#xE9CA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock Text="性能模式" Style="{StaticResource SectionHeader}" Margin="0" />
                                 <CheckBox x:Name="GpuOverclockSwitch" Content="GPU 超频" Style="{StaticResource HeaderSwitch}" Margin="14,0,0,0" VerticalAlignment="Center" Click="GpuOverclock_Click" />
-                                <Button x:Name="FanCurveButton" Content="风扇曲线" Style="{StaticResource MiniButton}" Margin="10,0,0,0" VerticalAlignment="Center" Click="FanCurve_Click" />
+                                <Button x:Name="PerfConfigEditButton" Content="配置编辑" Style="{StaticResource MiniButton}" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" Click="PerfConfigEdit_Click" />
                             </StackPanel>
                             <TextBlock x:Name="CpuStat" Grid.Column="1" Text="CPU —" Style="{StaticResource StatText}" />
                         </Grid>
@@ -455,12 +455,31 @@
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
-                            <ToggleButton x:Name="CustomModeButton" Tag="#A78BFA" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Margin="0" >
+                            <ToggleButton x:Name="CustomModeButton" Tag="#A78BFA" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" MouseRightButtonUp="CustomModeButton_MouseRightButtonUp" Margin="0" >
                                 <TextBlock Text="自定义" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
                         </local:AdaptivePanel>
+                        <Grid x:Name="PerfConfigRow" Margin="0,4,0,0" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Grid.Column="0" Margin="0,0,6,0">
+                                <TextBlock Text="静音" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                <ComboBox x:Name="PerfConfigSilentCombo" Style="{StaticResource RoundCombo}" Tag="2" SelectionChanged="PerfConfig_SelectionChanged" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Grid.Column="1" Margin="0,0,6,0">
+                                <TextBlock Text="平衡" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                <ComboBox x:Name="PerfConfigBalancedCombo" Style="{StaticResource RoundCombo}" Tag="0" SelectionChanged="PerfConfig_SelectionChanged" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Grid.Column="2">
+                                <TextBlock Text="狂暴" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                <ComboBox x:Name="PerfConfigTurboCombo" Style="{StaticResource RoundCombo}" Tag="1" SelectionChanged="PerfConfig_SelectionChanged" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
 
                     <!-- P1 后端实时（只读） -->

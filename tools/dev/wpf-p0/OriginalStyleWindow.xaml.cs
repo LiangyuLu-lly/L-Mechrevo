@@ -52,12 +52,13 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
     private MechrevoLite.CustomModeForm? _customModeForm;
-    private MechrevoLite.FanCurveForm? _fanCurveForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
     private bool _lightingPowerSuspended;
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
+    private bool _syncingPerfConfig;
+    private bool _perfConfigBuilt;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private bool _batteryLimitLoaded;
@@ -671,7 +672,7 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private void ModeButton_Click(object sender, RoutedEventArgs e)
+    private async void ModeButton_Click(object sender, RoutedEventArgs e)
     {
         foreach (object child in ModeGrid.Children)
         {
@@ -692,7 +693,8 @@ public partial class OriginalStyleWindow : Window
                 : -1;
             if (ReferenceEquals(selected, CustomModeButton))
             {
-                OpenCustomModeForm();
+                await OpenCustomModeFormAsync(switchMode: true);
+                return;
             }
             if (mode >= 0 && _backendProbe != null)
             {
@@ -1431,6 +1433,7 @@ public partial class OriginalStyleWindow : Window
         CustomModeButton.IsChecked = mode == 3 || mode == 4;
         RefreshModeHighlights();
         SyncRefreshRateState();
+        RefreshPerfConfigSelections();
         ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         int batteryMode = probe.BatteryMode;
         for (int i = 0; i < batteryButtons.Length; i++)
@@ -1770,6 +1773,17 @@ public partial class OriginalStyleWindow : Window
         LogoLightRow.Visibility = ResolveRowVisibility(AppConfig.GetString("light_logo_ui") ?? "auto", hasLogo);
         LightHingeRow.Visibility = hasHinge ? Visibility.Visible : Visibility.Collapsed;
         LightSyncRow.Visibility = hasSync ? Visibility.Visible : Visibility.Collapsed;
+        InitPerfConfigRow();
+        bool gen30 = hw?.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
+        bool profileConfig = hw?.SupportsModeProfileConfig == true;
+        PerfConfigRow.Visibility = profileConfig ? Visibility.Visible : Visibility.Collapsed;
+        PerfConfigEditButton.Visibility = profileConfig ? Visibility.Visible : Visibility.Collapsed;
+        ChargeSliderToggle.Visibility = gen30 ? Visibility.Collapsed : Visibility.Visible;
+        EcDirectOffToggle.Visibility = gen30 ? Visibility.Collapsed : Visibility.Visible;
+        if (gen30)
+        {
+            BatteryLimitSlider.Visibility = Visibility.Collapsed;
+        }
         bool liquidSupported = (caps?.LiquidCooling ?? false) || (hw?.SupportsLiquidCooling ?? false);
         LiquidSection.Visibility = (AppConfig.Is("force_liquid_cooling_menu") || liquidSupported) ? Visibility.Visible : Visibility.Collapsed;
         RefreshLiquidCoolingUi();
@@ -1892,34 +1906,125 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = ok ? "水冷风扇档位已下发" : "水冷风扇档位下发失败";
     }
 
-    private void FanCurve_Click(object sender, RoutedEventArgs e)
+
+
+    private void InitPerfConfigRow()
+    {
+        if (_perfConfigBuilt)
+        {
+            return;
+        }
+        _perfConfigBuilt = true;
+        int count = Math.Max(1, MechrevoLite.Mode.ModeProfileConfig.Count);
+        ComboBox[] combos = { PerfConfigSilentCombo, PerfConfigBalancedCombo, PerfConfigTurboCombo };
+        _syncingPerfConfig = true;
+        foreach (ComboBox combo in combos)
+        {
+            combo.Items.Clear();
+            for (int i = 0; i < count; i++)
+            {
+                combo.Items.Add(new ComboBoxItem { Content = "配置 " + (i + 1), Tag = i.ToString() });
+            }
+        }
+        _syncingPerfConfig = false;
+    }
+
+    private void RefreshPerfConfigSelections()
+    {
+        try
+        {
+            ComboBox[] combos = { PerfConfigSilentCombo, PerfConfigBalancedCombo, PerfConfigTurboCombo };
+            _syncingPerfConfig = true;
+            foreach (ComboBox combo in combos)
+            {
+                if (combo.Tag is string tag && int.TryParse(tag, out int visualMode))
+                {
+                    combo.SelectedIndex = Math.Clamp(MechrevoLite.Mode.ModeProfileConfig.Get(visualMode), 0, Math.Max(0, combo.Items.Count - 1));
+                }
+            }
+            _syncingPerfConfig = false;
+        }
+        catch
+        {
+            _syncingPerfConfig = false;
+        }
+    }
+
+    private async void PerfConfig_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingPerfConfig || sender is not ComboBox combo || combo.Tag is not string tag
+            || !int.TryParse(tag, out int visualMode) || combo.SelectedIndex < 0)
+        {
+            return;
+        }
+        MechrevoLite.Mode.ModeProfileConfig.Set(visualMode, combo.SelectedIndex);
+        if (_backendProbe != null && _backendProbe.Service?.CurrentMode == visualMode)
+        {
+            await _backendProbe.SwitchModeAsync(visualMode);
+        }
+        StatusText.Text = "配置已保存：" + combo.SelectedIndex + "（模式 " + visualMode + "）";
+    }
+
+    private void PerfConfigEdit_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             if (_backendProbe == null)
             {
-                StatusText.Text = "后端未连接，无法打开风扇曲线";
+                StatusText.Text = "后端未连接，无法打开配置编辑";
                 return;
             }
             Program.hw = _backendProbe.Hw;
             Program.service = _backendProbe.Service!;
-            if (_fanCurveForm == null || _fanCurveForm.IsDisposed)
+            int visualMode = _backendProbe.Service?.CurrentMode ?? 0;
+            if (_customModeForm == null || _customModeForm.IsDisposed)
             {
-                _fanCurveForm = new FanCurveForm();
+                _customModeForm = new CustomModeForm();
             }
-            if (!_fanCurveForm.Visible)
+            _customModeForm.BindFirmwareProfile(visualMode, MechrevoLite.Mode.ModeProfileConfig.Get(visualMode));
+            if (!_customModeForm.Visible)
             {
-                _fanCurveForm.Show();
+                _customModeForm.Show();
             }
-            _fanCurveForm.Activate();
+            _customModeForm.Activate();
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开风扇曲线失败：" + ex.Message;
+            StatusText.Text = "打开配置编辑失败：" + ex.Message;
         }
     }
 
-    private void OpenCustomModeForm()
+    private async void CustomModeButton_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        await OpenCustomModeFormAsync(switchMode: false);
+    }
+
+    private string ResolveCustomModeId()
+    {
+        MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+        if (perf != null)
+        {
+            string active = perf.DisplayedModeId;
+            foreach (MechrevoLite.Mode.PerfModeDefinition mode in perf.Modes)
+            {
+                if (mode.IsCustom && string.Equals(mode.Id, active, StringComparison.Ordinal))
+                {
+                    return mode.Id;
+                }
+            }
+            foreach (MechrevoLite.Mode.PerfModeDefinition mode in perf.Modes)
+            {
+                if (mode.IsCustom)
+                {
+                    return mode.Id;
+                }
+            }
+        }
+        return MechrevoLite.Mode.PerfModeStore.ActiveModeId;
+    }
+
+    private async Task OpenCustomModeFormAsync(bool switchMode)
     {
         try
         {
@@ -1934,11 +2039,23 @@ public partial class OriginalStyleWindow : Window
             {
                 _customModeForm = new CustomModeForm();
             }
+            string customId = ResolveCustomModeId();
             if (!_customModeForm.Visible)
             {
                 _customModeForm.Show();
             }
             _customModeForm.Activate();
+            if (switchMode)
+            {
+                if (!await _customModeForm.SelectModeAsync(customId))
+                {
+                    _customModeForm.BindMode(MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId);
+                }
+            }
+            else
+            {
+                _customModeForm.BindMode(customId);
+            }
         }
         catch (Exception ex)
         {
