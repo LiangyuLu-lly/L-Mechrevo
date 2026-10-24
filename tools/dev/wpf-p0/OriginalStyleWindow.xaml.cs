@@ -55,6 +55,7 @@ public partial class OriginalStyleWindow : Window
     private bool _lightingIdleSuspended;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
+    private bool _batteryLimitLoaded;
     private BackendProbe? _backendProbe;
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _backendRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
@@ -293,7 +294,7 @@ public partial class OriginalStyleWindow : Window
 
     private void InitBatteryControls()
     {
-        _ = InitBatteryLimitControlsAsync();
+        ApplyBatteryLimitVisibility();
         ChargeSliderToggle.IsChecked = AppConfig.Is("charge_limit_slider");
         EcDirectOffToggle.IsChecked = string.Equals(AppConfig.GetString("ec_charge_limit"), "0", StringComparison.Ordinal);
         BatteryLimitSlider.Visibility = ChargeSliderToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
@@ -302,10 +303,41 @@ public partial class OriginalStyleWindow : Window
         _syncingBatteryLimit = false;
     }
 
+    private void ApplyBatteryLimitVisibility()
+    {
+        bool supported = false;
+        try
+        {
+            MechrevoHw? hw = _backendProbe?.Hw;
+            supported = hw != null && BatteryLimitPanel.IsSupportedBoard(hw);
+        }
+        catch
+        {
+            supported = false;
+        }
+        Visibility visibility = supported ? Visibility.Visible : Visibility.Collapsed;
+        ChargeLimitRow.Visibility = visibility;
+        ChargeLimitInputRow.Visibility = visibility;
+        ChargeLimitStatus.Visibility = visibility;
+        if (!supported)
+        {
+            return;
+        }
+        if (!_batteryLimitLoaded)
+        {
+            _batteryLimitLoaded = true;
+            _ = InitBatteryLimitControlsAsync();
+        }
+    }
+
     private async Task InitBatteryLimitControlsAsync()
     {
         try
         {
+            if (_backendProbe?.Hw == null || !BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw))
+            {
+                return;
+            }
             (bool ok, int high, int low, int mode) = await Task.Run(() =>
             {
                 bool read = BatteryLimitWriter.TryReadState(out int h, out int l, out int m, out _);
@@ -1467,6 +1499,7 @@ public partial class OriginalStyleWindow : Window
             ScreenOffTile.Visibility = probe.SupportsQuick("monitoroff") ? Visibility.Visible : Visibility.Collapsed;
             InitScreenColorControls();
             ApplyUiVisibilityFromConfig();
+            ApplyBatteryLimitVisibility();
         }
         catch
         {

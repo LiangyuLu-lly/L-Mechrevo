@@ -616,7 +616,7 @@
                             <ToggleButton x:Name="BatteryBalancedButton" Content="平衡模式" Style="{StaticResource BatterySegment}" Tag="1" Click="BatteryMode_Click" />
                             <ToggleButton x:Name="BatteryWorkButton" Content="工作站模式" Style="{StaticResource BatterySegment}" Tag="2" Click="BatteryMode_Click" Margin="0" />
                         </local:AdaptivePanel>
-                        <Grid Margin="0,6,0,0">
+                        <Grid x:Name="ChargeLimitRow" Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
@@ -627,7 +627,7 @@
                             <CheckBox x:Name="ChargeLimitSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" VerticalAlignment="Center" Click="ChargeLimitSwitch_Click" />
                             <Button x:Name="ChargeLimitApplyButton" Grid.Column="3" Content="保存阈值" Style="{StaticResource MiniButton}" Click="ChargeLimitApply_Click" />
                         </Grid>
-                        <Grid Margin="0,6,0,0">
+                        <Grid x:Name="ChargeLimitInputRow" Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
