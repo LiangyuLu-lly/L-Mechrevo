@@ -438,7 +438,7 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
-            return _service != null && await _service.SetLightEffect("Logo", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+            return _service != null && await _service.SetLightEffect("HidLightbar_Logo/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
         }
         catch
         {

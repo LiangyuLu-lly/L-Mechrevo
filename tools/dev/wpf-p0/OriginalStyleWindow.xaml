@@ -744,10 +744,6 @@
                             <TextBlock Text="灯带" Style="{StaticResource RowLabel}" />
                             <CheckBox x:Name="LightStripSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="LightStripSwitch_Click" />
                             <ComboBox x:Name="LightStripEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="LightStripEffectCombo_SelectionChanged">
-                                <ComboBoxItem Content="单色" Tag="Single" />
-                                <ComboBoxItem Content="呼吸" Tag="Breathe" />
-                                <ComboBoxItem Content="彩虹" Tag="Rainbow" />
-                                <ComboBoxItem Content="关" Tag="Off" />
                             </ComboBox>
                             <Button x:Name="LightStripEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="LightStripEdit_Click" />
                         </Grid>
@@ -761,10 +757,6 @@
                             <TextBlock Text="Logo 灯" Style="{StaticResource RowLabel}" />
                             <CheckBox x:Name="LogoLightSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="LogoLightSwitch_Click" />
                             <ComboBox x:Name="LogoEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="LogoEffectCombo_SelectionChanged">
-                                <ComboBoxItem Content="单色" Tag="Single" />
-                                <ComboBoxItem Content="呼吸" Tag="Breathe" />
-                                <ComboBoxItem Content="彩虹" Tag="Rainbow" />
-                                <ComboBoxItem Content="关" Tag="Off" />
                             </ComboBox>
                             <Button x:Name="LogoLightEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="LogoLightEdit_Click" />
                         </Grid>
@@ -778,10 +770,6 @@
                             <TextBlock Text="铰链灯" Style="{StaticResource RowLabel}" />
                             <CheckBox x:Name="LightHingeSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="LightHingeSwitch_Click" />
                             <ComboBox x:Name="LightHingeEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="LightHingeEffectCombo_SelectionChanged">
-                                <ComboBoxItem Content="单色" Tag="Single" />
-                                <ComboBoxItem Content="呼吸" Tag="Breathe" />
-                                <ComboBoxItem Content="彩虹" Tag="Rainbow" />
-                                <ComboBoxItem Content="关" Tag="Off" />
                             </ComboBox>
                             <Button x:Name="LightHingeEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="LightHingeEdit_Click" />
                         </Grid>
@@ -795,10 +783,6 @@
                             <TextBlock Text="同步灯" Style="{StaticResource RowLabel}" />
                             <CheckBox x:Name="LightSyncSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,8,0" VerticalAlignment="Center" Click="LightSyncSwitch_Click" />
                             <ComboBox x:Name="LightSyncEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="LightSyncEffectCombo_SelectionChanged">
-                                <ComboBoxItem Content="单色" Tag="Single" />
-                                <ComboBoxItem Content="呼吸" Tag="Breathe" />
-                                <ComboBoxItem Content="彩虹" Tag="Rainbow" />
-                                <ComboBoxItem Content="关" Tag="Off" />
                             </ComboBox>
                             <Button x:Name="LightSyncEditButton" Grid.Column="3" Content="编辑" Style="{StaticResource MiniButton}" Click="LightSyncEdit_Click" />
                         </Grid>

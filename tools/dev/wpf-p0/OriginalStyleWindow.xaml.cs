@@ -2671,6 +2671,45 @@ public partial class OriginalStyleWindow : Window
         InitScreenColorControls();
     }
 
+    private static void FillEffects(ComboBox combo, (string Effect, string Name)[] effects, string topic)
+    {
+        combo.Items.Clear();
+        string selected = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effects[0].Effect).Effect;
+        int selectedIndex = 0;
+        for (int i = 0; i < effects.Length; i++)
+        {
+            combo.Items.Add(new ComboBoxItem { Content = effects[i].Name, Tag = effects[i].Effect });
+            if (string.Equals(effects[i].Effect, selected, StringComparison.Ordinal))
+            {
+                selectedIndex = i;
+            }
+        }
+        if (combo.Items.Count > 0)
+        {
+            combo.SelectedIndex = selectedIndex;
+        }
+    }
+
+    private static bool LoadChannelPower(string topic, string defaultEffect)
+    {
+        try
+        {
+            return MechrevoLite.Hardware.LightingSettingsStore.Load(topic, defaultEffect).PowerOn;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void FillLightChannelEffects()
+    {
+        FillEffects(LightStripEffectCombo, LightForm.LightbarEffects, "HidLightbar/Ctrl");
+        FillEffects(LogoEffectCombo, LightForm.CurrentLogoEffects(), "HidLightbar_Logo/Ctrl");
+        FillEffects(LightHingeEffectCombo, LightForm.HingeEffects, "HidLightbar_Hinge/Ctrl");
+        FillEffects(LightSyncEffectCombo, LightForm.SyncEffects, "HidLightbar_Sync/Ctrl");
+    }
+
     private void FillKeyboardEffects()
     {
         KeyboardEffectCombo.Items.Clear();
@@ -2696,6 +2735,7 @@ public partial class OriginalStyleWindow : Window
     {
         LightOffOnBatteryCheck.IsChecked = AppConfig.Is("lighting_off_on_battery");
         FillKeyboardEffects();
+        FillLightChannelEffects();
         try
         {
             KeyboardLightSwitch.IsChecked = _backendProbe?.Hw?.KeyboardPower == true;
@@ -2704,6 +2744,10 @@ public partial class OriginalStyleWindow : Window
         {
             KeyboardLightSwitch.IsChecked = false;
         }
+        LightStripSwitch.IsChecked = LoadChannelPower("HidLightbar/Ctrl", LightForm.LightbarEffects[0].Effect);
+        LogoLightSwitch.IsChecked = LoadChannelPower("HidLightbar_Logo/Ctrl", LightForm.CurrentLogoEffects()[0].Effect);
+        LightHingeSwitch.IsChecked = LoadChannelPower("HidLightbar_Hinge/Ctrl", LightForm.HingeEffects[0].Effect);
+        LightSyncSwitch.IsChecked = LoadChannelPower("HidLightbar_Sync/Ctrl", LightForm.SyncEffects[0].Effect);
         int seconds = AppConfig.Get("lighting_idle_seconds", 0);
         foreach (object item in LightIdleCombo.Items)
         {
@@ -2761,7 +2805,7 @@ public partial class OriginalStyleWindow : Window
         }
         MechrevoLite.Program.hw = _backendProbe.Hw;
         MechrevoLite.Program.service = _backendProbe.Service!;
-        new MechrevoLite.LightForm("HidLightbar_Logo/Ctrl", "Logo 灯光", MechrevoLite.LightForm.CurrentLogoEffects()).ShowDialog();
+        OpenLightEditor("HidLightbar_Logo/Ctrl", "Logo 灯光", MechrevoLite.LightForm.CurrentLogoEffects());
     }
 
     private void CheckLightingIdle()
@@ -2861,6 +2905,7 @@ public partial class OriginalStyleWindow : Window
         string effect = (LightStripEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
         if (on)
         {
+            await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", true);
             await _backendProbe.SetLightbarEffectAsync(effect);
         }
         else
@@ -2879,6 +2924,7 @@ public partial class OriginalStyleWindow : Window
         string effect = (LightHingeEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
         if (on)
         {
+            await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", true);
             await _backendProbe.SetHingeEffectAsync(effect);
         }
         else
@@ -2897,6 +2943,7 @@ public partial class OriginalStyleWindow : Window
         string effect = (LightSyncEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
         if (on)
         {
+            await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", true);
             await _backendProbe.SetSyncEffectAsync(effect);
         }
         else
@@ -3091,9 +3138,16 @@ public partial class OriginalStyleWindow : Window
         }
         bool on = LogoLightSwitch.IsChecked == true;
         string effect = item.Tag as string ?? "Single";
-        bool ok = on
-            ? await _backendProbe.SetLogoEffectAsync(effect)
-            : await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
+        bool ok;
+        if (on)
+        {
+            await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", true);
+            ok = await _backendProbe.SetLogoEffectAsync(effect);
+        }
+        else
+        {
+            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
+        }
         StatusText.Text = ok ? (on ? "Logo 灯效已下发：" + effect : "Logo 灯已关闭") : "Logo 灯效下发失败";
     }
 
