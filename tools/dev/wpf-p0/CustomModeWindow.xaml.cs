@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 
 using MechrevoLite;
+using MechrevoLite.Hardware;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -156,6 +157,10 @@ public partial class CustomModeWindow : Window
         SelectComboInt(CpuBoostCombo, s.CpuBoost);
         SelectComboBool(FanBoostCombo, s.FanBoost);
         RefreshOptions(s.RefreshHz);
+        if (_current?.IsCustom != true && Program.hw is MechrevoHw liveHw)
+        {
+            LoadLiveHardware(liveHw);
+        }
         bool editable = _current?.IsCustom == true;
         CpuPowerCard.IsEnabled = editable;
         TempGpuCard.IsEnabled = editable;
@@ -163,6 +168,29 @@ public partial class CustomModeWindow : Window
         CpuPowerCard.Opacity = editable ? 1.0 : 0.45;
         TempGpuCard.Opacity = editable ? 1.0 : 0.45;
         FanCard.Opacity = editable ? 1.0 : 0.45;
+    }
+
+    private void LoadLiveHardware(MechrevoHw hw)
+    {
+        if (hw.Pl1 > 0) SetSlider(Pl1Slider, Pl1Text, hw.Pl1);
+        if (hw.Pl2 > 0) SetSlider(Pl2Slider, Pl2Text, hw.Pl2);
+        if (hw.Pl4 > 0) SetSlider(Pl4Slider, Pl4Text, hw.Pl4);
+        if (hw.TccTarget > 0) SetSlider(TccSlider, TccText, hw.TccTarget);
+        TccSwitch.IsChecked = hw.TccSwitch;
+        if (hw.GpuTgp > 0) SetSlider(GpuTgpSlider, GpuTgpText, hw.GpuTgp);
+        DbSwitch.IsChecked = hw.GpuDbSwitch;
+        if (hw.GpuDb > 0) SetSlider(DbSlider, DbText, hw.GpuDb);
+        FanSensitivitySwitch.IsChecked = hw.FanSwitchSpeedEnabled;
+        if (hw.FanSwitchSpeed > 0) SetSlider(FanDelaySlider, FanDelayText, hw.FanSwitchSpeed);
+        SelectComboBool(FanBoostCombo, hw.FanBoost);
+        GpuOcSwitch.IsChecked = hw.GpuOverclockEnabled;
+        SetSlider(CoreOffsetSlider, CoreOffsetText, hw.EffectiveGpuCoreClockOffset);
+        SetSlider(MemoryOffsetSlider, MemoryOffsetText, hw.EffectiveGpuMemoryClockOffset);
+        DbSlider.IsEnabled = DbSwitch.IsChecked == true;
+        TccSlider.IsEnabled = TccSwitch.IsChecked == true;
+        FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true;
+        CoreOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
+        MemoryOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
     }
 
     private void RefreshOptions(int? current)

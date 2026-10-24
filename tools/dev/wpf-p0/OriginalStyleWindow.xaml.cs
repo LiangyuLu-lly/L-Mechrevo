@@ -758,6 +758,10 @@ public partial class OriginalStyleWindow : Window
             }
             Program.hw = _backendProbe.Hw;
             Program.service = _backendProbe.Service!;
+            if (!MechrevoLite.Hardware.GpuDbControl.Supported())
+            {
+                return;
+            }
             if (mode == _lastDbVisualMode)
             {
                 return;
