@@ -609,7 +609,10 @@
                     <StackPanel x:Name="BatterySection" Style="{StaticResource Section}">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE83F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="电池" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
-                            <TextBlock x:Name="BatteryInfo" Text="电池 —" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="BatteryFullButton" Content="充满" Style="{StaticResource MiniButton}" Click="BatteryFull_Click" Margin="0,0,8,0" />
+                                <TextBlock x:Name="BatteryInfo" Text="电池 —" Style="{StaticResource StatText}" VerticalAlignment="Center" />
+                            </StackPanel>
                         </Grid>
                         <local:AdaptivePanel Margin="0,0,0,10">
                             <ToggleButton x:Name="BatteryLongButton" Content="长效模式" Style="{StaticResource BatterySegment}" Tag="0" Click="BatteryMode_Click" IsChecked="True" />
