@@ -241,6 +241,8 @@ public partial class SettingsWindow : Window
     private void WaterCooling_Click(object sender, RoutedEventArgs e)
     {
         AppConfig.Set("force_liquid_cooling_menu", WaterCoolingCheck.IsChecked == true ? 1 : 0);
+        AppConfig.Flush();
+        _owner.ApplyUiVisibilityFromConfig();
         Status("水冷菜单设置已保存");
     }
 
