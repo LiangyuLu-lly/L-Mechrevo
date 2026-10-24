@@ -1742,12 +1742,18 @@ public partial class OriginalStyleWindow : Window
         bool keyboard = (caps?.Keyboard ?? false) || (hw?.SupportsKeyboard ?? false);
         bool hasStrip = (caps?.Lightbar ?? false) || (hw?.SupportsLightbar ?? false);
         bool hasLogo = (caps?.LogoLight ?? false) || (hw?.SupportsLogoLight ?? false);
+        bool hasHinge = _backendProbe?.SupportsHingeLight == true;
+        bool hasSync = _backendProbe?.SupportsSyncLight == true;
         KeyboardLightRow.Visibility = keyboard ? Visibility.Visible : Visibility.Collapsed;
         LightStripRow.Visibility = ResolveRowVisibility(AppConfig.GetString("light_strip_ui") ?? "auto", hasStrip);
         LogoLightRow.Visibility = ResolveRowVisibility(AppConfig.GetString("light_logo_ui") ?? "auto", hasLogo);
+        LightHingeRow.Visibility = hasHinge ? Visibility.Visible : Visibility.Collapsed;
+        LightSyncRow.Visibility = hasSync ? Visibility.Visible : Visibility.Collapsed;
         LightingSection.Visibility = (KeyboardLightRow.Visibility == Visibility.Visible
             || LightStripRow.Visibility == Visibility.Visible
-            || LogoLightRow.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
+            || LogoLightRow.Visibility == Visibility.Visible
+            || LightHingeRow.Visibility == Visibility.Visible
+            || LightSyncRow.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static Visibility ResolveRowVisibility(string mode, bool supported)
@@ -2078,7 +2084,13 @@ public partial class OriginalStyleWindow : Window
         }
         MechrevoLite.Program.hw = _backendProbe.Hw;
         MechrevoLite.Program.service = _backendProbe.Service!;
-        new MechrevoLite.LightForm("HidLightbar/Ctrl", "键盘灯光").ShowDialog();
+        KeyboardRgb? rgb = EnsureKeyboardRgb();
+        if (rgb == null)
+        {
+            StatusText.Text = "键盘 RGB 设备未连接，无法打开键盘灯光编辑";
+            return;
+        }
+        new RgbForm(rgb).ShowDialog();
     }
 
     private void LogoLightEdit_Click(object sender, RoutedEventArgs e)
@@ -2161,6 +2173,97 @@ public partial class OriginalStyleWindow : Window
         Program.hw = _backendProbe.Hw;
         Program.service = _backendProbe.Service!;
         new LightForm("HidLightbar/Ctrl", "灯带灯光").ShowDialog();
+    }
+
+    private KeyboardRgb? EnsureKeyboardRgb()
+    {
+        if (Program.rgb != null)
+        {
+            return Program.rgb;
+        }
+        try
+        {
+            KeyboardRgb rgb = new();
+            rgb.LoadConfig();
+            rgb.Connect();
+            Program.rgb = rgb;
+            return rgb;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "键盘 RGB 初始化失败：" + ex.Message;
+            return null;
+        }
+    }
+
+    private async void LightHingeSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        string effect = LightHingeSwitch.IsChecked == true
+            ? (LightHingeEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single"
+            : "Off";
+        bool ok = await _backendProbe.SetHingeEffectAsync(effect);
+        StatusText.Text = ok ? "铰链灯已下发：" + effect : "铰链灯下发失败";
+    }
+
+    private async void LightHingeEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_backendProbe == null || LightHingeSwitch.IsChecked != true || LightHingeEffectCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        bool ok = await _backendProbe.SetHingeEffectAsync(item.Tag as string ?? "Single");
+        StatusText.Text = ok ? "铰链灯效果已下发" : "铰链灯效果下发失败";
+    }
+
+    private void LightHingeEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            StatusText.Text = "后端未连接，无法编辑铰链灯";
+            return;
+        }
+        Program.hw = _backendProbe.Hw;
+        Program.service = _backendProbe.Service!;
+        new LightForm("HidLightbar_Hinge/Ctrl", "铰链灯光", LightForm.HingeEffects).ShowDialog();
+    }
+
+    private async void LightSyncSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        string effect = LightSyncSwitch.IsChecked == true
+            ? (LightSyncEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single"
+            : "Off";
+        bool ok = await _backendProbe.SetSyncEffectAsync(effect);
+        StatusText.Text = ok ? "同步灯已下发：" + effect : "同步灯下发失败";
+    }
+
+    private async void LightSyncEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_backendProbe == null || LightSyncSwitch.IsChecked != true || LightSyncEffectCombo.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        bool ok = await _backendProbe.SetSyncEffectAsync(item.Tag as string ?? "Single");
+        StatusText.Text = ok ? "同步灯效果已下发" : "同步灯效果下发失败";
+    }
+
+    private void LightSyncEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backendProbe == null)
+        {
+            StatusText.Text = "后端未连接，无法编辑同步灯";
+            return;
+        }
+        Program.hw = _backendProbe.Hw;
+        Program.service = _backendProbe.Service!;
+        new LightForm("HidLightbar_Sync/Ctrl", "同步灯光", LightForm.SyncEffects).ShowDialog();
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)

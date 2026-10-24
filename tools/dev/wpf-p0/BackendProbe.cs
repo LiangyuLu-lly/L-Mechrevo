@@ -364,6 +364,34 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal bool SupportsHingeLight => _hw?.SupportsHingeLight == true;
+
+    internal bool SupportsSyncLight => _hw?.SupportsSyncLight == true;
+
+    internal async Task<bool> SetHingeEffectAsync(string effect)
+    {
+        try
+        {
+            return _service != null && await _service.SetLightEffect("HidLightbar_Hinge/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal async Task<bool> SetSyncEffectAsync(string effect)
+    {
+        try
+        {
+            return _service != null && await _service.SetLightEffect("HidLightbar_Sync/Ctrl", effect, 4, 1, "None", null, true).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> SetLightbarEffectAsync(string effect)
     {
         try
