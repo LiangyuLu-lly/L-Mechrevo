@@ -56,6 +56,7 @@ public partial class OriginalStyleWindow : Window
     private HotkeyService? _hotkeyService;
     private bool _firstRunChecked;
     private bool _updateCheckStarted;
+    private bool _perfRestoreStarted;
     private CustomModeWindow? _customModeForm;
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -1002,10 +1003,77 @@ public partial class OriginalStyleWindow : Window
         }
         if (ok)
         {
+            MechrevoLite.Mode.PerfModeKind? kind = mode switch
+            {
+                2 => MechrevoLite.Mode.PerfModeKind.Silent,
+                1 => MechrevoLite.Mode.PerfModeKind.Turbo,
+                0 => MechrevoLite.Mode.PerfModeKind.Balanced,
+                _ => null
+            };
+            if (kind.HasValue)
+            {
+                MechrevoLite.Mode.PerfModeStore.ActiveModeId = MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind.Value);
+            }
             SyncGpuDbForMode(mode, "WPF 切档");
             SyncCustomWindowMode(mode);
         }
         RefreshFromBackend();
+    }
+
+    private static int VisualModeForId(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return -1;
+        }
+        if (id.StartsWith("custom", StringComparison.OrdinalIgnoreCase))
+        {
+            return 3;
+        }
+        return id switch
+        {
+            "silent" => 2,
+            "balanced" => 0,
+            "turbo" => 1,
+            _ => -1
+        };
+    }
+
+    private static int ResolveDisplayMode(BackendProbe probe)
+    {
+        int mode = probe.CurrentMode;
+        if (mode >= 0)
+        {
+            return mode;
+        }
+        int stored = VisualModeForId(MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId
+            ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId);
+        return stored;
+    }
+
+    private async Task RestorePerfModeOnStartupAsync()
+    {
+        if (_perfRestoreStarted)
+        {
+            return;
+        }
+        _perfRestoreStarted = true;
+        try
+        {
+            MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+            if (perf != null)
+            {
+                await perf.ReconcileForStartupAsync().ConfigureAwait(true);
+                await perf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(true);
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            Dispatcher.BeginInvoke(new Action(RefreshFromBackend));
+        }
     }
 
     private void RefreshModeHighlights()
@@ -1675,7 +1743,7 @@ public partial class OriginalStyleWindow : Window
         }
         BatteryInfo.Text = "电池 " + hw.BatteryPercent + "%" + powerState + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
         BatteryInfo.ToolTip = health;
-        int mode = probe.CurrentMode;
+        int mode = ResolveDisplayMode(probe);
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
         int currentGpu = probe.CurrentGpuMode;
         int pendingGpu = probe.PendingGpuTarget;
@@ -2006,6 +2074,7 @@ public partial class OriginalStyleWindow : Window
                     {
                         MechrevoLite.Mode.PerfModeService.Create(probe.Service!, probe.Hw);
                     }
+                    _ = RestorePerfModeOnStartupAsync();
                 }
                 catch
                 {
