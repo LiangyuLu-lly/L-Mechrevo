@@ -301,6 +301,80 @@ public partial class OriginalStyleWindow : Window
         _syncingBatteryLimit = true;
         BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
         _syncingBatteryLimit = false;
+        ApplyBatterySliderStage();
+    }
+
+    private void ApplyBatterySliderStage()
+    {
+        bool on = ChargeSliderToggle.IsChecked == true;
+        ToggleButton[] buttons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
+        foreach (ToggleButton button in buttons)
+        {
+            button.IsEnabled = !on;
+            button.Opacity = on ? 0.45 : 1.0;
+        }
+    }
+
+    private async Task WriteBackFullChargeAfterSliderOffAsync()
+    {
+        try
+        {
+            bool ecAllowed = !string.Equals(AppConfig.GetString("ec_charge_limit"), "0", StringComparison.Ordinal)
+                && EcChargeLimit.IsEcDirectWriteAllowed();
+            if (ecAllowed)
+            {
+                int current = await Task.Run(() => EcChargeLimit.ReadPercent());
+                if (current == 100)
+                {
+                    AppConfig.Set("charge_limit", 100);
+                    AppConfig.Flush();
+                    BatteryControl.chargeFull = true;
+                    return;
+                }
+                (bool ok, int readback) = await Task.Run(() =>
+                {
+                    bool written = EcChargeLimit.TrySet(100, out _, out _);
+                    return (written, EcChargeLimit.ReadPercent());
+                });
+                if (readback == 100)
+                {
+                    AppConfig.Set("charge_limit", 100);
+                    AppConfig.Flush();
+                    BatteryControl.chargeFull = true;
+                    StatusText.Text = "已关闭无极限充，充电上限恢复 100%";
+                    return;
+                }
+                StatusText.Text = "关闭无极限充后写回 100% 失败（写入=" + ok + " · 回读=" + readback + "%）";
+                return;
+            }
+            MechrevoHw? hw = _backendProbe?.Hw;
+            if (hw != null && hw.IsConnected)
+            {
+                if (hw.BatteryProtection == 0)
+                {
+                    AppConfig.Set("charge_limit", 100);
+                    AppConfig.Flush();
+                    BatteryControl.chargeFull = true;
+                    return;
+                }
+                bool confirmed = await hw.SetBatteryProtection(0);
+                if (confirmed && hw.BatteryProtection == 0)
+                {
+                    AppConfig.Set("charge_limit", 100);
+                    AppConfig.Flush();
+                    BatteryControl.chargeFull = true;
+                    StatusText.Text = "已关闭无极限充，GCU 充电上限恢复 100%";
+                    return;
+                }
+                StatusText.Text = "关闭无极限充后 GCU 写回 100% 失败";
+                return;
+            }
+            StatusText.Text = "关闭无极限充：没有可用的 EC/GCU 回写通道";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "关闭无极限充失败：" + ex.Message;
+        }
     }
 
     private void ApplyBatteryLimitVisibility()
@@ -486,12 +560,22 @@ public partial class OriginalStyleWindow : Window
         return true;
     }
 
-    private void ChargeSliderToggle_Click(object sender, RoutedEventArgs e)
+    private async void ChargeSliderToggle_Click(object sender, RoutedEventArgs e)
     {
         bool on = ChargeSliderToggle.IsChecked == true;
         AppConfig.Set("charge_limit_slider", on ? 1 : 0);
         BatteryLimitSlider.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        StatusText.Text = on ? "已启用无极限充滑块" : "已关闭无极限充滑块";
+        ApplyBatterySliderStage();
+        if (on)
+        {
+            StatusText.Text = "已启用无极限充滑块（三档按钮暂时置灰）";
+            return;
+        }
+        StatusText.Text = "正在关闭无极限充并恢复满充…";
+        await WriteBackFullChargeAfterSliderOffAsync();
+        _syncingBatteryLimit = true;
+        BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
+        _syncingBatteryLimit = false;
     }
 
     private void EcDirectOffToggle_Click(object sender, RoutedEventArgs e)
@@ -751,6 +835,11 @@ public partial class OriginalStyleWindow : Window
 
     private async void BatteryMode_Click(object sender, RoutedEventArgs e)
     {
+        if (ChargeSliderToggle.IsChecked == true)
+        {
+            StatusText.Text = "无极限充开启时三档按钮不可用";
+            return;
+        }
         if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
         {
             return;
