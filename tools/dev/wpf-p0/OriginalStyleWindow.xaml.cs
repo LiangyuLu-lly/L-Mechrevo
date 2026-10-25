@@ -509,6 +509,50 @@ public partial class OriginalStyleWindow : Window
         CustomTile_Click(CustomTile, new RoutedEventArgs());
     }
 
+    internal (string Label, int Seconds)[] WideLightIdleOptions()
+    {
+        List<(string, int)> options = new();
+        foreach ((string Label, int Mins, int IdleSeconds) option in MechrevoLite.SettingsForm.LightingCloseTimerOptions)
+        {
+            options.Add((option.Label, option.IdleSeconds));
+        }
+        return options.ToArray();
+    }
+
+    internal int WideLightIdleSeconds()
+    {
+        return _backendProbe?.Hw?.UsesBaolongda == true
+            ? MechrevoHw.GetKeyboardAutoOffSeconds()
+            : AppConfig.Get("lighting_idle_seconds", 0);
+    }
+
+    internal void WideSetLightIdleSeconds(int seconds)
+    {
+        if (_backendProbe?.Hw?.UsesBaolongda == true)
+        {
+            MechrevoHw.SetKeyboardAutoOffSeconds(seconds);
+            _backendProbe.Hw.ApplyKeyboardAutoOffSetting();
+            return;
+        }
+        AppConfig.Set("lighting_idle_seconds", seconds);
+        AppConfig.Flush();
+        if (Program.rgb != null)
+        {
+            Program.rgb.CloseTimerMinutes = seconds / 60;
+            Program.rgb.SaveConfig();
+        }
+        _ = ReconcileLightingPowerAsync();
+    }
+
+    internal bool WideLightOffOnBattery => AppConfig.Is("lighting_off_on_battery");
+
+    internal void WideSetLightOffOnBattery(bool on)
+    {
+        AppConfig.Set("lighting_off_on_battery", on ? 1 : 0);
+        AppConfig.Flush();
+        _ = ReconcileLightingPowerAsync();
+    }
+
     internal (string Key, string Label, string Glyph, bool On)[] WideQuickTiles()
     {
         List<(string, string, string, bool)> result = new();

@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private CheckBox? _autoRefresh;
     private readonly List<ToggleButton> _calibrationOptionButtons = new();
     private readonly List<ToggleButton> _effectOptionButtons = new();
+    private readonly List<ToggleButton> _lightingIdleButtons = new();
     private readonly Dictionary<string, Slider> _effectSliders = new();
     private readonly Dictionary<string, TextBlock> _effectValues = new();
     private DispatcherTimer? _effectCommitTimer;
@@ -1155,6 +1156,7 @@ public partial class MainWindow : Window
         {
             return;
         }
+        BuildLightingGlobalControls();
         MechrevoHw? hw = _probe?.Hw;
         int keyboardType = hw?.Capabilities.KeyboardType ?? 0;
         var channels = new List<(string Topic, string Title, (string Effect, string Name)[] Effects)>
@@ -1189,6 +1191,38 @@ public partial class MainWindow : Window
                 LightingCardsGrid.Children.Add(BuildLightCard(topic, title, effects));
             }
         }
+    }
+
+    private void BuildLightingGlobalControls()
+    {
+        if (_owner == null || LightingIdlePanel == null) return;
+        LightingIdlePanel.Children.Clear();
+        _lightingIdleButtons.Clear();
+        int current = _owner.WideLightIdleSeconds();
+        foreach ((string label, int seconds) in _owner.WideLightIdleOptions())
+        {
+            int target = seconds;
+            ToggleButton button = new()
+            {
+                Content = label,
+                Style = (Style)FindResource("SegmentButton"),
+                IsChecked = seconds == current,
+                Margin = new Thickness(0, 0, 8, 8)
+            };
+            button.Click += (_, _) =>
+            {
+                _owner.WideSetLightIdleSeconds(target);
+                foreach (ToggleButton item in _lightingIdleButtons) item.IsChecked = ReferenceEquals(item, button);
+            };
+            _lightingIdleButtons.Add(button);
+            LightingIdlePanel.Children.Add(button);
+        }
+        LightingOffBatteryToggle.IsChecked = _owner.WideLightOffOnBattery;
+    }
+
+    private void LightingOffBatteryToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _owner?.WideSetLightOffOnBattery(LightingOffBatteryToggle.IsChecked == true);
     }
 
     private Border BuildLightCard(string topic, string title, (string Effect, string Name)[] effects)
