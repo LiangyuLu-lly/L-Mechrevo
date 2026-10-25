@@ -39,8 +39,8 @@ internal static class TrayMenuConfig
 
     internal static HashSet<string> Load()
     {
-        string text = MechrevoLite.AppConfig.GetString(ConfigKey) ?? "";
-        if (string.IsNullOrWhiteSpace(text))
+        string? text = MechrevoLite.AppConfig.GetString(ConfigKey);
+        if (text == null)
         {
             return Catalog.Select(item => item.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         }

@@ -43,7 +43,11 @@ public partial class App : Application
             _showMainEvent,
             (_, _) => Dispatcher.BeginInvoke(() =>
             {
-                if (MainWindow is Window window)
+                if (MainWindow is OriginalStyleWindow owner)
+                {
+                    owner.ShowMainFromExternal();
+                }
+                else if (MainWindow is Window window)
                 {
                     window.Show();
                     if (window.WindowState == WindowState.Minimized)

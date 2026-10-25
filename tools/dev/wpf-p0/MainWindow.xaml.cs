@@ -19,7 +19,7 @@ namespace L_Mechrevo.WpfP0;
 public partial class MainWindow : Window
 {
     private readonly OriginalStyleWindow? _owner;
-    private readonly BackendProbe? _probe;
+    private BackendProbe? _probe;
     private readonly DispatcherTimer _sensorTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _dark = true;
     private bool _navCollapsed;
@@ -79,6 +79,10 @@ public partial class MainWindow : Window
         BuildScreenControls();
         BuildLightingCards();
         BuildCustomModeList();
+        if (_owner != null)
+        {
+            _owner.BackendReady += OnBackendReady;
+        }
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
         _sensorTimer.Start();
@@ -418,6 +422,18 @@ public partial class MainWindow : Window
         catch
         {
         }
+    }
+
+    private void OnBackendReady()
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _probe = _owner?.CurrentBackend;
+            BuildMoreSwitchTiles();
+            BuildLightingCards();
+            ApplyHomeCapabilities();
+            RefreshHomeExtras();
+        }));
     }
 
     private void WideTitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1866,7 +1882,7 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    new CustomModeWindow(modeId).ShowDialog();
+                    new CustomModeWindow(modeId) { Owner = this }.ShowDialog();
                     BuildCustomModeList();
                     StatusText.Text = "自定义模式已关闭";
                 }
@@ -1887,7 +1903,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            new CustomModeWindow().ShowDialog();
+            new CustomModeWindow { Owner = this }.ShowDialog();
             BuildCustomModeList();
             StatusText.Text = "自定义模式已关闭";
         }
@@ -1901,7 +1917,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            new FanCurveWindow("balanced", showCpu: true, showGpu: false).ShowDialog();
+            new FanCurveWindow("balanced", showCpu: true, showGpu: false) { Owner = this }.ShowDialog();
             StatusText.Text = "CPU 风扇曲线已关闭";
         }
         catch (Exception ex)
@@ -1914,7 +1930,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            new FanCurveWindow("balanced", showCpu: false, showGpu: true).ShowDialog();
+            new FanCurveWindow("balanced", showCpu: false, showGpu: true) { Owner = this }.ShowDialog();
             StatusText.Text = "GPU 风扇曲线已关闭";
         }
         catch (Exception ex)

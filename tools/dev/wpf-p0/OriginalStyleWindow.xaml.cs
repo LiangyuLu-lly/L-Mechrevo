@@ -14,6 +14,7 @@ using MechrevoLite.Display;
 using MechrevoLite.Gpu;
 using MechrevoLite.Gpu.NVidia;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Services;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
@@ -54,6 +55,9 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
     private MainWindow? _wideWindow;
+    private AppServices? _services;
+    internal event Action? BackendReady;
+    internal BackendProbe? CurrentBackend => _backendProbe;
     private bool _overlayPreloaded;
     private bool _wideMode;
     private TrayIconService? _trayIcon;
@@ -319,14 +323,26 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    internal void WideSetRefresh(int hertz)
+    internal async void WideSetRefresh(int hertz)
     {
-        ToggleButton target = hertz <= 60 ? Refresh60Button : Refresh180Button;
-        RefreshRate_Click(target, new RoutedEventArgs());
+        if (_backendProbe == null)
+        {
+            return;
+        }
+        AutoRefreshSwitch.IsChecked = false;
+        AppConfig.Set("screen_auto", 0);
+        ScreenControl.SetAutoRefresh(0);
+        bool ok = await _backendProbe.SwitchRefreshRateAsync(hertz);
+        StatusText.Text = ok ? "刷新率已下发：" + hertz + " Hz" : "刷新率下发失败：" + hertz + " Hz";
+        SyncRefreshRateState();
     }
 
     internal async Task<bool> WideToggleQuickAsync(string key)
     {
+        if (_services != null)
+        {
+            return (await _services.QuickSwitches.ToggleAsync(key)).Ok;
+        }
         if (_backendProbe == null)
         {
             return false;
@@ -529,6 +545,15 @@ public partial class OriginalStyleWindow : Window
 
     internal (string Group, (string Key, string Label, bool On)[] Items)[] WideMoreSwitches()
     {
+        if (_services != null)
+        {
+            return _services.QuickSwitches.Groups
+                .Select(group => (group.Title, group.Items
+                    .Where(item => _services.QuickSwitches.Supports(item.Key))
+                    .Select(item => (item.Key, item.Label, _services.QuickSwitches.GetState(item.Key)))
+                    .ToArray()))
+                .ToArray();
+        }
         (string Title, (string Key, string Label)[] Items)[] groups =
         {
             ("输入设备", new (string, string)[]
@@ -801,6 +826,16 @@ public partial class OriginalStyleWindow : Window
     }
 
     private void ShowFromTray()
+    {
+        if (string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowWideWindow();
+            return;
+        }
+        ShowCompactWindow();
+    }
+
+    internal void ShowMainFromExternal()
     {
         if (string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
         {
@@ -3059,6 +3094,7 @@ public partial class OriginalStyleWindow : Window
                 BackendLine.Text = probe.Snapshot();
                 Program.hw = probe.Hw;
                 Program.service = probe.Service!;
+                _services = new AppServices(probe);
                 try
                 {
                     if (MechrevoLite.Mode.PerfModeService.Instance == null)
@@ -3074,6 +3110,7 @@ public partial class OriginalStyleWindow : Window
                 SyncGpuDbForMode(probe.CurrentMode, "WPF 启动同步");
                 await probe.RefreshGpuModeAsync();
                 ApplyCapabilities();
+                BackendReady?.Invoke();
                 ShowFirstRunGuidesIfNeeded();
                 StartSilentUpdateCheckIfAllowed();
                 _backendTimer.Start();
@@ -5222,6 +5259,10 @@ public partial class OriginalStyleWindow : Window
         Opacity = 0;
         ShowInTaskbar = false;
         Hide();
+        if (_wideWindow.WindowState == WindowState.Minimized)
+        {
+            _wideWindow.WindowState = WindowState.Normal;
+        }
         _wideWindow.Show();
         _wideWindow.Activate();
     }
@@ -5230,6 +5271,8 @@ public partial class OriginalStyleWindow : Window
     {
         _wideWindow?.ReloadWideBackground();
     }
+
+    internal AppServices? Services => _services;
 
     internal void ShowCompactWindow()
     {
