@@ -1584,6 +1584,20 @@ public partial class MainWindow : Window
             effectPanel.Children.Add(button);
         }
         left.Children.Add(effectPanel);
+        Button editLight = new()
+        {
+            Content = "编辑详细参数…",
+            Style = (Style)FindResource("GhostButton"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(10, 4, 10, 4),
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        editLight.Click += (_, _) =>
+        {
+            new LightEditorWindow(topic, title, effects) { Owner = this }.ShowDialog();
+            BuildLightingCards();
+        };
+        left.Children.Add(editLight);
         Grid.SetColumn(left, 0);
         layout.Children.Add(left);
 
