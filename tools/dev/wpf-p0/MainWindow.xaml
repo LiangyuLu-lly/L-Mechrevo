@@ -161,15 +161,13 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Width="48" Height="48" CornerRadius="13" Background="{DynamicResource ControlBrush}" Margin="0,0,16,0" VerticalAlignment="Center">
-                                            <Viewbox Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M3,18 A10,10 0 0 1 21,18" />
-                                                    <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M12,18 L17,10" />
-                                                    <Ellipse Fill="{DynamicResource MutedBrush}" Width="3" Height="3" Canvas.Left="10.5" Canvas.Top="16.5" />
-                                                </Canvas>
-                                            </Viewbox>
-                                        </Border>
+                                        <Viewbox Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M3,18 A10,10 0 0 1 21,18" />
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M12,18 L17,10" />
+                                                <Ellipse Fill="{DynamicResource MutedBrush}" Width="2.4" Height="2.4" Canvas.Left="10.8" Canvas.Top="16.8" />
+                                            </Canvas>
+                                        </Viewbox>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Text="性能模式" Style="{StaticResource CardTitle}" />
                                             <TextBlock x:Name="PerfCurrentText" Text="当前：平衡" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
@@ -188,16 +186,11 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Width="48" Height="48" CornerRadius="13" Background="{DynamicResource ControlBrush}" Margin="0,0,16,0" VerticalAlignment="Center">
-                                            <Viewbox Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <Canvas Width="24" Height="24">
-                                                    <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.7" StrokeLineJoin="Round" Data="M2,7 H22 V16 H2 Z" />
-                                                    <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.7" Data="M6,11.5 A2,2 0 1 1 10,11.5 A2,2 0 1 1 6,11.5" />
-                                                    <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.7" Data="M14,11.5 A2,2 0 1 1 18,11.5 A2,2 0 1 1 14,11.5" />
-                                                    <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M2,18 V20 H8 M16,20 H22 V18" />
-                                                </Canvas>
-                                            </Viewbox>
-                                        </Border>
+                                        <Viewbox Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" Fill="Transparent" Data="M3,5 H21 V17 H3 Z M5,8 H9 M5,11 H9 M13.5,8 A3.5,3.5 0 1 0 13.5,15 A3.5,3.5 0 0 0 13.5,8 M7,17 V20 H17 V17" />
+                                            </Canvas>
+                                        </Viewbox>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Text="显卡模式" Style="{StaticResource CardTitle}" />
                                             <TextBlock x:Name="GpuCurrentText" Text="当前：混合输出" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
@@ -226,10 +219,9 @@
                                         </Grid.ColumnDefinitions>
                                         <Viewbox Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center">
                                             <Grid Width="48" Height="48">
-                                                <Border Width="34" Height="22" CornerRadius="4" BorderBrush="{DynamicResource MutedBrush}" BorderThickness="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,7,0,0" />
-                                                <Border Width="14" Height="2" CornerRadius="1" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0" />
-                                                <Border Width="2" Height="6" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,24,0,0" />
-                                                <Border Width="10" Height="2" CornerRadius="1" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,30,0,0" />
+                                                <Border Width="34" Height="24" CornerRadius="4" BorderBrush="{DynamicResource MutedBrush}" BorderThickness="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0" />
+                                                <Border Width="2" Height="6" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,30,0,0" />
+                                                <Border Width="14" Height="2" CornerRadius="1" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,36,0,0" />
                                             </Grid>
                                         </Viewbox>
                                         <StackPanel Grid.Column="1">

@@ -598,13 +598,13 @@ public partial class MainWindow : Window
             Margin = new Thickness(4, 0, 0, 0),
             Child = new Border
             {
-                Width = 14,
-                Height = 8,
+                Width = 18,
+                Height = 12,
                 CornerRadius = new CornerRadius(2),
                 Background = (Brush)FindResource("AccentBrush"),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 0, 0, 0)
+                Margin = new Thickness(3, 0, 0, 0)
             }
         };
         Border batteryTip = new()
