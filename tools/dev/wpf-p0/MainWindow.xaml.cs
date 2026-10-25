@@ -636,15 +636,20 @@ public partial class MainWindow : Window
         _igpuSavingState = new TextBlock { Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         row.Children.Add(_igpuSavingState);
         HomeIgpuSavingPanel.Children.Add(row);
-        HomeIgpuSavingPanel.Visibility = _owner.WideIgpuSavingSupported ? Visibility.Visible : Visibility.Collapsed;
+        HomeIgpuSavingPanel.Visibility = Visibility.Visible;
         RefreshIgpuSaving();
     }
 
     private void RefreshIgpuSaving()
     {
         if (_owner == null || HomeIgpuSavingPanel == null) return;
-        HomeIgpuSavingPanel.Visibility = _owner.WideIgpuSavingSupported ? Visibility.Visible : Visibility.Collapsed;
+        bool supported = _owner.WideIgpuSavingSupported;
+        HomeIgpuSavingPanel.Visibility = Visibility.Visible;
         int mode = _owner.WideIgpuSavingMode;
+        foreach (ToggleButton button in _igpuSavingButtons)
+        {
+            button.IsEnabled = supported;
+        }
         if (_igpuSavingButtons.Count >= 3)
         {
             _igpuSavingButtons[0].IsChecked = mode == 1;
@@ -653,7 +658,9 @@ public partial class MainWindow : Window
         }
         if (_igpuSavingState != null)
         {
-            _igpuSavingState.Text = mode switch { 0 => "当前：开", 1 => "当前：关", 3 => "当前：自动", _ => "当前：未知" };
+            _igpuSavingState.Text = supported
+                ? mode switch { 0 => "当前：开", 1 => "当前：关", 3 => "当前：自动", _ => "当前：未知" }
+                : "当前：机型不支持";
         }
     }
 
