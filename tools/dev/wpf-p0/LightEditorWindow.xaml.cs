@@ -475,6 +475,12 @@ public partial class LightEditorWindow : Window
             string effect = SelectedEffect;
             bool power = PowerCheck.IsChecked == true;
             bool powerWasOn = _settings.PowerOn;
+            if (power && !powerWasOn && _keyboard && _light <= 0)
+            {
+                _light = 1;
+                LightSlider.Value = 1;
+                LightText.Text = _wujieWhite ? "暗" : (_light + "/" + _lightMax);
+            }
             bool manualKeyboard = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal)
                 && string.Equals(effect, "Manual", StringComparison.Ordinal);
             int applySpeed = manualKeyboard ? _manualInterval : _speed;

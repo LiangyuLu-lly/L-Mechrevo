@@ -4131,6 +4131,26 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private void EnsureKeyboardBrightnessOnPowerOn()
+    {
+        if (_backendProbe?.Hw == null || IsHidKeyboard(_backendProbe.Hw))
+        {
+            return;
+        }
+        try
+        {
+            string currentEffect = (KeyboardEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Single";
+            LightChannelSettings settings = MechrevoLite.Hardware.LightingSettingsStore.Load("Keyboard/Ctrl", currentEffect);
+            if (settings.Light <= 0)
+            {
+                MechrevoLite.Hardware.LightingSettingsStore.Save("Keyboard/Ctrl", settings with { Light = 1 });
+            }
+        }
+        catch
+        {
+        }
+    }
+
     private async Task<bool> ApplyKeyboardLightCoreAsync()
     {
         if (_backendProbe == null || KeyboardEffectCombo.SelectedItem is not ComboBoxItem item)
@@ -4147,6 +4167,7 @@ public partial class OriginalStyleWindow : Window
         bool ok;
         if (on)
         {
+            EnsureKeyboardBrightnessOnPowerOn();
             if (_backendProbe.Hw?.KeyboardPower != true)
             {
                 bool powerOk = await _backendProbe.SetKeyboardPowerAsync(true);
