@@ -468,6 +468,7 @@ public partial class LightEditorWindow : Window
         {
             string effect = SelectedEffect;
             bool power = PowerCheck.IsChecked == true;
+            bool powerWasOn = _settings.PowerOn;
             bool manualKeyboard = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal)
                 && string.Equals(effect, "Manual", StringComparison.Ordinal);
             int applySpeed = manualKeyboard ? _manualInterval : _speed;
@@ -505,6 +506,10 @@ public partial class LightEditorWindow : Window
                 if (power)
                 {
                     await Program.service.SetKeyboardPower(true);
+                    if (!powerWasOn)
+                    {
+                        await Task.Delay(300);
+                    }
                     if (_wujieWhite)
                     {
                         ok = await Program.service.SetKeyboardBrightnessPreservingEffect(_light >= 2 ? 4 : 2);
@@ -526,6 +531,10 @@ public partial class LightEditorWindow : Window
             else if (power)
             {
                 await Program.service.SetLightPower(_topic, true);
+                if (!powerWasOn)
+                {
+                    await Task.Delay(600);
+                }
                 System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
                     ? System.Drawing.Color.FromArgb(_colorArgb)
                     : null;

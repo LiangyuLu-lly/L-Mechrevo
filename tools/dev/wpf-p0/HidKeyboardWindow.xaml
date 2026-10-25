@@ -56,6 +56,16 @@
                 <Slider x:Name="AngleSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="360" Value="30" ValueChanged="Angle_Changed" />
                 <TextBlock x:Name="AngleText" Grid.Column="2" Text="30°" TextAlignment="Right" VerticalAlignment="Center" />
             </Grid>
+            <Grid x:Name="FpsRow" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Text="帧率" VerticalAlignment="Center" />
+                <ComboBox x:Name="FpsCombo" Grid.Column="1" Width="110" Style="{StaticResource RoundCombo}" HorizontalAlignment="Left">
+                    <ComboBoxItem Content="15 FPS" Tag="15" />
+                    <ComboBoxItem Content="30 FPS" Tag="30" />
+                    <ComboBoxItem Content="45 FPS" Tag="45" />
+                    <ComboBoxItem Content="60 FPS" Tag="60" />
+                </ComboBox>
+            </Grid>
             <Grid x:Name="Extra1Row" Margin="0,0,0,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                 <TextBlock x:Name="Extra1Label" Text="附加" VerticalAlignment="Center" />

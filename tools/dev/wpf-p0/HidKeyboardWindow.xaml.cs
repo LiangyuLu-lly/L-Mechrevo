@@ -32,6 +32,15 @@ public partial class HidKeyboardWindow : Window
             }
         }
         EffectCombo.SelectedIndex = selected;
+        int targetFps = _rgb.TargetFps;
+        foreach (ComboBoxItem item in FpsCombo.Items)
+        {
+            if (item.Tag as string == targetFps.ToString())
+            {
+                FpsCombo.SelectedItem = item;
+                break;
+            }
+        }
         RefreshParams();
     }
 
@@ -442,6 +451,12 @@ public partial class HidKeyboardWindow : Window
                 return;
             }
             ApplyEffectParams(SelectedMode);
+            if (FpsCombo.SelectedItem is ComboBoxItem fpsItem
+                && fpsItem.Tag is string fpsText
+                && int.TryParse(fpsText, out int fps))
+            {
+                _rgb.TargetFps = Math.Clamp(fps, 15, 60);
+            }
             _rgb.KbHidMode = SelectedMode;
             _rgb.StartMode(SelectedMode);
             _rgb.ApplyBrightnessToDevice();
