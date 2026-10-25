@@ -414,6 +414,18 @@ public partial class OriginalStyleWindow : Window
         DisplayEffectSwitch_Click(DisplayEffectSwitch, new RoutedEventArgs());
     }
 
+    internal string WideSelectedDisplayEffectMode()
+    {
+        try
+        {
+            return SelectedDisplayEffectMode();
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
     internal void WideSetDisplayEffectIndex(int index)
     {
         if (index >= 0 && index < DisplayEffectCombo.Items.Count)

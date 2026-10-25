@@ -7,6 +7,8 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using MechrevoLite.Display;
+using Microsoft.Win32;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -28,10 +30,14 @@ public partial class MainWindow : Window
     private TextBlock? _displayBrightnessText;
     private Slider? _displayBrightness;
     private CheckBox? _autoRefresh;
-    private CheckBox? _calibrationSwitch;
-    private ComboBox? _calibrationCombo;
-    private CheckBox? _displayEffectSwitch;
-    private ComboBox? _displayEffectCombo;
+    private readonly List<ToggleButton> _calibrationOptionButtons = new();
+    private readonly List<ToggleButton> _effectOptionButtons = new();
+    private readonly Dictionary<string, Slider> _effectSliders = new();
+    private readonly Dictionary<string, TextBlock> _effectValues = new();
+    private DispatcherTimer? _effectCommitTimer;
+    private bool _syncingCalibrationUi;
+    private bool _syncingScreenEffect;
+    private string _currentEffectMode = "";
     private CheckBox? _chargeLimitSwitch;
     private TextBox? _chargeLow;
     private TextBox? _chargeHigh;
@@ -726,39 +732,310 @@ public partial class MainWindow : Window
 
     private void BuildScreenControls()
     {
-        if (_owner == null || ScreenCalibrationPanel == null || ScreenEffectPanel == null)
+        if (_owner == null)
         {
             return;
         }
-        (bool calibEnabled, (string Label, object? Tag)[] calibOptions, int calibSelected) = _owner.WideCalibration();
-        _calibrationSwitch = new CheckBox { Content = "启用校色", Style = (Style)FindResource("HeaderSwitch"), IsChecked = calibEnabled, Margin = new Thickness(0, 0, 10, 0) };
-        _calibrationSwitch.Click += (_, _) => _owner.WideSetCalibrationEnabled(_calibrationSwitch.IsChecked == true);
-        _calibrationCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 190, Height = 30, Margin = new Thickness(0, 0, 10, 0) };
-        foreach ((string label, object? tag) in calibOptions) _calibrationCombo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
-        _calibrationCombo.SelectedIndex = Math.Clamp(calibSelected, 0, Math.Max(0, _calibrationCombo.Items.Count - 1));
-        _calibrationCombo.SelectionChanged += (_, _) => _owner.WideSetCalibrationIndex(_calibrationCombo.SelectedIndex);
-        Button calibSettings = new() { Content = "设置", Style = (Style)FindResource("FlatButton") };
-        calibSettings.Click += (_, _) => _owner.WideOpenCalibrationSettings();
-        StackPanel calibRow = new() { Orientation = Orientation.Horizontal };
-        calibRow.Children.Add(_calibrationSwitch);
-        calibRow.Children.Add(_calibrationCombo);
-        calibRow.Children.Add(calibSettings);
-        ScreenCalibrationPanel.Children.Add(calibRow);
+        (bool calibEnabled, _, _) = _owner.WideCalibration();
+        ScreenCalibrationToggle.IsChecked = calibEnabled;
+        (bool effectEnabled, _, _) = _owner.WideDisplayEffect();
+        ScreenEffectToggle.IsChecked = effectEnabled;
+        BuildCalibrationOptions();
+        BuildEffectOptions();
+        LoadCalibrationSettings();
+        _effectCommitTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _effectCommitTimer.Tick += async (_, _) =>
+        {
+            _effectCommitTimer.Stop();
+            await CommitEffectProfileAsync();
+        };
+    }
 
+    private void BuildCalibrationOptions()
+    {
+        if (_owner == null) return;
+        ScreenCalibrationOptionsPanel.Children.Clear();
+        _calibrationOptionButtons.Clear();
+        (_, (string Label, object? Tag)[] options, int selected) = _owner.WideCalibration();
+        for (int i = 0; i < options.Length; i++)
+        {
+            int index = i;
+            ToggleButton button = new()
+            {
+                Content = options[i].Label,
+                Style = (Style)FindResource("SegmentButton"),
+                IsChecked = i == selected,
+                Margin = new Thickness(0, 0, 8, 8)
+            };
+            button.Click += (_, _) =>
+            {
+                _owner.WideSetCalibrationIndex(index);
+                foreach (ToggleButton item in _calibrationOptionButtons) item.IsChecked = ReferenceEquals(item, button);
+            };
+            _calibrationOptionButtons.Add(button);
+            ScreenCalibrationOptionsPanel.Children.Add(button);
+        }
+    }
+
+    private void BuildEffectOptions()
+    {
+        if (_owner == null) return;
+        ScreenEffectOptionsPanel.Children.Clear();
+        _effectOptionButtons.Clear();
+        (_, (string Label, object? Tag)[] options, int selected) = _owner.WideDisplayEffect();
+        for (int i = 0; i < options.Length; i++)
+        {
+            int index = i;
+            ToggleButton button = new()
+            {
+                Content = options[i].Label,
+                Style = (Style)FindResource("SegmentButton"),
+                IsChecked = i == selected,
+                Margin = new Thickness(0, 0, 8, 8)
+            };
+            button.Click += (_, _) =>
+            {
+                _owner.WideSetDisplayEffectIndex(index);
+                foreach (ToggleButton item in _effectOptionButtons) item.IsChecked = ReferenceEquals(item, button);
+                if (ScreenEffectEditorPanel.Visibility == Visibility.Visible) BuildEffectEditor();
+            };
+            _effectOptionButtons.Add(button);
+            ScreenEffectOptionsPanel.Children.Add(button);
+        }
+    }
+
+    private void LoadCalibrationSettings()
+    {
+        _syncingCalibrationUi = true;
+        try
+        {
+            CalibrationStartupSwitch.IsChecked = AppConfig.Is("calib_apply_on_startup");
+            CalibrationCustomSwitch.IsChecked = AppConfig.Is("calib_custom_on");
+            RefreshIccList();
+        }
+        finally
+        {
+            _syncingCalibrationUi = false;
+        }
+    }
+
+    private void RefreshIccList()
+    {
+        CalibrationIccCombo.Items.Clear();
+        foreach (string name in IccHelper.ListCustomIccFiles())
+        {
+            CalibrationIccCombo.Items.Add(name);
+        }
+        string saved = AppConfig.GetString("calib_custom_icc") ?? "";
+        int selected = CalibrationIccCombo.Items.IndexOf(saved);
+        if (selected >= 0) CalibrationIccCombo.SelectedIndex = selected;
+    }
+
+    private void ScreenCalibrationToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _owner?.WideSetCalibrationEnabled(ScreenCalibrationToggle.IsChecked == true);
+        BuildCalibrationOptions();
+    }
+
+    private void ScreenEffectToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _owner?.WideSetDisplayEffectEnabled(ScreenEffectToggle.IsChecked == true);
+        BuildEffectOptions();
+    }
+
+    private void ScreenCalibrationSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = ScreenCalibrationSettingsPanel.Visibility != Visibility.Visible;
+        ScreenCalibrationSettingsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show) LoadCalibrationSettings();
+    }
+
+    private void CalibrationStartupSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncingCalibrationUi) return;
+        AppConfig.Set("calib_apply_on_startup", CalibrationStartupSwitch.IsChecked == true ? 1 : 0);
+        AppConfig.Flush();
+    }
+
+    private void CalibrationCustomSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncingCalibrationUi) return;
+        bool on = CalibrationCustomSwitch.IsChecked == true;
+        AppConfig.Set("calib_custom_on", on ? 1 : 0);
+        AppConfig.Flush();
+        CalibrationIccCombo.IsEnabled = on;
+        if (!on)
+        {
+            _ = Task.Run(() => IccHelper.ClearAllIcc());
+            if (AppConfig.Get("calib_mode") == 999)
+            {
+                AppConfig.Set("calib_mode", 1);
+                AppConfig.Flush();
+            }
+        }
+        BuildCalibrationOptions();
+    }
+
+    private void CalibrationIccCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingCalibrationUi || CalibrationIccCombo.SelectedItem is not string name) return;
+        AppConfig.Set("calib_custom_icc", name);
+        AppConfig.Flush();
+    }
+
+    private void CalibrationImportIcc_Click(object sender, RoutedEventArgs e)
+    {
+        OpenFileDialog dialog = new()
+        {
+            Filter = "ICC 配置文件|*.icc;*.icm|所有文件|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        string? imported = IccHelper.ImportIcc(dialog.FileName);
+        if (string.IsNullOrWhiteSpace(imported))
+        {
+            StatusText.Text = "ICC 导入失败";
+            return;
+        }
+        AppConfig.Set("calib_custom_icc", imported);
+        AppConfig.Flush();
+        _syncingCalibrationUi = true;
+        try
+        {
+            RefreshIccList();
+            int index = CalibrationIccCombo.Items.IndexOf(imported);
+            if (index >= 0) CalibrationIccCombo.SelectedIndex = index;
+        }
+        finally
+        {
+            _syncingCalibrationUi = false;
+        }
+    }
+
+    private void ScreenEffectEditButton_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = ScreenEffectEditorPanel.Visibility != Visibility.Visible;
+        ScreenEffectEditorPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show) BuildEffectEditor();
+    }
+
+    private void BuildEffectEditor()
+    {
+        ScreenEffectSliderPanel.Children.Clear();
+        _effectSliders.Clear();
+        _effectValues.Clear();
+        if (_owner == null) return;
+        _currentEffectMode = _owner.WideSelectedDisplayEffectMode();
+        DisplayEffectProfile? profile = null;
+        if (_probe?.Hw != null && _probe.Hw.DisplayEffectProfiles.TryGetValue(_currentEffectMode, out DisplayEffectProfile? found))
+        {
+            profile = found;
+        }
+        profile ??= new DisplayEffectProfile
+        {
+            Name = _currentEffectMode,
+            Brightness = 50,
+            ColorTemp = 6500,
+            ColorR = 128,
+            ColorG = 128,
+            ColorB = 128,
+            VibrantValue = 1.5f,
+            Constrast = 1.0f,
+            Gamma = 1.0f
+        };
+        AddEffectRow("brightness", "亮度", 0, 100, profile.Brightness, v => v + "%");
+        AddEffectRow("colortemp", "色温", 30, 100, profile.ColorTemp / 100, v => (v * 100) + "K");
+        AddEffectRow("saturation", "饱和度", 5, 25, (int)Math.Round(profile.VibrantValue * 10), v => (v * 0.1).ToString("0.0"));
+        AddEffectRow("gamma", "伽玛", 50, 200, (int)Math.Round(profile.Gamma * 100), v => (v * 0.01).ToString("0.00"));
+        AddEffectRow("r", "红", 0, 255, (int)profile.ColorR, v => v.ToString());
+        AddEffectRow("g", "绿", 0, 255, (int)profile.ColorG, v => v.ToString());
+        AddEffectRow("b", "蓝", 0, 255, (int)profile.ColorB, v => v.ToString());
+        AddEffectRow("contrast", "对比度", 5, 20, (int)Math.Round(profile.Constrast * 10), v => (v * 0.1).ToString("0.0"));
+    }
+
+    private void AddEffectRow(string key, string label, int min, int max, int value, Func<int, string> format)
+    {
+        Grid row = new() { Margin = new Thickness(0, 6, 0, 0) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
+        row.Children.Add(new TextBlock { Text = label, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center });
+        Slider slider = new()
+        {
+            Style = (Style)FindResource("RoundSlider"),
+            Minimum = min,
+            Maximum = max,
+            Value = value,
+            IsSnapToTickEnabled = true,
+            TickFrequency = 1,
+            Margin = new Thickness(8, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(slider, 1);
+        row.Children.Add(slider);
+        TextBlock valueText = new()
+        {
+            Text = format(value),
+            TextAlignment = TextAlignment.Right,
+            Style = (Style)FindResource("MutedText"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(valueText, 2);
+        row.Children.Add(valueText);
+        slider.ValueChanged += (_, e) =>
+        {
+            valueText.Text = format((int)Math.Round(e.NewValue));
+            if (_syncingScreenEffect || _effectCommitTimer == null) return;
+            _effectCommitTimer.Stop();
+            _effectCommitTimer.Start();
+        };
+        _effectSliders[key] = slider;
+        _effectValues[key] = valueText;
+        ScreenEffectSliderPanel.Children.Add(row);
+    }
+
+    private int EffectValue(string key) => _effectSliders.TryGetValue(key, out Slider? slider) ? (int)Math.Round(slider.Value) : 0;
+
+    private async Task CommitEffectProfileAsync()
+    {
+        if (_probe?.Service == null || string.IsNullOrWhiteSpace(_currentEffectMode)) return;
+        DisplayEffectProfile profile = new()
+        {
+            Name = _currentEffectMode,
+            Brightness = EffectValue("brightness"),
+            ColorTemp = EffectValue("colortemp") * 100,
+            ColorR = EffectValue("r"),
+            ColorG = EffectValue("g"),
+            ColorB = EffectValue("b"),
+            VibrantValue = EffectValue("saturation") * 0.1f,
+            Constrast = EffectValue("contrast") * 0.1f,
+            Gamma = EffectValue("gamma") * 0.01f
+        };
+        await _probe.Service.ApplyDisplayEffectProfile(profile);
+    }
+
+    private async void ScreenEffectReset_Click(object sender, RoutedEventArgs e)
+    {
+        if (_probe?.Service == null || string.IsNullOrWhiteSpace(_currentEffectMode)) return;
+        if (await _probe.Service.ResetDisplayEffectProfile(_currentEffectMode))
+        {
+            await _probe.Service.RequestDisplayEffectStatus();
+            await Task.Delay(500);
+            BuildEffectEditor();
+        }
+    }
+
+    private void RefreshScreenControls()
+    {
+        if (_owner == null) return;
+        (bool calibEnabled, (string Label, object? Tag)[] calibOptions, int calibSelected) = _owner.WideCalibration();
+        ScreenCalibrationToggle.IsChecked = calibEnabled;
+        if (_calibrationOptionButtons.Count != calibOptions.Length) BuildCalibrationOptions();
+        for (int i = 0; i < _calibrationOptionButtons.Count; i++) _calibrationOptionButtons[i].IsChecked = i == calibSelected;
         (bool effectEnabled, (string Label, object? Tag)[] effectOptions, int effectSelected) = _owner.WideDisplayEffect();
-        _displayEffectSwitch = new CheckBox { Content = "启用色彩增强", Style = (Style)FindResource("HeaderSwitch"), IsChecked = effectEnabled, Margin = new Thickness(0, 0, 10, 0) };
-        _displayEffectSwitch.Click += (_, _) => _owner.WideSetDisplayEffectEnabled(_displayEffectSwitch.IsChecked == true);
-        _displayEffectCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 190, Height = 30, Margin = new Thickness(0, 0, 10, 0) };
-        foreach ((string label, object? tag) in effectOptions) _displayEffectCombo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
-        _displayEffectCombo.SelectedIndex = Math.Clamp(effectSelected, 0, Math.Max(0, _displayEffectCombo.Items.Count - 1));
-        _displayEffectCombo.SelectionChanged += (_, _) => _owner.WideSetDisplayEffectIndex(_displayEffectCombo.SelectedIndex);
-        Button effectEdit = new() { Content = "编辑", Style = (Style)FindResource("FlatButton") };
-        effectEdit.Click += (_, _) => _owner.WideOpenDisplayEffectEditor();
-        StackPanel effectRow = new() { Orientation = Orientation.Horizontal };
-        effectRow.Children.Add(_displayEffectSwitch);
-        effectRow.Children.Add(_displayEffectCombo);
-        effectRow.Children.Add(effectEdit);
-        ScreenEffectPanel.Children.Add(effectRow);
+        ScreenEffectToggle.IsChecked = effectEnabled;
+        if (_effectOptionButtons.Count != effectOptions.Length) BuildEffectOptions();
+        for (int i = 0; i < _effectOptionButtons.Count; i++) _effectOptionButtons[i].IsChecked = i == effectSelected;
     }
 
     private void UpdateChargeSliderVisibility()
@@ -807,12 +1084,7 @@ public partial class MainWindow : Window
             button.IsChecked = hz == currentHz;
         }
         if (_autoRefresh != null) _autoRefresh.IsChecked = auto;
-        (bool calibEnabled, (string Label, object? Tag)[] _, int calibSelected) = _owner.WideCalibration();
-        if (_calibrationSwitch != null) _calibrationSwitch.IsChecked = calibEnabled;
-        if (_calibrationCombo != null && calibSelected >= 0) _calibrationCombo.SelectedIndex = Math.Clamp(calibSelected, 0, _calibrationCombo.Items.Count - 1);
-        (bool effectEnabled, (string Label, object? Tag)[] _, int effectSelected) = _owner.WideDisplayEffect();
-        if (_displayEffectSwitch != null) _displayEffectSwitch.IsChecked = effectEnabled;
-        if (_displayEffectCombo != null && effectSelected >= 0) _displayEffectCombo.SelectedIndex = Math.Clamp(effectSelected, 0, _displayEffectCombo.Items.Count - 1);
+        RefreshScreenControls();
         (bool limitEnabled2, string lowText2, string highText2, string limitStatus2, bool experiment2, bool ecDirect2) = _owner.WideChargeLimit();
         if (_chargeLimitSwitch != null) _chargeLimitSwitch.IsChecked = limitEnabled2;
         if (_chargeLow != null && !_chargeLow.IsKeyboardFocusWithin) _chargeLow.Text = lowText2;

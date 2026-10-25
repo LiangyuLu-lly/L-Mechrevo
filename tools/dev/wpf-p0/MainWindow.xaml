@@ -245,16 +245,43 @@
                             <TextBlock Text="刷新率、亮度、屏幕校色与色彩增强" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
                             <Border x:Name="ScreenCalibrationCard" Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <TextBlock Text="屏幕校色" Style="{StaticResource CardTitle}" />
-                                    <TextBlock Text="ICC 校色档位与自定义校色" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
-                                    <StackPanel x:Name="ScreenCalibrationPanel" />
+                                    <Grid>
+                                        <TextBlock Text="屏幕校色" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                        <ToggleButton x:Name="ScreenCalibrationToggle" Content="启用校色" Style="{StaticResource SegmentButton}" HorizontalAlignment="Right" Click="ScreenCalibrationToggle_Click" />
+                                    </Grid>
+                                    <TextBlock Text="ICC 校色档位与自定义校色" Style="{StaticResource MutedText}" Margin="0,4,0,12" />
+                                    <WrapPanel x:Name="ScreenCalibrationOptionsPanel" />
+                                    <Button x:Name="ScreenCalibrationSettingsButton" Content="高级设置" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,10,0,0" Click="ScreenCalibrationSettingsButton_Click" />
+                                    <StackPanel x:Name="ScreenCalibrationSettingsPanel" Visibility="Collapsed" Margin="0,10,0,0">
+                                        <CheckBox x:Name="CalibrationStartupSwitch" Content="开机自动应用校色" Style="{StaticResource HeaderSwitch}" Click="CalibrationStartupSwitch_Click" />
+                                        <CheckBox x:Name="CalibrationCustomSwitch" Content="自定义校色（ICC）" Style="{StaticResource HeaderSwitch}" Margin="0,8,0,0" Click="CalibrationCustomSwitch_Click" />
+                                        <Grid Margin="0,8,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="CalibrationIccCombo" Style="{StaticResource RoundCombo}" Height="30" SelectionChanged="CalibrationIccCombo_SelectionChanged" />
+                                            <Button Grid.Column="1" Content="导入 ICC" Style="{StaticResource FlatButton}" Margin="8,0,0,0" Click="CalibrationImportIcc_Click" />
+                                        </Grid>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                             <Border x:Name="ScreenEffectCard" Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <TextBlock Text="色彩增强" Style="{StaticResource CardTitle}" />
-                                    <TextBlock Text="厂商色彩增强档位与编辑" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
-                                    <StackPanel x:Name="ScreenEffectPanel" />
+                                    <Grid>
+                                        <TextBlock Text="色彩增强" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                        <ToggleButton x:Name="ScreenEffectToggle" Content="启用色彩增强" Style="{StaticResource SegmentButton}" HorizontalAlignment="Right" Click="ScreenEffectToggle_Click" />
+                                    </Grid>
+                                    <TextBlock Text="厂商色彩增强档位与参数编辑" Style="{StaticResource MutedText}" Margin="0,4,0,12" />
+                                    <WrapPanel x:Name="ScreenEffectOptionsPanel" />
+                                    <Button x:Name="ScreenEffectEditButton" Content="编辑参数" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,10,0,0" Click="ScreenEffectEditButton_Click" />
+                                    <StackPanel x:Name="ScreenEffectEditorPanel" Visibility="Collapsed" Margin="0,10,0,0">
+                                        <Grid>
+                                            <TextBlock Text="档位参数" Style="{StaticResource CardTitle}" />
+                                            <Button Content="恢复默认" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="ScreenEffectReset_Click" />
+                                        </Grid>
+                                        <StackPanel x:Name="ScreenEffectSliderPanel" Margin="0,8,0,0" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
