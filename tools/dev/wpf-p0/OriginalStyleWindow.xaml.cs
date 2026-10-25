@@ -128,8 +128,6 @@ public partial class OriginalStyleWindow : Window
         AppTheme.Apply(_dark);
         ApplySavedAccent();
         ThemeButton.Content = _dark ? "浅色" : "深色";
-        MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
-        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
         Closed += (_, _) =>
@@ -5187,8 +5185,6 @@ public partial class OriginalStyleWindow : Window
     internal void ApplyThemeFromSettings(bool dark)
     {
         _dark = dark;
-        MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
-        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
@@ -5214,8 +5210,6 @@ public partial class OriginalStyleWindow : Window
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
-        MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
-        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();

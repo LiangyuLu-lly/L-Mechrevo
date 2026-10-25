@@ -31,7 +31,6 @@ public partial class CustomModeWindow : Window
     public CustomModeWindow(string? initialModeId = null)
     {
         InitializeComponent();
-        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(true);
         AddHandler(Slider.ValueChangedEvent,
             new RoutedPropertyChangedEventHandler<double>((_, _) => MarkDirty()), true);
         AddHandler(CheckBox.CheckedEvent,
@@ -48,8 +47,6 @@ public partial class CustomModeWindow : Window
 
     public void SetDark(bool dark)
     {
-        MechrevoLite.UI.UiVisualStyle.SetNightMode(dark);
-        MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(dark);
     }
 
     private void LoadModes(string? selectedId)
