@@ -528,6 +528,10 @@ public partial class LightEditorWindow : Window
                             ? System.Drawing.Color.FromArgb(_colorArgb)
                             : null);
                     ok = await Program.service.SetKeyboardEffect(effect, _light, applySpeed, "None", color, save: true);
+                    if (ok)
+                    {
+                        ok = await Program.service.SetKeyboardBrightnessPreservingEffect(_light);
+                    }
                 }
                 else
                 {
