@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -326,6 +327,29 @@ public partial class MainWindow : Window
         }
     }
 
+    private void WideTitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 1)
+        {
+            DragMove();
+        }
+        else
+        {
+            ToggleWideMaximize();
+        }
+    }
+
+    private void WideMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void WideMaximize_Click(object sender, RoutedEventArgs e) => ToggleWideMaximize();
+
+    private void ToggleWideMaximize()
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void WideClose_Click(object sender, RoutedEventArgs e) => Close();
+
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
@@ -493,13 +517,13 @@ public partial class MainWindow : Window
             {
                 Text = glyph,
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 16,
+                FontSize = 13,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
             TextBlock state = new()
             {
                 Text = label + (on ? " · 开" : " · 关"),
-                FontSize = 11,
+                FontSize = 9,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 4, 0, 0),
                 Style = (Style)FindResource("MutedText")
@@ -512,10 +536,10 @@ public partial class MainWindow : Window
                 Style = (Style)FindResource("TileButton"),
                 Tag = key,
                 Content = content,
-                Width = 86,
-                Height = 64,
-                Margin = new Thickness(4),
-                Padding = new Thickness(6, 4, 6, 4)
+                Width = 72,
+                Height = 52,
+                Margin = new Thickness(3),
+                Padding = new Thickness(4, 3, 4, 3)
             };
             tile.Click += async (_, _) =>
             {
@@ -534,13 +558,13 @@ public partial class MainWindow : Window
         {
             Text = "\uE710",
             FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 16,
+            FontSize = 13,
             HorizontalAlignment = HorizontalAlignment.Center
         });
         customContent.Children.Add(new TextBlock
         {
             Text = "自定义",
-            FontSize = 11,
+            FontSize = 9,
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 4, 0, 0),
             Style = (Style)FindResource("MutedText")
@@ -549,10 +573,10 @@ public partial class MainWindow : Window
         {
             Style = (Style)FindResource("TileButton"),
             Content = customContent,
-            Width = 86,
-            Height = 64,
-            Margin = new Thickness(4),
-            Padding = new Thickness(6, 4, 6, 4)
+            Width = 72,
+            Height = 52,
+            Margin = new Thickness(3),
+            Padding = new Thickness(4, 3, 4, 3)
         };
         customTile.Click += (_, _) =>
         {
@@ -1579,7 +1603,7 @@ public partial class MainWindow : Window
                 Application.Current.Shutdown();
                 return;
             case "设置":
-                ShowInlineWindow(new SettingsWindow(_owner!), "设置");
+                if (_owner != null) new SettingsWindow(_owner).Show();
                 return;
             case "赞助":
                 ShowInlineWindow(new SponsorWindow(), "赞助");
