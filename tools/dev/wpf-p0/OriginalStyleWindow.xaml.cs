@@ -373,6 +373,101 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    internal (bool Enabled, (string Label, object? Tag)[] Options, int Selected) WideCalibration()
+    {
+        List<(string, object?)> options = new();
+        foreach (object item in CalibrationCombo.Items)
+        {
+            if (item is ComboBoxItem comboItem)
+            {
+                options.Add((comboItem.Content?.ToString() ?? "", comboItem.Tag));
+            }
+        }
+        return (CalibrationSwitch.IsChecked == true, options.ToArray(), CalibrationCombo.SelectedIndex);
+    }
+
+    internal void WideSetCalibrationEnabled(bool enabled)
+    {
+        CalibrationSwitch.IsChecked = enabled;
+        CalibrationSwitch_Click(CalibrationSwitch, new RoutedEventArgs());
+    }
+
+    internal void WideSetCalibrationIndex(int index)
+    {
+        if (index >= 0 && index < CalibrationCombo.Items.Count)
+        {
+            CalibrationCombo.SelectedIndex = index;
+        }
+    }
+
+    internal void WideOpenCalibrationSettings()
+    {
+        CalibrationSettings_Click(CalibrationSettingsButton, new RoutedEventArgs());
+    }
+
+    internal (bool Enabled, (string Label, object? Tag)[] Options, int Selected) WideDisplayEffect()
+    {
+        List<(string, object?)> options = new();
+        foreach (object item in DisplayEffectCombo.Items)
+        {
+            if (item is ComboBoxItem comboItem)
+            {
+                options.Add((comboItem.Content?.ToString() ?? "", comboItem.Tag));
+            }
+        }
+        return (DisplayEffectSwitch.IsChecked == true, options.ToArray(), DisplayEffectCombo.SelectedIndex);
+    }
+
+    internal void WideSetDisplayEffectEnabled(bool enabled)
+    {
+        DisplayEffectSwitch.IsChecked = enabled;
+        DisplayEffectSwitch_Click(DisplayEffectSwitch, new RoutedEventArgs());
+    }
+
+    internal void WideSetDisplayEffectIndex(int index)
+    {
+        if (index >= 0 && index < DisplayEffectCombo.Items.Count)
+        {
+            DisplayEffectCombo.SelectedIndex = index;
+        }
+    }
+
+    internal void WideOpenDisplayEffectEditor()
+    {
+        DisplayEffectEdit_Click(DisplayEffectEditButton, new RoutedEventArgs());
+    }
+
+    internal (bool LimitEnabled, string Low, string High, string Status, bool Experiment, bool EcDirect) WideChargeLimit()
+    {
+        return (ChargeLimitSwitch.IsChecked == true, ChargeLimitLowBox.Text, ChargeLimitHighBox.Text,
+            ChargeLimitStatus.Text, ChargeSliderToggle.IsChecked == true, EcDirectOffToggle.IsChecked == true);
+    }
+
+    internal void WideSetChargeLimitEnabled(bool enabled)
+    {
+        ChargeLimitSwitch.IsChecked = enabled;
+        ChargeLimitSwitch_Click(ChargeLimitSwitch, new RoutedEventArgs());
+    }
+
+    internal void WideApplyChargeLimit(string low, string high)
+    {
+        ChargeLimitLowBox.Text = low;
+        ChargeLimitHighBox.Text = high;
+        ChargeLimitApply_Click(ChargeLimitApplyButton, new RoutedEventArgs());
+    }
+
+    internal void WideSetChargeExperiment(bool enabled)
+    {
+        ChargeSliderToggle.IsChecked = enabled;
+        ChargeSliderToggle_Click(ChargeSliderToggle, new RoutedEventArgs());
+    }
+
+    internal void WideSetEcDirect(bool enabled)
+    {
+        EcDirectOffToggle.IsChecked = enabled;
+        EcDirectOffToggle_Click(EcDirectOffToggle, new RoutedEventArgs());
+    }
+
     internal (string Info, int Mode, string Charge) WideBattery()
     {
         try

@@ -28,6 +28,16 @@ public partial class MainWindow : Window
     private TextBlock? _displayBrightnessText;
     private Slider? _displayBrightness;
     private CheckBox? _autoRefresh;
+    private CheckBox? _calibrationSwitch;
+    private ComboBox? _calibrationCombo;
+    private CheckBox? _displayEffectSwitch;
+    private ComboBox? _displayEffectCombo;
+    private CheckBox? _chargeLimitSwitch;
+    private TextBox? _chargeLow;
+    private TextBox? _chargeHigh;
+    private TextBlock? _chargeStatus;
+    private CheckBox? _chargeExperiment;
+    private CheckBox? _ecDirect;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
     private readonly List<ToggleButton> _batteryModeButtons = new();
 
@@ -374,6 +384,32 @@ public partial class MainWindow : Window
         battery.Children.Add(modes);
         _chargeLimitText = new TextBlock { Text = charge, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
         battery.Children.Add(_chargeLimitText);
+
+        (bool limitEnabled, string lowText, string highText, string limitStatus, bool experiment, bool ecDirect) = _owner.WideChargeLimit();
+        _chargeLimitSwitch = new CheckBox { Content = "限制充电", Style = (Style)FindResource("HeaderSwitch"), IsChecked = limitEnabled, Margin = new Thickness(0, 8, 8, 0) };
+        _chargeLimitSwitch.Click += (_, _) => _owner.WideSetChargeLimitEnabled(_chargeLimitSwitch.IsChecked == true);
+        _chargeLow = new TextBox { Text = lowText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
+        _chargeHigh = new TextBox { Text = highText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
+        Button applyLimit = new() { Content = "保存", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 8, 0, 0) };
+        applyLimit.Click += (_, _) => _owner.WideApplyChargeLimit(_chargeLow.Text, _chargeHigh.Text);
+        StackPanel limitRow = new() { Orientation = Orientation.Horizontal };
+        limitRow.Children.Add(_chargeLimitSwitch);
+        limitRow.Children.Add(new TextBlock { Text = "起", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
+        limitRow.Children.Add(_chargeLow);
+        limitRow.Children.Add(new TextBlock { Text = "停", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
+        limitRow.Children.Add(_chargeHigh);
+        limitRow.Children.Add(applyLimit);
+        battery.Children.Add(limitRow);
+        _chargeStatus = new TextBlock { Text = limitStatus, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
+        battery.Children.Add(_chargeStatus);
+        _chargeExperiment = new CheckBox { Content = "无极限充", Style = (Style)FindResource("HeaderSwitch"), IsChecked = experiment, Margin = new Thickness(0, 8, 16, 0) };
+        _chargeExperiment.Click += (_, _) => _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
+        _ecDirect = new CheckBox { Content = "关闭 EC 直写", Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirect, Margin = new Thickness(0, 8, 0, 0) };
+        _ecDirect.Click += (_, _) => _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
+        StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
+        extraLimitRow.Children.Add(_chargeExperiment);
+        extraLimitRow.Children.Add(_ecDirect);
+        battery.Children.Add(extraLimitRow);
         BatteryCardHost.Content = new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0), Child = battery };
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
@@ -413,6 +449,36 @@ public partial class MainWindow : Window
         DisplayDetailsPanel.Children.Add(brightnessRow);
         DisplayDetailsPanel.Children.Add(_autoRefresh);
 
+        (bool calibEnabled, (string Label, object? Tag)[] calibOptions, int calibSelected) = _owner.WideCalibration();
+        _calibrationSwitch = new CheckBox { Content = "屏幕校色", Style = (Style)FindResource("HeaderSwitch"), IsChecked = calibEnabled, Margin = new Thickness(0, 10, 8, 0) };
+        _calibrationSwitch.Click += (_, _) => _owner.WideSetCalibrationEnabled(_calibrationSwitch.IsChecked == true);
+        _calibrationCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 150, Height = 28, Margin = new Thickness(0, 10, 8, 0) };
+        foreach ((string label, object? tag) in calibOptions) _calibrationCombo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
+        _calibrationCombo.SelectedIndex = Math.Clamp(calibSelected, 0, Math.Max(0, _calibrationCombo.Items.Count - 1));
+        _calibrationCombo.SelectionChanged += (_, _) => _owner.WideSetCalibrationIndex(_calibrationCombo.SelectedIndex);
+        Button calibSettings = new() { Content = "设置", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 10, 0, 0) };
+        calibSettings.Click += (_, _) => _owner.WideOpenCalibrationSettings();
+        StackPanel calibRow = new() { Orientation = Orientation.Horizontal };
+        calibRow.Children.Add(_calibrationSwitch);
+        calibRow.Children.Add(_calibrationCombo);
+        calibRow.Children.Add(calibSettings);
+        DisplayDetailsPanel.Children.Add(calibRow);
+
+        (bool effectEnabled, (string Label, object? Tag)[] effectOptions, int effectSelected) = _owner.WideDisplayEffect();
+        _displayEffectSwitch = new CheckBox { Content = "色彩增强", Style = (Style)FindResource("HeaderSwitch"), IsChecked = effectEnabled, Margin = new Thickness(0, 8, 8, 0) };
+        _displayEffectSwitch.Click += (_, _) => _owner.WideSetDisplayEffectEnabled(_displayEffectSwitch.IsChecked == true);
+        _displayEffectCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 150, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        foreach ((string label, object? tag) in effectOptions) _displayEffectCombo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
+        _displayEffectCombo.SelectedIndex = Math.Clamp(effectSelected, 0, Math.Max(0, _displayEffectCombo.Items.Count - 1));
+        _displayEffectCombo.SelectionChanged += (_, _) => _owner.WideSetDisplayEffectIndex(_displayEffectCombo.SelectedIndex);
+        Button effectEdit = new() { Content = "编辑", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 8, 0, 0) };
+        effectEdit.Click += (_, _) => _owner.WideOpenDisplayEffectEditor();
+        StackPanel effectRow = new() { Orientation = Orientation.Horizontal };
+        effectRow.Children.Add(_displayEffectSwitch);
+        effectRow.Children.Add(_displayEffectCombo);
+        effectRow.Children.Add(effectEdit);
+        DisplayDetailsPanel.Children.Add(effectRow);
+
     }
 
     private void RefreshHomeExtras()
@@ -442,6 +508,19 @@ public partial class MainWindow : Window
             button.IsChecked = hz == currentHz;
         }
         if (_autoRefresh != null) _autoRefresh.IsChecked = auto;
+        (bool calibEnabled, (string Label, object? Tag)[] _, int calibSelected) = _owner.WideCalibration();
+        if (_calibrationSwitch != null) _calibrationSwitch.IsChecked = calibEnabled;
+        if (_calibrationCombo != null && calibSelected >= 0) _calibrationCombo.SelectedIndex = Math.Clamp(calibSelected, 0, _calibrationCombo.Items.Count - 1);
+        (bool effectEnabled, (string Label, object? Tag)[] _, int effectSelected) = _owner.WideDisplayEffect();
+        if (_displayEffectSwitch != null) _displayEffectSwitch.IsChecked = effectEnabled;
+        if (_displayEffectCombo != null && effectSelected >= 0) _displayEffectCombo.SelectedIndex = Math.Clamp(effectSelected, 0, _displayEffectCombo.Items.Count - 1);
+        (bool limitEnabled2, string lowText2, string highText2, string limitStatus2, bool experiment2, bool ecDirect2) = _owner.WideChargeLimit();
+        if (_chargeLimitSwitch != null) _chargeLimitSwitch.IsChecked = limitEnabled2;
+        if (_chargeLow != null && !_chargeLow.IsKeyboardFocusWithin) _chargeLow.Text = lowText2;
+        if (_chargeHigh != null && !_chargeHigh.IsKeyboardFocusWithin) _chargeHigh.Text = highText2;
+        if (_chargeStatus != null) _chargeStatus.Text = limitStatus2;
+        if (_chargeExperiment != null) _chargeExperiment.IsChecked = experiment2;
+        if (_ecDirect != null) _ecDirect.IsChecked = ecDirect2;
     }
 
     private void BuildLightingCards()
