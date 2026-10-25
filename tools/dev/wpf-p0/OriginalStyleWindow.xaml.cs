@@ -1434,6 +1434,19 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private void IgpuSavingPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton button || button.Tag is not string mode)
+        {
+            return;
+        }
+        IgpuSavingOffPreview.IsChecked = mode == "OFF";
+        IgpuSavingOnPreview.IsChecked = mode == "ON";
+        IgpuSavingAutoPreview.IsChecked = mode == "AUTO";
+        IgpuSavingPreviewStatus.Text = "UI 预览：" + button.Content;
+        StatusText.Text = "核显省电 UI 预览：" + button.Content + "（硬件切换待接入）";
+    }
+
     private async void GpuMode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
