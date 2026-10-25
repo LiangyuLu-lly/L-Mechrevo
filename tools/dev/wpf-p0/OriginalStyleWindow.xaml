@@ -576,7 +576,7 @@
                                 <ToggleButton x:Name="IgpuSavingOnPreview" Content="开" Tag="ON" Style="{StaticResource GpuSegment}" Width="76" Margin="0,0,6,0" Click="IgpuSavingPreview_Click" />
                                 <ToggleButton x:Name="IgpuSavingAutoPreview" Content="自动" Tag="AUTO" Style="{StaticResource GpuSegment}" Width="76" IsChecked="True" Click="IgpuSavingPreview_Click" />
                             </StackPanel>
-                            <TextBlock x:Name="IgpuSavingPreviewStatus" Grid.Column="2" Text="UI 预览" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="IgpuSavingPreviewStatus" Grid.Column="2" Text="当前：--" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                         </Grid>
                     </StackPanel>
 

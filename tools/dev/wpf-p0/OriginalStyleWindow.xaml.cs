@@ -11,6 +11,8 @@ using MechrevoLite;
 using MechrevoLite.Battery;
 using MechrevoLite.Diagnostics;
 using MechrevoLite.Display;
+using MechrevoLite.Gpu;
+using MechrevoLite.Gpu.NVidia;
 using MechrevoLite.Hardware;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -1434,17 +1436,101 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private void IgpuSavingPreview_Click(object sender, RoutedEventArgs e)
+    private bool _igpuSavingBusy;
+
+    private async void IgpuSavingPreview_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not ToggleButton button || button.Tag is not string mode)
+        if (sender is ToggleButton button && button.Tag is string mode)
+        {
+            await SwitchIgpuSavingAsync(mode);
+        }
+    }
+
+    private void VisualiseIgpuSaving()
+    {
+        MechrevoHw? hardware = _backendProbe?.Hw;
+        if (hardware == null)
         {
             return;
         }
-        IgpuSavingOffPreview.IsChecked = mode == "OFF";
-        IgpuSavingOnPreview.IsChecked = mode == "ON";
-        IgpuSavingAutoPreview.IsChecked = mode == "AUTO";
-        IgpuSavingPreviewStatus.Text = "UI 预览：" + button.Content;
-        StatusText.Text = "核显省电 UI 预览：" + button.Content + "（硬件切换待接入）";
+        IgpuSavingPreviewRow.Visibility = hardware.SupportsGpuHotSwap ? Visibility.Visible : Visibility.Collapsed;
+        int mode = hardware.IgpuOnlySaveMode;
+        IgpuSavingOffPreview.IsChecked = mode == 1;
+        IgpuSavingOnPreview.IsChecked = mode == 0;
+        IgpuSavingAutoPreview.IsChecked = mode == 3;
+        IgpuSavingPreviewStatus.Text = _igpuSavingBusy
+            ? "切换中…"
+            : mode switch { 0 => "当前：开", 1 => "当前：关", 3 => "当前：自动", _ => "当前：未知" };
+    }
+
+    private async Task SwitchIgpuSavingAsync(string mode)
+    {
+        if (_igpuSavingBusy)
+        {
+            return;
+        }
+        MechrevoService? service = _backendProbe?.Service;
+        MechrevoHw? hardware = _backendProbe?.Hw;
+        if (service == null || hardware == null || !hardware.IsConnected || !hardware.SupportsGpuHotSwap)
+        {
+            StatusText.Text = "本机不支持热切换核显省电";
+            return;
+        }
+        int target = mode switch { "ON" => 0, "OFF" => 1, "AUTO" => 3, _ => -1 };
+        if (target < 0)
+        {
+            return;
+        }
+        if (hardware.IgpuOnlySaveMode == target)
+        {
+            VisualiseIgpuSaving();
+            return;
+        }
+        _igpuSavingBusy = true;
+        VisualiseIgpuSaving();
+        int previous = hardware.IgpuOnlySaveMode;
+        try
+        {
+            if (NvidiaGpuControl.TryGetActiveDgpuApplications(out IReadOnlyList<DgpuApplication> applications))
+            {
+                IReadOnlyList<DgpuApplication> closable = DgpuApplicationSafety.FilterClosable(
+                    applications, Environment.ProcessId, System.Diagnostics.Process.GetCurrentProcess().SessionId);
+                if (closable.Count > 0)
+                {
+                    string names = string.Join("\n", closable.Select(static app => app.ProcessName));
+                    MessageBox.Show("以下程序正在占用独显，请先关闭后再切换核显省电：\n\n" + names,
+                        "核显省电", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    StatusText.Text = "核显省电未切换：独显仍有程序占用";
+                    return;
+                }
+            }
+            bool ok = await service.SetIGpuOnlySaveMode(mode);
+            await service.RecheckIgpuOnlySaveModeAsync();
+            VisualiseIgpuSaving();
+            if (ok)
+            {
+                StatusText.Text = "核显省电已切换：" + IgpuSavingPreviewStatus.Text;
+                return;
+            }
+            if (previous != -1)
+            {
+                string previousMode = previous switch { 0 => "ON", 1 => "OFF", 3 => "AUTO", _ => "OFF" };
+                await service.SetIGpuOnlySaveMode(previousMode);
+                await service.RecheckIgpuOnlySaveModeAsync();
+                VisualiseIgpuSaving();
+            }
+            StatusText.Text = "核显省电切换失败，已尝试恢复原状态";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "核显省电切换失败：" + ex.Message;
+            VisualiseIgpuSaving();
+        }
+        finally
+        {
+            _igpuSavingBusy = false;
+            VisualiseIgpuSaving();
+        }
     }
 
     private async void GpuMode_Click(object sender, RoutedEventArgs e)
@@ -2093,6 +2179,7 @@ public partial class OriginalStyleWindow : Window
         }
         CpuStat.Text = SensorLine(hw, cpu: true);
         GpuStat.Text = SensorLine(hw, cpu: false);
+        VisualiseIgpuSaving();
         if (Program.rgb != null)
         {
             string? selectedHidTag = (KeyboardEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string;
