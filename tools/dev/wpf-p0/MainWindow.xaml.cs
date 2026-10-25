@@ -56,15 +56,19 @@ public partial class MainWindow : Window
             return;
         }
         (string cpuTemp, string gpuTemp, string cpuFan, string gpuFan, string cpuUsage, string gpuUsage,
-            string cpuFanDuty, string gpuFanDuty, string cpuFreq, string gpuFreq, string fanMaxText) = _owner.WideSensors();
+            string cpuFanDuty, string gpuFanDuty, string cpuFreq, string gpuFreq, string fanMaxText,
+            string cpuPower, string gpuPower, string gpuMemFreq) = _owner.WideSensors();
         double fanMax = Math.Max(1, ParseNumber(fanMaxText));
         if (fanMax <= 1) fanMax = 5000;
-        SetMetric(_cpuMetrics, 0, ParseNumber(cpuUsage), "%");
-        SetMetric(_cpuMetrics, 1, ParseNumber(cpuFreq), "MHz");
-        SetMetric(_cpuMetrics, 2, ParseNumber(cpuTemp), "℃");
-        SetMetric(_gpuMetrics, 0, ParseNumber(gpuUsage), "%");
-        SetMetric(_gpuMetrics, 1, ParseNumber(gpuFreq), "MHz");
-        SetMetric(_gpuMetrics, 2, ParseNumber(gpuTemp), "℃");
+        SetMetric(_cpuMetrics, 0, ParseNumber(cpuTemp), "℃");
+        SetMetric(_cpuMetrics, 1, ParseNumber(cpuUsage), "%");
+        SetMetric(_cpuMetrics, 2, ParseNumber(cpuPower), "W");
+        SetMetric(_cpuMetrics, 3, ParseNumber(cpuFreq), "MHz");
+        SetMetric(_gpuMetrics, 0, ParseNumber(gpuTemp), "℃");
+        SetMetric(_gpuMetrics, 1, ParseNumber(gpuUsage), "%");
+        SetMetric(_gpuMetrics, 2, ParseNumber(gpuPower), "W");
+        SetMetric(_gpuMetrics, 3, ParseNumber(gpuFreq), "MHz");
+        SetMetric(_gpuMetrics, 4, ParseNumber(gpuMemFreq), "MHz");
         _cpuFanRing?.SetValue(ParseNumber(cpuFan), fanMax, "rpm");
         _gpuFanRing?.SetValue(ParseNumber(gpuFan), fanMax, "rpm");
         if (_cpuDutyText != null) _cpuDutyText.Text = "占空比 " + cpuFanDuty;
@@ -76,7 +80,11 @@ public partial class MainWindow : Window
         if (index < 0 || index >= metrics.Count) return;
         (ProgressBar bar, TextBlock text, string _) = metrics[index];
         bar.Value = Math.Clamp(value, 0, bar.Maximum);
-        text.Text = Math.Round(value) + " " + unit;
+        text.Text = unit switch
+        {
+            "W" => value.ToString("0.0") + " W",
+            _ => Math.Round(value) + " " + unit
+        };
     }
 
     private static double ParseNumber(string text)
@@ -95,15 +103,15 @@ public partial class MainWindow : Window
 
     private Border BuildCpuGpuCard(string title, bool cpu)
     {
-        StackPanel left = new() { Width = 150 };
+        StackPanel left = new() { Width = 140 };
         left.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle") });
-        RingGauge ring = new() { Width = 124, Height = 124, HorizontalAlignment = HorizontalAlignment.Center };
+        RingGauge ring = new() { Width = 116, Height = 116, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0) };
         TextBlock duty = new()
         {
             Text = "占空比 --",
             Style = (Style)FindResource("MutedText"),
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 4, 0, 0)
+            Margin = new Thickness(0, 2, 0, 0)
         };
         left.Children.Add(ring);
         left.Children.Add(duty);
@@ -120,41 +128,42 @@ public partial class MainWindow : Window
             _gpuMetrics.Clear();
         }
 
-        StackPanel metrics = new() { Margin = new Thickness(16, 30, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        (string Label, double Maximum)[] rows =
-        {
-            ("使用率", 100),
-            (cpu ? "核心频率" : "核心频率", cpu ? 6000 : 3000),
-            ("温度", 100)
-        };
+        StackPanel metrics = new() { Margin = new Thickness(14, 2, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        (string Label, double Maximum)[] rows = cpu
+            ? new[] { ("温度", 100.0), ("使用率", 100.0), ("功耗", 100.0), ("频率", 6000.0) }
+            : new[] { ("温度", 100.0), ("使用率", 100.0), ("功耗", 200.0), ("核心频率", 3000.0), ("显存频率", 12000.0) };
         List<(ProgressBar Bar, TextBlock Value, string Unit)> target = cpu ? _cpuMetrics : _gpuMetrics;
         foreach ((string label, double maximum) in rows)
         {
-            Grid row = new() { Margin = new Thickness(0, 0, 0, 14) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(74) });
-            TextBlock name = new() { Text = label, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center };
-            ProgressBar bar = new() { Style = (Style)FindResource("RoundedBar"), Maximum = maximum, VerticalAlignment = VerticalAlignment.Center };
+            StackPanel metric = new() { Margin = new Thickness(0, 0, 0, 8) };
+            Grid header = new();
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            TextBlock name = new() { Text = label, Style = (Style)FindResource("MutedText") };
             TextBlock value = new()
             {
                 Text = "--",
                 Style = (Style)FindResource("MutedText"),
-                TextAlignment = TextAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
+                TextAlignment = TextAlignment.Right
             };
             Grid.SetColumn(name, 0);
-            Grid.SetColumn(bar, 1);
-            Grid.SetColumn(value, 2);
-            row.Children.Add(name);
-            row.Children.Add(bar);
-            row.Children.Add(value);
-            metrics.Children.Add(row);
+            Grid.SetColumn(value, 1);
+            header.Children.Add(name);
+            header.Children.Add(value);
+            ProgressBar bar = new()
+            {
+                Style = (Style)FindResource("RoundedBar"),
+                Maximum = maximum,
+                Margin = new Thickness(0, 5, 0, 0)
+            };
+            metric.Children.Add(header);
+            metric.Children.Add(bar);
+            metrics.Children.Add(metric);
             target.Add((bar, value, ""));
         }
 
         Grid grid = new();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         Grid.SetColumn(left, 0);
         Grid.SetColumn(metrics, 1);
@@ -164,7 +173,7 @@ public partial class MainWindow : Window
         {
             Style = (Style)FindResource("Card"),
             Margin = new Thickness(5),
-            MinHeight = 230,
+            MinHeight = 220,
             Child = grid
         };
     }

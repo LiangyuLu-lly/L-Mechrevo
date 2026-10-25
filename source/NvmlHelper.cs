@@ -182,6 +182,7 @@ public static class NvmlHelper
 	//    ⇒ ⭐ NVIDIA 机型的 **GPU 频率**也得从这里补 ✅
 	//    ⭐（⭐ 温度已经补了，⭐ 见 `GetGpuTemperature` ✅）—— ⭐ 数据与 LHM 同源、⭐ 路径更安全 ✅
 	private static uint? _snapshotClockMhz;
+	private static uint? _snapshotMemoryClockMhz;
 
 	/// <summary>
 	/// ⭐ <c>nvmlDeviceGetClockInfo</c>（⭐ NVML 官方导出 ✅）。
@@ -193,6 +194,7 @@ public static class NvmlHelper
 
 	/// <summary>⭐ `NVML_CLOCK_GRAPHICS`（⭐ NVML 头文件枚举值 = 0 ✅）。</summary>
 	private const int NvmlClockGraphics = 0;
+	private const int NvmlClockMemory = 2;
 
 	// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ GPU 核心利用率快照。
 	//   ⚠️ 旧链路里 `HardwareControl.gpuUsage` **只**来自 GCU/MQTT 推送（`hw.GpuUsage`）⚠️
@@ -287,6 +289,23 @@ public static class NvmlHelper
 	/// （⭐ NVML 原生崩溃修复 ⚠️）⇒ ⭐ 所以 NVIDIA 机型由本方法提供 ✅，⭐ 数据同源 ✅</para>
 	/// <para>⭐ 取不到返回 <c>null</c>（⭐ 调用方跳过即可 ✅）。</para>
 	/// </summary>
+	/// <summary>GPU 显存频率（MHz，NVML_CLOCK_MEM 快照）。</summary>
+	public static float? GetGpuMemoryClockMhz()
+	{
+		try
+		{
+			lock (_lock)
+			{
+				RefreshLocked(0u);
+				return _snapshotMemoryClockMhz.HasValue ? _snapshotMemoryClockMhz.Value : (float?)null;
+			}
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
 	public static float? GetGpuClockMhz(uint gpuIndex = 0u)
 	{
 		lock (_lock)
@@ -780,6 +799,11 @@ public static class NvmlHelper
 			if (num8 == NVML_SUCCESS && clockMhz > 0 && clockMhz <= 4000)
 			{
 				_snapshotClockMhz = clockMhz;
+			}
+			int memoryClockResult = nvmlDeviceGetClockInfo(device, NvmlClockMemory, out uint memoryClockMhz);
+			if (memoryClockResult == NVML_SUCCESS && memoryClockMhz > 0 && memoryClockMhz <= 4000)
+			{
+				_snapshotMemoryClockMhz = memoryClockMhz;
 			}
 			// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ GPU 核心利用率（⭐ 与上面同一把句柄、同一次快照 ✅）
 			//   ⚠️ 合理性：(0, 100] 的百分比 —— ⭐ `0` **是合法值**（待机时真的 0%）⚠️

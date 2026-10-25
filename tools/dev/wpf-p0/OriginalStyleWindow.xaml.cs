@@ -338,25 +338,31 @@ public partial class OriginalStyleWindow : Window
         return await _backendProbe.SwitchQuickAsync(key, !current);
     }
 
-    internal (string CpuTemp, string GpuTemp, string CpuFan, string GpuFan, string CpuUsage, string GpuUsage, string CpuFanDuty, string GpuFanDuty, string CpuFreq, string GpuFreq, string FanMax) WideSensors()
+    internal (string CpuTemp, string GpuTemp, string CpuFan, string GpuFan, string CpuUsage, string GpuUsage, string CpuFanDuty, string GpuFanDuty, string CpuFreq, string GpuFreq, string FanMax, string CpuPower, string GpuPower, string GpuMemFreq) WideSensors()
     {
         MechrevoHw? hardware = _backendProbe?.Hw;
         if (hardware == null)
         {
-            return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
+            return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
         }
         try
         {
+            float? cpuPower = MechrevoLite.HardwareControl.cpuPower;
+            float? gpuPower = MechrevoLite.HardwareControl.gpuPower;
+            float? memClock = NvmlHelper.GetGpuMemoryClockMhz();
             return (hardware.CpuTemp + " ℃", hardware.GpuTemp + " ℃",
                 hardware.CpuFanRpm + " RPM", hardware.GpuFanRpm + " RPM",
                 hardware.CpuUsage + "%", hardware.GpuUsage + "%",
                 hardware.CpuFanDuty + "%", hardware.GpuFanDuty + "%",
                 hardware.CpuFrequency + " MHz", hardware.GpuCoreFreq + " MHz",
-                hardware.FanRpmMaxForPercent.ToString());
+                hardware.FanRpmMaxForPercent.ToString(),
+                (cpuPower.HasValue ? cpuPower.Value.ToString("0.0") : "--") + " W",
+                (gpuPower.HasValue ? gpuPower.Value.ToString("0.0") : "--") + " W",
+                (memClock.HasValue && memClock.Value > 0 ? memClock.Value.ToString("0") : "--") + " MHz");
         }
         catch
         {
-            return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
+            return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
         }
     }
 
