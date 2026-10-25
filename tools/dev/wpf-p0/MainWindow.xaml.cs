@@ -315,6 +315,10 @@ public partial class MainWindow : Window
     {
         if (sender is ToggleButton button && button.Tag is string text && int.TryParse(text, out int mode))
         {
+            foreach (ToggleButton perfButton in new[] { HomePerf静音, HomePerf平衡, HomePerf狂暴, HomePerf自定义 })
+            {
+                perfButton.IsChecked = ReferenceEquals(perfButton, button);
+            }
             _owner?.WideSetMode(mode);
             StatusText.Text = "性能模式已请求：" + button.Content;
         }
@@ -324,6 +328,10 @@ public partial class MainWindow : Window
     {
         if (sender is ToggleButton button && button.Tag is string text && int.TryParse(text, out int mode))
         {
+            foreach (ToggleButton gpuButton in new[] { HomeGpu混合, HomeGpu独显, HomeGpu集显 })
+            {
+                gpuButton.IsChecked = ReferenceEquals(gpuButton, button);
+            }
             _owner?.WideSetGpuMode(mode);
             StatusText.Text = "显卡模式已请求：" + button.Content;
         }
@@ -333,6 +341,10 @@ public partial class MainWindow : Window
     {
         if (sender is ToggleButton button && button.Tag is string text && int.TryParse(text, out int hz))
         {
+            foreach ((ToggleButton refreshButton, int refreshHz) in _displayRefreshButtons)
+            {
+                refreshButton.IsChecked = refreshHz == hz;
+            }
             _owner?.WideSetRefresh(hz);
             StatusText.Text = "刷新率已请求：" + hz + " Hz";
         }
@@ -788,10 +800,18 @@ public partial class MainWindow : Window
         HomePerf自定义.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
         bool gpuSupported = caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap;
         HomeGpuCard.Visibility = gpuSupported ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpuColumn.Width = gpuSupported ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        HomeMidColumn.Width = gpuSupported ? new GridLength(12) : new GridLength(0);
+        Grid.SetColumn(HomePerfCard, 0);
+        Grid.SetColumnSpan(HomePerfCard, gpuSupported ? 1 : 3);
         HomeGpu集显.Visibility = caps.IgpuOnly ? Visibility.Visible : Visibility.Collapsed;
         HomeGpu独显.Visibility = caps.DgpuDirect ? Visibility.Visible : Visibility.Collapsed;
         bool displaySupported = caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming;
         HomeDisplayCard.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
+        HomeDisplayColumn.Width = displaySupported ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        HomeDisplayGap.Width = displaySupported ? new GridLength(10) : new GridLength(0);
+        Grid.SetColumn(BatteryCardHost, displaySupported ? 2 : 0);
+        Grid.SetColumnSpan(BatteryCardHost, displaySupported ? 1 : 3);
         NavScreen.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
         ScreenCalibrationCard.Visibility = caps.ColorCalibration ? Visibility.Visible : Visibility.Collapsed;
         if (ScreenCalibrationCard.Visibility != Visibility.Visible && ScreenEffectCard.Visibility != Visibility.Visible)

@@ -154,8 +154,8 @@
 
 
                             <Grid Margin="0,3,0,0">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource Card}">
+                                <Grid.ColumnDefinitions><ColumnDefinition x:Name="HomePerfColumn" Width="*" /><ColumnDefinition x:Name="HomeMidColumn" Width="12" /><ColumnDefinition x:Name="HomeGpuColumn" Width="*" /></Grid.ColumnDefinitions>
+                                <Border x:Name="HomePerfCard" Grid.Column="0" Style="{StaticResource Card}">
                                     <StackPanel>
                                         <TextBlock Text="性能模式" Style="{StaticResource CardTitle}" />
                                         <TextBlock x:Name="PerfCurrentText" Text="当前：平衡" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
@@ -183,9 +183,9 @@
 
                             <Grid Margin="0,0,0,14">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition x:Name="HomeDisplayColumn" Width="*" />
+                                    <ColumnDefinition x:Name="HomeDisplayGap" Width="10" />
+                                    <ColumnDefinition x:Name="HomeBatteryColumn" Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Border x:Name="HomeDisplayCard" Grid.Column="0" Style="{StaticResource Card}" Margin="0">
                                     <StackPanel>
