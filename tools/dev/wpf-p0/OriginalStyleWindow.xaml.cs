@@ -4201,13 +4201,13 @@ public partial class OriginalStyleWindow : Window
         await ApplyKeyboardLightAsync();
     }
 
-    private async Task<bool> ApplyHidKeyboardAsync(int mode, bool on)
+    private async Task<bool> ApplyHidKeyboardAsync(int mode, bool on, bool allowRetry = true)
     {
         await _hidApplyLock.WaitAsync();
         try
         {
             bool ok = await ApplyHidKeyboardCoreAsync(mode, on);
-            if (!ok && on)
+            if (!ok && on && allowRetry)
             {
                 ScheduleHidRetry(mode);
             }
@@ -4231,7 +4231,7 @@ public partial class OriginalStyleWindow : Window
                 {
                     return;
                 }
-                await ApplyHidKeyboardAsync(mode, on: true);
+                await ApplyHidKeyboardAsync(mode, on: true, allowRetry: false);
             }));
         });
     }
