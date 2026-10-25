@@ -355,13 +355,20 @@ public partial class MainWindow : Window
         }
     }
 
-    private void WideMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void WideMinimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
 
     private void WideMaximize_Click(object sender, RoutedEventArgs e) => ToggleWideMaximize();
 
     private void ToggleWideMaximize()
     {
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        if (WindowState == WindowState.Maximized)
+        {
+            SystemCommands.RestoreWindow(this);
+        }
+        else
+        {
+            SystemCommands.MaximizeWindow(this);
+        }
     }
 
     private void WideClose_Click(object sender, RoutedEventArgs e) => Close();

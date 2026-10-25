@@ -68,7 +68,7 @@
         <Image x:Name="BackgroundImage" Source="Assets/background.jpg" Stretch="UniformToFill" Opacity="0.78" />
         <Rectangle x:Name="BackgroundScrim" Fill="#99000000" Opacity="0.35" />
 
-        <Grid Margin="24,18,24,14">
+        <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="34" />
                 <RowDefinition Height="Auto" />
@@ -93,7 +93,7 @@
             </Grid>
 
             <!-- 顶栏 -->
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="1" Margin="24,10,24,0">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Content="切换浅色" x:Name="ThemeButton" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,0,10,0" />
                     <Button Content="小窗" Style="{StaticResource GhostButton}" Click="CompactButton_Click" Margin="0,0,10,0" />
@@ -111,7 +111,7 @@
             </Grid>
 
             <!-- 左侧导航 + 页面 -->
-            <Grid Grid.Row="3">
+            <Grid Grid.Row="3" Margin="24,0,24,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="NavColumn" Width="196" />
                     <ColumnDefinition Width="14" />
@@ -369,7 +369,7 @@
                 </Grid>
             </Grid>
 
-            <Grid Grid.Row="4">
+            <Grid Grid.Row="4" Margin="24,0,24,10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
