@@ -292,6 +292,71 @@ public partial class OriginalStyleWindow : Window
         _ = SwitchModeAsync(mode);
     }
 
+    internal void WideSetMode(int mode)
+    {
+        RequestMode(mode);
+    }
+
+    internal void WideSetGpuMode(int mode)
+    {
+        ToggleButton? target = mode switch
+        {
+            0 => GpuEcoButton,
+            1 => GpuHybridButton,
+            2 => GpuDirectButton,
+            _ => null
+        };
+        if (target != null)
+        {
+            GpuMode_Click(target, new RoutedEventArgs());
+        }
+    }
+
+    internal void WideSetRefresh(int hertz)
+    {
+        ToggleButton target = hertz <= 60 ? Refresh60Button : Refresh180Button;
+        RefreshRate_Click(target, new RoutedEventArgs());
+    }
+
+    internal async Task<bool> WideToggleQuickAsync(string key)
+    {
+        if (_backendProbe == null)
+        {
+            return false;
+        }
+        bool current = false;
+        try
+        {
+            if (_backendProbe.Hw?.QuickSwitches != null)
+            {
+                _backendProbe.Hw.QuickSwitches.TryGetValue(key, out current);
+            }
+        }
+        catch
+        {
+        }
+        return await _backendProbe.SwitchQuickAsync(key, !current);
+    }
+
+    internal (string CpuTemp, string GpuTemp, string CpuFan, string GpuFan, string CpuUsage, string GpuUsage) WideSensors()
+    {
+        MechrevoHw? hardware = _backendProbe?.Hw;
+        if (hardware == null)
+        {
+            return ("--", "--", "--", "--", "--", "--");
+        }
+        try
+        {
+            return (hardware.CpuTemp + " ℃", hardware.GpuTemp + " ℃",
+                hardware.CpuFanRpm + " RPM", hardware.GpuFanRpm + " RPM",
+                hardware.CpuUsage + "%", hardware.GpuUsage + "%");
+        }
+        catch
+        {
+            return ("--", "--", "--", "--", "--", "--");
+        }
+    }
+
     internal bool SupportsMiniled => _backendProbe?.Hw?.SupportsLocalDimming == true;
 
     internal bool MiniledOn => _backendProbe?.Hw?.LocalDimming == true;
@@ -4545,7 +4610,7 @@ public partial class OriginalStyleWindow : Window
     private void WideButton_Click(object sender, RoutedEventArgs e)
     {
         // 恢复独立宽屏 UI，不再把主窗口本身切成双列。
-        new MainWindow().Show();
+        new MainWindow(this, _backendProbe).Show();
     }
 
     private async void DockButton_Click(object sender, RoutedEventArgs e)

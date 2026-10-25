@@ -133,12 +133,12 @@
                                             <StackPanel Orientation="Horizontal"><TextBlock x:Name="GpuTempText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="℃" Style="{StaticResource MetricUnit}" /></StackPanel>
                                         </StackPanel>
                                         <StackPanel Margin="0,0,12,0">
-                                            <TextBlock Text="CPU 功耗" Style="{StaticResource MutedText}" />
-                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="CpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="W" Style="{StaticResource MetricUnit}" /></StackPanel>
+                                            <TextBlock Text="CPU 使用率" Style="{StaticResource MutedText}" />
+                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="CpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="%" Style="{StaticResource MetricUnit}" /></StackPanel>
                                         </StackPanel>
                                         <StackPanel>
-                                            <TextBlock Text="GPU 功耗" Style="{StaticResource MutedText}" />
-                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="GpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="W" Style="{StaticResource MetricUnit}" /></StackPanel>
+                                            <TextBlock Text="GPU 使用率" Style="{StaticResource MutedText}" />
+                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="GpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="%" Style="{StaticResource MetricUnit}" /></StackPanel>
                                         </StackPanel>
                                     </UniformGrid>
                                 </StackPanel>
@@ -151,9 +151,9 @@
                                         <TextBlock Text="性能模式" Style="{StaticResource CardTitle}" />
                                         <TextBlock Text="当前：平衡" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                         <StackPanel Orientation="Horizontal">
-                                            <ToggleButton Content="平衡" Style="{StaticResource SegmentButton}" IsChecked="True" />
-                                            <ToggleButton Content="狂暴" Style="{StaticResource SegmentButton}" />
-                                            <ToggleButton Content="自定义" Style="{StaticResource SegmentButton}" />
+                                            <ToggleButton Content="平衡" Tag="0" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Mode_Click" />
+                                            <ToggleButton Content="狂暴" Tag="1" Style="{StaticResource SegmentButton}" Click="Mode_Click" />
+                                            <ToggleButton Content="自定义" Tag="3" Style="{StaticResource SegmentButton}" Click="Mode_Click" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -162,9 +162,9 @@
                                         <TextBlock Text="显卡模式" Style="{StaticResource CardTitle}" />
                                         <TextBlock Text="当前：混合输出" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                         <StackPanel Orientation="Horizontal">
-                                            <ToggleButton Content="混合" Style="{StaticResource SegmentButton}" IsChecked="True" />
-                                            <ToggleButton Content="独显" Style="{StaticResource SegmentButton}" />
-                                            <ToggleButton Content="集显" Style="{StaticResource SegmentButton}" />
+                                            <ToggleButton Content="混合" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Gpu_Click" />
+                                            <ToggleButton Content="独显" Tag="2" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
+                                            <ToggleButton Content="集显" Tag="0" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -175,9 +175,9 @@
                                     <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
                                     <TextBlock Text="2560 × 1600 · 刷新率" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                     <StackPanel Orientation="Horizontal">
-                                        <ToggleButton Content="60 Hz" Style="{StaticResource SegmentButton}" />
-                                        <ToggleButton Content="120 Hz" Style="{StaticResource SegmentButton}" />
-                                        <ToggleButton Content="165 Hz" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                        <ToggleButton Content="60 Hz" Tag="60" Style="{StaticResource SegmentButton}" Click="Refresh_Click" />
+                                        <ToggleButton Content="120 Hz" Tag="120" Style="{StaticResource SegmentButton}" Click="Refresh_Click" />
+                                        <ToggleButton Content="165 Hz" Tag="165" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Refresh_Click" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -209,43 +209,7 @@
                         <StackPanel>
                             <TextBlock Text="灯光" Style="{StaticResource PageTitle}" />
                             <TextBlock Text="键盘、灯带、Logo、铰链与同步灯" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
-                            <UniformGrid Columns="2">
-                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
-                                    <StackPanel>
-                                        <TextBlock Text="键盘灯光" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="单分区 / 四分区 / per-key HID" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="打开键盘灯光" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="Keyboard/Ctrl" Click="LightEdit_Click" />
-                                    </StackPanel>
-                                </Border>
-                                <Border Style="{StaticResource Card}" Margin="6,0,0,6">
-                                    <StackPanel>
-                                        <TextBlock Text="灯带" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="效果、亮度、速度与混色" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="打开灯带设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar/Ctrl" Click="LightEdit_Click" />
-                                    </StackPanel>
-                                </Border>
-                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
-                                    <StackPanel>
-                                        <TextBlock Text="Logo 灯" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="Gen40 Logo 效果与亮度" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="打开 Logo 设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar_Logo/Ctrl" Click="LightEdit_Click" />
-                                    </StackPanel>
-                                </Border>
-                                <Border Style="{StaticResource Card}" Margin="6,0,0,6">
-                                    <StackPanel>
-                                        <TextBlock Text="铰链灯" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="铰链灯光效果" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="打开铰链设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar_Hinge/Ctrl" Click="LightEdit_Click" />
-                                    </StackPanel>
-                                </Border>
-                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
-                                    <StackPanel>
-                                        <TextBlock Text="同步灯" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="同步灯光效果" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="打开同步设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar_Sync/Ctrl" Click="LightEdit_Click" />
-                                    </StackPanel>
-                                </Border>
-                            </UniformGrid>
+                            <UniformGrid x:Name="LightingCardsGrid" Columns="2" />
                         </StackPanel>
                     </ScrollViewer>
 
