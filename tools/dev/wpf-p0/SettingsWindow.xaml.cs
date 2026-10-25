@@ -199,6 +199,7 @@ public partial class SettingsWindow : Window
         BackgroundScrimText.Text = (int)BackgroundScrimSlider.Value + "%";
         WideBackgroundOpacitySlider.Value = Math.Clamp(AppConfig.Get("wide_bg_opacity", 78), 0, 100);
         WideBackgroundOpacityText.Text = (int)WideBackgroundOpacitySlider.Value + "%";
+        RefreshBackgroundPathText();
         RefreshWideBackgroundPathText();
         DockOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_dock_opacity", 70), 0, 100);
         DockOpacityText.Text = (int)DockOpacitySlider.Value + "%";

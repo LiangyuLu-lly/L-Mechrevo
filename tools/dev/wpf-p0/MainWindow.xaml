@@ -119,6 +119,22 @@
                         <Button x:Name="NavLighting" Content="灯光" Tag="lighting" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavCustom" Content="自定义" Tag="custom" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavSwitches" Content="更多开关" Tag="switches" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="6,12,6,10" />
+                        <Button x:Name="NavDockOverlay" Tag="悬浮窗" Style="{StaticResource NavButton}" Click="WideDock_Click">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="悬浮窗" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                        <Button x:Name="NavDockSettings" Tag="设置" Style="{StaticResource NavButton}" Click="WideDock_Click">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="设置" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                        <Button x:Name="NavDockSponsor" Tag="赞助" Style="{StaticResource NavButton}" Click="WideDock_Click">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEB51;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="赞助" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                        <Button x:Name="NavDockDiag" Tag="诊断" Style="{StaticResource NavButton}" Click="WideDock_Click">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="诊断" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                        <Button x:Name="NavDockExit" Tag="退出" Style="{StaticResource NavButton}" Click="WideDock_Click">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="退出" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
 
@@ -361,23 +377,7 @@
                 <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="0,0,0,8" />
                 <Grid Grid.Row="1">
                     <TextBlock x:Name="StatusText" Text="就绪" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
-                    <UniformGrid Columns="5" Width="520" HorizontalAlignment="Right">
-                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="悬浮窗" Click="WideDock_Click">
-                            <StackPanel><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="悬浮窗" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="设置" Click="WideDock_Click">
-                            <StackPanel><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="设置" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="赞助" Click="WideDock_Click">
-                            <StackPanel><TextBlock Text="&#xEB51;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="赞助" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="诊断" Click="WideDock_Click">
-                            <StackPanel><TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="诊断" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="退出" Click="WideDock_Click">
-                            <StackPanel><TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="退出" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
-                        </Button>
-                    </UniformGrid>
+
                 </Grid>
             </Grid>
             <Grid x:Name="InlineOverlay" Grid.RowSpan="4" Background="#AA000000" Visibility="Collapsed" Panel.ZIndex="20">
