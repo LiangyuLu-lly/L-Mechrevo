@@ -143,6 +143,7 @@ public partial class OriginalStyleWindow : Window
         ApplyDarkTitleBar(_dark);
         UpdateTitleIcon();
         ApplyDockOpacity();
+        MigrateButtonOpacityDefault();
         ApplyButtonOpacity();
         _backendTimer.Tick += (_, _) =>
         {
@@ -4724,6 +4725,21 @@ public partial class OriginalStyleWindow : Window
         }
         catch
         {
+        }
+    }
+
+    private static void MigrateButtonOpacityDefault()
+    {
+        if (AppConfig.Is("ui_button_opacity_v2"))
+        {
+            return;
+        }
+        int previous = AppConfig.Get("ui_button_opacity", 100);
+        if (previous >= 100)
+        {
+            AppConfig.Set("ui_button_opacity", 60);
+            AppConfig.Set("ui_button_opacity_v2", 1);
+            AppConfig.Flush();
         }
     }
 
