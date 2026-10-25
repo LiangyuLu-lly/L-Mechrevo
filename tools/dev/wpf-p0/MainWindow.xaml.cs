@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         _sensorTimer.Tick += (_, _) => RefreshSensors();
         _sensorTimer.Start();
         Closed += (_, _) => _sensorTimer.Stop();
+        ApplyHomeCapabilities();
         RefreshSensors();
         StatusText.Text = "就绪 · 宽屏四页布局";
     }
@@ -562,6 +563,7 @@ public partial class MainWindow : Window
         {
             return;
         }
+        ApplyHomeCapabilities();
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
         string perf = _owner.WidePerformanceText;
@@ -608,6 +610,30 @@ public partial class MainWindow : Window
         if (_ecDirect != null) _ecDirect.IsChecked = ecDirect2;
     }
 
+    private void ApplyHomeCapabilities()
+    {
+        MechrevoDeviceCapabilities? caps = _probe?.Capabilities;
+        if (caps == null)
+        {
+            return;
+        }
+        bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings)
+            && !(_probe?.Hw?.SupportsModeProfileConfig ?? false);
+        HomePerf自定义.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
+        bool gpuSupported = caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap;
+        HomeGpuCard.Visibility = gpuSupported ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpu集显.Visibility = caps.IgpuOnly ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpu独显.Visibility = caps.DgpuDirect ? Visibility.Visible : Visibility.Collapsed;
+        bool displaySupported = caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming;
+        HomeDisplayCard.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
+        NavScreen.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
+        ScreenCalibrationCard.Visibility = caps.ColorCalibration ? Visibility.Visible : Visibility.Collapsed;
+        if (ScreenCalibrationCard.Visibility != Visibility.Visible && ScreenEffectCard.Visibility != Visibility.Visible)
+        {
+            NavScreen.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private void BuildLightingCards()
     {
         if (LightingCardsGrid == null)
@@ -628,9 +654,22 @@ public partial class MainWindow : Window
             ("HidLightbar_Hinge/Ctrl", "铰链灯", LightForm.HingeEffects),
             ("HidLightbar_Sync/Ctrl", "同步灯", LightForm.SyncEffects)
         };
+        bool hasKeyboard = hw?.SupportsKeyboard ?? true;
+        bool hasLightbar = hw?.SupportsLightbar ?? true;
+        bool hasLogo = hw?.SupportsLogoLight ?? true;
+        bool hasHinge = hw?.SupportsHingeLight ?? true;
+        bool hasSync = hw?.SupportsSyncLight ?? true;
         foreach ((string topic, string title, (string Effect, string Name)[] effects) in channels)
         {
-            if (effects.Length > 0)
+            bool supported = topic switch
+            {
+                "Keyboard/Ctrl" => hasKeyboard,
+                "HidLightbar/Ctrl" => hasLightbar,
+                "HidLightbar_Logo/Ctrl" => hasLogo,
+                "HidLightbar_Hinge/Ctrl" => hasHinge,
+                _ => hasSync
+            };
+            if (effects.Length > 0 && supported)
             {
                 LightingCardsGrid.Children.Add(BuildLightCard(topic, title, effects));
             }
