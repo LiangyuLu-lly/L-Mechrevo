@@ -197,6 +197,9 @@ public partial class SettingsWindow : Window
         BackgroundScrimSlider.Value = Math.Clamp(AppConfig.Get("ui_bg_scrim", 50), 0, 100);
         BackgroundOpacityText.Text = (int)BackgroundOpacitySlider.Value + "%";
         BackgroundScrimText.Text = (int)BackgroundScrimSlider.Value + "%";
+        WideBackgroundOpacitySlider.Value = Math.Clamp(AppConfig.Get("wide_bg_opacity", 78), 0, 100);
+        WideBackgroundOpacityText.Text = (int)WideBackgroundOpacitySlider.Value + "%";
+        RefreshWideBackgroundPathText();
         DockOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_dock_opacity", 70), 0, 100);
         DockOpacityText.Text = (int)DockOpacitySlider.Value + "%";
         ButtonOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_button_opacity", 60), 0, 100);
@@ -459,6 +462,48 @@ public partial class SettingsWindow : Window
         AppConfig.Set("ui_bg_scrim", value);
         AppConfig.Flush();
         _owner.ApplyBackgroundAppearance();
+    }
+
+    private void RefreshWideBackgroundPathText()
+    {
+        string path = AppConfig.GetString("wide_bg_image") ?? "";
+        WideBackgroundPathText.Text = string.IsNullOrWhiteSpace(path)
+            ? "未选择"
+            : System.IO.Path.GetFileName(path);
+    }
+
+    private void PickWideBackground_Click(object sender, RoutedEventArgs e)
+    {
+        OpenFileDialog dialog = new()
+        {
+            Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        AppConfig.Set("wide_bg_image", dialog.FileName);
+        AppConfig.Flush();
+        RefreshWideBackgroundPathText();
+        _owner.RefreshWideBackground();
+        Status("已应用宽屏背景图：" + System.IO.Path.GetFileName(dialog.FileName));
+    }
+
+    private void ClearWideBackground_Click(object sender, RoutedEventArgs e)
+    {
+        AppConfig.Set("wide_bg_image", "");
+        AppConfig.Flush();
+        RefreshWideBackgroundPathText();
+        _owner.RefreshWideBackground();
+        Status("已清除宽屏背景图");
+    }
+
+    private void WideBackgroundOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncing || WideBackgroundOpacityText == null) return;
+        int value = (int)Math.Round(e.NewValue);
+        WideBackgroundOpacityText.Text = value + "%";
+        AppConfig.Set("wide_bg_opacity", value);
+        AppConfig.Flush();
+        _owner.RefreshWideBackground();
     }
 
     private void PickBackground_Click(object sender, RoutedEventArgs e)

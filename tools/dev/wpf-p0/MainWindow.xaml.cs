@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MechrevoLite;
 using MechrevoLite.Hardware;
@@ -39,6 +41,7 @@ public partial class MainWindow : Window
     private bool _syncingCalibrationUi;
     private bool _syncingScreenEffect;
     private string _currentEffectMode = "";
+    private Window? _inlineWindow;
     private CheckBox? _chargeLimitSwitch;
     private TextBox? _chargeLow;
     private TextBox? _chargeHigh;
@@ -59,8 +62,8 @@ public partial class MainWindow : Window
         _owner = owner;
         _probe = probe;
         AppTheme.Apply(true);
-        BackgroundImage.Visibility = Visibility.Collapsed;
-        BackgroundScrim.Visibility = Visibility.Collapsed;
+        UpdateMonochromeIcon();
+        ReloadWideBackground();
         BuildMoreSwitchTiles();
         BuildSensorBlocks();
         BuildQuickTiles();
@@ -233,8 +236,6 @@ public partial class MainWindow : Window
         NavColumn.Width = new GridLength(_navCollapsed ? 58 : 196);
         NavPanel.Padding = new Thickness(_navCollapsed ? 6 : 18);
         NavTitle.Visibility = _navCollapsed ? Visibility.Collapsed : Visibility.Visible;
-        NavQuickTitle.Visibility = _navCollapsed ? Visibility.Collapsed : Visibility.Visible;
-        NavFooterPanel.Visibility = _navCollapsed ? Visibility.Collapsed : Visibility.Visible;
         NavCollapseButton.Content = _navCollapsed ? "»" : "«";
         FontFamily glyphFont = new("Segoe MDL2 Assets");
         FontFamily textFont = (FontFamily)Application.Current.Resources["AppFontFamily"];
@@ -258,6 +259,8 @@ public partial class MainWindow : Window
     {
         if (_owner != null)
         {
+            AppConfig.Set("last_window_mode", "mini");
+            AppConfig.Flush();
             _owner.Show();
             _owner.Activate();
             Close();
@@ -266,12 +269,65 @@ public partial class MainWindow : Window
         StatusText.Text = "没有可恢复的小窗";
     }
 
+    private void UpdateMonochromeIcon()
+    {
+        try
+        {
+            const int size = 32;
+            DrawingVisual visual = new();
+            using (DrawingContext dc = visual.RenderOpen())
+            {
+                Brush background = new SolidColorBrush(_dark ? Colors.White : Colors.Black);
+                dc.DrawRoundedRectangle(background, null, new Rect(0, 0, size, size), 7, 7);
+                Brush foreground = new SolidColorBrush(_dark ? Colors.Black : Colors.White);
+                FormattedText text = new("L", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"), 21, foreground, 1.0);
+                dc.DrawText(text, new Point((size - text.Width) / 2, (size - text.Height) / 2));
+            }
+            RenderTargetBitmap bitmap = new(size, size, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            Icon = bitmap;
+        }
+        catch
+        {
+        }
+    }
+
+    internal void ReloadWideBackground()
+    {
+        try
+        {
+            string path = AppConfig.GetString("wide_bg_image") ?? "";
+            if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            {
+                BackgroundImage.Visibility = Visibility.Collapsed;
+                BackgroundScrim.Visibility = Visibility.Collapsed;
+                return;
+            }
+            BitmapImage bitmap = new();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(path, UriKind.Absolute);
+            bitmap.EndInit();
+            BackgroundImage.Source = bitmap;
+            BackgroundImage.Opacity = Math.Clamp(AppConfig.Get("wide_bg_opacity", 78), 0, 100) / 100.0;
+            BackgroundImage.Visibility = Visibility.Visible;
+            BackgroundScrim.Fill = new SolidColorBrush(Colors.Black);
+            BackgroundScrim.Opacity = Math.Clamp(AppConfig.Get("wide_bg_scrim", 35), 0, 100) / 100.0;
+            BackgroundScrim.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+        }
+    }
+
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? "切换浅色" : "切换深色";
+        UpdateMonochromeIcon();
         StatusText.Text = "L-Mechrevo · " + (_dark ? "深色" : "浅色") + "主题";
     }
 
@@ -378,26 +434,43 @@ public partial class MainWindow : Window
 
     private void BuildMoreSwitchTiles()
     {
-        (string Key, string Label)[] switches =
+        if (MoreSwitchGrid == null || _owner == null) return;
+        MoreSwitchGrid.Children.Clear();
+        foreach ((string group, (string Key, string Label, bool On)[] items) in _owner.WideMoreSwitches())
         {
-            ("touchpad", "触摸板"), ("wifi", "WiFi"), ("bt", "蓝牙"),
-            ("webcam", "摄像头"), ("micmute", "麦克风静音"),
-            ("numpad", "小键盘锁"), ("touchpadtoggle", "触摸板切换键")
-        };
-        foreach ((string key, string label) in switches)
-        {
-            Button tile = new()
+            MoreSwitchGrid.Children.Add(new TextBlock
             {
-                Style = (Style)FindResource("TileButton"),
-                Tag = key,
-                Margin = new Thickness(5)
-            };
-            StackPanel content = new();
-            content.Children.Add(new TextBlock { Text = label, FontSize = 14, FontWeight = FontWeights.SemiBold });
-            content.Children.Add(new TextBlock { Text = key, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 6, 0, 0) });
-            tile.Content = content;
-            tile.Click += MoreSwitch_Click;
-            MoreSwitchGrid.Children.Add(tile);
+                Text = group,
+                Style = (Style)FindResource("MutedText"),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(2, 10, 0, 6)
+            });
+            WrapPanel row = new();
+            foreach ((string key, string label, bool on) in items)
+            {
+                string switchKey = key;
+                ToggleButton tile = new()
+                {
+                    Content = label,
+                    Style = (Style)FindResource("SegmentButton"),
+                    IsChecked = on,
+                    Margin = new Thickness(0, 0, 8, 8),
+                    MinWidth = 110
+                };
+                tile.Click += async (_, _) =>
+                {
+                    bool target = tile.IsChecked == true;
+                    await _owner.WideToggleQuickAsync(switchKey);
+                    bool actual = _owner.WideMoreSwitches()
+                        .SelectMany(groupItems => groupItems.Items)
+                        .FirstOrDefault(item => item.Key == switchKey).On;
+                    tile.IsChecked = actual;
+                    StatusText.Text = (actual ? "已开启：" : "已关闭：") + label;
+                };
+                row.Children.Add(tile);
+            }
+            MoreSwitchGrid.Children.Add(row);
         }
     }
 
@@ -1064,6 +1137,7 @@ public partial class MainWindow : Window
             return;
         }
         ApplyHomeCapabilities();
+        if (MoreSwitchGrid.Children.Count == 0) BuildMoreSwitchTiles();
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
         string perf = _owner.WidePerformanceText;
@@ -1478,6 +1552,59 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             StatusText.Text = "灯光编辑失败：" + ex.Message;
+        }
+    }
+
+    private void WideDock_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not string name) return;
+        switch (name)
+        {
+            case "退出":
+                Application.Current.Shutdown();
+                return;
+            case "设置":
+                ShowInlineWindow(new SettingsWindow(_owner!), "设置");
+                return;
+            case "赞助":
+                ShowInlineWindow(new SponsorWindow(), "赞助");
+                return;
+            case "悬浮窗":
+            case "诊断":
+                _ = RunDockActionAsync(name);
+                return;
+        }
+    }
+
+    private async Task RunDockActionAsync(string name)
+    {
+        if (_owner == null) return;
+        await _owner.WideDockActionAsync(name);
+        StatusText.Text = name + " 已执行";
+    }
+
+    private void ShowInlineWindow(Window window, string title)
+    {
+        if (window.Content is not UIElement content)
+        {
+            window.Close();
+            return;
+        }
+        window.Content = null;
+        InlineOverlayTitle.Text = title;
+        InlineOverlayContent.Content = content;
+        InlineOverlay.Visibility = Visibility.Visible;
+        _inlineWindow = window;
+    }
+
+    private void InlineOverlayClose_Click(object sender, RoutedEventArgs e)
+    {
+        InlineOverlay.Visibility = Visibility.Collapsed;
+        InlineOverlayContent.Content = null;
+        if (_inlineWindow != null)
+        {
+            _inlineWindow.Close();
+            _inlineWindow = null;
         }
     }
 

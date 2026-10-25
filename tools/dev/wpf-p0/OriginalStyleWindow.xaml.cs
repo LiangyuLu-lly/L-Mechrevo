@@ -53,6 +53,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
+    private MainWindow? _wideWindow;
     private bool _overlayPreloaded;
     private bool _wideMode;
     private TrayIconService? _trayIcon;
@@ -265,6 +266,10 @@ public partial class OriginalStyleWindow : Window
             ApplyRoundedCorners();
             ReloadBackgroundImage();
             _ = Dispatcher.BeginInvoke(new Action(() => _ = ConnectBackendAsync()), System.Windows.Threading.DispatcherPriority.Background);
+            if (string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = Dispatcher.BeginInvoke(new Action(ShowWideWindow), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            }
         };
     }
 
@@ -507,6 +512,66 @@ public partial class OriginalStyleWindow : Window
     internal void WideEditQuickTiles()
     {
         CustomTile_Click(CustomTile, new RoutedEventArgs());
+    }
+
+    internal async Task WideDockActionAsync(string name)
+    {
+        switch (name)
+        {
+            case "悬浮窗":
+                ToggleTrayOverlay();
+                break;
+            case "诊断":
+                await ExportDiagnosticPackAsync();
+                break;
+        }
+    }
+
+    internal (string Group, (string Key, string Label, bool On)[] Items)[] WideMoreSwitches()
+    {
+        (string Title, (string Key, string Label)[] Items)[] groups =
+        {
+            ("输入设备", new (string, string)[]
+            {
+                ("touchpad", "触摸板"), ("wifi", "WiFi"), ("bt", "蓝牙"), ("webcam", "摄像头"),
+                ("micmute", "麦克风静音"), ("numpad", "小键盘锁"), ("touchpadtoggle", "触摸板切换键")
+            }),
+            ("键盘与热键", new (string, string)[]
+            {
+                ("winkey", "Win键锁"), ("fnkey", "Fn键锁"), ("capslock", "大小写锁定"),
+                ("osd", "OSD提示"), ("copilot", "Copilot键锁")
+            }),
+            ("电源与系统", new (string, string)[]
+            {
+                ("usb", "关机USB供电"), ("acrecovery", "来电自启"), ("highperf", "高性能电源"),
+                ("apuboost", "APU 防缩缸"), ("fanboost", "风扇强冷"), ("deepsleep", "深度睡眠"),
+                ("gamewhitelist", "游戏白名单"), ("cpuadvperf", "解锁BIOS菜单"),
+                ("taskbarautohide", "任务栏自动隐藏"), ("transparency", "系统透明效果"),
+                ("darktheme", "系统深色主题"), ("monitoroff", "息屏（不睡眠）"),
+                ("winupdate", "禁用Win更新")
+            }),
+            ("睡眠省电", new (string, string)[]
+            {
+                ("sleepnetoff", "待机断开网络"), ("sleepaway", "封杀离开模式"),
+                ("sleepsysreq", "忽略系统策略"), ("sleeprtcwake", "禁用RTC唤醒"),
+                ("sleepdeep", "ACPI深度睡眠"), ("sleephibernate", "30分钟转休眠")
+            })
+        };
+        List<(string, (string, string, bool)[])> result = new();
+        foreach ((string title, (string Key, string Label)[] items) in groups)
+        {
+            List<(string, string, bool)> visible = new();
+            foreach ((string key, string label) in items)
+            {
+                if (_backendProbe != null && !_backendProbe.SupportsQuick(key)) continue;
+                visible.Add((key, label, _backendProbe?.QuickState(key) == true));
+            }
+            if (visible.Count > 0)
+            {
+                result.Add((title, visible.ToArray()));
+            }
+        }
+        return result.ToArray();
     }
 
     internal (string Label, int Seconds)[] WideLightIdleOptions()
@@ -5142,11 +5207,26 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
     }
 
-    private void WideButton_Click(object sender, RoutedEventArgs e)
+    private void WideButton_Click(object sender, RoutedEventArgs e) => ShowWideWindow();
+
+    internal void ShowWideWindow()
     {
-        // 恢复独立宽屏 UI，不再把主窗口本身切成双列。
-        new MainWindow(this, _backendProbe).Show();
+        if (_wideWindow == null)
+        {
+            MainWindow window = new(this, _backendProbe);
+            window.Closed += (_, _) => _wideWindow = null;
+            _wideWindow = window;
+        }
+        AppConfig.Set("last_window_mode", "wide");
+        AppConfig.Flush();
+        _wideWindow.Show();
+        _wideWindow.Activate();
         Hide();
+    }
+
+    internal void RefreshWideBackground()
+    {
+        _wideWindow?.ReloadWideBackground();
     }
 
     private async void DockButton_Click(object sender, RoutedEventArgs e)

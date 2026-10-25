@@ -242,6 +242,23 @@
                                 <TextBlock x:Name="BackgroundScrimText" Text="50%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
                             </StackPanel>
                         </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="宽屏背景图" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock x:Name="WideBackgroundPathText" Text="未选择" MaxWidth="170" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MutedBrush}" />
+                                <Button Content="选择..." Style="{StaticResource FlatButton}" Click="PickWideBackground_Click" />
+                                <Button Content="清除" Style="{StaticResource FlatButton}" Click="ClearWideBackground_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="宽屏背景不透明度" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="WideBackgroundOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="78"
+                                        VerticalAlignment="Center" ValueChanged="WideBackgroundOpacity_Changed" />
+                                <TextBlock x:Name="WideBackgroundOpacityText" Text="78%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
                         <Grid Margin="0,6,0,0">
                             <TextBlock Text="底栏不透明度" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

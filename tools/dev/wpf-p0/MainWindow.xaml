@@ -76,13 +76,13 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
-                    <TextBlock Text="L" FontSize="18" FontWeight="Bold" Foreground="White"
+                <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource TextBrush}" VerticalAlignment="Center">
+                    <TextBlock Text="L" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource WindowBgBrush}"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="L-Mechrevo" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock Text="宽屏控制中心 · 首页 / 灯光 / 自定义 / 更多开关" Style="{StaticResource MutedText}" />
+                    <TextBlock Text="宽屏控制中心 · 首页 / 屏幕 / 灯光 / 自定义 / 更多开关" Style="{StaticResource MutedText}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="切换浅色" x:Name="ThemeButton" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,0,10,0" />
@@ -119,13 +119,6 @@
                         <Button x:Name="NavLighting" Content="灯光" Tag="lighting" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavCustom" Content="自定义" Tag="custom" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavSwitches" Content="更多开关" Tag="switches" Style="{StaticResource NavButton}" Click="Nav_Click" />
-                        <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="6,14,6,14" />
-                        <TextBlock x:Name="NavQuickTitle" Text="快捷入口" FontSize="12" FontWeight="SemiBold" Margin="2,0,0,8" />
-                        <Button Content="小窗控制" Style="{StaticResource NavButton}" Click="CompactButton_Click" />
-                        <StackPanel x:Name="NavFooterPanel">
-                            <TextBlock Text="P0 宽屏界面" Style="{StaticResource MutedText}" Margin="2,18,0,4" />
-                            <TextBlock Text="四页布局&#10;磁贴式开关&#10;独立窗口" Style="{StaticResource MutedText}" LineHeight="19" />
-                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -352,7 +345,7 @@
                             <TextBlock Text="以磁贴形式排列的快捷开关" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <UniformGrid x:Name="MoreSwitchGrid" Columns="3" />
+                                    <StackPanel x:Name="MoreSwitchGrid" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -361,8 +354,48 @@
             </Grid>
 
             <Grid Grid.Row="3">
-                <TextBlock x:Name="StatusText" Text="就绪" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
-                <TextBlock Text="L-Mechrevo · 宽屏 P0" Style="{StaticResource MutedText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="0,0,0,8" />
+                <Grid Grid.Row="1">
+                    <TextBlock x:Name="StatusText" Text="就绪" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                    <UniformGrid Columns="5" Width="520" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="悬浮窗" Click="WideDock_Click">
+                            <StackPanel><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="悬浮窗" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="设置" Click="WideDock_Click">
+                            <StackPanel><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="设置" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="赞助" Click="WideDock_Click">
+                            <StackPanel><TextBlock Text="&#xEB51;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="赞助" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="诊断" Click="WideDock_Click">
+                            <StackPanel><TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="诊断" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Padding="6,4" Tag="退出" Click="WideDock_Click">
+                            <StackPanel><TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" /><TextBlock Text="退出" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" /></StackPanel>
+                        </Button>
+                    </UniformGrid>
+                </Grid>
+            </Grid>
+            <Grid x:Name="InlineOverlay" Grid.RowSpan="4" Background="#AA000000" Visibility="Collapsed" Panel.ZIndex="20">
+                <Border x:Name="InlineOverlayCard" Width="760" MaxHeight="680" Background="{DynamicResource WindowBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Margin="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <TextBlock x:Name="InlineOverlayTitle" Text="设置" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Content="关闭" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="InlineOverlayClose_Click" />
+                        </Grid>
+                        <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                            <ContentControl x:Name="InlineOverlayContent" />
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
             </Grid>
         </Grid>
     </Grid>
