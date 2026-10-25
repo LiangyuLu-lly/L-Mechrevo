@@ -183,8 +183,8 @@ public partial class OriginalStyleWindow : Window
             _hotkeyService?.Dispose();
             _hotkeyService = null;
         };
-        MechrevoLite.Helpers.ToastForm.FailureCallback = message => ToastService.Show(message, failure: true);
-        MechrevoLite.Helpers.ToastForm.NoticeCallback = message => ToastService.Show(message);
+        MechrevoLite.Helpers.ToastBridge.FailureCallback = message => ToastService.Show(message, failure: true);
+        MechrevoLite.Helpers.ToastBridge.NoticeCallback = message => ToastService.Show(message);
         _trayIcon = new TrayIconService();
         _trayIcon.SetTheme(_dark);
         _trayIcon.ShowRequested += ShowFromTray;
