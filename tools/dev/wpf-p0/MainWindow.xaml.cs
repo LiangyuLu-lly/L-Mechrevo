@@ -369,7 +369,7 @@ public partial class MainWindow : Window
         battery.Children.Add(modes);
         _chargeLimitText = new TextBlock { Text = charge, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
         battery.Children.Add(_chargeLimitText);
-        HomeExtrasPanel.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = battery });
+        BatteryCardHost.Content = new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0), Child = battery };
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
         DisplayInfoText.Text = displayInfo;
