@@ -21,9 +21,12 @@ public partial class MainWindow : Window
     private RingGauge? _gpuRing;
     private ProgressBar? _cpuUsageBar;
     private ProgressBar? _gpuUsageBar;
-    private TextBlock? _cpuFanText;
-    private TextBlock? _gpuFanText;
-    private TextBlock? _fanSummaryText;
+    private TextBlock? _cpuUsageText;
+    private TextBlock? _gpuUsageText;
+    private ProgressBar? _cpuFanBar;
+    private ProgressBar? _gpuFanBar;
+    private TextBlock? _cpuFanLabel;
+    private TextBlock? _gpuFanLabel;
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -56,29 +59,19 @@ public partial class MainWindow : Window
         {
             return;
         }
-        (string cpuTemp, string gpuTemp, string cpuFan, string gpuFan, string cpuUsage, string gpuUsage) = _owner.WideSensors();
+        (string cpuTemp, string gpuTemp, string cpuFan, string gpuFan, string cpuUsage, string gpuUsage, string cpuFanDuty, string gpuFanDuty) = _owner.WideSensors();
         _cpuRing?.SetValue(ParseNumber(cpuTemp), 100, "CPU");
         _gpuRing?.SetValue(ParseNumber(gpuTemp), 100, "GPU");
-        if (_cpuUsageBar != null)
-        {
-            _cpuUsageBar.Value = ParseNumber(cpuUsage);
-        }
-        if (_gpuUsageBar != null)
-        {
-            _gpuUsageBar.Value = ParseNumber(gpuUsage);
-        }
-        if (_cpuFanText != null)
-        {
-            _cpuFanText.Text = "CPU 风扇  " + cpuFan;
-        }
-        if (_gpuFanText != null)
-        {
-            _gpuFanText.Text = "GPU 风扇  " + gpuFan;
-        }
-        if (_fanSummaryText != null)
-        {
-            _fanSummaryText.Text = "CPU  " + cpuFan + "\nGPU  " + gpuFan;
-        }
+        double cpuUse = ParseNumber(cpuUsage);
+        double gpuUse = ParseNumber(gpuUsage);
+        if (_cpuUsageBar != null) _cpuUsageBar.Value = cpuUse;
+        if (_gpuUsageBar != null) _gpuUsageBar.Value = gpuUse;
+        if (_cpuUsageText != null) _cpuUsageText.Text = "使用率 " + Math.Round(cpuUse) + "%";
+        if (_gpuUsageText != null) _gpuUsageText.Text = "使用率 " + Math.Round(gpuUse) + "%";
+        if (_cpuFanLabel != null) _cpuFanLabel.Text = "CPU 风扇  " + cpuFan + " · " + cpuFanDuty;
+        if (_gpuFanLabel != null) _gpuFanLabel.Text = "GPU 风扇  " + gpuFan + " · " + gpuFanDuty;
+        if (_cpuFanBar != null) _cpuFanBar.Value = ParseNumber(cpuFanDuty);
+        if (_gpuFanBar != null) _gpuFanBar.Value = ParseNumber(gpuFanDuty);
     }
 
     private static double ParseNumber(string text)
@@ -93,24 +86,26 @@ public partial class MainWindow : Window
         {
             return;
         }
-        _cpuRing = new RingGauge { Width = 96, Height = 96, HorizontalAlignment = HorizontalAlignment.Center };
-        _gpuRing = new RingGauge { Width = 96, Height = 96, HorizontalAlignment = HorizontalAlignment.Center };
+        _cpuRing = new RingGauge { Width = 104, Height = 104, HorizontalAlignment = HorizontalAlignment.Center };
+        _gpuRing = new RingGauge { Width = 104, Height = 104, HorizontalAlignment = HorizontalAlignment.Center };
         _cpuUsageBar = CreateUsageBar();
         _gpuUsageBar = CreateUsageBar();
-        _cpuFanText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0) };
-        _gpuFanText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0) };
-        SensorBlocksGrid.Children.Add(BuildSensorBlock("CPU", _cpuRing, _cpuUsageBar, _cpuFanText));
-        SensorBlocksGrid.Children.Add(BuildSensorBlock("GPU", _gpuRing, _gpuUsageBar, _gpuFanText));
+        _cpuUsageText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 10, 0, 0) };
+        _gpuUsageText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 10, 0, 0) };
+        SensorBlocksGrid.Children.Add(BuildSensorBlock("CPU", _cpuRing, _cpuUsageText, _cpuUsageBar));
+        SensorBlocksGrid.Children.Add(BuildSensorBlock("GPU", _gpuRing, _gpuUsageText, _gpuUsageBar));
+
+        _cpuFanLabel = new TextBlock { Style = (Style)FindResource("MutedText") };
+        _gpuFanLabel = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 14, 0, 0) };
+        _cpuFanBar = CreateUsageBar();
+        _gpuFanBar = CreateUsageBar();
         StackPanel fans = new();
         fans.Children.Add(new TextBlock { Text = "风扇", Style = (Style)FindResource("CardTitle") });
-        fans.Children.Add(new TextBlock { Text = "CPU / GPU 转速", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 3, 0, 12) });
-        _fanSummaryText = new TextBlock
-        {
-            Text = "CPU —\nGPU —",
-            Style = (Style)FindResource("MutedText"),
-            LineHeight = 24
-        };
-        fans.Children.Add(_fanSummaryText);
+        fans.Children.Add(new TextBlock { Text = "CPU / GPU 转速与占空比", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 3, 0, 12) });
+        fans.Children.Add(_cpuFanLabel);
+        fans.Children.Add(_cpuFanBar);
+        fans.Children.Add(_gpuFanLabel);
+        fans.Children.Add(_gpuFanBar);
         SensorBlocksGrid.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = fans });
     }
 
@@ -128,17 +123,18 @@ public partial class MainWindow : Window
         };
     }
 
-    private static Border BuildSensorBlock(string title, RingGauge ring, ProgressBar usage, TextBlock fan)
+    private static Border BuildSensorBlock(string title, RingGauge ring, TextBlock usageText, ProgressBar usageBar)
     {
         StackPanel panel = new();
         panel.Children.Add(new TextBlock { Text = title, Style = (Style)Application.Current.Resources["CardTitle"] });
         panel.Children.Add(ring);
-        panel.Children.Add(usage);
-        panel.Children.Add(fan);
+        panel.Children.Add(usageText);
+        panel.Children.Add(usageBar);
         return new Border
         {
             Style = (Style)Application.Current.Resources["Card"],
             Margin = new Thickness(5),
+            MinHeight = 225,
             Child = panel
         };
     }
