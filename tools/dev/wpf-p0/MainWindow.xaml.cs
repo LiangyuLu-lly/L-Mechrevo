@@ -253,9 +253,9 @@ public partial class MainWindow : Window
         SetNavContent(NavHome, _navCollapsed, "\uE80F", "首页", glyphFont, textFont);
         SetNavContent(NavScreen, _navCollapsed, "\uE7F4", "屏幕", glyphFont, textFont);
         SetNavContent(NavLighting, _navCollapsed, "\uE706", "灯光", glyphFont, textFont);
-        SetNavContent(NavCustom, _navCollapsed, "\uE713", "自定义", glyphFont, textFont);
-        SetNavContent(NavSwitches, _navCollapsed, "\uE7F4", "更多开关", glyphFont, textFont);
-        SetNavContent(NavDockOverlay, _navCollapsed, "\uE7F4", "悬浮窗", glyphFont, textFont);
+        SetNavContent(NavCustom, _navCollapsed, "\uE70F", "自定义", glyphFont, textFont);
+        SetNavContent(NavSwitches, _navCollapsed, "\uE712", "更多开关", glyphFont, textFont);
+        SetNavContent(NavDockOverlay, _navCollapsed, "\uE8A7", "悬浮窗", glyphFont, textFont);
         SetNavContent(NavDockSettings, _navCollapsed, "\uE713", "设置", glyphFont, textFont);
         SetNavContent(NavDockSponsor, _navCollapsed, "\uEB51", "赞助", glyphFont, textFont);
         SetNavContent(NavDockDiag, _navCollapsed, "\uE9D9", "诊断", glyphFont, textFont);
