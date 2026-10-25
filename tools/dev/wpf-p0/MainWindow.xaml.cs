@@ -552,10 +552,19 @@ public partial class MainWindow : Window
         _chargeExperiment.Click += (_, _) =>
         {
             _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
+            if (_chargeExperiment.IsChecked == true && _ecDirect != null) _ecDirect.IsChecked = false;
             UpdateChargeSliderVisibility();
         };
         _ecDirect = new CheckBox { Content = "关闭 EC 直写", Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirectSlider, Margin = new Thickness(0, 8, 0, 0) };
-        _ecDirect.Click += (_, _) => _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
+        _ecDirect.Click += (_, _) =>
+        {
+            _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
+            if (_ecDirect.IsChecked == true && _chargeExperiment != null)
+            {
+                _chargeExperiment.IsChecked = false;
+                UpdateChargeSliderVisibility();
+            }
+        };
         StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
         extraLimitRow.Children.Add(_chargeExperiment);
         extraLimitRow.Children.Add(_ecDirect);

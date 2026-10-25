@@ -1009,6 +1009,7 @@ public partial class OriginalStyleWindow : Window
     private void ApplyBatterySliderStage()
     {
         bool on = ChargeSliderToggle.IsChecked == true;
+        EcDirectOffToggle.IsEnabled = !on;
         ToggleButton[] buttons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         foreach (ToggleButton button in buttons)
         {
@@ -1265,6 +1266,11 @@ public partial class OriginalStyleWindow : Window
     private async void ChargeSliderToggle_Click(object sender, RoutedEventArgs e)
     {
         bool on = ChargeSliderToggle.IsChecked == true;
+        if (on && EcDirectOffToggle.IsChecked == true)
+        {
+            EcDirectOffToggle.IsChecked = false;
+            AppConfig.Remove("ec_charge_limit");
+        }
         AppConfig.Set("charge_limit_slider", on ? 1 : 0);
         BatteryLimitSlider.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         if (BatteryLimitSliderText != null) BatteryLimitSliderText.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
@@ -1281,9 +1287,18 @@ public partial class OriginalStyleWindow : Window
         _syncingBatteryLimit = false;
     }
 
-    private void EcDirectOffToggle_Click(object sender, RoutedEventArgs e)
+    private async void EcDirectOffToggle_Click(object sender, RoutedEventArgs e)
     {
         bool on = EcDirectOffToggle.IsChecked == true;
+        if (on && ChargeSliderToggle.IsChecked == true)
+        {
+            ChargeSliderToggle.IsChecked = false;
+            AppConfig.Set("charge_limit_slider", 0);
+            BatteryLimitSlider.Visibility = Visibility.Collapsed;
+            if (BatteryLimitSliderText != null) BatteryLimitSliderText.Visibility = Visibility.Collapsed;
+            ApplyBatterySliderStage();
+            await WriteBackFullChargeAfterSliderOffAsync();
+        }
         if (on)
         {
             AppConfig.Set("ec_charge_limit", "0");
@@ -1292,6 +1307,7 @@ public partial class OriginalStyleWindow : Window
         {
             AppConfig.Remove("ec_charge_limit");
         }
+        ChargeSliderToggle.IsEnabled = !on;
         StatusText.Text = on ? "已关闭 EC 直写充电上限" : "EC 直写恢复自动判定";
     }
 
