@@ -44,7 +44,7 @@ public partial class OverlayWindow : Window
         try
         {
             _displayMode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
-            ApplyOverlayBackground(Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 82), 30, 100));
+            ApplyOverlayBackground(Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 72), 30, 100));
             _timer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(MechrevoLite.AppConfig.Get("overlay_interval_ms", 1000), 500, 10000));
         }
         catch
