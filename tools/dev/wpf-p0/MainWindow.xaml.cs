@@ -62,6 +62,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _owner = owner;
         _probe = probe;
+        SourceInitialized += (_, _) => ApplyRoundedWindowChrome();
         AppTheme.Apply(true);
         ReloadWideBackground();
         BuildMoreSwitchTiles();
@@ -272,6 +273,22 @@ public partial class MainWindow : Window
             return;
         }
         StatusText.Text = "没有可恢复的小窗";
+    }
+
+    private void ApplyRoundedWindowChrome()
+    {
+        try
+        {
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == 0) return;
+            int corner = 2;
+            DwmSetWindowAttribute(hwnd, 33, ref corner, sizeof(int));
+            int transitionsDisabled = 0;
+            DwmSetWindowAttribute(hwnd, 3, ref transitionsDisabled, sizeof(int));
+        }
+        catch
+        {
+        }
     }
 
     private void UpdateMonochromeIcon()

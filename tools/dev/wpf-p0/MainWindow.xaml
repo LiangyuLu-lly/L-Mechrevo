@@ -20,7 +20,7 @@
         Icon="Assets/Icons/app.png">
 
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="34" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+        <shell:WindowChrome CaptionHeight="34" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="12" UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -94,20 +94,7 @@
 
             <!-- 顶栏 -->
             <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource TextBrush}" VerticalAlignment="Center">
-                    <TextBlock Text="L" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource WindowBgBrush}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="L-Mechrevo" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock Text="宽屏控制中心 · 首页 / 屏幕 / 灯光 / 自定义 / 更多开关" Style="{StaticResource MutedText}" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Content="切换浅色" x:Name="ThemeButton" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,0,10,0" />
                     <Button Content="小窗" Style="{StaticResource GhostButton}" Click="CompactButton_Click" Margin="0,0,10,0" />
                     <Border Background="#22000000" CornerRadius="10" Padding="10,7">
