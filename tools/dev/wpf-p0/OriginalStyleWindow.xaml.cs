@@ -2658,7 +2658,7 @@ public partial class OriginalStyleWindow : Window
                 // 宝龙达没有适配器功率表，保持原版「外接电源」，不显示“未识别”。
                 return "外接电源";
             }
-            MechrevoLite.Hardware.PowerInputSample? sample = MechrevoLite.HardwareControl.PowerInput;
+            MechrevoLite.Hardware.PowerInputSample? sample = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().Input;
             MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(
                 sample, acOnline);
             if (sample?.AdapterWatts is int watts)
@@ -2675,7 +2675,7 @@ public partial class OriginalStyleWindow : Window
                 // 同方机型不在功率表里时，直接显示 EC 原始读数。
                 return "外接电源（EC 0x" + raw.ToString("X2") + "）";
             }
-            decimal? rate = MechrevoLite.HardwareControl.batteryRate;
+            decimal? rate = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().BatteryRateWatts;
             if (rate.HasValue)
             {
                 return "外接电源（EC " + rate.Value.ToString("0.0") + "W）";
@@ -2713,7 +2713,7 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            MechrevoLite.HardwareControl.ReadSensors();
+            L_Mechrevo.WpfP0.Services.PowerStatusService.Read(sample: true);
         }
         catch
         {
@@ -5321,7 +5321,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             // 保留既有采样触发（2 s 遥测/悬浮窗节奏不变）；⛔ 不在此处直接读静态传感器字段
-            HardwareControl.ReadSensorsOverlay();
+            L_Mechrevo.WpfP0.Services.PowerStatusService.ReadOverlay();
         }
         catch
         {
@@ -5333,7 +5333,7 @@ public partial class OriginalStyleWindow : Window
         int battery = hw?.BatteryPercent ?? -1;
         try
         {
-            double pct = HardwareControl.GetBatteryChargePercentage();
+            double pct = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().Percent;
             if (battery < 0 && pct >= 0)
             {
                 battery = (int)Math.Round(pct);

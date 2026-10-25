@@ -155,7 +155,8 @@ public partial class OverlayWindow : Window
             {
                 return "外接电源";
             }
-            MechrevoLite.Hardware.PowerInputSample? sample = MechrevoLite.HardwareControl.PowerInput;
+            L_Mechrevo.WpfP0.Services.PowerStatusSnapshot power = L_Mechrevo.WpfP0.Services.PowerStatusService.Read();
+            MechrevoLite.Hardware.PowerInputSample? sample = power.Input;
             MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(sample, acOnline);
             if (sample?.AdapterWatts is int watts)
             {
@@ -170,7 +171,7 @@ public partial class OverlayWindow : Window
             {
                 return "外接电源（EC 0x" + raw.ToString("X2") + "）";
             }
-            decimal? rate = MechrevoLite.HardwareControl.batteryRate;
+            decimal? rate = power.BatteryRateWatts;
             if (rate.HasValue)
             {
                 return "外接电源（EC " + rate.Value.ToString("0.0") + "W）";

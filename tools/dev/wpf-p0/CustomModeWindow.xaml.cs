@@ -136,19 +136,8 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            MechrevoLite.HardwareControl.SampleLocalPower();
-            string text;
-            if (MechrevoLite.HardwareControl.LocalPowerSamplingUnavailable)
-            {
-                text = MechrevoLite.Hardware.PowerWallVerifier.UnavailableText;
-            }
-            else
-            {
-                MechrevoLite.Hardware.PowerWallVerdict verdict = MechrevoLite.HardwareControl.powerWall.Evaluate(DateTime.Now);
-                text = verdict is MechrevoLite.Hardware.PowerWallVerdict.Enforced or MechrevoLite.Hardware.PowerWallVerdict.NotEnforced
-                    ? MechrevoLite.HardwareControl.powerWall.Describe(DateTime.Now)
-                    : "";
-            }
+            L_Mechrevo.WpfP0.Services.PowerStatusService.SampleLocalPower();
+            string text = L_Mechrevo.WpfP0.Services.PowerStatusService.ReadPowerWallText();
             PowerWallStatusText.Text = text;
             PowerWallStatusText.Visibility = string.IsNullOrWhiteSpace(text) ? Visibility.Collapsed : Visibility.Visible;
         }
