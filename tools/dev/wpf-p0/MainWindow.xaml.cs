@@ -16,6 +16,14 @@ public partial class MainWindow : Window
     private readonly BackendProbe? _probe;
     private readonly DispatcherTimer _sensorTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _dark = true;
+    private bool _navCollapsed;
+    private RingGauge? _cpuRing;
+    private RingGauge? _gpuRing;
+    private ProgressBar? _cpuUsageBar;
+    private ProgressBar? _gpuUsageBar;
+    private TextBlock? _cpuFanText;
+    private TextBlock? _gpuFanText;
+    private TextBlock? _fanSummaryText;
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -26,6 +34,7 @@ public partial class MainWindow : Window
         BackgroundImage.Visibility = Visibility.Collapsed;
         BackgroundScrim.Visibility = Visibility.Collapsed;
         BuildMoreSwitchTiles();
+        BuildSensorBlocks();
         BuildLightingCards();
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
@@ -48,10 +57,116 @@ public partial class MainWindow : Window
             return;
         }
         (string cpuTemp, string gpuTemp, string cpuFan, string gpuFan, string cpuUsage, string gpuUsage) = _owner.WideSensors();
-        CpuTempText.Text = cpuTemp.Replace(" ℃", "");
-        GpuTempText.Text = gpuTemp.Replace(" ℃", "");
-        CpuPowerText.Text = cpuUsage.Replace("%", "");
-        GpuPowerText.Text = gpuUsage.Replace("%", "");
+        _cpuRing?.SetValue(ParseNumber(cpuTemp), 100, "CPU");
+        _gpuRing?.SetValue(ParseNumber(gpuTemp), 100, "GPU");
+        if (_cpuUsageBar != null)
+        {
+            _cpuUsageBar.Value = ParseNumber(cpuUsage);
+        }
+        if (_gpuUsageBar != null)
+        {
+            _gpuUsageBar.Value = ParseNumber(gpuUsage);
+        }
+        if (_cpuFanText != null)
+        {
+            _cpuFanText.Text = "CPU 风扇  " + cpuFan;
+        }
+        if (_gpuFanText != null)
+        {
+            _gpuFanText.Text = "GPU 风扇  " + gpuFan;
+        }
+        if (_fanSummaryText != null)
+        {
+            _fanSummaryText.Text = "CPU  " + cpuFan + "\nGPU  " + gpuFan;
+        }
+    }
+
+    private static double ParseNumber(string text)
+    {
+        string digits = new(text.Where(char.IsDigit).ToArray());
+        return double.TryParse(digits, out double value) ? value : 0;
+    }
+
+    private void BuildSensorBlocks()
+    {
+        if (SensorBlocksGrid == null)
+        {
+            return;
+        }
+        _cpuRing = new RingGauge { Width = 96, Height = 96, HorizontalAlignment = HorizontalAlignment.Center };
+        _gpuRing = new RingGauge { Width = 96, Height = 96, HorizontalAlignment = HorizontalAlignment.Center };
+        _cpuUsageBar = CreateUsageBar();
+        _gpuUsageBar = CreateUsageBar();
+        _cpuFanText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0) };
+        _gpuFanText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0) };
+        SensorBlocksGrid.Children.Add(BuildSensorBlock("CPU", _cpuRing, _cpuUsageBar, _cpuFanText));
+        SensorBlocksGrid.Children.Add(BuildSensorBlock("GPU", _gpuRing, _gpuUsageBar, _gpuFanText));
+        StackPanel fans = new();
+        fans.Children.Add(new TextBlock { Text = "风扇", Style = (Style)FindResource("CardTitle") });
+        fans.Children.Add(new TextBlock { Text = "CPU / GPU 转速", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 3, 0, 12) });
+        _fanSummaryText = new TextBlock
+        {
+            Text = "CPU —\nGPU —",
+            Style = (Style)FindResource("MutedText"),
+            LineHeight = 24
+        };
+        fans.Children.Add(_fanSummaryText);
+        SensorBlocksGrid.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = fans });
+    }
+
+    private static ProgressBar CreateUsageBar()
+    {
+        return new ProgressBar
+        {
+            Height = 6,
+            Minimum = 0,
+            Maximum = 100,
+            Margin = new Thickness(0, 10, 0, 0),
+            Foreground = (Brush)Application.Current.Resources["AccentBrush"],
+            Background = (Brush)Application.Current.Resources["TrackBrush"],
+            BorderThickness = new Thickness(0)
+        };
+    }
+
+    private static Border BuildSensorBlock(string title, RingGauge ring, ProgressBar usage, TextBlock fan)
+    {
+        StackPanel panel = new();
+        panel.Children.Add(new TextBlock { Text = title, Style = (Style)Application.Current.Resources["CardTitle"] });
+        panel.Children.Add(ring);
+        panel.Children.Add(usage);
+        panel.Children.Add(fan);
+        return new Border
+        {
+            Style = (Style)Application.Current.Resources["Card"],
+            Margin = new Thickness(5),
+            Child = panel
+        };
+    }
+
+    private void NavToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _navCollapsed = !_navCollapsed;
+        NavColumn.Width = new GridLength(_navCollapsed ? 58 : 196);
+        NavPanel.Padding = new Thickness(_navCollapsed ? 6 : 18);
+        NavTitle.Visibility = _navCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        NavQuickTitle.Visibility = _navCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        NavFooterPanel.Visibility = _navCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        NavCollapseButton.Content = _navCollapsed ? "»" : "«";
+        FontFamily glyphFont = new("Segoe MDL2 Assets");
+        FontFamily textFont = (FontFamily)Application.Current.Resources["AppFontFamily"];
+        SetNavContent(NavHome, _navCollapsed, "\uE80F", "首页", glyphFont, textFont);
+        SetNavContent(NavLighting, _navCollapsed, "\uE706", "灯光", glyphFont, textFont);
+        SetNavContent(NavCustom, _navCollapsed, "\uE713", "自定义", glyphFont, textFont);
+        SetNavContent(NavSwitches, _navCollapsed, "\uE7F4", "更多开关", glyphFont, textFont);
+    }
+
+    private static void SetNavContent(Button button, bool collapsed, string glyph, string text, FontFamily glyphFont, FontFamily textFont)
+    {
+        button.Content = collapsed ? glyph : text;
+        button.FontFamily = collapsed ? glyphFont : textFont;
+        button.FontSize = collapsed ? 16 : 13;
+        button.Padding = collapsed ? new Thickness(10, 10, 10, 10) : new Thickness(12, 10, 12, 10);
+        button.HorizontalContentAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
     }
 
     private void CompactButton_Click(object sender, RoutedEventArgs e) => new CompactWindow().Show();
@@ -245,6 +360,47 @@ public partial class MainWindow : Window
         brightness.Children.Add(value);
         panel.Children.Add(brightness);
         int colorArgb = settings.ColorArgb;
+        CheckBox power = new()
+        {
+            Content = "电源",
+            Style = (Style)FindResource("HeaderSwitch"),
+            IsChecked = settings.PowerOn,
+            Margin = new Thickness(0, 4, 0, 0)
+        };
+        Slider speed = new()
+        {
+            Style = (Style)FindResource("RoundSlider"),
+            Minimum = 0,
+            Maximum = 4,
+            Value = Math.Clamp(settings.Speed, 0, 4),
+            Visibility = topic == "Keyboard/Ctrl" ? Visibility.Collapsed : Visibility.Visible
+        };
+        if (speed.Visibility == Visibility.Visible)
+        {
+            Grid speedRow = new() { Margin = new Thickness(0, 0, 0, 6) };
+            speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            TextBlock speedText = new()
+            {
+                Text = (int)speed.Value + "/4",
+                Style = (Style)FindResource("MutedText"),
+                Width = 40,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(speed, 0);
+            Grid.SetColumn(speedText, 1);
+            speedRow.Children.Add(speed);
+            speedRow.Children.Add(speedText);
+            panel.Children.Add(speedRow);
+            speed.ValueChanged += (_, _) =>
+            {
+                speedText.Text = (int)Math.Round(speed.Value) + "/4";
+                _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
+            };
+        }
+        panel.Children.Add(power);
+        power.Click += (_, _) => _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
         Button color = new()
         {
             Content = "颜色",
@@ -258,20 +414,20 @@ public partial class MainWindow : Window
             if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
             {
                 colorArgb = picked.ToArgb();
-                _ = ApplyLightCardAsync(topic, combo, slider, colorArgb);
+                _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
             }
         };
         panel.Children.Add(color);
         slider.ValueChanged += (_, _) =>
         {
             value.Text = (int)Math.Round(slider.Value) + "/" + maxLight;
-            _ = ApplyLightCardAsync(topic, combo, slider, colorArgb);
+            _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
         };
-        combo.SelectionChanged += (_, _) => _ = ApplyLightCardAsync(topic, combo, slider, colorArgb);
+        combo.SelectionChanged += (_, _) => _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = panel };
     }
 
-    private async Task ApplyLightCardAsync(string topic, ComboBox combo, Slider slider, int colorArgb)
+    private async Task ApplyLightCardAsync(string topic, ComboBox combo, Slider slider, Slider speed, int colorArgb, bool powerOn)
     {
         if (combo.SelectedItem is not ComboBoxItem item || item.Tag is not string effect)
         {
@@ -283,9 +439,10 @@ public partial class MainWindow : Window
             {
                 Effect = effect,
                 Light = (int)Math.Round(slider.Value),
+                Speed = (int)Math.Round(speed.Value),
                 ColorArgb = colorArgb,
                 UsePresetColor = false,
-                PowerOn = true
+                PowerOn = powerOn
             };
             LightingSettingsStore.Save(topic, settings);
             if (_probe == null)
@@ -293,7 +450,22 @@ public partial class MainWindow : Window
                 StatusText.Text = "灯光设置已保存（后端未连接）";
                 return;
             }
-            await _probe.SetLightPowerAsync(topic, true);
+            if (!powerOn)
+            {
+                bool off = topic == "Keyboard/Ctrl"
+                    ? await _probe.SetKeyboardPowerAsync(false)
+                    : await _probe.SetLightPowerAsync(topic, false);
+                StatusText.Text = off ? "灯光已关闭：" + topic : "灯光关闭失败：" + topic;
+                return;
+            }
+            if (topic == "Keyboard/Ctrl")
+            {
+                await _probe.SetKeyboardPowerAsync(true);
+            }
+            else
+            {
+                await _probe.SetLightPowerAsync(topic, true);
+            }
             bool ok = topic switch
             {
                 "Keyboard/Ctrl" => await _probe.SetKeyboardEffectAsync(effect),

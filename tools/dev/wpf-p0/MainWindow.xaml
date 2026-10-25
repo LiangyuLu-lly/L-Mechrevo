@@ -86,23 +86,28 @@
             <!-- 左侧导航 + 页面 -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="196" />
+                    <ColumnDefinition x:Name="NavColumn" Width="196" />
                     <ColumnDefinition Width="14" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Style="{StaticResource Card}">
+                <Border x:Name="NavPanel" Grid.Column="0" Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="导航" Style="{StaticResource MutedText}" Margin="2,0,0,10" />
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock x:Name="NavTitle" Text="导航" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                            <Button x:Name="NavCollapseButton" Content="«" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Padding="6,1" FontSize="11" Click="NavToggle_Click" />
+                        </Grid>
                         <Button x:Name="NavHome" Content="首页" Tag="home" Style="{StaticResource NavButton}" Click="Nav_Click" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource TextBrush}" />
                         <Button x:Name="NavLighting" Content="灯光" Tag="lighting" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavCustom" Content="自定义" Tag="custom" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavSwitches" Content="更多开关" Tag="switches" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="6,14,6,14" />
-                        <TextBlock Text="快捷入口" FontSize="12" FontWeight="SemiBold" Margin="2,0,0,8" />
+                        <TextBlock x:Name="NavQuickTitle" Text="快捷入口" FontSize="12" FontWeight="SemiBold" Margin="2,0,0,8" />
                         <Button Content="小窗控制" Style="{StaticResource NavButton}" Click="CompactButton_Click" />
-                        <TextBlock Text="P0 宽屏界面" Style="{StaticResource MutedText}" Margin="2,18,0,4" />
-                        <TextBlock Text="四页布局&#10;磁贴式开关&#10;独立窗口" Style="{StaticResource MutedText}" LineHeight="19" />
+                        <StackPanel x:Name="NavFooterPanel">
+                            <TextBlock Text="P0 宽屏界面" Style="{StaticResource MutedText}" Margin="2,18,0,4" />
+                            <TextBlock Text="四页布局&#10;磁贴式开关&#10;独立窗口" Style="{StaticResource MutedText}" LineHeight="19" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -123,24 +128,7 @@
                                         <TextBlock Text="传感器" Style="{StaticResource CardTitle}" />
                                         <TextBlock Text="实时" HorizontalAlignment="Right" Style="{StaticResource MutedText}" />
                                     </Grid>
-                                    <UniformGrid Columns="4" Margin="0,14,0,0">
-                                        <StackPanel Margin="0,0,12,0">
-                                            <TextBlock Text="CPU 温度" Style="{StaticResource MutedText}" />
-                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="CpuTempText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="℃" Style="{StaticResource MetricUnit}" /></StackPanel>
-                                        </StackPanel>
-                                        <StackPanel Margin="0,0,12,0">
-                                            <TextBlock Text="GPU 温度" Style="{StaticResource MutedText}" />
-                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="GpuTempText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="℃" Style="{StaticResource MetricUnit}" /></StackPanel>
-                                        </StackPanel>
-                                        <StackPanel Margin="0,0,12,0">
-                                            <TextBlock Text="CPU 使用率" Style="{StaticResource MutedText}" />
-                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="CpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="%" Style="{StaticResource MetricUnit}" /></StackPanel>
-                                        </StackPanel>
-                                        <StackPanel>
-                                            <TextBlock Text="GPU 使用率" Style="{StaticResource MutedText}" />
-                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="GpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="%" Style="{StaticResource MetricUnit}" /></StackPanel>
-                                        </StackPanel>
-                                    </UniformGrid>
+                                    <UniformGrid x:Name="SensorBlocksGrid" Columns="3" Margin="0,14,0,0" />
                                 </StackPanel>
                             </Border>
 
