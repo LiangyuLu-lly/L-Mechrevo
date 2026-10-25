@@ -44,6 +44,7 @@ public partial class MainWindow : Window
     private bool _syncingCalibrationUi;
     private bool _syncingScreenEffect;
     private string _currentEffectMode = "";
+    private readonly List<(ToggleButton Button, Func<bool> Get, Action<bool> Set)> _screenFeatures = new();
     private Window? _inlineWindow;
     private bool _wideMaximized;
     private bool _switchingToMini;
@@ -1044,6 +1045,7 @@ public partial class MainWindow : Window
         ScreenEffectToggle.IsChecked = effectEnabled;
         BuildCalibrationOptions();
         BuildEffectOptions();
+        BuildScreenFeatures();
         LoadCalibrationSettings();
         _effectCommitTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _effectCommitTimer.Tick += async (_, _) =>
@@ -1104,6 +1106,51 @@ public partial class MainWindow : Window
             _effectOptionButtons.Add(button);
             ScreenEffectOptionsPanel.Children.Add(button);
         }
+    }
+
+    private void BuildScreenFeatures()
+    {
+        if (_owner == null || ScreenFeaturesPanel == null) return;
+        ScreenFeaturesPanel.Children.Clear();
+        _screenFeatures.Clear();
+        AddScreenFeature("显示响应加速", () => _owner.SupportsLcdOverdrive, () => _owner.LcdOverdrive,
+            on => _ = _owner.SetLcdOverdriveAsync(on));
+        AddScreenFeature("MiniLED 分区控光", () => _owner.SupportsMiniled, () => _owner.MiniledOn,
+            on => { if (_owner.MiniledOn != on) _owner.ToggleMiniled(); });
+        AddScreenFeature("HDR Color Control", () => _owner.SupportsHdrControl, () => _owner.HdrControlOn,
+            on => { if (_owner.HdrControlOn != on) _owner.ToggleHdrControl(); });
+        if (_owner.SupportsFhd)
+        {
+            Button fhd = new()
+            {
+                Content = "切换 FHD 模式",
+                Style = (Style)FindResource("FlatButton"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 8, 8)
+            };
+            fhd.Click += (_, _) => _owner.ToggleFhd();
+            ScreenFeaturesPanel.Children.Add(fhd);
+        }
+    }
+
+    private void AddScreenFeature(string label, Func<bool> supported, Func<bool> get, Action<bool> set)
+    {
+        bool isSupported = false;
+        try { isSupported = supported(); } catch { }
+        if (!isSupported) return;
+        ToggleButton button = new()
+        {
+            Content = label,
+            Style = (Style)FindResource("SegmentButton"),
+            IsChecked = get(),
+            Margin = new Thickness(0, 0, 8, 8)
+        };
+        button.Click += (_, _) =>
+        {
+            try { set(button.IsChecked == true); } catch { }
+        };
+        ScreenFeaturesPanel.Children.Add(button);
+        _screenFeatures.Add((button, get, set));
     }
 
     private void LoadCalibrationSettings()
@@ -1334,6 +1381,10 @@ public partial class MainWindow : Window
         ScreenCalibrationToggle.IsChecked = calibEnabled;
         if (_calibrationOptionButtons.Count != calibOptions.Length) BuildCalibrationOptions();
         for (int i = 0; i < _calibrationOptionButtons.Count; i++) _calibrationOptionButtons[i].IsChecked = i == calibSelected;
+        foreach ((ToggleButton button, Func<bool> get, Action<bool> _) in _screenFeatures)
+        {
+            try { button.IsChecked = get(); } catch { }
+        }
         (bool effectEnabled, (string Label, object? Tag)[] effectOptions, int effectSelected) = _owner.WideDisplayEffect();
         ScreenEffectToggle.IsChecked = effectEnabled;
         if (_effectOptionButtons.Count != effectOptions.Length) BuildEffectOptions();

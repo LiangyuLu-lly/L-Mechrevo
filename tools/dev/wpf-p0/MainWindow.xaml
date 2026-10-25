@@ -275,6 +275,12 @@
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="显示特性" Style="{StaticResource CardTitle}" />
+                                    <StackPanel x:Name="ScreenFeaturesPanel" Margin="0,8,0,0" />
+                                </StackPanel>
+                            </Border>
                             <Border x:Name="ScreenEffectCard" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <Grid>
