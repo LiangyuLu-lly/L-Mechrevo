@@ -142,17 +142,7 @@
                     <!-- 首页 -->
                     <ScrollViewer x:Name="HomePage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" CanContentScroll="False">
                         <StackPanel>
-                            <Grid Margin="0,0,0,10">
-                                <StackPanel>
-                                    <TextBlock Text="首页" Style="{StaticResource PageTitle}" />
-                                    <TextBlock Text="传感器、性能模式、显卡模式、显示与快捷磁贴" Style="{StaticResource MutedText}" Margin="0,3,0,0" />
-                                </StackPanel>
-                            </Grid>
 
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="传感器" Style="{StaticResource CardTitle}" />
-                                <TextBlock Text="实时" HorizontalAlignment="Right" Style="{StaticResource MutedText}" />
-                            </Grid>
                             <UniformGrid x:Name="SensorBlocksGrid" Columns="2" />
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
@@ -162,7 +152,7 @@
                             </Border>
 
 
-                            <Grid Margin="0,3,0,0">
+                            <Grid Margin="0">
                                 <Grid.ColumnDefinitions><ColumnDefinition x:Name="HomePerfColumn" Width="*" /><ColumnDefinition x:Name="HomeMidColumn" Width="12" /><ColumnDefinition x:Name="HomeGpuColumn" Width="*" /></Grid.ColumnDefinitions>
                                 <Border x:Name="HomePerfCard" Grid.Column="0" Style="{StaticResource Card}">
                                     <Grid>
@@ -235,7 +225,13 @@
                                         </Viewbox>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
-                                            <TextBlock x:Name="DisplayInfoText" Text="—" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <Grid x:Name="DisplayInfoRow" Margin="0,3,0,12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="DisplayInfoText" Text="—" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                                            </Grid>
                                             <StackPanel x:Name="DisplayRefreshPanel" Orientation="Horizontal" />
                                             <StackPanel x:Name="DisplayDetailsPanel" Margin="0,10,0,0" />
                                         </StackPanel>

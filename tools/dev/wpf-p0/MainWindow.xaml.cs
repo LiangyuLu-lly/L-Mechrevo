@@ -224,7 +224,7 @@ public partial class MainWindow : Window
         return new Border
         {
             Style = (Style)FindResource("Card"),
-            Margin = new Thickness(5),
+            Margin = new Thickness(5, 0, 5, 14),
             MinHeight = 220,
             Child = grid
         };
@@ -758,11 +758,13 @@ public partial class MainWindow : Window
             Content = "自动刷新率",
             Style = (Style)FindResource("HeaderSwitch"),
             IsChecked = auto,
-            Margin = new Thickness(0, 8, 0, 0)
+            Margin = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center
         };
+        Grid.SetColumn(_autoRefresh, 1);
+        DisplayInfoRow.Children.Add(_autoRefresh);
         _autoRefresh.Click += (_, _) => _owner?.WideSetAutoRefresh(_autoRefresh.IsChecked == true);
         DisplayDetailsPanel.Children.Add(brightnessRow);
-        DisplayDetailsPanel.Children.Add(_autoRefresh);
     }
 
     private void BuildIgpuSavingControls()
