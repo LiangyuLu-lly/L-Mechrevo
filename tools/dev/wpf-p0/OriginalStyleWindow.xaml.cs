@@ -2991,7 +2991,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (_updateCheckStarted
             || !MechrevoLite.Update.UpdateChecker.AutoCheckEnabled
-            || MechrevoLite.Update.UpdateForm.TemporarilyHidden)
+            || L_Mechrevo.WpfP0.Services.UpdatePolicy.TemporarilyHidden)
         {
             return;
         }

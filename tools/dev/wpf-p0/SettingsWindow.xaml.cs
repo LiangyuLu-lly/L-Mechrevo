@@ -207,7 +207,7 @@ public partial class SettingsWindow : Window
         CardOpacityText.Text = (int)CardOpacitySlider.Value + "%";
         ButtonOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_button_opacity", 60), 0, 100);
         ButtonOpacityText.Text = (int)ButtonOpacitySlider.Value + "%";
-        CheckUpdateButton.Visibility = MechrevoLite.Update.UpdateForm.TemporarilyHidden
+        CheckUpdateButton.Visibility = L_Mechrevo.WpfP0.Services.UpdatePolicy.TemporarilyHidden
             ? Visibility.Collapsed
             : Visibility.Visible;
         _syncing = false;
@@ -753,7 +753,7 @@ public partial class SettingsWindow : Window
 
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
-        if (MechrevoLite.Update.UpdateForm.TemporarilyHidden)
+        if (L_Mechrevo.WpfP0.Services.UpdatePolicy.TemporarilyHidden)
         {
             Status("当前版本已按原版策略关闭在线更新");
             return;
