@@ -17,8 +17,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _sensorTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _dark = true;
     private bool _navCollapsed;
-    private readonly List<(ProgressBar Bar, TextBlock Value, string Unit)> _cpuMetrics = new();
-    private readonly List<(ProgressBar Bar, TextBlock Value, string Unit)> _gpuMetrics = new();
+    private readonly List<(RoundedBar Bar, TextBlock Value, string Unit)> _cpuMetrics = new();
+    private readonly List<(RoundedBar Bar, TextBlock Value, string Unit)> _gpuMetrics = new();
     private RingGauge? _cpuFanRing;
     private RingGauge? _gpuFanRing;
     private TextBlock? _cpuDutyText;
@@ -75,11 +75,11 @@ public partial class MainWindow : Window
         if (_gpuDutyText != null) _gpuDutyText.Text = "占空比 " + gpuFanDuty;
     }
 
-    private static void SetMetric(List<(ProgressBar Bar, TextBlock Value, string Unit)> metrics, int index, double value, string unit)
+    private static void SetMetric(List<(RoundedBar Bar, TextBlock Value, string Unit)> metrics, int index, double value, string unit)
     {
         if (index < 0 || index >= metrics.Count) return;
-        (ProgressBar bar, TextBlock text, string _) = metrics[index];
-        bar.Value = Math.Clamp(value, 0, bar.Maximum);
+        (RoundedBar bar, TextBlock text, string _) = metrics[index];
+        bar.SetValue(value, bar.Maximum);
         text.Text = unit switch
         {
             "W" => value.ToString("0.0") + " W",
@@ -132,7 +132,7 @@ public partial class MainWindow : Window
         (string Label, double Maximum)[] rows = cpu
             ? new[] { ("温度", 100.0), ("使用率", 100.0), ("功耗", 100.0), ("频率", 6000.0) }
             : new[] { ("温度", 100.0), ("使用率", 100.0), ("功耗", 200.0), ("核心频率", 3000.0), ("显存频率", 12000.0) };
-        List<(ProgressBar Bar, TextBlock Value, string Unit)> target = cpu ? _cpuMetrics : _gpuMetrics;
+        List<(RoundedBar Bar, TextBlock Value, string Unit)> target = cpu ? _cpuMetrics : _gpuMetrics;
         foreach ((string label, double maximum) in rows)
         {
             StackPanel metric = new() { Margin = new Thickness(0, 0, 0, 8) };
@@ -150,10 +150,10 @@ public partial class MainWindow : Window
             Grid.SetColumn(value, 1);
             header.Children.Add(name);
             header.Children.Add(value);
-            ProgressBar bar = new()
+            RoundedBar bar = new()
             {
-                Style = (Style)FindResource("RoundedBar"),
                 Maximum = maximum,
+                Height = 9,
                 Margin = new Thickness(0, 5, 0, 0)
             };
             metric.Children.Add(header);

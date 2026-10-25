@@ -34,6 +34,20 @@ public partial class CompactWindow : Window
         new MainWindow(_owner, _probe).Show();
     }
 
+    private void IgpuSaving_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Primitives.ToggleButton button)
+        {
+            return;
+        }
+        IgpuSavingOffButton.IsChecked = ReferenceEquals(button, IgpuSavingOffButton);
+        IgpuSavingOnButton.IsChecked = ReferenceEquals(button, IgpuSavingOnButton);
+        IgpuSavingAutoButton.IsChecked = ReferenceEquals(button, IgpuSavingAutoButton);
+        IgpuSavingStatus.Text = "当前：" + button.Content;
+        IgpuSavingHint.Text = "仅 UI 预览：核显省电硬件切换与安全门尚未接入";
+        StatusText.Text = "核显省电 UI 预览：" + button.Content;
+    }
+
     private void Mode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is System.Windows.Controls.Primitives.ToggleButton button && button.Tag is string text

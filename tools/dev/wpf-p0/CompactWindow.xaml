@@ -94,6 +94,25 @@
 
                     <Border Style="{StaticResource CompactCard}">
                         <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="核显省电" FontSize="12" FontWeight="SemiBold" />
+                                <TextBlock x:Name="IgpuSavingStatus" Grid.Column="1" Text="当前：自动" Foreground="{DynamicResource AccentBrush}" FontSize="11" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                                <ToggleButton x:Name="IgpuSavingOffButton" Content="关" Style="{StaticResource CompactSegment}" Click="IgpuSaving_Click" />
+                                <ToggleButton x:Name="IgpuSavingOnButton" Content="开" Style="{StaticResource CompactSegment}" Click="IgpuSaving_Click" />
+                                <ToggleButton x:Name="IgpuSavingAutoButton" Content="自动" Style="{StaticResource CompactSegment}" IsChecked="True" Click="IgpuSaving_Click" />
+                            </StackPanel>
+                            <TextBlock x:Name="IgpuSavingHint" Text="仅 UI 预览，硬件切换与安全门待接入" Style="{StaticResource MutedText}" FontSize="10" Margin="0,7,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CompactCard}">
+                        <StackPanel>
                             <TextBlock Text="快捷开关" FontSize="12" FontWeight="SemiBold" />
                             <Grid Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
