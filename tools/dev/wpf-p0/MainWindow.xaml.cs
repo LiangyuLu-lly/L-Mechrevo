@@ -448,34 +448,37 @@ public partial class MainWindow : Window
             _batteryModeButtons.Add(button);
         }
         battery.Children.Add(modes);
-        _chargeLimitText = new TextBlock { Text = charge, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
-        battery.Children.Add(_chargeLimitText);
+        if (_owner.WideChargeLimitVisible)
+        {
+            _chargeLimitText = new TextBlock { Text = charge, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
+            battery.Children.Add(_chargeLimitText);
 
-        (bool limitEnabled, string lowText, string highText, string limitStatus, bool experiment, bool ecDirect) = _owner.WideChargeLimit();
-        _chargeLimitSwitch = new CheckBox { Content = "限制充电", Style = (Style)FindResource("HeaderSwitch"), IsChecked = limitEnabled, Margin = new Thickness(0, 8, 8, 0) };
-        _chargeLimitSwitch.Click += (_, _) => _owner.WideSetChargeLimitEnabled(_chargeLimitSwitch.IsChecked == true);
-        _chargeLow = new TextBox { Text = lowText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
-        _chargeHigh = new TextBox { Text = highText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
-        Button applyLimit = new() { Content = "保存", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 8, 0, 0) };
-        applyLimit.Click += (_, _) => _owner.WideApplyChargeLimit(_chargeLow.Text, _chargeHigh.Text);
-        StackPanel limitRow = new() { Orientation = Orientation.Horizontal };
-        limitRow.Children.Add(_chargeLimitSwitch);
-        limitRow.Children.Add(new TextBlock { Text = "起", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
-        limitRow.Children.Add(_chargeLow);
-        limitRow.Children.Add(new TextBlock { Text = "停", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
-        limitRow.Children.Add(_chargeHigh);
-        limitRow.Children.Add(applyLimit);
-        battery.Children.Add(limitRow);
-        _chargeStatus = new TextBlock { Text = limitStatus, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
-        battery.Children.Add(_chargeStatus);
-        _chargeExperiment = new CheckBox { Content = "无极限充", Style = (Style)FindResource("HeaderSwitch"), IsChecked = experiment, Margin = new Thickness(0, 8, 16, 0) };
-        _chargeExperiment.Click += (_, _) => _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
-        _ecDirect = new CheckBox { Content = "关闭 EC 直写", Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirect, Margin = new Thickness(0, 8, 0, 0) };
-        _ecDirect.Click += (_, _) => _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
-        StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
-        extraLimitRow.Children.Add(_chargeExperiment);
-        extraLimitRow.Children.Add(_ecDirect);
-        battery.Children.Add(extraLimitRow);
+            (bool limitEnabled, string lowText, string highText, string limitStatus, bool experiment, bool ecDirect) = _owner.WideChargeLimit();
+            _chargeLimitSwitch = new CheckBox { Content = "限制充电", Style = (Style)FindResource("HeaderSwitch"), IsChecked = limitEnabled, Margin = new Thickness(0, 8, 8, 0) };
+            _chargeLimitSwitch.Click += (_, _) => _owner.WideSetChargeLimitEnabled(_chargeLimitSwitch.IsChecked == true);
+            _chargeLow = new TextBox { Text = lowText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
+            _chargeHigh = new TextBox { Text = highText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
+            Button applyLimit = new() { Content = "保存", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 8, 0, 0) };
+            applyLimit.Click += (_, _) => _owner.WideApplyChargeLimit(_chargeLow.Text, _chargeHigh.Text);
+            StackPanel limitRow = new() { Orientation = Orientation.Horizontal };
+            limitRow.Children.Add(_chargeLimitSwitch);
+            limitRow.Children.Add(new TextBlock { Text = "起", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
+            limitRow.Children.Add(_chargeLow);
+            limitRow.Children.Add(new TextBlock { Text = "停", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
+            limitRow.Children.Add(_chargeHigh);
+            limitRow.Children.Add(applyLimit);
+            battery.Children.Add(limitRow);
+            _chargeStatus = new TextBlock { Text = limitStatus, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
+            battery.Children.Add(_chargeStatus);
+            _chargeExperiment = new CheckBox { Content = "无极限充", Style = (Style)FindResource("HeaderSwitch"), IsChecked = experiment, Margin = new Thickness(0, 8, 16, 0) };
+            _chargeExperiment.Click += (_, _) => _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
+            _ecDirect = new CheckBox { Content = "关闭 EC 直写", Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirect, Margin = new Thickness(0, 8, 0, 0) };
+            _ecDirect.Click += (_, _) => _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
+            StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
+            extraLimitRow.Children.Add(_chargeExperiment);
+            extraLimitRow.Children.Add(_ecDirect);
+            battery.Children.Add(extraLimitRow);
+        }
         BatteryCardHost.Content = new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0), Child = battery };
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();

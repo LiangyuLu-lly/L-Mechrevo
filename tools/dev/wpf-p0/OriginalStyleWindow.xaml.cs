@@ -437,6 +437,21 @@ public partial class OriginalStyleWindow : Window
         DisplayEffectEdit_Click(DisplayEffectEditButton, new RoutedEventArgs());
     }
 
+    internal bool WideChargeLimitVisible
+    {
+        get
+        {
+            try
+            {
+                return _backendProbe?.Hw != null && MechrevoLite.BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
     internal (bool LimitEnabled, string Low, string High, string Status, bool Experiment, bool EcDirect) WideChargeLimit()
     {
         return (ChargeLimitSwitch.IsChecked == true, ChargeLimitLowBox.Text, ChargeLimitHighBox.Text,
