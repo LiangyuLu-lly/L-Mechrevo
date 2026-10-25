@@ -1463,6 +1463,99 @@ public partial class OriginalStyleWindow : Window
             : mode switch { 0 => "当前：开", 1 => "当前：关", 3 => "当前：自动", _ => "当前：未知" };
     }
 
+    private async Task<bool> TryForceIgpuSavingAsync(MechrevoService service, string mode, bool occupancyAlreadyConfirmed)
+    {
+        if (!NvidiaGpuControl.TryGetActiveDgpuApplications(out IReadOnlyList<DgpuApplication> applications))
+        {
+            MessageBox.Show("无法读取独显占用程序列表，已取消强制切换。", "核显省电",
+                MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            return false;
+        }
+        IReadOnlyList<DgpuApplication> closable = DgpuApplicationSafety.FilterClosable(
+            applications, Environment.ProcessId, System.Diagnostics.Process.GetCurrentProcess().SessionId);
+        DisplayRouteSnapshot display = await WmiDisplayRouteProbe.ProbeAsync();
+        GpuScenarioVerdict verdict = GpuScenarioGuard.Evaluate(display, occupancySnapshotAvailable: true,
+            occupied: closable.Count > 0, forceConfirmed: false, userOverrideDgpuOwnsDisplay: false);
+        if (verdict.Refused)
+        {
+            string reason = verdict.RefusalReason switch
+            {
+                "dgpu-owns-only-active-display" => "当前只有独显在驱动显示器。强制切换可能导致黑屏，已取消。",
+                "occupancy-snapshot-unavailable" => "无法确认独显占用状态，已取消。",
+                "display-route-unavailable" => "无法读取当前显示通路，已取消。",
+                _ => "核显省电安全检查未通过，已取消。"
+            };
+            MessageBox.Show(reason, "核显省电", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+        if (!verdict.NeedsForceConfirmation || closable.Count == 0)
+        {
+            return false;
+        }
+        if (!occupancyAlreadyConfirmed)
+        {
+            string names = string.Join("\n", closable.Select(static app => app.ProcessName));
+            string body = verdict.DgpuOwnsOnlyActiveDisplay
+                ? "警告：当前似乎只有独显在驱动显示器。\n强制切换可能导致黑屏，且需要重启才能恢复。\n\n" + names
+                : "以下程序正在占用独显，需要结束它们才能切换核显省电：\n\n" + names;
+            if (MessageBox.Show(body, "核显省电", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                return false;
+            }
+        }
+        bool displayOverride = false;
+        if (verdict.DgpuOwnsOnlyActiveDisplay)
+        {
+            if (MessageBox.Show("确认继续强制切换？\n\n如果黑屏，只能强制关机重启。", "核显省电",
+                MessageBoxButton.YesNo, MessageBoxImage.Stop) != MessageBoxResult.Yes)
+            {
+                return false;
+            }
+            displayOverride = true;
+        }
+        GpuScenarioVerdict confirmedVerdict = GpuScenarioGuard.Evaluate(display,
+            occupancySnapshotAvailable: true, occupied: true, forceConfirmed: true,
+            userOverrideDgpuOwnsDisplay: displayOverride);
+        if (confirmedVerdict.Refused || !confirmedVerdict.ForceAllowed)
+        {
+            return false;
+        }
+        GpuForceKillPlan plan = DgpuForceKillPlanBuilder.TryPlan(closable, Environment.ProcessId,
+            System.Diagnostics.Process.GetCurrentProcess().SessionId, forceConfirmed: true, ReadProcessImagePath);
+        if (plan.Refused || plan.SafeToKill.Count == 0)
+        {
+            MessageBox.Show("没有可安全结束的独显占用程序，已取消。", "核显省电",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return false;
+        }
+        string safeNames = string.Join("\n", plan.SafeToKill.Select(static app => app.ProcessName));
+        if (MessageBox.Show("将尝试结束以下程序：\n\n" + safeNames + "\n\n继续？", "核显省电",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return false;
+        }
+        (bool clean, string message) = await ElevatedProcessKiller.KillWithElevationAsync(plan.SafeToKill);
+        if (!clean)
+        {
+            MessageBox.Show("结束进程失败：" + message, "核显省电", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+        return await service.SetIGpuOnlySaveMode(mode);
+    }
+
+    private static string? ReadProcessImagePath(DgpuApplication application)
+    {
+        try
+        {
+            using System.Diagnostics.Process process = System.Diagnostics.Process.GetProcessById(application.ProcessId);
+            return process.MainModule?.FileName;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private async Task SwitchIgpuSavingAsync(string mode)
     {
         if (_igpuSavingBusy)
@@ -1489,6 +1582,7 @@ public partial class OriginalStyleWindow : Window
         _igpuSavingBusy = true;
         VisualiseIgpuSaving();
         int previous = hardware.IgpuOnlySaveMode;
+        bool occupancyConfirmed = false;
         try
         {
             if (NvidiaGpuControl.TryGetActiveDgpuApplications(out IReadOnlyList<DgpuApplication> applications))
@@ -1498,10 +1592,14 @@ public partial class OriginalStyleWindow : Window
                 if (closable.Count > 0)
                 {
                     string names = string.Join("\n", closable.Select(static app => app.ProcessName));
-                    MessageBox.Show("以下程序正在占用独显，请先关闭后再切换核显省电：\n\n" + names,
-                        "核显省电", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    StatusText.Text = "核显省电未切换：独显仍有程序占用";
-                    return;
+                    if (MessageBox.Show("检测到以下程序正在占用独显：\n\n" + names +
+                        "\n\n切换核显省电可能需要结束这些程序，是否继续？",
+                        "核显省电", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    {
+                        StatusText.Text = "核显省电已取消";
+                        return;
+                    }
+                    occupancyConfirmed = true;
                 }
             }
             bool ok = await service.SetIGpuOnlySaveMode(mode);
@@ -1510,6 +1608,14 @@ public partial class OriginalStyleWindow : Window
             if (ok)
             {
                 StatusText.Text = "核显省电已切换：" + IgpuSavingPreviewStatus.Text;
+                return;
+            }
+            bool forced = await TryForceIgpuSavingAsync(service, mode, occupancyConfirmed);
+            if (forced)
+            {
+                await service.RecheckIgpuOnlySaveModeAsync();
+                VisualiseIgpuSaving();
+                StatusText.Text = "核显省电已通过强制路径切换";
                 return;
             }
             if (previous != -1)
