@@ -76,6 +76,7 @@ public partial class OriginalStyleWindow : Window
     private readonly System.Threading.SemaphoreSlim _hidApplyLock = new(1, 1);
     private int _hidRetryGeneration;
     private int _lightingReassertGeneration;
+    private int _hidApplyGeneration;
     private MechrevoHw? _stateHookedHw;
     private bool? _pendingKeyboardPower;
     private long _pendingKeyboardPowerTick;
@@ -4206,10 +4207,11 @@ public partial class OriginalStyleWindow : Window
         await _hidApplyLock.WaitAsync();
         try
         {
+            int generation = ++_hidApplyGeneration;
             bool ok = await ApplyHidKeyboardCoreAsync(mode, on);
             if (!ok && on && allowRetry)
             {
-                ScheduleHidRetry(mode);
+                ScheduleHidRetry(mode, generation);
             }
             return ok;
         }
@@ -4219,20 +4221,44 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private void ScheduleHidRetry(int mode)
+    private void ScheduleHidRetry(int mode, int generation)
     {
-        int generation = ++_hidRetryGeneration;
         _ = Task.Run(async () =>
         {
-            await Task.Delay(1500);
-            Dispatcher.BeginInvoke(new Action(async () =>
+            try
             {
-                if (generation != _hidRetryGeneration)
+                KeyboardRgb? rgb = Program.rgb;
+                if (rgb == null || rgb.IsConnected
+                    || rgb.ControllerAvailability == MechrevoLite.Hardware.FeatureAvailability.Unsupported)
                 {
                     return;
                 }
-                await ApplyHidKeyboardAsync(mode, on: true, allowRetry: false);
-            }));
+                await Task.Delay(1500);
+                if (generation != _hidApplyGeneration || rgb.IsConnected
+                    || rgb.ControllerAvailability == MechrevoLite.Hardware.FeatureAvailability.Unsupported)
+                {
+                    return;
+                }
+                if (rgb.ControllerAvailability == MechrevoLite.Hardware.FeatureAvailability.Unknown)
+                {
+                    await rgb.EnsureHidReadyAsync();
+                }
+                if (!rgb.IsConnected && !rgb.Connect())
+                {
+                    return;
+                }
+                if (generation != _hidApplyGeneration)
+                {
+                    return;
+                }
+                rgb.ReInitCustomMode();
+                rgb.StartMode(mode);
+                MechrevoLite.Program.MarkKeyboardCustomStatusBaseline();
+                rgb.SaveConfig();
+            }
+            catch
+            {
+            }
         });
     }
 
