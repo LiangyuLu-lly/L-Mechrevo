@@ -582,7 +582,22 @@ public partial class MainWindow : Window
         sliderRow.Children.Add(_chargeSlider);
         sliderRow.Children.Add(_chargeSliderText);
         battery.Children.Add(sliderRow);
-        BatteryCardHost.Content = new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0), Child = battery };
+        Grid batteryLayout = new();
+        batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        TextBlock batteryIcon = new()
+        {
+            Text = "\uE83F",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 42,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 0, 16, 0),
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        Grid.SetColumn(battery, 1);
+        batteryLayout.Children.Add(batteryIcon);
+        batteryLayout.Children.Add(battery);
+        BatteryCardHost.Content = new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0), Child = batteryLayout };
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
         DisplayInfoText.Text = displayInfo;
