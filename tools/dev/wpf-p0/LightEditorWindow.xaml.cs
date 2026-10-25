@@ -58,6 +58,16 @@ public partial class LightEditorWindow : Window
         if (_keyboard)
         {
             bool bd = hw?.UsesBaolongda == true;
+            if (bd)
+            {
+                try
+                {
+                    hw!.EnsureKeyboardLightingCalibration();
+                }
+                catch
+                {
+                }
+            }
             _wujieWhite = hw?.WujieSmuApu == true
                 && hw.KeyboardStatusSeen
                 && string.Equals(hw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
@@ -102,8 +112,17 @@ public partial class LightEditorWindow : Window
         RefreshColorUi();
         BuildKeyboardExtra();
         _suppressAutoApply = false;
-        PowerCheck.Checked += (_, _) => ScheduleAutoApply();
-        PowerCheck.Unchecked += (_, _) => ScheduleAutoApply();
+        PowerCheck.Checked += (_, _) =>
+        {
+            UpdateEditorPowerUi();
+            ScheduleAutoApply();
+        };
+        PowerCheck.Unchecked += (_, _) =>
+        {
+            UpdateEditorPowerUi();
+            ScheduleAutoApply();
+        };
+        UpdateEditorPowerUi();
         _applyTimer.Tick += async (_, _) =>
         {
             _applyTimer.Stop();
@@ -120,6 +139,31 @@ public partial class LightEditorWindow : Window
         }
         _applyTimer.Stop();
         _applyTimer.Start();
+    }
+
+    private void UpdateEditorPowerUi()
+    {
+        bool on = PowerCheck.IsChecked == true;
+        LightSlider.IsEnabled = on;
+        SpeedSlider.IsEnabled = on;
+        ColorRow.IsEnabled = on;
+        MixRow.IsEnabled = on;
+        KeyboardExtraRow.IsEnabled = on;
+    }
+
+    private void ResetMix_Click(object sender, RoutedEventArgs e)
+    {
+        _mixColors = (int[])LightChannelSettings.DefaultMixColors.Clone();
+        try
+        {
+            LightChannelSettings mixSettings = LightingSettingsStore.Load(_topic, "ColorMarquee");
+            LightingSettingsStore.Save(_topic, mixSettings with { MixColors = (int[])_mixColors.Clone() });
+        }
+        catch
+        {
+        }
+        RefreshColorUi();
+        ScheduleAutoApply();
     }
 
     private void NetSliderValues()

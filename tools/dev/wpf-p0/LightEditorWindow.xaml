@@ -60,6 +60,7 @@
                 <StackPanel>
                     <TextBlock Text="混色（当前通道保存的七色）" Style="{DynamicResource MutedText}" Margin="0,0,0,6" />
                     <UniformGrid x:Name="MixGrid" Columns="7" />
+                    <Button Content="恢复默认七色" Style="{StaticResource MiniButton}" HorizontalAlignment="Left" Margin="0,6,0,0" Click="ResetMix_Click" />
                 </StackPanel>
             </Border>
             <StackPanel x:Name="KeyboardExtraRow" Grid.Row="6" Margin="0,8,0,0" Visibility="Collapsed">

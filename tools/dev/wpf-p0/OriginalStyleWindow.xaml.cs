@@ -60,10 +60,12 @@ public partial class OriginalStyleWindow : Window
     private bool _perfRestoreStarted;
     private CustomModeWindow? _customModeForm;
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
-    private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+    private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _lightingIdleSuspended;
     private long _lastLightingConnectionGeneration;
     private long _lastLightingRestoreTick;
+    private readonly bool?[] _pendingChannelPower = new bool?[4];
+    private readonly long[] _pendingChannelTick = new long[4];
     private System.Windows.Interop.HwndSource? _powerBroadcastSource;
     private bool[]? _lightingIdleSwitchSnapshot;
     private bool _lightingPowerSuspended;
@@ -71,6 +73,10 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingLiquid;
     private bool _syncingLighting;
     private readonly System.Threading.SemaphoreSlim _keyboardLightApplyLock = new(1, 1);
+    private readonly System.Threading.SemaphoreSlim _hidApplyLock = new(1, 1);
+    private int _hidRetryGeneration;
+    private int _lightingReassertGeneration;
+    private MechrevoHw? _stateHookedHw;
     private bool? _pendingKeyboardPower;
     private long _pendingKeyboardPowerTick;
     private bool _syncingPerfConfig;
@@ -117,6 +123,11 @@ public partial class OriginalStyleWindow : Window
         Closed += (_, _) =>
         {
             _powerBroadcastSource?.RemoveHook(PowerBroadcastHook);
+            if (_stateHookedHw != null)
+            {
+                _stateHookedHw.StateChanged -= OnHardwareLightingStateChanged;
+                _stateHookedHw = null;
+            }
         };
         SourceInitialized += (_, _) =>
         {
@@ -355,6 +366,7 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
+            _ = Program.service?.RequestLightStatus(topic);
             new LightEditorWindow(topic, title, effects) { Owner = this }.ShowDialog();
         }
         catch (Exception ex)
@@ -1959,6 +1971,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         BackendLine.Text = probe.Snapshot();
+        HookHardwareState(probe.Hw);
         try
         {
             MechrevoHw? liveHw = probe.Hw;
@@ -1968,6 +1981,7 @@ public partial class OriginalStyleWindow : Window
             {
                 _lastLightingConnectionGeneration = connectionGeneration;
                 _ = RestoreLightingOnStartupAsync();
+                ScheduleLightingReassert();
             }
         }
         catch
@@ -3123,12 +3137,28 @@ public partial class OriginalStyleWindow : Window
         combo.Items.Clear();
         string selected = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effects[0].Effect).Effect;
         int selectedIndex = 0;
+        bool effectFound = false;
         for (int i = 0; i < effects.Length; i++)
         {
             combo.Items.Add(new ComboBoxItem { Content = effects[i].Name, Tag = effects[i].Effect });
             if (string.Equals(effects[i].Effect, selected, StringComparison.Ordinal))
             {
                 selectedIndex = i;
+                effectFound = true;
+            }
+        }
+        if (!effectFound && Program.hw != null && !Program.hw.UsesBaolongda
+            && Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40)
+        {
+            try
+            {
+                MechrevoLite.Hardware.LightChannelSettings migrated =
+                    MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effects[0].Effect);
+                MechrevoLite.Hardware.LightingSettingsStore.Save(topic,
+                    migrated with { Effect = effects[0].Effect });
+            }
+            catch
+            {
             }
         }
         if (combo.Items.Count > 0)
@@ -3304,10 +3334,10 @@ public partial class OriginalStyleWindow : Window
                     : MechrevoLite.KeyboardLightingDecision.ShouldWrite(hw.IsConnected, effectiveKeyboardPower);
                 KeyboardLightSwitch.IsChecked = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(keyboardOn, suspended);
             }
-            SetSwitchFromQuick(hw, "lightbar", LightStripSwitch, suspended);
-            SetSwitchFromQuick(hw, "logolight", LogoLightSwitch, suspended);
-            SetSwitchFromQuick(hw, "hingelight", LightHingeSwitch, suspended);
-            SetSwitchFromQuick(hw, "synclight", LightSyncSwitch, suspended);
+            SetSwitchFromQuick(hw, "lightbar", LightStripSwitch, suspended, 0);
+            SetSwitchFromQuick(hw, "logolight", LogoLightSwitch, suspended, 1);
+            SetSwitchFromQuick(hw, "hingelight", LightHingeSwitch, suspended, 2);
+            SetSwitchFromQuick(hw, "synclight", LightSyncSwitch, suspended, 3);
         }
         finally
         {
@@ -3315,12 +3345,21 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private static void SetSwitchFromQuick(MechrevoHw hw, string key, CheckBox target, bool suspended)
+    private void SetSwitchFromQuick(MechrevoHw hw, string key, CheckBox target, bool suspended, int index)
     {
-        if (hw.QuickSwitches != null && hw.QuickSwitches.TryGetValue(key, out bool power))
+        if (hw.QuickSwitches == null || !hw.QuickSwitches.TryGetValue(key, out bool power))
         {
-            target.IsChecked = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(power, suspended);
+            return;
         }
+        bool shown = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(power, suspended);
+        if (_pendingChannelPower[index] is bool pending
+            && Environment.TickCount64 - _pendingChannelTick[index] < 5000
+            && shown != pending)
+        {
+            return;
+        }
+        _pendingChannelPower[index] = null;
+        target.IsChecked = shown;
     }
 
     private void InitLightingControls()
@@ -3483,6 +3522,7 @@ public partial class OriginalStyleWindow : Window
         if (!_lightingIdleSuspended && idleSeconds >= timeoutSeconds)
         {
             _lightingIdleSuspended = true;
+            Program.LightingIdleSuspended = true;
             _lightingIdleSwitchSnapshot = new[]
             {
                 KeyboardLightSwitch.IsChecked == true,
@@ -3497,8 +3537,62 @@ public partial class OriginalStyleWindow : Window
         if (_lightingIdleSuspended && idleSeconds < Math.Max(5, timeoutSeconds / 2))
         {
             _lightingIdleSuspended = false;
+            Program.LightingIdleSuspended = false;
             _ = RestoreAllLightsAsync();
         }
+    }
+
+    private void HookHardwareState(MechrevoHw? hw)
+    {
+        if (ReferenceEquals(_stateHookedHw, hw))
+        {
+            return;
+        }
+        if (_stateHookedHw != null)
+        {
+            try
+            {
+                _stateHookedHw.StateChanged -= OnHardwareLightingStateChanged;
+            }
+            catch
+            {
+            }
+        }
+        _stateHookedHw = hw;
+        if (hw != null)
+        {
+            hw.StateChanged += OnHardwareLightingStateChanged;
+        }
+    }
+
+    private void OnHardwareLightingStateChanged(string topic)
+    {
+        if (string.IsNullOrEmpty(topic)
+            || (!topic.Contains("Keyboard", StringComparison.OrdinalIgnoreCase)
+                && !topic.Contains("Lightbar", StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+        Dispatcher.BeginInvoke(new Action(() => _ = RestoreLightingOnStartupAsync()));
+    }
+
+    private void ScheduleLightingReassert()
+    {
+        int generation = ++_lightingReassertGeneration;
+        _ = Task.Run(async () =>
+        {
+            foreach (int delaySeconds in new[] { 20, 45 })
+            {
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+                Dispatcher.BeginInvoke(new Action(async () =>
+                {
+                    if (generation == _lightingReassertGeneration)
+                    {
+                        await RestoreLightingOnStartupAsync();
+                    }
+                }));
+            }
+        });
     }
 
     private async Task RestoreLightingOnStartupAsync()
@@ -3551,7 +3645,10 @@ public partial class OriginalStyleWindow : Window
                 }
             }
             await RestoreSavedChannelAsync("HidLightbar/Ctrl", LightStripSwitch);
-            await RestoreSavedChannelAsync("HidLightbar_Logo/Ctrl", LogoLightSwitch);
+            if (!IsSamePhysicalLightbar(_backendProbe.Hw))
+            {
+                await RestoreSavedChannelAsync("HidLightbar_Logo/Ctrl", LogoLightSwitch);
+            }
             await RestoreSavedChannelAsync("HidLightbar_Hinge/Ctrl", LightHingeSwitch);
             await RestoreSavedChannelAsync("HidLightbar_Sync/Ctrl", LightSyncSwitch);
         }
@@ -3563,6 +3660,10 @@ public partial class OriginalStyleWindow : Window
     private async Task RestoreSavedChannelAsync(string topic, CheckBox powerSwitch)
     {
         if (_backendProbe == null)
+        {
+            return;
+        }
+        if (topic == "HidLightbar_Logo/Ctrl" && IsSamePhysicalLightbar(_backendProbe.Hw))
         {
             return;
         }
@@ -3604,6 +3705,30 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static bool IsSamePhysicalLightbar(MechrevoHw? hw)
+    {
+        try
+        {
+            if (hw == null || !MechrevoLite.Hardware.LightCompatibilitySwitches.LightbarDedupEnabled)
+            {
+                return false;
+            }
+            if (hw.SupportsLogoLight || hw.LightbarMbLogoSupport == true)
+            {
+                return false;
+            }
+            string? lightbar = hw.LightbarStatusFingerprint("HidLightbar/Status");
+            string? logo = hw.LightbarStatusFingerprint("HidLightbar_Logo/Status");
+            return lightbar != null && logo != null
+                && string.Equals(lightbar, logo, StringComparison.Ordinal)
+                && !string.Equals(lightbar, "type=-|powerStatus=-|power=-|light=-|brightNess=-", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private async Task RestoreAllLightsAsync()
     {
         if (_lightingIdleSwitchSnapshot is { Length: 5 } snapshot)
@@ -3618,7 +3743,10 @@ public partial class OriginalStyleWindow : Window
             _lightingIdleSwitchSnapshot = null;
         }
         await ApplyKeyboardLightAsync();
-        await ApplyLogoLightAsync(restoreEffect: true);
+        if (!IsSamePhysicalLightbar(_backendProbe?.Hw))
+        {
+            await ApplyLogoLightAsync(restoreEffect: true);
+        }
         await ApplyLightStripLightAsync(restoreEffect: true);
         await ApplyHingeLightAsync(restoreEffect: true);
         await ApplySyncLightAsync(restoreEffect: true);
@@ -3763,6 +3891,8 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LightStripSwitch.IsChecked == true;
+        _pendingChannelPower[0] = requested;
+        _pendingChannelTick[0] = Environment.TickCount64;
         LightStripSwitch.IsEnabled = false;
         bool ok;
         try
@@ -3862,6 +3992,8 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LightHingeSwitch.IsChecked == true;
+        _pendingChannelPower[2] = requested;
+        _pendingChannelTick[2] = Environment.TickCount64;
         LightHingeSwitch.IsEnabled = false;
         bool ok;
         try
@@ -3930,6 +4062,8 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LightSyncSwitch.IsChecked == true;
+        _pendingChannelPower[3] = requested;
+        _pendingChannelTick[3] = Environment.TickCount64;
         LightSyncSwitch.IsEnabled = false;
         bool ok;
         try
@@ -4056,7 +4190,7 @@ public partial class OriginalStyleWindow : Window
                 }
                 return;
             }
-            await ApplyHidKeyboardAsync(hidMode, on: true);
+            await ApplyKeyboardLightAsync();
             return;
         }
         if (KeyboardLightSwitch.IsChecked != true)
@@ -4068,6 +4202,41 @@ public partial class OriginalStyleWindow : Window
     }
 
     private async Task<bool> ApplyHidKeyboardAsync(int mode, bool on)
+    {
+        await _hidApplyLock.WaitAsync();
+        try
+        {
+            bool ok = await ApplyHidKeyboardCoreAsync(mode, on);
+            if (!ok && on)
+            {
+                ScheduleHidRetry(mode);
+            }
+            return ok;
+        }
+        finally
+        {
+            _hidApplyLock.Release();
+        }
+    }
+
+    private void ScheduleHidRetry(int mode)
+    {
+        int generation = ++_hidRetryGeneration;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(1500);
+            Dispatcher.BeginInvoke(new Action(async () =>
+            {
+                if (generation != _hidRetryGeneration)
+                {
+                    return;
+                }
+                await ApplyHidKeyboardAsync(mode, on: true);
+            }));
+        });
+    }
+
+    private async Task<bool> ApplyHidKeyboardCoreAsync(int mode, bool on)
     {
         KeyboardRgb? rgb = EnsureKeyboardRgb();
         if (rgb == null)
@@ -4199,6 +4368,8 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LogoLightSwitch.IsChecked == true;
+        _pendingChannelPower[1] = requested;
+        _pendingChannelTick[1] = Environment.TickCount64;
         LogoLightSwitch.IsEnabled = false;
         bool ok;
         try
