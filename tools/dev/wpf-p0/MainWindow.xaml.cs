@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private CheckBox? _ecDirect;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
     private readonly List<ToggleButton> _batteryModeButtons = new();
+    private readonly List<(string Key, Button Button, TextBlock State, string Label)> _quickTileButtons = new();
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -51,6 +52,7 @@ public partial class MainWindow : Window
         BackgroundScrim.Visibility = Visibility.Collapsed;
         BuildMoreSwitchTiles();
         BuildSensorBlocks();
+        BuildQuickTiles();
         BuildHomeExtras();
         BuildScreenControls();
         BuildLightingCards();
@@ -350,6 +352,66 @@ public partial class MainWindow : Window
         }
     }
 
+    private void BuildQuickTiles()
+    {
+        if (_owner == null || QuickTilesGrid == null)
+        {
+            return;
+        }
+        QuickTilesGrid.Children.Clear();
+        _quickTileButtons.Clear();
+        foreach ((string key, string label, string glyph, bool on) in _owner.WideQuickTiles())
+        {
+            TextBlock icon = new()
+            {
+                Text = glyph,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 16,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            TextBlock state = new()
+            {
+                Text = label + (on ? " · 开" : " · 关"),
+                FontSize = 11,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 4, 0, 0),
+                Style = (Style)FindResource("MutedText")
+            };
+            StackPanel content = new();
+            content.Children.Add(icon);
+            content.Children.Add(state);
+            Button tile = new()
+            {
+                Style = (Style)FindResource("TileButton"),
+                Tag = key,
+                Content = content
+            };
+            tile.Click += async (_, _) =>
+            {
+                if (_owner != null)
+                {
+                    await _owner.WideToggleQuickAsync(key);
+                    RefreshQuickTiles();
+                }
+            };
+            QuickTilesGrid.Children.Add(tile);
+            _quickTileButtons.Add((key, tile, state, label));
+        }
+    }
+
+    private void RefreshQuickTiles()
+    {
+        if (_owner == null)
+        {
+            return;
+        }
+        foreach ((string key, Button button, TextBlock state, string label) in _quickTileButtons)
+        {
+            bool on = _owner.WideQuickTiles().FirstOrDefault(item => item.Key == key).On;
+            state.Text = label + (on ? " · 开" : " · 关");
+        }
+    }
+
     private void BuildHomeExtras()
     {
         if (_owner == null)
@@ -499,6 +561,16 @@ public partial class MainWindow : Window
         }
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
+        string perf = _owner.WidePerformanceText;
+        HomePerf平衡.IsChecked = perf.Contains("平衡");
+        HomePerf狂暴.IsChecked = perf.Contains("狂暴");
+        HomePerf自定义.IsChecked = perf.Contains("自定义");
+        HomePerf静音.IsChecked = perf.Contains("静音");
+        string gpu = _owner.WideGpuModeText;
+        HomeGpu混合.IsChecked = gpu.Contains("混合");
+        HomeGpu独显.IsChecked = gpu.Contains("独显");
+        HomeGpu集显.IsChecked = gpu.Contains("核显");
+        RefreshQuickTiles();
         (string batteryInfo, int batteryMode, string batteryCharge) = _owner.WideBattery();
         if (_batteryInfoText != null) _batteryInfoText.Text = batteryInfo;
         for (int i = 0; i < _batteryModeButtons.Count; i++)

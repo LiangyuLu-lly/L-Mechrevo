@@ -468,6 +468,41 @@ public partial class OriginalStyleWindow : Window
         EcDirectOffToggle_Click(EcDirectOffToggle, new RoutedEventArgs());
     }
 
+    internal (string Key, string Label, string Glyph, bool On)[] WideQuickTiles()
+    {
+        List<(string, string, string, bool)> result = new();
+        List<string> keys = new();
+        if (QuickTileGrid != null)
+        {
+            foreach (object child in QuickTileGrid.Children)
+            {
+                if (child is ToggleButton tile && tile.Tag is string tileKey)
+                {
+                    keys.Add(tileKey);
+                }
+            }
+        }
+        if (keys.Count == 0)
+        {
+            keys.AddRange(new[] { "wifi", "bt", "webcam", "micmute" });
+        }
+        foreach (string key in keys)
+        {
+            if (_backendProbe != null && !_backendProbe.SupportsQuick(key))
+            {
+                continue;
+            }
+            (string Key, string Label, string Glyph) info = QuickTileCatalog.FirstOrDefault(item => item.Key == key);
+            if (info.Key == null)
+            {
+                continue;
+            }
+            bool on = _backendProbe?.QuickState(key) == true;
+            result.Add((key, info.Label, info.Glyph, on));
+        }
+        return result.ToArray();
+    }
+
     internal (string Info, int Mode, string Charge) WideBattery()
     {
         try

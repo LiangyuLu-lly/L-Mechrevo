@@ -148,20 +148,7 @@
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="快捷磁贴" Style="{StaticResource CardTitle}" Margin="0,0,0,10" />
-                                    <UniformGrid Columns="4">
-                                        <Button Style="{StaticResource TileButton}" Tag="wifi" Click="QuickTile_Click">
-                                            <StackPanel><TextBlock Text="WiFi" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="已连接" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
-                                        </Button>
-                                        <Button Style="{StaticResource TileButton}" Tag="bt" Click="QuickTile_Click">
-                                            <StackPanel><TextBlock Text="蓝牙" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="已开启" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
-                                        </Button>
-                                        <Button Style="{StaticResource TileButton}" Tag="webcam" Click="QuickTile_Click">
-                                            <StackPanel><TextBlock Text="摄像头" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="关" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
-                                        </Button>
-                                        <Button Style="{StaticResource TileButton}" Tag="micmute" Click="QuickTile_Click">
-                                            <StackPanel><TextBlock Text="麦克风" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="未静音" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
-                                        </Button>
-                                    </UniformGrid>
+                                    <UniformGrid x:Name="QuickTilesGrid" Columns="4" />
                                 </StackPanel>
                             </Border>
 
@@ -173,9 +160,10 @@
                                         <TextBlock Text="性能模式" Style="{StaticResource CardTitle}" />
                                         <TextBlock x:Name="PerfCurrentText" Text="当前：平衡" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                         <StackPanel Orientation="Horizontal">
-                                            <ToggleButton Content="平衡" Tag="0" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Mode_Click" />
-                                            <ToggleButton Content="狂暴" Tag="1" Style="{StaticResource SegmentButton}" Click="Mode_Click" />
-                                            <ToggleButton Content="自定义" Tag="3" Style="{StaticResource SegmentButton}" Click="Mode_Click" />
+                                            <ToggleButton x:Name="HomePerf静音" Content="静音" Tag="2" Style="{StaticResource SegmentButton}" Click="Mode_Click" />
+                                            <ToggleButton x:Name="HomePerf平衡" Content="平衡" Tag="0" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Mode_Click" />
+                                            <ToggleButton x:Name="HomePerf狂暴" Content="狂暴" Tag="1" Style="{StaticResource SegmentButton}" Click="Mode_Click" />
+                                            <ToggleButton x:Name="HomePerf自定义" Content="自定义" Tag="3" Style="{StaticResource SegmentButton}" Click="Mode_Click" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -184,9 +172,9 @@
                                         <TextBlock Text="显卡模式" Style="{StaticResource CardTitle}" />
                                         <TextBlock x:Name="GpuCurrentText" Text="当前：混合输出" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                         <StackPanel Orientation="Horizontal">
-                                            <ToggleButton Content="混合" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Gpu_Click" />
-                                            <ToggleButton Content="独显" Tag="2" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
-                                            <ToggleButton Content="集显" Tag="0" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
+                                            <ToggleButton x:Name="HomeGpu混合" Content="混合" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Gpu_Click" />
+                                            <ToggleButton x:Name="HomeGpu独显" Content="独显" Tag="2" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
+                                            <ToggleButton x:Name="HomeGpu集显" Content="集显" Tag="0" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
