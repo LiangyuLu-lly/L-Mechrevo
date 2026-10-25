@@ -14,8 +14,8 @@ public partial class UpdateWindow : Window
     {
         InitializeComponent();
         _info = info;
-        Title = "检查更新 · " + (info.LatestVersion ?? Program.ReleaseVersion);
-        VersionText.Text = "当前版本：" + (info.CurrentVersion ?? Program.ReleaseVersion)
+        Title = "检查更新 · " + (info.LatestVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion);
+        VersionText.Text = "当前版本：" + (info.CurrentVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion)
             + "    最新版本：" + (info.LatestVersion ?? "未知")
             + (string.IsNullOrWhiteSpace(info.Channel) ? "" : "    通道：" + info.Channel);
         DateText.Text = string.IsNullOrWhiteSpace(info.ReleaseDate) ? "" : "发布日期：" + info.ReleaseDate;

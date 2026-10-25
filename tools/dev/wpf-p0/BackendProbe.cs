@@ -29,7 +29,7 @@ internal sealed class BackendProbe : IDisposable
             bool ok = await _hw.ConnectAsync().ConfigureAwait(false);
             if (ok)
             {
-                Program.acpi ??= new AsusACPI();
+                L_Mechrevo.WpfP0.Services.WpfBackend.acpi ??= new AsusACPI();
                 _service = new MechrevoService(_hw);
             }
             Connected = ok;

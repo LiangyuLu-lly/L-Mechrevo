@@ -1,6 +1,7 @@
 using System;
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using MechrevoLite.Gpu;
 
 namespace L_Mechrevo.WpfP0.Services;
 
@@ -14,6 +15,8 @@ internal static class WpfBackend
 {
     private static MechrevoHw? _hw;
     private static MechrevoService? _service;
+    private static AsusACPI? _acpi;
+    private static KeyboardRgb? _rgb;
 
     internal static MechrevoHw? Hw
     {
@@ -34,6 +37,58 @@ internal static class WpfBackend
             MechrevoLite.Program.service = value;
         }
     }
+
+
+    internal static AsusACPI? Acpi
+    {
+        get => _acpi;
+        set
+        {
+            _acpi = value;
+            MechrevoLite.Program.acpi = value;
+        }
+    }
+
+    internal static KeyboardRgb? Rgb
+    {
+        get => _rgb;
+        set
+        {
+            _rgb = value;
+            MechrevoLite.Program.rgb = value;
+        }
+    }
+
+    // 兼容旧字段名（WPF 迁移期）；后续可直接用 Acpi/Rgb。
+    internal static AsusACPI? acpi
+    {
+        get => Acpi;
+        set => Acpi = value;
+    }
+
+    internal static KeyboardRgb? rgb
+    {
+        get => Rgb;
+        set => Rgb = value;
+    }
+
+    internal static bool UiAuditMode => MechrevoLite.Program.UiAuditMode;
+
+    internal static string ReleaseVersion => MechrevoLite.Program.ReleaseVersion;
+
+    internal static string ReleaseLabel => MechrevoLite.Program.ReleaseLabel;
+
+    internal static bool IsLightingTemporarilySuspended => MechrevoLite.Program.IsLightingTemporarilySuspended;
+
+    internal static bool LightingIdleSuspended
+    {
+        get => MechrevoLite.Program.LightingIdleSuspended;
+        set => MechrevoLite.Program.LightingIdleSuspended = value;
+    }
+
+    internal static void NotifyLightingUserIntent() => MechrevoLite.Program.NotifyLightingUserIntent();
+
+    internal static void MarkKeyboardCustomStatusBaseline() => MechrevoLite.Program.MarkKeyboardCustomStatusBaseline();
 
     internal static bool IsAttached => _hw != null && _service != null;
 

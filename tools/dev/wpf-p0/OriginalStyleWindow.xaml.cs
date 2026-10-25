@@ -688,10 +688,10 @@ public partial class OriginalStyleWindow : Window
         }
         AppConfig.Set("lighting_idle_seconds", seconds);
         AppConfig.Flush();
-        if (Program.rgb != null)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.rgb != null)
         {
-            Program.rgb.CloseTimerMinutes = seconds / 60;
-            Program.rgb.SaveConfig();
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb.CloseTimerMinutes = seconds / 60;
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb.SaveConfig();
         }
         _ = ReconcileLightingPowerAsync();
     }
@@ -827,24 +827,24 @@ public partial class OriginalStyleWindow : Window
 
     internal bool MiniledOn => _backendProbe?.Hw?.LocalDimming == true;
 
-    internal bool SupportsFhd => Program.acpi?.DeviceGet(327708u) >= 0;
+    internal bool SupportsFhd => L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327708u) >= 0;
 
-    internal bool FhdOn => Program.acpi?.DeviceGet(327708u) > 0;
+    internal bool FhdOn => L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327708u) > 0;
 
-    internal bool SupportsHdrControl => Program.acpi?.DeviceGet(327793u) >= 0;
+    internal bool SupportsHdrControl => L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327793u) >= 0;
 
-    internal bool HdrControlOn => Program.acpi?.DeviceGet(327793u) > 0;
+    internal bool HdrControlOn => L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327793u) > 0;
 
     internal void ToggleMiniled()
     {
         try
         {
-            if (Program.acpi == null)
+            if (L_Mechrevo.WpfP0.Services.WpfBackend.acpi == null)
             {
                 return;
             }
-            int primary = Program.acpi.DeviceGet(327710u);
-            int secondary = Program.acpi.DeviceGet(327726u);
+            int primary = L_Mechrevo.WpfP0.Services.WpfBackend.acpi.DeviceGet(327710u);
+            int secondary = L_Mechrevo.WpfP0.Services.WpfBackend.acpi.DeviceGet(327726u);
             int value = primary == 1 ? 0 : (primary >= 0 ? 1 : (secondary == 1 ? 2 : (secondary == 2 ? 0 : 1)));
             AppConfig.Set("miniled", value);
             AppConfig.Flush();
@@ -861,11 +861,11 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            if (Program.acpi == null)
+            if (L_Mechrevo.WpfP0.Services.WpfBackend.acpi == null)
             {
                 return;
             }
-            int current = Program.acpi.DeviceGet(327793u);
+            int current = L_Mechrevo.WpfP0.Services.WpfBackend.acpi.DeviceGet(327793u);
             AppConfig.Set("hdr_control", current == 1 ? 0 : 1);
             AppConfig.Flush();
             StatusText.Text = "HDR Color Control 已切换";
@@ -2772,12 +2772,12 @@ public partial class OriginalStyleWindow : Window
         CpuStat.Text = SensorLine(hw, cpu: true);
         GpuStat.Text = SensorLine(hw, cpu: false);
         VisualiseIgpuSaving();
-        if (Program.rgb != null)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.rgb != null)
         {
             string? selectedHidTag = (KeyboardEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string;
             if (IsHidKeyboard(hw))
             {
-                string expectedHidTag = "hid:" + Program.rgb.KbHidMode;
+                string expectedHidTag = "hid:" + L_Mechrevo.WpfP0.Services.WpfBackend.rgb.KbHidMode;
                 if (!string.Equals(selectedHidTag, expectedHidTag, StringComparison.Ordinal))
                 {
                     FillKeyboardEffects();
@@ -3974,7 +3974,7 @@ public partial class OriginalStyleWindow : Window
             return false;
         }
         // 与原版 ShouldUseGcuKeyboardFallback 一致：HID 不可用/亮度未生效时回 GCU 固件面板。
-        KeyboardRgb? rgb = Program.rgb;
+        KeyboardRgb? rgb = L_Mechrevo.WpfP0.Services.WpfBackend.rgb;
         if (rgb != null
             && MechrevoLite.Hardware.KeyboardLightPathPolicy.ShouldUseGcuKeyboardFallback(
                 rgb.ControllerAvailability,
@@ -4003,15 +4003,15 @@ public partial class OriginalStyleWindow : Window
 
     private static KeyboardRgb? EnsureKeyboardRgbConfig()
     {
-        if (Program.rgb != null)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.rgb != null)
         {
-            return Program.rgb;
+            return L_Mechrevo.WpfP0.Services.WpfBackend.rgb;
         }
         try
         {
             KeyboardRgb rgb = new();
             rgb.LoadConfig();
-            Program.rgb = rgb;
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb = rgb;
             return rgb;
         }
         catch
@@ -4032,7 +4032,7 @@ public partial class OriginalStyleWindow : Window
                 EnsureKeyboardRgbConfig();
                 (int Mode, string Name)[] hidEffects = LightingCatalog.VisibleHidEffects(
                     hw?.Capabilities.KeyboardType ?? 0);
-                int selectedMode = Program.rgb?.KbHidMode ?? (hidEffects.Length > 0 ? hidEffects[0].Mode : 1);
+                int selectedMode = L_Mechrevo.WpfP0.Services.WpfBackend.rgb?.KbHidMode ?? (hidEffects.Length > 0 ? hidEffects[0].Mode : 1);
                 int hidIndex = 0;
                 for (int i = 0; i < hidEffects.Length; i++)
                 {
@@ -4081,12 +4081,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        bool suspended = Program.IsLightingTemporarilySuspended;
+        bool suspended = L_Mechrevo.WpfP0.Services.WpfBackend.IsLightingTemporarilySuspended;
         _syncingLighting = true;
         try
         {
             bool effectiveKeyboardPower = IsHidKeyboard(hw)
-                ? (Program.rgb?.KbPowerOn ?? hw.KeyboardPower)
+                ? (L_Mechrevo.WpfP0.Services.WpfBackend.rgb?.KbPowerOn ?? hw.KeyboardPower)
                 : hw.KeyboardPower;
             if (_pendingKeyboardPower is bool pendingPower
                 && Environment.TickCount64 - _pendingKeyboardPowerTick < 5000
@@ -4209,10 +4209,10 @@ public partial class OriginalStyleWindow : Window
         }
         AppConfig.Set("lighting_idle_seconds", seconds);
         AppConfig.Flush();
-        if (Program.rgb != null)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.rgb != null)
         {
-            Program.rgb.CloseTimerMinutes = seconds / 60;
-            Program.rgb.SaveConfig();
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb.CloseTimerMinutes = seconds / 60;
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb.SaveConfig();
         }
         _ = ReconcileLightingPowerAsync();
         StatusText.Text = seconds <= 0 ? "灯光自动关闭：关" : "灯光自动关闭：" + (seconds >= 60 ? (seconds / 60) + " 分钟" : seconds + " 秒");
@@ -4288,7 +4288,7 @@ public partial class OriginalStyleWindow : Window
         if (!_lightingIdleSuspended && idleSeconds >= timeoutSeconds)
         {
             _lightingIdleSuspended = true;
-            Program.LightingIdleSuspended = true;
+            L_Mechrevo.WpfP0.Services.WpfBackend.LightingIdleSuspended = true;
             _lightingIdleSwitchSnapshot = new[]
             {
                 KeyboardLightSwitch.IsChecked == true,
@@ -4303,7 +4303,7 @@ public partial class OriginalStyleWindow : Window
         if (_lightingIdleSuspended && idleSeconds < Math.Max(5, timeoutSeconds / 2))
         {
             _lightingIdleSuspended = false;
-            Program.LightingIdleSuspended = false;
+            L_Mechrevo.WpfP0.Services.WpfBackend.LightingIdleSuspended = false;
             _ = RestoreAllLightsAsync();
         }
     }
@@ -4372,7 +4372,7 @@ public partial class OriginalStyleWindow : Window
         if (_backendProbe == null
             || !MechrevoLite.Hardware.LightingSettingsStore.HasUserLightingIntent()
             || L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true
-            || Program.IsLightingTemporarilySuspended
+            || L_Mechrevo.WpfP0.Services.WpfBackend.IsLightingTemporarilySuspended
             || _lightingPowerSuspended
             || _lightingIdleSuspended)
         {
@@ -4563,10 +4563,10 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        if (IsHidKeyboard(_backendProbe.Hw) && Program.rgb != null)
+        if (IsHidKeyboard(_backendProbe.Hw) && L_Mechrevo.WpfP0.Services.WpfBackend.rgb != null)
         {
-            Program.rgb.StopCurrentEffect();
-            Program.rgb.KbPowerSyncFromHardware(false);
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb.StopCurrentEffect();
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb.KbPowerSyncFromHardware(false);
         }
         else
         {
@@ -4721,26 +4721,26 @@ public partial class OriginalStyleWindow : Window
 
     private KeyboardRgb? EnsureKeyboardRgb()
     {
-        if (Program.rgb != null)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.rgb != null)
         {
-            if (!Program.rgb.IsConnected)
+            if (!L_Mechrevo.WpfP0.Services.WpfBackend.rgb.IsConnected)
             {
                 try
                 {
-                    Program.rgb.Connect();
+                    L_Mechrevo.WpfP0.Services.WpfBackend.rgb.Connect();
                 }
                 catch
                 {
                 }
             }
-            return Program.rgb;
+            return L_Mechrevo.WpfP0.Services.WpfBackend.rgb;
         }
         try
         {
             KeyboardRgb rgb = new();
             rgb.LoadConfig();
             rgb.Connect();
-            Program.rgb = rgb;
+            L_Mechrevo.WpfP0.Services.WpfBackend.rgb = rgb;
             return rgb;
         }
         catch (Exception ex)
@@ -4946,10 +4946,10 @@ public partial class OriginalStyleWindow : Window
             int hidMode = int.TryParse(effect.AsSpan(4), out int parsedHidMode) ? parsedHidMode : 1;
             if (KeyboardLightSwitch.IsChecked != true)
             {
-                if (Program.rgb != null)
+                if (L_Mechrevo.WpfP0.Services.WpfBackend.rgb != null)
                 {
-                    Program.rgb.KbHidMode = hidMode;
-                    Program.rgb.QueueSaveConfig();
+                    L_Mechrevo.WpfP0.Services.WpfBackend.rgb.KbHidMode = hidMode;
+                    L_Mechrevo.WpfP0.Services.WpfBackend.rgb.QueueSaveConfig();
                 }
                 return;
             }
@@ -4989,7 +4989,7 @@ public partial class OriginalStyleWindow : Window
         {
             try
             {
-                KeyboardRgb? rgb = Program.rgb;
+                KeyboardRgb? rgb = L_Mechrevo.WpfP0.Services.WpfBackend.rgb;
                 if (rgb == null || rgb.IsConnected
                     || rgb.ControllerAvailability == MechrevoLite.Hardware.FeatureAvailability.Unsupported)
                 {
@@ -5015,7 +5015,7 @@ public partial class OriginalStyleWindow : Window
                 }
                 rgb.ReInitCustomMode();
                 rgb.StartMode(mode);
-                MechrevoLite.Program.MarkKeyboardCustomStatusBaseline();
+                L_Mechrevo.WpfP0.Services.WpfBackend.MarkKeyboardCustomStatusBaseline();
                 rgb.SaveConfig();
             }
             catch
@@ -5057,9 +5057,9 @@ public partial class OriginalStyleWindow : Window
                 return false;
             }
             rgb.Brightness = Math.Clamp(rgb.Brightness, 1, 100);
-            MechrevoLite.Program.NotifyLightingUserIntent();
+            L_Mechrevo.WpfP0.Services.WpfBackend.NotifyLightingUserIntent();
             rgb.ReInitCustomMode();
-            MechrevoLite.Program.MarkKeyboardCustomStatusBaseline();
+            L_Mechrevo.WpfP0.Services.WpfBackend.MarkKeyboardCustomStatusBaseline();
             rgb.KbHidMode = mode;
             rgb.StartMode(mode);
             rgb.ApplyBrightnessToDevice();
@@ -5436,7 +5436,7 @@ public partial class OriginalStyleWindow : Window
             DefaultExt = "zip",
             AddExtension = true,
             OverwritePrompt = true,
-            FileName = DiagnosticPackExporter.BuildFileName(Program.ReleaseVersion, DateTime.Now)
+            FileName = DiagnosticPackExporter.BuildFileName(L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion, DateTime.Now)
         };
         if (dialog.ShowDialog(this) != true)
         {

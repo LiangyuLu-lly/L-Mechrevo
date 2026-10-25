@@ -337,7 +337,7 @@ public partial class FirstRunGuideWindow : Window
             return;
         }
         // 审计/截图模式（UiAuditRunner 也会创建窗口）不得写配置。
-        if (Program.UiAuditMode)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.UiAuditMode)
         {
             return;
         }
@@ -366,7 +366,7 @@ public partial class FirstRunGuideWindow : Window
     private void PersistTelemetryChoice()
     {
         // 单问模式没有这个控件；审计/截图模式不写；用户没动过（含 X / Esc / 稍后）一个字节都不写。
-        if (Program.UiAuditMode || _telemetryCheck == null)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.UiAuditMode || _telemetryCheck == null)
         {
             return;
         }

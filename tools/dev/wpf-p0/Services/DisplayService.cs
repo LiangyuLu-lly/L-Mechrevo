@@ -111,10 +111,10 @@ internal sealed class DisplayService : IDisplayService
             LcdOverdrive: hw?.LcdOverdrive == true,
             LocalDimmingSupported: hw?.SupportsLocalDimming == true,
             LocalDimming: hw?.LocalDimming == true,
-            FhdSupported: Program.acpi?.DeviceGet(327708u) >= 0,
-            FhdOn: Program.acpi?.DeviceGet(327708u) > 0,
-            HdrSupported: Program.acpi?.DeviceGet(327793u) >= 0,
-            HdrOn: Program.acpi?.DeviceGet(327793u) > 0,
+            FhdSupported: L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327708u) >= 0,
+            FhdOn: L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327708u) > 0,
+            HdrSupported: L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327793u) >= 0,
+            HdrOn: L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327793u) > 0,
             ColorCalibrationLevel: probe?.ColorCalibrationLevel ?? 1,
             ColorCalibrationSupported: probe?.SupportsColorCalibration == true);
     }

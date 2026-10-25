@@ -219,7 +219,7 @@ internal sealed class LightingService : ILightingService
         AppConfig.Flush();
         try
         {
-            KeyboardRgb? rgb = Program.rgb;
+            KeyboardRgb? rgb = L_Mechrevo.WpfP0.Services.WpfBackend.rgb;
             if (rgb != null)
             {
                 rgb.CloseTimerMinutes = normalized / 60;

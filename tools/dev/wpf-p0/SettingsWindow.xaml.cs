@@ -163,7 +163,7 @@ public partial class SettingsWindow : Window
         HdrControlCheck.IsChecked = _owner.HdrControlOn;
         FhdRow.Visibility = _owner.SupportsFhd ? Visibility.Visible : Visibility.Collapsed;
         FhdButton.Content = _owner.FhdOn ? "UHD" : "FHD";
-        AboutVersionText.Text = "L-Mechrevo " + Program.ReleaseVersion + " " + Program.ReleaseLabel;
+        AboutVersionText.Text = "L-Mechrevo " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion + " " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseLabel;
 
         string language = AppConfig.GetString("language") ?? "zh-CN";
         LanguageCombo.SelectedIndex = language.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
@@ -773,7 +773,7 @@ public partial class SettingsWindow : Window
             }
             if (!info.UpdateAvailable)
             {
-                Status("已是最新版本：" + Program.ReleaseVersion);
+                Status("已是最新版本：" + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion);
                 return;
             }
             new UpdateWindow(info) { Owner = this }.ShowDialog();

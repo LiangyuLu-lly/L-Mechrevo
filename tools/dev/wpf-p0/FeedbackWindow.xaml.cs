@@ -13,7 +13,7 @@ public partial class FeedbackWindow : Window
     {
         InitializeComponent();
         _owner = owner;
-        VersionText.Text = "L-Mechrevo " + Program.ReleaseVersion;
+        VersionText.Text = "L-Mechrevo " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion;
         try
         {
             string model = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.Capabilities.Model ?? "";
@@ -28,7 +28,7 @@ public partial class FeedbackWindow : Window
 
     private string BuildInfo()
     {
-        string info = "L-Mechrevo " + Program.ReleaseVersion + "\n" + DeviceText.Text;
+        string info = "L-Mechrevo " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion + "\n" + DeviceText.Text;
         try
         {
             info += "\nGCU：" + (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsGcuConnected == true ? "已连接" : "未连接")

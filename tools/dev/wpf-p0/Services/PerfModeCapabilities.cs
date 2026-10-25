@@ -13,7 +13,7 @@ internal static class PerfModeCapabilities
 {
     internal static bool IsOffered(PerfModeDefinition mode, MechrevoHw? hw)
     {
-        if (MechrevoLite.Program.UiAuditMode || hw == null)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.UiAuditMode || hw == null)
         {
             return true;
         }
