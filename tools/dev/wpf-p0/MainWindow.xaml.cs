@@ -44,6 +44,9 @@ public partial class MainWindow : Window
     private bool _syncingScreenEffect;
     private string _currentEffectMode = "";
     private Window? _inlineWindow;
+    private bool _wideMaximized;
+    private bool _animatingWindow;
+    private Rect _wideRestoreBounds;
     private CheckBox? _chargeLimitSwitch;
     private TextBox? _chargeLow;
     private TextBox? _chargeHigh;
@@ -64,15 +67,7 @@ public partial class MainWindow : Window
         _owner = owner;
         _probe = probe;
         SourceInitialized += (_, _) => ApplyRoundedWindowChrome();
-        RootContent.Opacity = 0;
-        ContentRendered += (_, _) =>
-        {
-            DoubleAnimation fadeIn = new(0, 1, TimeSpan.FromMilliseconds(180))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            RootContent.BeginAnimation(OpacityProperty, fadeIn);
-        };
+        RootContent.Opacity = 1;
         AppTheme.Apply(true);
         ReloadWideBackground();
         BuildMoreSwitchTiles();
@@ -86,6 +81,7 @@ public partial class MainWindow : Window
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
         _sensorTimer.Start();
+        StateChanged += (_, _) => OnWideStateChanged();
         Closed += (_, _) =>
         {
             _sensorTimer.Stop();
@@ -385,38 +381,86 @@ public partial class MainWindow : Window
         }
     }
 
-    private void WideMinimize_Click(object sender, RoutedEventArgs e)
+    private async void WideMinimize_Click(object sender, RoutedEventArgs e)
     {
-        PlayWindowTransition();
+        if (_animatingWindow) return;
+        _animatingWindow = true;
+        ScaleTransform scale = RootContent.RenderTransform as ScaleTransform ?? new ScaleTransform(1, 1);
+        RootContent.RenderTransformOrigin = new Point(0.5, 0.5);
+        RootContent.RenderTransform = scale;
+        CubicEase ease = new() { EasingMode = EasingMode.EaseIn };
+        DoubleAnimation fade = new(0, 0.35, TimeSpan.FromMilliseconds(140)) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        DoubleAnimation shrink = new(1, 0.94, TimeSpan.FromMilliseconds(140)) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        RootContent.BeginAnimation(OpacityProperty, fade);
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, shrink);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, shrink);
+        await Task.Delay(140);
         SystemCommands.MinimizeWindow(this);
+        _animatingWindow = false;
     }
 
     private void WideMaximize_Click(object sender, RoutedEventArgs e) => ToggleWideMaximize();
 
+    private void WideClose_Click(object sender, RoutedEventArgs e) => Close();
+
     private void ToggleWideMaximize()
     {
-        PlayWindowTransition();
-        if (WindowState == WindowState.Maximized)
+        if (_animatingWindow) return;
+        Rect target;
+        if (!_wideMaximized)
         {
-            SystemCommands.RestoreWindow(this);
+            _wideRestoreBounds = new Rect(Left, Top, ActualWidth, ActualHeight);
+            target = SystemParameters.WorkArea;
+            _wideMaximized = true;
         }
         else
         {
-            SystemCommands.MaximizeWindow(this);
+            target = _wideRestoreBounds;
+            _wideMaximized = false;
+        }
+        AnimateWindowBounds(target);
+        if (WideMaxButton != null) WideMaxButton.Content = _wideMaximized ? "❐" : "□";
+    }
+
+    private void AnimateWindowBounds(Rect target)
+    {
+        _animatingWindow = true;
+        TimeSpan duration = TimeSpan.FromMilliseconds(200);
+        CubicEase ease = new() { EasingMode = EasingMode.EaseOut };
+        DoubleAnimation left = new(target.Left, duration) { EasingFunction = ease, FillBehavior = FillBehavior.HoldEnd };
+        DoubleAnimation top = new(target.Top, duration) { EasingFunction = ease, FillBehavior = FillBehavior.HoldEnd };
+        DoubleAnimation width = new(target.Width, duration) { EasingFunction = ease, FillBehavior = FillBehavior.HoldEnd };
+        DoubleAnimation height = new(target.Height, duration) { EasingFunction = ease, FillBehavior = FillBehavior.HoldEnd };
+        left.Completed += (_, _) =>
+        {
+            Left = target.Left;
+            Top = target.Top;
+            Width = target.Width;
+            Height = target.Height;
+            BeginAnimation(LeftProperty, null);
+            BeginAnimation(TopProperty, null);
+            BeginAnimation(WidthProperty, null);
+            BeginAnimation(HeightProperty, null);
+            _animatingWindow = false;
+        };
+        BeginAnimation(LeftProperty, left);
+        BeginAnimation(TopProperty, top);
+        BeginAnimation(WidthProperty, width);
+        BeginAnimation(HeightProperty, height);
+    }
+
+    private void OnWideStateChanged()
+    {
+        if (WindowState == WindowState.Normal)
+        {
+            RootContent.Opacity = 1;
+            if (RootContent.RenderTransform is ScaleTransform scale)
+            {
+                scale.ScaleX = 1;
+                scale.ScaleY = 1;
+            }
         }
     }
-
-    private void PlayWindowTransition()
-    {
-        UIElement root = RootContent;
-        DoubleAnimation fade = new(0.55, 1.0, TimeSpan.FromMilliseconds(160))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        root.BeginAnimation(OpacityProperty, fade);
-    }
-
-    private void WideClose_Click(object sender, RoutedEventArgs e) => Close();
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {

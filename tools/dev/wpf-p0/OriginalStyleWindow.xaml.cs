@@ -5219,11 +5219,11 @@ public partial class OriginalStyleWindow : Window
         }
         AppConfig.Set("last_window_mode", "wide");
         AppConfig.Flush();
-        _wideWindow.Show();
-        _wideWindow.Activate();
         Opacity = 0;
         ShowInTaskbar = false;
         Hide();
+        _wideWindow.Show();
+        _wideWindow.Activate();
     }
 
     internal void RefreshWideBackground()
