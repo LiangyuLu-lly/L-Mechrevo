@@ -1456,13 +1456,13 @@ public partial class MainWindow : Window
         {
             ("Keyboard/Ctrl", "键盘灯光",
                 KeyboardFirmwareEffects.Visible(keyboardType).Select(static item => (item.Id, item.Label)).ToArray()),
-            ("HidLightbar/Ctrl", "灯带", LightForm.LightbarEffects),
+            ("HidLightbar/Ctrl", "灯带", LightingCatalog.LightbarEffects),
             ("HidLightbar_Logo/Ctrl", "Logo 灯",
                 hw is not null && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
                     || hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30)
-                    ? LightForm.LogoEffectsGen40 : LightForm.CurrentLogoEffects()),
-            ("HidLightbar_Hinge/Ctrl", "铰链灯", LightForm.HingeEffects),
-            ("HidLightbar_Sync/Ctrl", "同步灯", LightForm.SyncEffects)
+                    ? LightingCatalog.LogoEffectsGen40 : LightingCatalog.CurrentLogoEffects()),
+            ("HidLightbar_Hinge/Ctrl", "铰链灯", LightingCatalog.HingeEffects),
+            ("HidLightbar_Sync/Ctrl", "同步灯", LightingCatalog.SyncEffects)
         };
         bool hasKeyboard = hw?.SupportsKeyboard ?? true;
         bool hasLightbar = hw?.SupportsLightbar ?? true;

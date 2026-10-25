@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Services;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -225,7 +226,7 @@ public partial class LightEditorWindow : Window
         }
         if (_gradeColors)
         {
-            int mode = LightForm.LightEffectColorMode(effect);
+            int mode = LightingCatalog.LightEffectColorMode(effect);
             ColorRow.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
             MixRow.Visibility = mode == 7 ? Visibility.Visible : Visibility.Collapsed;
             if (mode == 7)

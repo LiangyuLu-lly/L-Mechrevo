@@ -66,7 +66,7 @@ public partial class OriginalStyleWindow : Window
     private bool _firstRunChecked;
     private bool _updateCheckStarted;
     private bool _perfRestoreStarted;
-    private CustomModeWindow? _customModeForm;
+    private CustomModeWindow? _customModeWindow;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _lightingIdleSuspended;
     private long _lastLightingConnectionGeneration;
@@ -603,7 +603,7 @@ public partial class OriginalStyleWindow : Window
     internal (string Label, int Seconds)[] WideLightIdleOptions()
     {
         List<(string, int)> options = new();
-        foreach ((string Label, int Mins, int IdleSeconds) option in MechrevoLite.SettingsForm.LightingCloseTimerOptions)
+        foreach ((string Label, int Mins, int IdleSeconds) option in LightingCatalog.LightingCloseTimerOptions)
         {
             options.Add((option.Label, option.IdleSeconds));
         }
@@ -1634,7 +1634,7 @@ public partial class OriginalStyleWindow : Window
 
     private void SyncCustomWindowMode(int mode)
     {
-        if (_customModeForm == null || !_customModeForm.IsVisible)
+        if (_customModeWindow == null || !_customModeWindow.IsVisible)
         {
             return;
         }
@@ -1651,7 +1651,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         _customWindowModeId = id;
-        _customModeForm.BindMode(id);
+        _customModeWindow.BindMode(id);
     }
 
     private void SyncGpuDbForMode(int mode, string reason)
@@ -2646,7 +2646,7 @@ public partial class OriginalStyleWindow : Window
                 sample, acOnline);
             if (sample?.AdapterWatts is int watts)
             {
-                string text = MechrevoLite.SettingsForm.PowerSourceHeadline(kind, watts);
+                string text = SettingsText.PowerSourceHeadline(kind, watts);
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     return text;
@@ -2724,7 +2724,7 @@ public partial class OriginalStyleWindow : Window
                 FillKeyboardEffects();
             }
         }
-        string health = MechrevoLite.SettingsForm.BatteryHealthText(hw);
+        string health = SettingsText.BatteryHealthText(hw);
         string abnormal = hw.BatteryAbnormal ? " · 电池异常" : "";
         string powerState = "";
         try
@@ -3438,14 +3438,14 @@ public partial class OriginalStyleWindow : Window
             L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
             int visualMode = _backendProbe.Service?.CurrentMode ?? 0;
             int profileIndex = MechrevoLite.Mode.ModeProfileConfig.Get(visualMode);
-            if (_customModeForm == null || !_customModeForm.IsVisible)
+            if (_customModeWindow == null || !_customModeWindow.IsVisible)
             {
-                _customModeForm = new CustomModeWindow { Owner = this };
+                _customModeWindow = new CustomModeWindow { Owner = this };
             }
-            _customModeForm.SetDark(_dark);
-            _customModeForm.BindFirmwareProfile(visualMode, profileIndex);
-            _customModeForm.Show();
-            _customModeForm.Activate();
+            _customModeWindow.SetDark(_dark);
+            _customModeWindow.BindFirmwareProfile(visualMode, profileIndex);
+            _customModeWindow.Show();
+            _customModeWindow.Activate();
         }
         catch (Exception ex)
         {
@@ -3494,28 +3494,28 @@ public partial class OriginalStyleWindow : Window
             }
             L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
             string customId = ResolveCustomModeId();
-            if (_customModeForm == null)
+            if (_customModeWindow == null)
             {
-                _customModeForm = new CustomModeWindow(customId) { Owner = this };
-                _customModeForm.SetDark(_dark);
-                _customModeForm.Closed += (_, _) => _customModeForm = null;
+                _customModeWindow = new CustomModeWindow(customId) { Owner = this };
+                _customModeWindow.SetDark(_dark);
+                _customModeWindow.Closed += (_, _) => _customModeWindow = null;
             }
-            if (!_customModeForm.IsVisible)
+            if (!_customModeWindow.IsVisible)
             {
-                _customModeForm.Show();
+                _customModeWindow.Show();
             }
-            _customModeForm.Activate();
+            _customModeWindow.Activate();
             _customWindowModeId = customId;
             if (switchMode)
             {
-                if (!await _customModeForm.SelectModeAsync(customId))
+                if (!await _customModeWindow.SelectModeAsync(customId))
                 {
-                    _customModeForm.BindMode(MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId);
+                    _customModeWindow.BindMode(MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId);
                 }
             }
             else
             {
-                _customModeForm.BindMode(customId);
+                _customModeWindow.BindMode(customId);
             }
         }
         catch (Exception ex)
@@ -3804,9 +3804,9 @@ public partial class OriginalStyleWindow : Window
             && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
                 || hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40))
         {
-            return EffectsForCurrentBackend(MechrevoLite.LightForm.LogoEffectsGen40);
+            return EffectsForCurrentBackend(LightingCatalog.LogoEffectsGen40);
         }
-        return EffectsForCurrentBackend(MechrevoLite.LightForm.CurrentLogoEffects());
+        return EffectsForCurrentBackend(LightingCatalog.CurrentLogoEffects());
     }
 
     private static (string Effect, string Name)[] EffectsForCurrentBackend((string Effect, string Name)[] effects)
@@ -3888,10 +3888,10 @@ public partial class OriginalStyleWindow : Window
         _syncingLighting = true;
         try
         {
-            FillEffects(LightStripEffectCombo, EffectsForCurrentBackend(LightForm.LightbarEffects), "HidLightbar/Ctrl");
+            FillEffects(LightStripEffectCombo, EffectsForCurrentBackend(LightingCatalog.LightbarEffects), "HidLightbar/Ctrl");
             FillEffects(LogoEffectCombo, CurrentLogoEffectsForBackend(), "HidLightbar_Logo/Ctrl");
-            FillEffects(LightHingeEffectCombo, EffectsForCurrentBackend(LightForm.HingeEffects), "HidLightbar_Hinge/Ctrl");
-            FillEffects(LightSyncEffectCombo, EffectsForCurrentBackend(LightForm.SyncEffects), "HidLightbar_Sync/Ctrl");
+            FillEffects(LightHingeEffectCombo, EffectsForCurrentBackend(LightingCatalog.HingeEffects), "HidLightbar_Hinge/Ctrl");
+            FillEffects(LightSyncEffectCombo, EffectsForCurrentBackend(LightingCatalog.SyncEffects), "HidLightbar_Sync/Ctrl");
             ApplyLightChannelBackendVisibility();
         }
         finally
@@ -3966,7 +3966,7 @@ public partial class OriginalStyleWindow : Window
             if (IsHidKeyboard(hw))
             {
                 EnsureKeyboardRgbConfig();
-                (int Mode, string Name)[] hidEffects = MechrevoLite.RgbForm.VisibleHidEffects(
+                (int Mode, string Name)[] hidEffects = LightingCatalog.VisibleHidEffects(
                     hw?.Capabilities.KeyboardType ?? 0);
                 int selectedMode = Program.rgb?.KbHidMode ?? (hidEffects.Length > 0 ? hidEffects[0].Mode : 1);
                 int hidIndex = 0;
@@ -4079,10 +4079,10 @@ public partial class OriginalStyleWindow : Window
         {
             KeyboardLightSwitch.IsChecked = false;
         }
-        LightStripSwitch.IsChecked = LoadChannelPower("HidLightbar/Ctrl", LightForm.LightbarEffects[0].Effect);
+        LightStripSwitch.IsChecked = LoadChannelPower("HidLightbar/Ctrl", LightingCatalog.LightbarEffects[0].Effect);
         LogoLightSwitch.IsChecked = LoadChannelPower("HidLightbar_Logo/Ctrl", CurrentLogoEffectsForBackend()[0].Effect);
-        LightHingeSwitch.IsChecked = LoadChannelPower("HidLightbar_Hinge/Ctrl", LightForm.HingeEffects[0].Effect);
-        LightSyncSwitch.IsChecked = LoadChannelPower("HidLightbar_Sync/Ctrl", LightForm.SyncEffects[0].Effect);
+        LightHingeSwitch.IsChecked = LoadChannelPower("HidLightbar_Hinge/Ctrl", LightingCatalog.HingeEffects[0].Effect);
+        LightSyncSwitch.IsChecked = LoadChannelPower("HidLightbar_Sync/Ctrl", LightingCatalog.SyncEffects[0].Effect);
         FillLightIdleOptions();
     }
 
@@ -4097,7 +4097,7 @@ public partial class OriginalStyleWindow : Window
             if (baolongda)
             {
                 current = MechrevoHw.GetKeyboardAutoOffSeconds();
-                foreach ((string Label, int Seconds) option in MechrevoLite.SettingsForm.KeyboardAutoOffOptions)
+                foreach ((string Label, int Seconds) option in LightingCatalog.KeyboardAutoOffOptions)
                 {
                     LightIdleCombo.Items.Add(new ComboBoxItem { Content = option.Label, Tag = option.Seconds.ToString() });
                 }
@@ -4105,7 +4105,7 @@ public partial class OriginalStyleWindow : Window
             else
             {
                 current = AppConfig.Get("lighting_idle_seconds", 0);
-                foreach ((string Label, int Mins, int IdleSeconds) option in MechrevoLite.SettingsForm.LightingCloseTimerOptions)
+                foreach ((string Label, int Mins, int IdleSeconds) option in LightingCatalog.LightingCloseTimerOptions)
                 {
                     LightIdleCombo.Items.Add(new ComboBoxItem { Content = option.Label, Tag = option.IdleSeconds.ToString() });
                 }
@@ -4371,10 +4371,10 @@ public partial class OriginalStyleWindow : Window
         }
         string defaultEffect = topic switch
         {
-            "HidLightbar/Ctrl" => LightForm.LightbarEffects[0].Effect,
+            "HidLightbar/Ctrl" => LightingCatalog.LightbarEffects[0].Effect,
             "HidLightbar_Logo/Ctrl" => CurrentLogoEffectsForBackend()[0].Effect,
-            "HidLightbar_Hinge/Ctrl" => LightForm.HingeEffects[0].Effect,
-            _ => LightForm.SyncEffects[0].Effect
+            "HidLightbar_Hinge/Ctrl" => LightingCatalog.HingeEffects[0].Effect,
+            _ => LightingCatalog.SyncEffects[0].Effect
         };
         LightChannelSettings saved = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, defaultEffect);
         if (!saved.PowerExplicit)
@@ -4652,7 +4652,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar/Ctrl", "灯带灯光", EffectsForCurrentBackend(LightForm.LightbarEffects));
+        OpenLightEditor("HidLightbar/Ctrl", "灯带灯光", EffectsForCurrentBackend(LightingCatalog.LightbarEffects));
     }
 
     private KeyboardRgb? EnsureKeyboardRgb()
@@ -4752,7 +4752,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar_Hinge/Ctrl", "铰链灯光", EffectsForCurrentBackend(LightForm.HingeEffects));
+        OpenLightEditor("HidLightbar_Hinge/Ctrl", "铰链灯光", EffectsForCurrentBackend(LightingCatalog.HingeEffects));
     }
 
     private async void LightSyncSwitch_Click(object sender, RoutedEventArgs e)
@@ -4821,7 +4821,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar_Sync/Ctrl", "同步灯光", EffectsForCurrentBackend(LightForm.SyncEffects));
+        OpenLightEditor("HidLightbar_Sync/Ctrl", "同步灯光", EffectsForCurrentBackend(LightingCatalog.SyncEffects));
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)

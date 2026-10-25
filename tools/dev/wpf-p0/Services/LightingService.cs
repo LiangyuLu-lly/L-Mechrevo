@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Services;
 
 namespace L_Mechrevo.WpfP0.Services;
 
@@ -167,7 +168,7 @@ internal sealed class LightingService : ILightingService
             List<LightIdleOption> options = new();
             try
             {
-                foreach ((string label, int mins, int idleSeconds) in MechrevoLite.SettingsForm.LightingCloseTimerOptions)
+                foreach ((string label, int mins, int idleSeconds) in LightingCatalog.LightingCloseTimerOptions)
                 {
                     options.Add(new LightIdleOption(label, mins, idleSeconds));
                 }

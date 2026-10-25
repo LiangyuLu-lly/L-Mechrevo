@@ -8,6 +8,7 @@ using System.Windows.Threading;
 
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Services;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -92,7 +93,7 @@ public partial class CustomModeWindow : Window
                 continue;
             }
             else if (!string.Equals(mode.Id, target, StringComparison.Ordinal)
-                && !MechrevoLite.CustomModeForm.IsOffered(mode, L_Mechrevo.WpfP0.Services.WpfBackend.Hw))
+                && !PerfModeCapabilities.IsOffered(mode, L_Mechrevo.WpfP0.Services.WpfBackend.Hw))
             {
                 continue;
             }
@@ -366,7 +367,7 @@ public partial class CustomModeWindow : Window
         }
         bool locked = L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
-            && MechrevoLite.CustomModeForm.IsGen40Plus(lockHw)
+            && PerfModeCapabilities.IsGen40Plus(lockHw)
             && _current?.IsCustom != true;
         CpuPowerCard.IsEnabled = !locked;
         TempGpuCard.IsEnabled = !locked;

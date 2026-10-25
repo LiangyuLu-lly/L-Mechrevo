@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Services;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -17,7 +18,7 @@ public partial class HidKeyboardWindow : Window
     {
         InitializeComponent();
         _rgb = rgb;
-        _effects = MechrevoLite.RgbForm.VisibleHidEffects(L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.Capabilities.KeyboardType ?? 0);
+        _effects = LightingCatalog.VisibleHidEffects(L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.Capabilities.KeyboardType ?? 0);
         PowerCheck.IsChecked = _rgb.KbPowerOn;
         BrightnessSlider.Value = Math.Clamp(_rgb.Brightness, 0, 100);
         BrightnessText.Text = ((int)BrightnessSlider.Value) + "%";

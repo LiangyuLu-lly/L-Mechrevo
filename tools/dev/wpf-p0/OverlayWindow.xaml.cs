@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using L_Mechrevo.WpfP0.Services;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -158,7 +159,7 @@ public partial class OverlayWindow : Window
             MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(sample, acOnline);
             if (sample?.AdapterWatts is int watts)
             {
-                string text = MechrevoLite.SettingsForm.PowerSourceHeadline(kind, watts);
+                string text = SettingsText.PowerSourceHeadline(kind, watts);
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     return text;
