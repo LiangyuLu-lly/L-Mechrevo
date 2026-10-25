@@ -3,11 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         mc:Ignorable="d"
-        Title="L-Mechrevo · WPF P0"
-        Width="1180" Height="800"
-        MinWidth="980" MinHeight="680"
+        Title="L-Mechrevo · 宽屏"
+        Width="1280" Height="820"
+        MinWidth="1080" MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -17,15 +16,38 @@
         SnapsToDevicePixels="True"
         Icon="Assets/Icons/app.png">
 
+    <Window.Resources>
+        <Style x:Key="PageTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}" />
+        <Style x:Key="TileButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="Height" Value="92" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="Padding" Value="14,12" />
+        </Style>
+        <Style x:Key="MetricValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="MetricUnit" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Margin" Value="3,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+        </Style>
+    </Window.Resources>
+
     <Grid>
-        <!-- P0：真实背景图（cover）+ 可调压暗层；卡片/控件全部半透明，滚动由 ScrollViewer 合成平移。 -->
         <Image x:Name="BackgroundImage" Source="Assets/background.jpg" Stretch="UniformToFill" Opacity="0.78" />
         <Rectangle x:Name="BackgroundScrim" Fill="#99000000" Opacity="0.35" />
 
-        <Grid Margin="26,22,26,18">
+        <Grid Margin="24,18,24,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="18" />
+                <RowDefinition Height="14" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -37,17 +59,17 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
                 <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center">
                     <TextBlock Text="L" FontSize="18" FontWeight="Bold" Foreground="White"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="L-Mechrevo" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock Text="WPF P0 · 背景图 / 半透明卡片 / 合成滚动 / 主题色" Style="{StaticResource MutedText}" />
+                    <TextBlock Text="宽屏控制中心 · 首页 / 灯光 / 自定义 / 更多开关" Style="{StaticResource MutedText}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="ThemeButton" Content="切换浅色" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,6,10,6" />
+                    <Button Content="切换浅色" x:Name="ThemeButton" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,0,10,0" />
+                    <Button Content="小窗" Style="{StaticResource GhostButton}" Click="CompactButton_Click" Margin="0,0,10,0" />
                     <Border Background="#22000000" CornerRadius="10" Padding="10,7">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="强调色" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -61,217 +83,214 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 左侧导航 + 主内容 -->
+            <!-- 左侧导航 + 页面 -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="218" />
-                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="196" />
+                    <ColumnDefinition Width="14" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0" Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="导航" Style="{StaticResource MutedText}" Margin="2,0,0,10" />
-                        <Button Content="仪表盘" Style="{StaticResource NavButton}" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource TextBrush}" />
-                        <Button Content="性能模式" Style="{StaticResource NavButton}" />
-                        <Button Content="显卡 / 显示" Style="{StaticResource NavButton}" />
-                        <Button Content="电池" Style="{StaticResource NavButton}" />
-                        <Button Content="风扇曲线" Style="{StaticResource NavButton}" />
-                        <Button Content="灯光" Style="{StaticResource NavButton}" />
-                        <Button Content="设置" Style="{StaticResource NavButton}" />
-                        <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="6,12,6,12" />
-                        <TextBlock Text="P0 验证点" FontSize="12" FontWeight="SemiBold" Margin="2,0,0,6" />
-                        <TextBlock Text="背景图 cover&#10;半透明卡片&#10;ScrollViewer 合成滚动&#10;主题色即时切换&#10;DPI / 字体" Style="{StaticResource MutedText}" LineHeight="19" />
+                        <Button x:Name="NavHome" Content="首页" Tag="home" Style="{StaticResource NavButton}" Click="Nav_Click" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource TextBrush}" />
+                        <Button x:Name="NavLighting" Content="灯光" Tag="lighting" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Button x:Name="NavCustom" Content="自定义" Tag="custom" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Button x:Name="NavSwitches" Content="更多开关" Tag="switches" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="6,14,6,14" />
+                        <TextBlock Text="快捷入口" FontSize="12" FontWeight="SemiBold" Margin="2,0,0,8" />
+                        <Button Content="小窗控制" Style="{StaticResource NavButton}" Click="CompactButton_Click" />
+                        <TextBlock Text="P0 宽屏界面" Style="{StaticResource MutedText}" Margin="2,18,0,4" />
+                        <TextBlock Text="四页布局&#10;磁贴式开关&#10;独立窗口" Style="{StaticResource MutedText}" LineHeight="19" />
                     </StackPanel>
                 </Border>
 
-                <ScrollViewer Grid.Column="2" x:Name="MainScroll"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              PanningMode="VerticalOnly"
-                              CanContentScroll="False"
-                              Background="Transparent"
-                              Padding="0,0,4,0">
-                    <StackPanel>
+                <Grid Grid.Column="2">
+                    <!-- 首页 -->
+                    <ScrollViewer x:Name="HomePage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" CanContentScroll="False">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="首页" Style="{StaticResource PageTitle}" />
+                                    <TextBlock Text="传感器、性能模式、显卡模式、显示与快捷磁贴" Style="{StaticResource MutedText}" Margin="0,3,0,0" />
+                                </StackPanel>
+                            </Grid>
 
-                        <!-- 性能模式 -->
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <Grid>
+                                        <TextBlock Text="传感器" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="实时" HorizontalAlignment="Right" Style="{StaticResource MutedText}" />
+                                    </Grid>
+                                    <UniformGrid Columns="4" Margin="0,14,0,0">
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="CPU 温度" Style="{StaticResource MutedText}" />
+                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="CpuTempText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="℃" Style="{StaticResource MetricUnit}" /></StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="GPU 温度" Style="{StaticResource MutedText}" />
+                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="GpuTempText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="℃" Style="{StaticResource MetricUnit}" /></StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="CPU 功耗" Style="{StaticResource MutedText}" />
+                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="CpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="W" Style="{StaticResource MetricUnit}" /></StackPanel>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="GPU 功耗" Style="{StaticResource MutedText}" />
+                                            <StackPanel Orientation="Horizontal"><TextBlock x:Name="GpuPowerText" Text="--" Style="{StaticResource MetricValue}" /><TextBlock Text="W" Style="{StaticResource MetricUnit}" /></StackPanel>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <Grid Margin="0,3,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource Card}">
                                     <StackPanel>
-                                        <TextBlock Text="性能模式" Style="{StaticResource SectionTitle}" />
-                                        <TextBlock Text="分段按钮 + 强调色高亮，全部半透明叠在底图上" Style="{StaticResource MutedText}" Margin="0,3,0,0" />
+                                        <TextBlock Text="性能模式" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="当前：平衡" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <ToggleButton Content="平衡" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                            <ToggleButton Content="狂暴" Style="{StaticResource SegmentButton}" />
+                                            <ToggleButton Content="自定义" Style="{StaticResource SegmentButton}" />
+                                        </StackPanel>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="当前：平衡" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                                </Grid>
-                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                                    <ToggleButton Content="平衡" Style="{StaticResource SegmentButton}" IsChecked="True" />
-                                    <ToggleButton Content="狂暴" Style="{StaticResource SegmentButton}" />
-                                    <ToggleButton Content="自定义" Style="{StaticResource SegmentButton}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 快捷开关 -->
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <TextBlock Text="快捷开关" Style="{StaticResource SectionTitle}" />
-                                <UniformGrid Columns="2" Rows="2" Margin="0,12,0,0">
-                                    <CheckBox Content="无线网络" Style="{StaticResource SwitchBox}" IsChecked="True" Margin="0,6,10,6" />
-                                    <CheckBox Content="蓝牙" Style="{StaticResource SwitchBox}" IsChecked="True" Margin="0,6,10,6" />
-                                    <CheckBox Content="摄像头" Style="{StaticResource SwitchBox}" Margin="0,6,10,6" />
-                                    <CheckBox Content="麦克风" Style="{StaticResource SwitchBox}" Margin="0,6,0,6" />
-                                </UniformGrid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 显卡 + 显示 -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="14" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Border Grid.Column="0" Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="显卡" Style="{StaticResource SectionTitle}" />
-                                    <TextBlock Text="NVIDIA GeForce RTX 4060 Laptop" Style="{StaticResource MutedText}" Margin="0,3,0,14" />
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="GPU 温度" Style="{StaticResource MutedText}" />
-                                        <TextBlock Grid.Column="1" Text="54 ℃" FontWeight="SemiBold" />
-                                    </Grid>
-                                    <ProgressBar Height="7" Minimum="0" Maximum="100" Value="38" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource TrackBrush}" BorderThickness="0" />
-                                    <Grid Margin="0,12,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="显存占用" Style="{StaticResource MutedText}" />
-                                        <TextBlock Grid.Column="1" Text="2.1 / 8 GB" FontWeight="SemiBold" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Grid.Column="2" Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="显示" Style="{StaticResource SectionTitle}" />
-                                    <TextBlock Text="2560 × 1600 · 165 Hz" Style="{StaticResource MutedText}" Margin="0,3,0,14" />
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="刷新率" Style="{StaticResource MutedText}" />
-                                        <TextBlock Grid.Column="1" Text="165 Hz" FontWeight="SemiBold" />
-                                    </Grid>
-                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                        <ToggleButton Content="60" Style="{StaticResource SegmentButton}" Padding="14,7" />
-                                        <ToggleButton Content="120" Style="{StaticResource SegmentButton}" Padding="14,7" />
-                                        <ToggleButton Content="165" Style="{StaticResource SegmentButton}" Padding="14,7" IsChecked="True" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <!-- 电池 -->
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="电池" Style="{StaticResource SectionTitle}" />
-                                    <TextBlock Grid.Column="1" Text="82% · 正在充电" Foreground="{DynamicResource AccentBrush}" />
-                                </Grid>
-                                <Grid Margin="0,14,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Slider Minimum="40" Maximum="100" Value="80" TickFrequency="5" IsSnapToTickEnabled="True" />
-                                    <TextBlock Grid.Column="1" Text="80%" Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" />
-                                </Grid>
-                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                                    <CheckBox Content="限制充电上限" Style="{StaticResource SwitchBox}" IsChecked="True" Margin="0,0,24,0" />
-                                    <CheckBox Content="无界电池电压修复(实验性)" Style="{StaticResource SwitchBox}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 风扇曲线 -->
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="风扇曲线" Style="{StaticResource SectionTitle}" />
-                                    <TextBlock Grid.Column="1" Text="CPU 30% · GPU 30%" Style="{StaticResource MutedText}" />
-                                </Grid>
-                                <Border Height="150" Margin="0,14,0,0" Background="#18000000" CornerRadius="10" ClipToBounds="True">
-                                    <Canvas x:Name="FanCanvas" Background="Transparent">
-                                        <Polyline Stroke="{DynamicResource AccentBrush}" StrokeThickness="3"
-                                                  Points="20,120 120,105 220,80 320,48 420,30 520,20 620,16" />
-                                        <Polyline Stroke="#66FFFFFF" StrokeThickness="1.5"
-                                                  Points="20,125 120,110 220,96 320,80 420,62 520,48 620,40" />
-                                    </Canvas>
                                 </Border>
-                                <TextBlock Text="拖拽点、温度轴与闭环状态在 P1 接入" Style="{StaticResource MutedText}" Margin="0,8,0,0" />
-                            </StackPanel>
-                        </Border>
+                                <Border Grid.Column="2" Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Text="显卡模式" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="当前：混合输出" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <ToggleButton Content="混合" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                            <ToggleButton Content="独显" Style="{StaticResource SegmentButton}" />
+                                            <ToggleButton Content="集显" Style="{StaticResource SegmentButton}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
 
-                        <!-- 外观设置：验证动态主题/背景 -->
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <TextBlock Text="外观（P0 验证）" Style="{StaticResource SectionTitle}" />
-                                <Grid Margin="0,14,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="背景图不透明度" />
-                                    <TextBlock Grid.Column="1" x:Name="BackgroundOpacityLabel" Text="62%" Style="{StaticResource MutedText}" />
-                                </Grid>
-                                <Slider x:Name="BackgroundOpacitySlider" Minimum="0" Maximum="100" Value="62" Margin="0,6,0,12"
-                                        ValueChanged="BackgroundOpacitySlider_ValueChanged" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="内容压暗" />
-                                    <TextBlock Grid.Column="1" x:Name="ScrimLabel" Text="60%" Style="{StaticResource MutedText}" />
-                                </Grid>
-                                <Slider x:Name="ScrimSlider" Minimum="0" Maximum="100" Value="60" Margin="0,6,0,0"
-                                        ValueChanged="ScrimSlider_ValueChanged" />
-                            </StackPanel>
-                        </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="2560 × 1600 · 刷新率" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <ToggleButton Content="60 Hz" Style="{StaticResource SegmentButton}" />
+                                        <ToggleButton Content="120 Hz" Style="{StaticResource SegmentButton}" />
+                                        <ToggleButton Content="165 Hz" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
 
-                        <TextBlock Text="P0 原型：WPF 视觉树 + Image(cover) + 半透明 Border + ScrollViewer 平移；逻辑库/硬件层尚未接入。"
-                                   Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="2,0,2,18" />
-                    </StackPanel>
-                </ScrollViewer>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="快捷磁贴" Style="{StaticResource CardTitle}" Margin="0,0,0,10" />
+                                    <UniformGrid Columns="4">
+                                        <Button Style="{StaticResource TileButton}" Tag="wifi" Click="QuickTile_Click">
+                                            <StackPanel><TextBlock Text="WiFi" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="已连接" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
+                                        </Button>
+                                        <Button Style="{StaticResource TileButton}" Tag="bt" Click="QuickTile_Click">
+                                            <StackPanel><TextBlock Text="蓝牙" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="已开启" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
+                                        </Button>
+                                        <Button Style="{StaticResource TileButton}" Tag="webcam" Click="QuickTile_Click">
+                                            <StackPanel><TextBlock Text="摄像头" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="关" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
+                                        </Button>
+                                        <Button Style="{StaticResource TileButton}" Tag="micmute" Click="QuickTile_Click">
+                                            <StackPanel><TextBlock Text="麦克风" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="未静音" Style="{StaticResource MutedText}" Margin="0,4,0,0" /></StackPanel>
+                                        </Button>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- 灯光 -->
+                    <ScrollViewer x:Name="LightingPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                        <StackPanel>
+                            <TextBlock Text="灯光" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="键盘、灯带、Logo、铰链与同步灯" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                            <UniformGrid Columns="2">
+                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
+                                    <StackPanel>
+                                        <TextBlock Text="键盘灯光" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="单分区 / 四分区 / per-key HID" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="打开键盘灯光" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="Keyboard/Ctrl" Click="LightEdit_Click" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="6,0,0,6">
+                                    <StackPanel>
+                                        <TextBlock Text="灯带" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="效果、亮度、速度与混色" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="打开灯带设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar/Ctrl" Click="LightEdit_Click" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
+                                    <StackPanel>
+                                        <TextBlock Text="Logo 灯" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="Gen40 Logo 效果与亮度" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="打开 Logo 设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar_Logo/Ctrl" Click="LightEdit_Click" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="6,0,0,6">
+                                    <StackPanel>
+                                        <TextBlock Text="铰链灯" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="铰链灯光效果" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="打开铰链设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar_Hinge/Ctrl" Click="LightEdit_Click" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
+                                    <StackPanel>
+                                        <TextBlock Text="同步灯" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="同步灯光效果" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="打开同步设置" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Tag="HidLightbar_Sync/Ctrl" Click="LightEdit_Click" />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- 自定义 -->
+                    <ScrollViewer x:Name="CustomPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                        <StackPanel>
+                            <TextBlock Text="自定义" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="自定义性能模式与风扇曲线" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                            <UniformGrid Columns="2">
+                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
+                                    <StackPanel>
+                                        <TextBlock Text="自定义模式" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="CPU / GPU 功耗与模式参数" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="打开自定义模式" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="CustomMode_Click" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="6,0,0,6">
+                                    <StackPanel>
+                                        <TextBlock Text="风扇曲线" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="温度 / 转速曲线与平滑" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="打开风扇曲线" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="FanCurve_Click" />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- 更多开关 -->
+                    <ScrollViewer x:Name="SwitchesPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                        <StackPanel>
+                            <TextBlock Text="更多开关" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="以磁贴形式排列的快捷开关" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <UniformGrid x:Name="MoreSwitchGrid" Columns="3" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
             </Grid>
 
-            <!-- 底栏 -->
             <Grid Grid.Row="3">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="StatusText" Text="L-Mechrevo WPF P0 · 滚动 / 背景 / 主题验证" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="仅原型，不替代 WinForms 版本" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                <TextBlock x:Name="StatusText" Text="就绪" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                <TextBlock Text="L-Mechrevo · 宽屏 P0" Style="{StaticResource MutedText}" HorizontalAlignment="Right" VerticalAlignment="Center" />
             </Grid>
         </Grid>
     </Grid>
