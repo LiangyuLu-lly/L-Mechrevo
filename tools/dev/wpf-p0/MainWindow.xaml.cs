@@ -23,6 +23,13 @@ public partial class MainWindow : Window
     private RingGauge? _gpuFanRing;
     private TextBlock? _cpuDutyText;
     private TextBlock? _gpuDutyText;
+    private TextBlock? _batteryInfoText;
+    private TextBlock? _chargeLimitText;
+    private TextBlock? _displayBrightnessText;
+    private Slider? _displayBrightness;
+    private CheckBox? _autoRefresh;
+    private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
+    private readonly List<(string Topic, Button Toggle, TextBlock Effect, LightChannelSettings Settings)> _lightRows = new();
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -34,6 +41,7 @@ public partial class MainWindow : Window
         BackgroundScrim.Visibility = Visibility.Collapsed;
         BuildMoreSwitchTiles();
         BuildSensorBlocks();
+        BuildHomeExtras();
         BuildLightingCards();
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
@@ -73,6 +81,7 @@ public partial class MainWindow : Window
         _gpuFanRing?.SetValue(ParseNumber(gpuFan), fanMax, "rpm");
         if (_cpuDutyText != null) _cpuDutyText.Text = "占空比 " + cpuFanDuty;
         if (_gpuDutyText != null) _gpuDutyText.Text = "占空比 " + gpuFanDuty;
+        RefreshHomeExtras();
     }
 
     private static void SetMetric(List<(RoundedBar Bar, TextBlock Value, string Unit)> metrics, int index, double value, string unit)
@@ -324,6 +333,163 @@ public partial class MainWindow : Window
             tile.Content = content;
             tile.Click += MoreSwitch_Click;
             MoreSwitchGrid.Children.Add(tile);
+        }
+    }
+
+    private void BuildHomeExtras()
+    {
+        if (_owner == null || HomeExtrasPanel == null)
+        {
+            return;
+        }
+        (string info, int mode, string charge) = _owner.WideBattery();
+        StackPanel battery = new();
+        battery.Children.Add(new TextBlock { Text = "电池", Style = (Style)FindResource("CardTitle") });
+        _batteryInfoText = new TextBlock { Text = info, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 4, 0, 8) };
+        battery.Children.Add(_batteryInfoText);
+        StackPanel modes = new() { Orientation = Orientation.Horizontal };
+        string[] labels = { "长效模式", "平衡模式", "工作站模式" };
+        for (int i = 0; i < labels.Length; i++)
+        {
+            int target = i;
+            ToggleButton button = new()
+            {
+                Content = labels[i],
+                Style = (Style)FindResource("SegmentButton"),
+                IsChecked = mode == i,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            button.Click += (_, _) =>
+            {
+                _owner?.WideSetBatteryMode(target);
+                StatusText.Text = "电池模式已请求：" + labels[target];
+            };
+            modes.Children.Add(button);
+        }
+        battery.Children.Add(modes);
+        _chargeLimitText = new TextBlock { Text = charge, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
+        battery.Children.Add(_chargeLimitText);
+        HomeExtrasPanel.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = battery });
+
+        (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
+        DisplayInfoText.Text = displayInfo;
+        DisplayRefreshPanel.Children.Clear();
+        _displayRefreshButtons.Clear();
+        foreach (int hz in new[] { 60, Math.Max(120, maxHz / 2), Math.Max(60, maxHz) }.Distinct())
+        {
+            int target = hz;
+            ToggleButton button = new()
+            {
+                Content = hz + " Hz",
+                Tag = hz.ToString(),
+                Style = (Style)FindResource("SegmentButton"),
+                IsChecked = hz == currentHz,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            button.Click += (_, _) => _owner?.WideSetRefresh(target);
+            DisplayRefreshPanel.Children.Add(button);
+            _displayRefreshButtons.Add((button, hz));
+        }
+        StackPanel brightnessRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+        brightnessRow.Children.Add(new TextBlock { Text = "亮度", Style = (Style)FindResource("MutedText"), Width = 54, VerticalAlignment = VerticalAlignment.Center });
+        _displayBrightness = new Slider { Minimum = 0, Maximum = 100, Value = brightness, Width = 220, Style = (Style)FindResource("RoundSlider") };
+        _displayBrightness.ValueChanged += (_, _) => _owner?.WideSetBrightness((int)Math.Round(_displayBrightness.Value));
+        _displayBrightnessText = new TextBlock { Text = brightness + "%", Style = (Style)FindResource("MutedText"), Width = 46, TextAlignment = TextAlignment.Right };
+        brightnessRow.Children.Add(_displayBrightness);
+        brightnessRow.Children.Add(_displayBrightnessText);
+        _autoRefresh = new CheckBox
+        {
+            Content = "自动刷新率",
+            Style = (Style)FindResource("HeaderSwitch"),
+            IsChecked = auto,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        _autoRefresh.Click += (_, _) => _owner?.WideSetAutoRefresh(_autoRefresh.IsChecked == true);
+        DisplayDetailsPanel.Children.Add(brightnessRow);
+        DisplayDetailsPanel.Children.Add(_autoRefresh);
+
+        (string topic, string label)[] lightChannels =
+        {
+            ("Keyboard/Ctrl", "键盘"),
+            ("HidLightbar/Ctrl", "灯带"),
+            ("HidLightbar_Logo/Ctrl", "Logo 灯"),
+            ("HidLightbar_Hinge/Ctrl", "铰链灯"),
+            ("HidLightbar_Sync/Ctrl", "同步灯")
+        };
+        StackPanel lights = new();
+        lights.Children.Add(new TextBlock { Text = "灯光", Style = (Style)FindResource("CardTitle") });
+        lights.Children.Add(new TextBlock { Text = "非编辑页：只显示状态与开关，详细参数到灯光页", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 3, 0, 8) });
+        foreach ((string topic, string label) in lightChannels)
+        {
+            LightChannelSettings settings = LightingSettingsStore.Load(topic, "Single");
+            Grid row = new() { Margin = new Thickness(0, 0, 0, 6) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            TextBlock name = new() { Text = label, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center };
+            TextBlock effect = new() { Text = settings.Effect, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center };
+            Button toggle = new()
+            {
+                Content = settings.PowerOn ? "开" : "关",
+                Style = (Style)FindResource("FlatButton"),
+                Tag = topic
+            };
+            toggle.Click += async (_, _) =>
+            {
+                bool turnOn = toggle.Content as string != "开";
+                LightChannelSettings current = LightingSettingsStore.Load(topic, "Single");
+                if (_probe != null)
+                {
+                    if (topic == "Keyboard/Ctrl")
+                    {
+                        await _probe.SetKeyboardPowerAsync(turnOn);
+                    }
+                    else
+                    {
+                        await _probe.SetLightPowerAsync(topic, turnOn);
+                    }
+                }
+                LightingSettingsStore.SavePower(topic, turnOn, "宽屏灯光摘要");
+                toggle.Content = turnOn ? "开" : "关";
+                StatusText.Text = label + (turnOn ? " 已打开" : " 已关闭");
+            };
+            Grid.SetColumn(name, 0);
+            Grid.SetColumn(effect, 1);
+            Grid.SetColumn(toggle, 2);
+            row.Children.Add(name);
+            row.Children.Add(effect);
+            row.Children.Add(toggle);
+            lights.Children.Add(row);
+            _lightRows.Add((topic, toggle, effect, settings));
+        }
+        HomeExtrasPanel.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = lights });
+    }
+
+    private void RefreshHomeExtras()
+    {
+        if (_owner == null)
+        {
+            return;
+        }
+        if (_batteryInfoText != null) _batteryInfoText.Text = _owner.WideBattery().Info;
+        if (_chargeLimitText != null) _chargeLimitText.Text = _owner.WideBattery().Charge;
+        (string info, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
+        DisplayInfoText.Text = info;
+        if (_displayBrightnessText != null) _displayBrightnessText.Text = brightness + "%";
+        if (_displayBrightness != null && Math.Abs(_displayBrightness.Value - brightness) > 1)
+        {
+            _displayBrightness.Value = brightness;
+        }
+        foreach ((ToggleButton button, int hz) in _displayRefreshButtons)
+        {
+            button.IsChecked = hz == currentHz;
+        }
+        if (_autoRefresh != null) _autoRefresh.IsChecked = auto;
+        foreach ((string topic, Button toggle, TextBlock effect, LightChannelSettings _) in _lightRows)
+        {
+            LightChannelSettings settings = LightingSettingsStore.Load(topic, "Single");
+            toggle.Content = settings.PowerOn ? "开" : "关";
+            effect.Text = settings.Effect;
         }
     }
 

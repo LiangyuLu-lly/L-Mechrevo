@@ -178,14 +178,13 @@
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
-                                    <TextBlock Text="2560 × 1600 · 刷新率" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                    <StackPanel Orientation="Horizontal">
-                                        <ToggleButton Content="60 Hz" Tag="60" Style="{StaticResource SegmentButton}" Click="Refresh_Click" />
-                                        <ToggleButton Content="120 Hz" Tag="120" Style="{StaticResource SegmentButton}" Click="Refresh_Click" />
-                                        <ToggleButton Content="165 Hz" Tag="165" Style="{StaticResource SegmentButton}" IsChecked="True" Click="Refresh_Click" />
-                                    </StackPanel>
+                                    <TextBlock x:Name="DisplayInfoText" Text="—" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                    <StackPanel x:Name="DisplayRefreshPanel" Orientation="Horizontal" />
+                                    <StackPanel x:Name="DisplayDetailsPanel" Margin="0,10,0,0" />
                                 </StackPanel>
                             </Border>
+
+                            <StackPanel x:Name="HomeExtrasPanel" />
 
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>

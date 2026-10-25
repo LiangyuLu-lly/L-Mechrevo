@@ -340,6 +340,59 @@ public partial class OriginalStyleWindow : Window
         return await _backendProbe.SwitchQuickAsync(key, !current);
     }
 
+    internal (string Info, int Mode, string Charge) WideBattery()
+    {
+        try
+        {
+            return (BatteryInfo.Text, _backendProbe?.BatteryMode ?? -1, ChargeLimitStatus.Text);
+        }
+        catch
+        {
+            return ("电池 —", -1, "");
+        }
+    }
+
+    internal void WideSetBatteryMode(int mode)
+    {
+        ToggleButton? target = mode switch
+        {
+            0 => BatteryLongButton,
+            1 => BatteryBalancedButton,
+            2 => BatteryWorkButton,
+            _ => null
+        };
+        if (target != null)
+        {
+            BatteryMode_Click(target, new RoutedEventArgs());
+        }
+    }
+
+    internal (string Info, int CurrentHz, int MaxHz, bool Auto, int Brightness) WideDisplay()
+    {
+        try
+        {
+            System.Drawing.Rectangle bounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 0, 0);
+            int current = MechrevoLite.Display.ScreenNative.GetRefreshRate(null);
+            string info = bounds.Width + " × " + bounds.Height + " · " + Math.Max(0, current) + " Hz";
+            return (info, current, _refreshHighHz, AutoRefreshSwitch.IsChecked == true, (int)Math.Round(BrightnessSlider.Value));
+        }
+        catch
+        {
+            return ("显示 —", -1, -1, false, 100);
+        }
+    }
+
+    internal void WideSetBrightness(int brightness)
+    {
+        BrightnessSlider.Value = Math.Clamp(brightness, 0, 100);
+    }
+
+    internal void WideSetAutoRefresh(bool enabled)
+    {
+        AutoRefreshSwitch.IsChecked = enabled;
+        AutoRefresh_Click(AutoRefreshSwitch, new RoutedEventArgs());
+    }
+
     internal (string CpuTemp, string GpuTemp, string CpuFan, string GpuFan, string CpuUsage, string GpuUsage, string CpuFanDuty, string GpuFanDuty, string CpuFreq, string GpuFreq, string FanMax, string CpuPower, string GpuPower, string GpuMemFreq) WideSensors()
     {
         MechrevoHw? hardware = _backendProbe?.Hw;
