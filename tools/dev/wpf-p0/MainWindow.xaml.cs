@@ -29,7 +29,6 @@ public partial class MainWindow : Window
     private Slider? _displayBrightness;
     private CheckBox? _autoRefresh;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
-    private readonly List<(string Topic, Button Toggle, TextBlock Effect, LightChannelSettings Settings)> _lightRows = new();
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -338,7 +337,7 @@ public partial class MainWindow : Window
 
     private void BuildHomeExtras()
     {
-        if (_owner == null || HomeExtrasPanel == null)
+        if (_owner == null)
         {
             return;
         }
@@ -408,61 +407,6 @@ public partial class MainWindow : Window
         DisplayDetailsPanel.Children.Add(brightnessRow);
         DisplayDetailsPanel.Children.Add(_autoRefresh);
 
-        (string topic, string label)[] lightChannels =
-        {
-            ("Keyboard/Ctrl", "键盘"),
-            ("HidLightbar/Ctrl", "灯带"),
-            ("HidLightbar_Logo/Ctrl", "Logo 灯"),
-            ("HidLightbar_Hinge/Ctrl", "铰链灯"),
-            ("HidLightbar_Sync/Ctrl", "同步灯")
-        };
-        StackPanel lights = new();
-        lights.Children.Add(new TextBlock { Text = "灯光", Style = (Style)FindResource("CardTitle") });
-        lights.Children.Add(new TextBlock { Text = "非编辑页：只显示状态与开关，详细参数到灯光页", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 3, 0, 8) });
-        foreach ((string topic, string label) in lightChannels)
-        {
-            LightChannelSettings settings = LightingSettingsStore.Load(topic, "Single");
-            Grid row = new() { Margin = new Thickness(0, 0, 0, 6) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            TextBlock name = new() { Text = label, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center };
-            TextBlock effect = new() { Text = settings.Effect, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center };
-            Button toggle = new()
-            {
-                Content = settings.PowerOn ? "开" : "关",
-                Style = (Style)FindResource("FlatButton"),
-                Tag = topic
-            };
-            toggle.Click += async (_, _) =>
-            {
-                bool turnOn = toggle.Content as string != "开";
-                LightChannelSettings current = LightingSettingsStore.Load(topic, "Single");
-                if (_probe != null)
-                {
-                    if (topic == "Keyboard/Ctrl")
-                    {
-                        await _probe.SetKeyboardPowerAsync(turnOn);
-                    }
-                    else
-                    {
-                        await _probe.SetLightPowerAsync(topic, turnOn);
-                    }
-                }
-                LightingSettingsStore.SavePower(topic, turnOn, "宽屏灯光摘要");
-                toggle.Content = turnOn ? "开" : "关";
-                StatusText.Text = label + (turnOn ? " 已打开" : " 已关闭");
-            };
-            Grid.SetColumn(name, 0);
-            Grid.SetColumn(effect, 1);
-            Grid.SetColumn(toggle, 2);
-            row.Children.Add(name);
-            row.Children.Add(effect);
-            row.Children.Add(toggle);
-            lights.Children.Add(row);
-            _lightRows.Add((topic, toggle, effect, settings));
-        }
-        HomeExtrasPanel.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = lights });
     }
 
     private void RefreshHomeExtras()
@@ -485,12 +429,6 @@ public partial class MainWindow : Window
             button.IsChecked = hz == currentHz;
         }
         if (_autoRefresh != null) _autoRefresh.IsChecked = auto;
-        foreach ((string topic, Button toggle, TextBlock effect, LightChannelSettings _) in _lightRows)
-        {
-            LightChannelSettings settings = LightingSettingsStore.Load(topic, "Single");
-            toggle.Content = settings.PowerOn ? "开" : "关";
-            effect.Text = settings.Effect;
-        }
     }
 
     private void BuildLightingCards()

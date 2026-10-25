@@ -191,13 +191,13 @@
                                 </Border>
                             </Grid>
 
-                            <Grid>
+                            <Grid Margin="0,0,0,14">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="10" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource Card}">
+                                <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0">
                                     <StackPanel>
                                         <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
                                         <TextBlock x:Name="DisplayInfoText" Text="—" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
@@ -207,8 +207,6 @@
                                 </Border>
                                 <ContentControl x:Name="BatteryCardHost" Grid.Column="2" />
                             </Grid>
-
-                            <StackPanel x:Name="HomeExtrasPanel" />
 
                         </StackPanel>
                     </ScrollViewer>
