@@ -478,6 +478,22 @@ public partial class OriginalStyleWindow : Window
         await SwitchIgpuSavingAsync(mode);
     }
 
+    internal bool WideDisplayEffectSupported
+    {
+        get
+        {
+            try
+            {
+                return _backendProbe?.Hw?.DisplayEffectProfiles.Count > 0
+                    || _backendProbe?.Capabilities?.ColorCalibration == true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
     internal bool WideChargeLimitVisible
     {
         get
@@ -924,7 +940,10 @@ public partial class OriginalStyleWindow : Window
             KeyboardLightRow.Visibility == Visibility.Visible,
             _overlayWindow?.IsVisible == true,
             probe?.Capabilities?.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported,
-            MechrevoLite.Hardware.MechrevoService.IsSilentTurboActive);
+            MechrevoLite.Hardware.MechrevoService.IsSilentTurboActive,
+            probe?.Capabilities?.TurboMode == true
+                || probe?.Hw?.UsesBaolongda == true
+                || (probe?.Hw != null && !probe.Hw.IsConnected && MechrevoHw.IsGcuServiceInstalled && !probe.Hw.UsesBaolongda));
     }
 
     private async Task TraySilentTurboAsync()

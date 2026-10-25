@@ -19,7 +19,8 @@ internal sealed record TrayMenuState(
     bool KeyboardLightVisible,
     bool OverlayOn,
     bool SilentTurboVisible,
-    bool SilentTurboOn);
+    bool SilentTurboOn,
+    bool TurboVisible);
 
 internal static class TrayMenuConfig
 {
@@ -147,7 +148,10 @@ internal sealed class TrayIconService : IDisposable
                 {
                     _menu.Items.Add(MenuItem("静音狂暴", mode == 1 && state.SilentTurboOn, () => SilentTurboRequested?.Invoke()));
                 }
-                _menu.Items.Add(MenuItem("狂暴", mode == 1 && state?.SilentTurboOn != true, () => ModeRequested?.Invoke(1)));
+                if (state?.TurboVisible == true)
+                {
+                    _menu.Items.Add(MenuItem("狂暴", mode == 1 && state?.SilentTurboOn != true, () => ModeRequested?.Invoke(1)));
+                }
                 if (state?.FanBoostVisible == true)
                 {
                     _menu.Items.Add(MenuItem("强冷", state.FanBoostOn, () => FanBoostRequested?.Invoke()));

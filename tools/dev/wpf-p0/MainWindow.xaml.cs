@@ -1437,6 +1437,7 @@ public partial class MainWindow : Window
         Grid.SetColumnSpan(BatteryCardHost, displaySupported ? 1 : 3);
         NavScreen.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
         ScreenCalibrationCard.Visibility = caps.ColorCalibration ? Visibility.Visible : Visibility.Collapsed;
+        ScreenEffectCard.Visibility = _owner?.WideDisplayEffectSupported == true ? Visibility.Visible : Visibility.Collapsed;
         if (ScreenCalibrationCard.Visibility != Visibility.Visible && ScreenEffectCard.Visibility != Visibility.Visible)
         {
             NavScreen.Visibility = Visibility.Collapsed;
@@ -1527,6 +1528,13 @@ public partial class MainWindow : Window
         Slider? sliderRef = null;
         Slider? speedRef = null;
         string selectedEffect = Array.Exists(effects, item => item.Effect == settings.Effect) ? settings.Effect : effects[0].Effect;
+        ToggleButton? powerRef = null;
+        DispatcherTimer lightApplyTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
+        lightApplyTimer.Tick += (_, _) =>
+        {
+            lightApplyTimer.Stop();
+            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, powerRef?.IsChecked == true);
+        };
 
         Grid layout = new();
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1546,6 +1554,7 @@ public partial class MainWindow : Window
         };
         Grid.SetColumn(power, 1);
         header.Children.Add(power);
+        powerRef = power;
         left.Children.Add(header);
         left.Children.Add(new TextBlock
         {
@@ -1705,7 +1714,8 @@ public partial class MainWindow : Window
             speed.ValueChanged += (_, _) =>
             {
                 speedText.Text = (int)Math.Round(speed.Value) + "/4";
-                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
+                lightApplyTimer.Stop();
+                lightApplyTimer.Start();
             };
         }
         Grid.SetColumn(right, 2);
@@ -1717,7 +1727,8 @@ public partial class MainWindow : Window
         slider.ValueChanged += (_, _) =>
         {
             value.Text = (int)Math.Round(slider.Value) + "/" + maxLight;
-            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
+            lightApplyTimer.Stop();
+            lightApplyTimer.Start();
         };
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 0, 0, 10), Child = layout };
     }
