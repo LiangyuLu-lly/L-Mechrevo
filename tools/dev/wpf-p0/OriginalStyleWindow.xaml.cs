@@ -348,9 +348,15 @@ public partial class OriginalStyleWindow : Window
                     .ToArray();
             }
             int type = hw?.Capabilities.KeyboardType ?? 0;
-            return MechrevoLite.Hardware.KeyboardFirmwareEffects.Visible(type)
+            (string Id, string Label)[] firmware = MechrevoLite.Hardware.KeyboardFirmwareEffects.Visible(type)
                 .Select(item => (item.Id, item.Label))
                 .ToArray();
+            if (firmware.Length == 0)
+            {
+                // 白色背光键盘没有固件灯效，仍保留电源/亮度入口。
+                return new[] { ("Single", "白色背光") };
+            }
+            return firmware;
         }
         catch
         {
