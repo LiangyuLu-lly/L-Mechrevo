@@ -16,7 +16,7 @@ namespace L_Mechrevo.WpfP0;
 public partial class SettingsWindow : Window
 {
     private readonly OriginalStyleWindow _owner;
-    private bool _syncing;
+    private bool _syncing = true;
     private bool _overlaySyncing;
     private bool _isolated;
 

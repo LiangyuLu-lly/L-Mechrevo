@@ -62,7 +62,7 @@ public partial class OriginalStyleWindow : Window
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
-    private bool _lastBackendConnected;
+    private long _lastLightingConnectionGeneration;
     private bool[]? _lightingIdleSwitchSnapshot;
     private bool _lightingPowerSuspended;
     private bool _lightingPowerBusy;
@@ -223,6 +223,12 @@ public partial class OriginalStyleWindow : Window
         };
         Microsoft.Win32.SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
         Closed += (_, _) => Microsoft.Win32.SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
+        SourceInitialized += (_, _) =>
+        {
+            System.Windows.Interop.HwndSource? source = System.Windows.Interop.HwndSource.FromHwnd(
+                new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            source?.AddHook(PowerBroadcastHook);
+        };
         Loaded += delegate
         {
             Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -489,6 +495,21 @@ public partial class OriginalStyleWindow : Window
         }
         _overlayWindow.Show();
         _overlayWindow.Activate();
+    }
+
+    private IntPtr PowerBroadcastHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WM_POWERBROADCAST = 0x0218;
+        const int PBT_APMRESUMEAUTOMATIC = 0x0012;
+        if (msg == WM_POWERBROADCAST && wParam.ToInt32() == PBT_APMRESUMEAUTOMATIC)
+        {
+            Dispatcher.BeginInvoke(new Action(async () =>
+            {
+                await Task.Delay(1500);
+                await RestoreLightingOnStartupAsync();
+            }));
+        }
+        return IntPtr.Zero;
     }
 
     private void SystemEvents_PowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
@@ -1947,11 +1968,20 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         BackendLine.Text = probe.Snapshot();
-        if (probe.Connected && !_lastBackendConnected)
+        try
         {
-            _ = RestoreLightingOnStartupAsync();
+            MechrevoHw? liveHw = probe.Hw;
+            long connectionGeneration = liveHw?.ConnectionGeneration ?? 0;
+            bool live = probe.Connected && liveHw?.IsGcuConnected == true && connectionGeneration > 0;
+            if (live && connectionGeneration != _lastLightingConnectionGeneration)
+            {
+                _lastLightingConnectionGeneration = connectionGeneration;
+                _ = RestoreLightingOnStartupAsync();
+            }
         }
-        _lastBackendConnected = probe.Connected;
+        catch
+        {
+        }
         try
         {
             MechrevoLite.HardwareControl.ReadSensors();
@@ -1965,11 +1995,18 @@ public partial class OriginalStyleWindow : Window
         }
         CpuStat.Text = SensorLine(hw, cpu: true);
         GpuStat.Text = SensorLine(hw, cpu: false);
-        if (IsHidKeyboard(hw) && Program.rgb != null)
+        if (Program.rgb != null)
         {
-            string expectedHidTag = "hid:" + Program.rgb.KbHidMode;
             string? selectedHidTag = (KeyboardEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string;
-            if (!string.Equals(selectedHidTag, expectedHidTag, StringComparison.Ordinal))
+            if (IsHidKeyboard(hw))
+            {
+                string expectedHidTag = "hid:" + Program.rgb.KbHidMode;
+                if (!string.Equals(selectedHidTag, expectedHidTag, StringComparison.Ordinal))
+                {
+                    FillKeyboardEffects();
+                }
+            }
+            else if (selectedHidTag?.StartsWith("hid:", StringComparison.Ordinal) == true)
             {
                 FillKeyboardEffects();
             }
@@ -3175,6 +3212,25 @@ public partial class OriginalStyleWindow : Window
         LightSyncEditButton.Visibility = visibility;
     }
 
+    private static KeyboardRgb? EnsureKeyboardRgbConfig()
+    {
+        if (Program.rgb != null)
+        {
+            return Program.rgb;
+        }
+        try
+        {
+            KeyboardRgb rgb = new();
+            rgb.LoadConfig();
+            Program.rgb = rgb;
+            return rgb;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private void FillKeyboardEffects()
     {
         _syncingLighting = true;
@@ -3184,6 +3240,7 @@ public partial class OriginalStyleWindow : Window
             MechrevoHw? hw = Program.hw;
             if (IsHidKeyboard(hw))
             {
+                EnsureKeyboardRgbConfig();
                 (int Mode, string Name)[] hidEffects = MechrevoLite.RgbForm.VisibleHidEffects(
                     hw?.Capabilities.KeyboardType ?? 0);
                 int selectedMode = Program.rgb?.KbHidMode ?? (hidEffects.Length > 0 ? hidEffects[0].Mode : 1);
@@ -3411,11 +3468,11 @@ public partial class OriginalStyleWindow : Window
 
     private void CheckLightingIdle()
     {
-        _ = ReconcileLightingPowerAsync();
         if (Program.hw?.UsesBaolongda == true)
         {
             return;
         }
+        _ = ReconcileLightingPowerAsync();
         BackendProbe? probe = _backendProbe;
         if (probe?.Connected != true)
         {
@@ -3455,7 +3512,18 @@ public partial class OriginalStyleWindow : Window
 
     private async Task RestoreLightingOnStartupAsync()
     {
-        if (_backendProbe == null || !MechrevoLite.Hardware.LightingSettingsStore.HasUserLightingIntent())
+        if (_backendProbe == null
+            || !MechrevoLite.Hardware.LightingSettingsStore.HasUserLightingIntent()
+            || Program.hw?.UsesBaolongda == true
+            || Program.IsLightingTemporarilySuspended
+            || _lightingPowerSuspended
+            || _lightingIdleSuspended)
+        {
+            return;
+        }
+        bool onBattery = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+            != System.Windows.Forms.PowerLineStatus.Online;
+        if (AppConfig.Is("lighting_off_on_battery") && onBattery)
         {
             return;
         }
@@ -3470,6 +3538,16 @@ public partial class OriginalStyleWindow : Window
                 if (keyboard.PowerOn)
                 {
                     await ApplyKeyboardLightAsync();
+                }
+                else if (IsHidKeyboard(_backendProbe.Hw))
+                {
+                    KeyboardRgb? rgb = EnsureKeyboardRgbConfig();
+                    if (rgb != null)
+                    {
+                        rgb.StopCurrentEffect();
+                        rgb.KbPowerSyncFromHardware(false);
+                        rgb.QueueSaveConfig();
+                    }
                 }
                 else
                 {
@@ -4123,6 +4201,12 @@ public partial class OriginalStyleWindow : Window
         if (LogoLightSwitch.IsChecked != true)
         {
             SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
+            return;
+        }
+        if (_backendProbe == null)
+        {
+            SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
+            StatusText.Text = "后端未连接，已记住 Logo 效果";
             return;
         }
         bool logoOk = await _backendProbe.SetLogoEffectAsync(effect);

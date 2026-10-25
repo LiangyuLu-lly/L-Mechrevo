@@ -32,6 +32,7 @@ public partial class LightEditorWindow : Window
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private bool _suppressAutoApply;
     private bool _applying;
+    private bool _pendingAutoApply;
 
     public LightEditorWindow(string topic, string title, (string Effect, string Name)[] effects)
     {
@@ -461,6 +462,10 @@ public partial class LightEditorWindow : Window
     {
         if (_applying)
         {
+            if (fromAuto)
+            {
+                _pendingAutoApply = true;
+            }
             return false;
         }
         _applying = true;
@@ -561,6 +566,11 @@ public partial class LightEditorWindow : Window
         finally
         {
             _applying = false;
+            if (_pendingAutoApply)
+            {
+                _pendingAutoApply = false;
+                _applyTimer.Start();
+            }
         }
     }
 
