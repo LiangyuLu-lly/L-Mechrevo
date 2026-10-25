@@ -430,7 +430,13 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE9CA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <Viewbox Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center">
+                                            <Canvas Width="16" Height="16">
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M2.5,12 A5.8,5.8 0 0 1 13.5,12" />
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M8,12 L11.2,7.2" />
+                                                <Ellipse Fill="{DynamicResource MutedBrush}" Width="2.2" Height="2.2" Canvas.Left="6.9" Canvas.Top="10.9" />
+                                            </Canvas>
+                                        </Viewbox>
                                 <TextBlock Text="性能模式" Style="{StaticResource SectionHeader}" Margin="0" />
                                 <CheckBox x:Name="GpuOverclockSwitch" Content="GPU 超频" Style="{StaticResource HeaderSwitch}" Margin="14,0,0,0" VerticalAlignment="Center" Click="GpuOverclock_Click" />
                                 <Button x:Name="PerfConfigEditButton" Content="配置编辑" Style="{StaticResource MiniButton}" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" Click="PerfConfigEdit_Click" />
@@ -806,31 +812,41 @@
                     <UniformGrid Grid.Column="1" Columns="5" VerticalAlignment="Center">
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
                             <StackPanel>
-                                <Image Source="Assets/Icons/ui-overlay.png" Width="15" Height="15" HorizontalAlignment="Center" />
+                                <Rectangle Width="15" Height="15" HorizontalAlignment="Center" Fill="{DynamicResource MutedBrush}">
+                        <Rectangle.OpacityMask><ImageBrush ImageSource="Assets/Icons/ui-overlay.png" /></Rectangle.OpacityMask>
+                    </Rectangle>
                                 <TextBlock Text="悬浮窗" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="设置">
                             <StackPanel>
-                                <Image Source="Assets/Icons/ui-settings.png" Width="15" Height="15" HorizontalAlignment="Center" />
+                                <Rectangle Width="15" Height="15" HorizontalAlignment="Center" Fill="{DynamicResource MutedBrush}">
+                        <Rectangle.OpacityMask><ImageBrush ImageSource="Assets/Icons/ui-settings.png" /></Rectangle.OpacityMask>
+                    </Rectangle>
                                 <TextBlock Text="设置" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="赞助">
                             <StackPanel>
-                                <Image Source="Assets/Icons/ui-donate.png" Width="15" Height="15" HorizontalAlignment="Center" />
+                                <Rectangle Width="15" Height="15" HorizontalAlignment="Center" Fill="{DynamicResource MutedBrush}">
+                        <Rectangle.OpacityMask><ImageBrush ImageSource="Assets/Icons/ui-donate.png" /></Rectangle.OpacityMask>
+                    </Rectangle>
                                 <TextBlock Text="赞助" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="诊断">
                             <StackPanel>
-                                <Image Source="Assets/Icons/ui-diag.png" Width="15" Height="15" HorizontalAlignment="Center" />
+                                <Rectangle Width="15" Height="15" HorizontalAlignment="Center" Fill="{DynamicResource MutedBrush}">
+                        <Rectangle.OpacityMask><ImageBrush ImageSource="Assets/Icons/ui-diag.png" /></Rectangle.OpacityMask>
+                    </Rectangle>
                                 <TextBlock Text="诊断" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="退出">
                             <StackPanel>
-                                <Image Source="Assets/Icons/ui-quit.png" Width="15" Height="15" HorizontalAlignment="Center" />
+                                <Rectangle Width="15" Height="15" HorizontalAlignment="Center" Fill="{DynamicResource MutedBrush}">
+                        <Rectangle.OpacityMask><ImageBrush ImageSource="Assets/Icons/ui-quit.png" /></Rectangle.OpacityMask>
+                    </Rectangle>
                                 <TextBlock Text="退出" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
