@@ -511,7 +511,11 @@ public partial class MainWindow : Window
             {
                 Style = (Style)FindResource("TileButton"),
                 Tag = key,
-                Content = content
+                Content = content,
+                Width = 86,
+                Height = 64,
+                Margin = new Thickness(4),
+                Padding = new Thickness(6, 4, 6, 4)
             };
             tile.Click += async (_, _) =>
             {
@@ -544,7 +548,11 @@ public partial class MainWindow : Window
         Button customTile = new()
         {
             Style = (Style)FindResource("TileButton"),
-            Content = customContent
+            Content = customContent,
+            Width = 86,
+            Height = 64,
+            Margin = new Thickness(4),
+            Padding = new Thickness(6, 4, 6, 4)
         };
         customTile.Click += (_, _) =>
         {

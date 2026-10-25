@@ -144,12 +144,6 @@
                         <StackPanel>
 
                             <UniformGrid x:Name="SensorBlocksGrid" Columns="2" />
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="快捷磁贴" Style="{StaticResource CardTitle}" Margin="0,0,0,10" />
-                                    <UniformGrid x:Name="QuickTilesGrid" Columns="7" />
-                                </StackPanel>
-                            </Border>
 
 
                             <Grid Margin="0">
@@ -373,7 +367,7 @@
                 <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="0,0,0,8" />
                 <Grid Grid.Row="1">
                     <TextBlock x:Name="StatusText" Text="就绪" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
-
+                    <UniformGrid x:Name="QuickTilesGrid" Columns="7" HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
             </Grid>
             <Grid x:Name="InlineOverlay" Grid.RowSpan="4" Background="#AA000000" Visibility="Collapsed" Panel.ZIndex="20">
