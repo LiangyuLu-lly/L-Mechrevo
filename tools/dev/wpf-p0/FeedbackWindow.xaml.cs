@@ -16,7 +16,7 @@ public partial class FeedbackWindow : Window
         VersionText.Text = "L-Mechrevo " + Program.ReleaseVersion;
         try
         {
-            string model = Program.hw?.Capabilities.Model ?? "";
+            string model = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.Capabilities.Model ?? "";
             DeviceText.Text = "机型：" + (string.IsNullOrWhiteSpace(model) ? "未知" : model)
                 + "\n系统：" + Environment.OSVersion.VersionString;
         }
@@ -31,9 +31,9 @@ public partial class FeedbackWindow : Window
         string info = "L-Mechrevo " + Program.ReleaseVersion + "\n" + DeviceText.Text;
         try
         {
-            info += "\nGCU：" + (Program.hw?.IsGcuConnected == true ? "已连接" : "未连接")
-                + " · 宝龙达：" + (Program.hw?.UsesBaolongda == true ? "是" : "否")
-                + " · 无界：" + (Program.hw?.WujieSmuApu == true ? "是" : "否");
+            info += "\nGCU：" + (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsGcuConnected == true ? "已连接" : "未连接")
+                + " · 宝龙达：" + (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true ? "是" : "否")
+                + " · 无界：" + (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.WujieSmuApu == true ? "是" : "否");
         }
         catch
         {

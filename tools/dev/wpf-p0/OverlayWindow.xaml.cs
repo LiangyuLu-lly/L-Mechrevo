@@ -150,7 +150,7 @@ public partial class OverlayWindow : Window
         }
         try
         {
-            if (MechrevoLite.Program.hw?.UsesBaolongda == true)
+            if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true)
             {
                 return "外接电源";
             }

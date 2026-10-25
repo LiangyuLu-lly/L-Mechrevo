@@ -42,7 +42,7 @@ public partial class LightEditorWindow : Window
         _keyboard = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
         Title = title;
         TitleText.Text = title;
-        MechrevoHw? hw = Program.hw;
+        MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
         bool gen40 = hw != null
             && !hw.UsesBaolongda
             && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
@@ -209,12 +209,12 @@ public partial class LightEditorWindow : Window
         if (_keyboard)
         {
             MixRow.Visibility = Visibility.Collapsed;
-            bool wujie = Program.hw?.WujieSmuApu == true;
+            bool wujie = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.WujieSmuApu == true;
             bool keyboardManual = string.Equals(effect, "Manual", StringComparison.Ordinal);
             bool keyboardBreathing = string.Equals(effect, "Breathing", StringComparison.Ordinal);
             bool keyboardRainbow = string.Equals(effect, "Rainbow", StringComparison.Ordinal);
-            bool singleZone = Program.hw != null
-                && KeyboardFirmwareEffects.IsSingleZoneRgb(Program.hw.Capabilities.KeyboardType);
+            bool singleZone = L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null
+                && KeyboardFirmwareEffects.IsSingleZoneRgb(L_Mechrevo.WpfP0.Services.WpfBackend.Hw.Capabilities.KeyboardType);
             bool colorVisible = !wujie && !keyboardManual && !keyboardRainbow
                 && (!keyboardBreathing || !singleZone)
                 && KeyboardFirmwareEffects.IsSingleColorEffect(effect);
@@ -318,8 +318,8 @@ public partial class LightEditorWindow : Window
         string effect = SelectedEffect;
         bool manual = string.Equals(effect, "Manual", StringComparison.Ordinal);
         bool breathing = string.Equals(effect, "Breathing", StringComparison.Ordinal)
-            && Program.hw != null
-            && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleZoneRgb(Program.hw.Capabilities.KeyboardType);
+            && L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null
+            && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleZoneRgb(L_Mechrevo.WpfP0.Services.WpfBackend.Hw.Capabilities.KeyboardType);
         SpeedRow.Visibility = Visibility.Collapsed;
         PerKeyPanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
         ManualPalettePanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
@@ -548,7 +548,7 @@ public partial class LightEditorWindow : Window
                 LightingSettingsStore.SavePower(_topic, power, "用户编辑灯光电源");
             }
             _settings = next;
-            if (Program.service == null)
+            if (L_Mechrevo.WpfP0.Services.WpfBackend.Service == null)
             {
                 if (!fromAuto)
                 {
@@ -561,36 +561,36 @@ public partial class LightEditorWindow : Window
             {
                 if (power)
                 {
-                    await Program.service.SetKeyboardPower(true);
+                    await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardPower(true);
                     if (!powerWasOn)
                     {
                         await Task.Delay(300);
                     }
                     if (_wujieWhite)
                     {
-                        ok = await Program.service.SetKeyboardBrightnessPreservingEffect(_light >= 2 ? 4 : 2);
+                        ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardBrightnessPreservingEffect(_light >= 2 ? 4 : 2);
                         return ok;
                     }
-                    bool baolongda = Program.hw?.UsesBaolongda == true;
+                    bool baolongda = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true;
                     System.Drawing.Color? color = baolongda
-                        ? System.Drawing.Color.FromArgb(Program.hw != null ? _settings.EffectiveColorArgb() : _colorArgb)
+                        ? System.Drawing.Color.FromArgb(L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null ? _settings.EffectiveColorArgb() : _colorArgb)
                         : (string.Equals(effect, "Single", StringComparison.Ordinal)
                             ? System.Drawing.Color.FromArgb(_colorArgb)
                             : null);
-                    ok = await Program.service.SetKeyboardEffect(effect, _light, applySpeed, "None", color, save: true);
+                    ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardEffect(effect, _light, applySpeed, "None", color, save: true);
                     if (ok)
                     {
-                        ok = await Program.service.SetKeyboardBrightnessPreservingEffect(_light);
+                        ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardBrightnessPreservingEffect(_light);
                     }
                 }
                 else
                 {
-                    ok = await Program.service.SetKeyboardPower(false);
+                    ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardPower(false);
                 }
             }
             else if (power)
             {
-                await Program.service.SetLightPower(_topic, true);
+                await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightPower(_topic, true);
                 if (!powerWasOn)
                 {
                     await Task.Delay(600);
@@ -598,11 +598,11 @@ public partial class LightEditorWindow : Window
                 System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
                     ? System.Drawing.Color.FromArgb(_colorArgb)
                     : null;
-                ok = await Program.service.SetLightEffect(_topic, effect, _light, _speed, "None", color);
+                ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightEffect(_topic, effect, _light, _speed, "None", color);
             }
             else
             {
-                ok = await Program.service.SetLightPower(_topic, false);
+                ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightPower(_topic, false);
             }
             if (!fromAuto || !ok)
             {

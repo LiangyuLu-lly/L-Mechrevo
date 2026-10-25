@@ -23,7 +23,7 @@ public partial class FanCurveWindow : Window
         _modeId = modeId;
         CpuSection.Visibility = showCpu ? Visibility.Visible : Visibility.Collapsed;
         GpuSection.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
-        _hw = Program.hw;
+        _hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
         bool supported = _hw != null && (_hw.IsGcuConnected || _hw.UsesBaolongda || _hw.WujieSmuApu);
         if (!supported)
         {

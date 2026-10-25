@@ -104,7 +104,7 @@ public partial class DisplayEffectEditorWindow : Window
     private void LoadProfile()
     {
         DisplayEffectProfile? profile = null;
-        if (Program.hw != null && Program.hw.DisplayEffectProfiles.TryGetValue(_mode, out DisplayEffectProfile? found))
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null && L_Mechrevo.WpfP0.Services.WpfBackend.Hw.DisplayEffectProfiles.TryGetValue(_mode, out DisplayEffectProfile? found))
         {
             profile = found;
         }
@@ -148,7 +148,7 @@ public partial class DisplayEffectEditorWindow : Window
 
     private async Task CommitAsync()
     {
-        if (Program.service == null || string.IsNullOrWhiteSpace(_mode))
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.Service == null || string.IsNullOrWhiteSpace(_mode))
         {
             return;
         }
@@ -164,7 +164,7 @@ public partial class DisplayEffectEditorWindow : Window
             Constrast = Get("contrast") * 0.1f,
             Gamma = Get("gamma") * 0.01f
         };
-        await Program.service.ApplyDisplayEffectProfile(profile);
+        await L_Mechrevo.WpfP0.Services.WpfBackend.Service.ApplyDisplayEffectProfile(profile);
     }
 
     private int Get(string key)
@@ -174,13 +174,13 @@ public partial class DisplayEffectEditorWindow : Window
 
     private async void ResetButton_Click(object sender, RoutedEventArgs e)
     {
-        if (Program.service == null || string.IsNullOrWhiteSpace(_mode))
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.Service == null || string.IsNullOrWhiteSpace(_mode))
         {
             return;
         }
-        if (await Program.service.ResetDisplayEffectProfile(_mode))
+        if (await L_Mechrevo.WpfP0.Services.WpfBackend.Service.ResetDisplayEffectProfile(_mode))
         {
-            await Program.service.RequestDisplayEffectStatus();
+            await L_Mechrevo.WpfP0.Services.WpfBackend.Service.RequestDisplayEffectStatus();
             await Task.Delay(500);
             LoadProfile();
         }

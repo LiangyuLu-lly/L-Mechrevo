@@ -850,7 +850,7 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            _ = Program.service?.RequestLightStatus(topic);
+            _ = L_Mechrevo.WpfP0.Services.WpfBackend.Service?.RequestLightStatus(topic);
             new LightEditorWindow(topic, title, effects) { Owner = this }.ShowDialog();
         }
         catch (Exception ex)
@@ -1660,8 +1660,7 @@ public partial class OriginalStyleWindow : Window
             {
                 return;
             }
-            Program.hw = _backendProbe.Hw;
-            Program.service = _backendProbe.Service!;
+            L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
             if (!MechrevoLite.Hardware.GpuDbControl.Supported())
             {
                 return;
@@ -2635,7 +2634,7 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            if (MechrevoLite.Program.hw?.UsesBaolongda == true)
+            if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true)
             {
                 // 宝龙达没有适配器功率表，保持原版「外接电源」，不显示“未识别”。
                 return "外接电源";
@@ -3096,8 +3095,7 @@ public partial class OriginalStyleWindow : Window
             {
                 UpdateBackendStatus();
                 BackendLine.Text = probe.Snapshot();
-                Program.hw = probe.Hw;
-                Program.service = probe.Service!;
+                L_Mechrevo.WpfP0.Services.WpfBackend.Attach(probe.Hw, probe.Service);
                 _services = new AppServices(probe);
                 try
                 {
@@ -3190,7 +3188,7 @@ public partial class OriginalStyleWindow : Window
             FillKeyboardEffects();
   FillLightChannelEffects();
   FillLightIdleOptions();
-  Program.hw?.ApplyKeyboardAutoOffSetting();
+  L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.ApplyKeyboardAutoOffSetting();
   SyncLightSwitchesFromHardware();
   bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
@@ -3446,8 +3444,7 @@ public partial class OriginalStyleWindow : Window
                 StatusText.Text = "后端未连接，无法打开配置编辑";
                 return;
             }
-            Program.hw = _backendProbe.Hw;
-            Program.service = _backendProbe.Service!;
+            L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
             int visualMode = _backendProbe.Service?.CurrentMode ?? 0;
             int profileIndex = MechrevoLite.Mode.ModeProfileConfig.Get(visualMode);
             if (_customModeForm == null || !_customModeForm.IsVisible)
@@ -3504,8 +3501,7 @@ public partial class OriginalStyleWindow : Window
                 StatusText.Text = "后端未连接，无法打开自定义模式";
                 return;
             }
-            Program.hw = _backendProbe.Hw;
-            Program.service = _backendProbe.Service!;
+            L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
             string customId = ResolveCustomModeId();
             if (_customModeForm == null)
             {
@@ -3812,7 +3808,7 @@ public partial class OriginalStyleWindow : Window
 
     private static (string Effect, string Name)[] CurrentLogoEffectsForBackend()
     {
-        MechrevoHw? hw = Program.hw;
+        MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
         if (hw != null && !hw.UsesBaolongda
             && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30
                 || hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40))
@@ -3824,7 +3820,7 @@ public partial class OriginalStyleWindow : Window
 
     private static (string Effect, string Name)[] EffectsForCurrentBackend((string Effect, string Name)[] effects)
     {
-        if (Program.hw?.UsesBaolongda == true)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true)
         {
             return new[]
             {
@@ -3837,7 +3833,7 @@ public partial class OriginalStyleWindow : Window
 
     private static (string Effect, string Name)[] KeyboardEffectsForCurrent()
     {
-        MechrevoHw? hw = Program.hw;
+        MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
         if (hw?.UsesBaolongda == true)
         {
             return EffectsForCurrentBackend(Array.Empty<(string, string)>());
@@ -3864,8 +3860,8 @@ public partial class OriginalStyleWindow : Window
                 effectFound = true;
             }
         }
-        if (!effectFound && Program.hw != null && !Program.hw.UsesBaolongda
-            && Program.hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40)
+        if (!effectFound && L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null && !L_Mechrevo.WpfP0.Services.WpfBackend.Hw.UsesBaolongda
+            && L_Mechrevo.WpfP0.Services.WpfBackend.Hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40)
         {
             try
             {
@@ -3928,7 +3924,7 @@ public partial class OriginalStyleWindow : Window
             && MechrevoLite.Hardware.KeyboardLightPathPolicy.ShouldUseGcuKeyboardFallback(
                 rgb.ControllerAvailability,
                 rgb.IsConnected,
-                Program.service != null && hw.IsConnected,
+                L_Mechrevo.WpfP0.Services.WpfBackend.Service != null && hw.IsConnected,
                 hidBrightnessTookEffect: true))
         {
             return false;
@@ -3938,7 +3934,7 @@ public partial class OriginalStyleWindow : Window
 
     private void ApplyLightChannelBackendVisibility()
     {
-        bool baolongda = Program.hw?.UsesBaolongda == true;
+        bool baolongda = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true;
         Visibility visibility = baolongda ? Visibility.Collapsed : Visibility.Visible;
         LightStripEffectCombo.Visibility = visibility;
         LightStripEditButton.Visibility = visibility;
@@ -3975,7 +3971,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             KeyboardEffectCombo.Items.Clear();
-            MechrevoHw? hw = Program.hw;
+            MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
             if (IsHidKeyboard(hw))
             {
                 EnsureKeyboardRgbConfig();
@@ -4105,7 +4101,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             LightIdleCombo.Items.Clear();
-            bool baolongda = Program.hw?.UsesBaolongda == true;
+            bool baolongda = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true;
             int current;
             if (baolongda)
             {
@@ -4149,10 +4145,10 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        if (Program.hw?.UsesBaolongda == true)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true)
         {
             MechrevoHw.SetKeyboardAutoOffSeconds(seconds);
-            Program.hw.ApplyKeyboardAutoOffSetting();
+            L_Mechrevo.WpfP0.Services.WpfBackend.Hw.ApplyKeyboardAutoOffSetting();
             StatusText.Text = seconds <= 0 ? "宝龙达键盘自动关闭：关" : "宝龙达键盘自动关闭：" + seconds + " 秒";
             return;
         }
@@ -4182,8 +4178,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "后端未连接，无法编辑键盘灯光";
             return;
         }
-        MechrevoLite.Program.hw = _backendProbe.Hw;
-        MechrevoLite.Program.service = _backendProbe.Service!;
+        L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
         MechrevoHw? hw = _backendProbe.Hw;
         bool firmwareKeyboard = hw != null && !IsHidKeyboard(hw);
         if (firmwareKeyboard)
@@ -4208,15 +4203,14 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "后端未连接，无法编辑 Logo 灯光";
             return;
         }
-        MechrevoLite.Program.hw = _backendProbe.Hw;
-        MechrevoLite.Program.service = _backendProbe.Service!;
+        L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
         OpenLightEditor("HidLightbar_Logo/Ctrl", "Logo 灯光", CurrentLogoEffectsForBackend());
     }
 
     private void CheckLightingIdle()
     {
         _ = ReconcileLightingPowerAsync();
-        if (Program.hw?.UsesBaolongda == true)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true)
         {
             return;
         }
@@ -4322,7 +4316,7 @@ public partial class OriginalStyleWindow : Window
         _lastLightingRestoreTick = now;
         if (_backendProbe == null
             || !MechrevoLite.Hardware.LightingSettingsStore.HasUserLightingIntent()
-            || Program.hw?.UsesBaolongda == true
+            || L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true
             || Program.IsLightingTemporarilySuspended
             || _lightingPowerSuspended
             || _lightingIdleSuspended)
@@ -4666,8 +4660,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "后端未连接，无法编辑灯带";
             return;
         }
-        Program.hw = _backendProbe.Hw;
-        Program.service = _backendProbe.Service!;
+        L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
         OpenLightEditor("HidLightbar/Ctrl", "灯带灯光", EffectsForCurrentBackend(LightForm.LightbarEffects));
     }
 
@@ -4767,8 +4760,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "后端未连接，无法编辑铰链灯";
             return;
         }
-        Program.hw = _backendProbe.Hw;
-        Program.service = _backendProbe.Service!;
+        L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
         OpenLightEditor("HidLightbar_Hinge/Ctrl", "铰链灯光", EffectsForCurrentBackend(LightForm.HingeEffects));
     }
 
@@ -4837,8 +4829,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "后端未连接，无法编辑同步灯";
             return;
         }
-        Program.hw = _backendProbe.Hw;
-        Program.service = _backendProbe.Service!;
+        L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
         OpenLightEditor("HidLightbar_Sync/Ctrl", "同步灯光", EffectsForCurrentBackend(LightForm.SyncEffects));
     }
 

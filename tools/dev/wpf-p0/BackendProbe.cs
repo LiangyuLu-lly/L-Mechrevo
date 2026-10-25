@@ -407,7 +407,7 @@ internal sealed class BackendProbe : IDisposable
             MechrevoLite.Hardware.LightChannelSettings settings = MechrevoLite.Hardware.LightingSettingsStore.Load(topic, effect);
             // 键盘：宝龙达用实际 ARGB；非宝龙达只有 Single 带颜色（原版 SettingsForm/RgbForm 逐字如此）。
             // 灯带/Logo/铰链/同步：原版 LightForm 对所有单色系效果带颜色。
-            bool baolongda = MechrevoLite.Program.hw?.UsesBaolongda == true;
+            bool baolongda = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true;
             Color? color;
             if (keyboard)
             {

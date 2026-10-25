@@ -86,8 +86,8 @@ public partial class FirstRunGuideWindow : Window
         InitializeComponent();
         _igpuOnlyStepOnly = igpuOnlyStepOnly;
         // 与旧版同一判据：完整引导里，宝龙达（已知无核显模式）或硬件未知 ⇒ 跳过步骤 4。
-        bool bdKnown = Program.hw?.UsesBaolongda ?? false;
-        bool bdUnknown = Program.hw == null;
+        bool bdKnown = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda ?? false;
+        bool bdUnknown = L_Mechrevo.WpfP0.Services.WpfBackend.Hw == null;
         _skipIgpuOnlyStep = !igpuOnlyStepOnly && (bdKnown || bdUnknown);
         Title = igpuOnlyStepOnly ? Strings.IgpuOnlyGuideTitle : Strings.FirstRun;
         BuildGuide();

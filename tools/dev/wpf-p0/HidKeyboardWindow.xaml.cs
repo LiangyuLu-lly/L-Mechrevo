@@ -17,7 +17,7 @@ public partial class HidKeyboardWindow : Window
     {
         InitializeComponent();
         _rgb = rgb;
-        _effects = MechrevoLite.RgbForm.VisibleHidEffects(Program.hw?.Capabilities.KeyboardType ?? 0);
+        _effects = MechrevoLite.RgbForm.VisibleHidEffects(L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.Capabilities.KeyboardType ?? 0);
         PowerCheck.IsChecked = _rgb.KbPowerOn;
         BrightnessSlider.Value = Math.Clamp(_rgb.Brightness, 0, 100);
         BrightnessText.Text = ((int)BrightnessSlider.Value) + "%";

@@ -92,7 +92,7 @@ public partial class CustomModeWindow : Window
                 continue;
             }
             else if (!string.Equals(mode.Id, target, StringComparison.Ordinal)
-                && !MechrevoLite.CustomModeForm.IsOffered(mode, Program.hw))
+                && !MechrevoLite.CustomModeForm.IsOffered(mode, L_Mechrevo.WpfP0.Services.WpfBackend.Hw))
             {
                 continue;
             }
@@ -164,7 +164,7 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            MechrevoHw? hw = Program.hw;
+            MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
             if (hw?.UsesBaolongda == true || hw?.WujieSmuApu == true)
             {
                 RouteHintText.Text = MechrevoLite.Properties.Strings.PerfModeHintLocalApply;
@@ -265,7 +265,7 @@ public partial class CustomModeWindow : Window
             MechrevoLite.Mode.PerfModeSettings stored = MechrevoLite.Mode.PerfModeStore.LoadSettings(storeId);
             if (stored.IsUntouched)
             {
-                stored = MechrevoLite.Mode.VendorModeDefaults.ComposeProfile(kind, Program.hw, _firmwareProfileIndex);
+                stored = MechrevoLite.Mode.VendorModeDefaults.ComposeProfile(kind, L_Mechrevo.WpfP0.Services.WpfBackend.Hw, _firmwareProfileIndex);
             }
             MechrevoLite.Mode.PerfModeDefinition mode = new(
                 MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind), kind, null, stored);
@@ -346,12 +346,12 @@ public partial class CustomModeWindow : Window
         SetSlider(SmuSlowLimitSlider, SmuSlowLimitText, s.SmuSlowLimit ?? 65);
         SetSlider(SmuSlowTimeSlider, SmuSlowTimeText, s.SmuSlowTimeSeconds ?? 28);
         SetSlider(SmuFastTimeSlider, SmuFastTimeText, s.SmuFastTimeSeconds ?? 5);
-        if (!_firmwareMode && _current?.IsCustom != true && Program.hw is MechrevoHw liveHw)
+        if (!_firmwareMode && _current?.IsCustom != true && L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw liveHw)
         {
             LoadLiveHardware(liveHw);
         }
         RefreshGpuPowerLimit(s.GpuPowerLimitW);
-        if (Program.hw is MechrevoHw limitsHw)
+        if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw limitsHw)
         {
             ApplyHardwareControlLimits(limitsHw);
             bool smuPower = MechrevoLite.Mode.PerfModeCapabilities.UsesSmuForCustomPower(
@@ -364,7 +364,7 @@ public partial class CustomModeWindow : Window
             SmuSlowTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
             SmuFastTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
         }
-        bool locked = Program.hw is MechrevoHw lockHw
+        bool locked = L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
             && MechrevoLite.CustomModeForm.IsGen40Plus(lockHw)
             && _current?.IsCustom != true;
@@ -374,7 +374,7 @@ public partial class CustomModeWindow : Window
         CpuPowerCard.Opacity = locked ? 0.45 : 1.0;
         TempGpuCard.Opacity = locked ? 0.45 : 1.0;
         FanCard.Opacity = locked ? 0.45 : 1.0;
-        MechrevoHw? hwForRows = Program.hw;
+        MechrevoHw? hwForRows = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
         bool apuOrNoDgpu = hwForRows != null
             && (hwForRows.WujieSmuApu || hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu);
         bool wujieApu = hwForRows?.WujieSmuApu == true;
@@ -539,7 +539,7 @@ public partial class CustomModeWindow : Window
         int minW = 0;
         int maxW = 0;
         int currentW = 0;
-        bool visible = Program.hw?.UsesBaolongda == true
+        bool visible = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true
             && NvmlHelper.TryGetPowerLimitBounds(out minW, out maxW, out currentW)
             && maxW > minW;
         GpuPowerLimitRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
@@ -605,7 +605,7 @@ public partial class CustomModeWindow : Window
         RefreshCombo.Items.Add(new ComboBoxItem { Content = "不改变", Tag = "" });
         try
         {
-            foreach (int hz in (Program.hw?.HzList ?? Array.Empty<int>()).Distinct().OrderByDescending(v => v))
+            foreach (int hz in (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.HzList ?? Array.Empty<int>()).Distinct().OrderByDescending(v => v))
             {
                 RefreshCombo.Items.Add(new ComboBoxItem { Content = hz + "Hz", Tag = hz.ToString() });
             }
@@ -738,7 +738,7 @@ public partial class CustomModeWindow : Window
                 return;
             }
             _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
-            bool amd = Program.hw?.UsesAmdPowerFields == true;
+            bool amd = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesAmdPowerFields == true;
             string summary = MechrevoLite.Mode.PerfModeText.Summary(outcome);
             string failure = outcome.AnyFailed
                 ? " · 失败：" + MechrevoLite.Mode.PerfModeText.FailedItems(outcome, amd)
@@ -782,7 +782,7 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            string? seedFrom = (Program.hw?.UsesBaolongda == true) ? null : _current?.Id;
+            string? seedFrom = (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true) ? null : _current?.Id;
             MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
             MechrevoLite.Mode.PerfModeDefinition? mode = perf?.AddCustom(seedFrom)
                 ?? MechrevoLite.Mode.PerfModeStore.AddCustom(seedFrom);
@@ -791,7 +791,7 @@ public partial class CustomModeWindow : Window
                 StatusText.Text = "新建自定义模式失败（已达到上限或没有可用序号）";
                 return;
             }
-            MechrevoHw? newModeHw = Program.hw;
+            MechrevoHw? newModeHw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
             bool gcuMachine = newModeHw != null
                 && newModeHw.IsGcuConnected
                 && !newModeHw.UsesBaolongda
@@ -880,7 +880,7 @@ public partial class CustomModeWindow : Window
     {
         try
         {
-            MechrevoHw? hw = Program.hw;
+            MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
             if (hw == null)
             {
                 StatusText.Text = "后端未连接，无法打开风扇曲线";
