@@ -251,11 +251,55 @@ public partial class MainWindow : Window
         SetNavContent(NavLighting, _navCollapsed, "\uE706", "灯光", glyphFont, textFont);
         SetNavContent(NavCustom, _navCollapsed, "\uE70F", "自定义", glyphFont, textFont);
         SetNavContent(NavSwitches, _navCollapsed, "\uE712", "更多开关", glyphFont, textFont);
-        SetNavContent(NavDockOverlay, _navCollapsed, "\uE8A7", "悬浮窗", glyphFont, textFont);
-        SetNavContent(NavDockSettings, _navCollapsed, "\uE713", "设置", glyphFont, textFont);
-        SetNavContent(NavDockSponsor, _navCollapsed, "\uEB51", "赞助", glyphFont, textFont);
-        SetNavContent(NavDockDiag, _navCollapsed, "\uE9D9", "诊断", glyphFont, textFont);
-        SetNavContent(NavDockExit, _navCollapsed, "\uE7E8", "退出", glyphFont, textFont);
+        SetDockNavContent(NavDockOverlay, _navCollapsed, "\uE8A7", "悬浮窗", glyphFont, textFont);
+        SetDockNavContent(NavDockSettings, _navCollapsed, "\uE713", "设置", glyphFont, textFont);
+        SetDockNavContent(NavDockSponsor, _navCollapsed, "\uEB51", "赞助", glyphFont, textFont);
+        SetDockNavContent(NavDockDiag, _navCollapsed, "\uE9D9", "诊断", glyphFont, textFont);
+        SetDockNavContent(NavDockExit, _navCollapsed, "\uE7E8", "退出", glyphFont, textFont);
+    }
+
+    private static void SetDockNavContent(Button button, bool collapsed, string glyph, string text, FontFamily glyphFont, FontFamily textFont)
+    {
+        if (collapsed)
+        {
+            button.Content = new TextBlock
+            {
+                Text = glyph,
+                FontFamily = glyphFont,
+                FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = button.Foreground
+            };
+            button.FontFamily = textFont;
+            button.FontSize = 13;
+            button.Padding = new Thickness(0);
+            button.Height = 40;
+            button.HorizontalContentAlignment = HorizontalAlignment.Center;
+            return;
+        }
+        StackPanel content = new() { Orientation = Orientation.Horizontal };
+        content.Children.Add(new TextBlock
+        {
+            Text = glyph,
+            FontFamily = glyphFont,
+            FontSize = 14,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0)
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = text,
+            FontFamily = textFont,
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        button.Content = content;
+        button.FontFamily = textFont;
+        button.FontSize = 13;
+        button.Padding = new Thickness(12, 10, 12, 10);
+        button.Height = double.NaN;
+        button.HorizontalContentAlignment = HorizontalAlignment.Left;
     }
 
     private static void SetNavContent(Button button, bool collapsed, string glyph, string text, FontFamily glyphFont, FontFamily textFont)
