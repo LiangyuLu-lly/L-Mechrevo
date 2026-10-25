@@ -63,6 +63,8 @@ public partial class OriginalStyleWindow : Window
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
     private long _lastLightingConnectionGeneration;
+    private long _lastLightingRestoreTick;
+    private System.Windows.Interop.HwndSource? _powerBroadcastSource;
     private bool[]? _lightingIdleSwitchSnapshot;
     private bool _lightingPowerSuspended;
     private bool _lightingPowerBusy;
@@ -112,6 +114,10 @@ public partial class OriginalStyleWindow : Window
         MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
+        Closed += (_, _) =>
+        {
+            _powerBroadcastSource?.RemoveHook(PowerBroadcastHook);
+        };
         SourceInitialized += (_, _) =>
         {
             HideMinMaxButtons();
@@ -221,13 +227,11 @@ public partial class OriginalStyleWindow : Window
         {
             UpdateContentWidth();
         };
-        Microsoft.Win32.SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
-        Closed += (_, _) => Microsoft.Win32.SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
         SourceInitialized += (_, _) =>
         {
-            System.Windows.Interop.HwndSource? source = System.Windows.Interop.HwndSource.FromHwnd(
+            _powerBroadcastSource = System.Windows.Interop.HwndSource.FromHwnd(
                 new System.Windows.Interop.WindowInteropHelper(this).Handle);
-            source?.AddHook(PowerBroadcastHook);
+            _powerBroadcastSource?.AddHook(PowerBroadcastHook);
         };
         Loaded += delegate
         {
@@ -510,19 +514,6 @@ public partial class OriginalStyleWindow : Window
             }));
         }
         return IntPtr.Zero;
-    }
-
-    private void SystemEvents_PowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
-    {
-        if (e.Mode != Microsoft.Win32.PowerModes.Resume)
-        {
-            return;
-        }
-        Dispatcher.BeginInvoke(new Action(async () =>
-        {
-            await Task.Delay(1500);
-            await RestoreLightingOnStartupAsync();
-        }));
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1972,8 +1963,8 @@ public partial class OriginalStyleWindow : Window
         {
             MechrevoHw? liveHw = probe.Hw;
             long connectionGeneration = liveHw?.ConnectionGeneration ?? 0;
-            bool live = probe.Connected && liveHw?.IsGcuConnected == true && connectionGeneration > 0;
-            if (live && connectionGeneration != _lastLightingConnectionGeneration)
+            bool live = probe.Connected && liveHw != null && liveHw.IsConnected;
+            if (live && (connectionGeneration != _lastLightingConnectionGeneration || _lastLightingConnectionGeneration == 0))
             {
                 _lastLightingConnectionGeneration = connectionGeneration;
                 _ = RestoreLightingOnStartupAsync();
@@ -3468,11 +3459,11 @@ public partial class OriginalStyleWindow : Window
 
     private void CheckLightingIdle()
     {
+        _ = ReconcileLightingPowerAsync();
         if (Program.hw?.UsesBaolongda == true)
         {
             return;
         }
-        _ = ReconcileLightingPowerAsync();
         BackendProbe? probe = _backendProbe;
         if (probe?.Connected != true)
         {
@@ -3512,6 +3503,12 @@ public partial class OriginalStyleWindow : Window
 
     private async Task RestoreLightingOnStartupAsync()
     {
+        long now = Environment.TickCount64;
+        if (now - _lastLightingRestoreTick < 5000)
+        {
+            return;
+        }
+        _lastLightingRestoreTick = now;
         if (_backendProbe == null
             || !MechrevoLite.Hardware.LightingSettingsStore.HasUserLightingIntent()
             || Program.hw?.UsesBaolongda == true
@@ -3541,12 +3538,11 @@ public partial class OriginalStyleWindow : Window
                 }
                 else if (IsHidKeyboard(_backendProbe.Hw))
                 {
-                    KeyboardRgb? rgb = EnsureKeyboardRgbConfig();
-                    if (rgb != null)
+                    KeyboardRgb? rgb = EnsureKeyboardRgb();
+                    if (rgb != null && rgb.IsConnected)
                     {
                         rgb.StopCurrentEffect();
                         rgb.KbPowerSyncFromHardware(false);
-                        rgb.QueueSaveConfig();
                     }
                 }
                 else
@@ -3677,7 +3673,6 @@ public partial class OriginalStyleWindow : Window
         {
             Program.rgb.StopCurrentEffect();
             Program.rgb.KbPowerSyncFromHardware(false);
-            Program.rgb.QueueSaveConfig();
         }
         else
         {
@@ -3833,6 +3828,16 @@ public partial class OriginalStyleWindow : Window
     {
         if (Program.rgb != null)
         {
+            if (!Program.rgb.IsConnected)
+            {
+                try
+                {
+                    Program.rgb.Connect();
+                }
+                catch
+                {
+                }
+            }
             return Program.rgb;
         }
         try
@@ -4075,8 +4080,14 @@ public partial class OriginalStyleWindow : Window
             rgb.KbPowerOn = on;
             if (!on)
             {
+                bool offReady = rgb.IsConnected || await rgb.EnsureHidReadyAsync() || rgb.Connect();
+                if (!offReady)
+                {
+                    rgb.KbPowerOn = true;
+                    StatusText.Text = "键盘 HID 未连接，关灯失败：" + rgb.LastError;
+                    return false;
+                }
                 rgb.StopCurrentEffect();
-                rgb.ApplyBrightnessToDevice();
                 rgb.SaveConfig();
                 StatusText.Text = "键盘灯光已关闭";
                 return true;

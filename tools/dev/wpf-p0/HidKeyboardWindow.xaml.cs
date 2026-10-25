@@ -436,8 +436,14 @@ public partial class HidKeyboardWindow : Window
             _rgb.KbPowerOn = power;
             if (!power)
             {
+                bool offReady = _rgb.IsConnected || await _rgb.EnsureHidReadyAsync() || _rgb.Connect();
+                if (!offReady)
+                {
+                    _rgb.KbPowerOn = true;
+                    StatusText.Text = "HID 未连接，关灯失败：" + _rgb.LastError;
+                    return;
+                }
                 _rgb.StopCurrentEffect();
-                _rgb.ApplyBrightnessToDevice();
                 _rgb.SaveConfig();
                 StatusText.Text = "HID 键盘灯已关闭";
                 return;

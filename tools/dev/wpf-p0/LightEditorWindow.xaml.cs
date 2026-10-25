@@ -109,6 +109,7 @@ public partial class LightEditorWindow : Window
             _applyTimer.Stop();
             await ApplyCoreAsync(fromAuto: true);
         };
+        Closed += (_, _) => _applyTimer.Stop();
     }
 
     private void ScheduleAutoApply()
