@@ -62,11 +62,13 @@ public partial class OriginalStyleWindow : Window
     private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _lightingIdleSuspended;
+    private bool _lastBackendConnected;
     private bool[]? _lightingIdleSwitchSnapshot;
     private bool _lightingPowerSuspended;
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
     private bool _syncingLighting;
+    private readonly System.Threading.SemaphoreSlim _keyboardLightApplyLock = new(1, 1);
     private bool? _pendingKeyboardPower;
     private long _pendingKeyboardPowerTick;
     private bool _syncingPerfConfig;
@@ -1945,6 +1947,11 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         BackendLine.Text = probe.Snapshot();
+        if (probe.Connected && !_lastBackendConnected)
+        {
+            _ = RestoreLightingOnStartupAsync();
+        }
+        _lastBackendConnected = probe.Connected;
         try
         {
             MechrevoLite.HardwareControl.ReadSensors();
@@ -3683,7 +3690,16 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LightStripSwitch.IsChecked == true;
-        bool ok = await ApplyLightStripLightAsync();
+        LightStripSwitch.IsEnabled = false;
+        bool ok;
+        try
+        {
+            ok = await ApplyLightStripLightAsync();
+        }
+        finally
+        {
+            LightStripSwitch.IsEnabled = true;
+        }
         if (!ok)
         {
             _syncingLighting = true;
@@ -3763,7 +3779,16 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LightHingeSwitch.IsChecked == true;
-        bool ok = await ApplyHingeLightAsync();
+        LightHingeSwitch.IsEnabled = false;
+        bool ok;
+        try
+        {
+            ok = await ApplyHingeLightAsync();
+        }
+        finally
+        {
+            LightHingeSwitch.IsEnabled = true;
+        }
         if (!ok)
         {
             _syncingLighting = true;
@@ -3822,7 +3847,16 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LightSyncSwitch.IsChecked == true;
-        bool ok = await ApplySyncLightAsync();
+        LightSyncSwitch.IsEnabled = false;
+        bool ok;
+        try
+        {
+            ok = await ApplySyncLightAsync();
+        }
+        finally
+        {
+            LightSyncSwitch.IsEnabled = true;
+        }
         if (!ok)
         {
             _syncingLighting = true;
@@ -3883,7 +3917,16 @@ public partial class OriginalStyleWindow : Window
         bool requested = KeyboardLightSwitch.IsChecked == true;
         _pendingKeyboardPower = requested;
         _pendingKeyboardPowerTick = Environment.TickCount64;
-        bool ok = await ApplyKeyboardLightAsync();
+        KeyboardLightSwitch.IsEnabled = false;
+        bool ok;
+        try
+        {
+            ok = await ApplyKeyboardLightAsync();
+        }
+        finally
+        {
+            KeyboardLightSwitch.IsEnabled = true;
+        }
         if (!ok)
         {
             _pendingKeyboardPower = null;
@@ -3988,6 +4031,19 @@ public partial class OriginalStyleWindow : Window
 
     private async Task<bool> ApplyKeyboardLightAsync()
     {
+        await _keyboardLightApplyLock.WaitAsync();
+        try
+        {
+            return await ApplyKeyboardLightCoreAsync();
+        }
+        finally
+        {
+            _keyboardLightApplyLock.Release();
+        }
+    }
+
+    private async Task<bool> ApplyKeyboardLightCoreAsync()
+    {
         if (_backendProbe == null || KeyboardEffectCombo.SelectedItem is not ComboBoxItem item)
         {
             return false;
@@ -4033,7 +4089,16 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = LogoLightSwitch.IsChecked == true;
-        bool ok = await ApplyLogoLightAsync();
+        LogoLightSwitch.IsEnabled = false;
+        bool ok;
+        try
+        {
+            ok = await ApplyLogoLightAsync();
+        }
+        finally
+        {
+            LogoLightSwitch.IsEnabled = true;
+        }
         if (!ok)
         {
             _syncingLighting = true;
