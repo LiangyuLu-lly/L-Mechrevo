@@ -585,23 +585,47 @@ public partial class MainWindow : Window
         Grid batteryLayout = new();
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        Border batteryIcon = new()
+        Grid batteryGlyph = new() { Width = 48, Height = 48 };
+        Border batteryBody = new()
+        {
+            Width = 32,
+            Height = 20,
+            CornerRadius = new CornerRadius(5),
+            BorderBrush = (Brush)FindResource("MutedBrush"),
+            BorderThickness = new Thickness(2),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 0, 0),
+            Child = new Border
+            {
+                Width = 14,
+                Height = 8,
+                CornerRadius = new CornerRadius(2),
+                Background = (Brush)FindResource("AccentBrush"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 0, 0)
+            }
+        };
+        Border batteryTip = new()
+        {
+            Width = 4,
+            Height = 8,
+            CornerRadius = new CornerRadius(2),
+            Background = (Brush)FindResource("MutedBrush"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0)
+        };
+        batteryGlyph.Children.Add(batteryBody);
+        batteryGlyph.Children.Add(batteryTip);
+        Viewbox batteryIcon = new()
         {
             Width = 48,
             Height = 48,
-            CornerRadius = new CornerRadius(13),
-            Background = (Brush)FindResource("ControlBrush"),
             Margin = new Thickness(0, 0, 16, 0),
             VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock
-            {
-                Text = "\uE83F",
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 26,
-                Foreground = (Brush)FindResource("MutedBrush"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
+            Child = batteryGlyph
         };
         Grid.SetColumn(battery, 1);
         batteryLayout.Children.Add(batteryIcon);

@@ -224,9 +224,14 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Width="48" Height="48" CornerRadius="13" Background="{DynamicResource ControlBrush}" Margin="0,0,16,0" VerticalAlignment="Center">
-                                            <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="26" Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
+                                        <Viewbox Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center">
+                                            <Grid Width="48" Height="48">
+                                                <Border Width="34" Height="22" CornerRadius="4" BorderBrush="{DynamicResource MutedBrush}" BorderThickness="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,7,0,0" />
+                                                <Border Width="14" Height="2" CornerRadius="1" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0" />
+                                                <Border Width="2" Height="6" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,24,0,0" />
+                                                <Border Width="10" Height="2" CornerRadius="1" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,30,0,0" />
+                                            </Grid>
+                                        </Viewbox>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
                                             <TextBlock x:Name="DisplayInfoText" Text="—" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
