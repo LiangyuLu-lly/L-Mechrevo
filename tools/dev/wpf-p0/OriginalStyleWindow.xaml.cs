@@ -219,6 +219,8 @@ public partial class OriginalStyleWindow : Window
         {
             UpdateContentWidth();
         };
+        Microsoft.Win32.SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
+        Closed += (_, _) => Microsoft.Win32.SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
         Loaded += delegate
         {
             Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -485,6 +487,19 @@ public partial class OriginalStyleWindow : Window
         }
         _overlayWindow.Show();
         _overlayWindow.Activate();
+    }
+
+    private void SystemEvents_PowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != Microsoft.Win32.PowerModes.Resume)
+        {
+            return;
+        }
+        Dispatcher.BeginInvoke(new Action(async () =>
+        {
+            await Task.Delay(1500);
+            await RestoreLightingOnStartupAsync();
+        }));
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1943,6 +1958,15 @@ public partial class OriginalStyleWindow : Window
         }
         CpuStat.Text = SensorLine(hw, cpu: true);
         GpuStat.Text = SensorLine(hw, cpu: false);
+        if (IsHidKeyboard(hw) && Program.rgb != null)
+        {
+            string expectedHidTag = "hid:" + Program.rgb.KbHidMode;
+            string? selectedHidTag = (KeyboardEffectCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+            if (!string.Equals(selectedHidTag, expectedHidTag, StringComparison.Ordinal))
+            {
+                FillKeyboardEffects();
+            }
+        }
         string health = MechrevoLite.SettingsForm.BatteryHealthText(hw);
         string abnormal = hw.BatteryAbnormal ? " · 电池异常" : "";
         string powerState = "";
