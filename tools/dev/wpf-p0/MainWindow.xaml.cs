@@ -84,7 +84,7 @@ public partial class MainWindow : Window
             {
                 if (_owner != null && !_owner.IsVisible)
                 {
-                    _owner.Show();
+                    _owner.ShowCompactWindow();
                 }
             }
             catch
@@ -269,8 +269,7 @@ public partial class MainWindow : Window
         {
             AppConfig.Set("last_window_mode", "mini");
             AppConfig.Flush();
-            _owner.Show();
-            _owner.Activate();
+            _owner.ShowCompactWindow();
             Close();
             return;
         }
@@ -357,7 +356,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void WideMinimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+    private void WideMinimize_Click(object sender, RoutedEventArgs e)
+    {
+        PlayWindowTransition();
+        SystemCommands.MinimizeWindow(this);
+    }
 
     private void WideMaximize_Click(object sender, RoutedEventArgs e) => ToggleWideMaximize();
 

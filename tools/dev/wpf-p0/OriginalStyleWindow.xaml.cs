@@ -5221,12 +5221,22 @@ public partial class OriginalStyleWindow : Window
         AppConfig.Flush();
         _wideWindow.Show();
         _wideWindow.Activate();
+        Opacity = 0;
+        ShowInTaskbar = false;
         Hide();
     }
 
     internal void RefreshWideBackground()
     {
         _wideWindow?.ReloadWideBackground();
+    }
+
+    internal void ShowCompactWindow()
+    {
+        Opacity = 1;
+        ShowInTaskbar = true;
+        Show();
+        Activate();
     }
 
     private async void DockButton_Click(object sender, RoutedEventArgs e)

@@ -58,6 +58,14 @@ public partial class App : Application
             executeOnlyOnce: false);
         ApplyFont();
         base.OnStartup(e);
+        OriginalStyleWindow window = new();
+        MainWindow = window;
+        if (string.Equals(MechrevoLite.AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
+        {
+            window.Opacity = 0;
+            window.ShowInTaskbar = false;
+        }
+        window.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
