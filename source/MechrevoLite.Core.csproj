@@ -3,8 +3,7 @@
   <!-- ==========================================================================================
        task-11（可行性探针）：把「业务代码」从旧 WinForms 工程 `L-Mechrevo.csproj` 拆成独立 Core 程序集。
        ⚠️ 本文件只用于**可行性验证 / 骨架**：不迁移文件、不改旧工程、不改 WPF；是否保留/转正由 Lead 决定。
-       ⚠️ 当前**不是 0 错误**：业务层与旧 UI 的耦合点（Program 门面 / 旧窗体 / MechrevoLite.UI）尚未重构，
-          实测结果、错误分类、拆分步骤见 docs/notes/WPF业务Core拆分可行性-20261026.md。
+       ✅ 2026-10-26：兼容 shim 后已 0 错误；WPF 已切到本 Core 引用（详见 WPF业务Core-Shim-20261026.md）。
        做法：EnableDefaultCompileItems=false + 显式 Include 业务目录/根文件；框架与 8 个第三方引用与旧工程一致。
        ========================================================================================== -->
 
@@ -77,6 +76,14 @@
     <!-- 旧根目录里的业务协调器/探针（非窗体；业务代码大量引用） -->
     <Compile Include="MechrevoLite\HardwareControl.cs" />
     <Compile Include="MechrevoLite\ScreenGateProbe.cs" />
+    <Compile Include="MechrevoLite\SettingsBackup.cs" />
+    <Compile Include="MechrevoLite\GcuPackageImport.cs" />
+    <Compile Include="MechrevoLite\KeyboardLightingDecision.cs" />
+    <Compile Include="Startup.cs" />
+    <!-- 旧入口的 ACPI 门面（纯 Win32/业务类型，非窗体；Program shim 需要它的类型） -->
+    <Compile Include="MechrevoLite\AsusACPI.cs" />
+    <!-- ⭐ task-12：旧 WinForms UI 的兼容 shim（在 source 外，显式 Link 编入 Core） -->
+    <Compile Include="..\tools\core-shims\CoreUiShims.cs" Link="CoreUiShims.cs" />
   </ItemGroup>
 
   <!-- ===== 业务资源（Strings 可编入 Core；旧 UI 的 Resources/Fans resx 不属 Core） ===== -->
@@ -119,4 +126,7 @@
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="L-Mechrevo.WpfP0" />
+  </ItemGroup>
 </Project>
