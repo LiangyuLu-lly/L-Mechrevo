@@ -63,7 +63,6 @@ public partial class MainWindow : Window
         _owner = owner;
         _probe = probe;
         AppTheme.Apply(true);
-        UpdateMonochromeIcon();
         ReloadWideBackground();
         BuildMoreSwitchTiles();
         BuildSensorBlocks();
@@ -279,15 +278,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            const int size = 32;
+            const int size = 256;
             DrawingVisual visual = new();
             using (DrawingContext dc = visual.RenderOpen())
             {
                 Brush background = new SolidColorBrush(_dark ? Colors.White : Colors.Black);
-                dc.DrawRoundedRectangle(background, null, new Rect(0, 0, size, size), 7, 7);
+                dc.DrawRoundedRectangle(background, null, new Rect(0, 0, size, size), 56, 56);
                 Brush foreground = new SolidColorBrush(_dark ? Colors.Black : Colors.White);
                 FormattedText text = new("L", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                    new Typeface("Segoe UI"), 21, foreground, 1.0);
+                    new Typeface("Segoe UI"), 176, foreground, 1.0);
                 dc.DrawText(text, new Point((size - text.Width) / 2, (size - text.Height) / 2));
             }
             RenderTargetBitmap bitmap = new(size, size, 96, 96, PixelFormats.Pbgra32);
@@ -356,7 +355,6 @@ public partial class MainWindow : Window
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? "切换浅色" : "切换深色";
-        UpdateMonochromeIcon();
         StatusText.Text = "L-Mechrevo · " + (_dark ? "深色" : "浅色") + "主题";
     }
 
