@@ -338,23 +338,25 @@ public partial class OriginalStyleWindow : Window
         return await _backendProbe.SwitchQuickAsync(key, !current);
     }
 
-    internal (string CpuTemp, string GpuTemp, string CpuFan, string GpuFan, string CpuUsage, string GpuUsage, string CpuFanDuty, string GpuFanDuty) WideSensors()
+    internal (string CpuTemp, string GpuTemp, string CpuFan, string GpuFan, string CpuUsage, string GpuUsage, string CpuFanDuty, string GpuFanDuty, string CpuFreq, string GpuFreq, string FanMax) WideSensors()
     {
         MechrevoHw? hardware = _backendProbe?.Hw;
         if (hardware == null)
         {
-            return ("--", "--", "--", "--", "--", "--", "--", "--");
+            return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
         }
         try
         {
             return (hardware.CpuTemp + " ℃", hardware.GpuTemp + " ℃",
                 hardware.CpuFanRpm + " RPM", hardware.GpuFanRpm + " RPM",
                 hardware.CpuUsage + "%", hardware.GpuUsage + "%",
-                hardware.CpuFanDuty + "%", hardware.GpuFanDuty + "%");
+                hardware.CpuFanDuty + "%", hardware.GpuFanDuty + "%",
+                hardware.CpuFrequency + " MHz", hardware.GpuCoreFreq + " MHz",
+                hardware.FanRpmMaxForPercent.ToString());
         }
         catch
         {
-            return ("--", "--", "--", "--", "--", "--", "--", "--");
+            return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
         }
     }
 

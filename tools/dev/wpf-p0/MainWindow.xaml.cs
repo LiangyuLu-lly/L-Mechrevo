@@ -17,16 +17,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _sensorTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _dark = true;
     private bool _navCollapsed;
-    private RingGauge? _cpuRing;
-    private RingGauge? _gpuRing;
-    private ProgressBar? _cpuUsageBar;
-    private ProgressBar? _gpuUsageBar;
-    private TextBlock? _cpuUsageText;
-    private TextBlock? _gpuUsageText;
-    private ProgressBar? _cpuFanBar;
-    private ProgressBar? _gpuFanBar;
-    private TextBlock? _cpuFanLabel;
-    private TextBlock? _gpuFanLabel;
+    private readonly List<(ProgressBar Bar, TextBlock Value, string Unit)> _cpuMetrics = new();
+    private readonly List<(ProgressBar Bar, TextBlock Value, string Unit)> _gpuMetrics = new();
+    private RingGauge? _cpuFanRing;
+    private RingGauge? _gpuFanRing;
+    private TextBlock? _cpuDutyText;
+    private TextBlock? _gpuDutyText;
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -59,25 +55,40 @@ public partial class MainWindow : Window
         {
             return;
         }
-        (string cpuTemp, string gpuTemp, string cpuFan, string gpuFan, string cpuUsage, string gpuUsage, string cpuFanDuty, string gpuFanDuty) = _owner.WideSensors();
-        _cpuRing?.SetValue(ParseNumber(cpuTemp), 100, "CPU");
-        _gpuRing?.SetValue(ParseNumber(gpuTemp), 100, "GPU");
-        double cpuUse = ParseNumber(cpuUsage);
-        double gpuUse = ParseNumber(gpuUsage);
-        if (_cpuUsageBar != null) _cpuUsageBar.Value = cpuUse;
-        if (_gpuUsageBar != null) _gpuUsageBar.Value = gpuUse;
-        if (_cpuUsageText != null) _cpuUsageText.Text = "使用率 " + Math.Round(cpuUse) + "%";
-        if (_gpuUsageText != null) _gpuUsageText.Text = "使用率 " + Math.Round(gpuUse) + "%";
-        if (_cpuFanLabel != null) _cpuFanLabel.Text = "CPU 风扇  " + cpuFan + " · " + cpuFanDuty;
-        if (_gpuFanLabel != null) _gpuFanLabel.Text = "GPU 风扇  " + gpuFan + " · " + gpuFanDuty;
-        if (_cpuFanBar != null) _cpuFanBar.Value = ParseNumber(cpuFanDuty);
-        if (_gpuFanBar != null) _gpuFanBar.Value = ParseNumber(gpuFanDuty);
+        (string cpuTemp, string gpuTemp, string cpuFan, string gpuFan, string cpuUsage, string gpuUsage,
+            string cpuFanDuty, string gpuFanDuty, string cpuFreq, string gpuFreq, string fanMaxText) = _owner.WideSensors();
+        double fanMax = Math.Max(1, ParseNumber(fanMaxText));
+        if (fanMax <= 1) fanMax = 5000;
+        SetMetric(_cpuMetrics, 0, ParseNumber(cpuUsage), "%");
+        SetMetric(_cpuMetrics, 1, ParseNumber(cpuFreq), "MHz");
+        SetMetric(_cpuMetrics, 2, ParseNumber(cpuTemp), "℃");
+        SetMetric(_cpuMetrics, 3, ParseNumber(cpuFan), "RPM");
+        SetMetric(_gpuMetrics, 0, ParseNumber(gpuUsage), "%");
+        SetMetric(_gpuMetrics, 1, ParseNumber(gpuFreq), "MHz");
+        SetMetric(_gpuMetrics, 2, ParseNumber(gpuTemp), "℃");
+        SetMetric(_gpuMetrics, 3, ParseNumber(gpuFan), "RPM");
+        _cpuFanRing?.SetValue(ParseNumber(cpuFan), fanMax, "CPU");
+        _gpuFanRing?.SetValue(ParseNumber(gpuFan), fanMax, "GPU");
+        if (_cpuDutyText != null) _cpuDutyText.Text = "占空比 " + cpuFanDuty;
+        if (_gpuDutyText != null) _gpuDutyText.Text = "占空比 " + gpuFanDuty;
+    }
+
+    private static void SetMetric(List<(ProgressBar Bar, TextBlock Value, string Unit)> metrics, int index, double value, string unit)
+    {
+        if (index < 0 || index >= metrics.Count)
+        {
+            return;
+        }
+        (ProgressBar bar, TextBlock text, string _) = metrics[index];
+        bar.Value = Math.Clamp(value, 0, bar.Maximum);
+        text.Text = Math.Round(value) + " " + unit;
     }
 
     private static double ParseNumber(string text)
     {
-        string digits = new(text.Where(char.IsDigit).ToArray());
-        return double.TryParse(digits, out double value) ? value : 0;
+        System.Text.RegularExpressions.Match match =
+            System.Text.RegularExpressions.Regex.Match(text, @"[-+]?\d+(?:\.\d+)?");
+        return match.Success && double.TryParse(match.Value, out double value) ? value : 0;
     }
 
     private void BuildSensorBlocks()
@@ -86,50 +97,81 @@ public partial class MainWindow : Window
         {
             return;
         }
-        _cpuRing = new RingGauge { Width = 104, Height = 104, HorizontalAlignment = HorizontalAlignment.Center };
-        _gpuRing = new RingGauge { Width = 104, Height = 104, HorizontalAlignment = HorizontalAlignment.Center };
-        _cpuUsageBar = CreateUsageBar();
-        _gpuUsageBar = CreateUsageBar();
-        _cpuUsageText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 10, 0, 0) };
-        _gpuUsageText = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 10, 0, 0) };
-        SensorBlocksGrid.Children.Add(BuildSensorBlock("CPU", _cpuRing, _cpuUsageText, _cpuUsageBar));
-        SensorBlocksGrid.Children.Add(BuildSensorBlock("GPU", _gpuRing, _gpuUsageText, _gpuUsageBar));
+        SensorBlocksGrid.Children.Add(BuildMetricCard("CPU", _cpuMetrics,
+            new[] { ("使用率", 100.0), ("核心频率", 6000.0), ("温度", 100.0), ("风扇", 5000.0) }));
+        SensorBlocksGrid.Children.Add(BuildMetricCard("GPU", _gpuMetrics,
+            new[] { ("使用率", 100.0), ("核心频率", 3000.0), ("温度", 100.0), ("风扇", 5000.0) }));
 
-        _cpuFanLabel = new TextBlock { Style = (Style)FindResource("MutedText") };
-        _gpuFanLabel = new TextBlock { Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 14, 0, 0) };
-        _cpuFanBar = CreateUsageBar();
-        _gpuFanBar = CreateUsageBar();
+        _cpuFanRing = new RingGauge { Width = 104, Height = 104, HorizontalAlignment = HorizontalAlignment.Center };
+        _gpuFanRing = new RingGauge { Width = 104, Height = 104, HorizontalAlignment = HorizontalAlignment.Center };
+        _cpuDutyText = new TextBlock { Style = (Style)FindResource("MutedText"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
+        _gpuDutyText = new TextBlock { Style = (Style)FindResource("MutedText"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
         StackPanel fans = new();
         fans.Children.Add(new TextBlock { Text = "风扇", Style = (Style)FindResource("CardTitle") });
-        fans.Children.Add(new TextBlock { Text = "CPU / GPU 转速与占空比", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 3, 0, 12) });
-        fans.Children.Add(_cpuFanLabel);
-        fans.Children.Add(_cpuFanBar);
-        fans.Children.Add(_gpuFanLabel);
-        fans.Children.Add(_gpuFanBar);
-        SensorBlocksGrid.Children.Add(new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = fans });
-    }
-
-    private static ProgressBar CreateUsageBar()
-    {
-        return new ProgressBar
+        fans.Children.Add(new TextBlock { Text = "转速环形图 · 底部占空比", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 3, 0, 10) });
+        Grid rings = new();
+        rings.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        rings.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        StackPanel cpuFan = new();
+        cpuFan.Children.Add(new TextBlock { Text = "CPU 风扇", Style = (Style)FindResource("MutedText"), HorizontalAlignment = HorizontalAlignment.Center });
+        cpuFan.Children.Add(_cpuFanRing);
+        cpuFan.Children.Add(_cpuDutyText);
+        StackPanel gpuFan = new();
+        gpuFan.Children.Add(new TextBlock { Text = "GPU 风扇", Style = (Style)FindResource("MutedText"), HorizontalAlignment = HorizontalAlignment.Center });
+        gpuFan.Children.Add(_gpuFanRing);
+        gpuFan.Children.Add(_gpuDutyText);
+        Grid.SetColumn(cpuFan, 0);
+        Grid.SetColumn(gpuFan, 1);
+        rings.Children.Add(cpuFan);
+        rings.Children.Add(gpuFan);
+        fans.Children.Add(rings);
+        SensorBlocksGrid.Children.Add(new Border
         {
-            Height = 6,
-            Minimum = 0,
-            Maximum = 100,
-            Margin = new Thickness(0, 10, 0, 0),
-            Foreground = (Brush)Application.Current.Resources["AccentBrush"],
-            Background = (Brush)Application.Current.Resources["TrackBrush"],
-            BorderThickness = new Thickness(0)
-        };
+            Style = (Style)FindResource("Card"),
+            Margin = new Thickness(5),
+            MinHeight = 225,
+            Child = fans
+        });
     }
 
-    private static Border BuildSensorBlock(string title, RingGauge ring, TextBlock usageText, ProgressBar usageBar)
+    private static Border BuildMetricCard(string title, List<(ProgressBar Bar, TextBlock Value, string Unit)> metrics,
+        (string Label, double Maximum)[] rows)
     {
         StackPanel panel = new();
         panel.Children.Add(new TextBlock { Text = title, Style = (Style)Application.Current.Resources["CardTitle"] });
-        panel.Children.Add(ring);
-        panel.Children.Add(usageText);
-        panel.Children.Add(usageBar);
+        foreach ((string label, double maximum) in rows)
+        {
+            Grid row = new() { Margin = new Thickness(0, 8, 0, 0) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(66) });
+            TextBlock name = new() { Text = label, Style = (Style)Application.Current.Resources["MutedText"], VerticalAlignment = VerticalAlignment.Center };
+            ProgressBar bar = new()
+            {
+                Height = 7,
+                Minimum = 0,
+                Maximum = maximum,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = (Brush)Application.Current.Resources["AccentBrush"],
+                Background = (Brush)Application.Current.Resources["TrackBrush"],
+                BorderThickness = new Thickness(0)
+            };
+            TextBlock value = new()
+            {
+                Text = "--",
+                Style = (Style)Application.Current.Resources["MutedText"],
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(name, 0);
+            Grid.SetColumn(bar, 1);
+            Grid.SetColumn(value, 2);
+            row.Children.Add(name);
+            row.Children.Add(bar);
+            row.Children.Add(value);
+            panel.Children.Add(row);
+            metrics.Add((bar, value, ""));
+        }
         return new Border
         {
             Style = (Style)Application.Current.Resources["Card"],
