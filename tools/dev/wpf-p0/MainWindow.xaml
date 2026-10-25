@@ -292,7 +292,7 @@
                         <StackPanel>
                             <TextBlock Text="灯光" Style="{StaticResource PageTitle}" />
                             <TextBlock Text="键盘、灯带、Logo、铰链与同步灯" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
-                            <UniformGrid x:Name="LightingCardsGrid" Columns="2" />
+                            <StackPanel x:Name="LightingCardsGrid" />
                         </StackPanel>
                     </ScrollViewer>
 
