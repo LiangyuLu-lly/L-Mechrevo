@@ -585,14 +585,23 @@ public partial class MainWindow : Window
         Grid batteryLayout = new();
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        TextBlock batteryIcon = new()
+        Border batteryIcon = new()
         {
-            Text = "\uE83F",
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 42,
-            Foreground = (Brush)FindResource("MutedBrush"),
+            Width = 48,
+            Height = 48,
+            CornerRadius = new CornerRadius(13),
+            Background = (Brush)FindResource("ControlBrush"),
             Margin = new Thickness(0, 0, 16, 0),
-            VerticalAlignment = VerticalAlignment.Top
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock
+            {
+                Text = "\uE83F",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 26,
+                Foreground = (Brush)FindResource("MutedBrush"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
         };
         Grid.SetColumn(battery, 1);
         batteryLayout.Children.Add(batteryIcon);
@@ -663,7 +672,7 @@ public partial class MainWindow : Window
         _igpuSavingState = new TextBlock { Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         row.Children.Add(_igpuSavingState);
         HomeIgpuSavingPanel.Children.Add(row);
-        HomeIgpuSavingPanel.Visibility = Visibility.Visible;
+        HomeIgpuSavingPanel.Visibility = _owner.WideIgpuSavingSupported ? Visibility.Visible : Visibility.Collapsed;
         RefreshIgpuSaving();
     }
 
@@ -671,7 +680,7 @@ public partial class MainWindow : Window
     {
         if (_owner == null || HomeIgpuSavingPanel == null) return;
         bool supported = _owner.WideIgpuSavingSupported;
-        HomeIgpuSavingPanel.Visibility = Visibility.Visible;
+        HomeIgpuSavingPanel.Visibility = supported ? Visibility.Visible : Visibility.Collapsed;
         int mode = _owner.WideIgpuSavingMode;
         foreach (ToggleButton button in _igpuSavingButtons)
         {
