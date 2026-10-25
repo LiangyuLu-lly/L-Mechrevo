@@ -326,17 +326,7 @@ public partial class OriginalStyleWindow : Window
         {
             return false;
         }
-        bool current = false;
-        try
-        {
-            if (_backendProbe.Hw?.QuickSwitches != null)
-            {
-                _backendProbe.Hw.QuickSwitches.TryGetValue(key, out current);
-            }
-        }
-        catch
-        {
-        }
+        bool current = _backendProbe.QuickState(key);
         return await _backendProbe.SwitchQuickAsync(key, !current);
     }
 
@@ -481,6 +471,11 @@ public partial class OriginalStyleWindow : Window
     {
         EcDirectOffToggle.IsChecked = enabled;
         EcDirectOffToggle_Click(EcDirectOffToggle, new RoutedEventArgs());
+    }
+
+    internal void WideEditQuickTiles()
+    {
+        CustomTile_Click(CustomTile, new RoutedEventArgs());
     }
 
     internal (string Key, string Label, string Glyph, bool On)[] WideQuickTiles()
@@ -2074,7 +2069,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = "没有可用的快捷开关";
             return;
         }
-        QuickTilePickerWindow picker = new QuickTilePickerWindow(choices, 5)
+        QuickTilePickerWindow picker = new QuickTilePickerWindow(choices, 6)
         {
             Owner = this
         };
@@ -5057,6 +5052,7 @@ public partial class OriginalStyleWindow : Window
     {
         // 恢复独立宽屏 UI，不再把主窗口本身切成双列。
         new MainWindow(this, _backendProbe).Show();
+        Hide();
     }
 
     private async void DockButton_Click(object sender, RoutedEventArgs e)

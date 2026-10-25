@@ -148,7 +148,7 @@
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="快捷磁贴" Style="{StaticResource CardTitle}" Margin="0,0,0,10" />
-                                    <UniformGrid x:Name="QuickTilesGrid" Columns="4" />
+                                    <UniformGrid x:Name="QuickTilesGrid" Columns="7" />
                                 </StackPanel>
                             </Border>
 

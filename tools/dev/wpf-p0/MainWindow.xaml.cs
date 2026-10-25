@@ -59,7 +59,20 @@ public partial class MainWindow : Window
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
         _sensorTimer.Start();
-        Closed += (_, _) => _sensorTimer.Stop();
+        Closed += (_, _) =>
+        {
+            _sensorTimer.Stop();
+            try
+            {
+                if (_owner != null && !_owner.IsVisible)
+                {
+                    _owner.Show();
+                }
+            }
+            catch
+            {
+            }
+        };
         ApplyHomeCapabilities();
         RefreshSensors();
         StatusText.Text = "就绪 · 宽屏四页布局";
@@ -398,6 +411,34 @@ public partial class MainWindow : Window
             QuickTilesGrid.Children.Add(tile);
             _quickTileButtons.Add((key, tile, state, label));
         }
+        StackPanel customContent = new();
+        customContent.Children.Add(new TextBlock
+        {
+            Text = "\uE710",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 16,
+            HorizontalAlignment = HorizontalAlignment.Center
+        });
+        customContent.Children.Add(new TextBlock
+        {
+            Text = "自定义",
+            FontSize = 11,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 4, 0, 0),
+            Style = (Style)FindResource("MutedText")
+        });
+        Button customTile = new()
+        {
+            Style = (Style)FindResource("TileButton"),
+            Content = customContent
+        };
+        customTile.Click += (_, _) =>
+        {
+            _owner?.WideEditQuickTiles();
+            BuildQuickTiles();
+        };
+        QuickTilesGrid.Children.Add(customTile);
+        QuickTilesGrid.Columns = Math.Max(1, QuickTilesGrid.Children.Count);
     }
 
     private void RefreshQuickTiles()
