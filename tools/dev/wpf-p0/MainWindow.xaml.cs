@@ -251,7 +251,7 @@ public partial class MainWindow : Window
             Close();
             return;
         }
-        new CompactWindow(_owner, _probe).Show();
+        StatusText.Text = "没有可恢复的小窗";
     }
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
