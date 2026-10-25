@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MechrevoLite;
@@ -256,8 +257,9 @@ public partial class MainWindow : Window
     {
         button.Content = collapsed ? glyph : text;
         button.FontFamily = collapsed ? glyphFont : textFont;
-        button.FontSize = collapsed ? 16 : 13;
-        button.Padding = collapsed ? new Thickness(10, 10, 10, 10) : new Thickness(12, 10, 12, 10);
+        button.FontSize = collapsed ? 18 : 13;
+        button.Padding = collapsed ? new Thickness(0) : new Thickness(12, 10, 12, 10);
+        button.Height = collapsed ? 40 : double.NaN;
         button.HorizontalContentAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
     }
 
@@ -361,6 +363,7 @@ public partial class MainWindow : Window
 
     private void ToggleWideMaximize()
     {
+        PlayWindowTransition();
         if (WindowState == WindowState.Maximized)
         {
             SystemCommands.RestoreWindow(this);
@@ -369,6 +372,16 @@ public partial class MainWindow : Window
         {
             SystemCommands.MaximizeWindow(this);
         }
+    }
+
+    private void PlayWindowTransition()
+    {
+        if (Content is not UIElement root) return;
+        DoubleAnimation fade = new(0.55, 1.0, TimeSpan.FromMilliseconds(160))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        root.BeginAnimation(OpacityProperty, fade);
     }
 
     private void WideClose_Click(object sender, RoutedEventArgs e) => Close();
