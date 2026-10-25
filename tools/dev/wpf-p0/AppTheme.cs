@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using MechrevoLite;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -31,6 +32,25 @@ internal static class AppTheme
             resources["TextBrush"] = Brush("#1B2029");
             resources["MutedBrush"] = Brush("#5A6574");
             resources["TrackBrush"] = Brush("#26000000");
+        }
+        ApplyCardOpacity();
+    }
+
+    internal static void ApplyCardOpacity()
+    {
+        try
+        {
+            if (Application.Current.Resources["CardBrush"] is not SolidColorBrush brush)
+            {
+                return;
+            }
+            int opacity = Math.Clamp(AppConfig.Get("ui_card_opacity", 100), 0, 100);
+            Color color = brush.Color;
+            color.A = (byte)Math.Round(opacity * 255.0 / 100.0);
+            Application.Current.Resources["CardBrush"] = new SolidColorBrush(color);
+        }
+        catch
+        {
         }
     }
 

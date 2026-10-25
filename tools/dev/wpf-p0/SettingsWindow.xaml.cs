@@ -203,6 +203,8 @@ public partial class SettingsWindow : Window
         RefreshWideBackgroundPathText();
         DockOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_dock_opacity", 70), 0, 100);
         DockOpacityText.Text = (int)DockOpacitySlider.Value + "%";
+        CardOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_card_opacity", 100), 0, 100);
+        CardOpacityText.Text = (int)CardOpacitySlider.Value + "%";
         ButtonOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_button_opacity", 60), 0, 100);
         ButtonOpacityText.Text = (int)ButtonOpacitySlider.Value + "%";
         CheckUpdateButton.Visibility = MechrevoLite.Update.UpdateForm.TemporarilyHidden
@@ -411,6 +413,16 @@ public partial class SettingsWindow : Window
         BackgroundPathText.Text = string.IsNullOrWhiteSpace(path)
             ? "未选择"
             : System.IO.Path.GetFileName(path);
+    }
+
+    private void CardOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncing || CardOpacityText == null) return;
+        int value = (int)Math.Round(e.NewValue);
+        CardOpacityText.Text = value + "%";
+        AppConfig.Set("ui_card_opacity", value);
+        AppConfig.Flush();
+        AppTheme.ApplyCardOpacity();
     }
 
     private void ButtonOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
