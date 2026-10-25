@@ -733,22 +733,24 @@ public partial class OriginalStyleWindow : Window
 
     internal (string CpuTemp, string GpuTemp, string CpuFan, string GpuFan, string CpuUsage, string GpuUsage, string CpuFanDuty, string GpuFanDuty, string CpuFreq, string GpuFreq, string FanMax, string CpuPower, string GpuPower, string GpuMemFreq) WideSensors()
     {
-        MechrevoHw? hardware = _backendProbe?.Hw;
-        if (hardware == null)
+        // ⭐ P0-3：统一走共享 ISensorService 快照（⛔ 不再直接读 HardwareControl 静态传感器）；
+        //   后端未连接/异常 ⇒ Empty ⇒ 全 "--"（与原行为一致）。UI 文本格式保持不变 ✅
+        SensorSnapshot snapshot = _services?.Sensors.Read() ?? SensorSnapshot.Empty;
+        if (!snapshot.HardwareAvailable)
         {
             return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
         }
         try
         {
-            float? cpuPower = MechrevoLite.HardwareControl.cpuPower;
-            float? gpuPower = MechrevoLite.HardwareControl.gpuPower;
-            float? memClock = NvmlHelper.GetGpuMemoryClockMhz();
-            return (hardware.CpuTemp + " ℃", hardware.GpuTemp + " ℃",
-                hardware.CpuFanRpm + " RPM", hardware.GpuFanRpm + " RPM",
-                hardware.CpuUsage + "%", hardware.GpuUsage + "%",
-                hardware.CpuFanDuty + "%", hardware.GpuFanDuty + "%",
-                hardware.CpuFrequency + " MHz", hardware.GpuCoreFreq + " MHz",
-                hardware.FanRpmMaxForPercent.ToString(),
+            double? cpuPower = snapshot.CpuPowerWatts;
+            double? gpuPower = snapshot.GpuPowerWatts;
+            int? memClock = snapshot.GpuMemoryClockMhz;
+            return (snapshot.CpuTempC + " ℃", snapshot.GpuTempC + " ℃",
+                snapshot.CpuFanRpm + " RPM", snapshot.GpuFanRpm + " RPM",
+                snapshot.CpuUsagePercent + "%", snapshot.GpuUsagePercent + "%",
+                snapshot.CpuFanDutyPercent + "%", snapshot.GpuFanDutyPercent + "%",
+                snapshot.CpuFrequencyMhz + " MHz", snapshot.GpuCoreFrequencyMhz + " MHz",
+                snapshot.FanRpmMaxForPercent.ToString(),
                 (cpuPower.HasValue ? cpuPower.Value.ToString("0.0") : "--") + " W",
                 (gpuPower.HasValue ? gpuPower.Value.ToString("0.0") : "--") + " W",
                 (memClock.HasValue && memClock.Value > 0 ? memClock.Value.ToString("0") : "--") + " MHz");
@@ -3027,11 +3029,13 @@ public partial class OriginalStyleWindow : Window
                     AppConfig.Set("igpu_only_asked", 1);
                     AppConfig.Flush();
                 }
-                OriginalFormHostWindow host = new(new MechrevoLite.FirstRunGuideForm(), "首次使用引导")
+                // P0-4：首次使用引导已迁到 WPF（FirstRunGuideWindow），不再经 OriginalFormHostWindow
+                // 托管 WinForms FirstRunGuideForm；步骤/配置键/完成动作与旧窗口逐项一致（见新窗口文件头）。
+                FirstRunGuideWindow guide = new(igpuOnlyStepOnly: false)
                 {
                     Owner = this
                 };
-                host.ShowDialog();
+                guide.ShowDialog();
                 AppConfig.Set("onboarding_version", 1);
                 AppConfig.Flush();
                 return;
@@ -3045,11 +3049,12 @@ public partial class OriginalStyleWindow : Window
                 {
                     AppConfig.Set("igpu_only_asked", 1);
                     AppConfig.Flush();
-                    OriginalFormHostWindow host = new(new MechrevoLite.FirstRunGuideForm(igpuOnlyStepOnly: true), "核显模式")
+                    // P0-4：单问模式同样改走 WPF（紧凑窗口、只问核显模式那一题、落盘逻辑不变）。
+                    FirstRunGuideWindow guide = new(igpuOnlyStepOnly: true)
                     {
                         Owner = this
                     };
-                    host.ShowDialog();
+                    guide.ShowDialog();
                 }
             }
         }
@@ -5321,11 +5326,15 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
+            // 保留既有采样触发（2 s 遥测/悬浮窗节奏不变）；⛔ 不在此处直接读静态传感器字段
             HardwareControl.ReadSensorsOverlay();
         }
         catch
         {
         }
+        // ⭐ P0-3：温度/占用/频率/风扇/功耗统一由共享 ISensorService 快照提供；
+        //   VRAM/RAM（SensorSnapshot 暂无字段）仍从后端对象取，未连接回退 -1 ✅
+        SensorSnapshot snapshot = _services?.Sensors.Read() ?? SensorSnapshot.Empty;
         MechrevoHw? hw = _backendProbe?.Hw;
         int battery = hw?.BatteryPercent ?? -1;
         try
@@ -5351,25 +5360,25 @@ public partial class OriginalStyleWindow : Window
         {
         }
         return new OverlaySnapshot(
-            HardwareControl.cpuTemp > 0 ? HardwareControl.cpuTemp : (hw?.CpuTemp ?? -1),
-            HardwareControl.cpuUsage ?? hw?.CpuUsage ?? -1,
-            HardwareControl.cpuFrequency > 0 ? HardwareControl.cpuFrequency : (hw?.CpuFrequency ?? -1),
-            HardwareControl.gpuTemp > 0 ? HardwareControl.gpuTemp : (hw?.GpuTemp ?? -1),
-            HardwareControl.gpuUsage ?? hw?.GpuUsage ?? -1,
-            HardwareControl.gpuCoreFreq > 0 ? HardwareControl.gpuCoreFreq : (hw?.GpuCoreFreq ?? -1),
-            HardwareControl.vramUsedMb ?? (hw != null && hw.VramUsedMb > 0 ? hw.VramUsedMb : -1),
-            HardwareControl.vramUsage ?? -1,
-            HardwareControl.cpuFanRPM > 0 ? HardwareControl.cpuFanRPM : (hw?.CpuFanRpm ?? -1),
-            HardwareControl.gpuFanRPM > 0 ? HardwareControl.gpuFanRPM : (hw?.GpuFanRpm ?? -1),
-            HardwareControl.cpuFan is int cpuDuty ? cpuDuty : (hw?.CpuFanDuty ?? -1),
-            HardwareControl.gpuFan is int gpuDuty ? gpuDuty : (hw?.GpuFanDuty ?? -1),
-            HardwareControl.ramUsage ?? hw?.RamUsage ?? -1,
-            HardwareControl.ramUsedMb.HasValue ? HardwareControl.ramUsedMb.Value / 1024.0 : (hw?.RamUsedGb ?? -1),
+            snapshot.CpuTempC > 0 ? snapshot.CpuTempC : (hw?.CpuTemp ?? -1),
+            snapshot.CpuUsagePercent,
+            snapshot.CpuFrequencyMhz,
+            snapshot.GpuTempC > 0 ? snapshot.GpuTempC : (hw?.GpuTemp ?? -1),
+            snapshot.GpuUsagePercent,
+            snapshot.GpuCoreFrequencyMhz,
+            hw != null && hw.VramUsedMb > 0 ? hw.VramUsedMb : -1,
+            -1, // ⚠️ SensorSnapshot 暂无 VramUsage 字段；保留占位 -1（原静态字段未迁移）
+            snapshot.CpuFanRpm > 0 ? snapshot.CpuFanRpm : (hw?.CpuFanRpm ?? -1),
+            snapshot.GpuFanRpm > 0 ? snapshot.GpuFanRpm : (hw?.GpuFanRpm ?? -1),
+            snapshot.CpuFanDutyPercent,
+            snapshot.GpuFanDutyPercent,
+            hw?.RamUsage ?? -1,
+            hw?.RamUsedGb ?? -1,
             battery,
             acOnline,
             charging,
-            HardwareControl.cpuPower ?? 0f,
-            HardwareControl.gpuPower ?? 0f);
+            (float)(snapshot.CpuPowerWatts ?? 0),
+            (float)(snapshot.GpuPowerWatts ?? 0));
     }
 
     internal Task ExportDiagnosticPackForFeedbackAsync()

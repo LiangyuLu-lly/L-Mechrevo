@@ -30,7 +30,8 @@ internal sealed record SensorSnapshot(
     int FanRpmMaxForPercent,
     double? CpuPowerWatts,
     double? GpuPowerWatts,
-    int? GpuMemoryClockMhz)
+    int? GpuMemoryClockMhz,
+    int GpuVramUsagePercent)
 {
     /// <summary>未连接/读取异常时的空快照（数值全 0、功耗全 null）。</summary>
     internal static SensorSnapshot Empty { get; } = new(
@@ -48,7 +49,8 @@ internal sealed record SensorSnapshot(
         FanRpmMaxForPercent: 0,
         CpuPowerWatts: null,
         GpuPowerWatts: null,
-        GpuMemoryClockMhz: null);
+        GpuMemoryClockMhz: null,
+        GpuVramUsagePercent: -1);
 }
 
 /// <summary>⭐ 电池快照（硬件字段 + 系统供电状态；⛔ 不含 UI 文案）。</summary>

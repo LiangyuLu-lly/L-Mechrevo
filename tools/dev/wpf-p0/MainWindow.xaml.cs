@@ -12,6 +12,7 @@ using System.Windows.Threading;
 using MechrevoLite;
 using MechrevoLite.Hardware;
 using MechrevoLite.Display;
+using L_Mechrevo.WpfP0.Services;
 using Microsoft.Win32;
 
 namespace L_Mechrevo.WpfP0;
@@ -123,24 +124,24 @@ public partial class MainWindow : Window
         {
             return;
         }
-        (string cpuTemp, string gpuTemp, string cpuFan, string gpuFan, string cpuUsage, string gpuUsage,
-            string cpuFanDuty, string gpuFanDuty, string cpuFreq, string gpuFreq, string fanMaxText,
-            string cpuPower, string gpuPower, string gpuMemFreq) = _owner.WideSensors();
-        double fanMax = Math.Max(1, ParseNumber(fanMaxText));
+        // ⭐ P0-3：宽屏也直接消费共享 ISensorService 快照（⛔ 不再经 WideSensors 读静态字段）；
+        //   未连接/异常 ⇒ Empty ⇒ 0，占位显示与原来的 ParseNumber("--") 一致 ✅
+        SensorSnapshot snapshot = _owner.Services?.Sensors.Read() ?? SensorSnapshot.Empty;
+        double fanMax = Math.Max(1, snapshot.FanRpmMaxForPercent);
         if (fanMax <= 1) fanMax = 5000;
-        SetMetric(_cpuMetrics, 0, ParseNumber(cpuTemp), "℃");
-        SetMetric(_cpuMetrics, 1, ParseNumber(cpuUsage), "%");
-        SetMetric(_cpuMetrics, 2, ParseNumber(cpuPower), "W");
-        SetMetric(_cpuMetrics, 3, ParseNumber(cpuFreq), "MHz");
-        SetMetric(_gpuMetrics, 0, ParseNumber(gpuTemp), "℃");
-        SetMetric(_gpuMetrics, 1, ParseNumber(gpuUsage), "%");
-        SetMetric(_gpuMetrics, 2, ParseNumber(gpuPower), "W");
-        SetMetric(_gpuMetrics, 3, ParseNumber(gpuFreq), "MHz");
-        SetMetric(_gpuMetrics, 4, ParseNumber(gpuMemFreq), "MHz");
-        _cpuFanRing?.SetValue(ParseNumber(cpuFan), fanMax, "rpm");
-        _gpuFanRing?.SetValue(ParseNumber(gpuFan), fanMax, "rpm");
-        if (_cpuDutyText != null) _cpuDutyText.Text = "占空比 " + cpuFanDuty;
-        if (_gpuDutyText != null) _gpuDutyText.Text = "占空比 " + gpuFanDuty;
+        SetMetric(_cpuMetrics, 0, snapshot.CpuTempC, "℃");
+        SetMetric(_cpuMetrics, 1, snapshot.CpuUsagePercent, "%");
+        SetMetric(_cpuMetrics, 2, snapshot.CpuPowerWatts ?? 0, "W");
+        SetMetric(_cpuMetrics, 3, snapshot.CpuFrequencyMhz, "MHz");
+        SetMetric(_gpuMetrics, 0, snapshot.GpuTempC, "℃");
+        SetMetric(_gpuMetrics, 1, snapshot.GpuUsagePercent, "%");
+        SetMetric(_gpuMetrics, 2, snapshot.GpuPowerWatts ?? 0, "W");
+        SetMetric(_gpuMetrics, 3, snapshot.GpuCoreFrequencyMhz, "MHz");
+        SetMetric(_gpuMetrics, 4, snapshot.GpuMemoryClockMhz ?? 0, "MHz");
+        _cpuFanRing?.SetValue(snapshot.CpuFanRpm, fanMax, "rpm");
+        _gpuFanRing?.SetValue(snapshot.GpuFanRpm, fanMax, "rpm");
+        if (_cpuDutyText != null) _cpuDutyText.Text = "占空比 " + snapshot.CpuFanDutyPercent + "%";
+        if (_gpuDutyText != null) _gpuDutyText.Text = "占空比 " + snapshot.GpuFanDutyPercent + "%";
         RefreshHomeExtras();
     }
 

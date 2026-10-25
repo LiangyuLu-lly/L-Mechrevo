@@ -96,7 +96,8 @@ internal sealed class TrayIconService : IDisposable
         _menu.ImageScalingSize = new Size(16, 16);
         _menu.Padding = new Padding(5);
         _menu.DropShadowEnabled = true;
-        _menu.Renderer = new MechrevoLite.UI.CustomMenuRenderer();
+        // 2026-10-26（P0-5）：托盘菜单渲染器迁到 WPF 项目内（TrayMenuRenderer），不再依赖旧 UI 的渲染器类型。
+        _menu.Renderer = new TrayMenuRenderer();
         SetTheme(dark: true);
         RebuildMenu();
     }
@@ -107,8 +108,10 @@ internal sealed class TrayIconService : IDisposable
         {
             _menu.BackColor = dark ? Color.FromArgb(22, 27, 35) : Color.FromArgb(248, 249, 251);
             _menu.ForeColor = dark ? Color.FromArgb(243, 245, 248) : Color.FromArgb(28, 32, 38);
-            _menu.Font = MechrevoLite.UI.UiVisualStyle.Font(9f);
-            _menu.Renderer = new MechrevoLite.UI.CustomMenuRenderer();
+            // 2026-10-26（P0-5）：字体由 WPF 项目内的 TrayMenuRenderer 提供（内嵌 HarmonyOS Sans SC，9pt；
+            // 加载/回退/缓存口径与迁移前旧 UI 字体工具一致）。
+            _menu.Font = TrayMenuRenderer.MenuFont(9f);
+            _menu.Renderer = new TrayMenuRenderer();
         }
         catch
         {

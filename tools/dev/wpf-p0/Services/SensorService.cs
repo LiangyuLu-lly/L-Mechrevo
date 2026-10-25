@@ -29,7 +29,7 @@ internal sealed class SensorService : ISensorService
     public SensorSnapshot Read()
     {
         MechrevoHw? hw = _backend.Hw;
-        if (hw == null)
+        if (hw == null || !hw.IsConnected)
         {
             return SensorSnapshot.Empty;
         }
@@ -55,7 +55,8 @@ internal sealed class SensorService : ISensorService
                 FanRpmMaxForPercent: hw.FanRpmMaxForPercent,
                 CpuPowerWatts: HardwareControl.cpuPower,
                 GpuPowerWatts: HardwareControl.gpuPower,
-                GpuMemoryClockMhz: gpuMemoryClockMhz);
+                GpuMemoryClockMhz: gpuMemoryClockMhz,
+                GpuVramUsagePercent: HardwareControl.vramUsage ?? -1);
         }
         catch
         {
