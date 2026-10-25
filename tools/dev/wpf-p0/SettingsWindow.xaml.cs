@@ -859,6 +859,12 @@ public partial class SettingsWindow : Window
             return;
         }
         Rect area = SystemParameters.WorkArea;
+        if (!owner.IsVisible || owner.Left < area.Left - Width || owner.Top < area.Top - Height)
+        {
+            Left = area.Left + (area.Width - Width) / 2;
+            Top = area.Top + (area.Height - Height) / 2;
+            return;
+        }
         double targetLeft = owner.Left - Width - 10;
         if (targetLeft < area.Left)
         {

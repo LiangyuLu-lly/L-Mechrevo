@@ -1765,7 +1765,12 @@ public partial class MainWindow : Window
                 Application.Current.Shutdown();
                 return;
             case "设置":
-                if (_owner != null) new SettingsWindow(_owner).Show();
+                if (_owner != null)
+                {
+                    SettingsWindow settings = new(_owner);
+                    settings.Owner = this;
+                    settings.ShowDialog();
+                }
                 return;
             case "赞助":
                 ShowInlineWindow(new SponsorWindow(), "赞助");
