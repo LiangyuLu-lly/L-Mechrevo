@@ -176,6 +176,7 @@
                                             <ToggleButton x:Name="HomeGpu独显" Content="独显" Tag="2" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
                                             <ToggleButton x:Name="HomeGpu集显" Content="集显" Tag="0" Style="{StaticResource SegmentButton}" Click="Gpu_Click" />
                                         </StackPanel>
+                                        <StackPanel x:Name="HomeIgpuSavingPanel" Margin="0,10,0,0" />
                                     </StackPanel>
                                 </Border>
                             </Grid>

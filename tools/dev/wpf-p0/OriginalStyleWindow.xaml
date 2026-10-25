@@ -679,7 +679,14 @@
                         <TextBlock x:Name="ChargeLimitStatus" Text="读取充电阈值状态…" Style="{StaticResource MutedText}" FontSize="10" TextWrapping="Wrap" />
                         <CheckBox x:Name="ChargeSliderToggle" Content="启用无极限充功能(实验性)" Style="{StaticResource RowSwitch}" Click="ChargeSliderToggle_Click" />
                         <CheckBox x:Name="EcDirectOffToggle" Content="关闭 EC 直写充电上限（写入异常时用）" Style="{StaticResource RowSwitch}" Click="EcDirectOffToggle_Click" />
-                        <Slider x:Name="BatteryLimitSlider" Minimum="40" Maximum="100" Value="100" Margin="0,8,0,0" Style="{StaticResource RoundSlider}" ValueChanged="BatteryLimitSlider_Changed" Visibility="Collapsed" />
+                        <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Slider x:Name="BatteryLimitSlider" Minimum="40" Maximum="100" Value="100" Style="{StaticResource RoundSlider}" ValueChanged="BatteryLimitSlider_Changed" Visibility="Collapsed" />
+                                <TextBlock x:Name="BatteryLimitSliderText" Grid.Column="1" Text="100%" Style="{StaticResource StatText}" Margin="10,0,0,0" Visibility="Collapsed" />
+                            </Grid>
                     </StackPanel>
 
                     <!-- 水冷 -->

@@ -437,6 +437,15 @@ public partial class OriginalStyleWindow : Window
         BatteryLimitSlider.Value = Math.Clamp(value, 40, 100);
     }
 
+    internal bool WideIgpuSavingSupported => _backendProbe?.Hw?.SupportsGpuHotSwap == true;
+
+    internal int WideIgpuSavingMode => _backendProbe?.Hw?.IgpuOnlySaveMode ?? -1;
+
+    internal async Task WideSetIgpuSavingAsync(string mode)
+    {
+        await SwitchIgpuSavingAsync(mode);
+    }
+
     internal bool WideChargeLimitVisible
     {
         get
@@ -978,6 +987,7 @@ public partial class OriginalStyleWindow : Window
         ChargeSliderToggle.IsChecked = AppConfig.Is("charge_limit_slider");
         EcDirectOffToggle.IsChecked = string.Equals(AppConfig.GetString("ec_charge_limit"), "0", StringComparison.Ordinal);
         BatteryLimitSlider.Visibility = ChargeSliderToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        if (BatteryLimitSliderText != null) BatteryLimitSliderText.Visibility = ChargeSliderToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         _syncingBatteryLimit = true;
         BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
         _syncingBatteryLimit = false;
@@ -1245,6 +1255,7 @@ public partial class OriginalStyleWindow : Window
         bool on = ChargeSliderToggle.IsChecked == true;
         AppConfig.Set("charge_limit_slider", on ? 1 : 0);
         BatteryLimitSlider.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        if (BatteryLimitSliderText != null) BatteryLimitSliderText.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         ApplyBatterySliderStage();
         if (on)
         {
@@ -1280,6 +1291,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         int value = (int)Math.Round(e.NewValue);
+        if (BatteryLimitSliderText != null) BatteryLimitSliderText.Text = value + "%";
         if (!BatteryControl.CaptureChargeLimitGesture() || !BatteryControl.ApplyChargeLimitFromUserGesture(value))
         {
             StatusText.Text = "充电上限写入未确认";

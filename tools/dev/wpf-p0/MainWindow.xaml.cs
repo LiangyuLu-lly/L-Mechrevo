@@ -38,6 +38,9 @@ public partial class MainWindow : Window
     private TextBlock? _chargeStatus;
     private CheckBox? _chargeExperiment;
     private Slider? _chargeSlider;
+    private TextBlock? _chargeSliderText;
+    private readonly List<ToggleButton> _igpuSavingButtons = new();
+    private TextBlock? _igpuSavingState;
     private CheckBox? _ecDirect;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
     private readonly List<ToggleButton> _batteryModeButtons = new();
@@ -55,6 +58,7 @@ public partial class MainWindow : Window
         BuildSensorBlocks();
         BuildQuickTiles();
         BuildHomeExtras();
+        BuildIgpuSavingControls();
         BuildScreenControls();
         BuildLightingCards();
         ApplyPage("home");
@@ -417,6 +421,7 @@ public partial class MainWindow : Window
                 {
                     await _owner.WideToggleQuickAsync(key);
                     RefreshQuickTiles();
+        RefreshIgpuSaving();
                 }
             };
             QuickTilesGrid.Children.Add(tile);
@@ -543,13 +548,28 @@ public partial class MainWindow : Window
             Minimum = 40,
             Maximum = 100,
             Value = sliderValue,
-            Width = 220,
-            Margin = new Thickness(0, 8, 0, 0),
+            Width = 190,
+            Margin = new Thickness(0, 8, 6, 0),
             Style = (Style)FindResource("RoundSlider"),
             Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed
         };
-        _chargeSlider.ValueChanged += (_, _) => _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
-        battery.Children.Add(_chargeSlider);
+        _chargeSlider.ValueChanged += (_, _) =>
+        {
+            _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
+            if (_chargeSliderText != null) _chargeSliderText.Text = (int)Math.Round(_chargeSlider.Value) + "%";
+        };
+        _chargeSliderText = new TextBlock
+        {
+            Text = sliderValue + "%",
+            Style = (Style)FindResource("MutedText"),
+            Width = 46,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed
+        };
+        StackPanel sliderRow = new() { Orientation = Orientation.Horizontal };
+        sliderRow.Children.Add(_chargeSlider);
+        sliderRow.Children.Add(_chargeSliderText);
+        battery.Children.Add(sliderRow);
         BatteryCardHost.Content = new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0), Child = battery };
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
@@ -588,6 +608,53 @@ public partial class MainWindow : Window
         _autoRefresh.Click += (_, _) => _owner?.WideSetAutoRefresh(_autoRefresh.IsChecked == true);
         DisplayDetailsPanel.Children.Add(brightnessRow);
         DisplayDetailsPanel.Children.Add(_autoRefresh);
+    }
+
+    private void BuildIgpuSavingControls()
+    {
+        if (_owner == null || HomeIgpuSavingPanel == null)
+        {
+            return;
+        }
+        StackPanel row = new() { Orientation = Orientation.Horizontal };
+        row.Children.Add(new TextBlock { Text = "核显省电", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+        string[] labels = { "关", "开", "自动" };
+        string[] modes = { "OFF", "ON", "AUTO" };
+        for (int i = 0; i < labels.Length; i++)
+        {
+            string mode = modes[i];
+            ToggleButton button = new() { Content = labels[i], Style = (Style)FindResource("SegmentButton"), Margin = new Thickness(0, 0, 6, 0) };
+            button.Click += async (_, _) =>
+            {
+                foreach (ToggleButton other in _igpuSavingButtons) other.IsChecked = ReferenceEquals(other, button);
+                await _owner.WideSetIgpuSavingAsync(mode);
+                RefreshIgpuSaving();
+            };
+            row.Children.Add(button);
+            _igpuSavingButtons.Add(button);
+        }
+        _igpuSavingState = new TextBlock { Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        row.Children.Add(_igpuSavingState);
+        HomeIgpuSavingPanel.Children.Add(row);
+        HomeIgpuSavingPanel.Visibility = _owner.WideIgpuSavingSupported ? Visibility.Visible : Visibility.Collapsed;
+        RefreshIgpuSaving();
+    }
+
+    private void RefreshIgpuSaving()
+    {
+        if (_owner == null || HomeIgpuSavingPanel == null) return;
+        HomeIgpuSavingPanel.Visibility = _owner.WideIgpuSavingSupported ? Visibility.Visible : Visibility.Collapsed;
+        int mode = _owner.WideIgpuSavingMode;
+        if (_igpuSavingButtons.Count >= 3)
+        {
+            _igpuSavingButtons[0].IsChecked = mode == 1;
+            _igpuSavingButtons[1].IsChecked = mode == 0;
+            _igpuSavingButtons[2].IsChecked = mode == 3;
+        }
+        if (_igpuSavingState != null)
+        {
+            _igpuSavingState.Text = mode switch { 0 => "当前：开", 1 => "当前：关", 3 => "当前：自动", _ => "当前：未知" };
+        }
     }
 
     private void BuildScreenControls()
@@ -690,6 +757,11 @@ public partial class MainWindow : Window
         if (_chargeSlider != null)
         {
             _chargeSlider.Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed;
+            if (_chargeSliderText != null)
+            {
+                _chargeSliderText.Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed;
+                _chargeSliderText.Text = sliderValue + "%";
+            }
             if (!_chargeSlider.IsMouseCaptureWithin && Math.Abs(_chargeSlider.Value - sliderValue) > 1)
             {
                 _chargeSlider.Value = sliderValue;
