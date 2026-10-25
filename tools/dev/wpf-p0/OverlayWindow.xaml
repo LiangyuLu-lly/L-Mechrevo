@@ -19,7 +19,7 @@
         MouseMove="Window_MouseMove"
         MouseRightButtonDown="Window_MouseRightButtonDown"
         Icon="Assets/Icons/app.png">
-    <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+    <Border x:Name="OverlayCard" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="10" Padding="10,5">
         <StackPanel>
             <Grid x:Name="GpuRow">

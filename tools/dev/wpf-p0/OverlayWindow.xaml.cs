@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace L_Mechrevo.WpfP0;
@@ -43,7 +44,7 @@ public partial class OverlayWindow : Window
         try
         {
             _displayMode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
-            Opacity = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 80), 30, 100) / 100.0;
+            ApplyOverlayBackground(Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 92), 30, 100));
             _timer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(MechrevoLite.AppConfig.Get("overlay_interval_ms", 1000), 500, 10000));
         }
         catch
@@ -180,9 +181,26 @@ public partial class OverlayWindow : Window
         return "外接电源";
     }
 
+    private void ApplyOverlayBackground(double opacity)
+    {
+        Opacity = 1.0;
+        try
+        {
+            if (Application.Current.Resources["CardBrush"] is SolidColorBrush baseBrush)
+            {
+                Color color = baseBrush.Color;
+                color.A = (byte)Math.Round(Math.Clamp(opacity, 0, 100) * 255.0 / 100.0);
+                OverlayCard.Background = new SolidColorBrush(color);
+            }
+        }
+        catch
+        {
+        }
+    }
+
     internal void ApplyAppearance(double opacity, int mode, int intervalMs, bool resetPosition)
     {
-        Opacity = Math.Clamp(opacity, 30, 100) / 100.0;
+        ApplyOverlayBackground(Math.Clamp(opacity, 30, 100));
         _displayMode = Math.Clamp(mode, 0, 2);
         _timer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(intervalMs, 500, 10000));
         ApplyDisplayMode();

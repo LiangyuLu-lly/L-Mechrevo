@@ -49,7 +49,7 @@ public partial class SettingsWindow : Window
         try
         {
             int mode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
-            int opacity = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 80), 30, 100);
+            int opacity = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_opacity", 92), 30, 100);
             int interval = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_interval_ms", 1000), 500, 10000);
             foreach (ComboBoxItem item in OverlayModeCombo.Items)
             {
