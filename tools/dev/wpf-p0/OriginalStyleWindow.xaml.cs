@@ -54,6 +54,7 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBrightness;
     private bool _syncingCalibration;
     private OverlayWindow? _overlayWindow;
+    private readonly L_Mechrevo.WpfP0.Services.BackendHost _backendHost = new();
     private MainWindow? _wideWindow;
     private AppServices? _services;
     internal event Action? BackendReady;
@@ -178,6 +179,7 @@ public partial class OriginalStyleWindow : Window
             _lightingIdleTimer.Stop();
             _backendProbe?.Dispose();
             _backendProbe = null;
+            _backendHost.Dispose();
             _trayIcon?.Dispose();
             _trayIcon = null;
             _hotkeyService?.Dispose();
@@ -3076,55 +3078,44 @@ public partial class OriginalStyleWindow : Window
         _connectAttempting = true;
         SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
         BackendLine.Text = "正在创建 MechrevoHw 并 ConnectAsync（最长 15 秒）…";
-        BackendProbe probe = new BackendProbe();
-        _backendProbe = probe;
         try
         {
-            Task<bool> connect = probe.ConnectAsync();
-            Task completed = await Task.WhenAny(connect, Task.Delay(TimeSpan.FromSeconds(15)));
-            if (completed != connect)
+            bool connected = await _backendHost.ConnectAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(true);
+            BackendProbe? probe = _backendHost.Probe;
+            if (!connected || probe == null)
             {
+                string reason = _backendHost.TimedOut
+                    ? "15 秒内未完成；应用会自动重试，点上方状态可重新检查。"
+                    : _backendHost.LastError;
                 SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
-                BackendLine.Text = "15 秒内未完成；应用会自动重试，点上方状态可重新检查。";
-                probe.Dispose();
+                BackendLine.Text = reason;
                 _backendProbe = null;
                 _backendRetryTimer.Start();
                 return;
             }
-            if (await connect)
+            _backendProbe = probe;
+            UpdateBackendStatus();
+            BackendLine.Text = probe.Snapshot();
+            _services = new AppServices(probe);
+            try
             {
-                UpdateBackendStatus();
-                BackendLine.Text = probe.Snapshot();
-                L_Mechrevo.WpfP0.Services.WpfBackend.Attach(probe.Hw, probe.Service);
-                _services = new AppServices(probe);
-                try
+                if (MechrevoLite.Mode.PerfModeService.Instance == null)
                 {
-                    if (MechrevoLite.Mode.PerfModeService.Instance == null)
-                    {
-                        MechrevoLite.Mode.PerfModeService.Create(probe.Service!, probe.Hw);
-                    }
-                    _ = RestorePerfModeOnStartupAsync();
+                    MechrevoLite.Mode.PerfModeService.Create(probe.Service!, probe.Hw);
                 }
-                catch
-                {
-                }
-                _backendRetryTimer.Stop();
-                SyncGpuDbForMode(probe.CurrentMode, "WPF 启动同步");
-                await probe.RefreshGpuModeAsync();
-                ApplyCapabilities();
-                BackendReady?.Invoke();
-                ShowFirstRunGuidesIfNeeded();
-                StartSilentUpdateCheckIfAllowed();
-                _backendTimer.Start();
+                _ = RestorePerfModeOnStartupAsync();
             }
-            else
+            catch
             {
-                SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
-                BackendLine.Text = probe.LastError;
-                probe.Dispose();
-                _backendProbe = null;
-                _backendRetryTimer.Start();
             }
+            _backendRetryTimer.Stop();
+            SyncGpuDbForMode(probe.CurrentMode, "WPF 启动同步");
+            await probe.RefreshGpuModeAsync();
+            ApplyCapabilities();
+            BackendReady?.Invoke();
+            ShowFirstRunGuidesIfNeeded();
+            StartSilentUpdateCheckIfAllowed();
+            _backendTimer.Start();
         }
         finally
         {
