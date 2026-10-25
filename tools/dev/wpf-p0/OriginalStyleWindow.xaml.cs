@@ -4528,7 +4528,8 @@ public partial class OriginalStyleWindow : Window
 
     private void WideButton_Click(object sender, RoutedEventArgs e)
     {
-        ApplyWideMode(!_wideMode);
+        // 恢复独立宽屏 UI，不再把主窗口本身切成双列。
+        new MainWindow().Show();
     }
 
     private async void DockButton_Click(object sender, RoutedEventArgs e)
