@@ -199,7 +199,7 @@ public partial class SettingsWindow : Window
         BackgroundScrimText.Text = (int)BackgroundScrimSlider.Value + "%";
         DockOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_dock_opacity", 70), 0, 100);
         DockOpacityText.Text = (int)DockOpacitySlider.Value + "%";
-        ButtonOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_button_opacity", 100), 0, 100);
+        ButtonOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_button_opacity", 60), 0, 100);
         ButtonOpacityText.Text = (int)ButtonOpacitySlider.Value + "%";
         CheckUpdateButton.Visibility = MechrevoLite.Update.UpdateForm.TemporarilyHidden
             ? Visibility.Collapsed
@@ -234,6 +234,8 @@ public partial class SettingsWindow : Window
     {
         DarkButton.IsChecked = true;
         LightButton.IsChecked = false;
+        AppConfig.Set("ui_dark_theme", 1);
+        AppConfig.Flush();
         _owner.ApplyThemeFromSettings(true);
         ApplyDarkTitleBar();
     }
@@ -242,6 +244,8 @@ public partial class SettingsWindow : Window
     {
         LightButton.IsChecked = true;
         DarkButton.IsChecked = false;
+        AppConfig.Set("ui_dark_theme", 0);
+        AppConfig.Flush();
         _owner.ApplyThemeFromSettings(false);
         ApplyDarkTitleBar();
     }

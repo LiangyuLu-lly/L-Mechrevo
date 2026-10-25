@@ -117,6 +117,10 @@ public partial class OriginalStyleWindow : Window
     public OriginalStyleWindow()
     {
         InitializeComponent();
+        _dark = ResolveStartupDarkTheme();
+        AppTheme.Apply(_dark);
+        ApplySavedAccent();
+        ThemeButton.Content = _dark ? "浅色" : "深色";
         MechrevoLite.UI.UiVisualStyle.SetNightMode(_dark);
         MechrevoLite.UI.UiVisualStyle.SetAuditNightMode(_dark);
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
@@ -2191,6 +2195,11 @@ public partial class OriginalStyleWindow : Window
     private void BackgroundToggle_Changed(object sender, RoutedEventArgs e)
     {
         UpdateBackgroundVisibility();
+        if (IsLoaded)
+        {
+            AppConfig.Set("ui_bg_enabled", BackgroundToggle.IsChecked == true ? 1 : 0);
+            AppConfig.Flush();
+        }
     }
 
     internal void ReloadBackgroundImage()
@@ -4498,6 +4507,8 @@ public partial class OriginalStyleWindow : Window
         ApplyButtonOpacity();
         _trayIcon?.SetTheme(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
+        AppConfig.Set("ui_dark_theme", _dark ? 1 : 0);
+        AppConfig.Flush();
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
@@ -4506,6 +4517,8 @@ public partial class OriginalStyleWindow : Window
     internal void SetBackgroundFromSettings(bool on)
     {
         BackgroundToggle.IsChecked = on;
+        AppConfig.Set("ui_bg_enabled", on ? 1 : 0);
+        AppConfig.Flush();
         UpdateBackgroundVisibility();
     }
 
@@ -4521,6 +4534,8 @@ public partial class OriginalStyleWindow : Window
         ApplyButtonOpacity();
         _trayIcon?.SetTheme(_dark);
         ThemeButton.Content = _dark ? "浅色" : "深色";
+        AppConfig.Set("ui_dark_theme", _dark ? 1 : 0);
+        AppConfig.Flush();
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
         StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
@@ -4675,19 +4690,55 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static bool ResolveStartupDarkTheme()
+    {
+        try
+        {
+            if (AppConfig.Is("ui_theme_follow_system"))
+            {
+                using Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                object? value = key?.GetValue("AppsUseLightTheme");
+                return value is int number ? number == 0 : true;
+            }
+            return AppConfig.Get("ui_dark_theme", 1) != 0;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static void ApplySavedAccent()
+    {
+        try
+        {
+            string? text = AppConfig.GetString("ui_accent_color");
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+            Color color = (Color)ColorConverter.ConvertFromString(text);
+            Application.Current.Resources["AccentColor"] = color;
+            Application.Current.Resources["AccentBrush"] = new SolidColorBrush(color);
+        }
+        catch
+        {
+        }
+    }
+
     internal void ApplyButtonOpacity()
     {
-        int opacity = Math.Clamp(AppConfig.Get("ui_button_opacity", 100), 0, 100);
+        int opacity = Math.Clamp(AppConfig.Get("ui_button_opacity", 60), 0, 100);
+        byte alpha = (byte)(opacity * 255 / 100);
         Color normal = _dark
-            ? Color.FromArgb(0x4D, 0xFF, 0xFF, 0xFF)
-            : Color.FromArgb(0x26, 0x00, 0x00, 0x00);
+            ? Color.FromArgb(alpha, 0x2A, 0x30, 0x38)
+            : Color.FromArgb(alpha, 0xE8, 0xEC, 0xF2);
         Color hover = _dark
-            ? Color.FromArgb(0x5C, 0xFF, 0xFF, 0xFF)
-            : Color.FromArgb(0x33, 0x00, 0x00, 0x00);
-        Application.Current.Resources["ControlBrush"] =
-            new SolidColorBrush(Color.FromArgb((byte)(normal.A * opacity / 100), normal.R, normal.G, normal.B));
-        Application.Current.Resources["ControlHoverBrush"] =
-            new SolidColorBrush(Color.FromArgb((byte)(hover.A * opacity / 100), hover.R, hover.G, hover.B));
+            ? Color.FromArgb(alpha, 0x36, 0x3D, 0x47)
+            : Color.FromArgb(alpha, 0xDD, 0xE2, 0xEA);
+        Application.Current.Resources["ControlBrush"] = new SolidColorBrush(normal);
+        Application.Current.Resources["ControlHoverBrush"] = new SolidColorBrush(hover);
     }
 
     internal void ApplyDockOpacity()
