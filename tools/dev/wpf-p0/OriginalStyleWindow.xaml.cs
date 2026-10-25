@@ -5235,6 +5235,9 @@ public partial class OriginalStyleWindow : Window
     {
         Opacity = 1;
         ShowInTaskbar = true;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width - Width) / 2;
+        Top = SystemParameters.WorkArea.Top + (SystemParameters.WorkArea.Height - Height) / 2;
         Show();
         Activate();
     }

@@ -64,6 +64,9 @@ public partial class App : Application
         {
             window.Opacity = 0;
             window.ShowInTaskbar = false;
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            window.Left = -20000;
+            window.Top = -20000;
         }
         window.Show();
     }

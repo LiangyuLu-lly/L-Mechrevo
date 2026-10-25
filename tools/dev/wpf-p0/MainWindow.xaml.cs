@@ -64,6 +64,15 @@ public partial class MainWindow : Window
         _owner = owner;
         _probe = probe;
         SourceInitialized += (_, _) => ApplyRoundedWindowChrome();
+        Opacity = 0;
+        ContentRendered += (_, _) =>
+        {
+            DoubleAnimation fadeIn = new(0, 1, TimeSpan.FromMilliseconds(180))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            BeginAnimation(OpacityProperty, fadeIn);
+        };
         AppTheme.Apply(true);
         ReloadWideBackground();
         BuildMoreSwitchTiles();
@@ -255,12 +264,32 @@ public partial class MainWindow : Window
 
     private static void SetNavContent(Button button, bool collapsed, string glyph, string text, FontFamily glyphFont, FontFamily textFont)
     {
-        button.Content = collapsed ? glyph : text;
-        button.FontFamily = collapsed ? glyphFont : textFont;
-        button.FontSize = collapsed ? 18 : 13;
-        button.Padding = collapsed ? new Thickness(0) : new Thickness(12, 10, 12, 10);
-        button.Height = collapsed ? 40 : double.NaN;
-        button.HorizontalContentAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+        if (collapsed)
+        {
+            button.Content = new TextBlock
+            {
+                Text = glyph,
+                FontFamily = glyphFont,
+                FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = button.Foreground
+            };
+            button.FontFamily = textFont;
+            button.FontSize = 13;
+            button.Padding = new Thickness(0);
+            button.Height = 40;
+            button.HorizontalContentAlignment = HorizontalAlignment.Center;
+        }
+        else
+        {
+            button.Content = text;
+            button.FontFamily = textFont;
+            button.FontSize = 13;
+            button.Padding = new Thickness(12, 10, 12, 10);
+            button.Height = double.NaN;
+            button.HorizontalContentAlignment = HorizontalAlignment.Left;
+        }
     }
 
     private void CompactButton_Click(object sender, RoutedEventArgs e)
