@@ -115,6 +115,7 @@
                             <Button x:Name="NavCollapseButton" Content="«" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Padding="6,1" FontSize="11" Click="NavToggle_Click" />
                         </Grid>
                         <Button x:Name="NavHome" Content="首页" Tag="home" Style="{StaticResource NavButton}" Click="Nav_Click" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource TextBrush}" />
+                        <Button x:Name="NavScreen" Content="屏幕" Tag="screen" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavLighting" Content="灯光" Tag="lighting" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavCustom" Content="自定义" Tag="custom" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Button x:Name="NavSwitches" Content="更多开关" Tag="switches" Style="{StaticResource NavButton}" Click="Nav_Click" />
@@ -208,6 +209,28 @@
                                 <ContentControl x:Name="BatteryCardHost" Grid.Column="2" />
                             </Grid>
 
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- 屏幕 -->
+                    <ScrollViewer x:Name="ScreenPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                        <StackPanel>
+                            <TextBlock Text="屏幕" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="刷新率、亮度、屏幕校色与色彩增强" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="屏幕校色" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="ICC 校色档位与自定义校色" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                                    <StackPanel x:Name="ScreenCalibrationPanel" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="色彩增强" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="厂商色彩增强档位与编辑" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                                    <StackPanel x:Name="ScreenEffectPanel" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
 

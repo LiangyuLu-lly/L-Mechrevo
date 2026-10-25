@@ -52,6 +52,7 @@ public partial class MainWindow : Window
         BuildMoreSwitchTiles();
         BuildSensorBlocks();
         BuildHomeExtras();
+        BuildScreenControls();
         BuildLightingCards();
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
@@ -209,6 +210,7 @@ public partial class MainWindow : Window
         FontFamily glyphFont = new("Segoe MDL2 Assets");
         FontFamily textFont = (FontFamily)Application.Current.Resources["AppFontFamily"];
         SetNavContent(NavHome, _navCollapsed, "\uE80F", "首页", glyphFont, textFont);
+        SetNavContent(NavScreen, _navCollapsed, "\uE7F4", "屏幕", glyphFont, textFont);
         SetNavContent(NavLighting, _navCollapsed, "\uE706", "灯光", glyphFont, textFont);
         SetNavContent(NavCustom, _navCollapsed, "\uE713", "自定义", glyphFont, textFont);
         SetNavContent(NavSwitches, _navCollapsed, "\uE7F4", "更多开关", glyphFont, textFont);
@@ -256,10 +258,11 @@ public partial class MainWindow : Window
     private void ApplyPage(string page)
     {
         HomePage.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
+        ScreenPage.Visibility = page == "screen" ? Visibility.Visible : Visibility.Collapsed;
         LightingPage.Visibility = page == "lighting" ? Visibility.Visible : Visibility.Collapsed;
         CustomPage.Visibility = page == "custom" ? Visibility.Visible : Visibility.Collapsed;
         SwitchesPage.Visibility = page == "switches" ? Visibility.Visible : Visibility.Collapsed;
-        Button[] navs = { NavHome, NavLighting, NavCustom, NavSwitches };
+        Button[] navs = { NavHome, NavScreen, NavLighting, NavCustom, NavSwitches };
         foreach (Button nav in navs)
         {
             bool active = string.Equals(nav.Tag as string, page, StringComparison.Ordinal);
@@ -269,6 +272,7 @@ public partial class MainWindow : Window
         StatusText.Text = page switch
         {
             "home" => "首页 · 传感器 / 性能 / 显卡 / 显示",
+            "screen" => "屏幕 · 刷新率 / 亮度 / 校色 / 色彩增强",
             "lighting" => "灯光 · 页面内直接编辑",
             "custom" => "自定义 · 自定义模式 / 风扇曲线",
             "switches" => "更多开关 · 磁贴布局",
@@ -448,37 +452,43 @@ public partial class MainWindow : Window
         _autoRefresh.Click += (_, _) => _owner?.WideSetAutoRefresh(_autoRefresh.IsChecked == true);
         DisplayDetailsPanel.Children.Add(brightnessRow);
         DisplayDetailsPanel.Children.Add(_autoRefresh);
+    }
 
+    private void BuildScreenControls()
+    {
+        if (_owner == null || ScreenCalibrationPanel == null || ScreenEffectPanel == null)
+        {
+            return;
+        }
         (bool calibEnabled, (string Label, object? Tag)[] calibOptions, int calibSelected) = _owner.WideCalibration();
-        _calibrationSwitch = new CheckBox { Content = "屏幕校色", Style = (Style)FindResource("HeaderSwitch"), IsChecked = calibEnabled, Margin = new Thickness(0, 10, 8, 0) };
+        _calibrationSwitch = new CheckBox { Content = "启用校色", Style = (Style)FindResource("HeaderSwitch"), IsChecked = calibEnabled, Margin = new Thickness(0, 0, 10, 0) };
         _calibrationSwitch.Click += (_, _) => _owner.WideSetCalibrationEnabled(_calibrationSwitch.IsChecked == true);
-        _calibrationCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 150, Height = 28, Margin = new Thickness(0, 10, 8, 0) };
+        _calibrationCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 190, Height = 30, Margin = new Thickness(0, 0, 10, 0) };
         foreach ((string label, object? tag) in calibOptions) _calibrationCombo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
         _calibrationCombo.SelectedIndex = Math.Clamp(calibSelected, 0, Math.Max(0, _calibrationCombo.Items.Count - 1));
         _calibrationCombo.SelectionChanged += (_, _) => _owner.WideSetCalibrationIndex(_calibrationCombo.SelectedIndex);
-        Button calibSettings = new() { Content = "设置", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 10, 0, 0) };
+        Button calibSettings = new() { Content = "设置", Style = (Style)FindResource("FlatButton") };
         calibSettings.Click += (_, _) => _owner.WideOpenCalibrationSettings();
         StackPanel calibRow = new() { Orientation = Orientation.Horizontal };
         calibRow.Children.Add(_calibrationSwitch);
         calibRow.Children.Add(_calibrationCombo);
         calibRow.Children.Add(calibSettings);
-        DisplayDetailsPanel.Children.Add(calibRow);
+        ScreenCalibrationPanel.Children.Add(calibRow);
 
         (bool effectEnabled, (string Label, object? Tag)[] effectOptions, int effectSelected) = _owner.WideDisplayEffect();
-        _displayEffectSwitch = new CheckBox { Content = "色彩增强", Style = (Style)FindResource("HeaderSwitch"), IsChecked = effectEnabled, Margin = new Thickness(0, 8, 8, 0) };
+        _displayEffectSwitch = new CheckBox { Content = "启用色彩增强", Style = (Style)FindResource("HeaderSwitch"), IsChecked = effectEnabled, Margin = new Thickness(0, 0, 10, 0) };
         _displayEffectSwitch.Click += (_, _) => _owner.WideSetDisplayEffectEnabled(_displayEffectSwitch.IsChecked == true);
-        _displayEffectCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 150, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        _displayEffectCombo = new ComboBox { Style = (Style)FindResource("RoundCombo"), Width = 190, Height = 30, Margin = new Thickness(0, 0, 10, 0) };
         foreach ((string label, object? tag) in effectOptions) _displayEffectCombo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
         _displayEffectCombo.SelectedIndex = Math.Clamp(effectSelected, 0, Math.Max(0, _displayEffectCombo.Items.Count - 1));
         _displayEffectCombo.SelectionChanged += (_, _) => _owner.WideSetDisplayEffectIndex(_displayEffectCombo.SelectedIndex);
-        Button effectEdit = new() { Content = "编辑", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 8, 0, 0) };
+        Button effectEdit = new() { Content = "编辑", Style = (Style)FindResource("FlatButton") };
         effectEdit.Click += (_, _) => _owner.WideOpenDisplayEffectEditor();
         StackPanel effectRow = new() { Orientation = Orientation.Horizontal };
         effectRow.Children.Add(_displayEffectSwitch);
         effectRow.Children.Add(_displayEffectCombo);
         effectRow.Children.Add(effectEdit);
-        DisplayDetailsPanel.Children.Add(effectRow);
-
+        ScreenEffectPanel.Children.Add(effectRow);
     }
 
     private void RefreshHomeExtras()
