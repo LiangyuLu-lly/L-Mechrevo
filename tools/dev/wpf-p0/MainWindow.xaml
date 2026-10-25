@@ -64,7 +64,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid>
+    <Grid x:Name="RootContent">
         <Image x:Name="BackgroundImage" Source="Assets/background.jpg" Stretch="UniformToFill" Opacity="0.78" />
         <Rectangle x:Name="BackgroundScrim" Fill="#99000000" Opacity="0.35" />
 

@@ -64,14 +64,14 @@ public partial class MainWindow : Window
         _owner = owner;
         _probe = probe;
         SourceInitialized += (_, _) => ApplyRoundedWindowChrome();
-        Opacity = 0;
+        RootContent.Opacity = 0;
         ContentRendered += (_, _) =>
         {
             DoubleAnimation fadeIn = new(0, 1, TimeSpan.FromMilliseconds(180))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
-            BeginAnimation(OpacityProperty, fadeIn);
+            RootContent.BeginAnimation(OpacityProperty, fadeIn);
         };
         AppTheme.Apply(true);
         ReloadWideBackground();
@@ -408,7 +408,7 @@ public partial class MainWindow : Window
 
     private void PlayWindowTransition()
     {
-        if (Content is not UIElement root) return;
+        UIElement root = RootContent;
         DoubleAnimation fade = new(0.55, 1.0, TimeSpan.FromMilliseconds(160))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }

@@ -186,12 +186,9 @@ public partial class OverlayWindow : Window
         Opacity = 1.0;
         try
         {
-            if (Application.Current.Resources["CardBrush"] is SolidColorBrush baseBrush)
-            {
-                Color color = baseBrush.Color;
-                color.A = (byte)Math.Round(Math.Clamp(opacity, 0, 100) * 255.0 / 100.0);
-                OverlayCard.Background = new SolidColorBrush(color);
-            }
+            Color color = Color.FromRgb(0x0B, 0x0D, 0x10);
+            color.A = (byte)Math.Round(Math.Clamp(opacity, 0, 100) * 255.0 / 100.0);
+            OverlayCard.Background = new SolidColorBrush(color);
         }
         catch
         {

@@ -19,7 +19,12 @@
         MouseMove="Window_MouseMove"
         MouseRightButtonDown="Window_MouseRightButtonDown"
         Icon="Assets/Icons/app.png">
-    <Border x:Name="OverlayCard" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+    <Window.Resources>
+        <SolidColorBrush x:Key="TextBrush" Color="#F3F5F8" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#C3CAD4" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#33FFFFFF" />
+    </Window.Resources>
+    <Border x:Name="OverlayCard" Background="#E60B0D10" BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="10" Padding="10,5">
         <StackPanel>
             <Grid x:Name="GpuRow">
@@ -35,10 +40,10 @@
                 <TextBlock x:Name="GpuPowerText" Grid.Column="4" Text="—" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center" />
                 <TextBlock x:Name="GpuUsageText" Grid.Column="5" Text="—" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center" />
                 <ProgressBar x:Name="GpuUsageBar" Grid.Column="6" Width="30" Height="7" Margin="4,0,0,0" Minimum="0" Maximum="100"
-                             Foreground="#22C55E" Background="#33000000" BorderThickness="0" VerticalAlignment="Center" />
+                             Foreground="#22C55E" Background="#33FFFFFF" BorderThickness="0" VerticalAlignment="Center" />
                 <TextBlock x:Name="GpuMemoryText" Grid.Column="7" Text="—" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center" />
                 <ProgressBar x:Name="GpuMemoryBar" Grid.Column="8" Width="30" Height="7" Margin="4,0,0,0" Minimum="0" Maximum="100"
-                             Foreground="#22C55E" Background="#33000000" BorderThickness="0" VerticalAlignment="Center" />
+                             Foreground="#22C55E" Background="#33FFFFFF" BorderThickness="0" VerticalAlignment="Center" />
             </Grid>
             <Grid x:Name="CpuRow" Margin="0,3,0,0">
                 <Grid.ColumnDefinitions>
@@ -53,10 +58,10 @@
                 <TextBlock x:Name="CpuPowerText" Grid.Column="4" Text="—" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center" />
                 <TextBlock x:Name="CpuUsageText" Grid.Column="5" Text="—" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center" />
                 <ProgressBar x:Name="CpuUsageBar" Grid.Column="6" Width="30" Height="7" Margin="4,0,0,0" Minimum="0" Maximum="100"
-                             Foreground="#22D3EE" Background="#33000000" BorderThickness="0" VerticalAlignment="Center" />
+                             Foreground="#22D3EE" Background="#33FFFFFF" BorderThickness="0" VerticalAlignment="Center" />
                 <TextBlock x:Name="CpuMemoryText" Grid.Column="7" Text="—" Margin="12,0,0,0" FontSize="12" VerticalAlignment="Center" />
                 <ProgressBar x:Name="CpuMemoryBar" Grid.Column="8" Width="30" Height="7" Margin="4,0,0,0" Minimum="0" Maximum="100"
-                             Foreground="#22D3EE" Background="#33000000" BorderThickness="0" VerticalAlignment="Center" />
+                             Foreground="#22D3EE" Background="#33FFFFFF" BorderThickness="0" VerticalAlignment="Center" />
             </Grid>
             <StackPanel x:Name="BatteryPanel" Margin="0,4,0,0" HorizontalAlignment="Right">
                 <TextBlock x:Name="BatteryText" Text="电池 —" Style="{DynamicResource MutedText}" FontSize="10" HorizontalAlignment="Right" />
