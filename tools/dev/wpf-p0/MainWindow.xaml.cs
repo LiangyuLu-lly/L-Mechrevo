@@ -1503,11 +1503,9 @@ public partial class MainWindow : Window
         }
         BuildLightingGlobalControls();
         MechrevoHw? hw = _probe?.Hw;
-        int keyboardType = hw?.Capabilities.KeyboardType ?? 0;
         var channels = new List<(string Topic, string Title, (string Effect, string Name)[] Effects)>
         {
-            ("Keyboard/Ctrl", "键盘灯光",
-                KeyboardFirmwareEffects.Visible(keyboardType).Select(static item => (item.Id, item.Label)).ToArray()),
+            ("Keyboard/Ctrl", "键盘灯光", _owner?.WideKeyboardEffects() ?? Array.Empty<(string, string)>()),
             ("HidLightbar/Ctrl", "灯带", LightingCatalog.LightbarEffects),
             ("HidLightbar_Logo/Ctrl", "Logo 灯",
                 hw is not null && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
@@ -1835,7 +1833,7 @@ public partial class MainWindow : Window
             }
             bool ok = topic switch
             {
-                "Keyboard/Ctrl" => await _probe.SetKeyboardEffectAsync(effect),
+                "Keyboard/Ctrl" => await (_owner?.WideApplyKeyboardEffectAsync(effect, true) ?? Task.FromResult(false)),
                 "HidLightbar/Ctrl" => await _probe.SetLightbarEffectAsync(effect),
                 "HidLightbar_Logo/Ctrl" => await _probe.SetLogoEffectAsync(effect),
                 "HidLightbar_Hinge/Ctrl" => await _probe.SetHingeEffectAsync(effect),

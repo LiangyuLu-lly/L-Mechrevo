@@ -336,6 +336,53 @@ public partial class OriginalStyleWindow : Window
         SyncRefreshRateState();
     }
 
+    internal (string Effect, string Name)[] WideKeyboardEffects()
+    {
+        try
+        {
+            MechrevoHw? hw = WpfBackend.Hw;
+            if (hw != null && IsHidKeyboard(hw))
+            {
+                return LightingCatalog.VisibleHidEffects(hw.Capabilities.KeyboardType)
+                    .Select(item => ("hid:" + item.Mode, item.Name))
+                    .ToArray();
+            }
+            int type = hw?.Capabilities.KeyboardType ?? 0;
+            return MechrevoLite.Hardware.KeyboardFirmwareEffects.Visible(type)
+                .Select(item => (item.Id, item.Label))
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<(string, string)>();
+        }
+    }
+
+    internal async Task<bool> WideApplyKeyboardEffectAsync(string effect, bool on)
+    {
+        try
+        {
+            if (effect.StartsWith("hid:", StringComparison.Ordinal))
+            {
+                int mode = int.TryParse(effect.AsSpan(4), out int parsed) ? parsed : 1;
+                return await ApplyHidKeyboardAsync(mode, on);
+            }
+            if (_backendProbe == null)
+            {
+                return false;
+            }
+            if (on)
+            {
+                await _backendProbe.SetKeyboardPowerAsync(true);
+            }
+            return await _backendProbe.SetKeyboardEffectAsync(effect);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> WideToggleQuickAsync(string key)
     {
         if (_services != null)
