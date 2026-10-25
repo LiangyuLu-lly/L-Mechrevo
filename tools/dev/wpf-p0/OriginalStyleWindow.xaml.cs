@@ -66,7 +66,6 @@ public partial class OriginalStyleWindow : Window
     private bool _updateCheckStarted;
     private bool _perfRestoreStarted;
     private CustomModeWindow? _customModeForm;
-    private MechrevoLite.CustomModeForm? _legacyCustomModeForm;
     private readonly DispatcherTimer _lightingIdleTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _lightingIdleSuspended;
     private long _lastLightingConnectionGeneration;
