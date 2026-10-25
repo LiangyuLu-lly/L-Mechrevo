@@ -207,7 +207,7 @@ public partial class MainWindow : Window
         button.HorizontalContentAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
     }
 
-    private void CompactButton_Click(object sender, RoutedEventArgs e) => new CompactWindow().Show();
+    private void CompactButton_Click(object sender, RoutedEventArgs e) => new CompactWindow(_owner, _probe).Show();
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {

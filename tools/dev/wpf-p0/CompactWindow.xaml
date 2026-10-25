@@ -74,9 +74,20 @@
                                 <TextBlock Grid.Column="1" Text="平衡" Foreground="{DynamicResource AccentBrush}" FontSize="11" />
                             </Grid>
                             <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
-                                <ToggleButton Content="平衡" Style="{StaticResource CompactSegment}" IsChecked="True" />
-                                <ToggleButton Content="狂暴" Style="{StaticResource CompactSegment}" />
-                                <ToggleButton Content="自定义" Style="{StaticResource CompactSegment}" />
+                                <ToggleButton Content="平衡" Tag="0" Style="{StaticResource CompactSegment}" Click="Mode_Click" />
+                                <ToggleButton Content="狂暴" Tag="1" Style="{StaticResource CompactSegment}" Click="Mode_Click" />
+                                <ToggleButton Content="自定义" Tag="3" Style="{StaticResource CompactSegment}" Click="Mode_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CompactCard}">
+                        <StackPanel>
+                            <TextBlock Text="显卡模式" FontSize="12" FontWeight="SemiBold" />
+                            <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                                <ToggleButton Content="核显" Tag="0" Style="{StaticResource CompactSegment}" Click="Gpu_Click" />
+                                <ToggleButton Content="混合" Tag="1" Style="{StaticResource CompactSegment}" IsChecked="True" Click="Gpu_Click" />
+                                <ToggleButton Content="独显" Tag="2" Style="{StaticResource CompactSegment}" Click="Gpu_Click" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -93,10 +104,10 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <CheckBox Grid.Row="0" Grid.Column="0" Content="无线网络" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" IsChecked="True" Margin="0,4,4,4" />
-                                <CheckBox Grid.Row="0" Grid.Column="1" Content="蓝牙" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" IsChecked="True" Margin="4,4,0,4" />
-                                <CheckBox Grid.Row="1" Grid.Column="0" Content="摄像头" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" Margin="0,4,4,4" />
-                                <CheckBox Grid.Row="1" Grid.Column="1" Content="麦克风" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" Margin="4,4,0,4" />
+                                <CheckBox Grid.Row="0" Grid.Column="0" Content="无线网络" Tag="wifi" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" Click="QuickSwitch_Click" IsChecked="True" Margin="0,4,4,4" />
+                                <CheckBox Grid.Row="0" Grid.Column="1" Content="蓝牙" Tag="bt" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" Click="QuickSwitch_Click" IsChecked="True" Margin="4,4,0,4" />
+                                <CheckBox Grid.Row="1" Grid.Column="0" Content="摄像头" Tag="webcam" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" Click="QuickSwitch_Click" Margin="0,4,4,4" />
+                                <CheckBox Grid.Row="1" Grid.Column="1" Content="麦克风" Tag="micmute" Width="174" HorizontalAlignment="Left" Style="{StaticResource CompactSwitch}" Click="QuickSwitch_Click" Margin="4,4,0,4" />
                             </Grid>
                         </StackPanel>
                     </Border>
