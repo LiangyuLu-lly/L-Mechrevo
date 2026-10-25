@@ -211,6 +211,38 @@ public partial class SettingsWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
         _syncing = false;
+        BuildTrayMenuOptions();
+    }
+
+    private void BuildTrayMenuOptions()
+    {
+        if (TrayMenuPanel == null) return;
+        TrayMenuPanel.Children.Clear();
+        HashSet<string> enabled = TrayMenuConfig.Load();
+        foreach ((string key, string label) in TrayMenuConfig.Catalog)
+        {
+            CheckBox box = new()
+            {
+                Content = label,
+                Style = (Style)FindResource("HeaderSwitch"),
+                IsChecked = enabled.Contains(key),
+                Tag = key,
+                Margin = new Thickness(0, 0, 14, 8)
+            };
+            box.Click += (_, _) =>
+            {
+                List<string> selected = new();
+                foreach (object child in TrayMenuPanel.Children)
+                {
+                    if (child is CheckBox item && item.IsChecked == true && item.Tag is string itemKey)
+                    {
+                        selected.Add(itemKey);
+                    }
+                }
+                TrayMenuConfig.Save(selected);
+            };
+            TrayMenuPanel.Children.Add(box);
+        }
     }
 
     private static void SetChoices(string value, params ToggleButton[] buttons)

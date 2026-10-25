@@ -286,6 +286,13 @@
                     </StackPanel>
                 </Border>
 
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="托盘菜单" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="勾选要显示在托盘右键菜单中的项目" Style="{StaticResource Hint}" />
+                        <WrapPanel x:Name="TrayMenuPanel" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
                 <Grid Margin="0,2,0,8">
                     <TextBlock Text="语言" Style="{StaticResource CardTitle}" />
                     <ComboBox x:Name="LanguageCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"

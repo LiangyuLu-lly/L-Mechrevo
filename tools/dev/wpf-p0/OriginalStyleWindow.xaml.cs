@@ -802,12 +802,12 @@ public partial class OriginalStyleWindow : Window
 
     private void ShowFromTray()
     {
-        Show();
-        if (WindowState == WindowState.Minimized)
+        if (string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
         {
-            WindowState = WindowState.Normal;
+            ShowWideWindow();
+            return;
         }
-        Activate();
+        ShowCompactWindow();
     }
 
     private void OpenLightEditor(string topic, string title, (string Effect, string Name)[] effects)

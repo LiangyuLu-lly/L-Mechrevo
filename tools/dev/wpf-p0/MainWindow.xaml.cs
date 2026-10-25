@@ -45,6 +45,7 @@ public partial class MainWindow : Window
     private string _currentEffectMode = "";
     private Window? _inlineWindow;
     private bool _wideMaximized;
+    private bool _switchingToMini;
     private bool _animatingWindow;
     private Rect _wideRestoreBounds;
     private CheckBox? _chargeLimitSwitch;
@@ -85,12 +86,17 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _sensorTimer.Stop();
+            if (_switchingToMini || _owner == null)
+            {
+                return;
+            }
             try
             {
-                if (_owner != null && !_owner.IsVisible)
-                {
-                    _owner.ShowCompactWindow();
-                }
+                AppConfig.Set("last_window_mode", "wide");
+                AppConfig.Flush();
+                _owner.Opacity = 0;
+                _owner.ShowInTaskbar = false;
+                _owner.Hide();
             }
             catch
             {
@@ -336,6 +342,7 @@ public partial class MainWindow : Window
     {
         if (_owner != null)
         {
+            _switchingToMini = true;
             AppConfig.Set("last_window_mode", "mini");
             AppConfig.Flush();
             _owner.ShowCompactWindow();
