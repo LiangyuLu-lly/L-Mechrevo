@@ -340,6 +340,39 @@ public partial class OriginalStyleWindow : Window
         return await _backendProbe.SwitchQuickAsync(key, !current);
     }
 
+    internal string WidePerformanceText
+    {
+        get
+        {
+            try
+            {
+                return CurrentModeText.Text;
+            }
+            catch
+            {
+                return "当前：—";
+            }
+        }
+    }
+
+    internal string WideGpuModeText
+    {
+        get
+        {
+            try
+            {
+                if (GpuEcoButton.IsChecked == true) return "当前：核显模式";
+                if (GpuDirectButton.IsChecked == true) return "当前：独显直连";
+                if (GpuHybridButton.IsChecked == true) return "当前：混合模式";
+                return "当前：—";
+            }
+            catch
+            {
+                return "当前：—";
+            }
+        }
+    }
+
     internal (string Info, int Mode, string Charge) WideBattery()
     {
         try

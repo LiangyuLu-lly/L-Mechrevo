@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private Slider? _displayBrightness;
     private CheckBox? _autoRefresh;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
+    private readonly List<ToggleButton> _batteryModeButtons = new();
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -360,10 +361,15 @@ public partial class MainWindow : Window
             };
             button.Click += (_, _) =>
             {
+                foreach (ToggleButton other in _batteryModeButtons)
+                {
+                    other.IsChecked = ReferenceEquals(other, button);
+                }
                 _owner?.WideSetBatteryMode(target);
                 StatusText.Text = "电池模式已请求：" + labels[target];
             };
             modes.Children.Add(button);
+            _batteryModeButtons.Add(button);
         }
         battery.Children.Add(modes);
         _chargeLimitText = new TextBlock { Text = charge, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
@@ -415,7 +421,14 @@ public partial class MainWindow : Window
         {
             return;
         }
-        if (_batteryInfoText != null) _batteryInfoText.Text = _owner.WideBattery().Info;
+        PerfCurrentText.Text = _owner.WidePerformanceText;
+        GpuCurrentText.Text = _owner.WideGpuModeText;
+        (string batteryInfo, int batteryMode, string batteryCharge) = _owner.WideBattery();
+        if (_batteryInfoText != null) _batteryInfoText.Text = batteryInfo;
+        for (int i = 0; i < _batteryModeButtons.Count; i++)
+        {
+            _batteryModeButtons[i].IsChecked = i == batteryMode;
+        }
         if (_chargeLimitText != null) _chargeLimitText.Text = _owner.WideBattery().Charge;
         (string info, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
         DisplayInfoText.Text = info;
