@@ -480,7 +480,7 @@ public partial class SettingsWindow : Window
             Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
             CheckFileExists = true
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog() != true) return;
         AppConfig.Set("wide_bg_image", dialog.FileName);
         AppConfig.Flush();
         RefreshWideBackgroundPathText();
@@ -514,7 +514,7 @@ public partial class SettingsWindow : Window
             Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
             CheckFileExists = true
         };
-        if (dialog.ShowDialog(this) != true)
+        if (dialog.ShowDialog() != true)
         {
             return;
         }
@@ -602,7 +602,7 @@ public partial class SettingsWindow : Window
             FileName = SettingsBackup.BuildFileName(DateTime.Now),
             InitialDirectory = SettingsBackup.ResolveDefaultDirectory()
         };
-        if (dialog.ShowDialog(this) != true)
+        if (dialog.ShowDialog() != true)
         {
             return;
         }
@@ -625,7 +625,7 @@ public partial class SettingsWindow : Window
             Filter = "Zip 压缩包 (*.zip)|*.zip",
             InitialDirectory = SettingsBackup.ResolveDefaultDirectory()
         };
-        if (dialog.ShowDialog(this) != true)
+        if (dialog.ShowDialog() != true)
         {
             return;
         }
