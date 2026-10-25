@@ -21,10 +21,10 @@ internal sealed class HotkeyService : IDisposable
 
     internal static readonly HotkeyAction[] Actions =
     {
-        new(1, "mode_silent", "静音", ModControl | ModAlt, 0x31),
-        new(2, "mode_balanced", "平衡", ModControl | ModAlt, 0x32),
-        new(3, "mode_turbo", "狂暴", ModControl | ModAlt, 0x33),
-        new(4, "mode_custom", "自定义", ModControl | ModAlt, 0x34),
+        new(1, "mode_silent", "切换到静音模式", ModControl | ModAlt, 0x31),
+        new(2, "mode_balanced", "切换到平衡模式", ModControl | ModAlt, 0x32),
+        new(3, "mode_turbo", "切换到狂暴模式", ModControl | ModAlt, 0x33),
+        new(4, "mode_custom", "切换到自定义模式", ModControl | ModAlt, 0x34),
         new(5, "overlay", "悬浮窗", ModControl | ModAlt, 0x4F),
         new(6, "settings", "设置", ModControl | ModAlt, 0x53),
         new(7, "show_main", "显示主界面", ModControl | ModAlt, 0x4D)
