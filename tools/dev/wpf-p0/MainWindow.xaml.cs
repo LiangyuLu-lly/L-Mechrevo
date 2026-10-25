@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private TextBox? _chargeHigh;
     private TextBlock? _chargeStatus;
     private CheckBox? _chargeExperiment;
+    private Slider? _chargeSlider;
     private CheckBox? _ecDirect;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
     private readonly List<ToggleButton> _batteryModeButtons = new();
@@ -512,15 +513,33 @@ public partial class MainWindow : Window
             battery.Children.Add(limitRow);
             _chargeStatus = new TextBlock { Text = limitStatus, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
             battery.Children.Add(_chargeStatus);
-            _chargeExperiment = new CheckBox { Content = "无极限充", Style = (Style)FindResource("HeaderSwitch"), IsChecked = experiment, Margin = new Thickness(0, 8, 16, 0) };
-            _chargeExperiment.Click += (_, _) => _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
-            _ecDirect = new CheckBox { Content = "关闭 EC 直写", Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirect, Margin = new Thickness(0, 8, 0, 0) };
-            _ecDirect.Click += (_, _) => _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
-            StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
-            extraLimitRow.Children.Add(_chargeExperiment);
-            extraLimitRow.Children.Add(_ecDirect);
-            battery.Children.Add(extraLimitRow);
         }
+        (bool _, string _, string _, string _, bool experimentSlider, bool ecDirectSlider) = _owner.WideChargeLimit();
+        _chargeExperiment = new CheckBox { Content = "无极限充（实验性）", Style = (Style)FindResource("HeaderSwitch"), IsChecked = experimentSlider, Margin = new Thickness(0, 8, 16, 0) };
+        _chargeExperiment.Click += (_, _) =>
+        {
+            _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
+            UpdateChargeSliderVisibility();
+        };
+        _ecDirect = new CheckBox { Content = "关闭 EC 直写", Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirectSlider, Margin = new Thickness(0, 8, 0, 0) };
+        _ecDirect.Click += (_, _) => _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
+        StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
+        extraLimitRow.Children.Add(_chargeExperiment);
+        extraLimitRow.Children.Add(_ecDirect);
+        battery.Children.Add(extraLimitRow);
+        (bool sliderOn, int sliderValue) = _owner.WideBatteryLimitSlider();
+        _chargeSlider = new Slider
+        {
+            Minimum = 40,
+            Maximum = 100,
+            Value = sliderValue,
+            Width = 220,
+            Margin = new Thickness(0, 8, 0, 0),
+            Style = (Style)FindResource("RoundSlider"),
+            Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed
+        };
+        _chargeSlider.ValueChanged += (_, _) => _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
+        battery.Children.Add(_chargeSlider);
         BatteryCardHost.Content = new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0), Child = battery };
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
@@ -598,6 +617,14 @@ public partial class MainWindow : Window
         ScreenEffectPanel.Children.Add(effectRow);
     }
 
+    private void UpdateChargeSliderVisibility()
+    {
+        if (_chargeSlider != null && _chargeExperiment != null)
+        {
+            _chargeSlider.Visibility = _chargeExperiment.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
     private void RefreshHomeExtras()
     {
         if (_owner == null)
@@ -649,6 +676,15 @@ public partial class MainWindow : Window
         if (_chargeStatus != null) _chargeStatus.Text = limitStatus2;
         if (_chargeExperiment != null) _chargeExperiment.IsChecked = experiment2;
         if (_ecDirect != null) _ecDirect.IsChecked = ecDirect2;
+        (bool sliderOn, int sliderValue) = _owner.WideBatteryLimitSlider();
+        if (_chargeSlider != null)
+        {
+            _chargeSlider.Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed;
+            if (!_chargeSlider.IsMouseCaptureWithin && Math.Abs(_chargeSlider.Value - sliderValue) > 1)
+            {
+                _chargeSlider.Value = sliderValue;
+            }
+        }
     }
 
     private void ApplyHomeCapabilities()

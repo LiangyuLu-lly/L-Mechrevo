@@ -427,6 +427,16 @@ public partial class OriginalStyleWindow : Window
         DisplayEffectEdit_Click(DisplayEffectEditButton, new RoutedEventArgs());
     }
 
+    internal (bool Toggle, int Value) WideBatteryLimitSlider()
+    {
+        return (ChargeSliderToggle.IsChecked == true, (int)Math.Round(BatteryLimitSlider.Value));
+    }
+
+    internal void WideSetBatteryLimitSlider(int value)
+    {
+        BatteryLimitSlider.Value = Math.Clamp(value, 40, 100);
+    }
+
     internal bool WideChargeLimitVisible
     {
         get
