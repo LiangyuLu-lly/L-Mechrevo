@@ -1187,31 +1187,71 @@ public partial class MainWindow : Window
         LightChannelSettings settings = LightingSettingsStore.Load(topic, effects[0].Effect);
         int maxLight = topic == "Keyboard/Ctrl" ? 4 : topic == "HidLightbar_Logo/Ctrl" ? 4 : 100;
         int light = Math.Clamp(settings.Light, 0, maxLight);
+        int colorArgb = settings.ColorArgb;
+        string selectedEffect = Array.Exists(effects, item => item.Effect == settings.Effect) ? settings.Effect : effects[0].Effect;
         StackPanel panel = new();
-        panel.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle") });
+        Grid header = new();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
+        ToggleButton power = new()
+        {
+            Content = "开启灯光",
+            Style = (Style)FindResource("SegmentButton"),
+            IsChecked = settings.PowerOn
+        };
+        Grid.SetColumn(power, 1);
+        header.Children.Add(power);
+        panel.Children.Add(header);
         panel.Children.Add(new TextBlock
         {
-            Text = "页面内直接编辑，修改后自动下发",
+            Text = "档位直接切换，亮度/颜色/速度在高级设置中",
             Style = (Style)FindResource("MutedText"),
-            Margin = new Thickness(0, 3, 0, 10)
+            Margin = new Thickness(0, 4, 0, 10)
         });
-        ComboBox combo = new() { Style = (Style)FindResource("RoundCombo"), Height = 30, Margin = new Thickness(0, 0, 0, 8) };
+        Slider? sliderRef = null;
+        Slider? speedRef = null;
+        WrapPanel effectPanel = new();
+        List<ToggleButton> effectButtons = new();
         foreach ((string effect, string name) in effects)
         {
-            combo.Items.Add(new ComboBoxItem { Content = name, Tag = effect });
+            string effectId = effect;
+            ToggleButton button = new()
+            {
+                Content = name,
+                Style = (Style)FindResource("SegmentButton"),
+                IsChecked = effect == selectedEffect,
+                Margin = new Thickness(0, 0, 8, 8)
+            };
+            button.Click += (_, _) =>
+            {
+                selectedEffect = effectId;
+                foreach (ToggleButton item in effectButtons) item.IsChecked = ReferenceEquals(item, button);
+                _ = ApplyLightCardAsync(topic, effectId, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
+            };
+            effectButtons.Add(button);
+            effectPanel.Children.Add(button);
         }
-        int effectIndex = Array.FindIndex(effects, item => item.Effect == settings.Effect);
-        combo.SelectedIndex = effectIndex >= 0 ? effectIndex : 0;
-        panel.Children.Add(combo);
-        Grid brightness = new() { Margin = new Thickness(0, 0, 0, 6) };
+        panel.Children.Add(effectPanel);
+        Button advanced = new()
+        {
+            Content = "高级设置",
+            Style = (Style)FindResource("FlatButton"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        panel.Children.Add(advanced);
+        StackPanel advancedPanel = new() { Visibility = Visibility.Collapsed };
+        Grid brightness = new() { Margin = new Thickness(0, 4, 0, 6) };
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Slider slider = new() { Style = (Style)FindResource("RoundSlider"), Minimum = 0, Maximum = maxLight, Value = light };
+        sliderRef = slider;
         TextBlock value = new()
         {
             Text = light + "/" + maxLight,
             Style = (Style)FindResource("MutedText"),
-            Width = 44,
+            Width = 48,
             TextAlignment = TextAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -1219,24 +1259,16 @@ public partial class MainWindow : Window
         Grid.SetColumn(value, 1);
         brightness.Children.Add(slider);
         brightness.Children.Add(value);
-        panel.Children.Add(brightness);
-        int colorArgb = settings.ColorArgb;
-        CheckBox power = new()
-        {
-            Content = "电源",
-            Style = (Style)FindResource("HeaderSwitch"),
-            IsChecked = settings.PowerOn,
-            Margin = new Thickness(0, 4, 0, 0)
-        };
+        advancedPanel.Children.Add(brightness);
         Slider speed = new()
         {
             Style = (Style)FindResource("RoundSlider"),
             Minimum = 0,
             Maximum = 4,
-            Value = Math.Clamp(settings.Speed, 0, 4),
-            Visibility = topic == "Keyboard/Ctrl" ? Visibility.Collapsed : Visibility.Visible
+            Value = Math.Clamp(settings.Speed, 0, 4)
         };
-        if (speed.Visibility == Visibility.Visible)
+        speedRef = speed;
+        if (topic != "Keyboard/Ctrl")
         {
             Grid speedRow = new() { Margin = new Thickness(0, 0, 0, 6) };
             speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1245,7 +1277,7 @@ public partial class MainWindow : Window
             {
                 Text = (int)speed.Value + "/4",
                 Style = (Style)FindResource("MutedText"),
-                Width = 40,
+                Width = 44,
                 TextAlignment = TextAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -1253,21 +1285,20 @@ public partial class MainWindow : Window
             Grid.SetColumn(speedText, 1);
             speedRow.Children.Add(speed);
             speedRow.Children.Add(speedText);
-            panel.Children.Add(speedRow);
+            advancedPanel.Children.Add(speedRow);
             speed.ValueChanged += (_, _) =>
             {
                 speedText.Text = (int)Math.Round(speed.Value) + "/4";
-                _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, selectedEffect, slider, speed, colorArgb, power.IsChecked == true);
             };
         }
-        panel.Children.Add(power);
-        power.Click += (_, _) => _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
         Button color = new()
         {
-            Content = "颜色",
+            Content = "选择颜色",
             Style = (Style)FindResource("GhostButton"),
             HorizontalAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(12, 5, 12, 5)
+            Padding = new Thickness(12, 5, 12, 5),
+            Margin = new Thickness(0, 4, 0, 0)
         };
         color.Click += (_, _) =>
         {
@@ -1275,25 +1306,29 @@ public partial class MainWindow : Window
             if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
             {
                 colorArgb = picked.ToArgb();
-                _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, selectedEffect, slider, speed, colorArgb, power.IsChecked == true);
             }
         };
-        panel.Children.Add(color);
+        advancedPanel.Children.Add(color);
+        advanced.Click += (_, _) =>
+        {
+            advancedPanel.Visibility = advancedPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        };
+        panel.Children.Add(advancedPanel);
+        power.Click += (_, _) =>
+        {
+            _ = ApplyLightCardAsync(topic, selectedEffect, slider, speed, colorArgb, power.IsChecked == true);
+        };
         slider.ValueChanged += (_, _) =>
         {
             value.Text = (int)Math.Round(slider.Value) + "/" + maxLight;
-            _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
+            _ = ApplyLightCardAsync(topic, selectedEffect, slider, speed, colorArgb, power.IsChecked == true);
         };
-        combo.SelectionChanged += (_, _) => _ = ApplyLightCardAsync(topic, combo, slider, speed, colorArgb, power.IsChecked == true);
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(5), Child = panel };
     }
 
-    private async Task ApplyLightCardAsync(string topic, ComboBox combo, Slider slider, Slider speed, int colorArgb, bool powerOn)
+    private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, bool powerOn)
     {
-        if (combo.SelectedItem is not ComboBoxItem item || item.Tag is not string effect)
-        {
-            return;
-        }
         try
         {
             LightChannelSettings settings = LightingSettingsStore.Load(topic, effect) with
