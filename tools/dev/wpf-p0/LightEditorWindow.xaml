@@ -82,8 +82,7 @@
         <Grid Grid.Row="2" Margin="0,10,0,0">
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{DynamicResource MutedText}" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="应用" Style="{StaticResource FlatButton}" Click="Apply_Click" Margin="0,0,8,0" />
-                <Button Content="关闭" Style="{StaticResource FlatButton}" Click="Close_Click" />
+                <TextBlock Text="调整后自动生效" Style="{DynamicResource MutedText}" VerticalAlignment="Center" />
             </StackPanel>
         </Grid>
     </Grid>
