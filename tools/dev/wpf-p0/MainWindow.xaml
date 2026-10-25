@@ -311,22 +311,37 @@
                         <StackPanel>
                             <TextBlock Text="自定义" Style="{StaticResource PageTitle}" />
                             <TextBlock Text="自定义性能模式与风扇曲线" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
-                            <UniformGrid Columns="2">
-                                <Border Style="{StaticResource Card}" Margin="0,0,6,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource Card}">
                                     <StackPanel>
                                         <TextBlock Text="自定义模式" Style="{StaticResource CardTitle}" />
                                         <TextBlock Text="CPU / GPU 功耗与模式参数" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="打开自定义模式" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="CustomMode_Click" />
+                                        <Button Content="新建 / 管理自定义模式" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="CustomMode_Click" Margin="0,0,0,10" />
+                                        <StackPanel x:Name="CustomModeListPanel" />
                                     </StackPanel>
                                 </Border>
-                                <Border Style="{StaticResource Card}" Margin="6,0,0,6">
-                                    <StackPanel>
-                                        <TextBlock Text="风扇曲线" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="温度 / 转速曲线与平滑" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="打开风扇曲线" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="FanCurve_Click" />
-                                    </StackPanel>
-                                </Border>
-                            </UniformGrid>
+                                <StackPanel Grid.Column="2">
+                                    <Border Style="{StaticResource Card}">
+                                        <StackPanel>
+                                            <TextBlock Text="CPU 风扇曲线" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="温度 / 转速曲线与平滑" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <Button Content="打开 CPU 风扇曲线" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="FanCurveCpu_Click" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource Card}">
+                                        <StackPanel>
+                                            <TextBlock Text="GPU 风扇曲线" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="温度 / 转速曲线与平滑" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <Button Content="打开 GPU 风扇曲线" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="FanCurveGpu_Click" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </ScrollViewer>
 

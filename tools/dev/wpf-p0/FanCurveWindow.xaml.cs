@@ -17,10 +17,12 @@ public partial class FanCurveWindow : Window
     private bool _dirty;
     private WujieFanEcController? _wujieController;
 
-    public FanCurveWindow(string modeId)
+    public FanCurveWindow(string modeId, bool showCpu = true, bool showGpu = true)
     {
         InitializeComponent();
         _modeId = modeId;
+        CpuSection.Visibility = showCpu ? Visibility.Visible : Visibility.Collapsed;
+        GpuSection.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
         _hw = Program.hw;
         bool supported = _hw != null && (_hw.IsGcuConnected || _hw.UsesBaolongda || _hw.WujieSmuApu);
         if (!supported)

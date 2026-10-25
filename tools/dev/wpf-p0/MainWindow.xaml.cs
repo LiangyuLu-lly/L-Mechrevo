@@ -68,6 +68,7 @@ public partial class MainWindow : Window
         BuildIgpuSavingControls();
         BuildScreenControls();
         BuildLightingCards();
+        BuildCustomModeList();
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
         _sensorTimer.Start();
@@ -1480,11 +1481,81 @@ public partial class MainWindow : Window
         }
     }
 
+    private void BuildCustomModeList()
+    {
+        if (CustomModeListPanel == null) return;
+        CustomModeListPanel.Children.Clear();
+        List<MechrevoLite.Mode.PerfModeDefinition> customs = new();
+        try
+        {
+            MechrevoLite.Mode.PerfModeService? service = MechrevoLite.Mode.PerfModeService.Instance;
+            if (service != null)
+            {
+                customs.AddRange(service.Modes.Where(mode => mode.IsCustom));
+            }
+        }
+        catch
+        {
+        }
+        if (customs.Count == 0)
+        {
+            CustomModeListPanel.Children.Add(new TextBlock
+            {
+                Text = "暂无自定义模式",
+                Style = (Style)FindResource("MutedText"),
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+            return;
+        }
+        foreach (MechrevoLite.Mode.PerfModeDefinition custom in customs)
+        {
+            string modeId = custom.Id;
+            string name = string.IsNullOrWhiteSpace(custom.UserName)
+                ? MechrevoLite.Mode.PerfModeText.Name(custom)
+                : custom.UserName;
+            Grid row = new() { Margin = new Thickness(0, 0, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            TextBlock label = new()
+            {
+                Text = name,
+                Style = (Style)FindResource("MutedText"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            Button edit = new()
+            {
+                Content = "编辑",
+                Style = (Style)FindResource("GhostButton"),
+                Padding = new Thickness(12, 5, 12, 5)
+            };
+            edit.Click += (_, _) =>
+            {
+                try
+                {
+                    new CustomModeWindow(modeId).ShowDialog();
+                    BuildCustomModeList();
+                    StatusText.Text = "自定义模式已关闭";
+                }
+                catch (Exception ex)
+                {
+                    StatusText.Text = "打开自定义模式失败：" + ex.Message;
+                }
+            };
+            Grid.SetColumn(label, 0);
+            Grid.SetColumn(edit, 1);
+            row.Children.Add(label);
+            row.Children.Add(edit);
+            CustomModeListPanel.Children.Add(row);
+        }
+    }
+
     private void CustomMode_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             new CustomModeWindow().ShowDialog();
+            BuildCustomModeList();
             StatusText.Text = "自定义模式已关闭";
         }
         catch (Exception ex)
@@ -1493,16 +1564,29 @@ public partial class MainWindow : Window
         }
     }
 
-    private void FanCurve_Click(object sender, RoutedEventArgs e)
+    private void FanCurveCpu_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            new FanCurveWindow("balanced").ShowDialog();
-            StatusText.Text = "风扇曲线已关闭";
+            new FanCurveWindow("balanced", showCpu: true, showGpu: false).ShowDialog();
+            StatusText.Text = "CPU 风扇曲线已关闭";
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开风扇曲线失败：" + ex.Message;
+            StatusText.Text = "打开 CPU 风扇曲线失败：" + ex.Message;
+        }
+    }
+
+    private void FanCurveGpu_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            new FanCurveWindow("balanced", showCpu: false, showGpu: true).ShowDialog();
+            StatusText.Text = "GPU 风扇曲线已关闭";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "打开 GPU 风扇曲线失败：" + ex.Message;
         }
     }
 

@@ -21,10 +21,14 @@
         </StackPanel>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Text="CPU 风扇" FontWeight="SemiBold" Margin="0,0,0,4" />
-                <local:FanCurveCanvas x:Name="CpuCurve" />
-                <TextBlock Text="GPU 风扇" FontWeight="SemiBold" Margin="0,12,0,4" />
-                <local:FanCurveCanvas x:Name="GpuCurve" />
+                <StackPanel x:Name="CpuSection">
+                    <TextBlock Text="CPU 风扇" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <local:FanCurveCanvas x:Name="CpuCurve" />
+                </StackPanel>
+                <StackPanel x:Name="GpuSection" Margin="0,12,0,0">
+                    <TextBlock Text="GPU 风扇" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <local:FanCurveCanvas x:Name="GpuCurve" />
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
         <Grid Grid.Row="2" Margin="0,10,0,0">
