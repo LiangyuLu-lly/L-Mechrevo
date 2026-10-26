@@ -76,6 +76,7 @@ public partial class MainWindow : Window
     private TextBlock? _igpuSavingState;
     private CheckBox? _ecDirect;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
+    private string _refreshRatesSignature = "";
     private readonly List<ToggleButton> _batteryModeButtons = new();
     private readonly List<(string Key, Button Button, TextBlock State, string Label)> _quickTileButtons = new();
     /// <summary>⭐ task-26：每张灯光卡的 150 ms 合并计时器；重建卡片时统一 Stop（避免对已拆掉的卡补发旧值）✅。</summary>
@@ -1023,23 +1024,7 @@ public partial class MainWindow : Window
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
         DisplayInfoText.Text = displayInfo;
-        DisplayRefreshPanel.Children.Clear();
-        _displayRefreshButtons.Clear();
-        foreach (int hz in new[] { 60, Math.Max(120, maxHz / 2), Math.Max(60, maxHz) }.Distinct())
-        {
-            int target = hz;
-            ToggleButton button = new()
-            {
-                Content = hz + " Hz",
-                Tag = hz.ToString(),
-                Style = (Style)FindResource("SegmentButton"),
-                IsChecked = hz == currentHz,
-                Margin = new Thickness(0, 0, 6, 0)
-            };
-            button.Click += (_, _) => _owner?.WideSetRefresh(target);
-            DisplayRefreshPanel.Children.Add(button);
-            _displayRefreshButtons.Add((button, hz));
-        }
+        BuildRefreshRateButtons(_owner.WideRefreshRates(), currentHz);
         StackPanel brightnessRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         brightnessRow.Children.Add(new TextBlock { Text = WpfStrings.Brightness, Style = (Style)FindResource("MutedText"), Width = 54, VerticalAlignment = VerticalAlignment.Center });
         _displayBrightness = new Slider { Minimum = 0, Maximum = 100, Value = brightness, Width = 220, Style = (Style)FindResource("RoundSlider") };
@@ -1059,6 +1044,28 @@ public partial class MainWindow : Window
         DisplayInfoRow.Children.Add(_autoRefresh);
         _autoRefresh.Click += (_, _) => _owner?.WideSetAutoRefresh(_autoRefresh.IsChecked == true);
         DisplayDetailsPanel.Children.Add(brightnessRow);
+    }
+
+    private void BuildRefreshRateButtons(int[] rates, int currentHz)
+    {
+        DisplayRefreshPanel.Children.Clear();
+        _displayRefreshButtons.Clear();
+        _refreshRatesSignature = string.Join(",", rates);
+        foreach (int hz in rates)
+        {
+            int target = hz;
+            ToggleButton button = new()
+            {
+                Content = hz + " Hz",
+                Tag = hz.ToString(),
+                Style = (Style)FindResource("SegmentButton"),
+                IsChecked = Math.Abs(hz - currentHz) <= 2,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            button.Click += (_, _) => _owner?.WideSetRefresh(target);
+            DisplayRefreshPanel.Children.Add(button);
+            _displayRefreshButtons.Add((button, hz));
+        }
     }
 
     private void BuildIgpuSavingControls()
@@ -1616,9 +1623,18 @@ public partial class MainWindow : Window
         {
             _displayBrightness.Value = brightness;
         }
-        foreach ((ToggleButton button, int hz) in _displayRefreshButtons)
+        int[] refreshRates = _owner.WideRefreshRates();
+        string refreshSignature = string.Join(",", refreshRates);
+        if (refreshSignature != _refreshRatesSignature)
         {
-            button.IsChecked = hz == currentHz;
+            BuildRefreshRateButtons(refreshRates, currentHz);
+        }
+        else
+        {
+            foreach ((ToggleButton button, int hz) in _displayRefreshButtons)
+            {
+                button.IsChecked = Math.Abs(hz - currentHz) <= 2;
+            }
         }
         if (_autoRefresh != null) _autoRefresh.IsChecked = auto;
         RefreshLiquidCooling();

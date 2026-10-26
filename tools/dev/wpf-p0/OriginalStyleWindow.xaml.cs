@@ -395,19 +395,33 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    internal async void WideSetRefresh(int hertz)
+    internal void WideSetRefresh(int hertz)
     {
         if (_backendProbe == null)
         {
             return;
         }
-        AutoRefreshSwitch.IsChecked = false;
-        AppConfig.Set("screen_auto", 0);
-        ScreenControl.SetAutoRefresh(0);
-        bool ok = _services != null
-            ? (await _services.Display.SetRefreshRateAsync(hertz)).Ok
-            : await _backendProbe.SwitchRefreshRateAsync(hertz);
-        StatusText.Text = ok ? WpfStrings.DisplayRefreshSentPrefix + hertz + " Hz" : WpfStrings.DisplayRefreshFailedPrefix + hertz + " Hz";
+        // 旧版定稿：刷新率唯一动作走 Win32（ChangeDisplaySettingsEx），GCU 仅 best-effort 镜像；
+        // 手选档位不关闭“自动刷新率”，只提示可能被插拔电源覆盖。
+        bool autoOn = AppConfig.Is("screen_auto");
+        bool ok;
+        try
+        {
+            ScreenControl.SetScreen(hertz);
+            ok = true;
+        }
+        catch (Exception ex)
+        {
+            ok = false;
+            Logger.WriteLine("[refresh] Win32 切换失败：" + ex.Message);
+        }
+        if (_backendProbe.Hw?.IsGcuConnected == true)
+        {
+            _ = _backendProbe.SwitchRefreshRateAsync(hertz);
+        }
+        StatusText.Text = ok
+            ? (autoOn ? WpfStrings.DisplayRefreshSentPrefix + hertz + " Hz · " + WpfStrings.DisplayRefreshAutoWarn : WpfStrings.DisplayRefreshSentPrefix + hertz + " Hz")
+            : WpfStrings.DisplayRefreshFailedPrefix + hertz + " Hz";
         SyncRefreshRateState();
     }
 
@@ -1071,6 +1085,30 @@ public partial class OriginalStyleWindow : Window
         catch
         {
             return (WpfStrings.PlaceholderDisplayDash, -1, -1, false, 100);
+        }
+    }
+
+    internal int[] WideRefreshRates()
+    {
+        try
+        {
+            string? laptopScreen = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
+            bool fallback = _backendProbe?.Hw?.UsesBaolongda == true;
+            IReadOnlyList<int> rates = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(laptopScreen, fallback);
+            if (rates.Count == 0)
+            {
+                (_, int current, int max, _, _) = WideDisplay();
+                rates = new[] { 60, Math.Max(120, max / 2), Math.Max(60, max), Math.Max(0, current) }
+                    .Where(v => v > 0)
+                    .Distinct()
+                    .OrderBy(v => v)
+                    .ToArray();
+            }
+            return rates.Distinct().OrderBy(v => v).ToArray();
+        }
+        catch
+        {
+            return Array.Empty<int>();
         }
     }
 
@@ -2987,23 +3025,17 @@ public partial class OriginalStyleWindow : Window
         StatusText.Text = ok ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
     }
 
-    private async void RefreshRate_Click(object sender, RoutedEventArgs e)
+    private void RefreshRate_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
         {
             return;
         }
-        AutoRefreshSwitch.IsChecked = false;
-        AppConfig.Set("screen_auto", 0);
-        ScreenControl.SetAutoRefresh(0);
         int requested = int.Parse(text);
         Refresh180Button.IsChecked = requested >= _refreshHighHz;
         Refresh60Button.IsChecked = requested < _refreshHighHz;
         HighlightSegment(button);
-        bool ok = _services != null
-            ? (await _services.Display.SetRefreshRateAsync(int.Parse(text))).Ok
-            : await _backendProbe.SwitchRefreshRateAsync(int.Parse(text));
-        StatusText.Text = ok ? WpfStrings.DisplayRefreshSent : WpfStrings.DisplayRefreshFailed;
+        WideSetRefresh(requested);
     }
 
     private async void AutoRefresh_Click(object sender, RoutedEventArgs e)

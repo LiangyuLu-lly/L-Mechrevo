@@ -2480,6 +2480,9 @@
   <data name="DisplayRefreshSent" xml:space="preserve">
     <value>刷新率已下发</value>
   </data>
+  <data name="DisplayRefreshAutoWarn" xml:space="preserve">
+    <value>自动刷新率开启时，插拔电源可能覆盖此设置。</value>
+  </data>
   <data name="DisplayRefreshSentPrefix" xml:space="preserve">
     <value>刷新率已下发：</value>
   </data>

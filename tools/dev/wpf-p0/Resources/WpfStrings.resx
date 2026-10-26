@@ -2480,6 +2480,9 @@ If the screen stays black, you will have to force shutdown and restart.</value>
   <data name="DisplayRefreshSent" xml:space="preserve">
     <value>Refresh rate applied</value>
   </data>
+  <data name="DisplayRefreshAutoWarn" xml:space="preserve">
+    <value>Auto refresh is on; plugging/unplugging power may override this setting.</value>
+  </data>
   <data name="DisplayRefreshSentPrefix" xml:space="preserve">
     <value>Refresh rate applied: </value>
   </data>

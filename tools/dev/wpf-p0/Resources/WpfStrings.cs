@@ -839,6 +839,7 @@ public static class WpfStrings
     public static string DisplayRefreshExceptionPrefix => Get("DisplayRefreshExceptionPrefix");
     public static string DisplayRefreshSent => Get("DisplayRefreshSent");
     public static string DisplayRefreshSentPrefix => Get("DisplayRefreshSentPrefix");
+    public static string DisplayRefreshAutoWarn => Get("DisplayRefreshAutoWarn");
     public static string LiquidPumpFailed => Get("LiquidPumpFailed");
     public static string LiquidPumpSent => Get("LiquidPumpSent");
     public static string LiquidFanFailed => Get("LiquidFanFailed");
