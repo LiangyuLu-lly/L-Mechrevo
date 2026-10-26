@@ -79,6 +79,7 @@
     <Compile Include="MechrevoLite\SettingsBackup.cs" />
     <Compile Include="MechrevoLite\GcuPackageImport.cs" />
     <Compile Include="MechrevoLite\KeyboardLightingDecision.cs" />
+    <Compile Include="MechrevoLite\WujieFanCurveAutoApply.cs" />
     <Compile Include="Startup.cs" />
     <!-- 旧入口的 ACPI 门面（纯 Win32/业务类型，非窗体；Program shim 需要它的类型） -->
     <Compile Include="MechrevoLite\AsusACPI.cs" />

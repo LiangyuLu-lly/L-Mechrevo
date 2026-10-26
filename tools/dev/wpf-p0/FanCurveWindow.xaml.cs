@@ -21,6 +21,16 @@ public partial class FanCurveWindow : Window
     {
         InitializeComponent();
         _modeId = modeId;
+        try
+        {
+            PushFanCurveCheck.IsChecked = MechrevoLite.Mode.PerfModeStore.LoadSettings(modeId).FanCurveOn ?? true;
+            bool wujie = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.WujieSmuApu == true;
+            WujieIndependentCheck.Visibility = wujie ? Visibility.Visible : Visibility.Collapsed;
+            WujieIndependentCheck.IsChecked = MechrevoLite.AppConfig.Is("wujie_fan_independent");
+        }
+        catch
+        {
+        }
         CpuSection.Visibility = showCpu ? Visibility.Visible : Visibility.Collapsed;
         GpuSection.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
         _hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
@@ -158,7 +168,15 @@ public partial class FanCurveWindow : Window
                 _wujieController ??= new WujieFanEcController();
                 byte[] cpuTemps = CpuCurve.Temperatures;
                 byte[] gpuTemps = GpuCurve.Temperatures;
-                bool ok = _wujieController.Start(cpuTemps, cpu, independent: false, gpuTemps, gpu, out string detail);
+                bool independent = WujieIndependentCheck?.IsChecked == true;
+                try
+                {
+                    MechrevoLite.AppConfig.Set("wujie_fan_independent", independent ? 1 : 0);
+                }
+                catch
+                {
+                }
+                bool ok = _wujieController.Start(cpuTemps, cpu, independent, gpuTemps, gpu, out string detail);
                 PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
                 SaveWujieTemps(cpuTemps, gpuTemps);
                 _dirty = false;
@@ -174,6 +192,16 @@ public partial class FanCurveWindow : Window
         {
             int[] cpu = CpuCurve.Duties;
             int[] gpu = GpuCurve.Duties;
+            bool push = PushFanCurveCheck?.IsChecked != false;
+            if (!push)
+            {
+                PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
+                PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, false);
+                _dirty = false;
+                StatusText.Text = "风扇曲线已保存；下发开关关闭，未推送硬件";
+                return;
+            }
+            PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
             await _hw.SetFanCurve(0, cpu).ConfigureAwait(true);
             await _hw.SetFanCurve(1, gpu).ConfigureAwait(true);
             await _hw.Publish("Fan/Control", new Dictionary<string, object> { ["Action"] = "GET_FAN_SPEED_CURVE_SETTING" }).ConfigureAwait(true);
@@ -189,7 +217,7 @@ public partial class FanCurveWindow : Window
                     {
                         CpuFanDuty = cpu,
                         GpuFanDuty = gpu,
-                        FanCurveOn = true
+                        FanCurveOn = PushFanCurveCheck?.IsChecked != false
                     };
                     MechrevoLite.Mode.PerfModeStore.SaveSettings(_modeId, settings);
                 }
@@ -262,17 +290,17 @@ public partial class FanCurveWindow : Window
             CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
             GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
         }
-        else if (_modeId.StartsWith("custom", StringComparison.Ordinal)
-            || _modeId.StartsWith("fw", StringComparison.Ordinal))
-        {
-            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
-            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
-        }
         else if (_hw != null && _hw.TryGetBuiltInDefaultFanCurve(out byte[] cpuTemps, out byte[] cpuDuties,
                      out byte[] gpuTemps, out byte[] gpuDuties))
         {
             CpuCurve.Load(cpuTemps, cpuDuties);
             GpuCurve.Load(gpuTemps, gpuDuties);
+        }
+        else if (_modeId.StartsWith("custom", StringComparison.Ordinal)
+            || _modeId.StartsWith("fw", StringComparison.Ordinal))
+        {
+            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
+            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
         }
         else
         {

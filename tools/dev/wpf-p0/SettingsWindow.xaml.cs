@@ -210,6 +210,11 @@ public partial class SettingsWindow : Window
         CheckUpdateButton.Visibility = L_Mechrevo.WpfP0.Services.UpdatePolicy.TemporarilyHidden
             ? Visibility.Collapsed
             : Visibility.Visible;
+        if (FeedbackButtonsPanel != null)
+        {
+            FeedbackButtonsPanel.Visibility = AppConfig.Is("ui_show_privacy_feedback")
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
         _syncing = false;
         BuildTrayMenuOptions();
     }

@@ -78,6 +78,7 @@ public partial class OriginalStyleWindow : Window
     private System.Windows.Interop.HwndSource? _powerBroadcastSource;
     private bool[]? _lightingIdleSwitchSnapshot;
     private bool _lightingPowerSuspended;
+    private bool _sleepKeyboardLightWasOn;
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
     private bool _syncingLighting;
@@ -85,6 +86,7 @@ public partial class OriginalStyleWindow : Window
     private readonly System.Threading.SemaphoreSlim _hidApplyLock = new(1, 1);
     private int _hidRetryGeneration;
     private int _lightingReassertGeneration;
+    private int _capabilityWarmupGeneration;
     private int _hidApplyGeneration;
     private MechrevoHw? _stateHookedHw;
     private bool? _pendingKeyboardPower;
@@ -1074,16 +1076,45 @@ public partial class OriginalStyleWindow : Window
     private IntPtr PowerBroadcastHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         const int WM_POWERBROADCAST = 0x0218;
+        const int PBT_APMSUSPEND = 0x0004;
+        const int PBT_APMRESUMESUSPEND = 0x0007;
         const int PBT_APMRESUMEAUTOMATIC = 0x0012;
-        if (msg == WM_POWERBROADCAST && wParam.ToInt32() == PBT_APMRESUMEAUTOMATIC)
+        int powerEvent = wParam.ToInt32();
+        if (msg == WM_POWERBROADCAST && powerEvent == PBT_APMSUSPEND)
+        {
+            // 睡前记录键盘灯电源：现代待机只有 BROADCAST，不能依赖 PowerModeChanged。
+            _sleepKeyboardLightWasOn = KeyboardLightSwitch?.IsChecked == true;
+            return IntPtr.Zero;
+        }
+        if (msg == WM_POWERBROADCAST
+            && (powerEvent == PBT_APMRESUMESUSPEND || powerEvent == PBT_APMRESUMEAUTOMATIC))
         {
             Dispatcher.BeginInvoke(new Action(async () =>
             {
                 await Task.Delay(1500);
+                await RestoreKeyboardLightAfterWakeAsync();
                 await RestoreLightingOnStartupAsync();
             }));
         }
         return IntPtr.Zero;
+    }
+
+    private async Task RestoreKeyboardLightAfterWakeAsync()
+    {
+        if (!_sleepKeyboardLightWasOn || _backendProbe == null)
+        {
+            return;
+        }
+        try
+        {
+            _syncingLighting = true;
+            KeyboardLightSwitch.IsChecked = true;
+            _syncingLighting = false;
+            await ApplyKeyboardLightAsync();
+        }
+        catch
+        {
+        }
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1853,6 +1884,13 @@ public partial class OriginalStyleWindow : Window
             {
                 await perf.ReconcileForStartupAsync().ConfigureAwait(true);
                 await perf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(true);
+                try
+                {
+                    perf.ApplyApuAntiDegradeOnStartup();
+                }
+                catch
+                {
+                }
             }
         }
         catch
@@ -4348,6 +4386,37 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         Dispatcher.BeginInvoke(new Action(() => _ = RestoreLightingOnStartupAsync()));
+    }
+
+    /// <summary>
+    /// 近期修复：首次装 GCU / 后端预热期能力位可能晚到，启动后分阶梯重新评估一次。
+    /// 只刷新只读能力与 UI，不重复连接、不写硬件。
+    /// </summary>
+    private void ScheduleCapabilityWarmup()
+    {
+        int generation = ++_capabilityWarmupGeneration;
+        _ = Task.Run(async () =>
+        {
+            foreach (int delaySeconds in new[] { 5, 15, 30, 60 })
+            {
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (generation != _capabilityWarmupGeneration || _backendProbe == null)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        ApplyCapabilities();
+                        BackendReady?.Invoke();
+                    }
+                    catch
+                    {
+                    }
+                }));
+            }
+        });
     }
 
     private void ScheduleLightingReassert()
