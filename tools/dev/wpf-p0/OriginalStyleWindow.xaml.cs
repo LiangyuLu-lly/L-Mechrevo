@@ -5134,15 +5134,23 @@ public partial class OriginalStyleWindow : Window
             bool effectiveKeyboardPower = IsHidKeyboard(hw)
                 ? (L_Mechrevo.WpfP0.Services.WpfBackend.rgb?.KbPowerOn ?? hw.KeyboardPower)
                 : hw.KeyboardPower;
-            if (_pendingKeyboardPower is bool pendingPower
-                && Environment.TickCount64 - _pendingKeyboardPowerTick < 5000
-                && effectiveKeyboardPower != pendingPower)
+            if (_pendingKeyboardPower is bool pendingPower)
             {
-                // 等硬件/ HID 回读追上用户刚点的状态，避免开关立即回弹
+                // 用户刚点的状态优先；只有回读真正追上才清 pending。
+                // ⛔ 不用 5s 超时强制回填，否则下发成功但回读慢时会“回弹”。
+                if (effectiveKeyboardPower != pendingPower)
+                {
+                    // 保持按钮状态，等下一次回读
+                }
+                else
+                {
+                    _pendingKeyboardPower = null;
+                    KeyboardLightSwitch.IsChecked = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(
+                        MechrevoLite.KeyboardLightingDecision.ShouldWrite(hw.IsConnected, effectiveKeyboardPower), suspended);
+                }
             }
             else
             {
-                _pendingKeyboardPower = null;
                 bool keyboardOn = hw.UsesBaolongda
                     ? effectiveKeyboardPower
                     : MechrevoLite.KeyboardLightingDecision.ShouldWrite(hw.IsConnected, effectiveKeyboardPower);
@@ -5166,13 +5174,15 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool shown = MechrevoLite.Hardware.LightingState.IsLightSwitchOn(power, suspended);
-        if (_pendingChannelPower[index] is bool pending
-            && Environment.TickCount64 - _pendingChannelTick[index] < 5000
-            && shown != pending)
+        if (_pendingChannelPower[index] is bool pending)
         {
-            return;
+            // 用户刚点的状态优先；回读未追上则保持按钮，不用超时强制回填。
+            if (shown != pending)
+            {
+                return;
+            }
+            _pendingChannelPower[index] = null;
         }
-        _pendingChannelPower[index] = null;
         target.IsChecked = shown;
     }
 
