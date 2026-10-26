@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MechrevoLite.Hardware;
 using MechrevoLite.Mode;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -62,21 +63,21 @@ internal sealed class PerformanceService : IPerformanceService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             MechrevoService.ModeSwitchResult result = await probe.SwitchModeResultAsync(mode).ConfigureAwait(false);
             return result switch
             {
-                MechrevoService.ModeSwitchResult.Ok => ServiceResult.Success("模式已下发"),
-                MechrevoService.ModeSwitchResult.Superseded => ServiceResult.Fail("模式请求被更新的一次请求取代"),
-                _ => ServiceResult.Fail("模式下发失败")
+                MechrevoService.ModeSwitchResult.Ok => ServiceResult.Success(WpfStrings.OriginalStyleWindow_xaml_Text_8),
+                MechrevoService.ModeSwitchResult.Superseded => ServiceResult.Fail(WpfStrings.PerfModeSuperseded),
+                _ => ServiceResult.Fail(WpfStrings.PerfModeFailed)
             };
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("模式下发异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.PerfModeExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -159,7 +160,7 @@ internal sealed class PerformanceService : IPerformanceService
             MechrevoHw? hw = _backend.Hw;
             if (hw == null)
             {
-                return ServiceResult.Fail("后端未连接");
+                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
             }
             try
             {
@@ -167,31 +168,31 @@ internal sealed class PerformanceService : IPerformanceService
                 bool handled = hw.TrySetFanBoostViaBackend(on, out bool confirmed);
                 if (!handled)
                 {
-                    return ServiceResult.Fail("本机强冷通道不可用");
+                    return ServiceResult.Fail(WpfStrings.QuickFanBoostBackendUnavailable);
                 }
                 return confirmed
-                    ? ServiceResult.Success(on ? "强冷已开启（回读确认）" : "强冷已关闭（已恢复原曲线）")
-                    : ServiceResult.Fail(on ? "强冷已下发但回读未确认" : "强冷关闭未确认");
+                    ? ServiceResult.Success(on ? WpfStrings.QuickFanBoostOnConfirmed : WpfStrings.QuickFanBoostOffConfirmed)
+                    : ServiceResult.Fail(on ? WpfStrings.QuickFanBoostOnUnconfirmed : WpfStrings.QuickFanBoostOffUnconfirmed);
             }
             catch (Exception ex)
             {
-                return ServiceResult.Fail("强冷异常：" + ex.GetType().Name);
+                return ServiceResult.Fail(WpfStrings.FanBoostExceptionPrefix + ex.GetType().Name);
             }
         }
 
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             bool ok = await probe.SwitchQuickAsync("fanboost", on).ConfigureAwait(false);
-            return ok ? ServiceResult.Success(on ? "强冷已开启" : "强冷已关闭") : ServiceResult.Fail("强冷下发失败");
+            return ok ? ServiceResult.Success(on ? WpfStrings.FanBoostOn : WpfStrings.FanBoostOff) : ServiceResult.Fail(WpfStrings.FanBoostFailed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("强冷异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.FanBoostExceptionPrefix + ex.GetType().Name);
         }
     }
 

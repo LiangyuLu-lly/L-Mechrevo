@@ -161,13 +161,26 @@ public partial class OverlayWindow : Window
             L_Mechrevo.WpfP0.Services.PowerStatusSnapshot power = L_Mechrevo.WpfP0.Services.PowerStatusService.Read();
             MechrevoLite.Hardware.PowerInputSample? sample = power.Input;
             MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(sample, acOnline);
+            // task-38: map the enum on the WPF side so the power-source headline is localized
+            // (Core only returns a pre-localized string; we no longer depend on its language).
             if (sample?.AdapterWatts is int watts)
             {
-                string text = SettingsText.PowerSourceHeadline(kind, watts);
+                string text = kind switch
+                {
+                    MechrevoLite.Hardware.PowerInputKind.Barrel => string.Format(WpfStrings.OverlayBarrelWattsFormat, watts),
+                    MechrevoLite.Hardware.PowerInputKind.TypeC => WpfStrings.OverlayUsbCPower,
+                    MechrevoLite.Hardware.PowerInputKind.BarrelAndTypeC => WpfStrings.OverlayUsbCPower,
+                    MechrevoLite.Hardware.PowerInputKind.ExternalUnknown => WpfStrings.OverlayExternalPower,
+                    _ => WpfStrings.OverlayAcPower
+                };
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     return text;
                 }
+            }
+            else if (kind == MechrevoLite.Hardware.PowerInputKind.Barrel)
+            {
+                return WpfStrings.OverlayBarrelPower;
             }
             int raw = sample?.BiosInfo3Raw ?? -1;
             if (raw >= 0)

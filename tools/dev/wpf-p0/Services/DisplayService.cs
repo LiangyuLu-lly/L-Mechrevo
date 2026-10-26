@@ -131,12 +131,12 @@ internal sealed class DisplayService : IDisplayService
         try
         {
             return ScreenBrightness.TrySet(target)
-                ? ServiceResult.Success("亮度已设置")
-                : ServiceResult.Fail("亮度写入未确认");
+                ? ServiceResult.Success(WpfStrings.DisplayBrightnessSet)
+                : ServiceResult.Fail(WpfStrings.DisplayBrightnessUnconfirmed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("亮度设置异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.DisplayBrightnessExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -145,7 +145,7 @@ internal sealed class DisplayService : IDisplayService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
@@ -154,11 +154,11 @@ internal sealed class DisplayService : IDisplayService
             AppConfig.Set("screen_auto", 0);
             ScreenControl.SetAutoRefresh(0);
             AppConfig.Flush();
-            return ok ? ServiceResult.Success("刷新率已下发") : ServiceResult.Fail("刷新率下发失败");
+            return ok ? ServiceResult.Success(WpfStrings.DisplayRefreshSent) : ServiceResult.Fail(WpfStrings.DisplayRefreshFailed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("刷新率下发异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.DisplayRefreshExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -167,7 +167,7 @@ internal sealed class DisplayService : IDisplayService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
@@ -175,11 +175,11 @@ internal sealed class DisplayService : IDisplayService
             // 与原窗口 AutoRefresh_Click 一致：无论后端回执如何都落盘（下一次启动仍按用户选择）。
             AppConfig.Set("screen_auto", on ? 1 : 0);
             AppConfig.Flush();
-            return ok ? ServiceResult.Success("自动刷新率已下发") : ServiceResult.Fail("自动刷新率下发失败");
+            return ok ? ServiceResult.Success(WpfStrings.DisplayAutoRefreshSent) : ServiceResult.Fail(WpfStrings.DisplayAutoRefreshFailed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("自动刷新率下发异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.DisplayAutoRefreshExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -188,16 +188,16 @@ internal sealed class DisplayService : IDisplayService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             bool ok = await probe.SetLcdOverdriveAsync(on).ConfigureAwait(false);
-            return ok ? ServiceResult.Success(on ? "过驱已开启" : "过驱已关闭") : ServiceResult.Fail("过驱下发失败");
+            return ok ? ServiceResult.Success(on ? WpfStrings.DisplayOverdriveOn : WpfStrings.DisplayOverdriveOff) : ServiceResult.Fail(WpfStrings.DisplayOverdriveFailed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("过驱下发异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.DisplayOverdriveExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -206,7 +206,7 @@ internal sealed class DisplayService : IDisplayService
         int level = _backend.Probe?.ColorCalibrationLevel ?? 1;
         List<CalibrationOption> options = new()
         {
-            new(1, "默认", false)
+            new(1, WpfStrings.OriginalStyleWindow_Content_9, false)
         };
         if (level >= 2)
         {
@@ -222,7 +222,7 @@ internal sealed class DisplayService : IDisplayService
         }
         if (CustomCalibrationAvailable())
         {
-            options.Add(new(999, "自定义校色", true));
+            options.Add(new(999, WpfStrings.CustomSwitch_Content, true));
         }
         return options;
     }
@@ -236,7 +236,7 @@ internal sealed class DisplayService : IDisplayService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
@@ -256,16 +256,16 @@ internal sealed class DisplayService : IDisplayService
             }
             if (!ok)
             {
-                return ServiceResult.Fail(mode == 999 ? "自定义 ICC 文件缺失或应用失败" : "屏幕校色下发失败");
+                return ServiceResult.Fail(mode == 999 ? WpfStrings.DisplayIccMissing : WpfStrings.DisplayCalibrationFailed);
             }
             AppConfig.Set("calib_mode", mode);
             AppConfig.Set("calib_enabled", on ? 1 : 0);
             AppConfig.Flush();
-            return ServiceResult.Success(on ? "屏幕校色已开启" : "屏幕校色已关闭");
+            return ServiceResult.Success(on ? WpfStrings.DisplayCalibrationOn : WpfStrings.DisplayCalibrationOff);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("屏幕校色异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.DisplayCalibrationExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -280,14 +280,14 @@ internal sealed class DisplayService : IDisplayService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             bool ok = await probe.SetDisplayEffectSwitchAsync(on).ConfigureAwait(false);
             if (!ok)
             {
-                return ServiceResult.Fail("色彩增强下发失败");
+                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_61);
             }
             AppConfig.Set("display_effect", on ? 1 : 0);
             AppConfig.Flush();
@@ -300,11 +300,11 @@ internal sealed class DisplayService : IDisplayService
                 }
             }
             await probe.RequestDisplayEffectStatusAsync().ConfigureAwait(false);
-            return ServiceResult.Success(on ? "色彩增强已开启" : "色彩增强已关闭");
+            return ServiceResult.Success(on ? WpfStrings.DisplayColorEnhancementOn : WpfStrings.DisplayColorEnhancementOff);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("色彩增强异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.DisplayColorEnhancementExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -313,27 +313,27 @@ internal sealed class DisplayService : IDisplayService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         if (string.IsNullOrWhiteSpace(mode))
         {
-            return ServiceResult.Fail("色彩增强档位为空");
+            return ServiceResult.Fail(WpfStrings.DisplayColorProfileEmpty);
         }
         try
         {
             bool ok = await probe.ApplyDisplayEffectProfileAsync(mode).ConfigureAwait(false);
             if (!ok)
             {
-                return ServiceResult.Fail("色彩增强档位下发失败");
+                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_63);
             }
             AppConfig.Set("display_effect_mode", mode);
             AppConfig.Flush();
             await probe.RequestDisplayEffectStatusAsync().ConfigureAwait(false);
-            return ServiceResult.Success("色彩增强档位已切换");
+            return ServiceResult.Success(WpfStrings.DisplayColorProfileSwitched);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("色彩增强档位异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.DisplayColorProfileExceptionPrefix + ex.GetType().Name);
         }
     }
 

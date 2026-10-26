@@ -2214,4 +2214,607 @@
   <data name="QuickTilePickerMaxCurrentFormat" xml:space="preserve">
     <value>最多 {0} 个（当前 {1} 个）</value>
   </data>
+  <data name="StatusReadbackSuffix" xml:space="preserve">
+    <value> · 回读=</value>
+  </data>
+  <data name="UnitMinutesSuffix" xml:space="preserve">
+    <value> 分钟</value>
+  </data>
+  <data name="UnitDevicesSuffix" xml:space="preserve">
+    <value> 个设备</value>
+  </data>
+  <data name="UnitSecondsSuffix" xml:space="preserve">
+    <value> 秒</value>
+  </data>
+  <data name="ChargeStartSeparator" xml:space="preserve">
+    <value>% / 起充 </value>
+  </data>
+  <data name="ModeSeparatorSuffix" xml:space="preserve">
+    <value>（模式 </value>
+  </data>
+  <data name="UpdateAvailableSuffix" xml:space="preserve">
+    <value>，可在设置中检查更新</value>
+  </data>
+  <data name="ContinuePromptSuffix" xml:space="preserve">
+    <value>
+
+继续？</value>
+  </data>
+  <data name="ChargeEcAuto" xml:space="preserve">
+    <value>EC 直写恢复自动判定</value>
+  </data>
+  <data name="LightLogoFailed" xml:space="preserve">
+    <value>Logo 灯效下发失败</value>
+  </data>
+  <data name="LightLogoSentPrefix" xml:space="preserve">
+    <value>Logo 灯效已下发：</value>
+  </data>
+  <data name="LightLogoOff" xml:space="preserve">
+    <value>Logo 灯已关闭</value>
+  </data>
+  <data name="LightChannelLogo" xml:space="preserve">
+    <value>Logo灯效</value>
+  </data>
+  <data name="LightBdKeyboardAutoOffPrefix" xml:space="preserve">
+    <value>宝龙达键盘自动关闭：</value>
+  </data>
+  <data name="LightBdKeyboardAutoOffOff" xml:space="preserve">
+    <value>宝龙达键盘自动关闭：关</value>
+  </data>
+  <data name="ChargeUnsupported" xml:space="preserve">
+    <value>本机不支持充电阈值</value>
+  </data>
+  <data name="LightChannelLightbar" xml:space="preserve">
+    <value>灯带灯效</value>
+  </data>
+  <data name="LightLightbarFailed" xml:space="preserve">
+    <value>灯带效果下发失败</value>
+  </data>
+  <data name="LightLightbarSentPrefix" xml:space="preserve">
+    <value>灯带效果已下发：</value>
+  </data>
+  <data name="LightPowerFailed" xml:space="preserve">
+    <value>灯光电源下发失败</value>
+  </data>
+  <data name="LightPowerExceptionPrefix" xml:space="preserve">
+    <value>灯光电源异常：</value>
+  </data>
+  <data name="LightLiquidFailed" xml:space="preserve">
+    <value>灯光下发失败</value>
+  </data>
+  <data name="LightPowerOff" xml:space="preserve">
+    <value>灯光已关闭</value>
+  </data>
+  <data name="LightPowerOn" xml:space="preserve">
+    <value>灯光已开启</value>
+  </data>
+  <data name="LightLiquidSent" xml:space="preserve">
+    <value>灯光已下发</value>
+  </data>
+  <data name="LightAutoOffPrefix" xml:space="preserve">
+    <value>灯光自动关闭：</value>
+  </data>
+  <data name="LightAutoOffOff" xml:space="preserve">
+    <value>灯光自动关闭：关</value>
+  </data>
+  <data name="BatteryModeFailed" xml:space="preserve">
+    <value>电池档位下发失败</value>
+  </data>
+  <data name="BatteryModeSent" xml:space="preserve">
+    <value>电池档位已下发</value>
+  </data>
+  <data name="UpdateAvailablePrefix" xml:space="preserve">
+    <value>发现新版本：</value>
+  </data>
+  <data name="PeripheralCountPrefix" xml:space="preserve">
+    <value>共 </value>
+  </data>
+  <data name="ChargeDisableExceptionPrefix" xml:space="preserve">
+    <value>关闭异常：</value>
+  </data>
+  <data name="DisplayOverdriveFailed" xml:space="preserve">
+    <value>过驱下发失败</value>
+  </data>
+  <data name="DisplayOverdriveExceptionPrefix" xml:space="preserve">
+    <value>过驱下发异常：</value>
+  </data>
+  <data name="DisplayOverdriveOff" xml:space="preserve">
+    <value>过驱已关闭</value>
+  </data>
+  <data name="DisplayOverdriveOn" xml:space="preserve">
+    <value>过驱已开启</value>
+  </data>
+  <data name="IgpuOccupiedPrefix" xml:space="preserve">
+    <value>检测到以下程序正在占用独显：
+
+</value>
+  </data>
+  <data name="LightKeyboardPowerFailed" xml:space="preserve">
+    <value>键盘灯电源下发失败</value>
+  </data>
+  <data name="LightKeyboardPowerExceptionPrefix" xml:space="preserve">
+    <value>键盘灯电源异常：</value>
+  </data>
+  <data name="LightKeyboardFailed" xml:space="preserve">
+    <value>键盘灯效下发失败</value>
+  </data>
+  <data name="LightKeyboardSentPrefix" xml:space="preserve">
+    <value>键盘灯效已下发：</value>
+  </data>
+  <data name="LightKeyboardOff" xml:space="preserve">
+    <value>键盘灯已关闭</value>
+  </data>
+  <data name="LightKeyboardOn" xml:space="preserve">
+    <value>键盘灯已开启</value>
+  </data>
+  <data name="IgpuKillListPrefix" xml:space="preserve">
+    <value>将尝试结束以下程序：
+
+</value>
+  </data>
+  <data name="LightChannelHinge" xml:space="preserve">
+    <value>铰链灯效</value>
+  </data>
+  <data name="LightHingeFailed" xml:space="preserve">
+    <value>铰链灯效果下发失败</value>
+  </data>
+  <data name="LightHingeSent" xml:space="preserve">
+    <value>铰链灯效果已下发</value>
+  </data>
+  <data name="IgpuKillFailedPrefix" xml:space="preserve">
+    <value>结束进程失败：</value>
+  </data>
+  <data name="QuickFailedPrefix" xml:space="preserve">
+    <value>快捷开关下发失败：</value>
+  </data>
+  <data name="QuickSentPrefix" xml:space="preserve">
+    <value>快捷开关已下发：</value>
+  </data>
+  <data name="LiquidBleDisconnected" xml:space="preserve">
+    <value>蓝牙水冷已断开</value>
+  </data>
+  <data name="LightOffOnBatteryOff" xml:space="preserve">
+    <value>离电自动关闭灯效：关</value>
+  </data>
+  <data name="LightOffOnBatteryOn" xml:space="preserve">
+    <value>离电自动关闭灯效：开</value>
+  </data>
+  <data name="DisplayBrightnessExceptionPrefix" xml:space="preserve">
+    <value>亮度设置异常：</value>
+  </data>
+  <data name="DisplayBrightnessUnconfirmed" xml:space="preserve">
+    <value>亮度写入未确认</value>
+  </data>
+  <data name="DisplayBrightnessSet" xml:space="preserve">
+    <value>亮度已设置</value>
+  </data>
+  <data name="IgpuNoSafeProcesses" xml:space="preserve">
+    <value>没有可安全结束的独显占用程序，已取消。</value>
+  </data>
+  <data name="PerfModeSuperseded" xml:space="preserve">
+    <value>模式请求被更新的一次请求取代</value>
+  </data>
+  <data name="PerfModeFailed" xml:space="preserve">
+    <value>模式下发失败</value>
+  </data>
+  <data name="PerfModeExceptionPrefix" xml:space="preserve">
+    <value>模式下发异常：</value>
+  </data>
+  <data name="DisplayCalibrationModeFailed" xml:space="preserve">
+    <value>屏幕校色档位下发失败</value>
+  </data>
+  <data name="DisplayCalibrationFailed" xml:space="preserve">
+    <value>屏幕校色下发失败</value>
+  </data>
+  <data name="DisplayCalibrationOff" xml:space="preserve">
+    <value>屏幕校色已关闭</value>
+  </data>
+  <data name="DisplayCalibrationOn" xml:space="preserve">
+    <value>屏幕校色已开启</value>
+  </data>
+  <data name="DisplayCalibrationExceptionPrefix" xml:space="preserve">
+    <value>屏幕校色异常：</value>
+  </data>
+  <data name="ChargeEnableExceptionPrefix" xml:space="preserve">
+    <value>启用异常：</value>
+  </data>
+  <data name="ChargeRangeInvalid" xml:space="preserve">
+    <value>起充/停充阈值需为 1~99</value>
+  </data>
+  <data name="ChargeOrderInvalid" xml:space="preserve">
+    <value>起充阈值必须小于停充阈值</value>
+  </data>
+  <data name="FanBoostFailed" xml:space="preserve">
+    <value>强冷下发失败</value>
+  </data>
+  <data name="FanBoostOff" xml:space="preserve">
+    <value>强冷已关闭</value>
+  </data>
+  <data name="FanBoostOn" xml:space="preserve">
+    <value>强冷已开启</value>
+  </data>
+  <data name="FanBoostExceptionPrefix" xml:space="preserve">
+    <value>强冷异常：</value>
+  </data>
+  <data name="SwitchFailedPrefix" xml:space="preserve">
+    <value>切换失败：</value>
+  </data>
+  <data name="PerfCustomSwitchFailed" xml:space="preserve">
+    <value>切换自定义模式失败</value>
+  </data>
+  <data name="PerfCustomSwitchFailedPrefix" xml:space="preserve">
+    <value>切换自定义模式失败：</value>
+  </data>
+  <data name="IgpuForceConfirm" xml:space="preserve">
+    <value>确认继续强制切换？
+
+如果黑屏，只能强制关机重启。</value>
+  </data>
+  <data name="DisplayColorProfileEmpty" xml:space="preserve">
+    <value>色彩增强档位为空</value>
+  </data>
+  <data name="DisplayColorProfileSwitched" xml:space="preserve">
+    <value>色彩增强档位已切换</value>
+  </data>
+  <data name="DisplayColorProfileExceptionPrefix" xml:space="preserve">
+    <value>色彩增强档位异常：</value>
+  </data>
+  <data name="DisplayColorEnhancementOff" xml:space="preserve">
+    <value>色彩增强已关闭</value>
+  </data>
+  <data name="DisplayColorEnhancementOn" xml:space="preserve">
+    <value>色彩增强已开启</value>
+  </data>
+  <data name="DisplayColorEnhancementExceptionPrefix" xml:space="preserve">
+    <value>色彩增强异常：</value>
+  </data>
+  <data name="DisplayRefreshFailed" xml:space="preserve">
+    <value>刷新率下发失败</value>
+  </data>
+  <data name="DisplayRefreshFailedPrefix" xml:space="preserve">
+    <value>刷新率下发失败：</value>
+  </data>
+  <data name="DisplayRefreshExceptionPrefix" xml:space="preserve">
+    <value>刷新率下发异常：</value>
+  </data>
+  <data name="DisplayRefreshSent" xml:space="preserve">
+    <value>刷新率已下发</value>
+  </data>
+  <data name="DisplayRefreshSentPrefix" xml:space="preserve">
+    <value>刷新率已下发：</value>
+  </data>
+  <data name="LiquidPumpFailed" xml:space="preserve">
+    <value>水泵档位下发失败</value>
+  </data>
+  <data name="LiquidPumpSent" xml:space="preserve">
+    <value>水泵档位已下发</value>
+  </data>
+  <data name="LiquidFanFailed" xml:space="preserve">
+    <value>水冷风扇档位下发失败</value>
+  </data>
+  <data name="LiquidFanSent" xml:space="preserve">
+    <value>水冷风扇档位已下发</value>
+  </data>
+  <data name="LightChannelSync" xml:space="preserve">
+    <value>同步灯效</value>
+  </data>
+  <data name="LightSyncFailed" xml:space="preserve">
+    <value>同步灯效果下发失败</value>
+  </data>
+  <data name="LightSyncSent" xml:space="preserve">
+    <value>同步灯效果已下发</value>
+  </data>
+  <data name="IsEmptySuffix" xml:space="preserve">
+    <value>为空</value>
+  </data>
+  <data name="IgpuListReadFailed" xml:space="preserve">
+    <value>无法读取独显占用程序列表，已取消强制切换。</value>
+  </data>
+  <data name="ApplyFailedSuffix" xml:space="preserve">
+    <value>下发失败</value>
+  </data>
+  <data name="GpuOverclockPrefix" xml:space="preserve">
+    <value>显卡超频：</value>
+  </data>
+  <data name="GpuOverclockOffPending" xml:space="preserve">
+    <value>显卡超频：关（下发中…）</value>
+  </data>
+  <data name="GpuOverclockOnPending" xml:space="preserve">
+    <value>显卡超频：开（下发中…）</value>
+  </data>
+  <data name="GpuOverclockFailed" xml:space="preserve">
+    <value>显卡超频下发失败（开关保持按钮状态）</value>
+  </data>
+  <data name="GpuModeFailed" xml:space="preserve">
+    <value>显卡模式下发失败</value>
+  </data>
+  <data name="GpuModeExceptionPrefix" xml:space="preserve">
+    <value>显卡模式下发异常：</value>
+  </data>
+  <data name="GpuModeSent" xml:space="preserve">
+    <value>显卡模式已下发</value>
+  </data>
+  <data name="GpuModeSentRestart" xml:space="preserve">
+    <value>显卡模式已下发，重启后生效</value>
+  </data>
+  <data name="OverlayOpened" xml:space="preserve">
+    <value>悬浮窗已打开</value>
+  </data>
+  <data name="OverlayClosed" xml:space="preserve">
+    <value>悬浮窗已关闭</value>
+  </data>
+  <data name="LiquidColorFailed" xml:space="preserve">
+    <value>颜色下发失败</value>
+  </data>
+  <data name="LiquidColorSent" xml:space="preserve">
+    <value>颜色已下发</value>
+  </data>
+  <data name="SavedPrefix" xml:space="preserve">
+    <value>已保存：</value>
+  </data>
+  <data name="ChargeEcDirectOff" xml:space="preserve">
+    <value>已关闭 EC 直写充电上限</value>
+  </data>
+  <data name="LightOffOnBatteryOffShort" xml:space="preserve">
+    <value>已关闭离电关灯</value>
+  </data>
+  <data name="ChargeSliderOff" xml:space="preserve">
+    <value>已关闭无极限充滑块</value>
+  </data>
+  <data name="LightOffOnBatteryOnLong" xml:space="preserve">
+    <value>已开启离电关灯（生效由灯效核对触发）</value>
+  </data>
+  <data name="ChargeSliderOn" xml:space="preserve">
+    <value>已启用无极限充滑块</value>
+  </data>
+  <data name="GpuTargetModeRestart" xml:space="preserve">
+    <value>已切到目标模式，重启后生效</value>
+  </data>
+  <data name="SwitchedPrefix" xml:space="preserve">
+    <value>已切换：</value>
+  </data>
+  <data name="GpuSwitchUnconfirmed" xml:space="preserve">
+    <value>已请求切换，回读未确认，重启后确认</value>
+  </data>
+  <data name="SentSuffix" xml:space="preserve">
+    <value>已下发</value>
+  </data>
+  <data name="ExceptionPrefix" xml:space="preserve">
+    <value>异常：</value>
+  </data>
+  <data name="GpuRestartExceptionPrefix" xml:space="preserve">
+    <value>重启切换请求异常：</value>
+  </data>
+  <data name="DisplayIccMissing" xml:space="preserve">
+    <value>自定义 ICC 文件缺失或应用失败</value>
+  </data>
+  <data name="LightAutoOffWriteExceptionPrefix" xml:space="preserve">
+    <value>自动关灯写入异常：</value>
+  </data>
+  <data name="LightAutoOffSaved" xml:space="preserve">
+    <value>自动关灯已保存</value>
+  </data>
+  <data name="LightAutoOffWritten" xml:space="preserve">
+    <value>自动关灯已写入键盘设置</value>
+  </data>
+  <data name="DisplayAutoRefreshFailed" xml:space="preserve">
+    <value>自动刷新率下发失败</value>
+  </data>
+  <data name="DisplayAutoRefreshExceptionPrefix" xml:space="preserve">
+    <value>自动刷新率下发异常：</value>
+  </data>
+  <data name="DisplayAutoRefreshSent" xml:space="preserve">
+    <value>自动刷新率已下发</value>
+  </data>
+  <data name="OverlayBarrelWattsFormat" xml:space="preserve">
+    <value>圆口 {0}W</value>
+  </data>
+  <data name="OverlayBarrelPower" xml:space="preserve">
+    <value>圆口供电</value>
+  </data>
+  <data name="OverlayUsbCPower" xml:space="preserve">
+    <value>Type-C 供电</value>
+  </data>
+  <data name="OverlayExternalPower" xml:space="preserve">
+    <value>外接电源</value>
+  </data>
+  <data name="SettingsLoadExceptionPrefix" xml:space="preserve">
+    <value>设置加载异常：</value>
+  </data>
+  <data name="OverlayStateToggled" xml:space="preserve">
+    <value>悬浮窗状态已切换</value>
+  </data>
+  <data name="OverlayPositionReset" xml:space="preserve">
+    <value>悬浮窗位置已重置</value>
+  </data>
+  <data name="AccentSaved" xml:space="preserve">
+    <value>主题色已保存</value>
+  </data>
+  <data name="AccentReset" xml:space="preserve">
+    <value>主题色已恢复默认</value>
+  </data>
+  <data name="LanguageSaved" xml:space="preserve">
+    <value>语言已保存，重启后生效</value>
+  </data>
+  <data name="LogLevelSaved" xml:space="preserve">
+    <value>日志级别已保存</value>
+  </data>
+  <data name="StartupSettingFailed" xml:space="preserve">
+    <value>开机自启设置失败</value>
+  </data>
+  <data name="StartupSettingExceptionPrefix" xml:space="preserve">
+    <value>开机自启异常：</value>
+  </data>
+  <data name="LiquidMenuSaved" xml:space="preserve">
+    <value>水冷菜单设置已保存</value>
+  </data>
+  <data name="IgpuModeDisplayPrefix" xml:space="preserve">
+    <value>核显模式显示：</value>
+  </data>
+  <data name="LightStripRowPrefix" xml:space="preserve">
+    <value>灯带行显示：</value>
+  </data>
+  <data name="LogoRowPrefix" xml:space="preserve">
+    <value>Logo 灯行显示：</value>
+  </data>
+  <data name="WideBackgroundAppliedPrefix" xml:space="preserve">
+    <value>已应用宽屏背景图：</value>
+  </data>
+  <data name="WideBackgroundCleared" xml:space="preserve">
+    <value>已清除宽屏背景图</value>
+  </data>
+  <data name="BackgroundAppliedPrefix" xml:space="preserve">
+    <value>已应用背景图：</value>
+  </data>
+  <data name="BackgroundCleared" xml:space="preserve">
+    <value>已清除背景图</value>
+  </data>
+  <data name="BackupExportedPrefix" xml:space="preserve">
+    <value>已导出 </value>
+  </data>
+  <data name="BackupExportedSuffix" xml:space="preserve">
+    <value> 个文件</value>
+  </data>
+  <data name="ExportFailedPrefix" xml:space="preserve">
+    <value>导出失败：</value>
+  </data>
+  <data name="SettingsImported" xml:space="preserve">
+    <value>设置已导入，重启 L-Mechrevo 生效</value>
+  </data>
+  <data name="ImportFailedPrefix" xml:space="preserve">
+    <value>导入失败：</value>
+  </data>
+  <data name="DisplayResponseToggleFailed" xml:space="preserve">
+    <value>显示响应加速切换失败</value>
+  </data>
+  <data name="DisplayResponseExceptionPrefix" xml:space="preserve">
+    <value>显示响应加速异常：</value>
+  </data>
+  <data name="OnlineUpdateDisabled" xml:space="preserve">
+    <value>当前版本已按原版策略关闭在线更新</value>
+  </data>
+  <data name="UpdateCheckNoResult" xml:space="preserve">
+    <value>检查更新失败：没有返回结果</value>
+  </data>
+  <data name="UpdateLatestPrefix" xml:space="preserve">
+    <value>已是最新版本：</value>
+  </data>
+  <data name="UpdateCheckFailedPrefix" xml:space="preserve">
+    <value>检查更新失败：</value>
+  </data>
+  <data name="FeedbackOpenFailedPrefix" xml:space="preserve">
+    <value>打开反馈失败：</value>
+  </data>
+  <data name="LinkOpenFailedPrefix" xml:space="preserve">
+    <value>打开链接失败：</value>
+  </data>
+  <data name="LicenseOpenFailedPrefix" xml:space="preserve">
+    <value>打开许可证失败：</value>
+  </data>
+  <data name="PlaceholderDisplayDash" xml:space="preserve">
+    <value>显示 —</value>
+  </data>
+  <data name="ModeNamePrefix" xml:space="preserve">
+    <value>模式 </value>
+  </data>
+  <data name="PowerSourceChangedReason" xml:space="preserve">
+    <value>电源变化</value>
+  </data>
+  <data name="BatteryInfoDash" xml:space="preserve">
+    <value>电池 —</value>
+  </data>
+  <data name="LightTitleLogo" xml:space="preserve">
+    <value>Logo 灯光</value>
+  </data>
+  <data name="LightTitleLightbar" xml:space="preserve">
+    <value>灯带灯光</value>
+  </data>
+  <data name="LightTitleHinge" xml:space="preserve">
+    <value>铰链灯光</value>
+  </data>
+  <data name="LightTitleSync" xml:space="preserve">
+    <value>同步灯光</value>
+  </data>
+  <data name="SwitchingEllipsis" xml:space="preserve">
+    <value>切换中…</value>
+  </data>
+  <data name="ChargeAppliedPrefix" xml:space="preserve">
+    <value>限制充电已生效（停充 </value>
+  </data>
+  <data name="ChargeNotEnabled" xml:space="preserve">
+    <value>限制充电未启用</value>
+  </data>
+  <data name="ChargeStartRangeError" xml:space="preserve">
+    <value>起充阈值需为 1~99</value>
+  </data>
+  <data name="ChargeStopRangeError" xml:space="preserve">
+    <value>停充阈值需为 2~100</value>
+  </data>
+  <data name="IgpuBlockOnlyDgpu" xml:space="preserve">
+    <value>当前只有独显在驱动显示器。强制切换可能导致黑屏，已取消。</value>
+  </data>
+  <data name="IgpuBlockSnapshotUnavailable" xml:space="preserve">
+    <value>无法确认独显占用状态，已取消。</value>
+  </data>
+  <data name="IgpuBlockRouteUnavailable" xml:space="preserve">
+    <value>无法读取当前显示通路，已取消。</value>
+  </data>
+  <data name="IgpuBlockSafetyFailed" xml:space="preserve">
+    <value>核显省电安全检查未通过，已取消。</value>
+  </data>
+  <data name="IgpuWarningDgpuOnlyPrefix" xml:space="preserve">
+    <value>警告：当前似乎只有独显在驱动显示器。
+强制切换可能导致黑屏，且需要重启才能恢复。
+
+</value>
+  </data>
+  <data name="IgpuWarningOccupiedPrefix" xml:space="preserve">
+    <value>以下程序正在占用独显，需要结束它们才能切换核显省电：
+
+</value>
+  </data>
+  <data name="IgpuConfirmContinueSuffix" xml:space="preserve">
+    <value>
+
+切换核显省电可能需要结束这些程序，是否继续？</value>
+  </data>
+  <data name="DisplayPowerEcHexFormat" xml:space="preserve">
+    <value>外接电源（EC 0x{0}）</value>
+  </data>
+  <data name="DisplayPowerEcWattFormat" xml:space="preserve">
+    <value>外接电源（EC {0}W）</value>
+  </data>
+  <data name="UpdateTimeoutStatus" xml:space="preserve">
+    <value>15 秒内未完成；应用会自动重试，点上方状态可重新检查。</value>
+  </data>
+  <data name="ImageFileFilter" xml:space="preserve">
+    <value>图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*</value>
+  </data>
+  <data name="ZipFileFilter" xml:space="preserve">
+    <value>Zip 压缩包 (*.zip)|*.zip</value>
+  </data>
+  <data name="StartupEnabled" xml:space="preserve">
+    <value>已启用开机自启</value>
+  </data>
+  <data name="StartupDisabled" xml:space="preserve">
+    <value>已关闭开机自启</value>
+  </data>
+  <data name="DisplayResponseOn" xml:space="preserve">
+    <value>显示响应加速已开启</value>
+  </data>
+  <data name="DisplayResponseOff" xml:space="preserve">
+    <value>显示响应加速已关闭</value>
+  </data>
+  <data name="TraySensorOn" xml:space="preserve">
+    <value>托盘图标显示传感器参数已开启</value>
+  </data>
+  <data name="TraySensorOff" xml:space="preserve">
+    <value>托盘图标显示传感器参数已关闭；后台无悬浮窗时暂停传感器读取</value>
+  </data>
+  <data name="LightSingleWhiteBacklight" xml:space="preserve">
+    <value>白色背光</value>
+  </data>
+  <data name="ClosingParen" xml:space="preserve">
+    <value>）</value>
+  </data>
 </root>

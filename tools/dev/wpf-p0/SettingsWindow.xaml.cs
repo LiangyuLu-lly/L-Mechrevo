@@ -37,7 +37,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Status("设置加载异常：" + ex.Message);
+            Status(WpfStrings.SettingsLoadExceptionPrefix + ex.Message);
         }
         SourceInitialized += (_, _) =>
   {
@@ -134,7 +134,7 @@ public partial class SettingsWindow : Window
                 PeripheralBatteryPanel.Children.Add(row);
             }
 
-            PeripheralBatteryStatus.Text = items.Count > 3 ? "共 " + items.Count + " 个设备" : "";
+            PeripheralBatteryStatus.Text = items.Count > 3 ? WpfStrings.PeripheralCountPrefix + items.Count + WpfStrings.UnitDevicesSuffix : "";
             PeripheralBatteryCard.Visibility = Visibility.Visible;
         }
         catch
@@ -248,13 +248,13 @@ public partial class SettingsWindow : Window
     private void OverlayToggle_Click(object sender, RoutedEventArgs e)
     {
         _owner.ToggleOverlayFromSettings();
-        Status("悬浮窗状态已切换");
+        Status(WpfStrings.OverlayStateToggled);
     }
 
     private void OverlayReset_Click(object sender, RoutedEventArgs e)
     {
         ApplyOverlayValues(resetPosition: true);
-        Status("悬浮窗位置已重置");
+        Status(WpfStrings.OverlayPositionReset);
     }
 
     private void LoadState()
@@ -452,14 +452,14 @@ public partial class SettingsWindow : Window
             return;
         }
         ApplyAccent(Color.FromArgb(dialog.Color.A, dialog.Color.R, dialog.Color.G, dialog.Color.B), save: true);
-        Status("主题色已保存");
+        Status(WpfStrings.AccentSaved);
     }
 
     private void DefaultAccent_Click(object sender, RoutedEventArgs e)
     {
         AppConfig.Set("ui_accent_color", "");
         ApplyAccent(Color.FromRgb(59, 130, 246), save: false);
-        Status("主题色已恢复默认");
+        Status(WpfStrings.AccentReset);
     }
 
     private void ApplyAccent(Color color, bool save)
@@ -511,7 +511,7 @@ public partial class SettingsWindow : Window
         }
         else
         {
-            Status("语言已保存，重启后生效");
+            Status(WpfStrings.LanguageSaved);
         }
     }
 
@@ -522,7 +522,7 @@ public partial class SettingsWindow : Window
             return;
         }
         AppConfig.Set("log_level", item.Tag as string ?? "error");
-        Status("日志级别已保存");
+        Status(WpfStrings.LogLevelSaved);
     }
 
     private void Startup_Click(object sender, RoutedEventArgs e)
@@ -534,16 +534,16 @@ public partial class SettingsWindow : Window
             if (!ok)
             {
                 StartupCheck.IsChecked = !on;
-                Status("开机自启设置失败");
+                Status(WpfStrings.StartupSettingFailed);
                 return;
             }
             AppConfig.Set("startup_enabled", on ? 1 : 0);
-            Status(on ? "已启用开机自启" : "已关闭开机自启");
+            Status(on ? WpfStrings.StartupEnabled : WpfStrings.StartupDisabled);
         }
         catch (Exception ex)
         {
             StartupCheck.IsChecked = !on;
-            Status("开机自启异常：" + ex.Message);
+            Status(WpfStrings.StartupSettingExceptionPrefix + ex.Message);
         }
     }
 
@@ -552,7 +552,7 @@ public partial class SettingsWindow : Window
         AppConfig.Set("force_liquid_cooling_menu", WaterCoolingCheck.IsChecked == true ? 1 : 0);
         AppConfig.Flush();
         _owner.ApplyUiVisibilityFromConfig();
-        Status("水冷菜单设置已保存");
+        Status(WpfStrings.LiquidMenuSaved);
     }
 
     private void IgpuRow_Click(object sender, RoutedEventArgs e)
@@ -563,7 +563,7 @@ public partial class SettingsWindow : Window
             AppConfig.Set("igpu_only_ui", value);
             AppConfig.Flush();
             _owner.ApplyUiVisibilityFromConfig();
-            Status("核显模式显示：" + value);
+            Status(WpfStrings.IgpuModeDisplayPrefix + value);
         }
     }
 
@@ -575,7 +575,7 @@ public partial class SettingsWindow : Window
             AppConfig.Set("light_strip_ui", value);
             AppConfig.Flush();
             _owner.ApplyUiVisibilityFromConfig();
-            Status("灯带行显示：" + value);
+            Status(WpfStrings.LightStripRowPrefix + value);
         }
     }
 
@@ -587,7 +587,7 @@ public partial class SettingsWindow : Window
             AppConfig.Set("light_logo_ui", value);
             AppConfig.Flush();
             _owner.ApplyUiVisibilityFromConfig();
-            Status("Logo 灯行显示：" + value);
+            Status(WpfStrings.LogoRowPrefix + value);
         }
     }
 
@@ -673,7 +673,7 @@ public partial class SettingsWindow : Window
     {
         OpenFileDialog dialog = new()
         {
-            Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
+            Filter = WpfStrings.ImageFileFilter,
             CheckFileExists = true
         };
         if (dialog.ShowDialog() != true) return;
@@ -681,7 +681,7 @@ public partial class SettingsWindow : Window
         AppConfig.Flush();
         RefreshWideBackgroundPathText();
         _owner.RefreshWideBackground();
-        Status("已应用宽屏背景图：" + System.IO.Path.GetFileName(dialog.FileName));
+        Status(WpfStrings.WideBackgroundAppliedPrefix + System.IO.Path.GetFileName(dialog.FileName));
     }
 
     private void ClearWideBackground_Click(object sender, RoutedEventArgs e)
@@ -690,7 +690,7 @@ public partial class SettingsWindow : Window
         AppConfig.Flush();
         RefreshWideBackgroundPathText();
         _owner.RefreshWideBackground();
-        Status("已清除宽屏背景图");
+        Status(WpfStrings.WideBackgroundCleared);
     }
 
     private void WideBackgroundOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -707,7 +707,7 @@ public partial class SettingsWindow : Window
     {
         OpenFileDialog dialog = new OpenFileDialog
         {
-            Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.webp|所有文件|*.*",
+            Filter = WpfStrings.ImageFileFilter,
             CheckFileExists = true
         };
         if (dialog.ShowDialog() != true)
@@ -719,7 +719,7 @@ public partial class SettingsWindow : Window
         RefreshBackgroundPathText();
         _owner.ReloadBackgroundImage();
         _owner.SetBackgroundFromSettings(true);
-        Status("已应用背景图：" + System.IO.Path.GetFileName(dialog.FileName));
+        Status(WpfStrings.BackgroundAppliedPrefix + System.IO.Path.GetFileName(dialog.FileName));
     }
 
     private void ClearBackground_Click(object sender, RoutedEventArgs e)
@@ -729,7 +729,7 @@ public partial class SettingsWindow : Window
         RefreshBackgroundPathText();
         _owner.ReloadBackgroundImage();
         _owner.SetBackgroundFromSettings(false);
-        Status("已清除背景图");
+        Status(WpfStrings.BackgroundCleared);
     }
 
     private void RefreshOfficialConsole()
@@ -793,7 +793,7 @@ public partial class SettingsWindow : Window
         SaveFileDialog dialog = new SaveFileDialog
         {
             Title = WpfStrings.SettingsWindow_xaml_Title,
-            Filter = "Zip 压缩包 (*.zip)|*.zip",
+            Filter = WpfStrings.ZipFileFilter,
             DefaultExt = "zip",
             FileName = SettingsBackup.BuildFileName(DateTime.Now),
             InitialDirectory = SettingsBackup.ResolveDefaultDirectory()
@@ -805,11 +805,11 @@ public partial class SettingsWindow : Window
         try
         {
             SettingsBackupExportResult result = SettingsBackup.Export(dialog.FileName, DateTime.Now);
-            Status("已导出 " + result.Included.Count + " 个文件");
+            Status(WpfStrings.BackupExportedPrefix + result.Included.Count + WpfStrings.BackupExportedSuffix);
         }
         catch (Exception ex)
         {
-            Status("导出失败：" + ex.Message);
+            Status(WpfStrings.ExportFailedPrefix + ex.Message);
         }
     }
 
@@ -818,7 +818,7 @@ public partial class SettingsWindow : Window
         OpenFileDialog dialog = new OpenFileDialog
         {
             Title = WpfStrings.SettingsWindow_xaml_Title_2,
-            Filter = "Zip 压缩包 (*.zip)|*.zip",
+            Filter = WpfStrings.ZipFileFilter,
             InitialDirectory = SettingsBackup.ResolveDefaultDirectory()
         };
         if (dialog.ShowDialog() != true)
@@ -833,11 +833,11 @@ public partial class SettingsWindow : Window
         try
         {
             SettingsBackup.Import(dialog.FileName, DateTime.Now);
-            Status("设置已导入，重启 L-Mechrevo 生效");
+            Status(WpfStrings.SettingsImported);
         }
         catch (Exception ex)
         {
-            Status("导入失败：" + ex.Message);
+            Status(WpfStrings.ImportFailedPrefix + ex.Message);
         }
     }
 
@@ -886,16 +886,16 @@ public partial class SettingsWindow : Window
                 _syncing = true;
                 OverdriveCheck.IsChecked = _owner.LcdOverdrive;
                 _syncing = false;
-                Status("显示响应加速切换失败");
+                Status(WpfStrings.DisplayResponseToggleFailed);
             }
             else
             {
-                Status(requested ? "显示响应加速已开启" : "显示响应加速已关闭");
+                Status(requested ? WpfStrings.DisplayResponseOn : WpfStrings.DisplayResponseOff);
             }
         }
         catch (Exception ex)
         {
-            Status("显示响应加速异常：" + ex.Message);
+            Status(WpfStrings.DisplayResponseExceptionPrefix + ex.Message);
         }
         finally
         {
@@ -907,7 +907,7 @@ public partial class SettingsWindow : Window
     {
         if (L_Mechrevo.WpfP0.Services.UpdatePolicy.TemporarilyHidden)
         {
-            Status("当前版本已按原版策略关闭在线更新");
+            Status(WpfStrings.OnlineUpdateDisabled);
             return;
         }
         Button? updateButton = sender as Button;
@@ -920,19 +920,19 @@ public partial class SettingsWindow : Window
             MechrevoLite.Update.UpdateInfo? info = await MechrevoLite.Update.UpdateChecker.CheckAsync(force: true);
             if (info == null)
             {
-                Status("检查更新失败：没有返回结果");
+                Status(WpfStrings.UpdateCheckNoResult);
                 return;
             }
             if (!info.UpdateAvailable)
             {
-                Status("已是最新版本：" + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion);
+                Status(WpfStrings.UpdateLatestPrefix + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion);
                 return;
             }
             new UpdateWindow(info) { Owner = this }.ShowDialog();
         }
         catch (Exception ex)
         {
-            Status("检查更新失败：" + ex.Message);
+            Status(WpfStrings.UpdateCheckFailedPrefix + ex.Message);
         }
         finally
         {
@@ -956,8 +956,8 @@ public partial class SettingsWindow : Window
         }
         _owner.WideSetTraySensorEnabled(TraySensorTooltipCheck.IsChecked == true);
         Status(TraySensorTooltipCheck.IsChecked == true
-            ? "托盘图标显示传感器参数已开启"
-            : "托盘图标显示传感器参数已关闭；后台无悬浮窗时暂停传感器读取");
+            ? WpfStrings.TraySensorOn
+            : WpfStrings.TraySensorOff);
     }
 
     private void OpenFeedback_Click(object sender, RoutedEventArgs e)
@@ -968,7 +968,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Status("打开反馈失败：" + ex.Message);
+            Status(WpfStrings.FeedbackOpenFailedPrefix + ex.Message);
         }
     }
 
@@ -983,7 +983,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Status("打开链接失败：" + ex.Message);
+            Status(WpfStrings.LinkOpenFailedPrefix + ex.Message);
         }
     }
 
@@ -995,7 +995,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Status("打开许可证失败：" + ex.Message);
+            Status(WpfStrings.LicenseOpenFailedPrefix + ex.Message);
         }
     }
 

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -131,10 +132,10 @@ internal static class PerformanceModeLabel
 {
     internal static string Of(int mode) => mode switch
     {
-        2 => "静音",
-        1 => "狂暴",
-        0 => "平衡",
-        3 or 4 => "自定义",
+        2 => WpfStrings.OriginalStyleWindow_Text_23,
+        1 => WpfStrings.OriginalStyleWindow_Text_22,
+        0 => WpfStrings.CustomModeWindow_Content_13,
+        3 or 4 => WpfStrings.NavCustom_Content,
         _ => "—"
     };
 }

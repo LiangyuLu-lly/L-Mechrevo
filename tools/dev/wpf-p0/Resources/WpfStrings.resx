@@ -2214,4 +2214,607 @@
   <data name="QuickTilePickerMaxCurrentFormat" xml:space="preserve">
     <value>Up to {0} items (current {1})</value>
   </data>
+  <data name="StatusReadbackSuffix" xml:space="preserve">
+    <value> · readback=</value>
+  </data>
+  <data name="UnitMinutesSuffix" xml:space="preserve">
+    <value> min</value>
+  </data>
+  <data name="UnitDevicesSuffix" xml:space="preserve">
+    <value> devices</value>
+  </data>
+  <data name="UnitSecondsSuffix" xml:space="preserve">
+    <value> s</value>
+  </data>
+  <data name="ChargeStartSeparator" xml:space="preserve">
+    <value>% / start </value>
+  </data>
+  <data name="ModeSeparatorSuffix" xml:space="preserve">
+    <value> (mode </value>
+  </data>
+  <data name="UpdateAvailableSuffix" xml:space="preserve">
+    <value>, check for updates in Settings</value>
+  </data>
+  <data name="ContinuePromptSuffix" xml:space="preserve">
+    <value>
+
+Continue?</value>
+  </data>
+  <data name="ChargeEcAuto" xml:space="preserve">
+    <value>EC direct write restored to automatic</value>
+  </data>
+  <data name="LightLogoFailed" xml:space="preserve">
+    <value>Failed to apply Logo lighting</value>
+  </data>
+  <data name="LightLogoSentPrefix" xml:space="preserve">
+    <value>Logo lighting applied: </value>
+  </data>
+  <data name="LightLogoOff" xml:space="preserve">
+    <value>Logo lighting off</value>
+  </data>
+  <data name="LightChannelLogo" xml:space="preserve">
+    <value>Logo lighting</value>
+  </data>
+  <data name="LightBdKeyboardAutoOffPrefix" xml:space="preserve">
+    <value>Baolongda keyboard auto-off: </value>
+  </data>
+  <data name="LightBdKeyboardAutoOffOff" xml:space="preserve">
+    <value>Baolongda keyboard auto-off: off</value>
+  </data>
+  <data name="ChargeUnsupported" xml:space="preserve">
+    <value>Charge threshold is not supported on this device</value>
+  </data>
+  <data name="LightChannelLightbar" xml:space="preserve">
+    <value>Lightbar lighting</value>
+  </data>
+  <data name="LightLightbarFailed" xml:space="preserve">
+    <value>Failed to apply lightbar effect</value>
+  </data>
+  <data name="LightLightbarSentPrefix" xml:space="preserve">
+    <value>Lightbar effect applied: </value>
+  </data>
+  <data name="LightPowerFailed" xml:space="preserve">
+    <value>Failed to switch light power</value>
+  </data>
+  <data name="LightPowerExceptionPrefix" xml:space="preserve">
+    <value>Light power error: </value>
+  </data>
+  <data name="LightLiquidFailed" xml:space="preserve">
+    <value>Failed to apply lighting</value>
+  </data>
+  <data name="LightPowerOff" xml:space="preserve">
+    <value>Lighting off</value>
+  </data>
+  <data name="LightPowerOn" xml:space="preserve">
+    <value>Lighting on</value>
+  </data>
+  <data name="LightLiquidSent" xml:space="preserve">
+    <value>Lighting applied</value>
+  </data>
+  <data name="LightAutoOffPrefix" xml:space="preserve">
+    <value>Lighting auto-off: </value>
+  </data>
+  <data name="LightAutoOffOff" xml:space="preserve">
+    <value>Lighting auto-off: off</value>
+  </data>
+  <data name="BatteryModeFailed" xml:space="preserve">
+    <value>Failed to apply battery mode</value>
+  </data>
+  <data name="BatteryModeSent" xml:space="preserve">
+    <value>Battery mode applied</value>
+  </data>
+  <data name="UpdateAvailablePrefix" xml:space="preserve">
+    <value>New version available: </value>
+  </data>
+  <data name="PeripheralCountPrefix" xml:space="preserve">
+    <value>Total </value>
+  </data>
+  <data name="ChargeDisableExceptionPrefix" xml:space="preserve">
+    <value>Disable error: </value>
+  </data>
+  <data name="DisplayOverdriveFailed" xml:space="preserve">
+    <value>Failed to apply overdrive</value>
+  </data>
+  <data name="DisplayOverdriveExceptionPrefix" xml:space="preserve">
+    <value>Overdrive error: </value>
+  </data>
+  <data name="DisplayOverdriveOff" xml:space="preserve">
+    <value>Overdrive off</value>
+  </data>
+  <data name="DisplayOverdriveOn" xml:space="preserve">
+    <value>Overdrive on</value>
+  </data>
+  <data name="IgpuOccupiedPrefix" xml:space="preserve">
+    <value>The following programs are using the discrete GPU:
+
+</value>
+  </data>
+  <data name="LightKeyboardPowerFailed" xml:space="preserve">
+    <value>Failed to switch keyboard light power</value>
+  </data>
+  <data name="LightKeyboardPowerExceptionPrefix" xml:space="preserve">
+    <value>Keyboard light power error: </value>
+  </data>
+  <data name="LightKeyboardFailed" xml:space="preserve">
+    <value>Failed to apply keyboard lighting</value>
+  </data>
+  <data name="LightKeyboardSentPrefix" xml:space="preserve">
+    <value>Keyboard lighting applied: </value>
+  </data>
+  <data name="LightKeyboardOff" xml:space="preserve">
+    <value>Keyboard lighting off</value>
+  </data>
+  <data name="LightKeyboardOn" xml:space="preserve">
+    <value>Keyboard lighting on</value>
+  </data>
+  <data name="IgpuKillListPrefix" xml:space="preserve">
+    <value>Will attempt to end the following programs:
+
+</value>
+  </data>
+  <data name="LightChannelHinge" xml:space="preserve">
+    <value>Hinge lighting</value>
+  </data>
+  <data name="LightHingeFailed" xml:space="preserve">
+    <value>Failed to apply hinge effect</value>
+  </data>
+  <data name="LightHingeSent" xml:space="preserve">
+    <value>Hinge effect applied</value>
+  </data>
+  <data name="IgpuKillFailedPrefix" xml:space="preserve">
+    <value>Failed to end process: </value>
+  </data>
+  <data name="QuickFailedPrefix" xml:space="preserve">
+    <value>Failed to switch: </value>
+  </data>
+  <data name="QuickSentPrefix" xml:space="preserve">
+    <value>Switched: </value>
+  </data>
+  <data name="LiquidBleDisconnected" xml:space="preserve">
+    <value>Bluetooth liquid cooling disconnected</value>
+  </data>
+  <data name="LightOffOnBatteryOff" xml:space="preserve">
+    <value>Turn off lighting on battery: off</value>
+  </data>
+  <data name="LightOffOnBatteryOn" xml:space="preserve">
+    <value>Turn off lighting on battery: on</value>
+  </data>
+  <data name="DisplayBrightnessExceptionPrefix" xml:space="preserve">
+    <value>Brightness error: </value>
+  </data>
+  <data name="DisplayBrightnessUnconfirmed" xml:space="preserve">
+    <value>Brightness write not confirmed</value>
+  </data>
+  <data name="DisplayBrightnessSet" xml:space="preserve">
+    <value>Brightness set</value>
+  </data>
+  <data name="IgpuNoSafeProcesses" xml:space="preserve">
+    <value>No discrete-GPU programs can be ended safely; canceled.</value>
+  </data>
+  <data name="PerfModeSuperseded" xml:space="preserve">
+    <value>Mode request was superseded by a newer request</value>
+  </data>
+  <data name="PerfModeFailed" xml:space="preserve">
+    <value>Failed to apply mode</value>
+  </data>
+  <data name="PerfModeExceptionPrefix" xml:space="preserve">
+    <value>Mode error: </value>
+  </data>
+  <data name="DisplayCalibrationModeFailed" xml:space="preserve">
+    <value>Failed to apply calibration profile</value>
+  </data>
+  <data name="DisplayCalibrationFailed" xml:space="preserve">
+    <value>Failed to apply calibration</value>
+  </data>
+  <data name="DisplayCalibrationOff" xml:space="preserve">
+    <value>Calibration off</value>
+  </data>
+  <data name="DisplayCalibrationOn" xml:space="preserve">
+    <value>Calibration on</value>
+  </data>
+  <data name="DisplayCalibrationExceptionPrefix" xml:space="preserve">
+    <value>Calibration error: </value>
+  </data>
+  <data name="ChargeEnableExceptionPrefix" xml:space="preserve">
+    <value>Enable error: </value>
+  </data>
+  <data name="ChargeRangeInvalid" xml:space="preserve">
+    <value>Start/stop thresholds must be 1-99</value>
+  </data>
+  <data name="ChargeOrderInvalid" xml:space="preserve">
+    <value>Start threshold must be lower than stop threshold</value>
+  </data>
+  <data name="FanBoostFailed" xml:space="preserve">
+    <value>Failed to apply fan boost</value>
+  </data>
+  <data name="FanBoostOff" xml:space="preserve">
+    <value>Fan boost off</value>
+  </data>
+  <data name="FanBoostOn" xml:space="preserve">
+    <value>Fan boost on</value>
+  </data>
+  <data name="FanBoostExceptionPrefix" xml:space="preserve">
+    <value>Fan boost error: </value>
+  </data>
+  <data name="SwitchFailedPrefix" xml:space="preserve">
+    <value>Switch failed: </value>
+  </data>
+  <data name="PerfCustomSwitchFailed" xml:space="preserve">
+    <value>Failed to switch custom mode</value>
+  </data>
+  <data name="PerfCustomSwitchFailedPrefix" xml:space="preserve">
+    <value>Failed to switch custom mode: </value>
+  </data>
+  <data name="IgpuForceConfirm" xml:space="preserve">
+    <value>Continue with forced switch?
+
+If the screen stays black, you will have to force shutdown and restart.</value>
+  </data>
+  <data name="DisplayColorProfileEmpty" xml:space="preserve">
+    <value>Color enhancement profile is empty</value>
+  </data>
+  <data name="DisplayColorProfileSwitched" xml:space="preserve">
+    <value>Color enhancement profile switched</value>
+  </data>
+  <data name="DisplayColorProfileExceptionPrefix" xml:space="preserve">
+    <value>Color enhancement profile error: </value>
+  </data>
+  <data name="DisplayColorEnhancementOff" xml:space="preserve">
+    <value>Color enhancement off</value>
+  </data>
+  <data name="DisplayColorEnhancementOn" xml:space="preserve">
+    <value>Color enhancement on</value>
+  </data>
+  <data name="DisplayColorEnhancementExceptionPrefix" xml:space="preserve">
+    <value>Color enhancement error: </value>
+  </data>
+  <data name="DisplayRefreshFailed" xml:space="preserve">
+    <value>Failed to apply refresh rate</value>
+  </data>
+  <data name="DisplayRefreshFailedPrefix" xml:space="preserve">
+    <value>Failed to apply refresh rate: </value>
+  </data>
+  <data name="DisplayRefreshExceptionPrefix" xml:space="preserve">
+    <value>Refresh rate error: </value>
+  </data>
+  <data name="DisplayRefreshSent" xml:space="preserve">
+    <value>Refresh rate applied</value>
+  </data>
+  <data name="DisplayRefreshSentPrefix" xml:space="preserve">
+    <value>Refresh rate applied: </value>
+  </data>
+  <data name="LiquidPumpFailed" xml:space="preserve">
+    <value>Failed to apply pump level</value>
+  </data>
+  <data name="LiquidPumpSent" xml:space="preserve">
+    <value>Pump level applied</value>
+  </data>
+  <data name="LiquidFanFailed" xml:space="preserve">
+    <value>Failed to apply liquid-cooling fan level</value>
+  </data>
+  <data name="LiquidFanSent" xml:space="preserve">
+    <value>Liquid-cooling fan level applied</value>
+  </data>
+  <data name="LightChannelSync" xml:space="preserve">
+    <value>Sync lighting</value>
+  </data>
+  <data name="LightSyncFailed" xml:space="preserve">
+    <value>Failed to apply sync effect</value>
+  </data>
+  <data name="LightSyncSent" xml:space="preserve">
+    <value>Sync effect applied</value>
+  </data>
+  <data name="IsEmptySuffix" xml:space="preserve">
+    <value> is empty</value>
+  </data>
+  <data name="IgpuListReadFailed" xml:space="preserve">
+    <value>Could not read the list of programs using the discrete GPU; forced switch canceled.</value>
+  </data>
+  <data name="ApplyFailedSuffix" xml:space="preserve">
+    <value>failed to apply</value>
+  </data>
+  <data name="GpuOverclockPrefix" xml:space="preserve">
+    <value>GPU overclock: </value>
+  </data>
+  <data name="GpuOverclockOffPending" xml:space="preserve">
+    <value>GPU overclock: off (applying...)</value>
+  </data>
+  <data name="GpuOverclockOnPending" xml:space="preserve">
+    <value>GPU overclock: on (applying...)</value>
+  </data>
+  <data name="GpuOverclockFailed" xml:space="preserve">
+    <value>Failed to apply GPU overclock (switch keeps its button state)</value>
+  </data>
+  <data name="GpuModeFailed" xml:space="preserve">
+    <value>Failed to apply GPU mode</value>
+  </data>
+  <data name="GpuModeExceptionPrefix" xml:space="preserve">
+    <value>GPU mode error: </value>
+  </data>
+  <data name="GpuModeSent" xml:space="preserve">
+    <value>GPU mode applied</value>
+  </data>
+  <data name="GpuModeSentRestart" xml:space="preserve">
+    <value>GPU mode applied; takes effect after restart</value>
+  </data>
+  <data name="OverlayOpened" xml:space="preserve">
+    <value>Overlay opened</value>
+  </data>
+  <data name="OverlayClosed" xml:space="preserve">
+    <value>Overlay closed</value>
+  </data>
+  <data name="LiquidColorFailed" xml:space="preserve">
+    <value>Failed to apply color</value>
+  </data>
+  <data name="LiquidColorSent" xml:space="preserve">
+    <value>Color applied</value>
+  </data>
+  <data name="SavedPrefix" xml:space="preserve">
+    <value>Saved: </value>
+  </data>
+  <data name="ChargeEcDirectOff" xml:space="preserve">
+    <value>EC direct charge limit disabled</value>
+  </data>
+  <data name="LightOffOnBatteryOffShort" xml:space="preserve">
+    <value>Turn off lighting on battery disabled</value>
+  </data>
+  <data name="ChargeSliderOff" xml:space="preserve">
+    <value>Unlimited charge slider disabled</value>
+  </data>
+  <data name="LightOffOnBatteryOnLong" xml:space="preserve">
+    <value>Turn off lighting on battery enabled (applied on next lighting reconcile)</value>
+  </data>
+  <data name="ChargeSliderOn" xml:space="preserve">
+    <value>Unlimited charge slider enabled</value>
+  </data>
+  <data name="GpuTargetModeRestart" xml:space="preserve">
+    <value>Switched to target mode; takes effect after restart</value>
+  </data>
+  <data name="SwitchedPrefix" xml:space="preserve">
+    <value>Switched: </value>
+  </data>
+  <data name="GpuSwitchUnconfirmed" xml:space="preserve">
+    <value>Switch requested; read-back not confirmed; will confirm after restart</value>
+  </data>
+  <data name="SentSuffix" xml:space="preserve">
+    <value>applied</value>
+  </data>
+  <data name="ExceptionPrefix" xml:space="preserve">
+    <value>error: </value>
+  </data>
+  <data name="GpuRestartExceptionPrefix" xml:space="preserve">
+    <value>Restart switch error: </value>
+  </data>
+  <data name="DisplayIccMissing" xml:space="preserve">
+    <value>Custom ICC file is missing or failed to apply</value>
+  </data>
+  <data name="LightAutoOffWriteExceptionPrefix" xml:space="preserve">
+    <value>Auto-off write error: </value>
+  </data>
+  <data name="LightAutoOffSaved" xml:space="preserve">
+    <value>Auto-off saved</value>
+  </data>
+  <data name="LightAutoOffWritten" xml:space="preserve">
+    <value>Auto-off written to keyboard settings</value>
+  </data>
+  <data name="DisplayAutoRefreshFailed" xml:space="preserve">
+    <value>Failed to apply auto refresh rate</value>
+  </data>
+  <data name="DisplayAutoRefreshExceptionPrefix" xml:space="preserve">
+    <value>Auto refresh rate error: </value>
+  </data>
+  <data name="DisplayAutoRefreshSent" xml:space="preserve">
+    <value>Auto refresh rate applied</value>
+  </data>
+  <data name="OverlayBarrelWattsFormat" xml:space="preserve">
+    <value>AC power (barrel {0} W)</value>
+  </data>
+  <data name="OverlayBarrelPower" xml:space="preserve">
+    <value>AC power (barrel)</value>
+  </data>
+  <data name="OverlayUsbCPower" xml:space="preserve">
+    <value>AC power (USB-C)</value>
+  </data>
+  <data name="OverlayExternalPower" xml:space="preserve">
+    <value>AC power (external)</value>
+  </data>
+  <data name="SettingsLoadExceptionPrefix" xml:space="preserve">
+    <value>Settings load error: </value>
+  </data>
+  <data name="OverlayStateToggled" xml:space="preserve">
+    <value>Overlay state toggled</value>
+  </data>
+  <data name="OverlayPositionReset" xml:space="preserve">
+    <value>Overlay position reset</value>
+  </data>
+  <data name="AccentSaved" xml:space="preserve">
+    <value>Accent color saved</value>
+  </data>
+  <data name="AccentReset" xml:space="preserve">
+    <value>Accent color restored to default</value>
+  </data>
+  <data name="LanguageSaved" xml:space="preserve">
+    <value>Language saved; takes effect after restart</value>
+  </data>
+  <data name="LogLevelSaved" xml:space="preserve">
+    <value>Log level saved</value>
+  </data>
+  <data name="StartupSettingFailed" xml:space="preserve">
+    <value>Failed to update startup setting</value>
+  </data>
+  <data name="StartupSettingExceptionPrefix" xml:space="preserve">
+    <value>Startup setting error: </value>
+  </data>
+  <data name="LiquidMenuSaved" xml:space="preserve">
+    <value>Liquid cooling menu setting saved</value>
+  </data>
+  <data name="IgpuModeDisplayPrefix" xml:space="preserve">
+    <value>iGPU mode display: </value>
+  </data>
+  <data name="LightStripRowPrefix" xml:space="preserve">
+    <value>Lightbar row: </value>
+  </data>
+  <data name="LogoRowPrefix" xml:space="preserve">
+    <value>Logo row: </value>
+  </data>
+  <data name="WideBackgroundAppliedPrefix" xml:space="preserve">
+    <value>Wide background applied: </value>
+  </data>
+  <data name="WideBackgroundCleared" xml:space="preserve">
+    <value>Wide background cleared</value>
+  </data>
+  <data name="BackgroundAppliedPrefix" xml:space="preserve">
+    <value>Background applied: </value>
+  </data>
+  <data name="BackgroundCleared" xml:space="preserve">
+    <value>Background cleared</value>
+  </data>
+  <data name="BackupExportedPrefix" xml:space="preserve">
+    <value>Exported </value>
+  </data>
+  <data name="BackupExportedSuffix" xml:space="preserve">
+    <value> files</value>
+  </data>
+  <data name="ExportFailedPrefix" xml:space="preserve">
+    <value>Export failed: </value>
+  </data>
+  <data name="SettingsImported" xml:space="preserve">
+    <value>Settings imported; restart L-Mechrevo to apply</value>
+  </data>
+  <data name="ImportFailedPrefix" xml:space="preserve">
+    <value>Import failed: </value>
+  </data>
+  <data name="DisplayResponseToggleFailed" xml:space="preserve">
+    <value>Failed to toggle display response acceleration</value>
+  </data>
+  <data name="DisplayResponseExceptionPrefix" xml:space="preserve">
+    <value>Display response acceleration error: </value>
+  </data>
+  <data name="OnlineUpdateDisabled" xml:space="preserve">
+    <value>Online update is disabled in this build by the original policy</value>
+  </data>
+  <data name="UpdateCheckNoResult" xml:space="preserve">
+    <value>Update check failed: no result returned</value>
+  </data>
+  <data name="UpdateLatestPrefix" xml:space="preserve">
+    <value>Already up to date: </value>
+  </data>
+  <data name="UpdateCheckFailedPrefix" xml:space="preserve">
+    <value>Update check failed: </value>
+  </data>
+  <data name="FeedbackOpenFailedPrefix" xml:space="preserve">
+    <value>Failed to open feedback: </value>
+  </data>
+  <data name="LinkOpenFailedPrefix" xml:space="preserve">
+    <value>Failed to open link: </value>
+  </data>
+  <data name="LicenseOpenFailedPrefix" xml:space="preserve">
+    <value>Failed to open licenses: </value>
+  </data>
+  <data name="PlaceholderDisplayDash" xml:space="preserve">
+    <value>Display —</value>
+  </data>
+  <data name="ModeNamePrefix" xml:space="preserve">
+    <value>Mode </value>
+  </data>
+  <data name="PowerSourceChangedReason" xml:space="preserve">
+    <value>Power source changed</value>
+  </data>
+  <data name="BatteryInfoDash" xml:space="preserve">
+    <value>Battery —</value>
+  </data>
+  <data name="LightTitleLogo" xml:space="preserve">
+    <value>Logo lighting</value>
+  </data>
+  <data name="LightTitleLightbar" xml:space="preserve">
+    <value>Lightbar lighting</value>
+  </data>
+  <data name="LightTitleHinge" xml:space="preserve">
+    <value>Hinge lighting</value>
+  </data>
+  <data name="LightTitleSync" xml:space="preserve">
+    <value>Sync lighting</value>
+  </data>
+  <data name="SwitchingEllipsis" xml:space="preserve">
+    <value>Switching…</value>
+  </data>
+  <data name="ChargeAppliedPrefix" xml:space="preserve">
+    <value>Charge limit applied (stop at </value>
+  </data>
+  <data name="ChargeNotEnabled" xml:space="preserve">
+    <value>Charge limit not enabled</value>
+  </data>
+  <data name="ChargeStartRangeError" xml:space="preserve">
+    <value>Start threshold must be 1-99</value>
+  </data>
+  <data name="ChargeStopRangeError" xml:space="preserve">
+    <value>Stop threshold must be 2-100</value>
+  </data>
+  <data name="IgpuBlockOnlyDgpu" xml:space="preserve">
+    <value>Only the discrete GPU is driving the display. Forced switch may cause a black screen; canceled.</value>
+  </data>
+  <data name="IgpuBlockSnapshotUnavailable" xml:space="preserve">
+    <value>Could not confirm discrete-GPU usage; canceled.</value>
+  </data>
+  <data name="IgpuBlockRouteUnavailable" xml:space="preserve">
+    <value>Could not read the current display route; canceled.</value>
+  </data>
+  <data name="IgpuBlockSafetyFailed" xml:space="preserve">
+    <value>iGPU saving safety check failed; canceled.</value>
+  </data>
+  <data name="IgpuWarningDgpuOnlyPrefix" xml:space="preserve">
+    <value>Warning: only the discrete GPU appears to be driving the display.
+A forced switch may cause a black screen and require a restart.
+
+</value>
+  </data>
+  <data name="IgpuWarningOccupiedPrefix" xml:space="preserve">
+    <value>The following programs are using the discrete GPU; they must be ended before switching to iGPU saving:
+
+</value>
+  </data>
+  <data name="IgpuConfirmContinueSuffix" xml:space="preserve">
+    <value>
+
+Switching to iGPU saving may require ending these programs. Continue?</value>
+  </data>
+  <data name="DisplayPowerEcHexFormat" xml:space="preserve">
+    <value>AC power (EC 0x{0})</value>
+  </data>
+  <data name="DisplayPowerEcWattFormat" xml:space="preserve">
+    <value>AC power (EC {0} W)</value>
+  </data>
+  <data name="UpdateTimeoutStatus" xml:space="preserve">
+    <value>Not completed within 15 s; the app will retry automatically. Click the status above to check again.</value>
+  </data>
+  <data name="ImageFileFilter" xml:space="preserve">
+    <value>Images|*.png;*.jpg;*.jpeg;*.bmp;*.webp|All files|*.*</value>
+  </data>
+  <data name="ZipFileFilter" xml:space="preserve">
+    <value>Zip archive (*.zip)|*.zip</value>
+  </data>
+  <data name="StartupEnabled" xml:space="preserve">
+    <value>Startup enabled</value>
+  </data>
+  <data name="StartupDisabled" xml:space="preserve">
+    <value>Startup disabled</value>
+  </data>
+  <data name="DisplayResponseOn" xml:space="preserve">
+    <value>Display response acceleration on</value>
+  </data>
+  <data name="DisplayResponseOff" xml:space="preserve">
+    <value>Display response acceleration off</value>
+  </data>
+  <data name="TraySensorOn" xml:space="preserve">
+    <value>Tray icon shows sensor readings</value>
+  </data>
+  <data name="TraySensorOff" xml:space="preserve">
+    <value>Tray icon sensor readings disabled; sensor polling pauses when no overlay is open</value>
+  </data>
+  <data name="LightSingleWhiteBacklight" xml:space="preserve">
+    <value>White backlight</value>
+  </data>
+  <data name="ClosingParen" xml:space="preserve">
+    <value>)</value>
+  </data>
 </root>

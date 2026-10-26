@@ -4,6 +4,7 @@ using MechrevoLite;
 using MechrevoLite.Hardware;
 using L_Mechrevo.WpfP0.Services;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>⭐ 灯光通道 topic 常量（与生产代码 <c>MqttTopics</c> 同源；铰链/同步目前只有字面量）。</summary>
@@ -208,11 +209,11 @@ internal sealed class LightingService : ILightingService
             {
                 MechrevoHw.SetKeyboardAutoOffSeconds(normalized);
                 _backend.Hw?.ApplyKeyboardAutoOffSetting();
-                return ServiceResult.Success("自动关灯已写入键盘设置");
+                return ServiceResult.Success(WpfStrings.LightAutoOffWritten);
             }
             catch (Exception ex)
             {
-                return ServiceResult.Fail("自动关灯写入异常：" + ex.GetType().Name);
+                return ServiceResult.Fail(WpfStrings.LightAutoOffWriteExceptionPrefix + ex.GetType().Name);
             }
         }
         AppConfig.Set(IdleSecondsKey, normalized);
@@ -229,7 +230,7 @@ internal sealed class LightingService : ILightingService
         catch
         {
         }
-        return ServiceResult.Success("自动关灯已保存");
+        return ServiceResult.Success(WpfStrings.LightAutoOffSaved);
     }
 
     public bool LightOffOnBattery => AppConfig.Is(OffOnBatteryKey);
@@ -238,7 +239,7 @@ internal sealed class LightingService : ILightingService
     {
         AppConfig.Set(OffOnBatteryKey, on ? 1 : 0);
         AppConfig.Flush();
-        return ServiceResult.Success(on ? "已开启离电关灯（生效由灯效核对触发）" : "已关闭离电关灯");
+        return ServiceResult.Success(on ? WpfStrings.LightOffOnBatteryOnLong : WpfStrings.LightOffOnBatteryOffShort);
     }
 
     public IReadOnlyList<(string Id, string Label)> VisibleKeyboardEffects
@@ -262,35 +263,35 @@ internal sealed class LightingService : ILightingService
     }
 
     public Task<ServiceResult> SetKeyboardEffectAsync(string effectId) => RunProbeAsync(
-        static (probe, effect) => probe.SetKeyboardEffectAsync(effect), effectId, "键盘灯效");
+        static (probe, effect) => probe.SetKeyboardEffectAsync(effect), effectId, WpfStrings.HidKeyboardWindow_Text_9);
 
     public Task<ServiceResult> SetLightbarEffectAsync(string effectId) => RunProbeAsync(
-        static (probe, effect) => probe.SetLightbarEffectAsync(effect), effectId, "灯带灯效");
+        static (probe, effect) => probe.SetLightbarEffectAsync(effect), effectId, WpfStrings.LightChannelLightbar);
 
     public Task<ServiceResult> SetLogoEffectAsync(string effectId) => RunProbeAsync(
-        static (probe, effect) => probe.SetLogoEffectAsync(effect), effectId, "Logo灯效");
+        static (probe, effect) => probe.SetLogoEffectAsync(effect), effectId, WpfStrings.LightChannelLogo);
 
     public Task<ServiceResult> SetHingeEffectAsync(string effectId) => RunProbeAsync(
-        static (probe, effect) => probe.SetHingeEffectAsync(effect), effectId, "铰链灯效");
+        static (probe, effect) => probe.SetHingeEffectAsync(effect), effectId, WpfStrings.LightChannelHinge);
 
     public Task<ServiceResult> SetSyncEffectAsync(string effectId) => RunProbeAsync(
-        static (probe, effect) => probe.SetSyncEffectAsync(effect), effectId, "同步灯效");
+        static (probe, effect) => probe.SetSyncEffectAsync(effect), effectId, WpfStrings.LightChannelSync);
 
     public async Task<ServiceResult> SetKeyboardPowerAsync(bool on)
     {
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             bool ok = await probe.SetKeyboardPowerAsync(on).ConfigureAwait(false);
-            return ok ? ServiceResult.Success(on ? "键盘灯已开启" : "键盘灯已关闭") : ServiceResult.Fail("键盘灯电源下发失败");
+            return ok ? ServiceResult.Success(on ? WpfStrings.LightKeyboardOn : WpfStrings.LightKeyboardOff) : ServiceResult.Fail(WpfStrings.LightKeyboardPowerFailed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("键盘灯电源异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.LightKeyboardPowerExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -299,16 +300,16 @@ internal sealed class LightingService : ILightingService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             bool ok = await probe.SetLightPowerAsync(topic, on).ConfigureAwait(false);
-            return ok ? ServiceResult.Success(on ? "灯光已开启" : "灯光已关闭") : ServiceResult.Fail("灯光电源下发失败");
+            return ok ? ServiceResult.Success(on ? WpfStrings.LightPowerOn : WpfStrings.LightPowerOff) : ServiceResult.Fail(WpfStrings.LightPowerFailed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("灯光电源异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.LightPowerExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -320,20 +321,20 @@ internal sealed class LightingService : ILightingService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         if (string.IsNullOrWhiteSpace(effectId))
         {
-            return ServiceResult.Fail(displayName + "为空");
+            return ServiceResult.Fail(displayName + WpfStrings.IsEmptySuffix);
         }
         try
         {
             bool ok = await apply(probe, effectId).ConfigureAwait(false);
-            return ok ? ServiceResult.Success(displayName + "已下发") : ServiceResult.Fail(displayName + "下发失败");
+            return ok ? ServiceResult.Success(displayName + WpfStrings.SentSuffix) : ServiceResult.Fail(displayName + WpfStrings.ApplyFailedSuffix);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail(displayName + "异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(displayName + WpfStrings.ExceptionPrefix + ex.GetType().Name);
         }
     }
 }

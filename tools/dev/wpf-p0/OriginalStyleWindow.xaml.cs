@@ -127,19 +127,19 @@ public partial class OriginalStyleWindow : Window
     private static readonly string[] DefaultQuickTileKeys = { "fanboost", "webcam", "micmute", "winkey", "monitoroff" };
     private static readonly (string Key, string Label, string Glyph)[] QuickTileCatalog =
     {
-        ("touchpad", "触摸板", "\uE7C9"), ("touchpadtoggle", "触摸板切换键", "\uE7C9"),
-        ("wifi", "WiFi", "\uE701"), ("bt", "蓝牙", "\uE702"),
-        ("webcam", "摄像头", "\uE722"), ("micmute", "麦克风", "\uE720"),
-        ("numpad", "小键盘锁", "\uE765"), ("winkey", "Win键锁", "\uE765"),
-        ("fnkey", "Fn键锁", "\uE765"), ("capslock", "大小写锁定", "\uE8AB"),
-        ("osd", "OSD提示", "\uE7F4"), ("copilot", "Copilot键锁", "\uE8B7"),
-        ("usb", "关机USB供电", "\uE88E"), ("acrecovery", "来电自启", "\uE7E8"),
-        ("highperf", "高性能电源", "\uE945"), ("apuboost", "APU 防缩缸", "\uE9D9"),
-        ("fanboost", "强冷", "\uE9CA"), ("deepsleep", "深度睡眠", "\uE708"),
-        ("gamewhitelist", "游戏白名单", "\uE7FC"), ("cpuadvperf", "解锁BIOS菜单", "\uE7EF"),
-        ("taskbarautohide", "任务栏自动隐藏", "\uE7F4"), ("transparency", "系统透明效果", "\uE790"),
-        ("darktheme", "系统深色主题", "\uE793"), ("monitoroff", "息屏", "\uE7F4"),
-        ("winupdate", "禁用Win更新", "\uE895")
+        ("touchpad", QuickSwitchService.Label("touchpad", "触摸板"), "\uE7C9"), ("touchpadtoggle", QuickSwitchService.Label("touchpadtoggle", "触摸板切换键"), "\uE7C9"),
+        ("wifi", "WiFi", "\uE701"), ("bt", QuickSwitchService.Label("bt", "蓝牙"), "\uE702"),
+        ("webcam", QuickSwitchService.Label("webcam", "摄像头"), "\uE722"), ("micmute", QuickSwitchService.Label("micmute", "麦克风"), "\uE720"),
+        ("numpad", QuickSwitchService.Label("numpad", "小键盘锁"), "\uE765"), ("winkey", QuickSwitchService.Label("winkey", "Win键锁"), "\uE765"),
+        ("fnkey", QuickSwitchService.Label("fnkey", "Fn键锁"), "\uE765"), ("capslock", QuickSwitchService.Label("capslock", "大小写锁定"), "\uE8AB"),
+        ("osd", QuickSwitchService.Label("osd", "OSD提示"), "\uE7F4"), ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"), "\uE8B7"),
+        ("usb", QuickSwitchService.Label("usb", "关机USB供电"), "\uE88E"), ("acrecovery", QuickSwitchService.Label("acrecovery", "来电自启"), "\uE7E8"),
+        ("highperf", QuickSwitchService.Label("highperf", "高性能电源"), "\uE945"), ("apuboost", QuickSwitchService.Label("apuboost", "APU 防缩缸"), "\uE9D9"),
+        ("fanboost", QuickSwitchService.Label("fanboost", "强冷"), "\uE9CA"), ("deepsleep", QuickSwitchService.Label("deepsleep", "深度睡眠"), "\uE708"),
+        ("gamewhitelist", QuickSwitchService.Label("gamewhitelist", "游戏白名单"), "\uE7FC"), ("cpuadvperf", QuickSwitchService.Label("cpuadvperf", "解锁BIOS菜单"), "\uE7EF"),
+        ("taskbarautohide", QuickSwitchService.Label("taskbarautohide", "任务栏自动隐藏"), "\uE7F4"), ("transparency", QuickSwitchService.Label("transparency", "系统透明效果"), "\uE790"),
+        ("darktheme", QuickSwitchService.Label("darktheme", "系统深色主题"), "\uE793"), ("monitoroff", QuickSwitchService.Label("monitoroff", "息屏"), "\uE7F4"),
+        ("winupdate", QuickSwitchService.Label("winupdate", "禁用Win更新"), "\uE895")
     };
 
     public OriginalStyleWindow()
@@ -407,7 +407,7 @@ public partial class OriginalStyleWindow : Window
         bool ok = _services != null
             ? (await _services.Display.SetRefreshRateAsync(hertz)).Ok
             : await _backendProbe.SwitchRefreshRateAsync(hertz);
-        StatusText.Text = ok ? "刷新率已下发：" + hertz + " Hz" : "刷新率下发失败：" + hertz + " Hz";
+        StatusText.Text = ok ? WpfStrings.DisplayRefreshSentPrefix + hertz + " Hz" : WpfStrings.DisplayRefreshFailedPrefix + hertz + " Hz";
         SyncRefreshRateState();
     }
 
@@ -429,7 +429,7 @@ public partial class OriginalStyleWindow : Window
             if (firmware.Length == 0)
             {
                 // 白色背光键盘没有固件灯效，仍保留电源/亮度入口。
-                return new[] { ("Single", "白色背光") };
+                return new[] { ("Single", WpfStrings.LightSingleWhiteBacklight) };
             }
             return firmware;
         }
@@ -897,30 +897,30 @@ public partial class OriginalStyleWindow : Window
         }
         (string Title, (string Key, string Label)[] Items)[] groups =
         {
-            ("输入设备", new (string, string)[]
+            (WpfStrings.QuickGroupInput, new (string, string)[]
             {
-                ("touchpad", "触摸板"), ("wifi", "WiFi"), ("bt", "蓝牙"), ("webcam", "摄像头"),
-                ("micmute", "麦克风静音"), ("numpad", "小键盘锁"), ("touchpadtoggle", "触摸板切换键")
+                ("touchpad", QuickSwitchService.Label("touchpad", "触摸板")), ("wifi", "WiFi"), ("bt", QuickSwitchService.Label("bt", "蓝牙")), ("webcam", QuickSwitchService.Label("webcam", "摄像头")),
+                ("micmute", QuickSwitchService.Label("micmute", "麦克风静音")), ("numpad", QuickSwitchService.Label("numpad", "小键盘锁")), ("touchpadtoggle", QuickSwitchService.Label("touchpadtoggle", "触摸板切换键"))
             }),
-            ("键盘与热键", new (string, string)[]
+            (WpfStrings.QuickGroupKeyboard, new (string, string)[]
             {
-                ("winkey", "Win键锁"), ("fnkey", "Fn键锁"), ("capslock", "大小写锁定"),
-                ("osd", "OSD提示"), ("copilot", "Copilot键锁")
+                ("winkey", QuickSwitchService.Label("winkey", "Win键锁")), ("fnkey", QuickSwitchService.Label("fnkey", "Fn键锁")), ("capslock", QuickSwitchService.Label("capslock", "大小写锁定")),
+                ("osd", QuickSwitchService.Label("osd", "OSD提示")), ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"))
             }),
-            ("电源与系统", new (string, string)[]
+            (WpfStrings.QuickGroupPower, new (string, string)[]
             {
-                ("usb", "关机USB供电"), ("acrecovery", "来电自启"), ("highperf", "高性能电源"),
-                ("apuboost", "APU 防缩缸"), ("fanboost", "风扇强冷"), ("deepsleep", "深度睡眠"),
-                ("gamewhitelist", "游戏白名单"), ("cpuadvperf", "解锁BIOS菜单"),
-                ("taskbarautohide", "任务栏自动隐藏"), ("transparency", "系统透明效果"),
-                ("darktheme", "系统深色主题"), ("monitoroff", "息屏（不睡眠）"),
-                ("winupdate", "禁用Win更新")
+                ("usb", QuickSwitchService.Label("usb", "关机USB供电")), ("acrecovery", QuickSwitchService.Label("acrecovery", "来电自启")), ("highperf", QuickSwitchService.Label("highperf", "高性能电源")),
+                ("apuboost", QuickSwitchService.Label("apuboost", "APU 防缩缸")), ("fanboost", QuickSwitchService.Label("fanboost", "风扇强冷")), ("deepsleep", QuickSwitchService.Label("deepsleep", "深度睡眠")),
+                ("gamewhitelist", QuickSwitchService.Label("gamewhitelist", "游戏白名单")), ("cpuadvperf", QuickSwitchService.Label("cpuadvperf", "解锁BIOS菜单")),
+                ("taskbarautohide", QuickSwitchService.Label("taskbarautohide", "任务栏自动隐藏")), ("transparency", QuickSwitchService.Label("transparency", "系统透明效果")),
+                ("darktheme", QuickSwitchService.Label("darktheme", "系统深色主题")), ("monitoroff", QuickSwitchService.Label("monitoroff", "息屏（不睡眠）")),
+                ("winupdate", QuickSwitchService.Label("winupdate", "禁用Win更新"))
             }),
-            ("睡眠省电", new (string, string)[]
+            (WpfStrings.QuickGroupSleep, new (string, string)[]
             {
-                ("sleepnetoff", "待机断开网络"), ("sleepaway", "封杀离开模式"),
-                ("sleepsysreq", "忽略系统策略"), ("sleeprtcwake", "禁用RTC唤醒"),
-                ("sleepdeep", "ACPI深度睡眠"), ("sleephibernate", "30分钟转休眠")
+                ("sleepnetoff", QuickSwitchService.Label("sleepnetoff", "待机断开网络")), ("sleepaway", QuickSwitchService.Label("sleepaway", "封杀离开模式")),
+                ("sleepsysreq", QuickSwitchService.Label("sleepsysreq", "忽略系统策略")), ("sleeprtcwake", QuickSwitchService.Label("sleeprtcwake", "禁用RTC唤醒")),
+                ("sleepdeep", QuickSwitchService.Label("sleepdeep", "ACPI深度睡眠")), ("sleephibernate", QuickSwitchService.Label("sleephibernate", "30分钟转休眠"))
             })
         };
         List<(string, (string, string, bool)[])> result = new();
@@ -1032,7 +1032,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch
         {
-            return ("电池 —", -1, "");
+            return (WpfStrings.BatteryInfoDash, -1, "");
         }
     }
 
@@ -1070,7 +1070,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch
         {
-            return ("显示 —", -1, -1, false, 100);
+            return (WpfStrings.PlaceholderDisplayDash, -1, -1, false, 100);
         }
     }
 
@@ -1325,7 +1325,7 @@ public partial class OriginalStyleWindow : Window
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "tray");
             if (outcome?.AnyFailed == true)
             {
-                ToastService.Show("切换自定义模式失败", failure: true);
+                ToastService.Show(WpfStrings.PerfCustomSwitchFailed, failure: true);
             }
             else
             {
@@ -1334,7 +1334,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            ToastService.Show("切换自定义模式失败：" + ex.Message, failure: true);
+            ToastService.Show(WpfStrings.PerfCustomSwitchFailedPrefix + ex.Message, failure: true);
         }
         RefreshFromBackend();
     }
@@ -1393,7 +1393,7 @@ public partial class OriginalStyleWindow : Window
             bool registered = _lidSwitch.Start();
             bool selfCheck = L_Mechrevo.WpfP0.Services.LidSwitchService.RunSelfCheck(out string selfCheckDetail);
             Logger.WriteLine("[lid] 服务：" + (registered ? "已注册 LIDSWITCH_STATE_CHANGE" : "未注册（安全 no-op，不伪造）")
-                + " · 自检=" + selfCheck + "（" + selfCheckDetail + "）"
+                + " · 自检=" + selfCheck + "（" + selfCheckDetail + WpfStrings.ClosingParen
                 + (registered ? "" : " · 原因=" + _lidSwitch.LastError));
         }
         catch (Exception ex)
@@ -1550,7 +1550,7 @@ public partial class OriginalStyleWindow : Window
         if (e.Mode == Microsoft.Win32.PowerModes.Suspend)
         {
             _sleepKeyboardLightWasOn = KeyboardLightSwitch.IsChecked == true;
-            Logger.WriteLine("[power] Suspend：记录键盘灯=" + (_sleepKeyboardLightWasOn ? "开" : "关"));
+            Logger.WriteLine("[power] Suspend：记录键盘灯=" + (_sleepKeyboardLightWasOn ? WpfStrings.IgpuSavingOnPreview_Content : WpfStrings.OriginalStyleWindow_Content_5));
             return;
         }
         if (e.Mode == Microsoft.Win32.PowerModes.Resume)
@@ -1620,7 +1620,7 @@ public partial class OriginalStyleWindow : Window
     private void MarkResumeShowSuppression(string reason)
     {
         _resumeShowSuppressUntil = Environment.TickCount64 + 90_000L;
-        Logger.WriteLine("[power] 唤醒后 90 秒内抑制「第二实例唤起主界面」（来源=" + reason + "）");
+        Logger.WriteLine("[power] 唤醒后 90 秒内抑制「第二实例唤起主界面」（来源=" + reason + WpfStrings.ClosingParen);
     }
 
     private void SchedulePowerSettle()
@@ -1648,7 +1648,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         _lastPowerLineOnline = online;
-        Logger.WriteLine("[power] 电源来源变化 ⇒ " + (online ? "外接电源" : "电池"));
+        Logger.WriteLine("[power] 电源来源变化 ⇒ " + (online ? WpfStrings.OverlayExternalPower : "电池"));
         try
         {
             BatteryControl.AutoBattery();
@@ -1663,7 +1663,7 @@ public partial class OriginalStyleWindow : Window
             MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
             if (perf != null)
             {
-                await perf.ReplayAsync("电源变化", powerSourceChanged: true, appSideOnly: false);
+                await perf.ReplayAsync(WpfStrings.PowerSourceChangedReason, powerSourceChanged: true, appSideOnly: false);
             }
         }
         catch (Exception ex)
@@ -1699,7 +1699,7 @@ public partial class OriginalStyleWindow : Window
         {
             CpuCoAutoApplyGuard.MarkCleanExit(reason);
             GpuOcShutdownGuard.MarkCleanExit(reason);
-            Logger.WriteLine("[power] 已写 clean-exit marker（" + reason + "）");
+            Logger.WriteLine("[power] 已写 clean-exit marker（" + reason + WpfStrings.ClosingParen);
         }
         catch (Exception ex)
         {
@@ -1893,7 +1893,7 @@ public partial class OriginalStyleWindow : Window
                     StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_10;
                     return;
                 }
-                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_11 + ok + " · 回读=" + readback + "%）";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_11 + ok + WpfStrings.StatusReadbackSuffix + readback + "%" + WpfStrings.ClosingParen;
                 return;
             }
             MechrevoHw? hw = _backendProbe?.Hw;
@@ -1972,8 +1972,8 @@ public partial class OriginalStyleWindow : Window
                 ChargeLimitHighBox.Text = Math.Clamp(high, 2, 100).ToString();
                 ChargeLimitSwitch.IsChecked = mode == BatteryLimitWriter.ModeActive;
                 ChargeLimitStatus.Text = mode == BatteryLimitWriter.ModeActive
-                    ? "限制充电已生效（停充 " + high + "% / 起充 " + low + "%）"
-                    : "限制充电未启用";
+                    ? WpfStrings.ChargeAppliedPrefix + high + WpfStrings.ChargeStartSeparator + low + "%" + WpfStrings.ClosingParen
+                    : WpfStrings.ChargeNotEnabled;
             }
             else
             {
@@ -2000,8 +2000,8 @@ public partial class OriginalStyleWindow : Window
             {
                 ChargeLimitSwitch.IsChecked = mode == BatteryLimitWriter.ModeActive;
                 ChargeLimitStatus.Text = mode == BatteryLimitWriter.ModeActive
-                    ? "限制充电已生效（停充 " + high + "% / 起充 " + low + "%）"
-                    : "限制充电未启用";
+                    ? WpfStrings.ChargeAppliedPrefix + high + WpfStrings.ChargeStartSeparator + low + "%" + WpfStrings.ClosingParen
+                    : WpfStrings.ChargeNotEnabled;
             }
         }
         catch
@@ -2031,7 +2031,7 @@ public partial class OriginalStyleWindow : Window
                 if (ok)
                 {
                     BatteryLimitRestore.SaveConfig(true, low, high);
-                    ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_18 + high + "% / 起充 " + low + "%）";
+                    ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_18 + high + WpfStrings.ChargeStartSeparator + low + "%" + WpfStrings.ClosingParen;
                 }
                 else
                 {
@@ -2085,7 +2085,7 @@ public partial class OriginalStyleWindow : Window
             {
                 BatteryLimitRestore.SaveConfig(true, low, high);
                 ChargeLimitSwitch.IsChecked = true;
-                ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_23 + high + "% / 起充 " + low + "%）";
+                ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_23 + high + WpfStrings.ChargeStartSeparator + low + "%" + WpfStrings.ClosingParen;
             }
             else
             {
@@ -2171,17 +2171,17 @@ public partial class OriginalStyleWindow : Window
         error = "";
         if (!int.TryParse(ChargeLimitLowBox.Text.Trim(), out low) || low < 1 || low > 99)
         {
-            error = "起充阈值需为 1~99";
+            error = WpfStrings.ChargeStartRangeError;
             return false;
         }
         if (!int.TryParse(ChargeLimitHighBox.Text.Trim(), out high) || high < 2 || high > 100)
         {
-            error = "停充阈值需为 2~100";
+            error = WpfStrings.ChargeStopRangeError;
             return false;
         }
         if (low >= high)
         {
-            error = "起充阈值必须小于停充阈值";
+            error = WpfStrings.ChargeOrderInvalid;
             return false;
         }
         return true;
@@ -2232,7 +2232,7 @@ public partial class OriginalStyleWindow : Window
             if (_services != null) { _services.ChargeLimit.SetEcDirectWrite(false); } else { AppConfig.Remove("ec_charge_limit"); }
         }
         ChargeSliderToggle.IsEnabled = !on;
-        StatusText.Text = on ? "已关闭 EC 直写充电上限" : "EC 直写恢复自动判定";
+        StatusText.Text = on ? WpfStrings.ChargeEcDirectOff : WpfStrings.ChargeEcAuto;
     }
 
 
@@ -2478,7 +2478,7 @@ public partial class OriginalStyleWindow : Window
                 return;
             }
             bool ok = result == MechrevoService.ModeSwitchResult.Ok;
-            BackendStatus.Text = ok ? "模式已下发" : "模式下发失败";
+            BackendStatus.Text = ok ? WpfStrings.OriginalStyleWindow_xaml_Text_8 : WpfStrings.PerfModeFailed;
             if (!ok)
             {
                 // 旧版失败后会 RefreshCurrentModeAsync 再回填；不能拿缓存的 CurrentMode 直接回弹。
@@ -2689,15 +2689,15 @@ public partial class OriginalStyleWindow : Window
         IgpuSavingOnPreview.IsChecked = mode == 0;
         IgpuSavingAutoPreview.IsChecked = mode == 3;
         IgpuSavingPreviewStatus.Text = _igpuSavingBusy
-            ? "切换中…"
-            : mode switch { 0 => "当前：开", 1 => "当前：关", 3 => "当前：自动", _ => "当前：未知" };
+            ? WpfStrings.SwitchingEllipsis
+            : mode switch { 0 => WpfStrings.IgpuSavingCurrentOn, 1 => WpfStrings.IgpuSavingCurrentOff, 3 => WpfStrings.IgpuSavingCurrentAuto, _ => WpfStrings.IgpuSavingCurrentUnknown };
     }
 
     private async Task<bool> TryForceIgpuSavingAsync(MechrevoService service, string mode, bool occupancyAlreadyConfirmed)
     {
         if (!NvidiaGpuControl.TryGetActiveDgpuApplications(out IReadOnlyList<DgpuApplication> applications))
         {
-            MessageBox.Show("无法读取独显占用程序列表，已取消强制切换。", "核显省电",
+            MessageBox.Show(WpfStrings.IgpuListReadFailed, WpfStrings.OriginalStyleWindow_Text_14,
                 MessageBoxButton.OK, MessageBoxImage.Exclamation);
             return false;
         }
@@ -2710,10 +2710,10 @@ public partial class OriginalStyleWindow : Window
         {
             string reason = verdict.RefusalReason switch
             {
-                "dgpu-owns-only-active-display" => "当前只有独显在驱动显示器。强制切换可能导致黑屏，已取消。",
-                "occupancy-snapshot-unavailable" => "无法确认独显占用状态，已取消。",
-                "display-route-unavailable" => "无法读取当前显示通路，已取消。",
-                _ => "核显省电安全检查未通过，已取消。"
+                "dgpu-owns-only-active-display" => WpfStrings.IgpuBlockOnlyDgpu,
+                "occupancy-snapshot-unavailable" => WpfStrings.IgpuBlockSnapshotUnavailable,
+                "display-route-unavailable" => WpfStrings.IgpuBlockRouteUnavailable,
+                _ => WpfStrings.IgpuBlockSafetyFailed
             };
             MessageBox.Show(reason, WpfStrings.MainWindow_xaml_Text_14, MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
@@ -2726,8 +2726,8 @@ public partial class OriginalStyleWindow : Window
         {
             string names = string.Join("\n", closable.Select(static app => app.ProcessName));
             string body = verdict.DgpuOwnsOnlyActiveDisplay
-                ? "警告：当前似乎只有独显在驱动显示器。\n强制切换可能导致黑屏，且需要重启才能恢复。\n\n" + names
-                : "以下程序正在占用独显，需要结束它们才能切换核显省电：\n\n" + names;
+                ? WpfStrings.IgpuWarningDgpuOnlyPrefix + names
+                : WpfStrings.IgpuWarningOccupiedPrefix + names;
             if (MessageBox.Show(body, WpfStrings.MainWindow_xaml_Text_14, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             {
                 return false;
@@ -2736,7 +2736,7 @@ public partial class OriginalStyleWindow : Window
         bool displayOverride = false;
         if (verdict.DgpuOwnsOnlyActiveDisplay)
         {
-            if (MessageBox.Show("确认继续强制切换？\n\n如果黑屏，只能强制关机重启。", "核显省电",
+            if (MessageBox.Show(WpfStrings.IgpuForceConfirm, WpfStrings.OriginalStyleWindow_Text_14,
                 MessageBoxButton.YesNo, MessageBoxImage.Stop) != MessageBoxResult.Yes)
             {
                 return false;
@@ -2754,12 +2754,12 @@ public partial class OriginalStyleWindow : Window
             System.Diagnostics.Process.GetCurrentProcess().SessionId, forceConfirmed: true, ReadProcessImagePath);
         if (plan.Refused || plan.SafeToKill.Count == 0)
         {
-            MessageBox.Show("没有可安全结束的独显占用程序，已取消。", "核显省电",
+            MessageBox.Show(WpfStrings.IgpuNoSafeProcesses, WpfStrings.OriginalStyleWindow_Text_14,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return false;
         }
         string safeNames = string.Join("\n", plan.SafeToKill.Select(static app => app.ProcessName));
-        if (MessageBox.Show("将尝试结束以下程序：\n\n" + safeNames + "\n\n继续？", "核显省电",
+        if (MessageBox.Show(WpfStrings.IgpuKillListPrefix + safeNames + WpfStrings.ContinuePromptSuffix, WpfStrings.OriginalStyleWindow_Text_14,
             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             return false;
@@ -2767,7 +2767,7 @@ public partial class OriginalStyleWindow : Window
         (bool clean, string message) = await ElevatedProcessKiller.KillWithElevationAsync(plan.SafeToKill);
         if (!clean)
         {
-            MessageBox.Show("结束进程失败：" + message, "核显省电", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(WpfStrings.IgpuKillFailedPrefix + message, WpfStrings.OriginalStyleWindow_Text_14, MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
         return await service.SetIGpuOnlySaveMode(mode);
@@ -2822,9 +2822,9 @@ public partial class OriginalStyleWindow : Window
                 if (closable.Count > 0)
                 {
                     string names = string.Join("\n", closable.Select(static app => app.ProcessName));
-                    if (MessageBox.Show("检测到以下程序正在占用独显：\n\n" + names +
-                        "\n\n切换核显省电可能需要结束这些程序，是否继续？",
-                        "核显省电", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    if (MessageBox.Show(WpfStrings.IgpuOccupiedPrefix + names +
+                        WpfStrings.IgpuConfirmContinueSuffix,
+                        WpfStrings.OriginalStyleWindow_Text_14, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     {
                         StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_32;
                         return;
@@ -2903,7 +2903,7 @@ public partial class OriginalStyleWindow : Window
             if (bdOk)
             {
                 if (_services != null) { _services.Gpu.MarkRestartPending(mode); } else { _backendProbe.MarkGpuRestartPending(mode); }
-                StatusText.Text = confirmed ? "已切到目标模式，重启后生效" : "已请求切换，回读未确认，重启后确认";
+                StatusText.Text = confirmed ? WpfStrings.GpuTargetModeRestart : WpfStrings.GpuSwitchUnconfirmed;
             }
             else
             {
@@ -2912,7 +2912,7 @@ public partial class OriginalStyleWindow : Window
             RefreshFromBackend();
             return;
         }
-        string modeName = button.Content?.ToString() ?? ("模式 " + mode);
+        string modeName = button.Content?.ToString() ?? (WpfStrings.ModeNamePrefix + mode);
         if (!_backendProbe.IsBaolongda)
         {
             GpuRestartPromptWindow prompt = new GpuRestartPromptWindow(modeName) { Owner = this };
@@ -2958,7 +2958,7 @@ public partial class OriginalStyleWindow : Window
         {
             if (_services != null) { _services.Gpu.ClearRestartPending(); } else { _backendProbe.ClearGpuRestartPending(); }
         }
-        StatusText.Text = ok ? "显卡模式已下发，重启后生效" : "显卡模式下发失败";
+        StatusText.Text = ok ? WpfStrings.GpuModeSentRestart : WpfStrings.GpuModeFailed;
         RefreshFromBackend();
     }
 
@@ -2984,7 +2984,7 @@ public partial class OriginalStyleWindow : Window
         bool ok = _services != null
             ? (await _services.Battery.SetModeAsync(int.Parse(text))).Ok
             : await _backendProbe.SetBatteryModeAsync(int.Parse(text));
-        StatusText.Text = ok ? "电池档位已下发" : "电池档位下发失败";
+        StatusText.Text = ok ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
     }
 
     private async void RefreshRate_Click(object sender, RoutedEventArgs e)
@@ -3003,7 +3003,7 @@ public partial class OriginalStyleWindow : Window
         bool ok = _services != null
             ? (await _services.Display.SetRefreshRateAsync(int.Parse(text))).Ok
             : await _backendProbe.SwitchRefreshRateAsync(int.Parse(text));
-        StatusText.Text = ok ? "刷新率已下发" : "刷新率下发失败";
+        StatusText.Text = ok ? WpfStrings.DisplayRefreshSent : WpfStrings.DisplayRefreshFailed;
     }
 
     private async void AutoRefresh_Click(object sender, RoutedEventArgs e)
@@ -3019,7 +3019,7 @@ public partial class OriginalStyleWindow : Window
         AppConfig.Set("screen_auto", on ? 1 : 0);
         AppConfig.Flush();
         SyncRefreshRateState();
-        StatusText.Text = ok ? "自动刷新率已下发" : "自动刷新率下发失败";
+        StatusText.Text = ok ? WpfStrings.DisplayAutoRefreshSent : WpfStrings.DisplayAutoRefreshFailed;
     }
 
     private async void QuickTile_Click(object sender, RoutedEventArgs e)
@@ -3034,7 +3034,7 @@ public partial class OriginalStyleWindow : Window
             on = !on;
         }
         bool ok = await _backendProbe.SwitchQuickAsync(key, on);
-        StatusText.Text = ok ? "快捷开关已下发：" + key : "快捷开关下发失败：" + key;
+        StatusText.Text = ok ? WpfStrings.QuickSentPrefix + key : WpfStrings.QuickFailedPrefix + key;
     }
 
     private void UpdateQuickTileStates()
@@ -3295,30 +3295,30 @@ public partial class OriginalStyleWindow : Window
         }
         (string Title, (string Key, string Label)[] Items)[] groups =
         {
-            ("输入设备", new (string, string)[]
+            (WpfStrings.QuickGroupInput, new (string, string)[]
             {
-                ("touchpad", "触摸板"), ("wifi", "WiFi"), ("bt", "蓝牙"), ("webcam", "摄像头"),
-                ("micmute", "麦克风静音"), ("numpad", "小键盘锁"), ("touchpadtoggle", "触摸板切换键")
+                ("touchpad", QuickSwitchService.Label("touchpad", "触摸板")), ("wifi", "WiFi"), ("bt", QuickSwitchService.Label("bt", "蓝牙")), ("webcam", QuickSwitchService.Label("webcam", "摄像头")),
+                ("micmute", QuickSwitchService.Label("micmute", "麦克风静音")), ("numpad", QuickSwitchService.Label("numpad", "小键盘锁")), ("touchpadtoggle", QuickSwitchService.Label("touchpadtoggle", "触摸板切换键"))
             }),
-            ("键盘与热键", new (string, string)[]
+            (WpfStrings.QuickGroupKeyboard, new (string, string)[]
             {
-                ("winkey", "Win键锁"), ("fnkey", "Fn键锁"), ("capslock", "大小写锁定"),
-                ("osd", "OSD提示"), ("copilot", "Copilot键锁")
+                ("winkey", QuickSwitchService.Label("winkey", "Win键锁")), ("fnkey", QuickSwitchService.Label("fnkey", "Fn键锁")), ("capslock", QuickSwitchService.Label("capslock", "大小写锁定")),
+                ("osd", QuickSwitchService.Label("osd", "OSD提示")), ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"))
             }),
-            ("电源与系统", new (string, string)[]
+            (WpfStrings.QuickGroupPower, new (string, string)[]
             {
-                ("usb", "关机USB供电"), ("acrecovery", "来电自启"), ("highperf", "高性能电源"),
-                ("apuboost", "APU 防缩缸"), ("fanboost", "风扇强冷"), ("deepsleep", "深度睡眠"),
-                ("gamewhitelist", "游戏白名单"), ("cpuadvperf", "解锁BIOS菜单"),
-                ("taskbarautohide", "任务栏自动隐藏"), ("transparency", "系统透明效果"),
-                ("darktheme", "系统深色主题"), ("monitoroff", "息屏（不睡眠）"),
-                ("winupdate", "禁用Win更新")
+                ("usb", QuickSwitchService.Label("usb", "关机USB供电")), ("acrecovery", QuickSwitchService.Label("acrecovery", "来电自启")), ("highperf", QuickSwitchService.Label("highperf", "高性能电源")),
+                ("apuboost", QuickSwitchService.Label("apuboost", "APU 防缩缸")), ("fanboost", QuickSwitchService.Label("fanboost", "风扇强冷")), ("deepsleep", QuickSwitchService.Label("deepsleep", "深度睡眠")),
+                ("gamewhitelist", QuickSwitchService.Label("gamewhitelist", "游戏白名单")), ("cpuadvperf", QuickSwitchService.Label("cpuadvperf", "解锁BIOS菜单")),
+                ("taskbarautohide", QuickSwitchService.Label("taskbarautohide", "任务栏自动隐藏")), ("transparency", QuickSwitchService.Label("transparency", "系统透明效果")),
+                ("darktheme", QuickSwitchService.Label("darktheme", "系统深色主题")), ("monitoroff", QuickSwitchService.Label("monitoroff", "息屏（不睡眠）")),
+                ("winupdate", QuickSwitchService.Label("winupdate", "禁用Win更新"))
             }),
-            ("睡眠省电", new (string, string)[]
+            (WpfStrings.QuickGroupSleep, new (string, string)[]
             {
-                ("sleepnetoff", "待机断开网络"), ("sleepaway", "封杀离开模式"),
-                ("sleepsysreq", "忽略系统策略"), ("sleeprtcwake", "禁用RTC唤醒"),
-                ("sleepdeep", "ACPI深度睡眠"), ("sleephibernate", "30分钟转休眠")
+                ("sleepnetoff", QuickSwitchService.Label("sleepnetoff", "待机断开网络")), ("sleepaway", QuickSwitchService.Label("sleepaway", "封杀离开模式")),
+                ("sleepsysreq", QuickSwitchService.Label("sleepsysreq", "忽略系统策略")), ("sleeprtcwake", QuickSwitchService.Label("sleeprtcwake", "禁用RTC唤醒")),
+                ("sleepdeep", QuickSwitchService.Label("sleepdeep", "ACPI深度睡眠")), ("sleephibernate", QuickSwitchService.Label("sleephibernate", "30分钟转休眠"))
             })
         };
         foreach ((string title, (string Key, string Label)[] items) in groups)
@@ -3345,7 +3345,7 @@ public partial class OriginalStyleWindow : Window
             {
                 continue;
             }
-            if (title == "睡眠省电")
+            if (title == WpfStrings.QuickGroupSleep)
             {
                 Grid headerRow = new Grid { Margin = new Thickness(0, 8, 0, 2) };
                 headerRow.Children.Add(new TextBlock { Text = QuickSwitchService.GroupTitle(title), Style = (Style)FindResource("MutedText"), FontSize = 10 });
@@ -3405,7 +3405,7 @@ public partial class OriginalStyleWindow : Window
             {
                 box.IsChecked = !(box.IsChecked == true);
             }
-            StatusText.Text = ok ? "已切换：" + key : "切换失败：" + key;
+            StatusText.Text = ok ? WpfStrings.SwitchedPrefix + key : WpfStrings.SwitchFailedPrefix + key;
             UpdateMoreSwitchCount();
         }
     }
@@ -3453,14 +3453,14 @@ public partial class OriginalStyleWindow : Window
     {
         if (!acOnline)
         {
-            return "电池供电";
+            return WpfStrings.OverlayBatteryPower;
         }
         try
         {
             if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true)
             {
                 // 宝龙达没有适配器功率表，保持原版「外接电源」，不显示“未识别”。
-                return "外接电源";
+                return WpfStrings.OverlayExternalPower;
             }
             MechrevoLite.Hardware.PowerInputSample? sample = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().Input;
             MechrevoLite.Hardware.PowerInputKind kind = MechrevoLite.Hardware.PowerInputDecoder.Reconcile(
@@ -3477,18 +3477,18 @@ public partial class OriginalStyleWindow : Window
             if (raw >= 0)
             {
                 // 同方机型不在功率表里时，直接显示 EC 原始读数。
-                return "外接电源（EC 0x" + raw.ToString("X2") + "）";
+                return string.Format(WpfStrings.DisplayPowerEcHexFormat, raw.ToString("X2"));
             }
             decimal? rate = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().BatteryRateWatts;
             if (rate.HasValue)
             {
-                return "外接电源（EC " + rate.Value.ToString("0.0") + "W）";
+                return string.Format(WpfStrings.DisplayPowerEcWattFormat, rate.Value.ToString("0.0"));
             }
         }
         catch
         {
         }
-        return "外接电源";
+        return WpfStrings.OverlayExternalPower;
     }
 
     internal void WideRefreshTrayMenu()
@@ -3919,7 +3919,7 @@ public partial class OriginalStyleWindow : Window
             MechrevoLite.Update.UpdateInfo? info = await MechrevoLite.Update.UpdateChecker.CheckAsync();
             if (info?.UpdateAvailable == true)
             {
-                Dispatcher.BeginInvoke(() => ToastService.Show("发现新版本：" + (info.LatestVersion ?? "") + "，可在设置中检查更新"));
+                Dispatcher.BeginInvoke(() => ToastService.Show(WpfStrings.UpdateAvailablePrefix + (info.LatestVersion ?? "") + WpfStrings.UpdateAvailableSuffix));
             }
         }
         catch
@@ -4005,7 +4005,7 @@ public partial class OriginalStyleWindow : Window
             if (!connected || probe == null)
             {
                 string reason = _backendHost.TimedOut
-                    ? "15 秒内未完成；应用会自动重试，点上方状态可重新检查。"
+                    ? WpfStrings.UpdateTimeoutStatus
                     : _backendHost.LastError;
                 SetBackendStatus(WpfStrings.BackendGcuDisconnected, "#EF4444", WpfStrings.BackendGcuDisconnectedTip);
                 BackendLine.Text = reason;
@@ -4359,7 +4359,7 @@ public partial class OriginalStyleWindow : Window
                 RefreshLiquidLightUi();
                 return;
             }
-            LiquidStatusButton.Content = routing?.StatusText ?? (WideLiquidConnected ? "水冷已连接" : "水冷未连接");
+            LiquidStatusButton.Content = routing?.StatusText ?? (WideLiquidConnected ? WpfStrings.LiquidConnected : WpfStrings.LiquidDisconnected);
             LiquidPumpCombo.IsEnabled = true;
             LiquidFanCombo.IsEnabled = true;
             _syncingLiquid = true;
@@ -4386,7 +4386,7 @@ public partial class OriginalStyleWindow : Window
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.Children.Add(new TextBlock
         {
-            Text = "灯光",
+            Text = WpfStrings.TitleText_Text_2,
             Style = (Style)FindResource("MutedText"),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
@@ -4401,7 +4401,7 @@ public partial class OriginalStyleWindow : Window
         row.Children.Add(_liquidLightCombo);
         _liquidLightColorButton = new Button
         {
-            Content = "颜色",
+            Content = WpfStrings.MultiColorLabel_Text,
             Style = (Style)FindResource("MiniButton"),
             MinWidth = 52,
             Margin = new Thickness(0, 0, 8, 0)
@@ -4461,7 +4461,7 @@ public partial class OriginalStyleWindow : Window
             }
             if (_liquidLightStatus != null)
             {
-                _liquidLightStatus.Text = string.IsNullOrWhiteSpace(saved) ? "" : "已保存：" + saved;
+                _liquidLightStatus.Text = string.IsNullOrWhiteSpace(saved) ? "" : WpfStrings.SavedPrefix + saved;
             }
         }
         finally
@@ -4484,7 +4484,7 @@ public partial class OriginalStyleWindow : Window
         bool ok = await WideApplyLiquidLightAsync(profile, WideLiquidLightColor);
         if (_liquidLightStatus != null)
         {
-            _liquidLightStatus.Text = ok ? "灯光已下发" : "灯光下发失败";
+            _liquidLightStatus.Text = ok ? WpfStrings.LightLiquidSent : WpfStrings.LightLiquidFailed;
         }
     }
 
@@ -4504,7 +4504,7 @@ public partial class OriginalStyleWindow : Window
         bool ok = await WideApplyLiquidLightAsync(profile, color);
         if (_liquidLightStatus != null)
         {
-            _liquidLightStatus.Text = ok ? "颜色已下发" : "颜色下发失败";
+            _liquidLightStatus.Text = ok ? WpfStrings.LiquidColorSent : WpfStrings.LiquidColorFailed;
         }
     }
 
@@ -4540,7 +4540,7 @@ public partial class OriginalStyleWindow : Window
         {
             routing.Disconnect();
             RefreshLiquidCoolingUi();
-            StatusText.Text = "蓝牙水冷已断开";
+            StatusText.Text = WpfStrings.LiquidBleDisconnected;
             return;
         }
         if (_backendProbe?.Service == null)
@@ -4575,7 +4575,7 @@ public partial class OriginalStyleWindow : Window
         bool ok = profile < 0
             ? await _backendProbe.Service.SwitchLcFanAuto()
             : await _backendProbe.Service.SwitchLcPump(profile);
-        StatusText.Text = ok ? "水泵档位已下发" : "水泵档位下发失败";
+        StatusText.Text = ok ? WpfStrings.LiquidPumpSent : WpfStrings.LiquidPumpFailed;
     }
 
     private async void LiquidFan_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -4588,7 +4588,7 @@ public partial class OriginalStyleWindow : Window
         bool ok = profile < 0
             ? await _backendProbe.Service.SwitchLcFanAuto()
             : await _backendProbe.Service.SwitchLcFan(profile);
-        StatusText.Text = ok ? "水冷风扇档位已下发" : "水冷风扇档位下发失败";
+        StatusText.Text = ok ? WpfStrings.LiquidFanSent : WpfStrings.LiquidFanFailed;
     }
 
 
@@ -4656,7 +4656,7 @@ public partial class OriginalStyleWindow : Window
         {
             await _backendProbe.SwitchModeAsync(visualMode);
         }
-        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_54 + combo.SelectedIndex + "（模式 " + visualMode + "）";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_54 + combo.SelectedIndex + WpfStrings.ModeSeparatorSuffix + visualMode + WpfStrings.ClosingParen;
     }
 
     private void PerfConfigEdit_Click(object sender, RoutedEventArgs e)
@@ -4764,9 +4764,9 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool on = GpuOverclockSwitch.IsChecked == true;
-        StatusText.Text = on ? "显卡超频：开（下发中…）" : "显卡超频：关（下发中…）";
+        StatusText.Text = on ? WpfStrings.GpuOverclockOnPending : WpfStrings.GpuOverclockOffPending;
         bool ok = await _backendProbe.ApplyGpuOverclockAsync(on);
-        StatusText.Text = ok ? "显卡超频：" + (on ? "开" : "关") : "显卡超频下发失败（开关保持按钮状态）";
+        StatusText.Text = ok ? WpfStrings.GpuOverclockPrefix + (on ? WpfStrings.IgpuSavingOnPreview_Content : WpfStrings.OriginalStyleWindow_Content_5) : WpfStrings.GpuOverclockFailed;
     }
 
     private void InitScreenColorControls()
@@ -4901,14 +4901,14 @@ public partial class OriginalStyleWindow : Window
             AppConfig.Set("calib_mode", mode);
             AppConfig.Set("calib_enabled", on ? 1 : 0);
             AppConfig.Flush();
-            StatusText.Text = on ? "屏幕校色已开启" : "屏幕校色已关闭";
+            StatusText.Text = on ? WpfStrings.DisplayCalibrationOn : WpfStrings.DisplayCalibrationOff;
         }
         else
         {
             _syncingCalibration = true;
             CalibrationSwitch.IsChecked = !on;
             _syncingCalibration = false;
-            StatusText.Text = mode == 999 ? "自定义 ICC 文件缺失或应用失败" : "屏幕校色下发失败";
+            StatusText.Text = mode == 999 ? WpfStrings.DisplayIccMissing : WpfStrings.DisplayCalibrationFailed;
         }
         CalibrationCombo.IsEnabled = CalibrationSwitch.IsChecked == true;
         CalibrationSettingsButton.IsEnabled = CalibrationSwitch.IsChecked == true;
@@ -4947,7 +4947,7 @@ public partial class OriginalStyleWindow : Window
         }
         else
         {
-            StatusText.Text = mode == 999 ? "自定义 ICC 文件缺失或应用失败" : "屏幕校色档位下发失败";
+            StatusText.Text = mode == 999 ? WpfStrings.DisplayIccMissing : WpfStrings.DisplayCalibrationModeFailed;
             InitScreenColorControls();
         }
     }
@@ -4978,7 +4978,7 @@ public partial class OriginalStyleWindow : Window
                 await _backendProbe.ApplyDisplayEffectProfileAsync(SelectedDisplayEffectMode());
             }
             await _backendProbe.RequestDisplayEffectStatusAsync();
-            StatusText.Text = on ? "色彩增强已开启" : "色彩增强已关闭";
+            StatusText.Text = on ? WpfStrings.DisplayColorEnhancementOn : WpfStrings.DisplayColorEnhancementOff;
         }
         else
         {
@@ -5380,7 +5380,7 @@ public partial class OriginalStyleWindow : Window
         {
             MechrevoHw.SetKeyboardAutoOffSeconds(seconds);
             L_Mechrevo.WpfP0.Services.WpfBackend.Hw.ApplyKeyboardAutoOffSetting();
-            StatusText.Text = seconds <= 0 ? "宝龙达键盘自动关闭：关" : "宝龙达键盘自动关闭：" + seconds + " 秒";
+            StatusText.Text = seconds <= 0 ? WpfStrings.LightBdKeyboardAutoOffOff : WpfStrings.LightBdKeyboardAutoOffPrefix + seconds + WpfStrings.UnitSecondsSuffix;
             return;
         }
         AppConfig.Set("lighting_idle_seconds", seconds);
@@ -5391,7 +5391,7 @@ public partial class OriginalStyleWindow : Window
             L_Mechrevo.WpfP0.Services.WpfBackend.rgb.SaveConfig();
         }
         _ = ReconcileLightingPowerAsync();
-        StatusText.Text = seconds <= 0 ? "灯光自动关闭：关" : "灯光自动关闭：" + (seconds >= 60 ? (seconds / 60) + " 分钟" : seconds + " 秒");
+        StatusText.Text = seconds <= 0 ? WpfStrings.LightAutoOffOff : WpfStrings.LightAutoOffPrefix + (seconds >= 60 ? (seconds / 60) + WpfStrings.UnitMinutesSuffix : seconds + WpfStrings.UnitSecondsSuffix);
     }
 
     private void LightOffOnBattery_Click(object sender, RoutedEventArgs e)
@@ -5399,7 +5399,7 @@ public partial class OriginalStyleWindow : Window
         bool on = LightOffOnBatteryCheck.IsChecked == true;
         AppConfig.Set("lighting_off_on_battery", on ? 1 : 0);
         AppConfig.Flush();
-        StatusText.Text = on ? "离电自动关闭灯效：开" : "离电自动关闭灯效：关";
+        StatusText.Text = on ? WpfStrings.LightOffOnBatteryOn : WpfStrings.LightOffOnBatteryOff;
     }
 
     private void KeyboardLightEdit_Click(object sender, RoutedEventArgs e)
@@ -5414,7 +5414,7 @@ public partial class OriginalStyleWindow : Window
         bool firmwareKeyboard = hw != null && !IsHidKeyboard(hw);
         if (firmwareKeyboard)
         {
-            OpenLightEditor("Keyboard/Ctrl", "键盘灯效", EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
+            OpenLightEditor("Keyboard/Ctrl", WpfStrings.HidKeyboardWindow_Text_9, EffectsForCurrentBackend(KeyboardEffectsForCurrent()));
             return;
         }
         KeyboardRgb? rgb = EnsureKeyboardRgb();
@@ -5435,7 +5435,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar_Logo/Ctrl", "Logo 灯光", CurrentLogoEffectsForBackend());
+        OpenLightEditor("HidLightbar_Logo/Ctrl", WpfStrings.LightTitleLogo, CurrentLogoEffectsForBackend());
     }
 
     private void CheckLightingIdle()
@@ -5931,7 +5931,7 @@ public partial class OriginalStyleWindow : Window
         {
             SaveChannelEffect("HidLightbar/Ctrl", effect);
         }
-        StatusText.Text = ok ? "灯带效果已下发：" + effect : "灯带效果下发失败";
+        StatusText.Text = ok ? WpfStrings.LightLightbarSentPrefix + effect : WpfStrings.LightLightbarFailed;
     }
 
     private void LightStripEdit_Click(object sender, RoutedEventArgs e)
@@ -5942,7 +5942,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar/Ctrl", "灯带灯光", EffectsForCurrentBackend(LightingCatalog.LightbarEffects));
+        OpenLightEditor("HidLightbar/Ctrl", WpfStrings.LightTitleLightbar, EffectsForCurrentBackend(LightingCatalog.LightbarEffects));
     }
 
     private KeyboardRgb? EnsureKeyboardRgb()
@@ -6031,7 +6031,7 @@ public partial class OriginalStyleWindow : Window
         {
             SaveChannelEffect("HidLightbar_Hinge/Ctrl", effect);
         }
-        StatusText.Text = ok ? "铰链灯效果已下发" : "铰链灯效果下发失败";
+        StatusText.Text = ok ? WpfStrings.LightHingeSent : WpfStrings.LightHingeFailed;
     }
 
     private void LightHingeEdit_Click(object sender, RoutedEventArgs e)
@@ -6042,7 +6042,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar_Hinge/Ctrl", "铰链灯光", EffectsForCurrentBackend(LightingCatalog.HingeEffects));
+        OpenLightEditor("HidLightbar_Hinge/Ctrl", WpfStrings.LightTitleHinge, EffectsForCurrentBackend(LightingCatalog.HingeEffects));
     }
 
     private async void LightSyncSwitch_Click(object sender, RoutedEventArgs e)
@@ -6100,7 +6100,7 @@ public partial class OriginalStyleWindow : Window
         {
             SaveChannelEffect("HidLightbar_Sync/Ctrl", effect);
         }
-        StatusText.Text = ok ? "同步灯效果已下发" : "同步灯效果下发失败";
+        StatusText.Text = ok ? WpfStrings.LightSyncSent : WpfStrings.LightSyncFailed;
     }
 
     private void LightSyncEdit_Click(object sender, RoutedEventArgs e)
@@ -6111,7 +6111,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar_Sync/Ctrl", "同步灯光", EffectsForCurrentBackend(LightingCatalog.SyncEffects));
+        OpenLightEditor("HidLightbar_Sync/Ctrl", WpfStrings.LightTitleSync, EffectsForCurrentBackend(LightingCatalog.SyncEffects));
     }
 
     private async void KeyboardLightSwitch_Click(object sender, RoutedEventArgs e)
@@ -6371,7 +6371,7 @@ public partial class OriginalStyleWindow : Window
         {
             ok = await _backendProbe.SetKeyboardPowerAsync(false);
         }
-        StatusText.Text = ok ? (on ? "键盘灯效已下发：" + effect : "键盘灯光已关闭") : "键盘灯效下发失败";
+        StatusText.Text = ok ? (on ? WpfStrings.LightKeyboardSentPrefix + effect : WpfStrings.OriginalStyleWindow_xaml_Text_81) : WpfStrings.LightKeyboardFailed;
         return ok;
     }
 
@@ -6431,7 +6431,7 @@ public partial class OriginalStyleWindow : Window
         {
             SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
         }
-        StatusText.Text = logoOk ? "Logo 灯效已下发：" + effect : "Logo 灯效下发失败";
+        StatusText.Text = logoOk ? WpfStrings.LightLogoSentPrefix + effect : WpfStrings.LightLogoFailed;
     }
 
     private async Task<bool> ApplyLogoLightAsync(bool restoreEffect = false)
@@ -6455,7 +6455,7 @@ public partial class OriginalStyleWindow : Window
         {
             ok = await SetLightPowerServiceAsync("HidLightbar_Logo/Ctrl", false);
         }
-        StatusText.Text = ok ? (on ? "Logo 灯效已下发：" + effect : "Logo 灯已关闭") : "Logo 灯效下发失败";
+        StatusText.Text = ok ? (on ? WpfStrings.LightLogoSentPrefix + effect : WpfStrings.LightLogoOff) : WpfStrings.LightLogoFailed;
         return ok;
     }
 
@@ -6583,7 +6583,7 @@ public partial class OriginalStyleWindow : Window
 
             case "悬浮窗":
                 ToggleTrayOverlay();
-                StatusText.Text = _overlayWindow?.IsVisible == true ? "悬浮窗已打开" : "悬浮窗已关闭";
+                StatusText.Text = _overlayWindow?.IsVisible == true ? WpfStrings.OverlayOpened : WpfStrings.OverlayClosed;
                 return;
 
             case "赞助":
@@ -6670,7 +6670,7 @@ public partial class OriginalStyleWindow : Window
         Microsoft.Win32.SaveFileDialog dialog = new()
         {
             Title = WpfStrings.OriginalStyleWindow_xaml_Title,
-            Filter = "Zip 压缩包 (*.zip)|*.zip",
+            Filter = WpfStrings.ZipFileFilter,
             DefaultExt = "zip",
             AddExtension = true,
             OverwritePrompt = true,

@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -68,12 +69,12 @@ internal sealed class GpuService : IGpuService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         bool ok = probe.SwitchGpuModeBaolongda(mode, out confirmed);
         return ok
-            ? ServiceResult.Success(confirmed ? "已切到目标模式，重启后生效" : "已请求切换，回读未确认，重启后确认")
-            : ServiceResult.Fail("宝龙达显卡模式写入失败");
+            ? ServiceResult.Success(confirmed ? WpfStrings.GpuTargetModeRestart : WpfStrings.GpuSwitchUnconfirmed)
+            : ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_39);
     }
 
     public async Task<ServiceResult> SwitchAsync(int mode)
@@ -81,16 +82,16 @@ internal sealed class GpuService : IGpuService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             bool ok = await probe.SwitchGpuModeAsync(mode).ConfigureAwait(false);
-            return ok ? ServiceResult.Success("显卡模式已下发") : ServiceResult.Fail("显卡模式下发失败");
+            return ok ? ServiceResult.Success(WpfStrings.GpuModeSent) : ServiceResult.Fail(WpfStrings.GpuModeFailed);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("显卡模式下发异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.GpuModeExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -99,16 +100,16 @@ internal sealed class GpuService : IGpuService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_51);
         }
         try
         {
             bool ok = await probe.RequestGpuModeRestartAsync(mode).ConfigureAwait(false);
-            return ok ? ServiceResult.Success("已请求切换并重启，重启后生效") : ServiceResult.Fail("重启切换请求失败");
+            return ok ? ServiceResult.Success(WpfStrings.OriginalStyleWindow_xaml_Text_40) : ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_41);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("重启切换请求异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.GpuRestartExceptionPrefix + ex.GetType().Name);
         }
     }
 

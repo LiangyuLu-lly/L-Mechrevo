@@ -2,6 +2,7 @@ using MechrevoLite;
 using MechrevoLite.Battery;
 using MechrevoLite.Hardware;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -137,29 +138,29 @@ internal sealed class ChargeLimitService : IChargeLimitService
     {
         if (!Supported)
         {
-            return ServiceResult.Fail("本机不支持充电阈值");
+            return ServiceResult.Fail(WpfStrings.ChargeUnsupported);
         }
         if (lowPercent is < 1 or > 99 || highPercent is < 1 or > 99)
         {
-            return ServiceResult.Fail("起充/停充阈值需为 1~99");
+            return ServiceResult.Fail(WpfStrings.ChargeRangeInvalid);
         }
         if (lowPercent >= highPercent)
         {
-            return ServiceResult.Fail("起充阈值必须小于停充阈值");
+            return ServiceResult.Fail(WpfStrings.ChargeOrderInvalid);
         }
         try
         {
             bool ok = BatteryLimitWriter.TryEnable(lowPercent, highPercent, allowInitialDischarge: true, out string detail);
             if (!ok)
             {
-                return ServiceResult.Fail("启用失败：" + detail);
+                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_19 + detail);
             }
             BatteryLimitRestore.SaveConfig(true, lowPercent, highPercent);
-            return ServiceResult.Success("阈值已保存（停充 " + highPercent + "% / 起充 " + lowPercent + "%）");
+            return ServiceResult.Success(WpfStrings.OriginalStyleWindow_xaml_Text_23 + highPercent + WpfStrings.ChargeStartSeparator + lowPercent + "%" + WpfStrings.ClosingParen);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("启用异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.ChargeEnableExceptionPrefix + ex.GetType().Name);
         }
     }
 
@@ -169,28 +170,28 @@ internal sealed class ChargeLimitService : IChargeLimitService
     {
         if (!Supported)
         {
-            return ServiceResult.Fail("本机不支持充电阈值");
+            return ServiceResult.Fail(WpfStrings.ChargeUnsupported);
         }
         try
         {
             bool ok = BatteryLimitWriter.TryDisable(out string detail);
             if (!ok)
             {
-                return ServiceResult.Fail("关闭失败：" + detail);
+                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_21 + detail);
             }
             BatteryLimitRestore.SaveConfig(false, 0, 0);
-            return ServiceResult.Success("限制充电已关闭");
+            return ServiceResult.Success(WpfStrings.OriginalStyleWindow_xaml_Text_20);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("关闭异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.ChargeDisableExceptionPrefix + ex.GetType().Name);
         }
     }
 
     public ServiceResult SetSliderEnabled(bool on)
     {
         AppConfig.Set(SliderKey, on ? 1 : 0);
-        return ServiceResult.Success(on ? "已启用无极限充滑块" : "已关闭无极限充滑块");
+        return ServiceResult.Success(on ? WpfStrings.ChargeSliderOn : WpfStrings.ChargeSliderOff);
     }
 
     public ServiceResult SetEcDirectWrite(bool on)
@@ -198,10 +199,10 @@ internal sealed class ChargeLimitService : IChargeLimitService
         if (on)
         {
             AppConfig.Set(EcDirectWriteKey, "0");
-            return ServiceResult.Success("已关闭 EC 直写充电上限");
+            return ServiceResult.Success(WpfStrings.ChargeEcDirectOff);
         }
         AppConfig.Remove(EcDirectWriteKey);
-        return ServiceResult.Success("EC 直写恢复自动判定");
+        return ServiceResult.Success(WpfStrings.ChargeEcAuto);
     }
 
     private static int SafeCall(Func<int> read, int fallback)
