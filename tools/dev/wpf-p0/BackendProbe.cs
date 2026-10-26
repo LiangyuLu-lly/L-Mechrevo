@@ -278,6 +278,14 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            // ⭐ task-24：息屏（monitoroff）由 Core VirtualDisplayBlank 接管（等价旧 SettingsForm.ApplyQuickMonitorOffAsync）。
+            //   放在 _service 判空之前：息屏是纯显示层动作，不需要 GCU/MQTT 服务连接；
+            //   原 taskbarautohide/transparency/darktheme/sleep* 分支保持不动。
+            //   一次性语义：on=true 启动息屏（失败返回 false 供 UI 回弹并已记日志），on=false 无动作返回 false。
+            if (L_Mechrevo.WpfP0.Services.VirtualDisplayBlankService.TryHandleQuickSwitch(key, on, out bool blankConfirmed))
+            {
+                return blankConfirmed;
+            }
             if (_service == null)
             {
                 return false;
