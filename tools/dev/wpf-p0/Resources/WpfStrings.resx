@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -58,7 +58,7 @@
     <value>Refresh</value>
   </data>
   <data name="CalibrationSettingsWindow_Text" xml:space="preserve">
-    <value>开启后，校色下拉列表将出现「自定义」选项，经 Windows 颜色管理应用所选 ICC（不经由 GCU）；关闭则取消所有已应用 ICC。</value>
+    <value>When enabled, a "Custom" option appears in the color profile list and the selected ICC profile is applied through Windows Color Management (not via GCU). When disabled, all applied ICC profiles are removed.</value>
   </data>
   <data name="ImportButton_Content" xml:space="preserve">
     <value>Import</value>
@@ -67,7 +67,7 @@
     <value>Custom calibration</value>
   </data>
   <data name="CalibrationSettingsWindow_Text_2" xml:space="preserve">
-    <value>开启后，每次开机将自动应用一次当前校色。一般无需开启，仅当重启后校色无法保持时使用。</value>
+    <value>When enabled, the current color profile is applied once at every boot. Usually unnecessary; use it only if calibration does not survive a restart.</value>
   </data>
   <data name="StartupSwitch_Content" xml:space="preserve">
     <value>Apply calibration on startup</value>
@@ -94,13 +94,13 @@
     <value>Reset</value>
   </data>
   <data name="CpuTuningWindow_Content_3" xml:space="preserve">
-    <value>读取快照</value>
+    <value>Load snapshot</value>
   </data>
   <data name="CpuTuningWindow_Content_4" xml:space="preserve">
-    <value>保存快照</value>
+    <value>Save snapshot</value>
   </data>
   <data name="AutoApplyCheck_Content" xml:space="preserve">
-    <value>开机自动应用</value>
+    <value>Apply automatically at boot</value>
   </data>
   <data name="TitleText_Text" xml:space="preserve">
     <value>CPU tuning</value>
@@ -145,16 +145,16 @@
     <value>Temperature / GPU dynamic boost</value>
   </data>
   <data name="CustomModeWindow_Text_10" xml:space="preserve">
-    <value>SMU 快速时间 (s)</value>
+    <value>SMU fast time (s)</value>
   </data>
   <data name="CustomModeWindow_Text_11" xml:space="preserve">
-    <value>SMU 慢速时间 (s)</value>
+    <value>SMU slow time (s)</value>
   </data>
   <data name="CustomModeWindow_Text_12" xml:space="preserve">
-    <value>SMU 慢速限制 (W)</value>
+    <value>SMU slow limit (W)</value>
   </data>
   <data name="CustomModeWindow_Text_13" xml:space="preserve">
-    <value>STAPM 时间窗 (s)</value>
+    <value>STAPM time window (s)</value>
   </data>
   <data name="CustomModeWindow_Text_14" xml:space="preserve">
     <value>CPU peak power fPPT (W)</value>
@@ -214,7 +214,7 @@
     <value>Balanced</value>
   </data>
   <data name="CustomModeWindow_Content_14" xml:space="preserve">
-    <value>能效优先</value>
+    <value>Efficiency first</value>
   </data>
   <data name="CustomModeWindow_Text_20" xml:space="preserve">
     <value>Windows power mode</value>
@@ -241,7 +241,7 @@
     <value>Mode</value>
   </data>
   <data name="DisplayEffectEditorWindow_Content" xml:space="preserve">
-    <value>恢复默认</value>
+    <value>Restore defaults</value>
   </data>
   <data name="DisplayEffectEditorWindow_Text" xml:space="preserve">
     <value>Vibrancy</value>
@@ -250,7 +250,7 @@
     <value>Push fan curve</value>
   </data>
   <data name="WujieIndependentCheck_Content" xml:space="preserve">
-    <value>CPU/GPU 独立控制</value>
+    <value>Independent CPU/GPU control</value>
   </data>
   <data name="FanCurveWindow_Text" xml:space="preserve">
     <value>GPU fan</value>
@@ -259,43 +259,43 @@
     <value>CPU fan</value>
   </data>
   <data name="HintText_Text" xml:space="preserve">
-    <value>拖动曲线点调整占空比；温度轴来自硬件。</value>
+    <value>Drag curve points to adjust duty cycle; the temperature axis comes from hardware.</value>
   </data>
   <data name="FeedbackWindow_Content" xml:space="preserve">
-    <value>打开 Issues</value>
+    <value>Open Issues</value>
   </data>
   <data name="FeedbackWindow_Content_2" xml:space="preserve">
     <value>Export diagnostics</value>
   </data>
   <data name="FeedbackWindow_Content_3" xml:space="preserve">
-    <value>复制信息</value>
+    <value>Copy info</value>
   </data>
   <data name="FeedbackWindow_Text" xml:space="preserve">
-    <value>建议附带：问题现象、复现步骤、是否插电、当前性能模式、诊断包。</value>
+    <value>Suggested attachments: symptoms, reproduction steps, AC power state, current performance mode, diagnostic pack.</value>
   </data>
   <data name="FeedbackWindow_Text_2" xml:space="preserve">
-    <value>把版本信息、硬件信息和日志一起发到 GitHub Issues，定位会快很多。</value>
+    <value>Send the version, hardware info and logs together in the GitHub Issue for much faster diagnosis.</value>
   </data>
   <data name="FeedbackWindow_Text_3" xml:space="preserve">
-    <value>反馈与问题</value>
+    <value>Feedback &amp; Issues</value>
   </data>
   <data name="FeedbackWindow_Title" xml:space="preserve">
     <value>Feedback</value>
   </data>
   <data name="GpuRestartPromptWindow_Content" xml:space="preserve">
-    <value>否</value>
+    <value>No</value>
   </data>
   <data name="GpuRestartPromptWindow_Content_2" xml:space="preserve">
-    <value>是</value>
+    <value>Yes</value>
   </data>
   <data name="GpuRestartPromptWindow_Title" xml:space="preserve">
-    <value>切换显卡模式</value>
+    <value>Switch GPU mode</value>
   </data>
   <data name="ExtraCheck_Content" xml:space="preserve">
-    <value>附加选项</value>
+    <value>Additional options</value>
   </data>
   <data name="Extra3Label_Text" xml:space="preserve">
-    <value>附加</value>
+    <value>Extra</value>
   </data>
   <data name="MultiColorLabel_Text" xml:space="preserve">
     <value>Color</value>
@@ -316,16 +316,16 @@
     <value>Brightness</value>
   </data>
   <data name="HidKeyboardWindow_Text_5" xml:space="preserve">
-    <value>关闭后停止 HID 效果</value>
+    <value>Stops HID effects when disabled</value>
   </data>
   <data name="HidKeyboardWindow_Text_6" xml:space="preserve">
-    <value>电源</value>
+    <value>Power</value>
   </data>
   <data name="HidKeyboardWindow_Text_7" xml:space="preserve">
-    <value>效果</value>
+    <value>Effect</value>
   </data>
   <data name="HidKeyboardWindow_Text_8" xml:space="preserve">
-    <value>HID 直连键盘：效果、电源与亮度。</value>
+    <value>HID keyboard: effects, power and brightness.</value>
   </data>
   <data name="HidKeyboardWindow_Text_9" xml:space="preserve">
     <value>Keyboard lighting</value>
@@ -334,58 +334,58 @@
     <value>Open the LICENSES folder</value>
   </data>
   <data name="LicensesWindow_Text" xml:space="preserve">
-    <value>本程序按 GPL-3.0 提供，不附任何担保；详见根目录 LICENSE。</value>
+    <value>This program is provided under GPL-3.0 without any warranty; see LICENSE in the program directory.</value>
   </data>
   <data name="LicensesWindow_Text_2" xml:space="preserve">
-    <value>Copyright (C) 2026 L-Mechrevo contributors；原项目：LiangyuLu-lly/L-Mechrevo；本版维护：xiaohan (xmsjx)。</value>
+    <value>Copyright (C) 2026 L-Mechrevo contributors; original project: LiangyuLu-lly/L-Mechrevo; maintained by: xiaohan (xmsjx).</value>
   </data>
   <data name="LicensesWindow_Text_3" xml:space="preserve">
-    <value>Zcodeoooo/JiaoLong16Pro-Battery-threshold — 无 LICENSE（协议事实参考）</value>
+    <value>Zcodeoooo/JiaoLong16Pro-Battery-threshold — no LICENSE (protocol reference only)</value>
   </data>
   <data name="LicensesWindow_Text_4" xml:space="preserve">
     <value>Protocol references (no code copied)</value>
   </data>
   <data name="LicensesWindow_Text_5" xml:space="preserve">
-    <value>usbmmidd_v2 虚拟显示器驱动 — Amyuni（见驱动自带 License.txt）</value>
+    <value>usbmmidd_v2 virtual display driver — Amyuni (see the driver's bundled License.txt)</value>
   </data>
   <data name="LicensesWindow_Text_6" xml:space="preserve">
-    <value>随程序分发</value>
+    <value>Distributed with the program</value>
   </data>
   <data name="LicensesWindow_Text_7" xml:space="preserve">
-    <value>G-Helper（含 AMD SMU 层） — GPL-3.0</value>
+    <value>G-Helper (including AMD SMU layer) — GPL-3.0</value>
   </data>
   <data name="LicensesWindow_Text_8" xml:space="preserve">
-    <value>派生自</value>
+    <value>Derived from</value>
   </data>
   <data name="LicensesWindow_Text_9" xml:space="preserve">
-    <value>L-Mechrevo 以 GPL-3.0-only 分发；下列为本项目使用的第三方项目与许可摘要。完整文本见程序目录 LICENSES。</value>
+    <value>L-Mechrevo is distributed under GPL-3.0-only. The following third-party projects and license summaries are used by this project. Full texts are in the LICENSES folder.</value>
   </data>
   <data name="LicensesWindow_Text_10" xml:space="preserve">
-    <value>许可证与鸣谢</value>
+    <value>Licenses &amp; Credits</value>
   </data>
   <data name="LightEditorWindow_Text" xml:space="preserve">
-    <value>调整后自动生效</value>
+    <value>Applied automatically after adjustment</value>
   </data>
   <data name="LightEditorWindow_Text_2" xml:space="preserve">
     <value>Breathing color</value>
   </data>
   <data name="LightEditorWindow_Text_3" xml:space="preserve">
-    <value>切换颜色（六段）</value>
+    <value>Switch color (6 segments)</value>
   </data>
   <data name="LightEditorWindow_Text_4" xml:space="preserve">
-    <value>每键显示时间</value>
+    <value>Per-key display time</value>
   </data>
   <data name="LightEditorWindow_Content" xml:space="preserve">
-    <value>恢复默认七色</value>
+    <value>Restore default 7 colors</value>
   </data>
   <data name="LightEditorWindow_Text_5" xml:space="preserve">
-    <value>混色（当前通道保存的七色）</value>
+    <value>Mixed colors (7 colors saved for the current channel)</value>
   </data>
   <data name="LightEditorWindow_Text_6" xml:space="preserve">
-    <value>开启后按下发灯效</value>
+    <value>Apply effect when enabled</value>
   </data>
   <data name="HintText_Text_2" xml:space="preserve">
-    <value>效果、亮度、速度与颜色。混色效果沿用当前通道已保存的七色。</value>
+    <value>Effects, brightness, speed and color. Mixed effects reuse the 7 colors saved for the current channel.</value>
   </data>
   <data name="TitleText_Text_2" xml:space="preserve">
     <value>Lighting</value>
@@ -394,7 +394,7 @@
     <value>Settings</value>
   </data>
   <data name="StatusText_Text" xml:space="preserve">
-    <value>就绪</value>
+    <value>Ready</value>
   </data>
   <data name="MainWindow_Text" xml:space="preserve">
     <value>Quit</value>
@@ -439,7 +439,7 @@
     <value>Edit</value>
   </data>
   <data name="OriginalStyleWindow_Text" xml:space="preserve">
-    <value>同步灯</value>
+    <value>Sync light</value>
   </data>
   <data name="OriginalStyleWindow_Text_2" xml:space="preserve">
     <value>Hinge</value>
@@ -496,13 +496,13 @@
     <value>Enable stepless charge limit (experimental)</value>
   </data>
   <data name="ChargeLimitStatus_Text" xml:space="preserve">
-    <value>读取充电阈值状态…</value>
+    <value>Reading charge threshold status…</value>
   </data>
   <data name="OriginalStyleWindow_Text_10" xml:space="preserve">
-    <value>停充 %</value>
+    <value>Stop at %</value>
   </data>
   <data name="OriginalStyleWindow_Text_11" xml:space="preserve">
-    <value>起充 %</value>
+    <value>Start at %</value>
   </data>
   <data name="ChargeLimitApplyButton_Content" xml:space="preserve">
     <value>Save thresholds</value>
@@ -526,7 +526,7 @@
     <value>Battery</value>
   </data>
   <data name="OriginalStyleWindow_Content_7" xml:space="preserve">
-    <value>鲜艳</value>
+    <value>Vivid</value>
   </data>
   <data name="OriginalStyleWindow_Content_8" xml:space="preserve">
     <value>Standard</value>
@@ -538,7 +538,7 @@
     <value>Auto Refresh</value>
   </data>
   <data name="IgpuSavingPreviewStatus_Text" xml:space="preserve">
-    <value>当前：--</value>
+    <value>Current: --</value>
   </data>
   <data name="IgpuSavingOnPreview_Content" xml:space="preserve">
     <value>On</value>
@@ -586,7 +586,7 @@
     <value>Current: —</value>
   </data>
   <data name="PerfConfigEditButton_Content" xml:space="preserve">
-    <value>配置编辑</value>
+    <value>Edit config</value>
   </data>
   <data name="BackgroundToggle_Content" xml:space="preserve">
     <value>Background image</value>
@@ -601,25 +601,25 @@
     <value>● GCU status unknown</value>
   </data>
   <data name="OriginalStyleWindow_Text_24" xml:space="preserve">
-    <value>L-Mechrevo · 原版小窗</value>
+    <value>L-Mechrevo · Classic mini window</value>
   </data>
   <data name="OriginalStyleWindow_Title" xml:space="preserve">
-    <value>L-Mechrevo · 原版小窗 P0</value>
+    <value>L-Mechrevo · Classic mini window P0</value>
   </data>
   <data name="OverlayWindow_Title" xml:space="preserve">
-    <value>L-Mechrevo 悬浮窗</value>
+    <value>L-Mechrevo overlay</value>
   </data>
   <data name="QuickTilePickerWindow_Content" xml:space="preserve">
     <value>OK</value>
   </data>
   <data name="HintText_Text_3" xml:space="preserve">
-    <value>最多 5 个</value>
+    <value>Up to 5</value>
   </data>
   <data name="QuickTilePickerWindow_Text" xml:space="preserve">
-    <value>选择要放到磁贴行的快捷开关</value>
+    <value>Select quick switches for the tile row</value>
   </data>
   <data name="QuickTilePickerWindow_Title" xml:space="preserve">
-    <value>选择快捷按钮</value>
+    <value>Select quick buttons</value>
   </data>
   <data name="SettingsWindow_Content" xml:space="preserve">
     <value>Open install folder</value>
@@ -805,7 +805,7 @@
     <value>Choose...</value>
   </data>
   <data name="WideBackgroundPathText_Text" xml:space="preserve">
-    <value>未选择</value>
+    <value>Not selected</value>
   </data>
   <data name="SettingsWindow_Text_30" xml:space="preserve">
     <value>Wide background</value>
@@ -832,34 +832,34 @@
     <value>UI</value>
   </data>
   <data name="SponsorWindow_Text" xml:space="preserve">
-    <value>二维码仅用于赞助；L-Mechrevo 本身开源，不提供付费功能解锁。</value>
+    <value>The QR codes are for sponsorship only; L-Mechrevo itself is open source and has no paid feature unlocks.</value>
   </data>
   <data name="SponsorWindow_Text_2" xml:space="preserve">
-    <value>本版维护者</value>
+    <value>Current maintainer</value>
   </data>
   <data name="SponsorWindow_Text_3" xml:space="preserve">
-    <value>原项目</value>
+    <value>Original project</value>
   </data>
   <data name="SponsorWindow_Text_4" xml:space="preserve">
-    <value>感谢你支持 L-Mechrevo 的维护与更新。以下二维码分别对应原项目与当前维护者，请按需扫码。</value>
+    <value>Thank you for supporting the maintenance and updates of L-Mechrevo. The QR codes below correspond to the original project and the current maintainer; scan as needed.</value>
   </data>
   <data name="SponsorWindow_Text_5" xml:space="preserve">
-    <value>赞助 L-Mechrevo</value>
+    <value>Sponsor L-Mechrevo</value>
   </data>
   <data name="PromptText_Text" xml:space="preserve">
-    <value>输入：</value>
+    <value>Input:</value>
   </data>
   <data name="TextPromptWindow_Title" xml:space="preserve">
-    <value>输入</value>
+    <value>Input</value>
   </data>
   <data name="UpdateWindow_Content" xml:space="preserve">
     <value>Open Download Page</value>
   </data>
   <data name="UpdateWindow_Content_2" xml:space="preserve">
-    <value>复制下载链接</value>
+    <value>Copy download link</value>
   </data>
   <data name="UpdateWindow_Text" xml:space="preserve">
-    <value>发现新版本</value>
+    <value>New version found</value>
   </data>
   <data name="CustomPageView_Content" xml:space="preserve">
     <value>Open GPU fan curve</value>
@@ -946,79 +946,79 @@
     <value>Quick switches arranged as tiles</value>
   </data>
   <data name="CalibrationSettingsWindow_xaml_MessageBoxShowthis" xml:space="preserve">
-    <value>ICC 导入失败。</value>
+    <value>Failed to import ICC.</value>
   </data>
   <data name="CpuTuningWindow_xaml_Text" xml:space="preserve">
-    <value>该平台没有可调的 SMU/CO 选项。</value>
+    <value>No adjustable SMU/CO options are available on this platform.</value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_2" xml:space="preserve">
-    <value>CPU 探针失败：</value>
+    <value>CPU probe failed: </value>
   </data>
   <data name="CpuTuningWindow_xaml_Content" xml:space="preserve">
     <value>Apply</value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_3" xml:space="preserve">
-    <value>每核 CO（Curve Optimizer）</value>
+    <value>Per-core CO (Curve Optimizer)</value>
   </data>
   <data name="CpuTuningWindow_xaml_Content_2" xml:space="preserve">
-    <value>应用每核 CO</value>
+    <value>Apply per-core CO</value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_4" xml:space="preserve">
-    <value>每核 CO 应用失败：</value>
+    <value>Failed to apply per-core CO: </value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_5" xml:space="preserve">
-    <value>FMax 应用失败：</value>
+    <value>Failed to apply FMax: </value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_6" xml:space="preserve">
-    <value>应用失败：</value>
+    <value>Apply failed: </value>
   </data>
   <data name="CpuTuningWindow_xaml_MessageBoxShowthis" xml:space="preserve">
-    <value>重置所有 CPU 调节项？</value>
+    <value>Reset all CPU tuning items?</value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_7" xml:space="preserve">
-    <value>重置失败：</value>
+    <value>Reset failed: </value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_8" xml:space="preserve">
-    <value>快照已保存</value>
+    <value>Snapshot saved</value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_9" xml:space="preserve">
-    <value>保存快照失败：</value>
+    <value>Failed to save snapshot: </value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_10" xml:space="preserve">
-    <value>没有可读取的每核 CO 快照</value>
+    <value>No readable per-core CO snapshot</value>
   </data>
   <data name="CpuTuningWindow_xaml_Text_11" xml:space="preserve">
-    <value>读取快照失败：</value>
+    <value>Failed to load snapshot: </value>
   </data>
   <data name="CustomModeWindow_xaml_Content" xml:space="preserve">
     <value>Apply *</value>
   </data>
   <data name="CustomModeWindow_xaml_Text" xml:space="preserve">
-    <value>有未应用修改</value>
+    <value>There are unapplied changes</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_2" xml:space="preserve">
-    <value>切换模式失败：</value>
+    <value>Failed to switch mode: </value>
   </data>
   <data name="CustomModeWindow_xaml_Title" xml:space="preserve">
-    <value>性能模式 ·</value>
+    <value>Performance mode · </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_3" xml:space="preserve">
-    <value>30 系固件配置档（只读预览）</value>
+    <value>Gen 30 firmware profile (read-only preview)</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_4" xml:space="preserve">
-    <value>绑定固件配置失败：</value>
+    <value>Failed to bind firmware profile: </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_5" xml:space="preserve">
-    <value>当前模式：</value>
+    <value>Current mode: </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_6" xml:space="preserve">
-    <value>电源计划已切换</value>
+    <value>Power plan switched</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_7" xml:space="preserve">
     <value>Power plan not confirmed; not saved</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_8" xml:space="preserve">
-    <value>电源计划失败：</value>
+    <value>Power plan failed: </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_9" xml:space="preserve">
     <value>CPU power wall PL1 (W)</value>
@@ -1036,46 +1036,46 @@
     <value>Apply failed: no result returned</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_14" xml:space="preserve">
-    <value>已应用：</value>
+    <value>Applied: </value>
   </data>
   <data name="CustomModeWindow_xaml_MessageBoxShowthis" xml:space="preserve">
-    <value>恢复该模式的出厂默认参数？</value>
+    <value>Restore factory defaults for this mode?</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_15" xml:space="preserve">
-    <value>已恢复默认：</value>
+    <value>Defaults restored: </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_16" xml:space="preserve">
-    <value>新建自定义模式失败（已达到上限或没有可用序号）</value>
+    <value>Failed to create custom mode (limit reached or no available slot)</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_17" xml:space="preserve">
-    <value>已新建：</value>
+    <value>Created: </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_18" xml:space="preserve">
-    <value>新建失败：</value>
+    <value>Create failed: </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_19" xml:space="preserve">
-    <value>已重命名</value>
+    <value>Renamed</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_20" xml:space="preserve">
-    <value>内置模式不能删除</value>
+    <value>Built-in modes cannot be deleted</value>
   </data>
   <data name="CustomModeWindow_xaml_MessageBoxShowthis_2" xml:space="preserve">
-    <value>删除模式「</value>
+    <value>Delete mode "</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_21" xml:space="preserve">
-    <value>已删除</value>
+    <value>Deleted</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_22" xml:space="preserve">
-    <value>删除失败</value>
+    <value>Delete failed</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_23" xml:space="preserve">
-    <value>后端未连接，无法打开风扇曲线</value>
+    <value>Backend not connected; cannot open the fan curve</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_24" xml:space="preserve">
-    <value>打开风扇曲线失败：</value>
+    <value>Failed to open fan curve: </value>
   </data>
   <data name="CustomModeWindow_xaml_Text_25" xml:space="preserve">
-    <value>打开 CPU 调节失败：</value>
+    <value>Failed to open CPU tuning: </value>
   </data>
   <data name="FanCurveWindow_xaml_Text" xml:space="preserve">
     <value>Backend not connected. Cannot read fan curve.</value>
@@ -1084,163 +1084,163 @@
     <value>Fan curve changed; push to apply.</value>
   </data>
   <data name="FanCurveWindow_xaml_MessageBoxShowthis" xml:space="preserve">
-    <value>风扇曲线还有未应用的修改，确定关闭？</value>
+    <value>The fan curve has unapplied changes. Close anyway?</value>
   </data>
   <data name="FanCurveWindow_xaml_Text_3" xml:space="preserve">
-    <value>GCU 未连接，无法下发风扇曲线</value>
+    <value>GCU not connected; cannot apply the fan curve</value>
   </data>
   <data name="FanCurveWindow_xaml_Text_4" xml:space="preserve">
-    <value>风扇曲线已保存；下发开关关闭，未推送硬件</value>
+    <value>Fan curve saved; apply switch is off, nothing was sent to hardware</value>
   </data>
   <data name="FanCurveWindow_xaml_Text_5" xml:space="preserve">
-    <value>风扇曲线已下发并回读确认，已写入当前配置档</value>
+    <value>Fan curve applied and read back successfully; written to the current profile</value>
   </data>
   <data name="FanCurveWindow_xaml_Text_6" xml:space="preserve">
-    <value>风扇曲线回读未确认，未写入当前配置档</value>
+    <value>Fan curve readback was not confirmed; not written to the current profile</value>
   </data>
   <data name="FanCurveWindow_xaml_Text_7" xml:space="preserve">
-    <value>已恢复默认曲线，点应用后下发</value>
+    <value>Default curve restored; click Apply to send it</value>
   </data>
   <data name="FeedbackWindow_xaml_Text" xml:space="preserve">
-    <value>机型：</value>
+    <value>Model: </value>
   </data>
   <data name="FeedbackWindow_xaml_Text_2" xml:space="preserve">
     <value>System</value>
   </data>
   <data name="FeedbackWindow_xaml_Text_3" xml:space="preserve">
-    <value>信息已复制</value>
+    <value>Information copied</value>
   </data>
   <data name="FeedbackWindow_xaml_Text_4" xml:space="preserve">
-    <value>复制失败：</value>
+    <value>Copy failed: </value>
   </data>
   <data name="FeedbackWindow_xaml_Text_5" xml:space="preserve">
-    <value>正在导出诊断包…</value>
+    <value>Exporting diagnostic pack…</value>
   </data>
   <data name="FeedbackWindow_xaml_Text_6" xml:space="preserve">
-    <value>诊断包导出流程已结束</value>
+    <value>Diagnostic pack export finished</value>
   </data>
   <data name="FeedbackWindow_xaml_Text_7" xml:space="preserve">
-    <value>导出失败：</value>
+    <value>Export failed: </value>
   </data>
   <data name="FeedbackWindow_xaml_Text_8" xml:space="preserve">
-    <value>已在浏览器打开 Issues</value>
+    <value>Issues opened in the browser</value>
   </data>
   <data name="FeedbackWindow_xaml_Text_9" xml:space="preserve">
-    <value>打开失败：</value>
+    <value>Open failed: </value>
   </data>
   <data name="HidKeyboardWindow_xaml_Content" xml:space="preserve">
     <value>Random color</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Content_2" xml:space="preserve">
-    <value>反向</value>
+    <value>Reverse</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text" xml:space="preserve">
-    <value>雨滴颜色数</value>
+    <value>Raindrop color count</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_2" xml:space="preserve">
-    <value>雨滴颜色</value>
+    <value>Raindrop color</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_3" xml:space="preserve">
-    <value>矩阵颜色数</value>
+    <value>Matrix color count</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_4" xml:space="preserve">
-    <value>矩阵颜色</value>
+    <value>Matrix color</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_5" xml:space="preserve">
-    <value>静态分区数</value>
+    <value>Static zone count</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_6" xml:space="preserve">
     <value>Zone colors</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_7" xml:space="preserve">
-    <value>HID 未连接，关灯失败：</value>
+    <value>HID not connected; failed to turn off lighting: </value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_8" xml:space="preserve">
-    <value>HID 键盘灯已关闭</value>
+    <value>HID keyboard lighting turned off</value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_9" xml:space="preserve">
-    <value>HID 连接失败：</value>
+    <value>HID connection failed: </value>
   </data>
   <data name="HidKeyboardWindow_xaml_Text_10" xml:space="preserve">
-    <value>HID 键盘效果已应用</value>
+    <value>HID keyboard effect applied</value>
   </data>
   <data name="HotkeySettingsWindow_Title" xml:space="preserve">
-    <value>全局热键</value>
+    <value>Global hotkeys</value>
   </data>
   <data name="HotkeySettingsWindow_Content" xml:space="preserve">
-    <value>启用全局热键</value>
+    <value>Enable global hotkeys</value>
   </data>
   <data name="HotkeySettingsWindow_Text" xml:space="preserve">
-    <value>点“录制”后按下组合键；Esc 取消。</value>
+    <value>Click Record, then press the key combination; Esc cancels.</value>
   </data>
   <data name="HotkeySettingsWindow_Content_2" xml:space="preserve">
-    <value>录制</value>
+    <value>Record</value>
   </data>
   <data name="HotkeySettingsWindow_Content_3" xml:space="preserve">
-    <value>恢复默认</value>
+    <value>Restore defaults</value>
   </data>
   <data name="HotkeySettingsWindow_Text_2" xml:space="preserve">
-    <value>已恢复默认热键</value>
+    <value>Default hotkeys restored</value>
   </data>
   <data name="HotkeySettingsWindow_Content_4" xml:space="preserve">
     <value>Close</value>
   </data>
   <data name="HotkeySettingsWindow_Text_3" xml:space="preserve">
-    <value>请按下新的组合键，Esc 取消</value>
+    <value>Press the new key combination; Esc cancels</value>
   </data>
   <data name="HotkeySettingsWindow_Text_4" xml:space="preserve">
-    <value>已取消</value>
+    <value>Cancelled</value>
   </data>
   <data name="HotkeySettingsWindow_Text_5" xml:space="preserve">
-    <value>热键至少需要 Ctrl / Alt / Shift / Win 之一</value>
+    <value>A hotkey must include at least one of Ctrl / Alt / Shift / Win</value>
   </data>
   <data name="HotkeySettingsWindow_Text_6" xml:space="preserve">
-    <value>该组合键已被「</value>
+    <value>This key combination is already used by "</value>
   </data>
   <data name="HotkeySettingsWindow_Text_7" xml:space="preserve">
-    <value>已设置：</value>
+    <value>Set: </value>
   </data>
   <data name="LicensesWindow_xaml_MessageBoxShowthis" xml:space="preserve">
-    <value>程序目录下未找到 LICENSES 文件夹。</value>
+    <value>The LICENSES folder was not found in the program directory.</value>
   </data>
   <data name="LicensesWindow_xaml_MessageBoxShowthis_2" xml:space="preserve">
-    <value>打开 LICENSES 文件夹失败：</value>
+    <value>Failed to open the LICENSES folder: </value>
   </data>
   <data name="LightEditorWindow_xaml_Text" xml:space="preserve">
-    <value>单分区键盘：呼吸四色、彩虹不可改色、亮度为 x/4、Manual 每键时间 2~10。</value>
+    <value>Single-zone keyboard: breathing uses 4 colors, rainbow cannot be recolored, brightness is x/4, Manual per-key time is 2–10.</value>
   </data>
   <data name="LightEditorWindow_xaml_Text_2" xml:space="preserve">
-    <value>单分区键盘模式</value>
+    <value>Single-zone keyboard mode</value>
   </data>
   <data name="LightEditorWindow_xaml_ToolTip" xml:space="preserve">
     <value>Breathing color</value>
   </data>
   <data name="LightEditorWindow_xaml_Text_3" xml:space="preserve">
-    <value>保存成功，但后端未连接，未下发</value>
+    <value>Saved, but the backend is not connected so nothing was sent</value>
   </data>
   <data name="MainWindow_xaml_Text" xml:space="preserve">
-    <value>就绪 · 宽屏四页布局</value>
+    <value>Ready · Wide four-page layout</value>
   </data>
   <data name="MainWindow_xaml_Text_2" xml:space="preserve">
     <value>Duty</value>
   </data>
   <data name="MainWindow_xaml_Text_3" xml:space="preserve">
-    <value>占空比 --</value>
+    <value>Duty -- </value>
   </data>
   <data name="MainWindow_xaml_Text_4" xml:space="preserve">
-    <value>没有可恢复的小窗</value>
+    <value>No mini window to restore</value>
   </data>
   <data name="MainWindow_xaml_Text_5" xml:space="preserve">
-    <value>强调色已切换：</value>
+    <value>Accent color switched: </value>
   </data>
   <data name="MainWindow_xaml_Text_6" xml:space="preserve">
-    <value>性能模式已请求：</value>
+    <value>Performance mode requested: </value>
   </data>
   <data name="MainWindow_xaml_Text_7" xml:space="preserve">
-    <value>显卡模式已请求：</value>
+    <value>GPU mode requested: </value>
   </data>
   <data name="MainWindow_xaml_Text_8" xml:space="preserve">
-    <value>刷新率已请求：</value>
+    <value>Refresh rate requested: </value>
   </data>
   <data name="MainWindow_xaml_Text_9" xml:space="preserve">
     <value>Custom</value>
@@ -1258,10 +1258,10 @@
     <value>Save</value>
   </data>
   <data name="MainWindow_xaml_Text_12" xml:space="preserve">
-    <value>起</value>
+    <value>Start</value>
   </data>
   <data name="MainWindow_xaml_Text_13" xml:space="preserve">
-    <value>停</value>
+    <value>Stop</value>
   </data>
   <data name="MainWindow_xaml_Content_3" xml:space="preserve">
     <value>Unlimited charge (experimental)</value>
@@ -1276,352 +1276,352 @@
     <value>iGPU Saving</value>
   </data>
   <data name="MainWindow_xaml_Content_6" xml:space="preserve">
-    <value>切换 FHD 模式</value>
+    <value>Switch FHD mode</value>
   </data>
   <data name="MainWindow_xaml_Text_15" xml:space="preserve">
-    <value>ICC 导入失败</value>
+    <value>ICC import failed</value>
   </data>
   <data name="MainWindow_xaml_Text_16" xml:space="preserve">
-    <value>灯光设置已保存（后端未连接）</value>
+    <value>Lighting settings saved (backend not connected)</value>
   </data>
   <data name="MainWindow_xaml_Text_17" xml:space="preserve">
-    <value>灯光编辑失败：</value>
+    <value>Lighting edit failed: </value>
   </data>
   <data name="MainWindow_xaml_Text_18" xml:space="preserve">
-    <value>暂无自定义模式</value>
+    <value>No custom modes yet</value>
   </data>
   <data name="MainWindow_xaml_Content_7" xml:space="preserve">
     <value>Edit</value>
   </data>
   <data name="MainWindow_xaml_Text_19" xml:space="preserve">
-    <value>自定义模式已关闭</value>
+    <value>Custom mode closed</value>
   </data>
   <data name="MainWindow_xaml_Text_20" xml:space="preserve">
-    <value>打开自定义模式失败：</value>
+    <value>Failed to open custom mode: </value>
   </data>
   <data name="MainWindow_xaml_Text_21" xml:space="preserve">
-    <value>CPU 风扇曲线已关闭</value>
+    <value>CPU fan curve closed</value>
   </data>
   <data name="MainWindow_xaml_Text_22" xml:space="preserve">
-    <value>打开 CPU 风扇曲线失败：</value>
+    <value>Failed to open CPU fan curve: </value>
   </data>
   <data name="MainWindow_xaml_Text_23" xml:space="preserve">
-    <value>GPU 风扇曲线已关闭</value>
+    <value>GPU fan curve closed</value>
   </data>
   <data name="MainWindow_xaml_Text_24" xml:space="preserve">
-    <value>打开 GPU 风扇曲线失败：</value>
+    <value>Failed to open GPU fan curve: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text" xml:space="preserve">
-    <value>全局热键注册失败：</value>
+    <value>Failed to register global hotkey: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_2" xml:space="preserve">
-    <value>MiniLED 分区控光已切换</value>
+    <value>MiniLED local dimming switched</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_3" xml:space="preserve">
-    <value>MiniLED 切换失败：</value>
+    <value>MiniLED switch failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_4" xml:space="preserve">
-    <value>HDR Color Control 已切换</value>
+    <value>HDR Color Control switched</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_5" xml:space="preserve">
-    <value>HDR Color Control 切换失败：</value>
+    <value>HDR Color Control switch failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_6" xml:space="preserve">
-    <value>FHD 切换失败：</value>
+    <value>FHD switch failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_7" xml:space="preserve">
-    <value>打开灯光编辑器失败：</value>
+    <value>Failed to open lighting editor: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_8" xml:space="preserve">
-    <value>模式已下发</value>
+    <value>Mode applied</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_9" xml:space="preserve">
-    <value>快捷磁贴顺序已保存</value>
+    <value>Quick tile order saved</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_10" xml:space="preserve">
-    <value>已关闭无极限充，充电上限恢复 100%</value>
+    <value>Unlimited charging disabled; charge limit restored to 100%</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_11" xml:space="preserve">
-    <value>关闭无极限充后写回 100% 失败（写入=</value>
+    <value>Failed to write back 100% after disabling unlimited charging (written=</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_12" xml:space="preserve">
-    <value>已关闭无极限充，GCU 充电上限恢复 100%</value>
+    <value>Unlimited charging disabled; GCU charge limit restored to 100%</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_13" xml:space="preserve">
-    <value>关闭无极限充后 GCU 写回 100% 失败</value>
+    <value>Failed to write back 100% via GCU after disabling unlimited charging</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_14" xml:space="preserve">
-    <value>关闭无极限充：没有可用的 EC/GCU 回写通道</value>
+    <value>Disable unlimited charging: no EC/GCU write-back channel available</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_15" xml:space="preserve">
-    <value>关闭无极限充失败：</value>
+    <value>Failed to disable unlimited charging: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_16" xml:space="preserve">
-    <value>读取充电阈值失败：需要 PawnIO 驱动或本机型不支持</value>
+    <value>Failed to read charge threshold: PawnIO driver required or unsupported model</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_17" xml:space="preserve">
-    <value>读取充电阈值异常：</value>
+    <value>Charge threshold read error: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_18" xml:space="preserve">
-    <value>限制充电已启用（停充</value>
+    <value>Charge limit enabled (stop at </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_19" xml:space="preserve">
-    <value>启用失败：</value>
+    <value>Enable failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_20" xml:space="preserve">
-    <value>限制充电已关闭</value>
+    <value>Charge limit disabled</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_21" xml:space="preserve">
-    <value>关闭失败：</value>
+    <value>Disable failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_22" xml:space="preserve">
-    <value>操作异常：</value>
+    <value>Operation error: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_23" xml:space="preserve">
-    <value>阈值已保存（停充</value>
+    <value>Threshold saved (stop at </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_24" xml:space="preserve">
     <value>Save failed</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_25" xml:space="preserve">
-    <value>保存异常：</value>
+    <value>Save error: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_26" xml:space="preserve">
-    <value>已启用无极限充滑块（三档按钮暂时置灰）</value>
+    <value>Unlimited charging slider enabled (three-level buttons are temporarily disabled)</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_27" xml:space="preserve">
-    <value>正在关闭无极限充并恢复满充…</value>
+    <value>Disabling unlimited charging and restoring full charge…</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_28" xml:space="preserve">
-    <value>充电上限写入未确认</value>
+    <value>Charge limit write was not confirmed</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_29" xml:space="preserve">
-    <value>充电上限：</value>
+    <value>Charge limit: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Content" xml:space="preserve">
-    <value>窄屏</value>
+    <value>Compact</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Content_2" xml:space="preserve">
-    <value>宽屏</value>
+    <value>Wide</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_30" xml:space="preserve">
     <value>Mode</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_31" xml:space="preserve">
-    <value>本机不支持热切换核显省电</value>
+    <value>This model does not support live iGPU-only power saving</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_32" xml:space="preserve">
-    <value>核显省电已取消</value>
+    <value>iGPU-only power saving cancelled</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_33" xml:space="preserve">
-    <value>核显省电已切换：</value>
+    <value>iGPU-only power saving switched: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_34" xml:space="preserve">
-    <value>核显省电已通过强制路径切换</value>
+    <value>iGPU-only power saving switched via forced path</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_35" xml:space="preserve">
-    <value>核显省电切换失败，已尝试恢复原状态</value>
+    <value>Failed to switch iGPU-only power saving; attempted to restore previous state</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_36" xml:space="preserve">
-    <value>核显省电切换失败：</value>
+    <value>Failed to switch iGPU-only power saving: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_37" xml:space="preserve">
-    <value>当前机型不支持该显卡模式</value>
+    <value>The current model does not support this GPU mode</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_38" xml:space="preserve">
-    <value>宝龙达不支持核显模式</value>
+    <value>Baolongda does not support iGPU mode</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_39" xml:space="preserve">
-    <value>宝龙达显卡模式写入失败</value>
+    <value>Failed to write GPU mode for Baolongda</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_40" xml:space="preserve">
-    <value>已请求切换并重启，重启后生效</value>
+    <value>Switch requested; takes effect after restart</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_41" xml:space="preserve">
-    <value>重启切换请求失败</value>
+    <value>Failed to request restart switch</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_42" xml:space="preserve">
-    <value>无极限充开启时三档按钮不可用</value>
+    <value>Three-level buttons are unavailable while unlimited charging is on</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_43" xml:space="preserve">
-    <value>没有可用的快捷开关</value>
+    <value>No quick switches available</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_44" xml:space="preserve">
-    <value>快捷磁贴已更新</value>
+    <value>Quick tiles updated</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_45" xml:space="preserve">
-    <value>睡眠省电范围：</value>
+    <value>Sleep power-saving scope: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_46" xml:space="preserve">
     <value>Battery</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_47" xml:space="preserve">
-    <value>当前：</value>
+    <value>Current: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_48" xml:space="preserve">
-    <value>GCU 状态检查失败：</value>
+    <value>GCU status check failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_49" xml:space="preserve">
-    <value>首次引导显示失败：</value>
+    <value>Failed to show first-run guide: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_50" xml:space="preserve">
-    <value>正在创建 MechrevoHw 并 ConnectAsync（最长 15 秒）…</value>
+    <value>Creating MechrevoHw and connecting (up to 15 seconds)…</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Content_3" xml:space="preserve">
     <value>Not Connected</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_51" xml:space="preserve">
-    <value>后端未连接</value>
+    <value>Backend not connected</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_52" xml:space="preserve">
-    <value>水冷状态已刷新</value>
+    <value>Liquid cooling status refreshed</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_53" xml:space="preserve">
-    <value>刷新水冷状态失败：</value>
+    <value>Failed to refresh liquid cooling status: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_54" xml:space="preserve">
-    <value>配置已保存：</value>
+    <value>Configuration saved: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_55" xml:space="preserve">
-    <value>后端未连接，无法打开配置编辑</value>
+    <value>Backend not connected; cannot open configuration editor</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_56" xml:space="preserve">
-    <value>打开配置编辑失败：</value>
+    <value>Failed to open configuration editor: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_57" xml:space="preserve">
-    <value>后端未连接，无法打开自定义模式</value>
+    <value>Backend not connected; cannot open custom mode</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_58" xml:space="preserve">
-    <value>屏幕校色下发中…</value>
+    <value>Applying display calibration…</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_59" xml:space="preserve">
-    <value>屏幕校色档位：</value>
+    <value>Display calibration profile: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_60" xml:space="preserve">
-    <value>色彩增强下发中…</value>
+    <value>Applying color enhancement…</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_61" xml:space="preserve">
-    <value>色彩增强下发失败</value>
+    <value>Failed to apply color enhancement</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_62" xml:space="preserve">
-    <value>色彩增强档位：</value>
+    <value>Color enhancement profile: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_63" xml:space="preserve">
-    <value>色彩增强档位下发失败</value>
+    <value>Failed to apply color enhancement profile</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_64" xml:space="preserve">
-    <value>后端未连接，无法编辑色彩增强</value>
+    <value>Backend not connected; cannot edit color enhancement</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_65" xml:space="preserve">
-    <value>后端未连接，无法编辑键盘灯光</value>
+    <value>Backend not connected; cannot edit keyboard lighting</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_66" xml:space="preserve">
-    <value>键盘 RGB 设备未连接，无法打开键盘灯光编辑</value>
+    <value>Keyboard RGB device not connected; cannot open keyboard lighting editor</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_67" xml:space="preserve">
-    <value>后端未连接，无法编辑 Logo 灯光</value>
+    <value>Backend not connected; cannot edit Logo lighting</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_68" xml:space="preserve">
-    <value>灯带写入失败，开关已回弹</value>
+    <value>Light strip write failed; switch reverted</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_69" xml:space="preserve">
-    <value>灯带状态已下发</value>
+    <value>Light strip state applied</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_70" xml:space="preserve">
-    <value>后端未连接，无法编辑灯带</value>
+    <value>Backend not connected; cannot edit light strip</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_71" xml:space="preserve">
-    <value>键盘 RGB 初始化失败：</value>
+    <value>Keyboard RGB initialization failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_72" xml:space="preserve">
-    <value>铰链灯写入失败，开关已回弹</value>
+    <value>Hinge light write failed; switch reverted</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_73" xml:space="preserve">
-    <value>铰链灯状态已下发</value>
+    <value>Hinge light state applied</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_74" xml:space="preserve">
-    <value>后端未连接，无法编辑铰链灯</value>
+    <value>Backend not connected; cannot edit hinge light</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_75" xml:space="preserve">
-    <value>同步灯写入失败，开关已回弹</value>
+    <value>Sync light write failed; switch reverted</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_76" xml:space="preserve">
-    <value>同步灯状态已下发</value>
+    <value>Sync light state applied</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_77" xml:space="preserve">
-    <value>后端未连接，无法编辑同步灯</value>
+    <value>Backend not connected; cannot edit sync light</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_78" xml:space="preserve">
-    <value>键盘灯光写入失败，开关已回弹</value>
+    <value>Keyboard lighting write failed; switch reverted</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_79" xml:space="preserve">
     <value>Keyboard RGB device not connected</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_80" xml:space="preserve">
-    <value>键盘 HID 未连接，关灯失败：</value>
+    <value>Keyboard HID not connected; failed to turn off lighting: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_81" xml:space="preserve">
-    <value>键盘灯光已关闭</value>
+    <value>Keyboard lighting turned off</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_82" xml:space="preserve">
-    <value>键盘 HID 连接失败：</value>
+    <value>Keyboard HID connection failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_83" xml:space="preserve">
-    <value>键盘 HID 灯效已下发：</value>
+    <value>Keyboard HID effect applied: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_84" xml:space="preserve">
-    <value>键盘 HID 下发失败：</value>
+    <value>Keyboard HID apply failed: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_85" xml:space="preserve">
-    <value>键盘灯上电失败</value>
+    <value>Failed to power on keyboard lighting</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_86" xml:space="preserve">
-    <value>Logo 灯写入失败，开关已回弹</value>
+    <value>Logo light write failed; switch reverted</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_87" xml:space="preserve">
-    <value>后端未连接，已记住 Logo 效果</value>
+    <value>Backend not connected; Logo effect remembered</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Title" xml:space="preserve">
     <value>Export diagnostics</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_88" xml:space="preserve">
-    <value>诊断包已导出：</value>
+    <value>Diagnostic pack exported: </value>
   </data>
   <data name="OriginalStyleWindow_xaml_Text_89" xml:space="preserve">
-    <value>诊断包导出失败：</value>
+    <value>Diagnostic pack export failed: </value>
   </data>
   <data name="QuickTilePickerWindow_xaml_Text" xml:space="preserve">
-    <value>最多</value>
+    <value>Up to </value>
   </data>
   <data name="QuickTilePickerWindow_xaml_Text_2" xml:space="preserve">
-    <value>最多只能选</value>
+    <value>You can select at most </value>
   </data>
   <data name="SettingsWindow_xaml_Title" xml:space="preserve">
-    <value>导出设置备份</value>
+    <value>Export settings backup</value>
   </data>
   <data name="SettingsWindow_xaml_Title_2" xml:space="preserve">
-    <value>导入设置备份</value>
+    <value>Import settings backup</value>
   </data>
   <data name="SettingsWindow_xaml_MessageBoxShowthis" xml:space="preserve">
-    <value>导入会覆盖现有设置，并自动备份当前设置。继续？</value>
+    <value>Importing will overwrite current settings and automatically back them up first. Continue?</value>
   </data>
   <data name="UpdateWindow_xaml_Title" xml:space="preserve">
-    <value>检查更新 ·</value>
+    <value>Check for updates · </value>
   </data>
   <data name="UpdateWindow_xaml_Text" xml:space="preserve">
-    <value>当前版本：</value>
+    <value>Current version: </value>
   </data>
   <data name="UpdateWindow_xaml_Text_2" xml:space="preserve">
-    <value>没有可复制的下载链接</value>
+    <value>No download link to copy</value>
   </data>
   <data name="UpdateWindow_xaml_Text_3" xml:space="preserve">
-    <value>下载链接已复制</value>
+    <value>Download link copied</value>
   </data>
   <data name="UpdateWindow_xaml_Text_4" xml:space="preserve">
-    <value>没有可打开的下载链接</value>
+    <value>No download link to open</value>
   </data>
   <data name="UpdateWindow_xaml_Text_5" xml:space="preserve">
-    <value>已在浏览器打开下载页</value>
+    <value>Download page opened in the browser</value>
   </data>
   <data name="OriginalStyleWindow_xaml_Content_4" xml:space="preserve">
     <value>Default</value>

@@ -77,6 +77,8 @@ public partial class OriginalStyleWindow : Window
     private readonly bool?[] _pendingChannelPower = new bool?[4];
     private readonly long[] _pendingChannelTick = new long[4];
     private System.Windows.Interop.HwndSource? _powerBroadcastSource;
+    // ⭐ task-30：盖子开关监听（独立 message-only 窗口；不挂主窗 WndProc）
+    private L_Mechrevo.WpfP0.Services.LidSwitchService? _lidSwitch;
     private bool[]? _lightingIdleSwitchSnapshot;
     private bool _lightingPowerSuspended;
     private bool _sleepKeyboardLightWasOn;
@@ -148,9 +150,12 @@ public partial class OriginalStyleWindow : Window
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
         HookPowerSessionEvents();
+        InitializeLidSwitchMonitor();
         Closed += (_, _) =>
         {
             _powerBroadcastSource?.RemoveHook(PowerBroadcastHook);
+            _lidSwitch?.Dispose();
+            _lidSwitch = null;
             UnhookPowerSessionEvents();
             MarkCleanExitForShutdown("窗口 Closed");
             if (_stateHookedHw != null)
@@ -1335,6 +1340,113 @@ public partial class OriginalStyleWindow : Window
             }));
         }
         return IntPtr.Zero;
+    }
+
+    // ⭐⭐ task-30：盖子开关监听（旧 Program.cs:1175 注册 LIDSWITCH_STATE_CHANGE 的 WPF 等价）✅
+    //   旧版把通知注册在 settingsForm.Handle 上、由窗体的 WndProc 处理；WPF 这里用**独立 message-only 窗口**
+    //   （LidSwitchService 内部 HWND_MESSAGE）⇒ ⛔ 不占用/不改本窗 WndProc，生命周期随窗口创建/Closed 释放。
+    private void InitializeLidSwitchMonitor()
+    {
+        try
+        {
+            _lidSwitch = new L_Mechrevo.WpfP0.Services.LidSwitchService();
+            _lidSwitch.LidStateChanged += OnLidStateChanged;
+            bool registered = _lidSwitch.Start();
+            bool selfCheck = L_Mechrevo.WpfP0.Services.LidSwitchService.RunSelfCheck(out string selfCheckDetail);
+            Logger.WriteLine("[lid] 服务：" + (registered ? "已注册 LIDSWITCH_STATE_CHANGE" : "未注册（安全 no-op，不伪造）")
+                + " · 自检=" + selfCheck + "（" + selfCheckDetail + "）"
+                + (registered ? "" : " · 原因=" + _lidSwitch.LastError));
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[lid] 启动失败（已吞掉，不影响启动）：" + ex.Message);
+        }
+    }
+
+    private void OnLidStateChanged(object? sender, L_Mechrevo.WpfP0.Services.LidStateChangedEventArgs e)
+    {
+        // 钩子运行在 UI 线程；再排一次 Dispatcher，避免在消息处理里长时间 await 硬件下发。
+        _ = Dispatcher.InvokeAsync(async () =>
+        {
+            try
+            {
+                await ApplyLidStateAsync(e.Closed);
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLine("[lid] 处理异常（已吞掉）：" + ex.Message);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 旧 <c>SettingsForm.cs:12273</c> LIDSWITCH 处理的 WPF 等价：
+    /// 合盖 = <c>BatteryControl.AutoBattery()</c> + 关键盘背光（旧 <c>Aura.ApplyBrightness(0,"Lid")</c>）；
+    /// 开盖 = 恢复键盘背光（旧 <c>InputDispatcher.GetBacklight()</c>）+ 旧 <c>InputDispatcher.InitFNLock()</c>
+    /// （后者在可得反编译源里是空 stub，Core 无同源 API ⇒ 安全跳过并记录，⛔ 不伪造）。
+    /// <para>⚠️ 旧合盖分支**不**改性能模式/刷新率/电源计划；电源来源变化的模式重放已由 task-25
+    /// <c>OnPowerSettledAsync → PerfModeService.ReplayAsync</c> 覆盖 ⇒ 本路径不重复做。</para>
+    /// </summary>
+    private async Task ApplyLidStateAsync(bool closed)
+    {
+        try
+        {
+            // 旧合盖分支第一句即 BatteryControl.AutoBattery()（与 SetAutoModes 同源；不涉及模式/刷新率）。
+            BatteryControl.AutoBattery();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[lid] AutoBattery 失败（已吞掉）：" + ex.Message);
+        }
+        if (closed)
+        {
+            Logger.WriteLine("[lid] 合盖 ⇒ 关闭键盘背光（旧 Aura.ApplyBrightness(0,\"Lid\") 的 WPF 等价）");
+            await SetKeyboardBacklightForLidAsync(on: false);
+            return;
+        }
+        Logger.WriteLine("[lid] 开盖 ⇒ 恢复键盘背光（旧 InputDispatcher.GetBacklight() 的 WPF 等价：按当前开关重放）");
+        Logger.WriteLine("[lid] 开盖：旧 InputDispatcher.InitFNLock 无 Core 等价 API ⇒ 跳过（不伪造）");
+        await SetKeyboardBacklightForLidAsync(on: true);
+    }
+
+    /// <summary>盖子场景的键盘背光开关：HID/EC 分支均复用既有窗口实现，不新增硬件协议。</summary>
+    private async Task SetKeyboardBacklightForLidAsync(bool on)
+    {
+        if (_backendProbe == null)
+        {
+            Logger.WriteLine("[lid] 后端未连接 ⇒ 键盘背光" + (on ? "恢复" : "关闭") + "跳过");
+            return;
+        }
+        try
+        {
+            if (on)
+            {
+                if (KeyboardLightSwitch.IsChecked != true)
+                {
+                    Logger.WriteLine("[lid] 键盘灯开关是关的 ⇒ 开盖不擅自点亮");
+                    return;
+                }
+                await ApplyKeyboardLightAsync();
+                return;
+            }
+            if (IsHidKeyboard(_backendProbe.Hw))
+            {
+                KeyboardRgb? rgb = EnsureKeyboardRgb();
+                if (rgb == null)
+                {
+                    Logger.WriteLine("[lid] HID 键盘实例不可用 ⇒ 合盖关灯安全跳过（不伪造）");
+                    return;
+                }
+                rgb.StopCurrentEffect();
+                rgb.KbPowerSyncFromHardware(false);
+                return;
+            }
+            await _backendProbe.SetKeyboardPowerAsync(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[lid] 键盘背光" + (on ? "恢复" : "关闭") + "异常（已吞掉）：" + ex.Message);
+        }
     }
 
     private async Task RestoreKeyboardLightAfterWakeAsync()
