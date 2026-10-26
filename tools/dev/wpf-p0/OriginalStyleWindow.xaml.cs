@@ -1076,23 +1076,12 @@ public partial class OriginalStyleWindow : Window
     private IntPtr PowerBroadcastHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         const int WM_POWERBROADCAST = 0x0218;
-        const int PBT_APMSUSPEND = 0x0004;
-        const int PBT_APMRESUMESUSPEND = 0x0007;
         const int PBT_APMRESUMEAUTOMATIC = 0x0012;
-        int powerEvent = wParam.ToInt32();
-        if (msg == WM_POWERBROADCAST && powerEvent == PBT_APMSUSPEND)
-        {
-            // 睡前记录键盘灯电源：现代待机只有 BROADCAST，不能依赖 PowerModeChanged。
-            _sleepKeyboardLightWasOn = KeyboardLightSwitch?.IsChecked == true;
-            return IntPtr.Zero;
-        }
-        if (msg == WM_POWERBROADCAST
-            && (powerEvent == PBT_APMRESUMESUSPEND || powerEvent == PBT_APMRESUMEAUTOMATIC))
+        if (msg == WM_POWERBROADCAST && wParam.ToInt32() == PBT_APMRESUMEAUTOMATIC)
         {
             Dispatcher.BeginInvoke(new Action(async () =>
             {
                 await Task.Delay(1500);
-                await RestoreKeyboardLightAfterWakeAsync();
                 await RestoreLightingOnStartupAsync();
             }));
         }
