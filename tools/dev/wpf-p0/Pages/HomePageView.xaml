@@ -1,0 +1,105 @@
+<UserControl x:Class="L_Mechrevo.WpfP0.Pages.HomePageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FontFamily="{DynamicResource AppFontFamily}">
+    <UserControl.Resources>
+        <Style x:Key="PageTitle" TargetType="TextBlock"><Setter Property="FontSize" Value="20" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}" />
+    </UserControl.Resources>
+<ScrollViewer x:Name="HomePage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" CanContentScroll="False">
+                        <StackPanel>
+
+                            <UniformGrid x:Name="SensorBlocksGrid" Columns="2" />
+
+
+                            <Grid Margin="0">
+                                <Grid.ColumnDefinitions><ColumnDefinition x:Name="HomePerfColumn" Width="*" /><ColumnDefinition x:Name="HomeMidColumn" Width="12" /><ColumnDefinition x:Name="HomeGpuColumn" Width="*" /></Grid.ColumnDefinitions>
+                                <Border x:Name="HomePerfCard" Grid.Column="0" Style="{StaticResource Card}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Viewbox Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M3,18 A10,10 0 0 1 21,18" />
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M12,18 L17,10" />
+                                                <Ellipse Fill="{DynamicResource MutedBrush}" Width="2.4" Height="2.4" Canvas.Left="10.8" Canvas.Top="16.8" />
+                                            </Canvas>
+                                        </Viewbox>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="性能模式" Style="{StaticResource CardTitle}" />
+                                            <TextBlock x:Name="PerfCurrentText" Text="当前：平衡" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <ToggleButton x:Name="HomePerf静音" Content="静音" Tag="2" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomePerf平衡" Content="平衡" Tag="0" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                                <ToggleButton x:Name="HomePerf狂暴" Content="狂暴" Tag="1" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomePerf自定义" Content="自定义" Tag="3" Style="{StaticResource SegmentButton}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border x:Name="HomeGpuCard" Grid.Column="2" Style="{StaticResource Card}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Viewbox Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" Fill="Transparent" Data="M3,5 H21 V17 H3 Z M5,8 H9 M5,11 H9 M13.5,8 A3.5,3.5 0 1 0 13.5,15 A3.5,3.5 0 0 0 13.5,8 M7,17 V20 H17 V17" />
+                                            </Canvas>
+                                        </Viewbox>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="显卡模式" Style="{StaticResource CardTitle}" />
+                                            <TextBlock x:Name="GpuCurrentText" Text="当前：混合输出" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <ToggleButton x:Name="HomeGpu混合" Content="混合" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                                <ToggleButton x:Name="HomeGpu独显" Content="独显" Tag="2" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomeGpu集显" Content="集显" Tag="0" Style="{StaticResource SegmentButton}" />
+                                            </StackPanel>
+                                            <StackPanel x:Name="HomeIgpuSavingPanel" Margin="0,10,0,0" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition x:Name="HomeDisplayColumn" Width="*" />
+                                    <ColumnDefinition x:Name="HomeDisplayGap" Width="10" />
+                                    <ColumnDefinition x:Name="HomeBatteryColumn" Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="HomeDisplayCard" Grid.Column="0" Style="{StaticResource Card}" Margin="0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Viewbox Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center">
+                                            <Grid Width="48" Height="48">
+                                                <Border Width="34" Height="24" CornerRadius="4" BorderBrush="{DynamicResource MutedBrush}" BorderThickness="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0" />
+                                                <Border Width="2" Height="6" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,30,0,0" />
+                                                <Border Width="14" Height="2" CornerRadius="1" Background="{DynamicResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,36,0,0" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
+                                            <Grid x:Name="DisplayInfoRow" Margin="0,3,0,12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="DisplayInfoText" Text="—" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <StackPanel x:Name="DisplayRefreshPanel" Orientation="Horizontal" />
+                                            <StackPanel x:Name="DisplayDetailsPanel" Margin="0,10,0,0" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <ContentControl x:Name="BatteryCardHost" Grid.Column="2" />
+                            </Grid>
+
+                        </StackPanel>
+                    </ScrollViewer>
+</UserControl>

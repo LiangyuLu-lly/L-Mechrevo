@@ -70,20 +70,17 @@ public partial class MainWindow : Window
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
         InitializeComponent();
+        EnsureHomeView();
         _owner = owner;
         _probe = probe;
         SourceInitialized += (_, _) => ApplyRoundedWindowChrome();
         RootContent.Opacity = 1;
         AppTheme.Apply(true);
         ReloadWideBackground();
-        BuildMoreSwitchTiles();
         BuildSensorBlocks();
         BuildQuickTiles();
         BuildHomeExtras();
         BuildIgpuSavingControls();
-        BuildScreenControls();
-        BuildLightingCards();
-        BuildCustomModeList();
         if (_owner != null)
         {
             _owner.BackendReady += OnBackendReady;
@@ -435,8 +432,8 @@ public partial class MainWindow : Window
         {
             _probe = _owner?.CurrentBackend;
             BuildMoreSwitchTiles();
-            BuildLightingCards();
-            BuildScreenFeatures();
+            if (_lightingView != null) BuildLightingCards();
+            if (_screenView != null) BuildScreenFeatures();
             ApplyHomeCapabilities();
             RefreshHomeExtras();
         }));
@@ -578,14 +575,15 @@ public partial class MainWindow : Window
 
     private void ApplyPage(string page)
     {
-        HomePage.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
-        ScreenPage.Visibility = page == "screen" ? Visibility.Visible : Visibility.Collapsed;
-        LightingPage.Visibility = page == "lighting" ? Visibility.Visible : Visibility.Collapsed;
-        CustomPage.Visibility = page == "custom" ? Visibility.Visible : Visibility.Collapsed;
-        if (page == "switches")
-        {
-            EnsureSwitchesView();
-        }
+        if (page == "home") EnsureHomeView();
+        else if (page == "screen") EnsureScreenView();
+        else if (page == "lighting") EnsureLightingView();
+        else if (page == "custom") EnsureCustomView();
+        else if (page == "switches") EnsureSwitchesView();
+        HomeHost.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
+        ScreenHost.Visibility = page == "screen" ? Visibility.Visible : Visibility.Collapsed;
+        LightingHost.Visibility = page == "lighting" ? Visibility.Visible : Visibility.Collapsed;
+        CustomHost.Visibility = page == "custom" ? Visibility.Visible : Visibility.Collapsed;
         SwitchesHost.Visibility = page == "switches" ? Visibility.Visible : Visibility.Collapsed;
         Button[] navs = { NavHome, NavScreen, NavLighting, NavCustom, NavSwitches };
         foreach (Button nav in navs)
@@ -1400,7 +1398,7 @@ public partial class MainWindow : Window
 
     private void RefreshScreenControls()
     {
-        if (_owner == null) return;
+        if (_owner == null || ScreenCalibrationToggle == null || ScreenEffectToggle == null) return;
         (bool calibEnabled, (string Label, object? Tag)[] calibOptions, int calibSelected) = _owner.WideCalibration();
         ScreenCalibrationToggle.IsChecked = calibEnabled;
         if (_calibrationOptionButtons.Count != calibOptions.Length) BuildCalibrationOptions();
@@ -1511,9 +1509,16 @@ public partial class MainWindow : Window
         Grid.SetColumn(BatteryCardHost, displaySupported ? 2 : 0);
         Grid.SetColumnSpan(BatteryCardHost, displaySupported ? 1 : 3);
         NavScreen.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
-        ScreenCalibrationCard.Visibility = caps.ColorCalibration ? Visibility.Visible : Visibility.Collapsed;
-        ScreenEffectCard.Visibility = _owner?.WideDisplayEffectSupported == true ? Visibility.Visible : Visibility.Collapsed;
-        if (ScreenCalibrationCard.Visibility != Visibility.Visible && ScreenEffectCard.Visibility != Visibility.Visible)
+        if (ScreenCalibrationCard != null)
+        {
+            ScreenCalibrationCard.Visibility = caps.ColorCalibration ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (ScreenEffectCard != null)
+        {
+            ScreenEffectCard.Visibility = _owner?.WideDisplayEffectSupported == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (ScreenCalibrationCard != null && ScreenEffectCard != null
+            && ScreenCalibrationCard.Visibility != Visibility.Visible && ScreenEffectCard.Visibility != Visibility.Visible)
         {
             NavScreen.Visibility = Visibility.Collapsed;
         }
