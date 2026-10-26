@@ -785,7 +785,14 @@ public partial class OriginalStyleWindow : Window
         {
             try
             {
-                return _backendProbe?.Hw != null && MechrevoLite.BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw);
+                MechrevoHw? hw = _backendProbe?.Hw;
+                if (hw == null)
+                {
+                    return false;
+                }
+                // 宝龙达白名单或本机 EC 通道可用（同方/GCU 机型）；不可用机型仍隐藏。
+                return MechrevoLite.BatteryLimitPanel.IsSupportedBoard(hw)
+                    || MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine();
             }
             catch
             {
@@ -1990,7 +1997,8 @@ public partial class OriginalStyleWindow : Window
         try
         {
             MechrevoHw? hw = _backendProbe?.Hw;
-            supported = hw != null && BatteryLimitPanel.IsSupportedBoard(hw);
+            supported = hw != null && (BatteryLimitPanel.IsSupportedBoard(hw)
+                || MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine());
         }
         catch
         {
@@ -2015,7 +2023,9 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            if (_backendProbe?.Hw == null || !BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw))
+            if (_backendProbe?.Hw == null
+                || (!BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw)
+                    && !MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine()))
             {
                 return;
             }

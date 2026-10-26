@@ -1005,7 +1005,8 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("MutedBrush"),
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 4, 0)
+            // 电池尾部小凸起紧贴电池体，原 4px 间距看起来断开
+            Margin = new Thickness(0, 0, 8, 0)
         };
         batteryGlyph.Children.Add(batteryBody);
         batteryGlyph.Children.Add(batteryTip);

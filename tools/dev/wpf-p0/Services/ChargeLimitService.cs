@@ -57,7 +57,8 @@ internal sealed class ChargeLimitService : IChargeLimitService
         _backend = backend;
     }
 
-    public bool Supported => _backend.Hw is { } hw && BatteryLimitPanel.IsSupportedBoard(hw);
+    public bool Supported => _backend.Hw is { } hw
+        && (BatteryLimitPanel.IsSupportedBoard(hw) || MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine());
 
     public ChargeLimitState Read()
     {
