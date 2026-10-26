@@ -1707,12 +1707,12 @@ public partial class MainWindow : Window
         _liquidStatusButton = new Button { Content = WpfStrings.NotConnected, Style = (Style)FindResource("FlatButton"), HorizontalAlignment = HorizontalAlignment.Right };
         _liquidStatusButton.Click += async (_, _) =>
         {
-            bool ok = await _owner.WideRefreshLiquidAsync();
+            bool ok = await _owner.WideLiquidStatusActionAsync();
             if (_liquidStatusButton != null)
             {
                 _liquidStatusButton.Content = _owner.WideLiquidConnected ? WpfStrings.LiquidConnected : WpfStrings.LiquidDisconnected;
             }
-            StatusText.Text = ok ? "水冷状态已刷新" : "刷新水冷状态失败";
+            StatusText.Text = ok ? "水冷状态已更新" : "刷新水冷状态失败";
         };
         Grid.SetColumn(_liquidStatusButton, 2);
         header.Children.Add(_liquidStatusButton);
@@ -1878,7 +1878,7 @@ public partial class MainWindow : Window
         {
             _liquidStatusButton.Content = supported
                 ? (_owner.WideLiquidConnected ? WpfStrings.LiquidConnected : WpfStrings.LiquidDisconnected)
-                : WpfStrings.NotConnected;
+                : _owner.WideLiquidStatus;
         }
         if (_liquidPumpCombo != null) _liquidPumpCombo.IsEnabled = supported;
         if (_liquidFanCombo != null) _liquidFanCombo.IsEnabled = supported;

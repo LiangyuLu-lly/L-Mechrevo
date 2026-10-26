@@ -82,6 +82,7 @@ public partial class OriginalStyleWindow : Window
     private bool _sleepKeyboardLightWasOn;
     private bool _lightingPowerBusy;
     private bool _syncingLiquid;
+    private WaterCoolerRoutingService? _waterCoolerRouting;
     private bool _syncingLiquidLight;
     private Grid? _liquidLightRow;
     private ComboBox? _liquidLightCombo;
@@ -214,6 +215,8 @@ public partial class OriginalStyleWindow : Window
             _backendTimer.Stop();
             _backendRetryTimer.Stop();
             _lightingIdleTimer.Stop();
+            _waterCoolerRouting?.Dispose();
+            _waterCoolerRouting = null;
             _backendProbe?.Dispose();
             _backendProbe = null;
             _backendHost.Dispose();
@@ -3906,30 +3909,73 @@ public partial class OriginalStyleWindow : Window
         return supported ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private WaterCoolerRoutingService? EnsureWaterCoolerRouting()
+    {
+        if (_waterCoolerRouting != null)
+        {
+            return _waterCoolerRouting;
+        }
+        if (_backendProbe == null)
+        {
+            return null;
+        }
+        try
+        {
+            _waterCoolerRouting = new WaterCoolerRoutingService(_backendProbe.Hw, _backendProbe.Service);
+            _waterCoolerRouting.RouteChanged += () =>
+            {
+                try
+                {
+                    Dispatcher.BeginInvoke(new Action(RefreshLiquidCoolingUi));
+                }
+                catch
+                {
+                }
+            };
+            _ = _waterCoolerRouting.InitializeAsync();
+            return _waterCoolerRouting;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     internal bool WideLiquidVisible =>
         MechrevoLite.AppConfig.Is("force_liquid_cooling_menu")
+        || EnsureWaterCoolerRouting()?.Route != LiquidCoolingControlRoute.None
         || _backendProbe?.Hw?.SupportsLiquidCooling == true
         || _backendProbe?.Capabilities?.LiquidCooling == true;
 
-    internal bool WideLiquidSupported =>
-        _backendProbe?.Hw?.SupportsLiquidCooling == true
-        || _backendProbe?.Capabilities?.LiquidCooling == true;
+    internal bool WideLiquidSupported => EnsureWaterCoolerRouting()?.Route is LiquidCoolingControlRoute.Gcu or LiquidCoolingControlRoute.DirectBle;
 
-    internal bool WideLiquidConnected => _backendProbe?.Hw?.LcReportedConnected == true;
+    internal bool WideLiquidConnected
+    {
+        get
+        {
+            WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+            if (routing == null)
+            {
+                return false;
+            }
+            return routing.IsGcuRoute ? _backendProbe?.Hw?.LcReportedConnected == true : routing.IsBleConnected;
+        }
+    }
 
-    internal int WideLiquidPump => _backendProbe?.Hw?.LcPumpControl ?? -1;
+    internal int WideLiquidPump => EnsureWaterCoolerRouting()?.PumpProfile ?? -1;
 
-    internal int WideLiquidFan => _backendProbe?.Hw?.LcFanControl ?? -1;
+    internal int WideLiquidFan => EnsureWaterCoolerRouting()?.FanProfile ?? -1;
+
+    internal string WideLiquidStatus => EnsureWaterCoolerRouting()?.StatusText ?? WpfStrings.OriginalStyleWindow_xaml_Content_3;
 
     internal async Task<bool> WideSetLiquidPumpAsync(int profile)
     {
-        if (_backendProbe?.Service == null || !WideLiquidSupported)
+        WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+        if (routing == null || !routing.IsGcuRoute && !routing.IsBleRoute)
         {
             return false;
         }
-        bool ok = profile < 0
-            ? await _backendProbe.Service.SwitchLcFanAuto()
-            : await _backendProbe.Service.SwitchLcPump(profile);
+        bool ok = await routing.SetPumpAsync(profile);
         if (ok)
         {
             RefreshLiquidCoolingUi();
@@ -3940,13 +3986,12 @@ public partial class OriginalStyleWindow : Window
 
     internal async Task<bool> WideSetLiquidFanAsync(int profile)
     {
-        if (_backendProbe?.Service == null || !WideLiquidSupported)
+        WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+        if (routing == null || !routing.IsGcuRoute && !routing.IsBleRoute)
         {
             return false;
         }
-        bool ok = profile < 0
-            ? await _backendProbe.Service.SwitchLcFanAuto()
-            : await _backendProbe.Service.SwitchLcFan(profile);
+        bool ok = await routing.SetFanAsync(profile);
         if (ok)
         {
             RefreshLiquidCoolingUi();
@@ -3957,16 +4002,17 @@ public partial class OriginalStyleWindow : Window
 
     internal async Task<bool> WideRefreshLiquidAsync()
     {
-        if (_backendProbe?.Service == null)
+        WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+        if (routing == null)
         {
             return false;
         }
         try
         {
-            await _backendProbe.Service.RefreshLiquidCoolingStatus();
+            bool ok = await routing.RefreshAsync();
             RefreshLiquidCoolingUi();
             RefreshFromBackend();
-            return true;
+            return ok;
         }
         catch
         {
@@ -3974,21 +4020,35 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    internal bool WideLiquidLightSupported => LiquidCoolingLightService.SupportsColor(_backendProbe?.Hw);
+    internal Task<bool> WideLiquidStatusActionAsync()
+    {
+        WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+        if (routing?.IsBleRoute == true)
+        {
+            routing.Disconnect();
+            RefreshLiquidCoolingUi();
+            return Task.FromResult(true);
+        }
+        return WideRefreshLiquidAsync();
+    }
 
-    internal System.Drawing.Color WideLiquidLightColor => LiquidCoolingLightService.SavedColor;
+    internal bool WideLiquidLightSupported => EnsureWaterCoolerRouting()?.SupportsLight == true;
 
-    internal string WideLiquidLightProfile => LiquidCoolingLightService.SavedProfile;
+    internal System.Drawing.Color WideLiquidLightColor => EnsureWaterCoolerRouting()?.LightColor ?? LiquidCoolingLightService.SavedColor;
 
-    internal IReadOnlyList<LiquidLightOption> WideLiquidLightOptions => LiquidCoolingLightService.Options(_backendProbe?.Hw);
+    internal string WideLiquidLightProfile => EnsureWaterCoolerRouting()?.LightProfile ?? LiquidCoolingLightService.SavedProfile;
+
+    internal IReadOnlyList<LiquidLightOption> WideLiquidLightOptions =>
+        EnsureWaterCoolerRouting()?.LightOptions ?? LiquidCoolingLightService.Options(_backendProbe?.Hw);
 
     internal async Task<bool> WideApplyLiquidLightAsync(string profile, System.Drawing.Color color)
     {
-        if (_backendProbe?.Service == null || !WideLiquidLightSupported)
+        WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+        if (routing == null || !routing.SupportsLight)
         {
             return false;
         }
-        bool ok = await LiquidCoolingLightService.ApplyAsync(_backendProbe.Service, _backendProbe.Hw, profile, color);
+        bool ok = await routing.ApplyLightAsync(profile, color);
         if (ok)
         {
             RefreshLiquidCoolingUi();
@@ -4002,23 +4062,34 @@ public partial class OriginalStyleWindow : Window
         EnsureLiquidLightRow();
         try
         {
-            MechrevoHw? hw = _backendProbe?.Hw;
-            bool connected = hw?.LcReportedConnected == true;
-            bool supported = hw?.SupportsLiquidCooling == true;
-            if (!supported)
+            WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+            bool force = MechrevoLite.AppConfig.Is("force_liquid_cooling_menu");
+            bool visible = force
+                || routing?.Route != LiquidCoolingControlRoute.None
+                || _backendProbe?.Hw?.SupportsLiquidCooling == true
+                || _backendProbe?.Capabilities?.LiquidCooling == true;
+            LiquidSection.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            if (!visible)
             {
-                LiquidStatusButton.Content = WpfStrings.OriginalStyleWindow_xaml_Content_3;
+                return;
+            }
+            bool gcuSupported = routing?.IsGcuRoute == true
+                || (routing == null && _backendProbe?.Hw?.SupportsLiquidCooling == true);
+            bool bleSupported = routing?.IsBleRoute == true;
+            if (!gcuSupported && !bleSupported)
+            {
+                LiquidStatusButton.Content = routing?.StatusText ?? WpfStrings.OriginalStyleWindow_xaml_Content_3;
                 LiquidPumpCombo.IsEnabled = false;
                 LiquidFanCombo.IsEnabled = false;
                 RefreshLiquidLightUi();
                 return;
             }
-            LiquidStatusButton.Content = connected ? "水冷已连接" : "水冷未连接";
+            LiquidStatusButton.Content = routing?.StatusText ?? (WideLiquidConnected ? "水冷已连接" : "水冷未连接");
             LiquidPumpCombo.IsEnabled = true;
             LiquidFanCombo.IsEnabled = true;
             _syncingLiquid = true;
-            SelectComboByTag(LiquidPumpCombo, hw!.LcPumpControl);
-            SelectComboByTag(LiquidFanCombo, hw.LcFanControl);
+            SelectComboByTag(LiquidPumpCombo, routing?.PumpProfile ?? _backendProbe?.Hw?.LcPumpControl ?? -1);
+            SelectComboByTag(LiquidFanCombo, routing?.FanProfile ?? _backendProbe?.Hw?.LcFanControl ?? -1);
             _syncingLiquid = false;
             RefreshLiquidLightUi();
         }
@@ -4087,8 +4158,8 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        IReadOnlyList<LiquidLightOption> options = LiquidCoolingLightService.Options(_backendProbe?.Hw);
-        string saved = LiquidCoolingLightService.SavedProfile;
+        IReadOnlyList<LiquidLightOption> options = WideLiquidLightOptions;
+        string saved = WideLiquidLightProfile;
         int selected = 0;
         _syncingLiquidLight = true;
         try
@@ -4110,7 +4181,7 @@ public partial class OriginalStyleWindow : Window
             }
             if (_liquidLightColorButton != null)
             {
-                _liquidLightColorButton.Background = new SolidColorBrush(ToMediaColor(LiquidCoolingLightService.SavedColor));
+                _liquidLightColorButton.Background = new SolidColorBrush(ToMediaColor(WideLiquidLightColor));
                 _liquidLightColorButton.IsEnabled = true;
             }
             if (_liquidLightStatus != null)
@@ -4135,7 +4206,7 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        bool ok = await WideApplyLiquidLightAsync(profile, LiquidCoolingLightService.SavedColor);
+        bool ok = await WideApplyLiquidLightAsync(profile, WideLiquidLightColor);
         if (_liquidLightStatus != null)
         {
             _liquidLightStatus.Text = ok ? "灯光已下发" : "灯光下发失败";
@@ -4144,13 +4215,13 @@ public partial class OriginalStyleWindow : Window
 
     private async Task LiquidColor_ClickAsync()
     {
-        ColorPickerWindow picker = new(LiquidCoolingLightService.SavedColor);
+        ColorPickerWindow picker = new(WideLiquidLightColor);
         if (picker.ShowDialog() != true || picker.Result is not System.Drawing.Color color)
         {
             return;
         }
-        LiquidCoolingLightService.SaveColor(color);
-        string profile = LiquidCoolingLightService.SavedProfile;
+        EnsureWaterCoolerRouting()?.SaveLightColor(color);
+        string profile = WideLiquidLightProfile;
         if (!LiquidCoolingLightService.IsCustom(profile))
         {
             profile = "custom_static";
@@ -4189,6 +4260,14 @@ public partial class OriginalStyleWindow : Window
 
     private async void LiquidStatus_Click(object sender, RoutedEventArgs e)
     {
+        WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
+        if (routing?.IsBleRoute == true)
+        {
+            routing.Disconnect();
+            RefreshLiquidCoolingUi();
+            StatusText.Text = "蓝牙水冷已断开";
+            return;
+        }
         if (_backendProbe?.Service == null)
         {
             StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_51;
