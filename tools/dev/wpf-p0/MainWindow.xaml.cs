@@ -1765,11 +1765,37 @@ public partial class MainWindow : Window
         Action<string>? updateEffectUi = null;
         bool lightUiSyncing = false;
         StackPanel colorSection = new();
+        StackPanel mixSection = new();
+        WrapPanel mixPanel = new();
+        List<Button> mixButtons = new();
+        int[] mixColors = (LightingSettingsStore.Load(topic, "ColorMarquee").MixColors ?? LightChannelSettings.DefaultMixColors).ToArray();
+        void RefreshMixButtons()
+        {
+            for (int i = 0; i < mixColors.Length && i < mixButtons.Count; i++)
+            {
+                System.Drawing.Color c = System.Drawing.Color.FromArgb(mixColors[i]);
+                mixButtons[i].Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B));
+                mixButtons[i].ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+            }
+        }
+        void SaveMixColors()
+        {
+            try
+            {
+                LightChannelSettings current = LightingSettingsStore.Load(topic, selectedEffect) with { MixColors = (int[])mixColors.Clone() };
+                LightingSettingsStore.Save(topic, current);
+                LightChannelSettings marquee = LightingSettingsStore.Load(topic, "ColorMarquee") with { MixColors = (int[])mixColors.Clone() };
+                LightingSettingsStore.Save(topic, marquee);
+            }
+            catch
+            {
+            }
+        }
         DispatcherTimer lightApplyTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
         lightApplyTimer.Tick += (_, _) =>
         {
             lightApplyTimer.Stop();
-            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, powerRef?.IsChecked == true);
+            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, powerRef?.IsChecked == true);
         };
 
         Grid layout = new();
@@ -1815,7 +1841,7 @@ public partial class MainWindow : Window
                 selectedEffect = effectId;
                 foreach (ToggleButton item in effectButtons) item.IsChecked = ReferenceEquals(item, button);
                 updateEffectUi?.Invoke(effectId);
-                _ = ApplyLightCardAsync(topic, effectId, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, effectId, sliderRef!, speedRef!, colorArgb, mixColors, power.IsChecked == true);
             };
             effectButtons.Add(button);
             effectPanel.Children.Add(button);
@@ -1861,7 +1887,7 @@ public partial class MainWindow : Window
                 colorArgb = picked.ToArgb();
                 swatch.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, picked.R, picked.G, picked.B));
                 colorLabel.Text = "#" + colorArgb.ToString("X8");
-                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, power.IsChecked == true);
             }
         };
         WrapPanel presets = new() { Margin = new Thickness(0, 0, 0, 8) };
@@ -1892,13 +1918,45 @@ public partial class MainWindow : Window
                 colorArgb = presetArgb;
                 swatch.Background = preset.Background;
                 colorLabel.Text = "#" + colorArgb.ToString("X8");
-                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, power.IsChecked == true);
             };
             presets.Children.Add(preset);
         }
         colorSection.Children.Add(color);
         colorSection.Children.Add(presets);
+        for (int i = 0; i < 7; i++)
+        {
+            int index = i;
+            System.Drawing.Color c = System.Drawing.Color.FromArgb(mixColors[index]);
+            Button mixSwatch = new()
+            {
+                Width = 24,
+                Height = 24,
+                Margin = new Thickness(0, 0, 6, 6),
+                Padding = new Thickness(0),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
+                BorderBrush = (Brush)FindResource("CardBorderBrush"),
+                BorderThickness = new Thickness(1),
+                ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}"
+            };
+            mixSwatch.Click += (_, _) =>
+            {
+                ColorPickerWindow picker = new(System.Drawing.Color.FromArgb(mixColors[index])) { Owner = this };
+                if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
+                {
+                    mixColors[index] = picked.ToArgb();
+                    RefreshMixButtons();
+                    SaveMixColors();
+                    _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, power.IsChecked == true);
+                }
+            };
+            mixButtons.Add(mixSwatch);
+            mixPanel.Children.Add(mixSwatch);
+        }
+        mixSection.Children.Add(new TextBlock { Text = WpfStrings.LightEditorWindow_Text_5, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 0, 0, 4) });
+        mixSection.Children.Add(mixPanel);
         right.Children.Add(colorSection);
+        right.Children.Add(mixSection);
         Slider slider = new() { Style = (Style)FindResource("RoundSlider"), Minimum = 0, Maximum = maxLight, Value = light };
         sliderRef = slider;
         TextBlock value = new()
@@ -1958,7 +2016,7 @@ public partial class MainWindow : Window
         layout.Children.Add(right);
         power.Click += (_, _) =>
         {
-            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
+            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, power.IsChecked == true);
         };
         slider.ValueChanged += (_, _) =>
         {
@@ -1972,15 +2030,20 @@ public partial class MainWindow : Window
             lightUiSyncing = true;
             try
             {
-                bool colorEnabled = LightingCatalog.LightEffectColorMode(effect) != 0;
-                if (effect.StartsWith("hid:", StringComparison.Ordinal)
-                    && int.TryParse(effect.AsSpan(4), out int hidMode))
-                {
-                    colorEnabled = hidMode is 0 or 9;
-                }
-                colorSection.Visibility = colorEnabled ? Visibility.Visible : Visibility.Collapsed;
+                int colorMode = LightingCatalog.LightEffectColorMode(effect);
+                bool hidColorEffect = effect.StartsWith("hid:", StringComparison.Ordinal)
+                    && int.TryParse(effect.AsSpan(4), out int hidColorMode) && hidColorMode is 0 or 9;
+                bool singleColor = hidColorEffect || colorMode == 1;
+                bool mixColor = !hidColorEffect && colorMode == 7;
+                colorSection.Visibility = singleColor ? Visibility.Visible : Visibility.Collapsed;
+                mixSection.Visibility = mixColor ? Visibility.Visible : Visibility.Collapsed;
                 speedRow.Visibility = EffectSupportsSpeed(effect) ? Visibility.Visible : Visibility.Collapsed;
                 LightChannelSettings effectSettings = LightingSettingsStore.Load(topic, effect);
+                if (mixColor && effectSettings.MixColors is { Length: 7 } savedMix)
+                {
+                    mixColors = (int[])savedMix.Clone();
+                    RefreshMixButtons();
+                }
                 slider.Value = Math.Clamp(effectSettings.Light, 0, maxLight);
                 speed.Value = Math.Clamp(effectSettings.Speed, 0, 4);
                 colorArgb = effectSettings.EffectiveColorArgb();
@@ -2012,7 +2075,7 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, bool powerOn)
+    private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, int[] mixColors, bool powerOn)
     {
         try
         {
@@ -2024,6 +2087,7 @@ public partial class MainWindow : Window
                 Light = light,
                 Speed = speedValue,
                 ColorArgb = colorArgb,
+                MixColors = (int[])mixColors.Clone(),
                 UsePresetColor = false,
                 PowerOn = powerOn
             };
