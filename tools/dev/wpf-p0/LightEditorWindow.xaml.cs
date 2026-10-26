@@ -36,6 +36,7 @@ public partial class LightEditorWindow : Window
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private bool _suppressAutoApply;
     private bool _applying;
+    private bool _inline;
     private bool _pendingAutoApply;
 
     public LightEditorWindow(string topic, string title, (string Effect, string Name)[] effects, bool whiteBacklightOnly = false)
@@ -147,9 +148,29 @@ public partial class LightEditorWindow : Window
         Closed += (_, _) => _applyTimer.Stop();
     }
 
+    /// <summary>宽屏卡内联：隐藏标题/提示/电源行，保留效果和完整二级菜单；控件变化直接自动应用。</summary>
+    internal void PrepareWideInline()
+    {
+        _inline = true;
+        TitleText.Visibility = Visibility.Collapsed;
+        HintText.Visibility = Visibility.Collapsed;
+        PowerRow.Visibility = Visibility.Collapsed;
+        if (Content is FrameworkElement root)
+        {
+            root.Margin = new Thickness(0);
+        }
+    }
+
+    internal bool PowerOn => PowerCheck.IsChecked == true;
+
+    internal void SetPower(bool on)
+    {
+        PowerCheck.IsChecked = on;
+    }
+
     private void ScheduleAutoApply()
     {
-        if (_suppressAutoApply || !IsLoaded)
+        if (_suppressAutoApply || (!IsLoaded && !_inline))
         {
             return;
         }

@@ -84,6 +84,7 @@ public partial class MainWindow : Window
     /// <summary>⭐ task-26：每张灯光卡的 150 ms 合并计时器；重建卡片时统一 Stop（避免对已拆掉的卡补发旧值）✅。</summary>
     private readonly List<DispatcherTimer> _lightCardApplyTimers = new();
     private Window? _inlineLightEditorWindow;
+    private readonly List<LightEditorWindow> _inlineLightEditors = new();
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -103,6 +104,7 @@ public partial class MainWindow : Window
         if (_owner != null)
         {
             _owner.BackendReady += OnBackendReady;
+            _owner.WideUiVisibilityChanged += ApplyWideUiVisibilityFromOwner;
         }
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
@@ -2090,6 +2092,37 @@ public partial class MainWindow : Window
         }
     }
 
+    private static bool ResolveWideLightVisible(string key, bool supported)
+    {
+        string mode = AppConfig.GetString(key) ?? "auto";
+        if (string.Equals(mode, "show", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        if (string.Equals(mode, "hide", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        return supported;
+    }
+
+    private void ApplyWideUiVisibilityFromOwner()
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            BuildLightingCards();
+            RefreshIgpuSaving();
+        }
+        else
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                BuildLightingCards();
+                RefreshIgpuSaving();
+            }));
+        }
+    }
+
     private void BuildLightingCards()
     {
         if (LightingCardsGrid == null)
@@ -2103,6 +2136,11 @@ public partial class MainWindow : Window
             timer.Stop();
         }
         _lightCardApplyTimers.Clear();
+        foreach (LightEditorWindow oldEditor in _inlineLightEditors)
+        {
+            oldEditor.Close();
+        }
+        _inlineLightEditors.Clear();
         LightingCardsGrid.Children.Clear();
         BuildLightingGlobalControls();
         MechrevoHw? hw = _probe?.Hw ?? WpfBackend.Hw;
@@ -2161,8 +2199,8 @@ public partial class MainWindow : Window
             bool supported = topic switch
             {
                 "Keyboard/Ctrl" => hasKeyboard,
-                "HidLightbar/Ctrl" => hasLightbar,
-                "HidLightbar_Logo/Ctrl" => hasLogo,
+                "HidLightbar/Ctrl" => ResolveWideLightVisible("light_strip_ui", hasLightbar),
+                "HidLightbar_Logo/Ctrl" => ResolveWideLightVisible("light_logo_ui", hasLogo),
                 "HidLightbar_Hinge/Ctrl" => hasHinge,
                 _ => hasSync
             };
@@ -2211,8 +2249,55 @@ public partial class MainWindow : Window
         _owner?.WideSetLightOffOnBattery(LightingOffBatteryToggle.IsChecked == true);
     }
 
+    private Border BuildInlineEditorCard(string topic, string title, (string Effect, string Name)[] effects, bool whiteBacklightOnly)
+    {
+        LightEditorWindow editor = new(topic, title, effects, whiteBacklightOnly);
+        editor.PrepareWideInline();
+        UIElement? editorContent = editor.Content as UIElement;
+        editor.Content = null;
+        ToggleButton power = new()
+        {
+            Content = WpfStrings.PowerOn,
+            Style = (Style)FindResource("SegmentButton"),
+            IsChecked = editor.PowerOn,
+            Margin = new Thickness(12, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        power.Click += (_, _) => editor.SetPower(power.IsChecked == true);
+        StackPanel left = new();
+        StackPanel header = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        header.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
+        header.Children.Add(power);
+        left.Children.Add(header);
+        left.Children.Add(new TextBlock
+        {
+            Text = WpfStrings.LightEditorWindow_xaml_Text,
+            Style = (Style)FindResource("MutedText"),
+            Margin = new Thickness(0, 8, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        Grid layout = new();
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(280) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(left, 0);
+        layout.Children.Add(left);
+        if (editorContent != null)
+        {
+            Grid.SetColumn(editorContent, 2);
+            layout.Children.Add(editorContent);
+        }
+        _inlineLightEditors.Add(editor);
+        return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 0, 0, 10), Child = layout };
+    }
+
     private Border BuildLightCard(string topic, string title, (string Effect, string Name)[] effects, bool hidKeyboard = false, bool whiteKeyboard = false)
     {
+        // 非 HID 通道直接内联完整编辑器（原二级菜单已验证可下发），不再由宽屏自绘一套控件。
+        if (!hidKeyboard)
+        {
+            return BuildInlineEditorCard(topic, title, effects, whiteKeyboard);
+        }
         LightChannelSettings settings = LightingSettingsStore.Load(topic, effects[0].Effect);
         bool keyboardChannel = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
         bool gradeLightChannel = IsGradeLightChannel(topic, _probe?.Hw ?? WpfBackend.Hw);

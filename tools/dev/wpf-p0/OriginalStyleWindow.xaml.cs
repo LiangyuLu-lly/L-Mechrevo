@@ -613,7 +613,13 @@ public partial class OriginalStyleWindow : Window
                 {
                     return false;
                 }
-                return await keyboardService.SetKeyboardEffect(effect, light, speed, "None", keyboardColor, true);
+                bool effectOk = await keyboardService.SetKeyboardEffect(effect, light, speed, "None", keyboardColor, true);
+                // 键盘亮度是独立命令：只发 SetEffectALL 时部分固件/GCU 不更新亮度。
+                if (effectOk && on && light > 0)
+                {
+                    await keyboardService.SetKeyboardBrightnessPreservingEffect(light);
+                }
+                return effectOk;
             }
 
             bool supported = topic switch
@@ -807,7 +813,24 @@ public partial class OriginalStyleWindow : Window
         BatteryLimitSlider.Value = Math.Clamp(value, 40, 100);
     }
 
-    internal bool WideIgpuSavingSupported => _backendProbe?.Hw?.SupportsGpuHotSwap == true;
+    internal event Action? WideUiVisibilityChanged;
+
+    internal bool WideIgpuSavingSupported
+    {
+        get
+        {
+            string mode = AppConfig.GetString("igpu_only_ui") ?? "auto";
+            if (string.Equals(mode, "hide", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            if (string.Equals(mode, "show", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return _backendProbe?.Hw?.SupportsGpuHotSwap == true;
+        }
+    }
 
     internal int WideIgpuSavingMode => _backendProbe?.Hw?.IgpuOnlySaveMode ?? -1;
 
@@ -4402,6 +4425,14 @@ public partial class OriginalStyleWindow : Window
             || LogoLightRow.Visibility == Visibility.Visible
             || LightHingeRow.Visibility == Visibility.Visible
             || LightSyncRow.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
+        try
+        {
+            WideUiVisibilityChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[wide-ui] 通知宽屏刷新可见性失败（已吞掉）：" + ex.Message);
+        }
     }
 
     private static Visibility ResolveRowVisibility(string mode, bool supported)

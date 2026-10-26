@@ -85,7 +85,7 @@
                 <TextBlock Text="{x:Static loc:WpfStrings.HidKeyboardWindow_Text_7}" VerticalAlignment="Center" />
                 <ComboBox x:Name="EffectCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" SelectionChanged="Effect_Changed" />
             </Grid>
-            <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid x:Name="PowerRow" Grid.Row="1" Margin="0,0,0,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                 <TextBlock Text="{x:Static loc:WpfStrings.HidKeyboardWindow_Text_6}" VerticalAlignment="Center" />
                 <CheckBox x:Name="PowerCheck" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" />
