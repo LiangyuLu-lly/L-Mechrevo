@@ -396,6 +396,72 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    internal async Task<bool> WideApplyLightAsync(string topic, string effect, int light, int speed, int colorArgb, bool on)
+    {
+        MechrevoHw? hw = _backendProbe?.Hw;
+        BackendProbe? probe = _backendProbe;
+        if (probe == null)
+        {
+            return false;
+        }
+        try
+        {
+            if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+            {
+                if (IsHidKeyboard(hw) && effect.StartsWith("hid:", StringComparison.Ordinal))
+                {
+                    int hidMode = int.TryParse(effect.AsSpan(4), out int parsedMode) ? parsedMode : 1;
+                    KeyboardRgb? rgb = EnsureKeyboardRgb();
+                    if (rgb == null)
+                    {
+                        return false;
+                    }
+                    rgb.Brightness = Math.Clamp(light <= 4 ? light * 25 : light, 1, 100);
+                    if (MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect))
+                    {
+                        rgb.StaticColor = System.Drawing.Color.FromArgb(colorArgb);
+                    }
+                    return await ApplyHidKeyboardAsync(hidMode, on);
+                }
+                if (on)
+                {
+                    await probe.SetKeyboardPowerAsync(true);
+                }
+                return await probe.SetKeyboardEffectAsync(effect);
+            }
+
+            bool supported = topic switch
+            {
+                "HidLightbar/Ctrl" => probe.SupportsLightbar,
+                "HidLightbar_Logo/Ctrl" => hw?.SupportsLogoLight == true,
+                "HidLightbar_Hinge/Ctrl" => probe.SupportsHingeLight,
+                "HidLightbar_Sync/Ctrl" => probe.SupportsSyncLight,
+                _ => false
+            };
+            if (!supported)
+            {
+                return false;
+            }
+            if (!on)
+            {
+                return await probe.SetLightPowerAsync(topic, false);
+            }
+            await probe.SetLightPowerAsync(topic, true);
+            return topic switch
+            {
+                "HidLightbar/Ctrl" => await probe.SetLightbarEffectAsync(effect),
+                "HidLightbar_Logo/Ctrl" => await probe.SetLogoEffectAsync(effect),
+                "HidLightbar_Hinge/Ctrl" => await probe.SetHingeEffectAsync(effect),
+                "HidLightbar_Sync/Ctrl" => await probe.SetSyncEffectAsync(effect),
+                _ => false
+            };
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> WideApplyKeyboardEffectAsync(string effect, bool on)
     {
         try
@@ -809,8 +875,16 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            System.Drawing.Rectangle bounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 0, 0);
-            int current = MechrevoLite.Display.ScreenNative.GetRefreshRate(null);
+            string? laptopScreen = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
+            System.Windows.Forms.Screen? screen = System.Windows.Forms.Screen.AllScreens.FirstOrDefault(
+                s => string.Equals(s.DeviceName, laptopScreen, StringComparison.OrdinalIgnoreCase))
+                ?? System.Windows.Forms.Screen.PrimaryScreen;
+            System.Drawing.Rectangle bounds = screen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 0, 0);
+            int current = MechrevoLite.Display.ScreenNative.GetRefreshRate(laptopScreen);
+            if (current < 0)
+            {
+                current = MechrevoLite.Display.ScreenNative.GetRefreshRate(null);
+            }
             string info = bounds.Width + " × " + bounds.Height + " · " + Math.Max(0, current) + " Hz";
             return (info, current, _refreshHighHz, AutoRefreshSwitch.IsChecked == true, (int)Math.Round(BrightnessSlider.Value));
         }

@@ -1698,11 +1698,11 @@ public partial class MainWindow : Window
             ("HidLightbar_Hinge/Ctrl", WpfStrings.LightingHinge, LightingCatalog.HingeEffects),
             ("HidLightbar_Sync/Ctrl", WpfStrings.LightingSync, LightingCatalog.SyncEffects)
         };
-        bool hasKeyboard = hw?.SupportsKeyboard ?? true;
-        bool hasLightbar = hw?.SupportsLightbar ?? true;
-        bool hasLogo = hw?.SupportsLogoLight ?? true;
-        bool hasHinge = hw?.SupportsHingeLight ?? true;
-        bool hasSync = hw?.SupportsSyncLight ?? true;
+        bool hasKeyboard = hw?.SupportsKeyboard ?? false;
+        bool hasLightbar = hw?.SupportsLightbar ?? false;
+        bool hasLogo = hw?.SupportsLogoLight ?? false;
+        bool hasHinge = hw?.SupportsHingeLight ?? false;
+        bool hasSync = hw?.SupportsSyncLight ?? false;
         foreach ((string topic, string title, (string Effect, string Name)[] effects) in channels)
         {
             bool supported = topic switch
@@ -1969,50 +1969,31 @@ public partial class MainWindow : Window
     {
         try
         {
+            int light = (int)Math.Round(slider.Value);
+            int speedValue = (int)Math.Round(speed.Value);
             LightChannelSettings settings = LightingSettingsStore.Load(topic, effect) with
             {
                 Effect = effect,
-                Light = (int)Math.Round(slider.Value),
-                Speed = (int)Math.Round(speed.Value),
+                Light = light,
+                Speed = speedValue,
                 ColorArgb = colorArgb,
                 UsePresetColor = false,
                 PowerOn = powerOn
             };
             LightingSettingsStore.Save(topic, settings);
-            if (_probe == null)
+            if (_owner == null)
             {
-                StatusText.Text = WpfStrings.MainWindow_xaml_Text_16;
+                StatusText.Text = "灯光设置已保存（后端未连接）";
                 return;
             }
-            if (!powerOn)
-            {
-                bool off = topic == "Keyboard/Ctrl"
-                    ? await _probe.SetKeyboardPowerAsync(false)
-                    : await _probe.SetLightPowerAsync(topic, false);
-                StatusText.Text = off ? "灯光已关闭：" + topic : "灯光关闭失败：" + topic;
-                return;
-            }
-            if (topic == "Keyboard/Ctrl")
-            {
-                await _probe.SetKeyboardPowerAsync(true);
-            }
-            else
-            {
-                await _probe.SetLightPowerAsync(topic, true);
-            }
-            bool ok = topic switch
-            {
-                "Keyboard/Ctrl" => await (_owner?.WideApplyKeyboardEffectAsync(effect, true) ?? Task.FromResult(false)),
-                "HidLightbar/Ctrl" => await _probe.SetLightbarEffectAsync(effect),
-                "HidLightbar_Logo/Ctrl" => await _probe.SetLogoEffectAsync(effect),
-                "HidLightbar_Hinge/Ctrl" => await _probe.SetHingeEffectAsync(effect),
-                _ => await _probe.SetSyncEffectAsync(effect)
-            };
-            StatusText.Text = ok ? "灯光已下发：" + topic + " / " + effect : "灯光下发失败：" + topic;
+            bool ok = await _owner.WideApplyLightAsync(topic, effect, light, speedValue, colorArgb, powerOn);
+            StatusText.Text = ok
+                ? "灯光已下发：" + topic + " / " + effect
+                : "灯光下发失败：" + topic + " / " + effect;
         }
         catch (Exception ex)
         {
-            StatusText.Text = WpfStrings.MainWindow_xaml_Text_17 + ex.Message;
+            StatusText.Text = "灯光编辑失败：" + ex.Message;
         }
     }
 
