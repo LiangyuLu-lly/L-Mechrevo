@@ -997,7 +997,7 @@ public partial class OriginalStyleWindow : Window
         int mode = probe != null ? ResolveDisplayMode(probe) : VisualModeForId(MechrevoLite.Mode.PerfModeStore.ActiveModeId);
         MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
         List<TrayCustomItem> customs = new();
-        string customRoot = "自定义";
+        string customRoot = WpfStrings.TrayCustom;
         try
         {
             if (perf != null)
@@ -1011,7 +1011,7 @@ public partial class OriginalStyleWindow : Window
                     customs.Add(new TrayCustomItem(custom.Id, label, active));
                     if (active)
                     {
-                        customRoot = "自定义：" + label;
+                        customRoot = WpfStrings.TrayCustom + ": " + label;
                     }
                 }
             }

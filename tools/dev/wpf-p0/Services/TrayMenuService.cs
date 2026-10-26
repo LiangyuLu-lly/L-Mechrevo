@@ -28,10 +28,8 @@ internal interface ITrayMenuService
 /// <inheritdoc />
 internal sealed class TrayMenuService : ITrayMenuService
 {
-    private static readonly TrayMenuItem[] CatalogItems =
+    public IReadOnlyList<TrayMenuItem> Catalog =>
         TrayMenuConfig.Catalog.Select(static item => new TrayMenuItem(item.Key, item.Label)).ToArray();
-
-    public IReadOnlyList<TrayMenuItem> Catalog => CatalogItems;
 
     public HashSet<string> LoadEnabled()
     {

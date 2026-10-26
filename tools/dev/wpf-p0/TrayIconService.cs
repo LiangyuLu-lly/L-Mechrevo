@@ -25,16 +25,25 @@ internal sealed record TrayMenuState(
 
 internal static class TrayMenuConfig
 {
-    internal static readonly (string Key, string Label)[] Catalog =
+    internal static readonly string[] CatalogKeys =
     {
-        ("performance", WpfStrings.TrayPerformance),
-        ("custom", WpfStrings.TrayCustom),
-        ("gpu", WpfStrings.TrayGpu),
-        ("keyboard", WpfStrings.TrayKeyboard),
-        ("overlay", WpfStrings.TrayOverlay),
-        ("main", WpfStrings.TrayMain),
-        ("diagnostics", WpfStrings.TrayDiagnostics),
-        ("exit", WpfStrings.TrayExit)
+        "performance", "custom", "gpu", "keyboard", "overlay", "main", "diagnostics", "exit"
+    };
+
+    internal static IEnumerable<(string Key, string Label)> Catalog =>
+        CatalogKeys.Select(key => (key, Label(key)));
+
+    private static string Label(string key) => key switch
+    {
+        "performance" => WpfStrings.TrayPerformance,
+        "custom" => WpfStrings.TrayCustom,
+        "gpu" => WpfStrings.TrayGpu,
+        "keyboard" => WpfStrings.TrayKeyboard,
+        "overlay" => WpfStrings.TrayOverlay,
+        "main" => WpfStrings.TrayMain,
+        "diagnostics" => WpfStrings.TrayDiagnostics,
+        "exit" => WpfStrings.TrayExit,
+        _ => key
     };
 
     private const string ConfigKey = "tray_menu_items";
@@ -44,7 +53,7 @@ internal static class TrayMenuConfig
         string? text = MechrevoLite.AppConfig.GetString(ConfigKey);
         if (text == null)
         {
-            return Catalog.Select(item => item.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return CatalogKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
         return text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -54,7 +63,7 @@ internal static class TrayMenuConfig
 
     internal static void Save(IEnumerable<string> keys)
     {
-        string text = string.Join(",", Catalog.Select(item => item.Key).Where(key => keys.Contains(key, StringComparer.OrdinalIgnoreCase)));
+        string text = string.Join(",", CatalogKeys.Where(key => keys.Contains(key, StringComparer.OrdinalIgnoreCase)));
         MechrevoLite.AppConfig.Set(ConfigKey, text);
         MechrevoLite.AppConfig.Flush();
     }
