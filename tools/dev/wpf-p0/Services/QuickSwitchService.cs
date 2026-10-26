@@ -192,7 +192,7 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         }
         if (string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase))
         {
-            return true;
+            return IsGcuMachine();
         }
         return probe.SupportsQuick(key) || IsBaolongdaFanBoost(key);
     }
@@ -219,6 +219,30 @@ internal sealed class QuickSwitchService : IQuickSwitchService
             return MechrevoHw.FanBoostActive;
         }
         return probe.QuickState(key);
+    }
+
+    /// <summary>GCU-OSD 只属于 GCU 机型；宝龙达/无 GCU 机型不显示。</summary>
+    private bool IsGcuMachine()
+    {
+        try
+        {
+            if (_backend.Hw?.UsesBaolongda == true)
+            {
+                return false;
+            }
+            if (_backend.Probe?.IsGcuConnected == true || _backend.Hw?.IsGcuConnected == true)
+            {
+                return true;
+            }
+            string variant = MechrevoLite.Hardware.GcuIdentity.Variant ?? "";
+            return variant.Length > 0
+                && !string.Equals(variant, "none", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(variant, "unknown", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<ServiceResult> SetAsync(string key, bool on)
