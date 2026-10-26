@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Resources;
 using Microsoft.Win32.SafeHandles;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
@@ -126,7 +127,7 @@ internal sealed class PeripheralsService : IPeripheralsService
         }
 
         return unique.Values
-            .OrderBy(item => item.Source == "蓝牙" ? 0 : 1)
+            .OrderBy(item => IsBluetoothSource(item.Source) ? 0 : 1)
             .ThenBy(item => item.Name, StringComparer.CurrentCulture)
             .Take(6)
             .ToArray();
@@ -178,7 +179,7 @@ internal sealed class PeripheralsService : IPeripheralsService
                 string name = string.IsNullOrWhiteSpace(deviceInfo.Name) ? device.Name : deviceInfo.Name;
                 if (string.IsNullOrWhiteSpace(name))
                 {
-                    name = "蓝牙外设";
+                    name = WpfStrings.PeripheralBluetoothDevice;
                 }
 
                 GattDeviceServicesResult services = await device.GetGattServicesAsync(BluetoothCacheMode.Uncached)
@@ -220,7 +221,7 @@ internal sealed class PeripheralsService : IPeripheralsService
                 }
                 if (percent is >= 0 and <= 100)
                 {
-                    result.Add(new PeripheralBatteryInfo(name.Trim(), "蓝牙", percent));
+                    result.Add(new PeripheralBatteryInfo(name.Trim(), WpfStrings.PeripheralSourceBluetooth, percent));
                 }
             }
             catch
@@ -259,6 +260,10 @@ internal sealed class PeripheralsService : IPeripheralsService
     // ------------------------------------------------------------------
     // HID：HID Feature Report 的 Battery Strength（usage page 0x06 / usage 0x20）
     // ------------------------------------------------------------------
+    private static bool IsBluetoothSource(string source) =>
+        string.Equals(source, WpfStrings.PeripheralSourceBluetooth, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(source, "蓝牙", StringComparison.Ordinal);
+
     private const ushort BatteryUsagePage = 0x0006;
     private const ushort BatteryStrengthUsage = 0x0020;
     private const ushort HidpFeatureReportType = 2;
@@ -361,7 +366,7 @@ internal sealed class PeripheralsService : IPeripheralsService
             string name = ReadHidProductName(handle);
             if (string.IsNullOrWhiteSpace(name))
             {
-                name = $"HID 外设 VID_{device.VendorID:X4} PID_{device.ProductID:X4}";
+                name = string.Format(WpfStrings.PeripheralHidDeviceFormat, device.VendorID.ToString("X4"), device.ProductID.ToString("X4"));
             }
             return new PeripheralBatteryInfo(name.Trim(), "HID", percent);
         }

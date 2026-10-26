@@ -124,15 +124,15 @@ public partial class HidKeyboardWindow : Window
         {
             case 0:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 2, 100, _rgb.BreathSmooth);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraSmooth, 2, 100, _rgb.BreathSmooth);
                 break;
             case 2:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 1, 20, _rgb.SparkleDensity);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraDensity, 1, 20, _rgb.SparkleDensity);
                 break;
             case 3:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "时长", 5, 60, _rgb.ReactiveDuration);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraDuration, 5, 60, _rgb.ReactiveDuration);
                 ExtraCheck.Visibility = Visibility.Visible;
                 ExtraCheck.Content = WpfStrings.HidKeyboardWindow_xaml_Content;
                 ExtraCheck.IsChecked = _rgb.ReactiveRandom;
@@ -144,29 +144,29 @@ public partial class HidKeyboardWindow : Window
                 break;
             case 5:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "宽度", 1, 4, _rgb.LightningWidth);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraWidth, 1, 4, _rgb.LightningWidth);
                 Extra2Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "并发", 1, 4, _rgb.LightningConcurrent);
+                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, WpfStrings.HidExtraConcurrent, 1, 4, _rgb.LightningConcurrent);
                 Extra3Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra3Slider, Extra3Label, Extra3Text, "平滑", 1, 40, _rgb.LightningSmooth);
+                ConfigureExtra(Extra3Slider, Extra3Label, Extra3Text, WpfStrings.HidExtraSmooth, 1, 40, _rgb.LightningSmooth);
                 break;
             case 6:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "平滑", 1, 40, _rgb.FlameSmooth);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraSmooth, 1, 40, _rgb.FlameSmooth);
                 break;
             case 7:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 1, 5, _rgb.RainDensity);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraDensity, 1, 5, _rgb.RainDensity);
                 break;
             case 8:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "密度", 1, 5, _rgb.MatrixDensity);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraDensity, 1, 5, _rgb.MatrixDensity);
                 Extra2Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, "样式", 0, 3, _rgb.MatrixStyle);
+                ConfigureExtra(Extra2Slider, Extra2Label, Extra2Text, WpfStrings.HidExtraStyle, 0, 3, _rgb.MatrixStyle);
                 break;
             case 9:
                 Extra1Row.Visibility = Visibility.Visible;
-                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "布局", 0, 1, _rgb.StaticLayout);
+                ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, WpfStrings.HidExtraLayout, 0, 1, _rgb.StaticLayout);
                 break;
         }
         RefreshMultiColors(mode);

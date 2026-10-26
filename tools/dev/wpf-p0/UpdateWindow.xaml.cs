@@ -17,10 +17,10 @@ public partial class UpdateWindow : Window
         _info = info;
         Title = WpfStrings.UpdateWindow_xaml_Title + (info.LatestVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion);
         VersionText.Text = WpfStrings.UpdateWindow_xaml_Text + (info.CurrentVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion)
-            + "    最新版本：" + (info.LatestVersion ?? "未知")
-            + (string.IsNullOrWhiteSpace(info.Channel) ? "" : "    通道：" + info.Channel);
-        DateText.Text = string.IsNullOrWhiteSpace(info.ReleaseDate) ? "" : "发布日期：" + info.ReleaseDate;
-        NotesText.Text = string.IsNullOrWhiteSpace(info.Notes) ? "该版本没有提供更新说明。" : info.Notes;
+            + "    " + WpfStrings.UpdateLatestVersionLabel + (info.LatestVersion ?? WpfStrings.CommonUnknown)
+            + (string.IsNullOrWhiteSpace(info.Channel) ? "" : "    " + WpfStrings.UpdateChannelLabel + info.Channel);
+        DateText.Text = string.IsNullOrWhiteSpace(info.ReleaseDate) ? "" : WpfStrings.UpdateReleaseDateLabel + info.ReleaseDate;
+        NotesText.Text = string.IsNullOrWhiteSpace(info.Notes) ? WpfStrings.UpdateNoNotes : info.Notes;
     }
 
     private string? Link => string.IsNullOrWhiteSpace(_info.DownloadPage) ? _info.DownloadUrl : _info.DownloadPage;

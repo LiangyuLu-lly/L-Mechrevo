@@ -120,7 +120,7 @@ public partial class LightEditorWindow : Window
         {
             // ⭐⭐ task-17（宽屏白色背光入口）：白色背光键盘按能力只保留「电源 + 2 档亮度」，
             //    ⛔ 不显示不支持的 RGB 效果/颜色/速度/七色等控件 ✅
-            HintText.Text = "白色背光键盘：仅电源与 2 档亮度";
+            HintText.Text = WpfStrings.LightWhiteKeyboardHint;
             EffectRow.Visibility = Visibility.Collapsed;
             ColorRow.Visibility = Visibility.Collapsed;
             MixRow.Visibility = Visibility.Collapsed;
@@ -187,7 +187,7 @@ public partial class LightEditorWindow : Window
         if (_keyboard)
         {
             LightSlider.Value = _light;
-            LightText.Text = (_wujieWhite || _whiteBacklightOnly) ? (_light >= 2 ? "亮" : "暗") : (_light + "/" + _lightMax);
+            LightText.Text = (_wujieWhite || _whiteBacklightOnly) ? (_light >= 2 ? WpfStrings.LightLevelBright : WpfStrings.LightLevelDim) : (_light + "/" + _lightMax);
             SpeedSlider.Value = _speed;
             SpeedText.Text = _speed + "/4";
             return;
@@ -448,7 +448,7 @@ public partial class LightEditorWindow : Window
             _light = Math.Clamp((int)Math.Round(e.NewValue), (int)LightSlider.Minimum, _lightMax);
             if (LightText != null)
             {
-                LightText.Text = (_wujieWhite || _whiteBacklightOnly) ? (_light >= 2 ? "亮" : "暗") : (_light + "/" + _lightMax);
+                LightText.Text = (_wujieWhite || _whiteBacklightOnly) ? (_light >= 2 ? WpfStrings.LightLevelBright : WpfStrings.LightLevelDim) : (_light + "/" + _lightMax);
             }
             ScheduleAutoApply();
             return;
@@ -548,7 +548,7 @@ public partial class LightEditorWindow : Window
             {
                 _light = 1;
                 LightSlider.Value = 1;
-                LightText.Text = (_wujieWhite || _whiteBacklightOnly) ? "暗" : (_light + "/" + _lightMax);
+                LightText.Text = (_wujieWhite || _whiteBacklightOnly) ? WpfStrings.LightLevelDim : (_light + "/" + _lightMax);
             }
             bool manualKeyboard = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal)
                 && string.Equals(effect, "Manual", StringComparison.Ordinal);
@@ -637,7 +637,7 @@ public partial class LightEditorWindow : Window
             }
             if (!fromAuto || !ok)
             {
-                StatusText.Text = ok ? "已保存并下发" : "已保存，但设备未确认";
+                StatusText.Text = ok ? WpfStrings.LightSavedApplied : WpfStrings.LightSavedUnconfirmed;
             }
             return ok;
         }

@@ -1,4 +1,5 @@
 using System;
+using L_Mechrevo.WpfP0.Resources;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -35,14 +36,14 @@ public partial class DisplayEffectEditorWindow : Window
 
     private void BuildSliders()
     {
-        AddRow("brightness", "亮度", 0, 100, 50, v => v + "%");
-        AddRow("colortemp", "色温", 30, 100, 65, v => (v * 100) + "K");
-        AddRow("saturation", "饱和度", 5, 25, 15, v => (v * 0.1).ToString("0.0"));
-        AddRow("gamma", "伽玛", 50, 200, 100, v => (v * 0.01).ToString("0.00"));
-        AddRow("r", "红", 0, 255, 128, v => v.ToString());
-        AddRow("g", "绿", 0, 255, 128, v => v.ToString());
-        AddRow("b", "蓝", 0, 255, 128, v => v.ToString());
-        AddRow("contrast", "对比度", 5, 20, 10, v => (v * 0.1).ToString("0.0"));
+        AddRow("brightness", WpfStrings.EffectBrightness, 0, 100, 50, v => v + "%");
+        AddRow("colortemp", WpfStrings.EffectColorTemp, 30, 100, 65, v => (v * 100) + "K");
+        AddRow("saturation", WpfStrings.EffectSaturation, 5, 25, 15, v => (v * 0.1).ToString("0.0"));
+        AddRow("gamma", WpfStrings.EffectGamma, 50, 200, 100, v => (v * 0.01).ToString("0.00"));
+        AddRow("r", WpfStrings.ColorRed, 0, 255, 128, v => v.ToString());
+        AddRow("g", WpfStrings.ColorGreen, 0, 255, 128, v => v.ToString());
+        AddRow("b", WpfStrings.ColorBlue, 0, 255, 128, v => v.ToString());
+        AddRow("contrast", WpfStrings.EffectContrast, 5, 20, 10, v => (v * 0.1).ToString("0.0"));
     }
 
     private void AddRow(string key, string label, int min, int max, int value, Func<int, string> format)

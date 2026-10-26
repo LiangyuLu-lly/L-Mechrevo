@@ -2817,4 +2817,114 @@ Switching to iGPU saving may require ending these programs. Continue?</value>
   <data name="ClosingParen" xml:space="preserve">
     <value>)</value>
   </data>
+  <data name="CpuFmaxPrefix" xml:space="preserve">
+    <value>; FMax: </value>
+  </data>
+  <data name="CpuAutoApplyConfirm" xml:space="preserve">
+    <value>After enabling, the saved CPU tuning values will be written to the SMU at boot. Continue?</value>
+  </data>
+  <data name="CpuAutoApplyOn" xml:space="preserve">
+    <value>Auto-apply at boot enabled</value>
+  </data>
+  <data name="CpuAutoApplyOff" xml:space="preserve">
+    <value>Auto-apply at boot disabled</value>
+  </data>
+  <data name="HidExtraSmooth" xml:space="preserve">
+    <value>Smooth</value>
+  </data>
+  <data name="HidExtraDensity" xml:space="preserve">
+    <value>Density</value>
+  </data>
+  <data name="HidExtraDuration" xml:space="preserve">
+    <value>Duration</value>
+  </data>
+  <data name="HidExtraWidth" xml:space="preserve">
+    <value>Width</value>
+  </data>
+  <data name="HidExtraConcurrent" xml:space="preserve">
+    <value>Concurrent</value>
+  </data>
+  <data name="HidExtraLayout" xml:space="preserve">
+    <value>Layout</value>
+  </data>
+  <data name="HidExtraStyle" xml:space="preserve">
+    <value>Style</value>
+  </data>
+  <data name="LightLevelBright" xml:space="preserve">
+    <value>Bright</value>
+  </data>
+  <data name="LightLevelDim" xml:space="preserve">
+    <value>Dim</value>
+  </data>
+  <data name="LightSavedApplied" xml:space="preserve">
+    <value>Saved and applied</value>
+  </data>
+  <data name="LightSavedUnconfirmed" xml:space="preserve">
+    <value>Saved, but device did not confirm</value>
+  </data>
+  <data name="CommonUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="FeedbackSystemLabel" xml:space="preserve">
+    <value>OS: </value>
+  </data>
+  <data name="FeedbackGcuLineFormat" xml:space="preserve">
+    <value>
+GCU: {0} · Baolongda: {1} · Wujie: {2}</value>
+  </data>
+  <data name="FeedbackConnected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="FeedbackDisconnected" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="FeedbackYes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="FeedbackNo" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="UpdateLatestVersionLabel" xml:space="preserve">
+    <value>Latest version: </value>
+  </data>
+  <data name="UpdateChannelLabel" xml:space="preserve">
+    <value>Channel: </value>
+  </data>
+  <data name="UpdateReleaseDateLabel" xml:space="preserve">
+    <value>Release date: </value>
+  </data>
+  <data name="UpdateNoNotes" xml:space="preserve">
+    <value>This release does not provide update notes.</value>
+  </data>
+  <data name="EffectBrightness" xml:space="preserve">
+    <value>Brightness</value>
+  </data>
+  <data name="EffectColorTemp" xml:space="preserve">
+    <value>Color temperature</value>
+  </data>
+  <data name="EffectSaturation" xml:space="preserve">
+    <value>Saturation</value>
+  </data>
+  <data name="EffectGamma" xml:space="preserve">
+    <value>Gamma</value>
+  </data>
+  <data name="EffectContrast" xml:space="preserve">
+    <value>Contrast</value>
+  </data>
+  <data name="GpuRestartPromptMessage" xml:space="preserve">
+    <value>Switching to &quot;{0}&quot; requires a GPU mode restart.
+
+Yes: switch and request restart
+No: switch only and restart manually later
+Cancel: do not switch</value>
+  </data>
+  <data name="PeripheralSourceBluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+  </data>
+  <data name="PeripheralBluetoothDevice" xml:space="preserve">
+    <value>Bluetooth device</value>
+  </data>
+  <data name="PeripheralHidDeviceFormat" xml:space="preserve">
+    <value>HID device VID_{0} PID_{1}</value>
+  </data>
 </root>

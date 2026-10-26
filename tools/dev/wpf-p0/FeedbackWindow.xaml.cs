@@ -18,8 +18,8 @@ public partial class FeedbackWindow : Window
         try
         {
             string model = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.Capabilities.Model ?? "";
-            DeviceText.Text = WpfStrings.FeedbackWindow_xaml_Text + (string.IsNullOrWhiteSpace(model) ? "未知" : model)
-                + "\n系统：" + Environment.OSVersion.VersionString;
+            DeviceText.Text = WpfStrings.FeedbackWindow_xaml_Text + (string.IsNullOrWhiteSpace(model) ? WpfStrings.CommonUnknown : model)
+                + "\n" + WpfStrings.FeedbackSystemLabel + Environment.OSVersion.VersionString;
         }
         catch
         {
@@ -32,9 +32,10 @@ public partial class FeedbackWindow : Window
         string info = "L-Mechrevo " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion + "\n" + DeviceText.Text;
         try
         {
-            info += "\nGCU：" + (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsGcuConnected == true ? "已连接" : "未连接")
-                + " · 宝龙达：" + (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true ? "是" : "否")
-                + " · 无界：" + (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.WujieSmuApu == true ? "是" : "否");
+            info += string.Format(WpfStrings.FeedbackGcuLineFormat,
+                L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsGcuConnected == true ? WpfStrings.FeedbackConnected : WpfStrings.FeedbackDisconnected,
+                L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true ? WpfStrings.FeedbackYes : WpfStrings.FeedbackNo,
+                L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.WujieSmuApu == true ? WpfStrings.FeedbackYes : WpfStrings.FeedbackNo);
         }
         catch
         {

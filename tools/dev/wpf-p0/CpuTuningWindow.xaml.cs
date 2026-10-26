@@ -353,7 +353,7 @@ public partial class CpuTuningWindow : Window
             if (fmax.HasValue && RuntimeCpuTuning.Instance.FMaxWritableCapability)
             {
                 CpuTuningResult fr = await Task.Run(() => RuntimeCpuTuning.Instance.ApplyFMax(fmax.Value));
-                detail += "；FMax：" + fr.Detail;
+                detail += WpfStrings.CpuFmaxPrefix + fr.Detail;
             }
             StatusText.Text = detail;
             LoadProbe();
@@ -368,14 +368,14 @@ public partial class CpuTuningWindow : Window
     {
         bool enabled = AutoApplyCheck.IsChecked == true;
         if (enabled && MessageBox.Show(this,
-                "开启后开机将按已保存的 CPU 调节值写入 SMU，是否继续？",
+                WpfStrings.CpuAutoApplyConfirm,
                 "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             AutoApplyCheck.IsChecked = false;
             return;
         }
         RuntimeCpuTuning.SetAutoApply(enabled);
-        StatusText.Text = enabled ? "已开启开机自动应用" : "已关闭开机自动应用";
+        StatusText.Text = enabled ? WpfStrings.CpuAutoApplyOn : WpfStrings.CpuAutoApplyOff;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e)

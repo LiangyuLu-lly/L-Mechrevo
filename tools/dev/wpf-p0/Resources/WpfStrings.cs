@@ -952,4 +952,41 @@ public static class WpfStrings
     public static string TraySensorOff => Get("TraySensorOff");
     public static string LightSingleWhiteBacklight => Get("LightSingleWhiteBacklight");
     public static string ClosingParen => Get("ClosingParen");
+
+    // 2026-10-26（task-39）：剩余窗口英文资源收口（CPU 调优/键盘/灯编辑器/反馈/GPU 重启/显示效果/更新/外设来源）。
+    public static string CpuFmaxPrefix => Get("CpuFmaxPrefix");
+    public static string CpuAutoApplyConfirm => Get("CpuAutoApplyConfirm");
+    public static string CpuAutoApplyOn => Get("CpuAutoApplyOn");
+    public static string CpuAutoApplyOff => Get("CpuAutoApplyOff");
+    public static string HidExtraSmooth => Get("HidExtraSmooth");
+    public static string HidExtraDensity => Get("HidExtraDensity");
+    public static string HidExtraDuration => Get("HidExtraDuration");
+    public static string HidExtraWidth => Get("HidExtraWidth");
+    public static string HidExtraConcurrent => Get("HidExtraConcurrent");
+    public static string HidExtraLayout => Get("HidExtraLayout");
+    public static string HidExtraStyle => Get("HidExtraStyle");
+    public static string LightLevelBright => Get("LightLevelBright");
+    public static string LightLevelDim => Get("LightLevelDim");
+    public static string LightSavedApplied => Get("LightSavedApplied");
+    public static string LightSavedUnconfirmed => Get("LightSavedUnconfirmed");
+    public static string CommonUnknown => Get("CommonUnknown");
+    public static string FeedbackSystemLabel => Get("FeedbackSystemLabel");
+    public static string FeedbackGcuLineFormat => Get("FeedbackGcuLineFormat");
+    public static string FeedbackConnected => Get("FeedbackConnected");
+    public static string FeedbackDisconnected => Get("FeedbackDisconnected");
+    public static string FeedbackYes => Get("FeedbackYes");
+    public static string FeedbackNo => Get("FeedbackNo");
+    public static string UpdateLatestVersionLabel => Get("UpdateLatestVersionLabel");
+    public static string UpdateChannelLabel => Get("UpdateChannelLabel");
+    public static string UpdateReleaseDateLabel => Get("UpdateReleaseDateLabel");
+    public static string UpdateNoNotes => Get("UpdateNoNotes");
+    public static string EffectBrightness => Get("EffectBrightness");
+    public static string EffectColorTemp => Get("EffectColorTemp");
+    public static string EffectSaturation => Get("EffectSaturation");
+    public static string EffectGamma => Get("EffectGamma");
+    public static string EffectContrast => Get("EffectContrast");
+    public static string GpuRestartPromptMessage => Get("GpuRestartPromptMessage");
+    public static string PeripheralSourceBluetooth => Get("PeripheralSourceBluetooth");
+    public static string PeripheralBluetoothDevice => Get("PeripheralBluetoothDevice");
+    public static string PeripheralHidDeviceFormat => Get("PeripheralHidDeviceFormat");
 }

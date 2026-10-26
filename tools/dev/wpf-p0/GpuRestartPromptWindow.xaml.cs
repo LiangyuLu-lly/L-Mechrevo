@@ -1,3 +1,4 @@
+using L_Mechrevo.WpfP0.Resources;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -19,10 +20,7 @@ public partial class GpuRestartPromptWindow : Window
     {
         InitializeComponent();
         MessageText.Text =
-            "切换到「" + modeName + "」需要重启显卡模式。\n\n" +
-            "是：切换并请求重启\n" +
-            "否：仅切换，稍后手动重启\n" +
-            "取消：不切换";
+            string.Format(WpfStrings.GpuRestartPromptMessage, modeName);
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
     }
 
