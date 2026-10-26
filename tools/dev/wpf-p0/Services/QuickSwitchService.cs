@@ -190,8 +190,11 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         {
             return false;
         }
-        string backendKey = string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase) ? "osd" : key;
-        return probe.SupportsQuick(backendKey) || IsBaolongdaFanBoost(key);
+        if (string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        return probe.SupportsQuick(key) || IsBaolongdaFanBoost(key);
     }
 
     public bool GetState(string key)
@@ -224,6 +227,10 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         {
             AppConfig.Set("lm_osd_enabled", on ? 1 : 0);
             AppConfig.Flush();
+            if (on)
+            {
+                L_Mechrevo.WpfP0.OsdService.Show("\uE7F4", WpfStrings.QuickOsd, WpfStrings.StateOn);
+            }
             return ServiceResult.Success(on ? WpfStrings.QuickResultOn : WpfStrings.QuickResultOff);
         }
         string backendKey = string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase) ? "osd" : key;
