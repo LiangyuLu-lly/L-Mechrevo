@@ -20,6 +20,9 @@ internal static class AppTheme
             resources["TextBrush"] = Brush("#F3F5F8");
             resources["MutedBrush"] = Brush("#9BA6B5");
             resources["TrackBrush"] = Brush("#35FFFFFF");
+            resources["PopupBrush"] = Brush("#F21B2029");
+            resources["SegmentCheckedBackgroundBrush"] = Brush("#22FFFFFF");
+            resources["SegmentCheckedForegroundBrush"] = Brush("#F3F5F8");
         }
         else
         {
@@ -32,6 +35,9 @@ internal static class AppTheme
             resources["TextBrush"] = Brush("#1B2029");
             resources["MutedBrush"] = Brush("#5A6574");
             resources["TrackBrush"] = Brush("#26000000");
+            resources["PopupBrush"] = Brush("#FFFFFFFF");
+            resources["SegmentCheckedBackgroundBrush"] = Brush("#1A3B82F6");
+            resources["SegmentCheckedForegroundBrush"] = Brush("#1B2029");
         }
         ApplyCardOpacity();
     }

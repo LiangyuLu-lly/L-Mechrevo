@@ -12,6 +12,8 @@
             <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
             <SolidColorBrush x:Key="WindowBgBrush" Color="#12151B" />
     <SolidColorBrush x:Key="PopupBrush" Color="#F21B2029" />
+            <SolidColorBrush x:Key="SegmentCheckedBackgroundBrush" Color="#22FFFFFF" />
+            <SolidColorBrush x:Key="SegmentCheckedForegroundBrush" Color="#F3F5F8" />
             <SolidColorBrush x:Key="CardBrush" Color="#B81B2029" />
     <SolidColorBrush x:Key="DockBrush" Color="#B3161A20" />
             <SolidColorBrush x:Key="CardBorderBrush" Color="#33FFFFFF" />
@@ -87,9 +89,10 @@
                                     <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                     <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
-                                    <Setter Property="Foreground" Value="White" />
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SegmentCheckedBackgroundBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource SegmentCheckedForegroundBrush}" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -239,7 +242,7 @@
                             </ToggleButton>
                             <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
-                                <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+                                <Border Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
                                         BorderThickness="1" CornerRadius="7" Margin="0,3,0,0" Padding="3"
                                         Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                     <ScrollViewer MaxHeight="220">

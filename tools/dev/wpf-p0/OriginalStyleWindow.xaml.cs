@@ -2682,7 +2682,7 @@ public partial class OriginalStyleWindow : Window
             0 => WpfStrings.ModeBalanced,
             _ => WpfStrings.ModeCustom
         };
-        OsdService.Show(QuickGlyph("highperf"), WpfStrings.OsdPerformance, osdMode);
+        OsdService.Show(string.Empty, WpfStrings.OsdPerformance, osdMode);
         _backendProbe?.MarkUserModeSwitch();
         try
         {

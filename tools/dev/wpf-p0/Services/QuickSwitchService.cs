@@ -109,6 +109,22 @@ internal sealed class QuickSwitchService : IQuickSwitchService
     /// 宽屏只拿到 label 文本；这里按 key 重新取资源，保证 en-US 下显示 English ✅。
     /// 未登记的 key 回退调用方给的 label（行为不变）。</para>
     /// </summary>
+    /// <summary>按 key 取当前语言的完整显示名（优先使用更多开关目录里的本地化名称）。</summary>
+    internal static string DisplayLabel(string key)
+    {
+        foreach (QuickSwitchGroup group in GroupCatalog)
+        {
+            foreach (QuickSwitchItem item in group.Items)
+            {
+                if (string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return item.Label;
+                }
+            }
+        }
+        return Label(key, key);
+    }
+
     internal static string Label(string key, string? fallback = null)
     {
         // ⭐ 中文保持原文：迷你窗目录里的中文短名（强冷/麦克风/息屏…）与「更多开关」里的长名不同，

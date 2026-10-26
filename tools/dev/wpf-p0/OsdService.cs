@@ -64,7 +64,10 @@ internal static class OsdService
                 VerticalAlignment = VerticalAlignment.Center
             };
             StackPanel row = new() { Orientation = Orientation.Horizontal };
-            row.Children.Add(glyphText);
+            if (!string.IsNullOrEmpty(glyph))
+            {
+                row.Children.Add(glyphText);
+            }
             row.Children.Add(titleText);
             row.Children.Add(valueText);
 
@@ -119,6 +122,6 @@ internal static class OsdService
     internal static void ShowQuickSwitch(string key, bool on)
     {
         string glyph = OriginalStyleWindow.QuickGlyph(key);
-        Show(glyph, QuickSwitchService.Label(key), on ? WpfStrings.StateOn : WpfStrings.StateOff);
+        Show(glyph, QuickSwitchService.DisplayLabel(key), on ? WpfStrings.StateOn : WpfStrings.StateOff);
     }
 }

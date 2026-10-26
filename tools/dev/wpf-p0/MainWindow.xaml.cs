@@ -81,6 +81,8 @@ public partial class MainWindow : Window
     private string _refreshRatesSignature = "";
     private readonly List<ToggleButton> _batteryModeButtons = new();
     private readonly List<(string Key, Button Button, TextBlock State, string Label)> _quickTileButtons = new();
+    private readonly Dictionary<string, bool> _quickTilePending = new();
+    private readonly Dictionary<string, long> _quickTilePendingTick = new();
     /// <summary>⭐ task-26：每张灯光卡的 150 ms 合并计时器；重建卡片时统一 Stop（避免对已拆掉的卡补发旧值）✅。</summary>
     private readonly List<DispatcherTimer> _lightCardApplyTimers = new();
     private Window? _inlineLightEditorWindow;
@@ -810,9 +812,15 @@ public partial class MainWindow : Window
             {
                 if (_owner != null)
                 {
-                    await _owner.WideToggleQuickAsync(key);
+                    bool previous = _owner.WideQuickTiles().FirstOrDefault(item => item.Key == key).On;
+                    bool ok = await _owner.WideToggleQuickAsync(key);
+                    if (ok)
+                    {
+                        _quickTilePending[key] = !previous;
+                        _quickTilePendingTick[key] = Environment.TickCount64;
+                    }
                     RefreshQuickTiles();
-        RefreshIgpuSaving();
+                    RefreshIgpuSaving();
                 }
             };
             QuickTilesGrid.Children.Add(tile);
@@ -862,6 +870,23 @@ public partial class MainWindow : Window
         foreach ((string key, Button button, TextBlock state, string label) in _quickTileButtons)
         {
             bool on = _owner.WideQuickTiles().FirstOrDefault(item => item.Key == key).On;
+            if (_quickTilePending.TryGetValue(key, out bool pending))
+            {
+                if (on == pending)
+                {
+                    _quickTilePending.Remove(key);
+                    _quickTilePendingTick.Remove(key);
+                }
+                else if (Environment.TickCount64 - _quickTilePendingTick.GetValueOrDefault(key) < 6000)
+                {
+                    on = pending;
+                }
+                else
+                {
+                    _quickTilePending.Remove(key);
+                    _quickTilePendingTick.Remove(key);
+                }
+            }
             state.Text = label + (on ? " · " + WpfStrings.StateOn : " · " + WpfStrings.StateOff);
             button.BorderBrush = on ? (Brush)FindResource("AccentBrush") : (Brush)FindResource("CardBorderBrush");
             button.BorderThickness = new Thickness(on ? 2 : 1);
