@@ -570,8 +570,8 @@ public partial class OriginalStyleWindow : Window
         {
             "Keyboard/Ctrl" => "\uE765",
             "HidLightbar/Ctrl" => "\uE706",
-            "HidLightbar_Logo/Ctrl" => "\uE8B7",
-            "HidLightbar_Hinge/Ctrl" => "\uE7C4",
+            "HidLightbar_Logo/Ctrl" => "\uE82F",
+            "HidLightbar_Hinge/Ctrl" => "\uE781",
             "HidLightbar_Sync/Ctrl" => "\uE895",
             _ => "\uE706"
         };
