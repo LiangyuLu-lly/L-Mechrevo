@@ -61,6 +61,7 @@ public partial class App : Application
             Timeout.Infinite,
             executeOnlyOnce: false);
         ApplyFont();
+        _ = Task.Run(() => MechrevoLite.HardwareControl.EnableLocalMonitoring());
         base.OnStartup(e);
         OriginalStyleWindow window = new();
         MainWindow = window;
@@ -81,6 +82,13 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try
+        {
+            MechrevoLite.HardwareControl.DisableLocalMonitoring();
+        }
+        catch
+        {
+        }
         _showMainWait?.Unregister(null);
         _showMainEvent?.Dispose();
         if (_ownsInstanceMutex)

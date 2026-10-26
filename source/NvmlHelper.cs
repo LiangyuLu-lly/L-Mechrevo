@@ -801,7 +801,7 @@ public static class NvmlHelper
 				_snapshotClockMhz = clockMhz;
 			}
 			int memoryClockResult = nvmlDeviceGetClockInfo(device, NvmlClockMemory, out uint memoryClockMhz);
-			if (memoryClockResult == NVML_SUCCESS && memoryClockMhz > 0 && memoryClockMhz <= 4000)
+			if (memoryClockResult == NVML_SUCCESS && memoryClockMhz > 0 && memoryClockMhz <= 30000)
 			{
 				_snapshotMemoryClockMhz = memoryClockMhz;
 			}

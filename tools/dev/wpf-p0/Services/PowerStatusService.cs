@@ -23,7 +23,11 @@ internal static class PowerStatusService
     {
         try
         {
-            if (sample) HardwareControl.ReadSensors();
+            if (sample)
+            {
+                // CPU/GPU 功耗、显存频率等属于本地采样链，不能只刷新电源输入/电池。
+                HardwareControl.SampleLocalPower();
+            }
             return new PowerStatusSnapshot(
                 HardwareControl.PowerInput,
                 HardwareControl.batteryRate,

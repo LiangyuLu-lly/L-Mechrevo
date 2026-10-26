@@ -128,6 +128,7 @@ public partial class MainWindow : Window
         // ⭐ P0-3：宽屏也直接消费共享 ISensorService 快照（⛔ 不再经 WideSensors 读静态字段）；
         //   未连接/异常 ⇒ Empty ⇒ 0，占位显示与原来的 ParseNumber("--") 一致 ✅
         SensorSnapshot snapshot = _owner.Services?.Sensors.Read() ?? SensorSnapshot.Empty;
+
         double fanMax = Math.Max(1, snapshot.FanRpmMaxForPercent);
         if (fanMax <= 1) fanMax = 5000;
         SetMetric(_cpuMetrics, 0, snapshot.CpuTempC, "℃");

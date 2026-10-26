@@ -29,30 +29,27 @@ internal sealed class SensorService : ISensorService
     public SensorSnapshot Read()
     {
         MechrevoHw? hw = _backend.Hw;
-        if (hw == null || !hw.IsConnected)
-        {
-            return SensorSnapshot.Empty;
-        }
+        bool connected = hw != null && hw.IsConnected;
         try
         {
-            // NVML 显存频率：与原窗口 WideSensors 同一来源；⛔ 不可用时返回 null（不编 0）。
+            // 后端暂时未连上时仍使用本地采样值（LHM/NVML），不要整页归零。
             float? gpuMemoryClock = NvmlHelper.GetGpuMemoryClockMhz();
             int? gpuMemoryClockMhz = gpuMemoryClock.HasValue && gpuMemoryClock.Value > 0
                 ? (int)Math.Round(gpuMemoryClock.Value)
                 : null;
             return new SensorSnapshot(
                 HardwareAvailable: true,
-                CpuTempC: hw.CpuTemp,
-                GpuTempC: hw.GpuTemp,
-                CpuFanRpm: hw.CpuFanRpm,
-                GpuFanRpm: hw.GpuFanRpm,
-                CpuUsagePercent: hw.CpuUsage,
-                GpuUsagePercent: hw.GpuUsage,
-                CpuFanDutyPercent: hw.CpuFanDuty,
-                GpuFanDutyPercent: hw.GpuFanDuty,
-                CpuFrequencyMhz: hw.CpuFrequency,
-                GpuCoreFrequencyMhz: hw.GpuCoreFreq,
-                FanRpmMaxForPercent: hw.FanRpmMaxForPercent,
+                CpuTempC: connected ? hw!.CpuTemp : HardwareControl.cpuTemp,
+                GpuTempC: connected ? hw!.GpuTemp : HardwareControl.gpuTemp,
+                CpuFanRpm: connected ? hw!.CpuFanRpm : HardwareControl.cpuFanRPM,
+                GpuFanRpm: connected ? hw!.GpuFanRpm : HardwareControl.gpuFanRPM,
+                CpuUsagePercent: connected ? hw!.CpuUsage : (HardwareControl.cpuUsage ?? 0),
+                GpuUsagePercent: connected ? hw!.GpuUsage : (HardwareControl.gpuUsage ?? 0),
+                CpuFanDutyPercent: connected ? hw!.CpuFanDuty : (HardwareControl.cpuFan ?? 0),
+                GpuFanDutyPercent: connected ? hw!.GpuFanDuty : (HardwareControl.gpuFan ?? 0),
+                CpuFrequencyMhz: connected ? hw!.CpuFrequency : HardwareControl.cpuFrequency,
+                GpuCoreFrequencyMhz: connected ? hw!.GpuCoreFreq : HardwareControl.gpuCoreFreq,
+                FanRpmMaxForPercent: connected ? hw!.FanRpmMaxForPercent : 5000,
                 CpuPowerWatts: HardwareControl.cpuPower,
                 GpuPowerWatts: HardwareControl.gpuPower,
                 GpuMemoryClockMhz: gpuMemoryClockMhz,
