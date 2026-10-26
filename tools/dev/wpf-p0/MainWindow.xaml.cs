@@ -2088,10 +2088,14 @@ public partial class MainWindow : Window
     private Border BuildLightCard(string topic, string title, (string Effect, string Name)[] effects, bool hidKeyboard = false, bool whiteKeyboard = false)
     {
         LightChannelSettings settings = LightingSettingsStore.Load(topic, effects[0].Effect);
-        int maxLight = whiteKeyboard ? 2 : (topic == "Keyboard/Ctrl" ? 4 : topic == "HidLightbar_Logo/Ctrl" ? 4 : 100);
+        bool keyboardChannel = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
+        bool gradeLightChannel = IsGradeLightChannel(topic, _probe?.Hw ?? WpfBackend.Hw);
+        int maxLight = whiteKeyboard ? 2 : (keyboardChannel || gradeLightChannel ? 4 : 100);
         int light = whiteKeyboard
             ? (settings.Light >= 3 ? 2 : Math.Clamp(settings.Light, 1, 2))
-            : Math.Clamp(settings.Light, 0, maxLight);
+            : gradeLightChannel || keyboardChannel
+                ? Math.Clamp(settings.Light, 0, 4)
+                : Math.Clamp(settings.Light * 25, 0, 100);
         int colorArgb = settings.ColorArgb;
         int breathingIndex = Math.Clamp(settings.BreathingIndex, 1, 4);
         bool singleZoneKeyboard = topic == "Keyboard/Ctrl"
@@ -2424,15 +2428,31 @@ public partial class MainWindow : Window
             lightUiSyncing = true;
             try
             {
-                int colorMode = LightingCatalog.LightEffectColorMode(effect);
-                bool hidColorEffect = effect.StartsWith("hid:", StringComparison.Ordinal)
-                    && int.TryParse(effect.AsSpan(4), out int hidColorMode) && hidColorMode is 0 or 9;
+                bool hidEffect = effect.StartsWith("hid:", StringComparison.Ordinal);
+                int hidColorMode = -1;
+                bool hidColorEffect = hidEffect
+                    && int.TryParse(effect.AsSpan(4), out hidColorMode) && hidColorMode is 0 or 9;
                 bool breathPalette = singleZoneKeyboard && string.Equals(effect, "Breathing", StringComparison.Ordinal);
-                bool keyboardBreathing = topic == "Keyboard/Ctrl"
-                    && string.Equals(effect, "Breathing", StringComparison.Ordinal)
-                    && !singleZoneKeyboard;
-                bool singleColor = !breathPalette && (hidColorEffect || keyboardBreathing || colorMode == 1);
-                bool mixColor = !breathPalette && !keyboardBreathing && !hidColorEffect && colorMode == 7;
+                bool singleColor;
+                bool mixColor;
+                if (hidEffect)
+                {
+                    singleColor = hidColorEffect;
+                    mixColor = false;
+                }
+                else if (gradeLightChannel)
+                {
+                    int colorMode = LightingCatalog.LightEffectColorMode(effect);
+                    singleColor = colorMode == 1;
+                    mixColor = colorMode == 7;
+                }
+                else
+                {
+                    // 老 LightForm：非 Gen40 灯条/Logo/铰链/同步没有七色混色；
+                    // 单色系灯效（含呼吸/波浪/冲击等）走一个单色选择器。
+                    singleColor = !breathPalette && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect);
+                    mixColor = false;
+                }
                 colorSection.Visibility = singleColor ? Visibility.Visible : Visibility.Collapsed;
                 mixSection.Visibility = mixColor ? Visibility.Visible : Visibility.Collapsed;
                 breathSection.Visibility = breathPalette ? Visibility.Visible : Visibility.Collapsed;
@@ -2451,7 +2471,10 @@ public partial class MainWindow : Window
                     mixColors = (int[])savedMix.Clone();
                     RefreshMixButtons();
                 }
-                slider.Value = Math.Clamp(effectSettings.Light, 0, maxLight);
+                int effectLight = gradeLightChannel || keyboardChannel
+                    ? effectSettings.Light
+                    : Math.Clamp(effectSettings.Light * 25, 0, 100);
+                slider.Value = Math.Clamp(effectLight, 0, maxLight);
                 speed.Value = Math.Clamp(effectSettings.Speed, 0, 4);
                 colorArgb = effectSettings.EffectiveColorArgb();
                 swatch.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255,
@@ -2702,6 +2725,15 @@ public partial class MainWindow : Window
         BuildLightingCards();
     }
 
+    private static bool IsGradeLightChannel(string topic, MechrevoHw? hw)
+    {
+        return (string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+                || string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal))
+            && hw != null
+            && !hw.UsesBaolongda
+            && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+    }
+
     private static bool EffectSupportsSpeed(string effect)
     {
         if (effect.StartsWith("hid:", StringComparison.Ordinal))
@@ -2719,7 +2751,12 @@ public partial class MainWindow : Window
     {
         try
         {
-            int light = (int)Math.Round(slider.Value);
+            bool keyboardChannel = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
+            bool gradeLightChannel = IsGradeLightChannel(topic, _probe?.Hw ?? WpfBackend.Hw);
+            int sliderLight = (int)Math.Round(slider.Value);
+            int light = keyboardChannel || gradeLightChannel
+                ? sliderLight
+                : Math.Clamp(sliderLight * 4 / 100, 0, 4);
             int speedValue = (int)Math.Round(speed.Value);
             if (topic == "Keyboard/Ctrl" && WideIsWhiteBacklightKeyboard(_probe?.Hw))
             {
