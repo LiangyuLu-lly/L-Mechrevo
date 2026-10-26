@@ -186,8 +186,8 @@ internal static class UiProbeRunnerService
         string[] lines =
         {
             "UI 探针（WPF 版：合成能力位、仅显示、不触硬件）：",
-            "  L-Mechrevo.WpfP0.exe --ui-probe list",
-            "  L-Mechrevo.WpfP0.exe --ui-probe <能力档>:<窗体>",
+            "  L-Mechrevo.exe --ui-probe list",
+            "  L-Mechrevo.exe --ui-probe <能力档>:<窗体>",
             "  能力档：all（全开）· wujie（无界类）· baolongda（宝龙达类）· gen50（50 系 GCU 类）· minimal（极简）",
             "  窗体：settings（主界面）· custommode（自定义模式）· fancurve（风扇曲线）",
             "  例：--ui-probe wujie:settings；无参数时也读环境变量 LMECHREVO_UI_PROBE",

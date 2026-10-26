@@ -12,7 +12,7 @@ public partial class App : Application
     private static readonly string InstanceMutexName =
         Environment.GetEnvironmentVariable("L_MECHREVO_WPF_INSTANCE") is { Length: > 0 } customInstance
             ? @"Local\" + customInstance
-            : @"Local\L-Mechrevo.WpfP0";
+            : @"Local\L-Mechrevo";
     private static readonly string ShowMainEventName = InstanceMutexName + ".ShowMain";
     private Mutex? _instanceMutex;
     private bool _ownsInstanceMutex;

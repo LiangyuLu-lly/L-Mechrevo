@@ -11,6 +11,7 @@ using MechrevoLite.Gpu;
 using PawnIO;
 
 [assembly: InternalsVisibleTo("L-Mechrevo.WpfP0")]
+[assembly: InternalsVisibleTo("L-Mechrevo")]
 
 namespace MechrevoLite
 {
