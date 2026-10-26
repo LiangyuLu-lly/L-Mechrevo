@@ -1092,7 +1092,15 @@ public partial class MainWindow : Window
         StackPanel brightnessRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         brightnessRow.Children.Add(new TextBlock { Text = WpfStrings.Brightness, Style = (Style)FindResource("MutedText"), Width = 54, VerticalAlignment = VerticalAlignment.Center });
         _displayBrightness = new Slider { Minimum = 0, Maximum = 100, Value = brightness, Width = 220, Style = (Style)FindResource("RoundSlider") };
-        _displayBrightness.ValueChanged += (_, _) => _owner?.WideSetBrightness((int)Math.Round(_displayBrightness.Value));
+        _displayBrightness.ValueChanged += (_, _) =>
+        {
+            int value = (int)Math.Round(_displayBrightness.Value);
+            if (_displayBrightnessText != null)
+            {
+                _displayBrightnessText.Text = value + "%";
+            }
+            _owner?.WideSetBrightness(value);
+        };
         _displayBrightnessText = new TextBlock { Text = brightness + "%", Style = (Style)FindResource("MutedText"), Width = 46, TextAlignment = TextAlignment.Right };
         brightnessRow.Children.Add(_displayBrightness);
         brightnessRow.Children.Add(_displayBrightnessText);
@@ -1690,7 +1698,9 @@ public partial class MainWindow : Window
         (string info, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
         DisplayInfoText.Text = info;
         if (_displayBrightnessText != null) _displayBrightnessText.Text = brightness + "%";
-        if (_displayBrightness != null && Math.Abs(_displayBrightness.Value - brightness) > 1)
+        if (_displayBrightness != null
+            && !_displayBrightness.IsMouseCaptureWithin
+            && Math.Abs(_displayBrightness.Value - brightness) > 1)
         {
             _displayBrightness.Value = brightness;
         }
