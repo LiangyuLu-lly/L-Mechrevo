@@ -521,6 +521,35 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static bool IsWhiteBacklightForOsd(MechrevoHw? hw)
+    {
+        try
+        {
+            if (hw == null || !hw.SupportsKeyboard || hw.UsesBaolongda || IsHidKeyboard(hw))
+            {
+                return false;
+            }
+            if (hw.WujieSmuApu)
+            {
+                return true;
+            }
+            return MechrevoLite.Hardware.KeyboardFirmwareEffects.Visible(hw.Capabilities.KeyboardType).Length == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsGradeLightTopicForOsd(string topic, MechrevoHw? hw)
+    {
+        return (string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+                || string.Equals(topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal))
+            && hw != null
+            && !hw.UsesBaolongda
+            && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
+    }
+
     internal async Task<bool> WideApplyLightAsync(string topic, string effect, int light, int speed, int colorArgb, bool on)
     {
         MechrevoHw? hw = _backendProbe?.Hw;
@@ -531,9 +560,18 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            // 灯光调节 OSD：宽屏卡/小窗所有通道都经过这里；无 OSD 设置时 OsdService 内部会忽略。
-            OsdService.Show(QuickGlyph("osd"), WpfStrings.OsdLighting,
-                on ? (light > 0 ? light + "%" : WpfStrings.StateOn) : WpfStrings.StateOff);
+            // 灯光调节 OSD：键盘/Gen40 灯条是档位（x/4、白色 x/2），其它外部通道才显示百分比。
+            bool osdKeyboard = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
+            bool osdWhite = osdKeyboard && IsWhiteBacklightForOsd(hw);
+            bool osdGrade = IsGradeLightTopicForOsd(topic, hw);
+            string osdValue = !on
+                ? WpfStrings.StateOff
+                : osdWhite
+                    ? Math.Clamp(light, 1, 2) + "/2"
+                    : osdKeyboard || osdGrade
+                        ? Math.Clamp(light, 0, 4) + "/4"
+                        : Math.Clamp(light * 25, 0, 100) + "%";
+            OsdService.Show(QuickGlyph("osd"), WpfStrings.OsdLighting, osdValue);
             if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
             {
                 if (IsHidKeyboard(hw) && effect.StartsWith("hid:", StringComparison.Ordinal))
@@ -566,7 +604,16 @@ public partial class OriginalStyleWindow : Window
                     return await probe.SetKeyboardPowerAsync(false);
                 }
                 await probe.SetKeyboardPowerAsync(true);
-                return await probe.SetKeyboardEffectAsync(effect);
+                System.Drawing.Color? keyboardColor = (hw?.UsesBaolongda == true
+                    || string.Equals(effect, "Single", StringComparison.Ordinal))
+                    ? System.Drawing.Color.FromArgb(colorArgb)
+                    : null;
+                MechrevoService? keyboardService = probe.Service;
+                if (keyboardService == null)
+                {
+                    return false;
+                }
+                return await keyboardService.SetKeyboardEffect(effect, light, speed, "None", keyboardColor, true);
             }
 
             bool supported = topic switch
@@ -586,14 +633,15 @@ public partial class OriginalStyleWindow : Window
                 return await probe.SetLightPowerAsync(topic, false);
             }
             await probe.SetLightPowerAsync(topic, true);
-            return topic switch
+            MechrevoService? lightService = probe.Service;
+            if (lightService == null)
             {
-                "HidLightbar/Ctrl" => await probe.SetLightbarEffectAsync(effect),
-                "HidLightbar_Logo/Ctrl" => await probe.SetLogoEffectAsync(effect),
-                "HidLightbar_Hinge/Ctrl" => await probe.SetHingeEffectAsync(effect),
-                "HidLightbar_Sync/Ctrl" => await probe.SetSyncEffectAsync(effect),
-                _ => false
-            };
+                return false;
+            }
+            System.Drawing.Color? lightColor = MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect)
+                ? System.Drawing.Color.FromArgb(colorArgb)
+                : null;
+            return await lightService.SetLightEffect(topic, effect, light, speed, "None", lightColor, true);
         }
         catch
         {
