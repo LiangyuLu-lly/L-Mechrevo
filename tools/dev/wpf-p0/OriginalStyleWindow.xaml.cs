@@ -102,6 +102,11 @@ public partial class OriginalStyleWindow : Window
     private int _modeRequestId;
     private long _pendingModeTick;
     private int _lastDbVisualMode = int.MinValue;
+    private bool _powerSessionEventsHooked;
+    private bool _lastPowerLineOnline;
+    private int _powerSettleGeneration;
+    private long _resumeShowSuppressUntil;
+    private int _cleanExitMarked;
     private string _customWindowModeId = "";
     private bool _perfConfigBuilt;
     private bool _syncingDisplayEffect;
@@ -141,9 +146,12 @@ public partial class OriginalStyleWindow : Window
         ThemeButton.Content = _dark ? WpfStrings.LightTheme : WpfStrings.DarkTheme;
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
+        HookPowerSessionEvents();
         Closed += (_, _) =>
         {
             _powerBroadcastSource?.RemoveHook(PowerBroadcastHook);
+            UnhookPowerSessionEvents();
+            MarkCleanExitForShutdown("窗口 Closed");
             if (_stateHookedHw != null)
             {
                 _stateHookedHw.StateChanged -= OnHardwareLightingStateChanged;
@@ -1122,6 +1130,11 @@ public partial class OriginalStyleWindow : Window
 
     internal void ShowMainFromExternal()
     {
+        if (Environment.TickCount64 < _resumeShowSuppressUntil)
+        {
+            Logger.WriteLine("[power] 唤醒/会话恢复抑制窗口内收到唤起请求 ⇒ 不显示主界面");
+            return;
+        }
         if (string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
         {
             ShowWideWindow();
@@ -1212,7 +1225,8 @@ public partial class OriginalStyleWindow : Window
             probe?.CurrentGpuMode ?? -1,
             KeyboardLightRow.Visibility == Visibility.Visible,
             _overlayWindow?.IsVisible == true,
-            probe?.Capabilities?.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported,
+            probe?.Capabilities?.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported
+                || UiQaShowAll.Enabled,
             MechrevoLite.Hardware.MechrevoService.IsSilentTurboActive,
             probe?.Capabilities?.TurboMode == true
                 || probe?.Hw?.UsesBaolongda == true
@@ -1320,6 +1334,199 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
+    }
+
+    // ⭐⭐ task-25：电源/会话事件（旧 Program.SystemEvents_PowerModeChanged/OnPowerSettled/
+    // SystemEvents_SessionSwitch/SystemEvents_SessionEnding 的 WPF 等价）✅
+    private void HookPowerSessionEvents()
+    {
+        if (_powerSessionEventsHooked)
+        {
+            return;
+        }
+        _powerSessionEventsHooked = true;
+        _lastPowerLineOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+            == System.Windows.Forms.PowerLineStatus.Online;
+        Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
+        if (Application.Current != null)
+        {
+            Application.Current.SessionEnding += OnAppSessionEnding;
+        }
+        Logger.WriteLine("[power] 已挂载 PowerModeChanged/SessionSwitch/SessionEnding");
+    }
+
+    private void UnhookPowerSessionEvents()
+    {
+        if (!_powerSessionEventsHooked)
+        {
+            return;
+        }
+        _powerSessionEventsHooked = false;
+        try { Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged; } catch { }
+        try { Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch; } catch { }
+        try
+        {
+            if (Application.Current != null)
+            {
+                Application.Current.SessionEnding -= OnAppSessionEnding;
+            }
+        }
+        catch { }
+    }
+
+    private void OnPowerModeChanged(object? sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == Microsoft.Win32.PowerModes.Suspend)
+        {
+            _sleepKeyboardLightWasOn = KeyboardLightSwitch.IsChecked == true;
+            Logger.WriteLine("[power] Suspend：记录键盘灯=" + (_sleepKeyboardLightWasOn ? "开" : "关"));
+            return;
+        }
+        if (e.Mode == Microsoft.Win32.PowerModes.Resume)
+        {
+            MarkResumeShowSuppression("PowerModes.Resume");
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1500).ConfigureAwait(false);
+                Dispatcher.BeginInvoke(new Action(async () =>
+                {
+                    await RestoreLightingOnStartupAsync();
+                    await RestoreKeyboardLightAfterWakeAsync();
+                }));
+            });
+        }
+        // StatusChange / Resume 都走同一套 2s 电源稳定检查（旧 Program.SchedulePowerCheck）
+        SchedulePowerSettle();
+    }
+
+    private void OnSessionSwitch(object? sender, Microsoft.Win32.SessionSwitchEventArgs e)
+    {
+        if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLogon
+            || e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock
+            || e.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleConnect)
+        {
+            MarkResumeShowSuppression("SessionSwitch:" + e.Reason);
+            _ = ReconcileLightingPowerAsync();
+            Logger.WriteLine("[power] SessionSwitch 恢复：" + e.Reason);
+        }
+    }
+
+    private void OnAppSessionEnding(object? sender, SessionEndingCancelEventArgs e)
+    {
+        MarkCleanExitForShutdown("SessionEnding");
+        try
+        {
+            // 旧 Program.SystemEvents_SessionEnding：会话结束时把自动电池策略交回
+            BatteryControl.AutoBattery();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[power] SessionEnding AutoBattery 失败（已吞掉）：" + ex.Message);
+        }
+    }
+
+    private void MarkResumeShowSuppression(string reason)
+    {
+        _resumeShowSuppressUntil = Environment.TickCount64 + 90_000L;
+        Logger.WriteLine("[power] 唤醒后 90 秒内抑制「第二实例唤起主界面」（来源=" + reason + "）");
+    }
+
+    private void SchedulePowerSettle()
+    {
+        int generation = System.Threading.Interlocked.Increment(ref _powerSettleGeneration);
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(2200).ConfigureAwait(false);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (generation == _powerSettleGeneration)
+                {
+                    _ = OnPowerSettledAsync();
+                }
+            });
+        });
+    }
+
+    private async Task OnPowerSettledAsync()
+    {
+        bool online = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+            == System.Windows.Forms.PowerLineStatus.Online;
+        if (online == _lastPowerLineOnline)
+        {
+            return;
+        }
+        _lastPowerLineOnline = online;
+        Logger.WriteLine("[power] 电源来源变化 ⇒ " + (online ? "外接电源" : "电池"));
+        try
+        {
+            BatteryControl.AutoBattery();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[power] AutoBattery 失败（已吞掉）：" + ex.Message);
+        }
+        try
+        {
+            // 旧 SetAutoModes 的等价：只按“按电源来源记住的档位”重放，不覆盖用户手选的当前档
+            MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+            if (perf != null)
+            {
+                await perf.ReplayAsync("电源变化", powerSourceChanged: true, appSideOnly: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[power] 自动性能模式失败（已吞掉）：" + ex.Message);
+        }
+        try
+        {
+            await ReconcileLightingPowerAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[power] 灯光电源跟随失败（已吞掉）：" + ex.Message);
+        }
+        try
+        {
+            // 旧 SetAutoModes 仅在“真·插拔电源”时应用自动刷新率（screen_auto 未开时内部 no-op）
+            ScreenControl.AutoScreen();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[power] 自动刷新率失败（已吞掉）：" + ex.Message);
+        }
+    }
+
+    private void MarkCleanExitForShutdown(string reason)
+    {
+        if (System.Threading.Interlocked.Exchange(ref _cleanExitMarked, 1) != 0)
+        {
+            return;
+        }
+        try
+        {
+            CpuCoAutoApplyGuard.MarkCleanExit(reason);
+            GpuOcShutdownGuard.MarkCleanExit(reason);
+            Logger.WriteLine("[power] 已写 clean-exit marker（" + reason + "）");
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[power] clean-exit marker 失败（已吞掉）：" + ex.Message);
+        }
+    }
+
+    // ⭐ task-25：startup 参数（计划任务）下不弹首启引导/更新窗口，仅正常启动弹 ✅
+    private static bool IsStartupLaunch()
+    {
+        foreach (string arg in Environment.GetCommandLineArgs())
+        {
+            if (string.Equals(arg, "startup", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -2190,7 +2397,8 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        IgpuSavingPreviewRow.Visibility = hardware.SupportsGpuHotSwap ? Visibility.Visible : Visibility.Collapsed;
+        IgpuSavingPreviewRow.Visibility = (hardware.SupportsGpuHotSwap || UiQaShowAll.Enabled)
+            ? Visibility.Visible : Visibility.Collapsed;
         int mode = hardware.IgpuOnlySaveMode;
         IgpuSavingOffPreview.IsChecked = mode == 1;
         IgpuSavingOnPreview.IsChecked = mode == 0;
@@ -3395,6 +3603,11 @@ public partial class OriginalStyleWindow : Window
 
     private async void StartSilentUpdateCheckIfAllowed()
     {
+        if (IsStartupLaunch())
+        {
+            Logger.WriteLine("[startup] startup 参数：跳过静默更新检查");
+            return;
+        }
         if (_updateCheckStarted
             || !MechrevoLite.Update.UpdateChecker.AutoCheckEnabled
             || L_Mechrevo.WpfP0.Services.UpdatePolicy.TemporarilyHidden)
@@ -3418,6 +3631,11 @@ public partial class OriginalStyleWindow : Window
 
     private void ShowFirstRunGuidesIfNeeded()
     {
+        if (IsStartupLaunch())
+        {
+            Logger.WriteLine("[startup] startup 参数：跳过首次引导（留待正常启动）");
+            return;
+        }
         if (_firstRunChecked)
         {
             return;

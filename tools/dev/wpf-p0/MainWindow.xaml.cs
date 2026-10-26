@@ -1069,14 +1069,15 @@ public partial class MainWindow : Window
         _igpuSavingState = new TextBlock { Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         row.Children.Add(_igpuSavingState);
         HomeIgpuSavingPanel.Children.Add(row);
-        HomeIgpuSavingPanel.Visibility = _owner.WideIgpuSavingSupported ? Visibility.Visible : Visibility.Collapsed;
+        HomeIgpuSavingPanel.Visibility = (_owner.WideIgpuSavingSupported || UiQaShowAll.Enabled)
+            ? Visibility.Visible : Visibility.Collapsed;
         RefreshIgpuSaving();
     }
 
     private void RefreshIgpuSaving()
     {
         if (_owner == null || HomeIgpuSavingPanel == null) return;
-        bool supported = _owner.WideIgpuSavingSupported;
+        bool supported = _owner.WideIgpuSavingSupported || UiQaShowAll.Enabled;
         HomeIgpuSavingPanel.Visibility = supported ? Visibility.Visible : Visibility.Collapsed;
         int mode = _owner.WideIgpuSavingMode;
         foreach (ToggleButton button in _igpuSavingButtons)
