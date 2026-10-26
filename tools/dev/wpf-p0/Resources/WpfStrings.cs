@@ -638,4 +638,22 @@ public static class WpfStrings
     public static string TrayMenu => Get("TrayMenu");
     public static string IsolateOfficial => Get("IsolateOfficial");
     public static string CancelIsolation => Get("CancelIsolation");
+    public static string TrayPerformance => Get("TrayPerformance");
+    public static string TrayCustom => Get("TrayCustom");
+    public static string TrayGpu => Get("TrayGpu");
+    public static string TrayKeyboard => Get("TrayKeyboard");
+    public static string TrayOverlay => Get("TrayOverlay");
+    public static string TrayMain => Get("TrayMain");
+    public static string TrayDiagnostics => Get("TrayDiagnostics");
+    public static string TrayExit => Get("TrayExit");
+    public static string TraySilent => Get("TraySilent");
+    public static string TrayBalanced => Get("TrayBalanced");
+    public static string TraySilentTurbo => Get("TraySilentTurbo");
+    public static string TrayTurbo => Get("TrayTurbo");
+    public static string TrayFanBoost => Get("TrayFanBoost");
+    public static string TrayGpuIntegrated => Get("TrayGpuIntegrated");
+    public static string TrayGpuHybrid => Get("TrayGpuHybrid");
+    public static string TrayGpuDirect => Get("TrayGpuDirect");
+    public static string TrayNoCustom => Get("TrayNoCustom");
+    public static string TraySaved => Get("TraySaved");
 }

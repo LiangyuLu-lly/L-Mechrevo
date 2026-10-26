@@ -247,6 +247,8 @@ public partial class SettingsWindow : Window
                     }
                 }
                 TrayMenuConfig.Save(selected);
+                _owner.WideRefreshTrayMenu();
+                Status(WpfStrings.TraySaved);
             };
             TrayMenuPanel.Children.Add(box);
         }

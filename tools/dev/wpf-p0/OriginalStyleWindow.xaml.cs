@@ -2802,6 +2802,17 @@ public partial class OriginalStyleWindow : Window
         return "外接电源";
     }
 
+    internal void WideRefreshTrayMenu()
+    {
+        try
+        {
+            _trayIcon?.RefreshMenu();
+        }
+        catch
+        {
+        }
+    }
+
     internal bool WideTraySensorEnabled => MechrevoLite.AppConfig.Get("tray_sensor_tooltip", 1) == 1;
 
     internal void WideSetTraySensorEnabled(bool enabled)

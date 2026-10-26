@@ -1896,4 +1896,58 @@
   <data name="CancelIsolation" xml:space="preserve">
     <value>Cancel isolation</value>
   </data>
+  <data name="TrayPerformance" xml:space="preserve">
+    <value>Performance mode</value>
+  </data>
+  <data name="TrayCustom" xml:space="preserve">
+    <value>Custom mode</value>
+  </data>
+  <data name="TrayGpu" xml:space="preserve">
+    <value>GPU mode</value>
+  </data>
+  <data name="TrayKeyboard" xml:space="preserve">
+    <value>Keyboard lighting</value>
+  </data>
+  <data name="TrayOverlay" xml:space="preserve">
+    <value>Overlay</value>
+  </data>
+  <data name="TrayMain" xml:space="preserve">
+    <value>Open main window</value>
+  </data>
+  <data name="TrayDiagnostics" xml:space="preserve">
+    <value>Export diagnostics</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="TraySilent" xml:space="preserve">
+    <value>Silent</value>
+  </data>
+  <data name="TrayBalanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="TraySilentTurbo" xml:space="preserve">
+    <value>Silent Turbo</value>
+  </data>
+  <data name="TrayTurbo" xml:space="preserve">
+    <value>Turbo</value>
+  </data>
+  <data name="TrayFanBoost" xml:space="preserve">
+    <value>Fan boost</value>
+  </data>
+  <data name="TrayGpuIntegrated" xml:space="preserve">
+    <value>Integrated</value>
+  </data>
+  <data name="TrayGpuHybrid" xml:space="preserve">
+    <value>Hybrid</value>
+  </data>
+  <data name="TrayGpuDirect" xml:space="preserve">
+    <value>Dedicated direct</value>
+  </data>
+  <data name="TrayNoCustom" xml:space="preserve">
+    <value>No custom modes</value>
+  </data>
+  <data name="TraySaved" xml:space="preserve">
+    <value>Tray menu saved</value>
+  </data>
 </root>

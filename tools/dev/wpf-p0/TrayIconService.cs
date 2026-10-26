@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using L_Mechrevo.WpfP0.Resources;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -26,14 +27,14 @@ internal static class TrayMenuConfig
 {
     internal static readonly (string Key, string Label)[] Catalog =
     {
-        ("performance", "性能模式"),
-        ("custom", "自定义模式"),
-        ("gpu", "显卡模式"),
-        ("keyboard", "键盘灯光"),
-        ("overlay", "悬浮窗"),
-        ("main", "打开主界面"),
-        ("diagnostics", "导出诊断包"),
-        ("exit", "退出")
+        ("performance", WpfStrings.TrayPerformance),
+        ("custom", WpfStrings.TrayCustom),
+        ("gpu", WpfStrings.TrayGpu),
+        ("keyboard", WpfStrings.TrayKeyboard),
+        ("overlay", WpfStrings.TrayOverlay),
+        ("main", WpfStrings.TrayMain),
+        ("diagnostics", WpfStrings.TrayDiagnostics),
+        ("exit", WpfStrings.TrayExit)
     };
 
     private const string ConfigKey = "tray_menu_items";
@@ -110,6 +111,8 @@ internal sealed class TrayIconService : IDisposable
         RebuildMenu();
     }
 
+    internal void RefreshMenu() => RebuildMenu();
+
     internal void SetTooltip(string? text)
     {
         if (_disposed || _icon == null)
@@ -171,26 +174,26 @@ internal sealed class TrayIconService : IDisposable
             if (TrayMenuConfig.IsEnabled("performance"))
             {
                 _menu.Items.Add(new ToolStripSeparator());
-                _menu.Items.Add(DisabledTitle("性能模式"));
-                _menu.Items.Add(MenuItem("静音", mode == 2, () => ModeRequested?.Invoke(2)));
-                _menu.Items.Add(MenuItem("平衡", mode == 0, () => ModeRequested?.Invoke(0)));
+                _menu.Items.Add(DisabledTitle(WpfStrings.TrayPerformance));
+                _menu.Items.Add(MenuItem(WpfStrings.TraySilent, mode == 2, () => ModeRequested?.Invoke(2)));
+                _menu.Items.Add(MenuItem(WpfStrings.TrayBalanced, mode == 0, () => ModeRequested?.Invoke(0)));
                 if (state?.SilentTurboVisible == true)
                 {
-                    _menu.Items.Add(MenuItem("静音狂暴", mode == 1 && state.SilentTurboOn, () => SilentTurboRequested?.Invoke()));
+                    _menu.Items.Add(MenuItem(WpfStrings.TraySilentTurbo, mode == 1 && state.SilentTurboOn, () => SilentTurboRequested?.Invoke()));
                 }
                 if (state?.TurboVisible == true)
                 {
-                    _menu.Items.Add(MenuItem("狂暴", mode == 1 && state?.SilentTurboOn != true, () => ModeRequested?.Invoke(1)));
+                    _menu.Items.Add(MenuItem(WpfStrings.TrayTurbo, mode == 1 && state?.SilentTurboOn != true, () => ModeRequested?.Invoke(1)));
                 }
                 if (state?.FanBoostVisible == true)
                 {
-                    _menu.Items.Add(MenuItem("强冷", state.FanBoostOn, () => FanBoostRequested?.Invoke()));
+                    _menu.Items.Add(MenuItem(WpfStrings.TrayFanBoost, state.FanBoostOn, () => FanBoostRequested?.Invoke()));
                 }
             }
 
             if (TrayMenuConfig.IsEnabled("custom"))
             {
-                ToolStripMenuItem customRoot = new(state?.CustomRootText ?? "自定义")
+                ToolStripMenuItem customRoot = new(state?.CustomRootText ?? WpfStrings.TrayCustom)
                 {
                     Checked = state?.CustomItems.Any(i => i.Checked) == true
                 };
@@ -205,7 +208,7 @@ internal sealed class TrayIconService : IDisposable
                 }
                 if (customRoot.DropDownItems.Count == 0)
                 {
-                    ToolStripMenuItem empty = new("暂无自定义档") { Enabled = false };
+                    ToolStripMenuItem empty = new(WpfStrings.TrayNoCustom) { Enabled = false };
                     customRoot.DropDownItems.Add(empty);
                 }
                 _menu.Items.Add(customRoot);
@@ -214,32 +217,32 @@ internal sealed class TrayIconService : IDisposable
             if (TrayMenuConfig.IsEnabled("gpu") && state?.GpuVisible == true)
             {
                 _menu.Items.Add(new ToolStripSeparator());
-                ToolStripMenuItem gpu = new("显卡模式");
-                gpu.DropDownItems.Add(MenuItem("核显模式", state.GpuMode == 0, () => GpuModeRequested?.Invoke(0)));
-                gpu.DropDownItems.Add(MenuItem("混合模式", state.GpuMode == 1, () => GpuModeRequested?.Invoke(1)));
-                gpu.DropDownItems.Add(MenuItem("独显直连", state.GpuMode == 2, () => GpuModeRequested?.Invoke(2)));
+                ToolStripMenuItem gpu = new(WpfStrings.TrayGpu);
+                gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuIntegrated, state.GpuMode == 0, () => GpuModeRequested?.Invoke(0)));
+                gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuHybrid, state.GpuMode == 1, () => GpuModeRequested?.Invoke(1)));
+                gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuDirect, state.GpuMode == 2, () => GpuModeRequested?.Invoke(2)));
                 _menu.Items.Add(gpu);
             }
             if (TrayMenuConfig.IsEnabled("keyboard") && state?.KeyboardLightVisible == true)
             {
-                _menu.Items.Add(MenuItem("键盘灯光", false, () => KeyboardLightingRequested?.Invoke()));
+                _menu.Items.Add(MenuItem(WpfStrings.TrayKeyboard, false, () => KeyboardLightingRequested?.Invoke()));
             }
             if (TrayMenuConfig.IsEnabled("overlay"))
             {
-                _menu.Items.Add(MenuItem("悬浮窗", state?.OverlayOn == true, () => OverlayRequested?.Invoke()));
+                _menu.Items.Add(MenuItem(WpfStrings.TrayOverlay, state?.OverlayOn == true, () => OverlayRequested?.Invoke()));
             }
             if (TrayMenuConfig.IsEnabled("main"))
             {
-                _menu.Items.Add(MenuItem("打开主界面", false, () => ShowRequested?.Invoke()));
+                _menu.Items.Add(MenuItem(WpfStrings.TrayMain, false, () => ShowRequested?.Invoke()));
             }
             if (TrayMenuConfig.IsEnabled("diagnostics"))
             {
-                _menu.Items.Add(MenuItem("导出诊断包", false, () => DiagnosticsRequested?.Invoke()));
+                _menu.Items.Add(MenuItem(WpfStrings.TrayDiagnostics, false, () => DiagnosticsRequested?.Invoke()));
             }
             if (TrayMenuConfig.IsEnabled("exit"))
             {
                 _menu.Items.Add(new ToolStripSeparator());
-                _menu.Items.Add(MenuItem("退出", false, () => ExitRequested?.Invoke()));
+                _menu.Items.Add(MenuItem(WpfStrings.TrayExit, false, () => ExitRequested?.Invoke()));
             }
         }
         finally

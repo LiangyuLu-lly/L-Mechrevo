@@ -1896,4 +1896,58 @@
   <data name="CancelIsolation" xml:space="preserve">
     <value>取消隔离</value>
   </data>
+  <data name="TrayPerformance" xml:space="preserve">
+    <value>性能模式</value>
+  </data>
+  <data name="TrayCustom" xml:space="preserve">
+    <value>自定义模式</value>
+  </data>
+  <data name="TrayGpu" xml:space="preserve">
+    <value>显卡模式</value>
+  </data>
+  <data name="TrayKeyboard" xml:space="preserve">
+    <value>键盘灯光</value>
+  </data>
+  <data name="TrayOverlay" xml:space="preserve">
+    <value>悬浮窗</value>
+  </data>
+  <data name="TrayMain" xml:space="preserve">
+    <value>打开主界面</value>
+  </data>
+  <data name="TrayDiagnostics" xml:space="preserve">
+    <value>导出诊断包</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <data name="TraySilent" xml:space="preserve">
+    <value>静音</value>
+  </data>
+  <data name="TrayBalanced" xml:space="preserve">
+    <value>平衡</value>
+  </data>
+  <data name="TraySilentTurbo" xml:space="preserve">
+    <value>静音狂暴</value>
+  </data>
+  <data name="TrayTurbo" xml:space="preserve">
+    <value>狂暴</value>
+  </data>
+  <data name="TrayFanBoost" xml:space="preserve">
+    <value>强冷</value>
+  </data>
+  <data name="TrayGpuIntegrated" xml:space="preserve">
+    <value>核显模式</value>
+  </data>
+  <data name="TrayGpuHybrid" xml:space="preserve">
+    <value>混合模式</value>
+  </data>
+  <data name="TrayGpuDirect" xml:space="preserve">
+    <value>独显直连</value>
+  </data>
+  <data name="TrayNoCustom" xml:space="preserve">
+    <value>暂无自定义档</value>
+  </data>
+  <data name="TraySaved" xml:space="preserve">
+    <value>托盘菜单已保存</value>
+  </data>
 </root>
