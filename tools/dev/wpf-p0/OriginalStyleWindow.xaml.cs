@@ -395,7 +395,7 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    internal void WideSetRefresh(int hertz)
+    internal async void WideSetRefresh(int hertz)
     {
         if (_backendProbe == null)
         {
@@ -415,9 +415,34 @@ public partial class OriginalStyleWindow : Window
             ok = false;
             Logger.WriteLine("[refresh] Win32 切换失败：" + ex.Message);
         }
+        if (ok)
+        {
+            // 旧版：ChangeDisplaySettingsEx 后模式异步落地，短重试回读；对不上目标时仍高亮用户点的那档。
+            string? laptop = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
+            int readback = -1;
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
+                if (attempt > 0)
+                {
+                    await Task.Delay(150);
+                }
+                readback = MechrevoLite.Display.ScreenNative.GetRefreshRate(laptop);
+                if (readback > 0 && Math.Abs(readback - hertz) <= 2)
+                {
+                    break;
+                }
+            }
+            int highlight = readback > 0 && Math.Abs(readback - hertz) <= 2 ? readback : hertz;
+            Refresh60Button.IsChecked = highlight < _refreshHighHz;
+            Refresh180Button.IsChecked = highlight >= _refreshHighHz;
+        }
         if (_backendProbe.Hw?.IsGcuConnected == true)
         {
             _ = _backendProbe.SwitchRefreshRateAsync(hertz);
+        }
+        if (autoOn && ok)
+        {
+            ToastService.Show(WpfStrings.DisplayRefreshAutoWarn);
         }
         StatusText.Text = ok
             ? (autoOn ? WpfStrings.DisplayRefreshSentPrefix + hertz + " Hz · " + WpfStrings.DisplayRefreshAutoWarn : WpfStrings.DisplayRefreshSentPrefix + hertz + " Hz")
@@ -1079,6 +1104,10 @@ public partial class OriginalStyleWindow : Window
             {
                 current = MechrevoLite.Display.ScreenNative.GetRefreshRate(null);
             }
+            if (current < 0)
+            {
+                current = _backendProbe?.Hw?.CurrentHz ?? -1;
+            }
             string info = bounds.Width + " × " + bounds.Height + " · " + Math.Max(0, current) + " Hz";
             return (info, current, _refreshHighHz, AutoRefreshSwitch.IsChecked == true, (int)Math.Round(BrightnessSlider.Value));
         }
@@ -1095,15 +1124,6 @@ public partial class OriginalStyleWindow : Window
             string? laptopScreen = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
             bool fallback = _backendProbe?.Hw?.UsesBaolongda == true;
             IReadOnlyList<int> rates = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(laptopScreen, fallback);
-            if (rates.Count == 0)
-            {
-                (_, int current, int max, _, _) = WideDisplay();
-                rates = new[] { 60, Math.Max(120, max / 2), Math.Max(60, max), Math.Max(0, current) }
-                    .Where(v => v > 0)
-                    .Distinct()
-                    .OrderBy(v => v)
-                    .ToArray();
-            }
             return rates.Distinct().OrderBy(v => v).ToArray();
         }
         catch
