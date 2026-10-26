@@ -336,7 +336,7 @@ public partial class SettingsWindow : Window
     {
         if (TrayMenuPanel == null) return;
         TrayMenuPanel.Children.Clear();
-        HashSet<string> enabled = TrayMenuConfig.Load();
+        HashSet<string> enabled = _owner.Services != null ? _owner.Services.TrayMenu.LoadEnabled() : TrayMenuConfig.Load();
         foreach ((string key, string label) in TrayMenuConfig.Catalog)
         {
             CheckBox box = new()
@@ -357,7 +357,7 @@ public partial class SettingsWindow : Window
                         selected.Add(itemKey);
                     }
                 }
-                TrayMenuConfig.Save(selected);
+                if (_owner.Services != null) { _owner.Services.TrayMenu.SaveEnabled(selected); } else { TrayMenuConfig.Save(selected); }
                 _owner.WideRefreshTrayMenu();
                 Status(WpfStrings.TraySaved);
             };

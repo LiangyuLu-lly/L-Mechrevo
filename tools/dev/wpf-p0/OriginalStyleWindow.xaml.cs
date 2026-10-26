@@ -402,7 +402,9 @@ public partial class OriginalStyleWindow : Window
         AutoRefreshSwitch.IsChecked = false;
         AppConfig.Set("screen_auto", 0);
         ScreenControl.SetAutoRefresh(0);
-        bool ok = await _backendProbe.SwitchRefreshRateAsync(hertz);
+        bool ok = _services != null
+            ? (await _services.Display.SetRefreshRateAsync(hertz)).Ok
+            : await _backendProbe.SwitchRefreshRateAsync(hertz);
         StatusText.Text = ok ? "刷新率已下发：" + hertz + " Hz" : "刷新率下发失败：" + hertz + " Hz";
         SyncRefreshRateState();
     }
@@ -948,6 +950,10 @@ public partial class OriginalStyleWindow : Window
 
     internal int WideLightIdleSeconds()
     {
+        if (_services != null)
+        {
+            return _services.Lighting.LightIdleSeconds;
+        }
         return _backendProbe?.Hw?.UsesBaolongda == true
             ? MechrevoHw.GetKeyboardAutoOffSeconds()
             : AppConfig.Get("lighting_idle_seconds", 0);
@@ -955,6 +961,7 @@ public partial class OriginalStyleWindow : Window
 
     internal void WideSetLightIdleSeconds(int seconds)
     {
+        if (_services != null) { _services.Lighting.SetLightIdleSeconds(seconds); return; }
         if (_backendProbe?.Hw?.UsesBaolongda == true)
         {
             MechrevoHw.SetKeyboardAutoOffSeconds(seconds);
@@ -1019,7 +1026,7 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            return (BatteryInfo.Text, _backendProbe?.BatteryMode ?? -1, ChargeLimitStatus.Text);
+            return (BatteryInfo.Text, _services?.Battery.CurrentMode ?? _backendProbe?.BatteryMode ?? -1, ChargeLimitStatus.Text);
         }
         catch
         {
@@ -2106,9 +2113,9 @@ public partial class OriginalStyleWindow : Window
         if (on && EcDirectOffToggle.IsChecked == true)
         {
             EcDirectOffToggle.IsChecked = false;
-            AppConfig.Remove("ec_charge_limit");
+            if (_services != null) { _services.ChargeLimit.SetEcDirectWrite(false); } else { AppConfig.Remove("ec_charge_limit"); }
         }
-        AppConfig.Set("charge_limit_slider", on ? 1 : 0);
+        if (_services != null) { _services.ChargeLimit.SetSliderEnabled(on); } else { AppConfig.Set("charge_limit_slider", on ? 1 : 0); }
         BatteryLimitSlider.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         if (BatteryLimitSliderText != null) BatteryLimitSliderText.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         ApplyBatterySliderStage();
@@ -2130,7 +2137,7 @@ public partial class OriginalStyleWindow : Window
         if (on && ChargeSliderToggle.IsChecked == true)
         {
             ChargeSliderToggle.IsChecked = false;
-            AppConfig.Set("charge_limit_slider", 0);
+            if (_services != null) { _services.ChargeLimit.SetSliderEnabled(false); } else { AppConfig.Set("charge_limit_slider", 0); }
             BatteryLimitSlider.Visibility = Visibility.Collapsed;
             if (BatteryLimitSliderText != null) BatteryLimitSliderText.Visibility = Visibility.Collapsed;
             ApplyBatterySliderStage();
@@ -2138,11 +2145,11 @@ public partial class OriginalStyleWindow : Window
         }
         if (on)
         {
-            AppConfig.Set("ec_charge_limit", "0");
+            if (_services != null) { _services.ChargeLimit.SetEcDirectWrite(true); } else { AppConfig.Set("ec_charge_limit", "0"); }
         }
         else
         {
-            AppConfig.Remove("ec_charge_limit");
+            if (_services != null) { _services.ChargeLimit.SetEcDirectWrite(false); } else { AppConfig.Remove("ec_charge_limit"); }
         }
         ChargeSliderToggle.IsEnabled = !on;
         StatusText.Text = on ? "已关闭 EC 直写充电上限" : "EC 直写恢复自动判定";
@@ -2201,7 +2208,7 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            ScreenBrightness.Set(value);
+            if (_services != null) { _services.Display.SetBrightness(value); } else { ScreenBrightness.Set(value); }
         }
         catch
         {
@@ -2787,7 +2794,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         int mode = int.Parse(text);
-        if (!_backendProbe.CanSwitchGpuMode(mode))
+        if (!(_services?.Gpu.CanSwitch(mode) ?? _backendProbe.CanSwitchGpuMode(mode)))
         {
             StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_37;
             RefreshFromBackend();
@@ -2832,7 +2839,9 @@ public partial class OriginalStyleWindow : Window
             }
             if (prompt.Result == GpuPromptResult.SwitchAndRestart)
             {
-                bool restartOk = await _backendProbe.RequestGpuModeRestartAsync(mode);
+                bool restartOk = _services != null
+                    ? (await _services.Gpu.RequestRestartAsync(mode)).Ok
+                    : await _backendProbe.RequestGpuModeRestartAsync(mode);
                 if (restartOk)
                 {
                     _backendProbe.MarkGpuRestartPending(mode);
@@ -2851,7 +2860,9 @@ public partial class OriginalStyleWindow : Window
             item.IsChecked = ReferenceEquals(item, button);
         }
         HighlightSegment(button);
-        bool ok = await _backendProbe.SwitchGpuModeAsync(mode);
+        bool ok = _services != null
+            ? (await _services.Gpu.SwitchAsync(mode)).Ok
+            : await _backendProbe.SwitchGpuModeAsync(mode);
         await _backendProbe.RefreshGpuModeAsync();
         int current = _backendProbe.CurrentGpuMode;
         if (ok && current != mode)
@@ -2885,7 +2896,9 @@ public partial class OriginalStyleWindow : Window
             }
         }
         HighlightSegment(button);
-        bool ok = await _backendProbe.SetBatteryModeAsync(int.Parse(text));
+        bool ok = _services != null
+            ? (await _services.Battery.SetModeAsync(int.Parse(text))).Ok
+            : await _backendProbe.SetBatteryModeAsync(int.Parse(text));
         StatusText.Text = ok ? "电池档位已下发" : "电池档位下发失败";
     }
 
@@ -2902,7 +2915,9 @@ public partial class OriginalStyleWindow : Window
         Refresh180Button.IsChecked = requested >= _refreshHighHz;
         Refresh60Button.IsChecked = requested < _refreshHighHz;
         HighlightSegment(button);
-        bool ok = await _backendProbe.SwitchRefreshRateAsync(int.Parse(text));
+        bool ok = _services != null
+            ? (await _services.Display.SetRefreshRateAsync(int.Parse(text))).Ok
+            : await _backendProbe.SwitchRefreshRateAsync(int.Parse(text));
         StatusText.Text = ok ? "刷新率已下发" : "刷新率下发失败";
     }
 
@@ -2913,7 +2928,9 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool on = AutoRefreshSwitch.IsChecked == true;
-        bool ok = await _backendProbe.SwitchAutoRefreshAsync(on);
+        bool ok = _services != null
+            ? (await _services.Display.SetAutoRefreshAsync(on)).Ok
+            : await _backendProbe.SwitchAutoRefreshAsync(on);
         AppConfig.Set("screen_auto", on ? 1 : 0);
         AppConfig.Flush();
         SyncRefreshRateState();
@@ -3948,21 +3965,21 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        if (probe.IsNonGcuBackend)
+        if (_services?.BackendStatus.IsNonGcuBackend ?? probe.IsNonGcuBackend)
         {
-            bool ready = probe.Connected;
+            bool ready = _services?.BackendStatus.Connected ?? probe.Connected;
             SetBackendStatus(
                 ready ? "● 已就绪" : "● 未就绪",
                 ready ? "#4ADE80" : "#F59E0B",
                 "本机使用老机型接口，仅支持三个内置性能档");
             return;
         }
-        if (probe.IsGcuConnected)
+        if (_services?.BackendStatus.IsGcuConnected ?? probe.IsGcuConnected)
         {
             SetBackendStatus("● GCU 已连接", "#4ADE80", "GCU 服务连接正常（GCUBridge，MQTT 127.0.0.1:13688）");
             return;
         }
-        if (probe.IsReconnecting || probe.IsSessionAwaitingSubscribe)
+        if ((_services?.BackendStatus.IsReconnecting ?? probe.IsReconnecting) || probe.IsSessionAwaitingSubscribe)
         {
             SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
             return;
@@ -4046,7 +4063,7 @@ public partial class OriginalStyleWindow : Window
         LightHingeRow.Visibility = hasHinge ? Visibility.Visible : Visibility.Collapsed;
         LightSyncRow.Visibility = hasSync ? Visibility.Visible : Visibility.Collapsed;
         InitPerfConfigRow();
-        RefreshPerfConfigVisibility(_backendProbe?.CurrentMode ?? -1);
+        RefreshPerfConfigVisibility(_services?.Performance.CurrentMode ?? _backendProbe?.CurrentMode ?? -1);
         // ⭐⭐ 2026-10-26（task-18）：实验行/EC 直写按**能力位**显隐（Gen30 / 宝龙达 / 无界 / GCU），
         //   不再只看“显卡是不是 Gen30”。不支持 ⇒ 连行都不留（与旧 WinForms ChargeSliderSupported / IsEcDirectWriteAllowed 同源）。
         bool chargeExperimentSupported = WideChargeExperimentSupported;
