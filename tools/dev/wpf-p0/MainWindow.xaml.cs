@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -82,6 +83,7 @@ public partial class MainWindow : Window
     private readonly List<(string Key, Button Button, TextBlock State, string Label)> _quickTileButtons = new();
     /// <summary>⭐ task-26：每张灯光卡的 150 ms 合并计时器；重建卡片时统一 Stop（避免对已拆掉的卡补发旧值）✅。</summary>
     private readonly List<DispatcherTimer> _lightCardApplyTimers = new();
+    private Window? _inlineLightEditorWindow;
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -459,7 +461,10 @@ public partial class MainWindow : Window
             // ⭐ 2026-10-26（task-18）：宽屏若在“后端就绪前”打开，充电阈值卡片（含实验行/EC 直写）
             //   当时因能力位读不到而**未建**；后端就绪后补建一次（不支持机型 Visible=false，不会建）。
             //   ⚠️ 只在“卡片还没建且现在支持”时补建，避免每次重连都重建整张电池卡。
-            if (_chargeLimitText == null && _owner?.WideChargeLimitVisible == true)
+            if (_owner != null
+                && ((_chargeLimitText == null && _owner.WideChargeLimitVisible)
+                    || (_chargeSlider == null && _owner.WideChargeExperimentSupported)
+                    || (_ecDirect == null && _owner.WideEcDirectSupported)))
             {
                 BuildHomeExtras();
             }
@@ -737,6 +742,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private FrameworkElement CreateWideQuickIcon(string key, string glyph)
+    {
+        // 强冷图标与迷你窗完全一致：复用其四叶风扇 Path，而不是另一枚字体图标。
+        if (string.Equals(key, "fanboost", StringComparison.OrdinalIgnoreCase))
+        {
+            Path path = new()
+            {
+                Data = Geometry.Parse("M8,8 C6,5 6,2 8,1 C10,2 10,5 8,8 Z M8,8 C11,6 14,7 15,9 C13,11 10,10 8,8 Z M8,8 C10,11 10,14 8,15 C6,14 6,11 8,8 Z M8,8 C5,10 2,9 1,7 C3,5 6,6 8,8 Z M8,7 A1,1 0 1 1 8,9 A1,1 0 1 1 8,7 Z"),
+                Fill = (Brush)FindResource("TextBrush"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Canvas canvas = new() { Width = 16, Height = 16 };
+            canvas.Children.Add(path);
+            return new Viewbox { Width = 16, Height = 16, Child = canvas, HorizontalAlignment = HorizontalAlignment.Center };
+        }
+        return new TextBlock
+        {
+            Text = glyph,
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 13,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+    }
+
     private void BuildQuickTiles()
     {
         if (_owner == null || QuickTilesGrid == null)
@@ -749,13 +779,7 @@ public partial class MainWindow : Window
         {
             // task-33：迷你窗目录 label 是硬编码中文；按 key 取当前语言显示名（en-US 下为英文）。
             string displayLabel = QuickSwitchService.Label(key, label);
-            TextBlock icon = new()
-            {
-                Text = glyph,
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 13,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
+            FrameworkElement icon = CreateWideQuickIcon(key, glyph);
             TextBlock state = new()
             {
                 Text = displayLabel + (on ? " · " + WpfStrings.StateOn : " · " + WpfStrings.StateOff),
@@ -2773,19 +2797,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            Logger.WriteLine("[wide-light] 打开完整灯光编辑器：" + topic + " white=" + whiteBacklightOnly);
+            Logger.WriteLine("[wide-light] 内联完整灯光编辑器：" + topic + " white=" + whiteBacklightOnly);
             WpfBackend.Attach(_probe?.Hw, _probe?.Service);
-            new LightEditorWindow(topic, title, effects, whiteBacklightOnly) { Owner = this }.ShowDialog();
+            MountInlineLightEditor(new LightEditorWindow(topic, title, effects, whiteBacklightOnly));
         }
         catch (Exception ex)
         {
             Logger.WriteError("[wide-light] 打开完整灯光编辑器失败：" + ex);
             StatusText.Text = string.Format(WpfStrings.StatusLightEditorOpenFailed, ex.Message);
-            return;
         }
-        Logger.WriteLineIfChanged("wide-light-editor-" + topic,
-            $"[wide-light] 完整编辑器已关闭：{topic}（white={whiteBacklightOnly}）⇒ 重载灯光卡 ✅");
-        RebuildLightingCards();
     }
 
     /// <summary>⭐ task-17：打开与迷你窗共用的 HID 键盘编辑器（模式/亮度/速度/颜色，按 HID 支持范围）✅。</summary>
@@ -2810,16 +2830,55 @@ public partial class MainWindow : Window
                 rgb.LoadConfig();
                 WpfBackend.rgb = rgb;
             }
-            new HidKeyboardWindow(rgb) { Owner = this }.ShowDialog();
-            Logger.WriteLineIfChanged("wide-light-hid-editor",
-                $"[wide-light] HID 键盘编辑器已关闭：{title}（mode={rgb.KbHidMode} brightness={rgb.Brightness}）⇒ 重载灯光卡 ✅");
+            MountInlineLightEditor(new HidKeyboardWindow(rgb));
+            Logger.WriteLineIfChanged("wide-light-hid-editor", $"[wide-light] HID 键盘编辑器已内联：{title}");
         }
         catch (Exception ex)
         {
             Logger.WriteError("[wide-light] 打开 HID 键盘编辑器失败：" + ex);
             StatusText.Text = string.Format(WpfStrings.StatusHidEditorOpenFailed, ex.Message);
-            return;
         }
+    }
+
+    /// <summary>把二级编辑器内容直接挂到灯光页，而不是另开窗口。</summary>
+    private void MountInlineLightEditor(Window editor)
+    {
+        try
+        {
+            if (LightingCardsGrid == null || editor.Content is not UIElement content)
+            {
+                editor.Owner = this;
+                editor.ShowDialog();
+                return;
+            }
+            _inlineLightEditorWindow?.Close();
+            _inlineLightEditorWindow = editor;
+            editor.Content = null;
+            StackPanel host = new();
+            Button back = new()
+            {
+                Content = WpfStrings.LightInlineBack,
+                Style = (Style)FindResource("GhostButton"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            back.Click += (_, _) => CloseInlineLightEditor();
+            host.Children.Add(back);
+            host.Children.Add(content);
+            LightingCardsGrid.Children.Clear();
+            LightingCardsGrid.Children.Add(host);
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteError("[wide-light] 内联灯光编辑器失败：" + ex);
+            RebuildLightingCards();
+        }
+    }
+
+    private void CloseInlineLightEditor()
+    {
+        _inlineLightEditorWindow?.Close();
+        _inlineLightEditorWindow = null;
         RebuildLightingCards();
     }
 

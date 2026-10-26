@@ -2942,4 +2942,7 @@ GCU：{0} · 宝龙达：{1} · 无界：{2}</value>
   <data name="QuickGcuOsd" xml:space="preserve">
     <value>GCU-OSD</value>
   </data>
+  <data name="LightInlineBack" xml:space="preserve">
+    <value>返回</value>
+  </data>
 </root>

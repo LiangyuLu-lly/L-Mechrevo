@@ -134,7 +134,7 @@ public partial class OriginalStyleWindow : Window
         ("webcam", QuickSwitchService.Label("webcam", "摄像头"), "\uE722"), ("micmute", QuickSwitchService.Label("micmute", "麦克风"), "\uE720"),
         ("numpad", QuickSwitchService.Label("numpad", "小键盘锁"), "\uE765"), ("winkey", QuickSwitchService.Label("winkey", "Win键锁"), "\uE765"),
         ("fnkey", QuickSwitchService.Label("fnkey", "Fn键锁"), "\uE765"), ("capslock", QuickSwitchService.Label("capslock", "大小写锁定"), "\uE8AB"),
-        ("osd", QuickSwitchService.Label("osd", "OSD提示"), "\uE7F4"), ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"), "\uE8B7"),
+        ("osd", QuickSwitchService.Label("osd", "OSD提示"), "\uE7F4"), ("gcuosd", "GCU-OSD", "\uE7F4"), ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"), "\uE8B7"),
         ("usb", QuickSwitchService.Label("usb", "关机USB供电"), "\uE88E"), ("acrecovery", QuickSwitchService.Label("acrecovery", "来电自启"), "\uE7E8"),
         ("highperf", QuickSwitchService.Label("highperf", "高性能电源"), "\uE945"), ("apuboost", QuickSwitchService.Label("apuboost", "APU 防缩缸"), "\uE9D9"),
         ("fanboost", QuickSwitchService.Label("fanboost", "强冷"), "\uE9CA"), ("deepsleep", QuickSwitchService.Label("deepsleep", "深度睡眠"), "\uE708"),
@@ -143,6 +143,19 @@ public partial class OriginalStyleWindow : Window
         ("darktheme", QuickSwitchService.Label("darktheme", "系统深色主题"), "\uE793"), ("monitoroff", QuickSwitchService.Label("monitoroff", "息屏"), "\uE7F4"),
         ("winupdate", QuickSwitchService.Label("winupdate", "禁用Win更新"), "\uE895")
     };
+
+    /// <summary>复用快捷磁贴目录里的图标，供 OSD 等复用，避免另造一套图标。</summary>
+    internal static string QuickGlyph(string key)
+    {
+        foreach ((string Key, string Label, string Glyph) item in QuickTileCatalog)
+        {
+            if (string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase))
+            {
+                return item.Glyph;
+            }
+        }
+        return "\uE7F4";
+    }
 
     public OriginalStyleWindow()
     {
@@ -1209,7 +1222,7 @@ public partial class OriginalStyleWindow : Window
         _syncingBrightness = true;
         BrightnessSlider.Value = value;
         _syncingBrightness = false;
-        OsdService.Show("\uE706", WpfStrings.OsdBrightness, value + "%");
+        OsdService.Show(QuickGlyph("monitoroff"), WpfStrings.OsdBrightness, value + "%");
     }
 
     internal void WideSetAutoRefresh(bool enabled)
@@ -2442,7 +2455,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             if (_services != null) { _services.Display.SetBrightness(value); } else { ScreenBrightness.Set(value); }
-            OsdService.Show("\uE706", WpfStrings.OsdBrightness, value + "%");
+            OsdService.Show(QuickGlyph("monitoroff"), WpfStrings.OsdBrightness, value + "%");
         }
         catch
         {
@@ -2616,6 +2629,14 @@ public partial class OriginalStyleWindow : Window
         _pendingMode = mode;
         _pendingModeTick = Environment.TickCount64;
         _modeSwitchInFlight = true;
+        string osdMode = mode switch
+        {
+            2 => WpfStrings.ModeSilent,
+            1 => WpfStrings.ModeTurbo,
+            0 => WpfStrings.ModeBalanced,
+            _ => WpfStrings.ModeCustom
+        };
+        OsdService.Show(QuickGlyph("highperf"), WpfStrings.OsdPerformance, osdMode);
         _backendProbe?.MarkUserModeSwitch();
         try
         {
@@ -6320,7 +6341,7 @@ public partial class OriginalStyleWindow : Window
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("Keyboard/Ctrl", requested, "用户点击键盘灯光开关");
         }
-        OsdService.Show("\uE706", WpfStrings.OsdLighting, requested ? WpfStrings.StateOn : WpfStrings.StateOff);
+        OsdService.Show(QuickGlyph("osd"), WpfStrings.OsdLighting, requested ? WpfStrings.StateOn : WpfStrings.StateOff);
     }
 
     private static void SaveChannelEffect(string topic, string effect)

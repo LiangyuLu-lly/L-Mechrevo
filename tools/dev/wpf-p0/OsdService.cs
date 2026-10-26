@@ -118,16 +118,7 @@ internal static class OsdService
 
     internal static void ShowQuickSwitch(string key, bool on)
     {
-        string glyph = key switch
-        {
-            "touchpad" or "touchpadtoggle" => "\uE7C4",
-            "winkey" => "\uE765",
-            "fnkey" => "\uE765",
-            "copilot" => "\uE99A",
-            "webcam" => "\uE722",
-            "micmute" => "\uE720",
-            _ => "\uE7F4"
-        };
+        string glyph = OriginalStyleWindow.QuickGlyph(key);
         Show(glyph, QuickSwitchService.Label(key), on ? WpfStrings.StateOn : WpfStrings.StateOff);
     }
 }

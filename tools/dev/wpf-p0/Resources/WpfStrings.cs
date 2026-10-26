@@ -152,6 +152,8 @@ public static class WpfStrings
     public static string MainWindow_Content_2 => Get("MainWindow_Content_2");
     public static string MainWindow_Text_6 => Get("MainWindow_Text_6");
     public static string LightSyncEditButton_Content => Get("LightSyncEditButton_Content");
+    public static string LightInlineBack => Get("LightInlineBack");
+
     public static string OriginalStyleWindow_Text => Get("OriginalStyleWindow_Text");
     public static string OriginalStyleWindow_Text_2 => Get("OriginalStyleWindow_Text_2");
     public static string OriginalStyleWindow_Text_3 => Get("OriginalStyleWindow_Text_3");

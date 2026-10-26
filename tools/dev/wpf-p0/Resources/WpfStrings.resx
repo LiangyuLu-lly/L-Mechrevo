@@ -2942,4 +2942,7 @@ Cancel: do not switch</value>
   <data name="QuickGcuOsd" xml:space="preserve">
     <value>GCU-OSD</value>
   </data>
+  <data name="LightInlineBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
 </root>
