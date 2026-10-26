@@ -1017,7 +1017,7 @@ public partial class OriginalStyleWindow : Window
                 continue;
             }
             bool on = _backendProbe?.QuickState(key) == true;
-            result.Add((key, info.Label, info.Glyph, on));
+            result.Add((key, QuickSwitchService.Label(key, info.Label), info.Glyph, on));
         }
         return result.ToArray();
     }
@@ -2991,7 +2991,7 @@ public partial class OriginalStyleWindow : Window
             {
                 continue;
             }
-            choices.Add(new QuickChoice(key, label, glyph, HasQuickTile(key)));
+            choices.Add(new QuickChoice(key, QuickSwitchService.Label(key, label), glyph, HasQuickTile(key)));
         }
         choices = choices
             .OrderBy(c => currentOrder.IndexOf(c.Key) is int i && i >= 0 ? i : int.MaxValue)
@@ -3169,7 +3169,7 @@ public partial class OriginalStyleWindow : Window
             {
                 if (string.Equals(catalogKey, key, StringComparison.OrdinalIgnoreCase))
                 {
-                    selected.Add(new QuickChoice(catalogKey, label, glyph, true));
+                    selected.Add(new QuickChoice(catalogKey, QuickSwitchService.Label(catalogKey, label), glyph, true));
                     break;
                 }
             }
@@ -3247,7 +3247,7 @@ public partial class OriginalStyleWindow : Window
                 }
                 visible.Add(new CheckBox
                 {
-                    Content = label,
+                    Content = QuickSwitchService.Label(key, label),
                     Style = (Style)FindResource("RowSwitch"),
                     Tag = key,
                     IsChecked = _backendProbe.QuickState(key),
@@ -3263,7 +3263,7 @@ public partial class OriginalStyleWindow : Window
             if (title == "睡眠省电")
             {
                 Grid headerRow = new Grid { Margin = new Thickness(0, 8, 0, 2) };
-                headerRow.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("MutedText"), FontSize = 10 });
+                headerRow.Children.Add(new TextBlock { Text = QuickSwitchService.GroupTitle(title), Style = (Style)FindResource("MutedText"), FontSize = 10 });
                 StackPanel scope = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
                 ToggleButton ac = new ToggleButton { Content = WpfStrings.OriginalStyleWindow_xaml_Content, Style = (Style)FindResource("SmallSegment"), IsChecked = true, Tag = "ac", Margin = new Thickness(0, 0, 4, 0), Height = 24, FontSize = 11 };
                 ToggleButton dc = new ToggleButton { Content = WpfStrings.OriginalStyleWindow_xaml_Content_2, Style = (Style)FindResource("SmallSegment"), Tag = "dc", Height = 24, FontSize = 11 };
@@ -3278,7 +3278,7 @@ public partial class OriginalStyleWindow : Window
             {
                 MoreGroupsPanel.Children.Add(new TextBlock
                 {
-                    Text = title,
+                    Text = QuickSwitchService.GroupTitle(title),
                     Style = (Style)FindResource("MutedText"),
                     FontSize = 10,
                     Margin = new Thickness(0, 8, 0, 2)
@@ -3344,7 +3344,7 @@ public partial class OriginalStyleWindow : Window
                 }
             }
         }
-        MoreSwitchCount.Text = on + "/" + total + " 开启";
+        MoreSwitchCount.Text = string.Format(WpfStrings.QuickMoreSummaryFormat, on, total);
     }
 
     private static IEnumerable<CheckBox> EnumerateCheckBoxes(DependencyObject root)
@@ -3911,7 +3911,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         _connectAttempting = true;
-        SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
+        SetBackendStatus(WpfStrings.BackendGcuConnecting, "#F59E0B", WpfStrings.BackendGcuConnectingTip);
         BackendLine.Text = WpfStrings.OriginalStyleWindow_xaml_Text_50;
         try
         {
@@ -3922,7 +3922,7 @@ public partial class OriginalStyleWindow : Window
                 string reason = _backendHost.TimedOut
                     ? "15 秒内未完成；应用会自动重试，点上方状态可重新检查。"
                     : _backendHost.LastError;
-                SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
+                SetBackendStatus(WpfStrings.BackendGcuDisconnected, "#EF4444", WpfStrings.BackendGcuDisconnectedTip);
                 BackendLine.Text = reason;
                 _backendProbe = null;
                 _backendRetryTimer.Start();
@@ -3969,22 +3969,22 @@ public partial class OriginalStyleWindow : Window
         {
             bool ready = _services?.BackendStatus.Connected ?? probe.Connected;
             SetBackendStatus(
-                ready ? "● 已就绪" : "● 未就绪",
+                ready ? WpfStrings.BackendNonGcuReady : WpfStrings.BackendNonGcuNotReady,
                 ready ? "#4ADE80" : "#F59E0B",
-                "本机使用老机型接口，仅支持三个内置性能档");
+                WpfStrings.BackendNonGcuTip);
             return;
         }
         if (_services?.BackendStatus.IsGcuConnected ?? probe.IsGcuConnected)
         {
-            SetBackendStatus("● GCU 已连接", "#4ADE80", "GCU 服务连接正常（GCUBridge，MQTT 127.0.0.1:13688）");
+            SetBackendStatus(WpfStrings.BackendGcuConnected, "#4ADE80", WpfStrings.BackendGcuConnectedTip);
             return;
         }
         if ((_services?.BackendStatus.IsReconnecting ?? probe.IsReconnecting) || probe.IsSessionAwaitingSubscribe)
         {
-            SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
+            SetBackendStatus(WpfStrings.BackendGcuConnecting, "#F59E0B", WpfStrings.BackendGcuConnectingTip);
             return;
         }
-        SetBackendStatus("● GCU 未连接", "#EF4444", "GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿");
+        SetBackendStatus(WpfStrings.BackendGcuDisconnected, "#EF4444", WpfStrings.BackendGcuDisconnectedTip);
     }
 
     private void SetBackendStatus(string text, string hex, string tooltip)

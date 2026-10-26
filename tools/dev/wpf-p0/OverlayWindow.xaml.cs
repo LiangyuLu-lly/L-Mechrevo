@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using L_Mechrevo.WpfP0.Resources;
 using System.Windows.Threading;
 using L_Mechrevo.WpfP0.Services;
 
@@ -109,8 +110,8 @@ public partial class OverlayWindow : Window
             CpuMemoryBar.Value = Math.Clamp(s.RamUsage, 0, 100);
 
             string source = FormatPowerSource(s.AcOnline);
-            string state = s.Charging ? "充电中" : (s.AcOnline ? (s.BatteryPercent >= 99 ? "已充满" : "未充电") : "放电中");
-            BatteryText.Text = s.BatteryPercent >= 0 ? "电池 " + s.BatteryPercent + "%" : "电池 —";
+            string state = s.Charging ? WpfStrings.OverlayCharging : (s.AcOnline ? (s.BatteryPercent >= 99 ? WpfStrings.OverlayBatteryFull : WpfStrings.OverlayNotCharging) : WpfStrings.OverlayDischarging);
+            BatteryText.Text = s.BatteryPercent >= 0 ? WpfStrings.OverlayBatteryLabel + s.BatteryPercent + "%" : WpfStrings.OverlayBatteryDash;
             BatteryDetailText.Text = s.BatteryPercent >= 0 ? source + " · " + state : "";
             UpdateBatteryVisibility();
         }
@@ -143,17 +144,19 @@ public partial class OverlayWindow : Window
         BatteryPanel.Visibility = showBattery ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private static string CloseParen() => System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("zh", System.StringComparison.OrdinalIgnoreCase) ? "）" : ")";
+
     private static string FormatPowerSource(bool acOnline)
     {
         if (!acOnline)
         {
-            return "电池供电";
+            return WpfStrings.OverlayBatteryPower;
         }
         try
         {
             if (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true)
             {
-                return "外接电源";
+                return WpfStrings.OverlayAcPower;
             }
             L_Mechrevo.WpfP0.Services.PowerStatusSnapshot power = L_Mechrevo.WpfP0.Services.PowerStatusService.Read();
             MechrevoLite.Hardware.PowerInputSample? sample = power.Input;
@@ -169,18 +172,18 @@ public partial class OverlayWindow : Window
             int raw = sample?.BiosInfo3Raw ?? -1;
             if (raw >= 0)
             {
-                return "外接电源（EC 0x" + raw.ToString("X2") + "）";
+                return WpfStrings.OverlayAcPowerEcHex + raw.ToString("X2") + CloseParen();
             }
             decimal? rate = power.BatteryRateWatts;
             if (rate.HasValue)
             {
-                return "外接电源（EC " + rate.Value.ToString("0.0") + "W）";
+                return WpfStrings.OverlayAcPowerEcWatt + rate.Value.ToString("0.0") + "W" + CloseParen();
             }
         }
         catch
         {
         }
-        return "外接电源";
+        return WpfStrings.OverlayAcPower;
     }
 
     private void ApplyOverlayBackground(double opacity)

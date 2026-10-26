@@ -277,15 +277,15 @@ public partial class MainWindow : Window
         FontFamily glyphFont = new("Segoe MDL2 Assets");
         FontFamily textFont = (FontFamily)Application.Current.Resources["AppFontFamily"];
         SetNavContent(NavHome, _navCollapsed, "\uE80F", "首页", glyphFont, textFont);
-        SetNavContent(NavScreen, _navCollapsed, "\uE7F4", "屏幕", glyphFont, textFont);
-        SetNavContent(NavLighting, _navCollapsed, "\uE706", "灯光", glyphFont, textFont);
-        SetNavContent(NavCustom, _navCollapsed, "\uE70F", "自定义", glyphFont, textFont);
+        SetNavContent(NavScreen, _navCollapsed, "\uE7F4", WpfStrings.NavScreen_Content, glyphFont, textFont);
+        SetNavContent(NavLighting, _navCollapsed, "\uE706", WpfStrings.TitleText_Text_2, glyphFont, textFont);
+        SetNavContent(NavCustom, _navCollapsed, "\uE70F", WpfStrings.NavCustom_Content, glyphFont, textFont);
         SetNavContent(NavSwitches, _navCollapsed, "\uE712", WpfStrings.NavMoreSwitches, glyphFont, textFont);
-        SetDockNavContent(NavDockOverlay, _navCollapsed, "\uE8A7", "悬浮窗", glyphFont, textFont);
-        SetDockNavContent(NavDockSettings, _navCollapsed, "\uE713", "设置", glyphFont, textFont);
-        SetDockNavContent(NavDockSponsor, _navCollapsed, "\uEB51", "赞助", glyphFont, textFont);
-        SetDockNavContent(NavDockDiag, _navCollapsed, "\uE9D9", "诊断", glyphFont, textFont);
-        SetDockNavContent(NavDockExit, _navCollapsed, "\uE7E8", "退出", glyphFont, textFont);
+        SetDockNavContent(NavDockOverlay, _navCollapsed, "\uE8A7", WpfStrings.MainWindow_Text_4, glyphFont, textFont);
+        SetDockNavContent(NavDockSettings, _navCollapsed, "\uE713", WpfStrings.InlineOverlayTitle_Text, glyphFont, textFont);
+        SetDockNavContent(NavDockSponsor, _navCollapsed, "\uEB51", WpfStrings.MainWindow_Text_3, glyphFont, textFont);
+        SetDockNavContent(NavDockDiag, _navCollapsed, "\uE9D9", WpfStrings.MainWindow_Text_2, glyphFont, textFont);
+        SetDockNavContent(NavDockExit, _navCollapsed, "\uE7E8", WpfStrings.MainWindow_Text, glyphFont, textFont);
     }
 
     private static void SetDockNavContent(Button button, bool collapsed, string glyph, string text, FontFamily glyphFont, FontFamily textFont)
@@ -622,12 +622,12 @@ public partial class MainWindow : Window
         }
         StatusText.Text = page switch
         {
-            "home" => "首页 · 传感器 / 性能 / 显卡 / 显示",
-            "screen" => "屏幕 · 刷新率 / 亮度 / 校色 / 色彩增强",
-            "lighting" => "灯光 · 页面内直接编辑",
+            "home" => WpfStrings.PageStatusHome,
+            "screen" => WpfStrings.PageStatusScreen,
+            "lighting" => WpfStrings.PageStatusLighting,
             "custom" => WpfStrings.NavCustom_Content + " · " + WpfStrings.CustomPageView_Text_5 + " / " + WpfStrings.CustomPageView_Text,
             "switches" => WpfStrings.NavSwitches_Content + " · " + WpfStrings.SwitchesPageView_Text,
-            _ => "就绪"
+            _ => WpfStrings.PageStatusReady
         };
     }
 
@@ -1281,7 +1281,7 @@ public partial class MainWindow : Window
         {
             // task-26：未连接时点了也不下发（开关已禁用，这里是键盘/并发路径的兜底）
             ScreenCalibrationToggle.IsChecked = !(ScreenCalibrationToggle.IsChecked == true);
-            StatusText.Text = "后端未连接：校色开关需连接后生效";
+            StatusText.Text = WpfStrings.StatusCalibrationNeedsBackend;
             return;
         }
         _owner?.WideSetCalibrationEnabled(ScreenCalibrationToggle.IsChecked == true);
@@ -1293,7 +1293,7 @@ public partial class MainWindow : Window
         if (!IsWideBackendConnected)
         {
             ScreenEffectToggle.IsChecked = !(ScreenEffectToggle.IsChecked == true);
-            StatusText.Text = "后端未连接：色彩增强开关需连接后生效";
+            StatusText.Text = WpfStrings.StatusEffectNeedsBackend;
             return;
         }
         _owner?.WideSetDisplayEffectEnabled(ScreenEffectToggle.IsChecked == true);
@@ -1308,7 +1308,7 @@ public partial class MainWindow : Window
         if (!IsWideBackendConnected && show)
         {
             // task-26：本地 ICC 设置仍可用；只提示需要后端的开关/档位
-            StatusText.Text = "后端未连接：校色开关/档位需连接后生效；本地 ICC 设置仍可用";
+            StatusText.Text = WpfStrings.StatusCalibrationSettingsNeedsBackend;
         }
     }
 
@@ -1379,7 +1379,7 @@ public partial class MainWindow : Window
         if (!IsWideBackendConnected)
         {
             // task-26：未连接时编辑面板打不开（按钮本身已被门控禁用；这里是兜底）
-            StatusText.Text = "后端未连接：屏幕效果编辑器暂不可用";
+            StatusText.Text = WpfStrings.StatusScreenEffectEditorNeedsBackend;
             return;
         }
         bool show = ScreenEffectEditorPanel.Visibility != Visibility.Visible;
@@ -1486,7 +1486,7 @@ public partial class MainWindow : Window
     {
         if (!IsWideBackendConnected)
         {
-            StatusText.Text = "后端未连接：色彩增强重置暂不可用";
+            StatusText.Text = WpfStrings.StatusEffectResetNeedsBackend;
             return;
         }
         if (_probe?.Service == null || string.IsNullOrWhiteSpace(_currentEffectMode)) return;
@@ -2265,10 +2265,10 @@ public partial class MainWindow : Window
         WrapPanel presets = new() { Margin = new Thickness(0, 0, 0, 8) };
         (string Name, int Argb)[] palette =
         {
-            ("红", unchecked((int)0xFFFF3B30)), ("橙", unchecked((int)0xFFFF9500)),
-            ("黄", unchecked((int)0xFFFFD60A)), ("绿", unchecked((int)0xFF34C759)),
-            ("青", unchecked((int)0xFF32ADE6)), ("蓝", unchecked((int)0xFF007AFF)),
-            ("紫", unchecked((int)0xFFAF52DE)), ("白", unchecked((int)0xFFFFFFFF))
+            (WpfStrings.ColorRed, unchecked((int)0xFFFF3B30)), (WpfStrings.ColorOrange, unchecked((int)0xFFFF9500)),
+            (WpfStrings.ColorYellow, unchecked((int)0xFFFFD60A)), (WpfStrings.ColorGreen, unchecked((int)0xFF34C759)),
+            (WpfStrings.ColorCyan, unchecked((int)0xFF32ADE6)), (WpfStrings.ColorBlue, unchecked((int)0xFF007AFF)),
+            (WpfStrings.ColorPurple, unchecked((int)0xFFAF52DE)), (WpfStrings.ColorWhite, unchecked((int)0xFFFFFFFF))
         };
         foreach ((string name, int argbValue) in palette)
         {
@@ -2353,7 +2353,7 @@ public partial class MainWindow : Window
             breathButtons.Add(breathSwatch);
             breathPanel.Children.Add(breathSwatch);
         }
-        breathSection.Children.Add(new TextBlock { Text = "呼吸颜色", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 0, 0, 4) });
+        breathSection.Children.Add(new TextBlock { Text = WpfStrings.LightBreathingColor, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 0, 0, 4) });
         breathSection.Children.Add(breathPanel);
         right.Children.Add(colorSection);
         right.Children.Add(mixSection);
@@ -2372,7 +2372,8 @@ public partial class MainWindow : Window
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        TextBlock brightnessLabel = new() { Text = WpfStrings.Brightness, Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
+        TextBlock brightnessLabel = new() { Text = WpfStrings.Brightness, Style = (Style)FindResource("MutedText"), MinWidth = 42, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+        if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("zh", StringComparison.OrdinalIgnoreCase)) { brightnessLabel.Width = 42; }
         brightness.Children.Add(brightnessLabel);
         Grid.SetColumn(slider, 1);
         brightness.Children.Add(slider);
@@ -2391,7 +2392,8 @@ public partial class MainWindow : Window
         speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        TextBlock speedLabel = new() { Text = WpfStrings.Speed, Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
+        TextBlock speedLabel = new() { Text = WpfStrings.Speed, Style = (Style)FindResource("MutedText"), MinWidth = 42, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+        if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("zh", StringComparison.OrdinalIgnoreCase)) { speedLabel.Width = 42; }
         TextBlock speedText = new()
         {
             Text = (int)speed.Value + "/4",
@@ -2495,7 +2497,7 @@ public partial class MainWindow : Window
         if (whiteKeyboard)
         {
             // ⭐⭐ task-17：白色背光键盘按能力只保留「电源 + 4 档亮度」，⛔ 不显示不支持的 RGB 效果/颜色/速度 ✅
-            hint.Text = "白色背光键盘：仅电源与 2 档亮度";
+            hint.Text = WpfStrings.LightWhiteKeyboardHint;
             effectPanel.Visibility = Visibility.Collapsed;
             colorSection.Visibility = Visibility.Collapsed;
             mixSection.Visibility = Visibility.Collapsed;
@@ -2679,7 +2681,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Logger.WriteError("[wide-light] 打开完整灯光编辑器失败：" + ex);
-            StatusText.Text = "灯光编辑器打开失败：" + ex.Message;
+            StatusText.Text = string.Format(WpfStrings.StatusLightEditorOpenFailed, ex.Message);
             return;
         }
         Logger.WriteLineIfChanged("wide-light-editor-" + topic,
@@ -2695,7 +2697,7 @@ public partial class MainWindow : Window
         {
             Logger.WriteLineIfChanged("wide-light-hid-no-device",
                 $"[wide-light] HID 编辑入口：无设备或后端未连接（connected={IsWideBackendConnected} hw={((_probe?.Hw ?? WpfBackend.Hw) == null ? "null" : "ok")}）⇒ 只提示，不打开 ✅");
-            StatusText.Text = "后端未连接：HID 键盘编辑器暂不可用";
+            StatusText.Text = WpfStrings.StatusHidEditorNeedsBackend;
             return;
         }
         try
@@ -2716,7 +2718,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Logger.WriteError("[wide-light] 打开 HID 键盘编辑器失败：" + ex);
-            StatusText.Text = "HID 键盘编辑器打开失败：" + ex.Message;
+            StatusText.Text = string.Format(WpfStrings.StatusHidEditorOpenFailed, ex.Message);
             return;
         }
         RebuildLightingCards();
@@ -2784,7 +2786,7 @@ public partial class MainWindow : Window
             LightingSettingsStore.Save(topic, settings);
             if (_owner == null)
             {
-                StatusText.Text = "灯光设置已保存（后端未连接）";
+                StatusText.Text = WpfStrings.StatusLightSavedOffline;
                 return;
             }
             bool ok = await _owner.WideApplyLightAsync(topic, effect, light, speedValue, colorArgb, powerOn);
@@ -2794,7 +2796,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "灯光编辑失败：" + ex.Message;
+            StatusText.Text = string.Format(WpfStrings.StatusLightEditFailed, ex.Message);
         }
     }
 

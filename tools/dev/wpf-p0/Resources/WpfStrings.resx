@@ -2046,4 +2046,139 @@
   <data name="AutoOption" xml:space="preserve">
     <value>Auto</value>
   </data>
+  <data name="PageStatusHome" xml:space="preserve">
+    <value>Home · Sensors / Performance / GPU / Display</value>
+  </data>
+  <data name="PageStatusScreen" xml:space="preserve">
+    <value>Screen · Refresh rate / Brightness / Calibration / Color enhancement</value>
+  </data>
+  <data name="PageStatusLighting" xml:space="preserve">
+    <value>Lighting · Edit inline on this page</value>
+  </data>
+  <data name="PageStatusReady" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="ImageNotSelected" xml:space="preserve">
+    <value>Not selected</value>
+  </data>
+  <data name="BackendGcuConnecting" xml:space="preserve">
+    <value>● GCU connecting</value>
+  </data>
+  <data name="BackendGcuConnected" xml:space="preserve">
+    <value>● GCU connected</value>
+  </data>
+  <data name="BackendGcuDisconnected" xml:space="preserve">
+    <value>● GCU not connected</value>
+  </data>
+  <data name="BackendGcuConnectingTip" xml:space="preserve">
+    <value>Connecting to the GCU service (127.0.0.1:13688); usually ready a few seconds after login. Retrying automatically.</value>
+  </data>
+  <data name="BackendGcuConnectedTip" xml:space="preserve">
+    <value>GCU service connected (GCUBridge, MQTT 127.0.0.1:13688).</value>
+  </data>
+  <data name="BackendGcuDisconnectedTip" xml:space="preserve">
+    <value>GCU service not running or connection failed (127.0.0.1:13688); retrying automatically.</value>
+  </data>
+  <data name="BackendNonGcuReady" xml:space="preserve">
+    <value>● Ready</value>
+  </data>
+  <data name="BackendNonGcuNotReady" xml:space="preserve">
+    <value>● Not ready</value>
+  </data>
+  <data name="BackendNonGcuTip" xml:space="preserve">
+    <value>This model uses the legacy interface; only the three built-in performance modes are supported.</value>
+  </data>
+  <data name="QuickMoreSummaryFormat" xml:space="preserve">
+    <value>{0}/{1} on</value>
+  </data>
+  <data name="LightBreathingColor" xml:space="preserve">
+    <value>Breathing colors</value>
+  </data>
+  <data name="LightWhiteKeyboardHint" xml:space="preserve">
+    <value>White backlight keyboard: power and brightness levels only</value>
+  </data>
+  <data name="ColorRed" xml:space="preserve">
+    <value>Red</value>
+  </data>
+  <data name="ColorOrange" xml:space="preserve">
+    <value>Orange</value>
+  </data>
+  <data name="ColorYellow" xml:space="preserve">
+    <value>Yellow</value>
+  </data>
+  <data name="ColorGreen" xml:space="preserve">
+    <value>Green</value>
+  </data>
+  <data name="ColorCyan" xml:space="preserve">
+    <value>Cyan</value>
+  </data>
+  <data name="ColorBlue" xml:space="preserve">
+    <value>Blue</value>
+  </data>
+  <data name="ColorPurple" xml:space="preserve">
+    <value>Purple</value>
+  </data>
+  <data name="ColorWhite" xml:space="preserve">
+    <value>White</value>
+  </data>
+  <data name="OverlayCharging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+  <data name="OverlayBatteryFull" xml:space="preserve">
+    <value>Fully charged</value>
+  </data>
+  <data name="OverlayNotCharging" xml:space="preserve">
+    <value>Not charging</value>
+  </data>
+  <data name="OverlayDischarging" xml:space="preserve">
+    <value>Discharging</value>
+  </data>
+  <data name="OverlayBatteryLabel" xml:space="preserve">
+    <value>Battery </value>
+  </data>
+  <data name="OverlayBatteryDash" xml:space="preserve">
+    <value>Battery —</value>
+  </data>
+  <data name="OverlayBatteryPower" xml:space="preserve">
+    <value>Battery power</value>
+  </data>
+  <data name="OverlayAcPower" xml:space="preserve">
+    <value>AC power</value>
+  </data>
+  <data name="OverlayAcPowerEcHex" xml:space="preserve">
+    <value>AC power (EC 0x</value>
+  </data>
+  <data name="OverlayAcPowerEcWatt" xml:space="preserve">
+    <value>AC power (EC </value>
+  </data>
+  <data name="StatusCalibrationNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: calibration switch takes effect after connecting</value>
+  </data>
+  <data name="StatusEffectNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: color enhancement switch takes effect after connecting</value>
+  </data>
+  <data name="StatusCalibrationSettingsNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: calibration switch/level need a connection; local ICC settings still work</value>
+  </data>
+  <data name="StatusScreenEffectEditorNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: screen effect editor is unavailable</value>
+  </data>
+  <data name="StatusEffectResetNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: color enhancement reset is unavailable</value>
+  </data>
+  <data name="StatusLightEditorOpenFailed" xml:space="preserve">
+    <value>Failed to open lighting editor: {0}</value>
+  </data>
+  <data name="StatusHidEditorNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: HID keyboard editor is unavailable</value>
+  </data>
+  <data name="StatusHidEditorOpenFailed" xml:space="preserve">
+    <value>Failed to open HID keyboard editor: {0}</value>
+  </data>
+  <data name="StatusLightSavedOffline" xml:space="preserve">
+    <value>Lighting settings saved (backend not connected)</value>
+  </data>
+  <data name="StatusLightEditFailed" xml:space="preserve">
+    <value>Lighting edit failed: {0}</value>
+  </data>
 </root>

@@ -2046,4 +2046,139 @@
   <data name="AutoOption" xml:space="preserve">
     <value>自动</value>
   </data>
+  <data name="PageStatusHome" xml:space="preserve">
+    <value>首页 · 传感器 / 性能 / 显卡 / 显示</value>
+  </data>
+  <data name="PageStatusScreen" xml:space="preserve">
+    <value>屏幕 · 刷新率 / 亮度 / 校色 / 色彩增强</value>
+  </data>
+  <data name="PageStatusLighting" xml:space="preserve">
+    <value>灯光 · 页面内直接编辑</value>
+  </data>
+  <data name="PageStatusReady" xml:space="preserve">
+    <value>就绪</value>
+  </data>
+  <data name="ImageNotSelected" xml:space="preserve">
+    <value>未选择</value>
+  </data>
+  <data name="BackendGcuConnecting" xml:space="preserve">
+    <value>● GCU 连接中</value>
+  </data>
+  <data name="BackendGcuConnected" xml:space="preserve">
+    <value>● GCU 已连接</value>
+  </data>
+  <data name="BackendGcuDisconnected" xml:space="preserve">
+    <value>● GCU 未连接</value>
+  </data>
+  <data name="BackendGcuConnectingTip" xml:space="preserve">
+    <value>正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试</value>
+  </data>
+  <data name="BackendGcuConnectedTip" xml:space="preserve">
+    <value>GCU 服务连接正常（GCUBridge，MQTT 127.0.0.1:13688）</value>
+  </data>
+  <data name="BackendGcuDisconnectedTip" xml:space="preserve">
+    <value>GCU 服务未运行或连接失败（127.0.0.1:13688）；应用正在自动重连，恢复后此指示会变绿</value>
+  </data>
+  <data name="BackendNonGcuReady" xml:space="preserve">
+    <value>● 已就绪</value>
+  </data>
+  <data name="BackendNonGcuNotReady" xml:space="preserve">
+    <value>● 未就绪</value>
+  </data>
+  <data name="BackendNonGcuTip" xml:space="preserve">
+    <value>本机使用老机型接口，仅支持三个内置性能档</value>
+  </data>
+  <data name="QuickMoreSummaryFormat" xml:space="preserve">
+    <value>{0}/{1} 开启</value>
+  </data>
+  <data name="LightBreathingColor" xml:space="preserve">
+    <value>呼吸颜色</value>
+  </data>
+  <data name="LightWhiteKeyboardHint" xml:space="preserve">
+    <value>白色背光键盘：仅电源与 2 档亮度</value>
+  </data>
+  <data name="ColorRed" xml:space="preserve">
+    <value>红</value>
+  </data>
+  <data name="ColorOrange" xml:space="preserve">
+    <value>橙</value>
+  </data>
+  <data name="ColorYellow" xml:space="preserve">
+    <value>黄</value>
+  </data>
+  <data name="ColorGreen" xml:space="preserve">
+    <value>绿</value>
+  </data>
+  <data name="ColorCyan" xml:space="preserve">
+    <value>青</value>
+  </data>
+  <data name="ColorBlue" xml:space="preserve">
+    <value>蓝</value>
+  </data>
+  <data name="ColorPurple" xml:space="preserve">
+    <value>紫</value>
+  </data>
+  <data name="ColorWhite" xml:space="preserve">
+    <value>白</value>
+  </data>
+  <data name="OverlayCharging" xml:space="preserve">
+    <value>充电中</value>
+  </data>
+  <data name="OverlayBatteryFull" xml:space="preserve">
+    <value>已充满</value>
+  </data>
+  <data name="OverlayNotCharging" xml:space="preserve">
+    <value>未充电</value>
+  </data>
+  <data name="OverlayDischarging" xml:space="preserve">
+    <value>放电中</value>
+  </data>
+  <data name="OverlayBatteryLabel" xml:space="preserve">
+    <value>电池 </value>
+  </data>
+  <data name="OverlayBatteryDash" xml:space="preserve">
+    <value>电池 —</value>
+  </data>
+  <data name="OverlayBatteryPower" xml:space="preserve">
+    <value>电池供电</value>
+  </data>
+  <data name="OverlayAcPower" xml:space="preserve">
+    <value>外接电源</value>
+  </data>
+  <data name="OverlayAcPowerEcHex" xml:space="preserve">
+    <value>外接电源（EC 0x</value>
+  </data>
+  <data name="OverlayAcPowerEcWatt" xml:space="preserve">
+    <value>外接电源（EC </value>
+  </data>
+  <data name="StatusCalibrationNeedsBackend" xml:space="preserve">
+    <value>后端未连接：校色开关需连接后生效</value>
+  </data>
+  <data name="StatusEffectNeedsBackend" xml:space="preserve">
+    <value>后端未连接：色彩增强开关需连接后生效</value>
+  </data>
+  <data name="StatusCalibrationSettingsNeedsBackend" xml:space="preserve">
+    <value>后端未连接：校色开关/档位需连接后生效；本地 ICC 设置仍可用</value>
+  </data>
+  <data name="StatusScreenEffectEditorNeedsBackend" xml:space="preserve">
+    <value>后端未连接：屏幕效果编辑器暂不可用</value>
+  </data>
+  <data name="StatusEffectResetNeedsBackend" xml:space="preserve">
+    <value>后端未连接：色彩增强重置暂不可用</value>
+  </data>
+  <data name="StatusLightEditorOpenFailed" xml:space="preserve">
+    <value>灯光编辑器打开失败：{0}</value>
+  </data>
+  <data name="StatusHidEditorNeedsBackend" xml:space="preserve">
+    <value>后端未连接：HID 键盘编辑器暂不可用</value>
+  </data>
+  <data name="StatusHidEditorOpenFailed" xml:space="preserve">
+    <value>HID 键盘编辑器打开失败：{0}</value>
+  </data>
+  <data name="StatusLightSavedOffline" xml:space="preserve">
+    <value>灯光设置已保存（后端未连接）</value>
+  </data>
+  <data name="StatusLightEditFailed" xml:space="preserve">
+    <value>灯光编辑失败：{0}</value>
+  </data>
 </root>

@@ -595,7 +595,7 @@ public partial class SettingsWindow : Window
     {
         string path = AppConfig.GetString("ui_bg_image") ?? "";
         BackgroundPathText.Text = string.IsNullOrWhiteSpace(path)
-            ? "未选择"
+            ? WpfStrings.ImageNotSelected
             : System.IO.Path.GetFileName(path);
     }
 
@@ -665,7 +665,7 @@ public partial class SettingsWindow : Window
     {
         string path = AppConfig.GetString("wide_bg_image") ?? "";
         WideBackgroundPathText.Text = string.IsNullOrWhiteSpace(path)
-            ? "未选择"
+            ? WpfStrings.ImageNotSelected
             : System.IO.Path.GetFileName(path);
     }
 
