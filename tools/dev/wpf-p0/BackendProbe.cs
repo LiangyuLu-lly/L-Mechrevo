@@ -285,6 +285,18 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal async Task<bool> SwitchLocalDimmingAsync(bool on)
+    {
+        try
+        {
+            return _service != null && await _service.SwitchLocalDimming(on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> SwitchRefreshRateAsync(int hz)
     {
         try

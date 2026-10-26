@@ -1192,20 +1192,20 @@ public partial class OriginalStyleWindow : Window
 
     internal bool HdrControlOn => L_Mechrevo.WpfP0.Services.WpfBackend.acpi?.DeviceGet(327793u) > 0;
 
-    internal void ToggleMiniled()
+    internal async void ToggleMiniled()
     {
         try
         {
-            if (L_Mechrevo.WpfP0.Services.WpfBackend.acpi == null)
+            BackendProbe? probe = _backendProbe;
+            if (probe?.Hw == null || !probe.Hw.SupportsLocalDimming)
             {
                 return;
             }
-            int primary = L_Mechrevo.WpfP0.Services.WpfBackend.acpi.DeviceGet(327710u);
-            int secondary = L_Mechrevo.WpfP0.Services.WpfBackend.acpi.DeviceGet(327726u);
-            int value = primary == 1 ? 0 : (primary >= 0 ? 1 : (secondary == 1 ? 2 : (secondary == 2 ? 0 : 1)));
-            AppConfig.Set("miniled", value);
-            AppConfig.Flush();
-            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_2;
+            bool target = !probe.Hw.LocalDimming;
+            bool ok = await probe.SwitchLocalDimmingAsync(target);
+            StatusText.Text = ok
+                ? (target ? WpfStrings.OriginalStyleWindow_xaml_Text_2 : WpfStrings.OriginalStyleWindow_xaml_Text_2)
+                : WpfStrings.OriginalStyleWindow_xaml_Text_3;
             RefreshFromBackend();
         }
         catch (Exception ex)
