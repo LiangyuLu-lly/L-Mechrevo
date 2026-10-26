@@ -1107,11 +1107,42 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            return (BatteryInfo.Text, _services?.Battery.CurrentMode ?? _backendProbe?.BatteryMode ?? -1, ChargeLimitStatus.Text);
+            int mode = _services?.Battery.CurrentMode ?? _backendProbe?.BatteryMode ?? -1;
+            // 无极限充/EC 限充生效时，三档是 EC 上限值来源，高亮必须跟选定百分比走。
+            if (ChargeSliderToggle.IsChecked == true || MechrevoLite.Battery.BatteryControl.LockEnabled())
+            {
+                mode = ModeForPercent(MechrevoLite.Battery.BatteryControl.SelectedModePercent());
+            }
+            return (BatteryInfo.Text, mode, ChargeLimitStatus.Text);
         }
         catch
         {
             return (WpfStrings.BatteryInfoDash, -1, "");
+        }
+    }
+
+    private static int ModeForPercent(int percent)
+    {
+        if (percent >= 90) return 0;
+        if (percent >= 70) return 1;
+        return 2;
+    }
+
+    private void ApplyBatteryModeHighlight(int mode)
+    {
+        BatteryLongButton.IsChecked = mode == 0;
+        BatteryBalancedButton.IsChecked = mode == 1;
+        BatteryWorkButton.IsChecked = mode == 2;
+        ToggleButton? selected = mode switch
+        {
+            0 => BatteryLongButton,
+            1 => BatteryBalancedButton,
+            2 => BatteryWorkButton,
+            _ => null
+        };
+        if (selected != null)
+        {
+            HighlightSegment(selected);
         }
     }
 
@@ -1228,39 +1259,6 @@ public partial class OriginalStyleWindow : Window
             {
                 return false;
             }
-        }
-    }
-
-    internal bool WideEcTransportOn => MechrevoLite.Battery.BatteryControl.LockEnabled();
-
-    internal void WideSetEcTransport(bool on)
-    {
-        try
-        {
-            MechrevoHw? hw = _backendProbe?.Hw;
-            if (hw == null || hw.UsesBaolongda)
-            {
-                return;
-            }
-            MechrevoLite.Battery.BatteryControl.SetLockEnabled(on);
-            if (on)
-            {
-                int percent = MechrevoLite.Battery.BatteryControl.SelectedModePercent();
-                if (MechrevoLite.Battery.BatteryControl.CaptureChargeLimitGesture())
-                {
-                    MechrevoLite.Battery.BatteryControl.ApplyChargeLimitFromUserGesture(percent);
-                }
-            }
-            else
-            {
-                MechrevoLite.Battery.BatteryControl.SetBatteryChargeLimit(100);
-            }
-            StatusText.Text = on ? WpfStrings.BatteryEcTransportOn : WpfStrings.BatteryEcTransportOff;
-            RefreshFromBackend();
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_3 + ex.Message;
         }
     }
 
@@ -2402,6 +2400,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         BatteryControl.SetSelectedModePercent(value);
+        ApplyBatteryModeHighlight(ModeForPercent(value));
         StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_29 + value + "%";
     }
 
@@ -3134,7 +3133,10 @@ public partial class OriginalStyleWindow : Window
                 && MechrevoLite.Battery.BatteryControl.ApplyChargeLimitFromUserGesture(percentForMode);
             if (sliderOk)
             {
+                _syncingBatteryLimit = true;
                 BatteryLimitSlider.Value = Math.Clamp(percentForMode, 40, 100);
+                _syncingBatteryLimit = false;
+                ApplyBatteryModeHighlight(mode);
                 StatusText.Text = WpfStrings.BatteryModeSent;
             }
             else

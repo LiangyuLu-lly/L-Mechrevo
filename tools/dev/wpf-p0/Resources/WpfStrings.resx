@@ -2930,13 +2930,4 @@ Cancel: do not switch</value>
   <data name="PeripheralHidDeviceFormat" xml:space="preserve">
     <value>HID device VID_{0} PID_{1}</value>
   </data>
-  <data name="BatteryEcTransport" xml:space="preserve">
-    <value>EC limit charging</value>
-  </data>
-  <data name="BatteryEcTransportOn" xml:space="preserve">
-    <value>EC limit charging enabled</value>
-  </data>
-  <data name="BatteryEcTransportOff" xml:space="preserve">
-    <value>EC limit charging disabled</value>
-  </data>
 </root>

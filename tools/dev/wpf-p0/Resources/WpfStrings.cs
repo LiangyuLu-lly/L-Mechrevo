@@ -780,9 +780,6 @@ public static class WpfStrings
     public static string LightAutoOffPrefix => Get("LightAutoOffPrefix");
     public static string LightAutoOffOff => Get("LightAutoOffOff");
     public static string BatteryModeFailed => Get("BatteryModeFailed");
-    public static string BatteryEcTransport => Get("BatteryEcTransport");
-    public static string BatteryEcTransportOn => Get("BatteryEcTransportOn");
-    public static string BatteryEcTransportOff => Get("BatteryEcTransportOff");
 
     public static string BatteryModeSent => Get("BatteryModeSent");
     public static string UpdateAvailablePrefix => Get("UpdateAvailablePrefix");

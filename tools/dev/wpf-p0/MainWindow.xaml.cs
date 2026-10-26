@@ -75,7 +75,7 @@ public partial class MainWindow : Window
     private readonly List<ToggleButton> _igpuSavingButtons = new();
     private TextBlock? _igpuSavingState;
     private CheckBox? _ecDirect;
-    private CheckBox? _ecTransport;
+    private bool _syncingChargeSlider;
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
     private string _refreshRatesSignature = "";
     private readonly List<ToggleButton> _batteryModeButtons = new();
@@ -878,19 +878,6 @@ public partial class MainWindow : Window
             _batteryModeButtons.Add(button);
         }
         battery.Children.Add(modes);
-        // GCU 的 EC 限充与宝龙达阈值面板是两套：GCU 只显示传输开关，三档仍共用。
-        if (_owner.WideEcTransportSupported)
-        {
-            _ecTransport = new CheckBox
-            {
-                Content = WpfStrings.BatteryEcTransport,
-                Style = (Style)FindResource("HeaderSwitch"),
-                IsChecked = _owner.WideEcTransportOn,
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-            _ecTransport.Click += (_, _) => _owner.WideSetEcTransport(_ecTransport.IsChecked == true);
-            battery.Children.Add(_ecTransport);
-        }
         if (_owner.WideChargeLimitVisible)
         {
             _chargeLimitText = new TextBlock { Text = charge, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
@@ -969,6 +956,10 @@ public partial class MainWindow : Window
                 };
                 _chargeSlider.ValueChanged += (_, _) =>
                 {
+                    if (_syncingChargeSlider)
+                    {
+                        return;
+                    }
                     _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
                     if (_chargeSliderText != null) _chargeSliderText.Text = (int)Math.Round(_chargeSlider.Value) + "%";
                 };
@@ -1029,6 +1020,10 @@ public partial class MainWindow : Window
                 _chargeSlider = new Slider { Minimum = 40, Maximum = 100, Value = gcuSliderValue, Width = 190, Margin = new Thickness(0, 8, 6, 0), Style = (Style)FindResource("RoundSlider"), Visibility = gcuSliderOn ? Visibility.Visible : Visibility.Collapsed };
                 _chargeSlider.ValueChanged += (_, _) =>
                 {
+                    if (_syncingChargeSlider)
+                    {
+                        return;
+                    }
                     _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
                     if (_chargeSliderText != null) _chargeSliderText.Text = (int)Math.Round(_chargeSlider.Value) + "%";
                 };
@@ -1722,7 +1717,6 @@ public partial class MainWindow : Window
         if (_chargeStatus != null) _chargeStatus.Text = limitStatus2;
         if (_chargeExperiment != null) _chargeExperiment.IsChecked = experiment2;
         if (_ecDirect != null) _ecDirect.IsChecked = ecDirect2;
-        if (_ecTransport != null) _ecTransport.IsChecked = _owner.WideEcTransportOn;
         (bool sliderOn, int sliderValue) = _owner.WideBatteryLimitSlider();
         if (_chargeSlider != null)
         {
@@ -1734,7 +1728,9 @@ public partial class MainWindow : Window
             }
             if (!_chargeSlider.IsMouseCaptureWithin && Math.Abs(_chargeSlider.Value - sliderValue) > 1)
             {
+                _syncingChargeSlider = true;
                 _chargeSlider.Value = sliderValue;
+                _syncingChargeSlider = false;
             }
         }
     }
