@@ -433,6 +433,7 @@ public partial class MainWindow : Window
             _probe = _owner?.CurrentBackend;
             BuildMoreSwitchTiles();
             BuildLightingCards();
+            BuildScreenFeatures();
             ApplyHomeCapabilities();
             RefreshHomeExtras();
         }));
@@ -1113,6 +1114,7 @@ public partial class MainWindow : Window
         if (_owner == null || ScreenFeaturesPanel == null) return;
         ScreenFeaturesPanel.Children.Clear();
         _screenFeatures.Clear();
+        ScreenFeaturesCard.Visibility = Visibility.Collapsed;
         AddScreenFeature("显示响应加速", () => _owner.SupportsLcdOverdrive, () => _owner.LcdOverdrive,
             on => _ = _owner.SetLcdOverdriveAsync(on));
         AddScreenFeature("MiniLED 分区控光", () => _owner.SupportsMiniled, () => _owner.MiniledOn,
@@ -1131,6 +1133,8 @@ public partial class MainWindow : Window
             fhd.Click += (_, _) => _owner.ToggleFhd();
             ScreenFeaturesPanel.Children.Add(fhd);
         }
+        ScreenFeaturesCard.Visibility = ScreenFeaturesPanel.Children.Count > 0
+            ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void AddScreenFeature(string label, Func<bool> supported, Func<bool> get, Action<bool> set)

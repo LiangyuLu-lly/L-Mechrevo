@@ -71,6 +71,8 @@ public partial class OriginalStyleWindow : Window
     private bool _lightingIdleSuspended;
     private long _lastLightingConnectionGeneration;
     private long _lastLightingRestoreTick;
+    private readonly long _bootTick = Environment.TickCount64;
+    private bool _hidStartupDeferred;
     private readonly bool?[] _pendingChannelPower = new bool?[4];
     private readonly long[] _pendingChannelTick = new long[4];
     private System.Windows.Interop.HwndSource? _powerBroadcastSource;
@@ -4383,6 +4385,25 @@ public partial class OriginalStyleWindow : Window
             || _lightingIdleSuspended)
         {
             return;
+        }
+        // r78：同方单键 RGB 开机闪 —— HID 帧流不要抢在固件/GCU 稳定前接管。
+        if (IsHidKeyboard(_backendProbe.Hw))
+        {
+            const long hidStartupDelayMs = 8000;
+            long elapsed = Environment.TickCount64 - _bootTick;
+            if (elapsed < hidStartupDelayMs)
+            {
+                if (!_hidStartupDeferred)
+                {
+                    _hidStartupDeferred = true;
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay((int)(hidStartupDelayMs - elapsed));
+                        Dispatcher.BeginInvoke(new Action(() => _ = RestoreLightingOnStartupAsync()));
+                    });
+                }
+                return;
+            }
         }
         bool onBattery = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
             != System.Windows.Forms.PowerLineStatus.Online;

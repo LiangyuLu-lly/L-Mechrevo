@@ -275,7 +275,7 @@
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource Card}">
+                            <Border x:Name="ScreenFeaturesCard" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="显示特性" Style="{StaticResource CardTitle}" />
                                     <StackPanel x:Name="ScreenFeaturesPanel" Margin="0,8,0,0" />
