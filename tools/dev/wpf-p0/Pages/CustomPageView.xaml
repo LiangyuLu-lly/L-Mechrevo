@@ -1,4 +1,4 @@
-<UserControl x:Class="L_Mechrevo.WpfP0.Pages.CustomPageView"
+<UserControl xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.Pages.CustomPageView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FontFamily="{DynamicResource AppFontFamily}">
@@ -8,8 +8,8 @@
     </UserControl.Resources>
 <ScrollViewer x:Name="CustomPage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
                         <StackPanel>
-                            <TextBlock Text="自定义" Style="{StaticResource PageTitle}" />
-                            <TextBlock Text="自定义性能模式与风扇曲线" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.NavCustom_Content}" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomPageView_Text_6}" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -18,25 +18,25 @@
                                 </Grid.ColumnDefinitions>
                                 <Border Grid.Column="0" Style="{StaticResource Card}">
                                     <StackPanel>
-                                        <TextBlock Text="自定义模式" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="CPU / GPU 功耗与模式参数" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                        <Button Content="新建 / 管理自定义模式" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,0,0,10" x:Name="CustomPageEventControl1"/>
+                                        <TextBlock Text="{x:Static loc:WpfStrings.CustomPageView_Text_5}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{x:Static loc:WpfStrings.CustomPageView_Text_4}" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                        <Button Content="{x:Static loc:WpfStrings.CustomPageView_Content_3}" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,0,0,10" x:Name="CustomPageEventControl1"/>
                                         <StackPanel x:Name="CustomModeListPanel" />
                                     </StackPanel>
                                 </Border>
                                 <StackPanel Grid.Column="2">
                                     <Border Style="{StaticResource Card}">
                                         <StackPanel>
-                                            <TextBlock Text="CPU 风扇曲线" Style="{StaticResource CardTitle}" />
-                                            <TextBlock Text="温度 / 转速曲线与平滑" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                            <Button Content="打开 CPU 风扇曲线" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" x:Name="CustomPageEventControl2"/>
+                                            <TextBlock Text="{x:Static loc:WpfStrings.CustomPageView_Text_3}" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="{x:Static loc:WpfStrings.CustomPageView_Text}" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <Button Content="{x:Static loc:WpfStrings.CustomPageView_Content_2}" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" x:Name="CustomPageEventControl2"/>
                                         </StackPanel>
                                     </Border>
                                     <Border Style="{StaticResource Card}">
                                         <StackPanel>
-                                            <TextBlock Text="GPU 风扇曲线" Style="{StaticResource CardTitle}" />
-                                            <TextBlock Text="温度 / 转速曲线与平滑" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
-                                            <Button Content="打开 GPU 风扇曲线" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" x:Name="CustomPageEventControl3"/>
+                                            <TextBlock Text="{x:Static loc:WpfStrings.CustomPageView_Text_2}" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="{x:Static loc:WpfStrings.CustomPageView_Text}" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <Button Content="{x:Static loc:WpfStrings.CustomPageView_Content}" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" x:Name="CustomPageEventControl3"/>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

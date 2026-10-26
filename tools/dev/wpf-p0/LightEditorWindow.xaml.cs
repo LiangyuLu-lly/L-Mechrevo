@@ -8,6 +8,7 @@ using MechrevoLite;
 using MechrevoLite.Hardware;
 using L_Mechrevo.WpfP0.Services;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class LightEditorWindow : Window
@@ -104,8 +105,8 @@ public partial class LightEditorWindow : Window
         PowerCheck.IsChecked = _settings.PowerOn;
         if (_keyboard)
         {
-            HintText.Text = "单分区键盘：呼吸四色、彩虹不可改色、亮度为 x/4、Manual 每键时间 2~10。";
-            StatusText.Text = "单分区键盘模式";
+            HintText.Text = WpfStrings.LightEditorWindow_xaml_Text;
+            StatusText.Text = WpfStrings.LightEditorWindow_xaml_Text_2;
         }
         _suppressAutoApply = true;
         NetSliderValues();
@@ -297,7 +298,7 @@ public partial class LightEditorWindow : Window
                 Padding = new Thickness(0),
                 Tag = index + 1,
                 Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
-                ToolTip = "呼吸颜色 " + (index + 1)
+                ToolTip = WpfStrings.LightEditorWindow_xaml_ToolTip + (index + 1)
             };
             button.Click += BreathColor_Click;
             BreathGrid.Children.Add(button);
@@ -553,7 +554,7 @@ public partial class LightEditorWindow : Window
             {
                 if (!fromAuto)
                 {
-                    StatusText.Text = "保存成功，但后端未连接，未下发";
+                    StatusText.Text = WpfStrings.LightEditorWindow_xaml_Text_3;
                 }
                 return false;
             }
@@ -615,7 +616,7 @@ public partial class LightEditorWindow : Window
         {
             if (!fromAuto)
             {
-                StatusText.Text = "应用失败：" + ex.Message;
+                StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
             }
             return false;
         }

@@ -1,4 +1,4 @@
-<UserControl x:Class="L_Mechrevo.WpfP0.Pages.HomePageView"
+<UserControl xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.Pages.HomePageView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FontFamily="{DynamicResource AppFontFamily}">
@@ -28,13 +28,13 @@
                                             </Canvas>
                                         </Viewbox>
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="性能模式" Style="{StaticResource CardTitle}" />
-                                            <TextBlock x:Name="PerfCurrentText" Text="当前：平衡" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Title}" Style="{StaticResource CardTitle}" />
+                                            <TextBlock x:Name="PerfCurrentText" Text="{x:Static loc:WpfStrings.PerfCurrentText_Text}" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                             <StackPanel Orientation="Horizontal">
-                                                <ToggleButton x:Name="HomePerf静音" Content="静音" Tag="2" Style="{StaticResource SegmentButton}" />
-                                                <ToggleButton x:Name="HomePerf平衡" Content="平衡" Tag="0" Style="{StaticResource SegmentButton}" IsChecked="True" />
-                                                <ToggleButton x:Name="HomePerf狂暴" Content="狂暴" Tag="1" Style="{StaticResource SegmentButton}" />
-                                                <ToggleButton x:Name="HomePerf自定义" Content="自定义" Tag="3" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomePerf静音" Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_23}" Tag="2" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomePerf平衡" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_13}" Tag="0" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                                <ToggleButton x:Name="HomePerf狂暴" Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_22}" Tag="1" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomePerf自定义" Content="{x:Static loc:WpfStrings.NavCustom_Content}" Tag="3" Style="{StaticResource SegmentButton}" />
                                             </StackPanel>
                                         </StackPanel>
                                     </Grid>
@@ -51,12 +51,12 @@
                                             </Canvas>
                                         </Viewbox>
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="显卡模式" Style="{StaticResource CardTitle}" />
-                                            <TextBlock x:Name="GpuCurrentText" Text="当前：混合输出" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+                                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_15}" Style="{StaticResource CardTitle}" />
+                                            <TextBlock x:Name="GpuCurrentText" Text="{x:Static loc:WpfStrings.GpuCurrentText_Text}" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                             <StackPanel Orientation="Horizontal">
-                                                <ToggleButton x:Name="HomeGpu混合" Content="混合" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" />
-                                                <ToggleButton x:Name="HomeGpu独显" Content="独显" Tag="2" Style="{StaticResource SegmentButton}" />
-                                                <ToggleButton x:Name="HomeGpu集显" Content="集显" Tag="0" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomeGpu混合" Content="{x:Static loc:WpfStrings.HomePageView_Content_3}" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                                <ToggleButton x:Name="HomeGpu独显" Content="{x:Static loc:WpfStrings.HomePageView_Content_2}" Tag="2" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomeGpu集显" Content="{x:Static loc:WpfStrings.HomePageView_Content}" Tag="0" Style="{StaticResource SegmentButton}" />
                                             </StackPanel>
                                             <StackPanel x:Name="HomeIgpuSavingPanel" Margin="0,10,0,0" />
                                         </StackPanel>
@@ -84,7 +84,7 @@
                                             </Grid>
                                         </Viewbox>
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="{x:Static loc:WpfStrings.TraySensorTooltipCheck_Content}" Style="{StaticResource CardTitle}" />
                                             <Grid x:Name="DisplayInfoRow" Margin="0,3,0,12">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />

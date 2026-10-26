@@ -7,6 +7,7 @@ using MechrevoLite;
 using MechrevoLite.Display;
 using Microsoft.Win32;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class CalibrationSettingsWindow : Window
@@ -112,7 +113,7 @@ public partial class CalibrationSettingsWindow : Window
         string? imported = IccHelper.ImportIcc(dialog.FileName);
         if (string.IsNullOrWhiteSpace(imported))
         {
-            MessageBox.Show(this, "ICC 导入失败。", "屏幕校色", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, WpfStrings.CalibrationSettingsWindow_xaml_MessageBoxShowthis, "屏幕校色", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         AppConfig.Set("calib_custom_icc", imported);

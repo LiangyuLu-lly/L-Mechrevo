@@ -1,11 +1,11 @@
-<Window x:Class="L_Mechrevo.WpfP0.MainWindow"
+<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="L-Mechrevo · 宽屏"
+        Title="{x:Static loc:WpfStrings.MainWindow_Text_6}"
         Width="1280" Height="820"
         MinWidth="1080" MinHeight="700"
         WindowStyle="None"
@@ -83,7 +83,7 @@
                     <Border Width="18" Height="18" CornerRadius="5" Background="{DynamicResource TextBrush}" Margin="0,0,8,0">
                         <TextBlock Text="L" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource WindowBgBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="L-Mechrevo · 宽屏" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_6}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="—" Width="46" Height="34" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TextBrush}" FontSize="14" Cursor="Hand" Click="WideMinimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
@@ -95,11 +95,11 @@
             <!-- 顶栏 -->
             <Grid Grid.Row="1" Margin="24,10,24,0">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button Content="切换浅色" x:Name="ThemeButton" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,0,10,0" />
-                    <Button Content="小窗" Style="{StaticResource GhostButton}" Click="CompactButton_Click" Margin="0,0,10,0" />
+                    <Button Content="{x:Static loc:WpfStrings.MainWindow_Content_2}" x:Name="ThemeButton" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,0,10,0" />
+                    <Button Content="{x:Static loc:WpfStrings.MainWindow_Content}" Style="{StaticResource GhostButton}" Click="CompactButton_Click" Margin="0,0,10,0" />
                     <Border Background="#22000000" CornerRadius="10" Padding="10,7">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="强调色" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_5}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
                             <Button Tag="#3B82F6" Background="#3B82F6" Width="20" Height="20" BorderThickness="0" Cursor="Hand" Click="AccentButton_Click" Margin="2,0" />
                             <Button Tag="#22C55E" Background="#22C55E" Width="20" Height="20" BorderThickness="0" Cursor="Hand" Click="AccentButton_Click" Margin="2,0" />
                             <Button Tag="#F59E0B" Background="#F59E0B" Width="20" Height="20" BorderThickness="0" Cursor="Hand" Click="AccentButton_Click" Margin="2,0" />
@@ -121,29 +121,29 @@
                 <Border x:Name="NavPanel" Grid.Column="0" Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid Margin="0,0,0,8">
-                            <TextBlock x:Name="NavTitle" Text="导航" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="NavTitle" Text="{x:Static loc:WpfStrings.NavTitle_Text}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                             <Button x:Name="NavCollapseButton" Content="«" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Padding="6,1" FontSize="11" Click="NavToggle_Click" />
                         </Grid>
-                        <Button x:Name="NavHome" Content="首页" Tag="home" Style="{StaticResource NavButton}" Click="Nav_Click" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource TextBrush}" />
-                        <Button x:Name="NavScreen" Content="屏幕" Tag="screen" Style="{StaticResource NavButton}" Click="Nav_Click" />
-                        <Button x:Name="NavLighting" Content="灯光" Tag="lighting" Style="{StaticResource NavButton}" Click="Nav_Click" />
-                        <Button x:Name="NavCustom" Content="自定义" Tag="custom" Style="{StaticResource NavButton}" Click="Nav_Click" />
-                        <Button x:Name="NavSwitches" Content="更多开关" Tag="switches" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Button x:Name="NavHome" Content="{x:Static loc:WpfStrings.NavHome_Content}" Tag="home" Style="{StaticResource NavButton}" Click="Nav_Click" Background="{DynamicResource ControlBrush}" Foreground="{DynamicResource TextBrush}" />
+                        <Button x:Name="NavScreen" Content="{x:Static loc:WpfStrings.NavScreen_Content}" Tag="screen" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Button x:Name="NavLighting" Content="{x:Static loc:WpfStrings.TitleText_Text_2}" Tag="lighting" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Button x:Name="NavCustom" Content="{x:Static loc:WpfStrings.NavCustom_Content}" Tag="custom" Style="{StaticResource NavButton}" Click="Nav_Click" />
+                        <Button x:Name="NavSwitches" Content="{x:Static loc:WpfStrings.NavSwitches_Content}" Tag="switches" Style="{StaticResource NavButton}" Click="Nav_Click" />
                         <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="6,12,6,10" />
                         <Button x:Name="NavDockOverlay" Tag="悬浮窗" Style="{StaticResource NavButton}" Click="WideDock_Click">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="悬浮窗" VerticalAlignment="Center" /></StackPanel>
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_4}" VerticalAlignment="Center" /></StackPanel>
                         </Button>
                         <Button x:Name="NavDockSettings" Tag="设置" Style="{StaticResource NavButton}" Click="WideDock_Click">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="设置" VerticalAlignment="Center" /></StackPanel>
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.InlineOverlayTitle_Text}" VerticalAlignment="Center" /></StackPanel>
                         </Button>
                         <Button x:Name="NavDockSponsor" Tag="赞助" Style="{StaticResource NavButton}" Click="WideDock_Click">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEB51;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="赞助" VerticalAlignment="Center" /></StackPanel>
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEB51;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_3}" VerticalAlignment="Center" /></StackPanel>
                         </Button>
                         <Button x:Name="NavDockDiag" Tag="诊断" Style="{StaticResource NavButton}" Click="WideDock_Click">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="诊断" VerticalAlignment="Center" /></StackPanel>
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_2}" VerticalAlignment="Center" /></StackPanel>
                         </Button>
                         <Button x:Name="NavDockExit" Tag="退出" Style="{StaticResource NavButton}" Click="WideDock_Click">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="退出" VerticalAlignment="Center" /></StackPanel>
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text}" VerticalAlignment="Center" /></StackPanel>
                         </Button>
                     </StackPanel>
                 </Border>
@@ -177,7 +177,7 @@
                 </Grid.RowDefinitions>
                 <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="0,0,0,8" />
                 <Grid Grid.Row="1">
-                    <TextBlock x:Name="StatusText" Text="就绪" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusText" Text="{x:Static loc:WpfStrings.StatusText_Text}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                     <UniformGrid x:Name="QuickTilesGrid" Columns="7" HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
             </Grid>
@@ -189,8 +189,8 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <Grid>
-                            <TextBlock x:Name="InlineOverlayTitle" Text="设置" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <Button Content="关闭" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="InlineOverlayClose_Click" />
+                            <TextBlock x:Name="InlineOverlayTitle" Text="{x:Static loc:WpfStrings.InlineOverlayTitle_Text}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Content="{x:Static loc:WpfStrings.CpuTuningWindow_Content}" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="InlineOverlayClose_Click" />
                         </Grid>
                         <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
                             <ContentControl x:Name="InlineOverlayContent" />

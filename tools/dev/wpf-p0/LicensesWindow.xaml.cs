@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class LicensesWindow : Window
@@ -22,12 +23,12 @@ public partial class LicensesWindow : Window
             }
             else
             {
-                MessageBox.Show(this, "程序目录下未找到 LICENSES 文件夹。", "L-Mechrevo", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, WpfStrings.LicensesWindow_xaml_MessageBoxShowthis, "L-Mechrevo", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         catch (System.Exception ex)
         {
-            MessageBox.Show(this, "打开 LICENSES 文件夹失败：" + ex.Message, "L-Mechrevo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, WpfStrings.LicensesWindow_xaml_MessageBoxShowthis_2 + ex.Message, "L-Mechrevo", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

@@ -4,6 +4,7 @@ using System.Windows;
 using MechrevoLite;
 using MechrevoLite.Update;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class UpdateWindow : Window
@@ -14,8 +15,8 @@ public partial class UpdateWindow : Window
     {
         InitializeComponent();
         _info = info;
-        Title = "检查更新 · " + (info.LatestVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion);
-        VersionText.Text = "当前版本：" + (info.CurrentVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion)
+        Title = WpfStrings.UpdateWindow_xaml_Title + (info.LatestVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion);
+        VersionText.Text = WpfStrings.UpdateWindow_xaml_Text + (info.CurrentVersion ?? L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion)
             + "    最新版本：" + (info.LatestVersion ?? "未知")
             + (string.IsNullOrWhiteSpace(info.Channel) ? "" : "    通道：" + info.Channel);
         DateText.Text = string.IsNullOrWhiteSpace(info.ReleaseDate) ? "" : "发布日期：" + info.ReleaseDate;
@@ -29,17 +30,17 @@ public partial class UpdateWindow : Window
         string? link = Link;
         if (string.IsNullOrWhiteSpace(link))
         {
-            StatusText.Text = "没有可复制的下载链接";
+            StatusText.Text = WpfStrings.UpdateWindow_xaml_Text_2;
             return;
         }
         try
         {
             Clipboard.SetText(link);
-            StatusText.Text = "下载链接已复制";
+            StatusText.Text = WpfStrings.UpdateWindow_xaml_Text_3;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "复制失败：" + ex.Message;
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_4 + ex.Message;
         }
     }
 
@@ -48,17 +49,17 @@ public partial class UpdateWindow : Window
         string? link = Link;
         if (string.IsNullOrWhiteSpace(link))
         {
-            StatusText.Text = "没有可打开的下载链接";
+            StatusText.Text = WpfStrings.UpdateWindow_xaml_Text_4;
             return;
         }
         try
         {
             Process.Start(new ProcessStartInfo(link) { UseShellExecute = true });
-            StatusText.Text = "已在浏览器打开下载页";
+            StatusText.Text = WpfStrings.UpdateWindow_xaml_Text_5;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开失败：" + ex.Message;
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_9 + ex.Message;
         }
     }
 

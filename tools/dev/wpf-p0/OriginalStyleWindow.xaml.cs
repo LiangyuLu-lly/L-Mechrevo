@@ -18,6 +18,7 @@ using L_Mechrevo.WpfP0.Services;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 internal sealed class DragGhostAdorner : Adorner
@@ -260,7 +261,7 @@ public partial class OriginalStyleWindow : Window
             }
             catch (Exception ex)
             {
-                StatusText.Text = "全局热键注册失败：" + ex.Message;
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text + ex.Message;
             }
         };
         if (ModeGrid != null && ModeGrid.Children.Count > 1 && ModeGrid.Children[1] is ToggleButton defaultMode)
@@ -885,12 +886,12 @@ public partial class OriginalStyleWindow : Window
             int value = primary == 1 ? 0 : (primary >= 0 ? 1 : (secondary == 1 ? 2 : (secondary == 2 ? 0 : 1)));
             AppConfig.Set("miniled", value);
             AppConfig.Flush();
-            StatusText.Text = "MiniLED 分区控光已切换";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_2;
             RefreshFromBackend();
         }
         catch (Exception ex)
         {
-            StatusText.Text = "MiniLED 切换失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_3 + ex.Message;
         }
     }
 
@@ -905,12 +906,12 @@ public partial class OriginalStyleWindow : Window
             int current = L_Mechrevo.WpfP0.Services.WpfBackend.acpi.DeviceGet(327793u);
             AppConfig.Set("hdr_control", current == 1 ? 0 : 1);
             AppConfig.Flush();
-            StatusText.Text = "HDR Color Control 已切换";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_4;
             RefreshFromBackend();
         }
         catch (Exception ex)
         {
-            StatusText.Text = "HDR Color Control 切换失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_5 + ex.Message;
         }
     }
 
@@ -922,7 +923,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "FHD 切换失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_6 + ex.Message;
         }
     }
 
@@ -955,7 +956,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开灯光编辑器失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_7 + ex.Message;
         }
     }
 
@@ -1068,7 +1069,7 @@ public partial class OriginalStyleWindow : Window
             }
             else
             {
-                StatusText.Text = "模式已下发";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_8;
             }
         }
         catch (Exception ex)
@@ -1233,7 +1234,7 @@ public partial class OriginalStyleWindow : Window
         QuickTileGrid.Children.Insert(index < 0 ? 0 : index, source);
         QuickTileGrid.Columns = Math.Max(1, QuickTileGrid.Children.Count);
         SaveCurrentQuickTileOrder();
-        StatusText.Text = "快捷磁贴顺序已保存";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_9;
     }
 
     private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
@@ -1315,10 +1316,10 @@ public partial class OriginalStyleWindow : Window
                     AppConfig.Set("charge_limit", 100);
                     AppConfig.Flush();
                     BatteryControl.chargeFull = true;
-                    StatusText.Text = "已关闭无极限充，充电上限恢复 100%";
+                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_10;
                     return;
                 }
-                StatusText.Text = "关闭无极限充后写回 100% 失败（写入=" + ok + " · 回读=" + readback + "%）";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_11 + ok + " · 回读=" + readback + "%）";
                 return;
             }
             MechrevoHw? hw = _backendProbe?.Hw;
@@ -1337,17 +1338,17 @@ public partial class OriginalStyleWindow : Window
                     AppConfig.Set("charge_limit", 100);
                     AppConfig.Flush();
                     BatteryControl.chargeFull = true;
-                    StatusText.Text = "已关闭无极限充，GCU 充电上限恢复 100%";
+                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_12;
                     return;
                 }
-                StatusText.Text = "关闭无极限充后 GCU 写回 100% 失败";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_13;
                 return;
             }
-            StatusText.Text = "关闭无极限充：没有可用的 EC/GCU 回写通道";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_14;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "关闭无极限充失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_15 + ex.Message;
         }
     }
 
@@ -1406,14 +1407,14 @@ public partial class OriginalStyleWindow : Window
                 ChargeLimitApplyButton.IsEnabled = false;
                 ChargeLimitLowBox.IsEnabled = false;
                 ChargeLimitHighBox.IsEnabled = false;
-                ChargeLimitStatus.Text = "读取充电阈值失败：需要 PawnIO 驱动或本机型不支持";
+                ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_16;
             }
         }
         catch (Exception ex)
         {
             ChargeLimitSwitch.IsEnabled = false;
             ChargeLimitApplyButton.IsEnabled = false;
-            ChargeLimitStatus.Text = "读取充电阈值异常：" + ex.Message;
+            ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_17 + ex.Message;
         }
     }
 
@@ -1452,11 +1453,11 @@ public partial class OriginalStyleWindow : Window
                 if (ok)
                 {
                     BatteryLimitRestore.SaveConfig(true, low, high);
-                    ChargeLimitStatus.Text = "限制充电已启用（停充 " + high + "% / 起充 " + low + "%）";
+                    ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_18 + high + "% / 起充 " + low + "%）";
                 }
                 else
                 {
-                    ChargeLimitStatus.Text = "启用失败：" + detail;
+                    ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_19 + detail;
                 }
             }
             else
@@ -1465,11 +1466,11 @@ public partial class OriginalStyleWindow : Window
                 if (ok)
                 {
                     BatteryLimitRestore.SaveConfig(false, 0, 0);
-                    ChargeLimitStatus.Text = "限制充电已关闭";
+                    ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_20;
                 }
                 else
                 {
-                    ChargeLimitStatus.Text = "关闭失败：" + detail;
+                    ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_21 + detail;
                 }
             }
             if (!ok)
@@ -1479,7 +1480,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            ChargeLimitStatus.Text = "操作异常：" + ex.Message;
+            ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_22 + ex.Message;
             RefreshBatteryLimitState();
         }
     }
@@ -1498,16 +1499,16 @@ public partial class OriginalStyleWindow : Window
             {
                 BatteryLimitRestore.SaveConfig(true, low, high);
                 ChargeLimitSwitch.IsChecked = true;
-                ChargeLimitStatus.Text = "阈值已保存（停充 " + high + "% / 起充 " + low + "%）";
+                ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_23 + high + "% / 起充 " + low + "%）";
             }
             else
             {
-                ChargeLimitStatus.Text = "保存失败：" + detail;
+                ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_24 + detail;
             }
         }
         catch (Exception ex)
         {
-            ChargeLimitStatus.Text = "保存异常：" + ex.Message;
+            ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_25 + ex.Message;
         }
     }
 
@@ -1548,10 +1549,10 @@ public partial class OriginalStyleWindow : Window
         ApplyBatterySliderStage();
         if (on)
         {
-            StatusText.Text = "已启用无极限充滑块（三档按钮暂时置灰）";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_26;
             return;
         }
-        StatusText.Text = "正在关闭无极限充并恢复满充…";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_27;
         await WriteBackFullChargeAfterSliderOffAsync();
         _syncingBatteryLimit = true;
         BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
@@ -1593,14 +1594,14 @@ public partial class OriginalStyleWindow : Window
         if (BatteryLimitSliderText != null) BatteryLimitSliderText.Text = value + "%";
         if (!BatteryControl.CaptureChargeLimitGesture() || !BatteryControl.ApplyChargeLimitFromUserGesture(value))
         {
-            StatusText.Text = "充电上限写入未确认";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_28;
             _syncingBatteryLimit = true;
             BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
             _syncingBatteryLimit = false;
             return;
         }
         BatteryControl.SetSelectedModePercent(value);
-        StatusText.Text = "充电上限：" + value + "%";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_29 + value + "%";
     }
 
     private void RefreshBrightness()
@@ -1672,14 +1673,14 @@ public partial class OriginalStyleWindow : Window
             MaxWidth = 1600;
             MinWidth = 920;
             Width = Math.Min(1100, SystemParameters.WorkArea.Width - 40);
-            WideButton.Content = "窄屏";
+            WideButton.Content = WpfStrings.OriginalStyleWindow_xaml_Content;
         }
         else
         {
             MaxWidth = 420;
             MinWidth = 420;
             Width = 420;
-            WideButton.Content = "宽屏";
+            WideButton.Content = WpfStrings.OriginalStyleWindow_xaml_Content_2;
         }
         Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
     }
@@ -1697,7 +1698,7 @@ public partial class OriginalStyleWindow : Window
         {
             selected.IsChecked = true;
             UpdateModeBorders(selected);
-            StatusText.Text = "性能模式：" + (selected.Content as TextBlock)?.Text;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_30 + (selected.Content as TextBlock)?.Text;
             int mode = selected == SilentModeButton ? 2
                 : selected == BalancedModeButton ? 0
                 : selected == TurboModeButton ? 1
@@ -2038,7 +2039,7 @@ public partial class OriginalStyleWindow : Window
                 "display-route-unavailable" => "无法读取当前显示通路，已取消。",
                 _ => "核显省电安全检查未通过，已取消。"
             };
-            MessageBox.Show(reason, "核显省电", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(reason, WpfStrings.MainWindow_xaml_Text_14, MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
         if (!verdict.NeedsForceConfirmation || closable.Count == 0)
@@ -2051,7 +2052,7 @@ public partial class OriginalStyleWindow : Window
             string body = verdict.DgpuOwnsOnlyActiveDisplay
                 ? "警告：当前似乎只有独显在驱动显示器。\n强制切换可能导致黑屏，且需要重启才能恢复。\n\n" + names
                 : "以下程序正在占用独显，需要结束它们才能切换核显省电：\n\n" + names;
-            if (MessageBox.Show(body, "核显省电", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            if (MessageBox.Show(body, WpfStrings.MainWindow_xaml_Text_14, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             {
                 return false;
             }
@@ -2119,7 +2120,7 @@ public partial class OriginalStyleWindow : Window
         MechrevoHw? hardware = _backendProbe?.Hw;
         if (service == null || hardware == null || !hardware.IsConnected || !hardware.SupportsGpuHotSwap)
         {
-            StatusText.Text = "本机不支持热切换核显省电";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_31;
             return;
         }
         int target = mode switch { "ON" => 0, "OFF" => 1, "AUTO" => 3, _ => -1 };
@@ -2149,7 +2150,7 @@ public partial class OriginalStyleWindow : Window
                         "\n\n切换核显省电可能需要结束这些程序，是否继续？",
                         "核显省电", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     {
-                        StatusText.Text = "核显省电已取消";
+                        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_32;
                         return;
                     }
                     occupancyConfirmed = true;
@@ -2160,7 +2161,7 @@ public partial class OriginalStyleWindow : Window
             VisualiseIgpuSaving();
             if (ok)
             {
-                StatusText.Text = "核显省电已切换：" + IgpuSavingPreviewStatus.Text;
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_33 + IgpuSavingPreviewStatus.Text;
                 return;
             }
             bool forced = await TryForceIgpuSavingAsync(service, mode, occupancyConfirmed);
@@ -2168,7 +2169,7 @@ public partial class OriginalStyleWindow : Window
             {
                 await service.RecheckIgpuOnlySaveModeAsync();
                 VisualiseIgpuSaving();
-                StatusText.Text = "核显省电已通过强制路径切换";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_34;
                 return;
             }
             if (previous != -1)
@@ -2178,11 +2179,11 @@ public partial class OriginalStyleWindow : Window
                 await service.RecheckIgpuOnlySaveModeAsync();
                 VisualiseIgpuSaving();
             }
-            StatusText.Text = "核显省电切换失败，已尝试恢复原状态";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_35;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "核显省电切换失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_36 + ex.Message;
             VisualiseIgpuSaving();
         }
         finally
@@ -2201,7 +2202,7 @@ public partial class OriginalStyleWindow : Window
         int mode = int.Parse(text);
         if (!_backendProbe.CanSwitchGpuMode(mode))
         {
-            StatusText.Text = "当前机型不支持该显卡模式";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_37;
             RefreshFromBackend();
             return;
         }
@@ -2209,7 +2210,7 @@ public partial class OriginalStyleWindow : Window
         {
             if (mode == 0)
             {
-                StatusText.Text = "宝龙达不支持核显模式";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_38;
                 RefreshFromBackend();
                 return;
             }
@@ -2227,7 +2228,7 @@ public partial class OriginalStyleWindow : Window
             }
             else
             {
-                StatusText.Text = "宝龙达显卡模式写入失败";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_39;
             }
             RefreshFromBackend();
             return;
@@ -2248,11 +2249,11 @@ public partial class OriginalStyleWindow : Window
                 if (restartOk)
                 {
                     _backendProbe.MarkGpuRestartPending(mode);
-                    StatusText.Text = "已请求切换并重启，重启后生效";
+                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_40;
                 }
                 else
                 {
-                    StatusText.Text = "重启切换请求失败";
+                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_41;
                 }
                 RefreshFromBackend();
                 return;
@@ -2282,7 +2283,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (ChargeSliderToggle.IsChecked == true)
         {
-            StatusText.Text = "无极限充开启时三档按钮不可用";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_42;
             return;
         }
         if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
@@ -2393,7 +2394,7 @@ public partial class OriginalStyleWindow : Window
             .ToList();
         if (choices.Count == 0)
         {
-            StatusText.Text = "没有可用的快捷开关";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_43;
             return;
         }
         QuickTilePickerWindow picker = new QuickTilePickerWindow(choices, 6)
@@ -2458,7 +2459,7 @@ public partial class OriginalStyleWindow : Window
         if (persist)
         {
             SaveQuickTileKeys(selected.Select(static c => c.Key).ToList());
-            StatusText.Text = "快捷磁贴已更新";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_44;
         }
     }
 
@@ -2660,8 +2661,8 @@ public partial class OriginalStyleWindow : Window
                 Grid headerRow = new Grid { Margin = new Thickness(0, 8, 0, 2) };
                 headerRow.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("MutedText"), FontSize = 10 });
                 StackPanel scope = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-                ToggleButton ac = new ToggleButton { Content = "通电时", Style = (Style)FindResource("SmallSegment"), IsChecked = true, Tag = "ac", Margin = new Thickness(0, 0, 4, 0), Height = 24, FontSize = 11 };
-                ToggleButton dc = new ToggleButton { Content = "离电时", Style = (Style)FindResource("SmallSegment"), Tag = "dc", Height = 24, FontSize = 11 };
+                ToggleButton ac = new ToggleButton { Content = WpfStrings.OriginalStyleWindow_xaml_Content, Style = (Style)FindResource("SmallSegment"), IsChecked = true, Tag = "ac", Margin = new Thickness(0, 0, 4, 0), Height = 24, FontSize = 11 };
+                ToggleButton dc = new ToggleButton { Content = WpfStrings.OriginalStyleWindow_xaml_Content_2, Style = (Style)FindResource("SmallSegment"), Tag = "dc", Height = 24, FontSize = 11 };
                 ac.Click += SleepScope_Click;
                 dc.Click += SleepScope_Click;
                 scope.Children.Add(ac);
@@ -2703,7 +2704,7 @@ public partial class OriginalStyleWindow : Window
                 button.IsChecked = ReferenceEquals(button, selected);
             }
         }
-        StatusText.Text = "睡眠省电范围：" + selected.Content;
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_45 + selected.Content;
     }
 
     private async void MoreSwitch_Click(object sender, RoutedEventArgs e)
@@ -2962,7 +2963,7 @@ public partial class OriginalStyleWindow : Window
             {
             }
         }
-        BatteryInfo.Text = "电池 " + batteryPercent + "%" + powerState + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
+        BatteryInfo.Text = WpfStrings.OriginalStyleWindow_xaml_Text_46 + batteryPercent + "%" + powerState + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
         BatteryInfo.ToolTip = health;
         int mode = ResolveDisplayMode(probe);
         GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
@@ -2978,7 +2979,7 @@ public partial class OriginalStyleWindow : Window
         }
         UpdateGpuButtons(displayGpu, pending);
         bool skipModeUi = false;
-        CurrentModeText.Text = "当前：" + (mode switch
+        CurrentModeText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_47 + (mode switch
         {
             2 => "静音",
             1 => "狂暴",
@@ -3178,7 +3179,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "GCU 状态检查失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_48 + ex.Message;
         }
     }
 
@@ -3269,7 +3270,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "首次引导显示失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_49 + ex.Message;
         }
     }
 
@@ -3286,7 +3287,7 @@ public partial class OriginalStyleWindow : Window
         }
         _connectAttempting = true;
         SetBackendStatus("● GCU 连接中", "#F59E0B", "正在连接 GCU 服务（127.0.0.1:13688）——服务通常在登录后数秒内就绪，应用会自动重试");
-        BackendLine.Text = "正在创建 MechrevoHw 并 ConnectAsync（最长 15 秒）…";
+        BackendLine.Text = WpfStrings.OriginalStyleWindow_xaml_Text_50;
         try
         {
             bool connected = await _backendHost.ConnectAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(true);
@@ -3546,7 +3547,7 @@ public partial class OriginalStyleWindow : Window
             bool supported = hw?.SupportsLiquidCooling == true;
             if (!supported)
             {
-                LiquidStatusButton.Content = "未连接";
+                LiquidStatusButton.Content = WpfStrings.OriginalStyleWindow_xaml_Content_3;
                 LiquidPumpCombo.IsEnabled = false;
                 LiquidFanCombo.IsEnabled = false;
                 return;
@@ -3590,7 +3591,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (_backendProbe?.Service == null)
         {
-            StatusText.Text = "后端未连接";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_51;
             return;
         }
         try
@@ -3598,11 +3599,11 @@ public partial class OriginalStyleWindow : Window
             LiquidStatusButton.IsEnabled = false;
             await _backendProbe.Service.RefreshLiquidCoolingStatus();
             RefreshLiquidCoolingUi();
-            StatusText.Text = "水冷状态已刷新";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_52;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "刷新水冷状态失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_53 + ex.Message;
         }
         finally
         {
@@ -3653,7 +3654,7 @@ public partial class OriginalStyleWindow : Window
             combo.Items.Clear();
             for (int i = 0; i < count; i++)
             {
-                combo.Items.Add(new ComboBoxItem { Content = "配置 " + (i + 1), Tag = i.ToString() });
+                combo.Items.Add(new ComboBoxItem { Content = WpfStrings.OriginalStyleWindow_xaml_Content_3 + (i + 1), Tag = i.ToString() });
             }
         }
         _syncingPerfConfig = false;
@@ -3701,7 +3702,7 @@ public partial class OriginalStyleWindow : Window
         {
             await _backendProbe.SwitchModeAsync(visualMode);
         }
-        StatusText.Text = "配置已保存：" + combo.SelectedIndex + "（模式 " + visualMode + "）";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_54 + combo.SelectedIndex + "（模式 " + visualMode + "）";
     }
 
     private void PerfConfigEdit_Click(object sender, RoutedEventArgs e)
@@ -3710,7 +3711,7 @@ public partial class OriginalStyleWindow : Window
         {
             if (_backendProbe == null)
             {
-                StatusText.Text = "后端未连接，无法打开配置编辑";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_55;
                 return;
             }
             L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
@@ -3727,7 +3728,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开配置编辑失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_56 + ex.Message;
         }
     }
 
@@ -3767,7 +3768,7 @@ public partial class OriginalStyleWindow : Window
         {
             if (_backendProbe == null)
             {
-                StatusText.Text = "后端未连接，无法打开自定义模式";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_57;
                 return;
             }
             L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
@@ -3798,7 +3799,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开自定义模式失败：" + ex.Message;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_20 + ex.Message;
         }
     }
 
@@ -3830,7 +3831,7 @@ public partial class OriginalStyleWindow : Window
             int level = probe.ColorCalibrationLevel;
             int selected = AppConfig.Exists("calib_mode") ? AppConfig.Get("calib_mode") : 1;
             CalibrationCombo.Items.Clear();
-            CalibrationCombo.Items.Add(new ComboBoxItem { Content = "默认", Tag = 1 });
+            CalibrationCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.OriginalStyleWindow_xaml_Content_4, Tag = 1 });
             if (level >= 2)
             {
                 CalibrationCombo.Items.Add(new ComboBoxItem { Content = "sRGB", Tag = 2 });
@@ -3846,7 +3847,7 @@ public partial class OriginalStyleWindow : Window
             bool customAvailable = AppConfig.Is("calib_custom_on") || IccHelper.ListCustomIccFiles().Count > 0;
             if (customAvailable)
             {
-                CalibrationCombo.Items.Add(new ComboBoxItem { Content = "自定义校色", Tag = 999 });
+                CalibrationCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.OriginalStyleWindow_xaml_Content_5, Tag = 999 });
             }
             int index = 0;
             for (int i = 0; i < CalibrationCombo.Items.Count; i++)
@@ -3920,7 +3921,7 @@ public partial class OriginalStyleWindow : Window
         bool on = CalibrationSwitch.IsChecked == true;
         int mode = SelectedCalibrationMode();
         CalibrationSwitch.IsEnabled = false;
-        StatusText.Text = "屏幕校色下发中…";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_58;
         bool ok;
         if (on && mode == 999)
         {
@@ -3991,7 +3992,7 @@ public partial class OriginalStyleWindow : Window
             AppConfig.Set("calib_mode", mode);
             AppConfig.Set("calib_enabled", 1);
             AppConfig.Flush();
-            StatusText.Text = "屏幕校色档位：" + (CalibrationCombo.SelectedItem as ComboBoxItem)?.Content;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_59 + (CalibrationCombo.SelectedItem as ComboBoxItem)?.Content;
         }
         else
         {
@@ -4015,7 +4016,7 @@ public partial class OriginalStyleWindow : Window
         }
         bool on = DisplayEffectSwitch.IsChecked == true;
         DisplayEffectSwitch.IsEnabled = false;
-        StatusText.Text = "色彩增强下发中…";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_60;
         bool ok = await _backendProbe.SetDisplayEffectSwitchAsync(on);
         if (ok)
         {
@@ -4033,7 +4034,7 @@ public partial class OriginalStyleWindow : Window
             _syncingDisplayEffect = true;
             DisplayEffectSwitch.IsChecked = !on;
             _syncingDisplayEffect = false;
-            StatusText.Text = "色彩增强下发失败";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_61;
         }
         DisplayEffectCombo.IsEnabled = DisplayEffectSwitch.IsChecked == true;
         DisplayEffectEditButton.IsEnabled = DisplayEffectSwitch.IsChecked == true;
@@ -4053,11 +4054,11 @@ public partial class OriginalStyleWindow : Window
             AppConfig.Set("display_effect_mode", mode);
             AppConfig.Flush();
             await _backendProbe.RequestDisplayEffectStatusAsync();
-            StatusText.Text = "色彩增强档位：" + (DisplayEffectCombo.SelectedItem as ComboBoxItem)?.Content;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_62 + (DisplayEffectCombo.SelectedItem as ComboBoxItem)?.Content;
         }
         else
         {
-            StatusText.Text = "色彩增强档位下发失败";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_63;
         }
     }
 
@@ -4066,7 +4067,7 @@ public partial class OriginalStyleWindow : Window
         BackendProbe? probe = _backendProbe;
         if (probe?.Service == null)
         {
-            StatusText.Text = "后端未连接，无法编辑色彩增强";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_64;
             return;
         }
         DisplayEffectEditorWindow dialog = new DisplayEffectEditorWindow(SelectedDisplayEffectMode()) { Owner = this };
@@ -4444,7 +4445,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (_backendProbe == null)
         {
-            StatusText.Text = "后端未连接，无法编辑键盘灯光";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_65;
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
@@ -4458,7 +4459,7 @@ public partial class OriginalStyleWindow : Window
         KeyboardRgb? rgb = EnsureKeyboardRgb();
         if (rgb == null)
         {
-            StatusText.Text = "键盘 RGB 设备未连接，无法打开键盘灯光编辑";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_66;
             return;
         }
         new HidKeyboardWindow(rgb) { Owner = this }.ShowDialog();
@@ -4469,7 +4470,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (_backendProbe == null)
         {
-            StatusText.Text = "后端未连接，无法编辑 Logo 灯光";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_67;
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
@@ -4938,14 +4939,14 @@ public partial class OriginalStyleWindow : Window
             _syncingLighting = true;
             LightStripSwitch.IsChecked = !requested;
             _syncingLighting = false;
-            StatusText.Text = "灯带写入失败，开关已回弹";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_68;
             return;
         }
         if (_backendProbe.Hw?.IsConnected == true)
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar/Ctrl", requested, "用户点击「灯光」开关");
         }
-        StatusText.Text = "灯带状态已下发";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_69;
     }
 
     private async void LightStripEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -4976,7 +4977,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (_backendProbe == null)
         {
-            StatusText.Text = "后端未连接，无法编辑灯带";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_70;
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
@@ -5009,7 +5010,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "键盘 RGB 初始化失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_71 + ex.Message;
             return null;
         }
     }
@@ -5038,14 +5039,14 @@ public partial class OriginalStyleWindow : Window
             _syncingLighting = true;
             LightHingeSwitch.IsChecked = !requested;
             _syncingLighting = false;
-            StatusText.Text = "铰链灯写入失败，开关已回弹";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_72;
             return;
         }
         if (_backendProbe.Hw?.IsConnected == true)
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Hinge/Ctrl", requested, "用户点击「灯光」开关");
         }
-        StatusText.Text = "铰链灯状态已下发";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_73;
     }
 
     private async void LightHingeEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -5076,7 +5077,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (_backendProbe == null)
         {
-            StatusText.Text = "后端未连接，无法编辑铰链灯";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_74;
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
@@ -5107,14 +5108,14 @@ public partial class OriginalStyleWindow : Window
             _syncingLighting = true;
             LightSyncSwitch.IsChecked = !requested;
             _syncingLighting = false;
-            StatusText.Text = "同步灯写入失败，开关已回弹";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_75;
             return;
         }
         if (_backendProbe.Hw?.IsConnected == true)
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Sync/Ctrl", requested, "用户点击「灯光」开关");
         }
-        StatusText.Text = "同步灯状态已下发";
+        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_76;
     }
 
     private async void LightSyncEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -5145,7 +5146,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (_backendProbe == null)
         {
-            StatusText.Text = "后端未连接，无法编辑同步灯";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_77;
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
@@ -5177,7 +5178,7 @@ public partial class OriginalStyleWindow : Window
             _syncingLighting = true;
             KeyboardLightSwitch.IsChecked = !requested;
             _syncingLighting = false;
-            StatusText.Text = "键盘灯光写入失败，开关已回弹";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_78;
             return;
         }
         if (_backendProbe?.Hw?.IsConnected == true)
@@ -5293,7 +5294,7 @@ public partial class OriginalStyleWindow : Window
         KeyboardRgb? rgb = EnsureKeyboardRgb();
         if (rgb == null)
         {
-            StatusText.Text = "键盘 RGB 设备未连接";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_79;
             return false;
         }
         try
@@ -5305,19 +5306,19 @@ public partial class OriginalStyleWindow : Window
                 if (!offReady)
                 {
                     rgb.KbPowerOn = true;
-                    StatusText.Text = "键盘 HID 未连接，关灯失败：" + rgb.LastError;
+                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_80 + rgb.LastError;
                     return false;
                 }
                 rgb.StopCurrentEffect();
                 rgb.SaveConfig();
-                StatusText.Text = "键盘灯光已关闭";
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_81;
                 return true;
             }
             bool ready = rgb.IsConnected || await rgb.EnsureHidReadyAsync() || rgb.Connect();
             if (!ready)
             {
                 rgb.KbPowerOn = !on;
-                StatusText.Text = "键盘 HID 连接失败：" + rgb.LastError;
+                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_82 + rgb.LastError;
                 return false;
             }
             rgb.Brightness = Math.Clamp(rgb.Brightness, 1, 100);
@@ -5328,13 +5329,13 @@ public partial class OriginalStyleWindow : Window
             rgb.StartMode(mode);
             rgb.ApplyBrightnessToDevice();
             rgb.SaveConfig();
-            StatusText.Text = "键盘 HID 灯效已下发：" + mode;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_83 + mode;
             return true;
         }
         catch (Exception ex)
         {
             rgb.KbPowerOn = !on;
-            StatusText.Text = "键盘 HID 下发失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_84 + ex.Message;
             return false;
         }
     }
@@ -5394,7 +5395,7 @@ public partial class OriginalStyleWindow : Window
                 bool powerOk = await _backendProbe.SetKeyboardPowerAsync(true);
                 if (!powerOk)
                 {
-                    StatusText.Text = "键盘灯上电失败";
+                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_85;
                     return false;
                 }
             }
@@ -5437,7 +5438,7 @@ public partial class OriginalStyleWindow : Window
             _syncingLighting = true;
             LogoLightSwitch.IsChecked = !requested;
             _syncingLighting = false;
-            StatusText.Text = "Logo 灯写入失败，开关已回弹";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_86;
             return;
         }
         if (_backendProbe?.Hw?.IsConnected == true)
@@ -5461,7 +5462,7 @@ public partial class OriginalStyleWindow : Window
         if (_backendProbe == null)
         {
             SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
-            StatusText.Text = "后端未连接，已记住 Logo 效果";
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_87;
             return;
         }
         bool logoOk = await _backendProbe.SetLogoEffectAsync(effect);
@@ -5707,7 +5708,7 @@ public partial class OriginalStyleWindow : Window
     {
         Microsoft.Win32.SaveFileDialog dialog = new()
         {
-            Title = "导出诊断包",
+            Title = WpfStrings.OriginalStyleWindow_xaml_Title,
             Filter = "Zip 压缩包 (*.zip)|*.zip",
             DefaultExt = "zip",
             AddExtension = true,
@@ -5718,12 +5719,12 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        StatusText.Text = "正在导出诊断包…";
+        StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_5;
         try
         {
             DiagnosticPackInputs inputs = DiagnosticPackCapture.Capture();
             DiagnosticPackResult result = await DiagnosticPackRunner.ExportAsync(dialog.FileName, inputs);
-            StatusText.Text = "诊断包已导出：" + System.IO.Path.GetFileName(result.ZipPath);
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_88 + System.IO.Path.GetFileName(result.ZipPath);
             try
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "/select,\"" + result.ZipPath + "\"")
@@ -5737,7 +5738,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "诊断包导出失败：" + ex.Message;
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_89 + ex.Message;
         }
     }
 

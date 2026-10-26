@@ -1,7 +1,7 @@
-<Window x:Class="L_Mechrevo.WpfP0.OverlayWindow"
+<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.OverlayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="L-Mechrevo 悬浮窗"
+        Title="{x:Static loc:WpfStrings.OverlayWindow_Title}"
         SizeToContent="WidthAndHeight"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -64,7 +64,7 @@
                              Foreground="#22D3EE" Background="#33FFFFFF" BorderThickness="0" VerticalAlignment="Center" />
             </Grid>
             <StackPanel x:Name="BatteryPanel" Margin="0,4,0,0" HorizontalAlignment="Right">
-                <TextBlock x:Name="BatteryText" Text="电池 —" Style="{DynamicResource MutedText}" FontSize="10" HorizontalAlignment="Right" />
+                <TextBlock x:Name="BatteryText" Text="{x:Static loc:WpfStrings.BatteryInfo_Text}" Style="{DynamicResource MutedText}" FontSize="10" HorizontalAlignment="Right" />
                 <TextBlock x:Name="BatteryDetailText" Text="" Style="{StaticResource MutedText}" FontSize="10" HorizontalAlignment="Right" Margin="0,1,0,0" />
             </StackPanel>
         </StackPanel>

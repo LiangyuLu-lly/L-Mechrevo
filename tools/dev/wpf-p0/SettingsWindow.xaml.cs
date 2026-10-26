@@ -11,6 +11,7 @@ using MechrevoLite.Hardware;
 using MechrevoLite.Helpers;
 using Microsoft.Win32;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class SettingsWindow : Window
@@ -646,7 +647,7 @@ public partial class SettingsWindow : Window
     {
         SaveFileDialog dialog = new SaveFileDialog
         {
-            Title = "导出设置备份",
+            Title = WpfStrings.SettingsWindow_xaml_Title,
             Filter = "Zip 压缩包 (*.zip)|*.zip",
             DefaultExt = "zip",
             FileName = SettingsBackup.BuildFileName(DateTime.Now),
@@ -671,7 +672,7 @@ public partial class SettingsWindow : Window
     {
         OpenFileDialog dialog = new OpenFileDialog
         {
-            Title = "导入设置备份",
+            Title = WpfStrings.SettingsWindow_xaml_Title_2,
             Filter = "Zip 压缩包 (*.zip)|*.zip",
             InitialDirectory = SettingsBackup.ResolveDefaultDirectory()
         };
@@ -679,7 +680,7 @@ public partial class SettingsWindow : Window
         {
             return;
         }
-        if (MessageBox.Show(this, "导入会覆盖现有设置，并自动备份当前设置。继续？", "L-Mechrevo",
+        if (MessageBox.Show(this, WpfStrings.SettingsWindow_xaml_MessageBoxShowthis, "L-Mechrevo",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
         {
             return;

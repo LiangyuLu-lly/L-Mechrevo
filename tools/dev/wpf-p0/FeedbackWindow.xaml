@@ -1,7 +1,7 @@
-<Window x:Class="L_Mechrevo.WpfP0.FeedbackWindow"
+<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.FeedbackWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="反馈"
+        Title="{x:Static loc:WpfStrings.FeedbackWindow_Title}"
         Width="560" Height="380"
         MinWidth="480" MinHeight="300"
         WindowStartupLocation="CenterOwner"
@@ -16,8 +16,8 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel>
-            <TextBlock Text="反馈与问题" FontSize="18" FontWeight="Bold" />
-            <TextBlock Text="把版本信息、硬件信息和日志一起发到 GitHub Issues，定位会快很多。"
+            <TextBlock Text="{x:Static loc:WpfStrings.FeedbackWindow_Text_3}" FontSize="18" FontWeight="Bold" />
+            <TextBlock Text="{x:Static loc:WpfStrings.FeedbackWindow_Text_2}"
                        Style="{DynamicResource MutedText}" Margin="0,6,0,8" TextWrapping="Wrap" />
         </StackPanel>
         <Border Grid.Row="1" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
@@ -25,17 +25,17 @@
             <StackPanel>
                 <TextBlock x:Name="VersionText" FontWeight="SemiBold" />
                 <TextBlock x:Name="DeviceText" Style="{DynamicResource MutedText}" Margin="0,6,0,0" TextWrapping="Wrap" />
-                <TextBlock Text="建议附带：问题现象、复现步骤、是否插电、当前性能模式、诊断包。"
+                <TextBlock Text="{x:Static loc:WpfStrings.FeedbackWindow_Text}"
                            Style="{DynamicResource MutedText}" Margin="0,10,0,0" TextWrapping="Wrap" />
             </StackPanel>
         </Border>
         <Grid Grid.Row="2" Margin="0,12,0,0">
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{DynamicResource MutedText}" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="复制信息" Style="{StaticResource FlatButton}" Click="CopyInfo_Click" />
-                <Button Content="导出诊断包" Style="{StaticResource FlatButton}" Click="Export_Click" />
-                <Button Content="打开 Issues" Style="{StaticResource FlatButton}" Click="Issues_Click" />
-                <Button Content="关闭" Style="{StaticResource FlatButton}" Click="Close_Click" Margin="0" />
+                <Button Content="{x:Static loc:WpfStrings.FeedbackWindow_Content_3}" Style="{StaticResource FlatButton}" Click="CopyInfo_Click" />
+                <Button Content="{x:Static loc:WpfStrings.FeedbackWindow_Content_2}" Style="{StaticResource FlatButton}" Click="Export_Click" />
+                <Button Content="{x:Static loc:WpfStrings.FeedbackWindow_Content}" Style="{StaticResource FlatButton}" Click="Issues_Click" />
+                <Button Content="{x:Static loc:WpfStrings.CpuTuningWindow_Content}" Style="{StaticResource FlatButton}" Click="Close_Click" Margin="0" />
             </StackPanel>
         </Grid>
     </Grid>

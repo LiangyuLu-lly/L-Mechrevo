@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using MechrevoLite;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 /// <summary>全局热键配置窗口。</summary>
@@ -19,7 +20,7 @@ internal sealed class HotkeySettingsWindow : Window
 
     internal HotkeySettingsWindow()
     {
-        Title = "全局热键";
+        Title = WpfStrings.HotkeySettingsWindow_Title;
         Width = 560;
         Height = 520;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -33,10 +34,10 @@ internal sealed class HotkeySettingsWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         StackPanel header = new();
-        header.Children.Add(new TextBlock { Text = "全局热键", FontSize = 18, FontWeight = FontWeights.Bold });
+        header.Children.Add(new TextBlock { Text = WpfStrings.HotkeySettingsWindow_Title, FontSize = 18, FontWeight = FontWeights.Bold });
         _enabled = new CheckBox
         {
-            Content = "启用全局热键",
+            Content = WpfStrings.HotkeySettingsWindow_Content,
             IsChecked = AppConfig.Get("hotkey_enabled", 1) != 0,
             Margin = new Thickness(0, 10, 0, 0),
             Style = (Style)Application.Current.Resources["HeaderSwitch"]
@@ -51,7 +52,7 @@ internal sealed class HotkeySettingsWindow : Window
         header.Children.Add(_enabled);
         _status = new TextBlock
         {
-            Text = "点“录制”后按下组合键；Esc 取消。",
+            Text = WpfStrings.HotkeySettingsWindow_Text,
             Style = (Style)Application.Current.Resources["MutedText"],
             Margin = new Thickness(0, 6, 0, 8),
             TextWrapping = TextWrapping.Wrap
@@ -80,7 +81,7 @@ internal sealed class HotkeySettingsWindow : Window
             _valueTexts[action.Id] = value;
             Button record = new()
             {
-                Content = "录制",
+                Content = WpfStrings.HotkeySettingsWindow_Content_2,
                 Style = (Style)Application.Current.Resources["FlatButton"],
                 Tag = action.Id
             };
@@ -95,15 +96,15 @@ internal sealed class HotkeySettingsWindow : Window
         root.Children.Add(scroll);
 
         StackPanel buttons = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-        Button reset = new() { Content = "恢复默认", Style = (Style)Application.Current.Resources["FlatButton"], Margin = new Thickness(0, 0, 8, 0) };
+        Button reset = new() { Content = WpfStrings.HotkeySettingsWindow_Content_3, Style = (Style)Application.Current.Resources["FlatButton"], Margin = new Thickness(0, 0, 8, 0) };
         reset.Click += (_, _) =>
         {
             HotkeyService.ResetGestures();
             RefreshValues();
-            _status.Text = "已恢复默认热键";
+            _status.Text = WpfStrings.HotkeySettingsWindow_Text_2;
         };
         buttons.Children.Add(reset);
-        Button close = new() { Content = "关闭", Style = (Style)Application.Current.Resources["FlatButton"] };
+        Button close = new() { Content = WpfStrings.HotkeySettingsWindow_Content_4, Style = (Style)Application.Current.Resources["FlatButton"] };
         close.Click += (_, _) => Close();
         buttons.Children.Add(close);
         Grid.SetRow(buttons, 2);
@@ -116,7 +117,7 @@ internal sealed class HotkeySettingsWindow : Window
     private void BeginCapture(int id)
     {
         _capturingId = id;
-        _status.Text = "请按下新的组合键，Esc 取消";
+        _status.Text = WpfStrings.HotkeySettingsWindow_Text_3;
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
@@ -128,7 +129,7 @@ internal sealed class HotkeySettingsWindow : Window
         if (e.Key == Key.Escape)
         {
             _capturingId = 0;
-            _status.Text = "已取消";
+            _status.Text = WpfStrings.HotkeySettingsWindow_Text_4;
             e.Handled = true;
             return;
         }
@@ -145,7 +146,7 @@ internal sealed class HotkeySettingsWindow : Window
         if ((Keyboard.Modifiers & ModifierKeys.Windows) != 0) modifiers |= HotkeyService.ModWin;
         if (modifiers == 0)
         {
-            _status.Text = "热键至少需要 Ctrl / Alt / Shift / Win 之一";
+            _status.Text = WpfStrings.HotkeySettingsWindow_Text_5;
             e.Handled = true;
             return;
         }
@@ -159,7 +160,7 @@ internal sealed class HotkeySettingsWindow : Window
             (uint otherMods, uint otherKey) = HotkeyService.GetGesture(other);
             if (otherMods == modifiers && otherKey == vk)
             {
-                _status.Text = "该组合键已被「" + other.Label + "」占用";
+                _status.Text = WpfStrings.HotkeySettingsWindow_Text_6 + other.Label + "」占用";
                 e.Handled = true;
                 return;
             }
@@ -167,7 +168,7 @@ internal sealed class HotkeySettingsWindow : Window
         HotkeyService.HotkeyAction action = Array.Find(HotkeyService.Actions, a => a.Id == _capturingId);
         HotkeyService.SetGesture(action, modifiers, vk);
         RefreshValues();
-        _status.Text = "已设置：" + action.Label + " = " + HotkeyService.Describe(modifiers, vk);
+        _status.Text = WpfStrings.HotkeySettingsWindow_Text_7 + action.Label + " = " + HotkeyService.Describe(modifiers, vk);
         _capturingId = 0;
         e.Handled = true;
     }

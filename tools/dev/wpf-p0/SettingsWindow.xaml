@@ -1,7 +1,7 @@
-<Window x:Class="L_Mechrevo.WpfP0.SettingsWindow"
+<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="设置"
+        Title="{x:Static loc:WpfStrings.InlineOverlayTitle_Text}"
         Width="500" Height="760"
         MinWidth="500" MinHeight="420"
         ResizeMode="CanResize"
@@ -195,39 +195,39 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
                 <Grid Margin="0,0,0,8">
-                    <TextBlock Text="界面" Style="{StaticResource CardTitle}" />
-                    <CheckBox x:Name="FollowSystemCheck" Content="跟随系统" Style="{DynamicResource HeaderSwitch}"
+                    <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_35}" Style="{StaticResource CardTitle}" />
+                    <CheckBox x:Name="FollowSystemCheck" Content="{x:Static loc:WpfStrings.FollowSystemCheck_Content}" Style="{DynamicResource HeaderSwitch}"
                               HorizontalAlignment="Right" VerticalAlignment="Center" Click="FollowSystem_Click" />
                 </Grid>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="界面外观" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_34}" Style="{StaticResource CardTitle}" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <ToggleButton x:Name="LightButton" Content="浅色" Style="{StaticResource ChoiceButton}" Click="Light_Click" />
-                                <ToggleButton x:Name="DarkButton" Content="深色" Style="{StaticResource ChoiceButton}" Click="Dark_Click" Margin="0" />
+                                <ToggleButton x:Name="LightButton" Content="{x:Static loc:WpfStrings.ThemeButton_Content}" Style="{StaticResource ChoiceButton}" Click="Light_Click" />
+                                <ToggleButton x:Name="DarkButton" Content="{x:Static loc:WpfStrings.DarkButton_Content}" Style="{StaticResource ChoiceButton}" Click="Dark_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,8,0,0">
-                            <TextBlock Text="主题色" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_33}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Border x:Name="AccentSwatch" Width="34" Height="22" CornerRadius="5" Background="{DynamicResource AccentBrush}" Margin="0,0,8,0" />
-                                <Button Content="选择..." Style="{StaticResource FlatButton}" Click="PickAccent_Click" />
-                                <Button Content="默认" Style="{StaticResource FlatButton}" Click="DefaultAccent_Click" Margin="0" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_20}" Style="{StaticResource FlatButton}" Click="PickAccent_Click" />
+                                <Button Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_9}" Style="{StaticResource FlatButton}" Click="DefaultAccent_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,8,0,0">
-                            <TextBlock Text="背景图" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.BackgroundToggle_Content}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock x:Name="BackgroundPathText" Text="未选择" MaxWidth="170" TextTrimming="CharacterEllipsis"
+                                <TextBlock x:Name="BackgroundPathText" Text="{x:Static loc:WpfStrings.WideBackgroundPathText_Text}" MaxWidth="170" TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MutedBrush}" />
-                                <Button Content="选择..." Style="{StaticResource FlatButton}" Click="PickBackground_Click" />
-                                <Button Content="清除" Style="{StaticResource FlatButton}" Click="ClearBackground_Click" Margin="0" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_20}" Style="{StaticResource FlatButton}" Click="PickBackground_Click" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_19}" Style="{StaticResource FlatButton}" Click="ClearBackground_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,8,0,0">
-                            <TextBlock Text="背景不透明度" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_32}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Slider x:Name="BackgroundOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="65"
                                         VerticalAlignment="Center" ValueChanged="BackgroundOpacity_Changed" />
@@ -235,7 +235,7 @@
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="背景遮罩" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_31}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Slider x:Name="BackgroundScrimSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="50"
                                         VerticalAlignment="Center" ValueChanged="BackgroundScrim_Changed" />
@@ -243,16 +243,16 @@
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,8,0,0">
-                            <TextBlock Text="宽屏背景图" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_30}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock x:Name="WideBackgroundPathText" Text="未选择" MaxWidth="170" TextTrimming="CharacterEllipsis"
+                                <TextBlock x:Name="WideBackgroundPathText" Text="{x:Static loc:WpfStrings.WideBackgroundPathText_Text}" MaxWidth="170" TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MutedBrush}" />
-                                <Button Content="选择..." Style="{StaticResource FlatButton}" Click="PickWideBackground_Click" />
-                                <Button Content="清除" Style="{StaticResource FlatButton}" Click="ClearWideBackground_Click" Margin="0" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_20}" Style="{StaticResource FlatButton}" Click="PickWideBackground_Click" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_19}" Style="{StaticResource FlatButton}" Click="ClearWideBackground_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="宽屏背景不透明度" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_29}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Slider x:Name="WideBackgroundOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="78"
                                         VerticalAlignment="Center" ValueChanged="WideBackgroundOpacity_Changed" />
@@ -260,7 +260,7 @@
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="底栏不透明度" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_28}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Slider x:Name="DockOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="70"
                                         VerticalAlignment="Center" ValueChanged="DockOpacity_Changed" />
@@ -268,7 +268,7 @@
                             </StackPanel>
                         </Grid>
                                                 <Grid Margin="0,6,0,0">
-                        <TextBlock Text="卡片不透明度" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_27}" VerticalAlignment="Center" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Slider x:Name="CardOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="100"
                         VerticalAlignment="Center" ValueChanged="CardOpacity_Changed" />
@@ -276,7 +276,7 @@
                         </StackPanel>
                         </Grid>
 <Grid Margin="0,6,0,0">
-                            <TextBlock Text="按钮不透明度" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_26}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Slider x:Name="ButtonOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="100"
                                         VerticalAlignment="Center" ValueChanged="ButtonOpacity_Changed" />
@@ -288,51 +288,51 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="托盘菜单" Style="{StaticResource CardTitle}" />
-                        <TextBlock Text="勾选要显示在托盘右键菜单中的项目" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_25}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_24}" Style="{StaticResource Hint}" />
                         <WrapPanel x:Name="TrayMenuPanel" Margin="0,8,0,0" />
                     </StackPanel>
                 </Border>
                 <Grid Margin="0,2,0,8">
-                    <TextBlock Text="语言" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_23}" Style="{StaticResource CardTitle}" />
                     <ComboBox x:Name="LanguageCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
                               SelectionChanged="Language_Changed">
-                        <ComboBoxItem Content="中文" Tag="zh-CN" />
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_18}" Tag="zh-CN" />
                         <ComboBoxItem Content="English" Tag="en-US" />
                     </ComboBox>
                 </Grid>
 
                 <Grid Margin="0,2,0,8">
-                    <TextBlock Text="系统" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_21}" Style="{StaticResource CardTitle}" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Content="快捷键" Style="{StaticResource FlatButton}" Click="Hotkeys_Click" Margin="0,0,12,0" />
-                        <CheckBox x:Name="StartupCheck" Content="开机自启动" Style="{DynamicResource HeaderSwitch}"
+                        <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_17}" Style="{StaticResource FlatButton}" Click="Hotkeys_Click" Margin="0,0,12,0" />
+                        <CheckBox x:Name="StartupCheck" Content="{x:Static loc:WpfStrings.StartupCheck_Content}" Style="{DynamicResource HeaderSwitch}"
                                   Margin="0,0,12,0" Click="Startup_Click" />
-                        <CheckBox x:Name="WaterCoolingCheck" Content="强制启用水冷菜单" Style="{DynamicResource HeaderSwitch}" Click="WaterCooling_Click" />
+                        <CheckBox x:Name="WaterCoolingCheck" Content="{x:Static loc:WpfStrings.WaterCoolingCheck_Content}" Style="{DynamicResource HeaderSwitch}" Click="WaterCooling_Click" />
                     </StackPanel>
                 </Grid>
 
                 <Border x:Name="DisplayCard" Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="显示" Style="{StaticResource CardTitle}" />
-                            <CheckBox x:Name="OverdriveCheck" Content="显示响应加速 (LCD Overdrive)"
+                            <TextBlock Text="{x:Static loc:WpfStrings.TraySensorTooltipCheck_Content}" Style="{StaticResource CardTitle}" />
+                            <CheckBox x:Name="OverdriveCheck" Content="{x:Static loc:WpfStrings.OverdriveCheck_Content}"
                                       Style="{DynamicResource HeaderSwitch}" HorizontalAlignment="Right" VerticalAlignment="Center"
                                       Click="Overdrive_Click" />
                         </Grid>
-                        <TextBlock Text="开启后降低 LCD 响应时间；部分面板可能增加轻微过冲。" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_22}" Style="{StaticResource Hint}" />
                         <Grid x:Name="MiniledRow" Margin="0,6,0,0">
-                            <TextBlock Text="MiniLED 分区控光" VerticalAlignment="Center" />
-                            <CheckBox x:Name="MiniledCheck" Content="开启" Style="{DynamicResource HeaderSwitch}"
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_21}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="MiniledCheck" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Style="{DynamicResource HeaderSwitch}"
                                       HorizontalAlignment="Right" VerticalAlignment="Center" Click="Miniled_Click" />
                         </Grid>
                         <Grid x:Name="HdrControlRow" Margin="0,6,0,0">
                             <TextBlock Text="HDR Color Control" VerticalAlignment="Center" />
-                            <CheckBox x:Name="HdrControlCheck" Content="开启" Style="{DynamicResource HeaderSwitch}"
+                            <CheckBox x:Name="HdrControlCheck" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Style="{DynamicResource HeaderSwitch}"
                                       HorizontalAlignment="Right" VerticalAlignment="Center" Click="HdrControl_Click" />
                         </Grid>
                         <Grid x:Name="FhdRow" Margin="0,6,0,0">
-                            <TextBlock Text="屏幕分辨率模式" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_20}" VerticalAlignment="Center" />
                             <Button x:Name="FhdButton" Content="FHD" Style="{StaticResource FlatButton}"
                                     HorizontalAlignment="Right" Click="Fhd_Click" />
                         </Grid>
@@ -342,97 +342,97 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="官方控制台" Style="{StaticResource CardTitle}" />
-                            <Button x:Name="IsolationButton" Content="隔离官方界面与托盘" Style="{StaticResource FlatButton}"
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_19}" Style="{StaticResource CardTitle}" />
+                            <Button x:Name="IsolationButton" Content="{x:Static loc:WpfStrings.IsolationButton_Content}" Style="{StaticResource FlatButton}"
                                     HorizontalAlignment="Right" Click="Isolation_Click" />
                         </Grid>
-                        <TextBlock x:Name="OfficialStatus" Text="未检测到官方控制台" Style="{StaticResource Hint}" />
+                        <TextBlock x:Name="OfficialStatus" Text="{x:Static loc:WpfStrings.OfficialStatus_Text}" Style="{StaticResource Hint}" />
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="PawnIO 驱动" VerticalAlignment="Center" />
-                            <Button x:Name="ReinstallPawnButton" Content="重新安装" Style="{StaticResource FlatButton}"
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_18}" VerticalAlignment="Center" />
+                            <Button x:Name="ReinstallPawnButton" Content="{x:Static loc:WpfStrings.ReinstallPawnButton_Content}" Style="{StaticResource FlatButton}"
                                     HorizontalAlignment="Right" Click="ReinstallPawnIO_Click" />
                         </Grid>
-                        <TextBlock x:Name="PawnStatus" Text="PawnIO 驱动：检测中…" Style="{StaticResource Hint}" />
+                        <TextBlock x:Name="PawnStatus" Text="{x:Static loc:WpfStrings.PawnStatus_Text}" Style="{StaticResource Hint}" />
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="核显模式显示" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_17}" Style="{StaticResource CardTitle}" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <ToggleButton x:Name="IgpuAutoButton" Content="自动 (按硬件)" Tag="auto" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
-                                <ToggleButton x:Name="IgpuShowButton" Content="强制显示" Tag="show" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
-                                <ToggleButton x:Name="IgpuHideButton" Content="强制隐藏" Tag="hide" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" Margin="0" />
+                                <ToggleButton x:Name="IgpuAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
+                                <ToggleButton x:Name="IgpuShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
+                                <ToggleButton x:Name="IgpuHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
-                        <TextBlock Text="判断有误时选「强制显示」" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_16}" Style="{StaticResource Hint}" />
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="灯带行显示" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_15}" Style="{StaticResource CardTitle}" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <ToggleButton x:Name="StripAutoButton" Content="自动 (按硬件)" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
-                                <ToggleButton x:Name="StripShowButton" Content="强制显示" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
-                                <ToggleButton x:Name="StripHideButton" Content="强制隐藏" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" Margin="0" />
+                                <ToggleButton x:Name="StripAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
+                                <ToggleButton x:Name="StripShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
+                                <ToggleButton x:Name="StripHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
-                        <TextBlock Text="判断有误时可选「强制显示」；即使有灯带，也可选「强制隐藏」" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_14}" Style="{StaticResource Hint}" />
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="Logo 灯行显示" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_13}" Style="{StaticResource CardTitle}" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <ToggleButton x:Name="LogoAutoButton" Content="自动 (按硬件)" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
-                                <ToggleButton x:Name="LogoShowButton" Content="强制显示" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
-                                <ToggleButton x:Name="LogoHideButton" Content="强制隐藏" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" Margin="0" />
+                                <ToggleButton x:Name="LogoAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
+                                <ToggleButton x:Name="LogoShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
+                                <ToggleButton x:Name="LogoHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" Margin="0" />
                             </StackPanel>
                         </Grid>
-                        <TextBlock Text="判断有误时可选「强制显示」；即使有 Logo 灯，也可选「强制隐藏」" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_12}" Style="{StaticResource Hint}" />
                     </StackPanel>
                 </Border>
 
                 <Grid Margin="0,2,0,8">
-                    <TextBlock Text="日志级别" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_11}" Style="{StaticResource CardTitle}" />
                     <ComboBox x:Name="LogLevelCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
                               SelectionChanged="LogLevel_Changed">
-                        <ComboBoxItem Content="关" Tag="off" />
-                        <ComboBoxItem Content="仅错误" Tag="error" />
-                        <ComboBoxItem Content="全部" Tag="all" />
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_5}" Tag="off" />
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_16}" Tag="error" />
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_15}" Tag="all" />
                     </ComboBox>
                 </Grid>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="设置备份" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_10}" Style="{StaticResource CardTitle}" />
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="导出设置..." Style="{StaticResource FlatButton}" Click="ExportBackup_Click" />
-                            <Button Content="导入设置..." Style="{StaticResource FlatButton}" Click="ImportBackup_Click" Margin="0" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_14}" Style="{StaticResource FlatButton}" Click="ExportBackup_Click" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_13}" Style="{StaticResource FlatButton}" Click="ImportBackup_Click" Margin="0" />
                         </StackPanel>
-                        <TextBlock Text="只含用户设置（不含日志）；导入前自动备份现有设置，导入后需重启 L-Mechrevo。" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_9}" Style="{StaticResource Hint}" />
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="悬浮窗" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_4}" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="显示内容" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_8}" VerticalAlignment="Center" />
                             <ComboBox x:Name="OverlayModeCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
                                       SelectionChanged="OverlayMode_Changed">
-                                <ComboBoxItem Content="极简" Tag="0" />
-                                <ComboBoxItem Content="标准" Tag="1" />
-                                <ComboBoxItem Content="完整" Tag="2" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_12}" Tag="0" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_8}" Tag="1" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_11}" Tag="2" />
                             </ComboBox>
                         </Grid>
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="不透明度" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_7}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Slider x:Name="OverlayOpacitySlider" Width="130" Style="{DynamicResource RoundSlider}" Minimum="30" Maximum="100" Value="100"
                                         VerticalAlignment="Center" ValueChanged="OverlayOpacity_Changed" />
@@ -440,48 +440,48 @@
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="托盘图标传感器参数" VerticalAlignment="Center" />
-                            <CheckBox x:Name="TraySensorTooltipCheck" Content="显示" Style="{DynamicResource HeaderSwitch}"
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_6}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="TraySensorTooltipCheck" Content="{x:Static loc:WpfStrings.TraySensorTooltipCheck_Content}" Style="{DynamicResource HeaderSwitch}"
                                       HorizontalAlignment="Right" VerticalAlignment="Center"
                                       Click="TraySensorTooltip_Click" />
                         </Grid>
-                        <TextBlock Text="关闭后，悬浮窗也关闭且主界面在后台时暂停传感器读取"
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_5}"
                                    Style="{StaticResource Hint}" TextWrapping="Wrap" />
                         <Grid Margin="0,6,0,0">
-                            <TextBlock Text="刷新间隔" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_4}" VerticalAlignment="Center" />
                             <ComboBox x:Name="OverlayIntervalCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
                                       SelectionChanged="OverlayInterval_Changed">
-                                <ComboBoxItem Content="0.5 秒" Tag="500" />
-                                <ComboBoxItem Content="1 秒" Tag="1000" />
-                                <ComboBoxItem Content="2 秒" Tag="2000" />
-                                <ComboBoxItem Content="5 秒" Tag="5000" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_10}" Tag="500" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_9}" Tag="1000" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_8}" Tag="2000" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_7}" Tag="5000" />
                             </ComboBox>
                         </Grid>
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="打开/关闭悬浮窗" Style="{StaticResource FlatButton}" Click="OverlayToggle_Click" />
-                            <Button Content="重置位置" Style="{StaticResource FlatButton}" Click="OverlayReset_Click" Margin="0" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_6}" Style="{StaticResource FlatButton}" Click="OverlayToggle_Click" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_5}" Style="{StaticResource FlatButton}" Click="OverlayReset_Click" Margin="0" />
                         </StackPanel>
-                        <TextBlock Text="桌面左键单击切换显示档；拖动可移动，位置会自动保存" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_3}" Style="{StaticResource Hint}" />
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="关于" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_2}" Style="{StaticResource CardTitle}" />
                         <TextBlock x:Name="AboutVersionText" Text="L-Mechrevo" Style="{StaticResource Hint}" />
-                        <TextBlock Text="界面与功能持续从原版 L-Mechrevo 移植；反馈请附带诊断包。" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
                         <StackPanel x:Name="FeedbackButtonsPanel" Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button x:Name="CheckUpdateButton" Content="检查更新" Style="{StaticResource FlatButton}" Click="CheckUpdate_Click" Margin="0,0,8,0" />
-                            <Button Content="应用内反馈" Style="{StaticResource FlatButton}" Click="OpenFeedback_Click" Margin="0,0,8,0" />
-                            <Button Content="项目主页 / 问题反馈" Style="{StaticResource FlatButton}" Click="OpenIssues_Click" />
-                            <Button Content="许可证" Style="{StaticResource FlatButton}" Click="OpenLicenses_Click" Margin="8,0,0,0" />
+                            <Button x:Name="CheckUpdateButton" Content="{x:Static loc:WpfStrings.CheckUpdateButton_Content}" Style="{StaticResource FlatButton}" Click="CheckUpdate_Click" Margin="0,0,8,0" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_4}" Style="{StaticResource FlatButton}" Click="OpenFeedback_Click" Margin="0,0,8,0" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_3}" Style="{StaticResource FlatButton}" Click="OpenIssues_Click" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_2}" Style="{StaticResource FlatButton}" Click="OpenLicenses_Click" Margin="8,0,0,0" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <Grid Margin="0,4,0,0">
                     <TextBlock x:Name="StatusText" Text="0.293.5 beta23.5" Style="{StaticResource Hint}" Margin="0" />
-                    <Button Content="打开安装目录" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="OpenFolder_Click" />
+                    <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content}" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="OpenFolder_Click" />
                 </Grid>
             </StackPanel>
         </ScrollViewer>

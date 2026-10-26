@@ -10,6 +10,7 @@ using MechrevoLite;
 using MechrevoLite.Hardware;
 using L_Mechrevo.WpfP0.Services;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class CustomModeWindow : Window
@@ -128,8 +129,8 @@ public partial class CustomModeWindow : Window
             return;
         }
         _dirty = true;
-        ApplyButton.Content = "应用 *";
-        StatusText.Text = "有未应用修改";
+        ApplyButton.Content = WpfStrings.CustomModeWindow_xaml_Content;
+        StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text;
     }
 
     private void UpdatePowerWallStatus()
@@ -227,7 +228,7 @@ public partial class CustomModeWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "切换模式失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_2 + ex.Message;
         }
         finally
         {
@@ -273,12 +274,12 @@ public partial class CustomModeWindow : Window
             DeleteButton.IsEnabled = false;
             ApplyButton.IsEnabled = false;
             LoadSettingsToUi(stored);
-            Title = "性能模式 · " + ModeName(mode) + " · 配置 " + (_firmwareProfileIndex + 1);
-            StatusText.Text = "30 系固件配置档（只读预览）";
+            Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode) + " · 配置 " + (_firmwareProfileIndex + 1);
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_3;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "绑定固件配置失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_4 + ex.Message;
         }
     }
 
@@ -296,8 +297,8 @@ public partial class CustomModeWindow : Window
         _current = mode;
         _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(id);
         LoadSettingsToUi(_settings);
-        Title = "性能模式 · " + ModeName(mode);
-        StatusText.Text = "当前模式：" + ModeName(mode);
+        Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode);
+        StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_5 + ModeName(mode);
         UpdateRouteHint(mode);
     }
 
@@ -419,7 +420,7 @@ public partial class CustomModeWindow : Window
         try
         {
             PowerPlanCombo.Items.Clear();
-            PowerPlanCombo.Items.Add(new ComboBoxItem { Content = "不改变", Tag = "" });
+            PowerPlanCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.CustomModeWindow_xaml_Content, Tag = "" });
             foreach ((string guid, string name) in MechrevoLite.Hardware.WinPowerPlan.GetPlans())
             {
                 PowerPlanCombo.Items.Add(new ComboBoxItem { Content = name, Tag = guid });
@@ -469,17 +470,17 @@ public partial class CustomModeWindow : Window
             {
                 _settings = _settings with { PowerPlanGuid = guid };
                 MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, _settings);
-                StatusText.Text = "电源计划已切换";
+                StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_6;
             }
             else
             {
-                StatusText.Text = "电源计划未确认，未保存";
+                StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_7;
                 LoadPowerPlans(_settings.PowerPlanGuid);
             }
         }
         catch (Exception ex)
         {
-            StatusText.Text = "电源计划失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_8 + ex.Message;
         }
         await Task.CompletedTask;
     }
@@ -488,9 +489,9 @@ public partial class CustomModeWindow : Window
     {
         if (hw == null || (!hw.UsesBaolongda && !hw.WujieSmuApu))
         {
-            Pl1Label.Text = "CPU 功耗墙 PL1 (W)";
-            Pl2Label.Text = "CPU 功耗墙 PL2 (W)";
-            TccLabel.Text = "CPU 温度墙";
+            Pl1Label.Text = WpfStrings.CustomModeWindow_xaml_Text_9;
+            Pl2Label.Text = WpfStrings.CustomModeWindow_xaml_Text_10;
+            TccLabel.Text = WpfStrings.CustomModeWindow_xaml_Text_11;
             return;
         }
         bool pl1Unset = hw.BaolongdaPl1Unset;
@@ -505,7 +506,7 @@ public partial class CustomModeWindow : Window
         string pl2Base = smu ? MechrevoLite.Properties.Strings.SmuFastLimitLabel : "CPU 功耗墙 PL2 (W)";
         Pl1Label.Text = pl1Base + (pl1Unset ? UnsetMark : "");
         Pl2Label.Text = pl2Base + (pl2Unset ? UnsetMark : "");
-        TccLabel.Text = "CPU 温度墙" + (tccUnset ? UnsetMark : "");
+        TccLabel.Text = WpfStrings.CustomModeWindow_xaml_Text_11 + (tccUnset ? UnsetMark : "");
         Pl1Label.ToolTip = pl1Unset ? PowerWallUnsetHint : null;
         Pl2Label.ToolTip = pl2Unset ? PowerWallUnsetHint : null;
         TccLabel.ToolTip = tccUnset ? PowerWallUnsetHint : null;
@@ -589,7 +590,7 @@ public partial class CustomModeWindow : Window
     private void RefreshOptions(int? current)
     {
         RefreshCombo.Items.Clear();
-        RefreshCombo.Items.Add(new ComboBoxItem { Content = "不改变", Tag = "" });
+        RefreshCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.CustomModeWindow_xaml_Content, Tag = "" });
         try
         {
             foreach (int hz in (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.HzList ?? Array.Empty<int>()).Distinct().OrderByDescending(v => v))
@@ -680,7 +681,7 @@ public partial class CustomModeWindow : Window
         MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
         if (perf == null)
         {
-            StatusText.Text = "PerfModeService 未初始化";
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_12;
             return;
         }
         ApplyButton.IsEnabled = false;
@@ -721,7 +722,7 @@ public partial class CustomModeWindow : Window
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");
             if (outcome == null)
             {
-                StatusText.Text = "应用失败：没有返回下发结果";
+                StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_13;
                 return;
             }
             _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
@@ -731,17 +732,17 @@ public partial class CustomModeWindow : Window
                 ? " · 失败：" + MechrevoLite.Mode.PerfModeText.FailedItems(outcome, amd)
                 : "";
             string stale = MechrevoLite.Mode.PerfModeText.StaleNote(outcome);
-            StatusText.Text = "已应用：" + ModeName(_current) + " · " + summary + failure + stale;
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_14 + ModeName(_current) + " · " + summary + failure + stale;
             ToolTip = MechrevoLite.Mode.PerfModeText.Details(outcome, amd);
             if (!outcome.AnyFailed)
             {
                 _dirty = false;
-                ApplyButton.Content = "应用";
+                ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
             }
         }
         catch (Exception ex)
         {
-            StatusText.Text = "应用失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
         }
         finally
         {
@@ -755,14 +756,14 @@ public partial class CustomModeWindow : Window
         {
             return;
         }
-        if (MessageBox.Show(this, "恢复该模式的出厂默认参数？", "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, WpfStrings.CustomModeWindow_xaml_MessageBoxShowthis, "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
         {
             return;
         }
         MechrevoLite.Mode.PerfModeStore.ResetSettings(_current.Id);
         _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
         LoadSettingsToUi(_settings);
-        StatusText.Text = "已恢复默认：" + ModeName(_current);
+        StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_15 + ModeName(_current);
     }
 
     private async void New_Click(object sender, RoutedEventArgs e)
@@ -775,7 +776,7 @@ public partial class CustomModeWindow : Window
                 ?? MechrevoLite.Mode.PerfModeStore.AddCustom(seedFrom);
             if (mode == null)
             {
-                StatusText.Text = "新建自定义模式失败（已达到上限或没有可用序号）";
+                StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_16;
                 return;
             }
             MechrevoHw? newModeHw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
@@ -805,7 +806,7 @@ public partial class CustomModeWindow : Window
                 });
             }
             LoadModes(mode.Id);
-            StatusText.Text = "已新建：" + ModeName(mode);
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_17 + ModeName(mode);
             if (perf != null)
             {
                 await perf.ActivateAsync(mode.Id, "wpf-editor-new", forceParameters: true);
@@ -813,7 +814,7 @@ public partial class CustomModeWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "新建失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_18 + ex.Message;
         }
     }
 
@@ -828,7 +829,7 @@ public partial class CustomModeWindow : Window
         {
             MechrevoLite.Mode.PerfModeStore.SaveName(_current.Id, prompt.Value.Trim());
             LoadModes(_current.Id);
-            StatusText.Text = "已重命名";
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_19;
         }
     }
 
@@ -836,10 +837,10 @@ public partial class CustomModeWindow : Window
     {
         if (_current == null || !_current.IsCustom)
         {
-            StatusText.Text = "内置模式不能删除";
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_20;
             return;
         }
-        if (MessageBox.Show(this, "删除模式「" + ModeName(_current) + "」？", "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, WpfStrings.CustomModeWindow_xaml_MessageBoxShowthis_2 + ModeName(_current) + "」？", "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
         {
             return;
         }
@@ -855,11 +856,11 @@ public partial class CustomModeWindow : Window
             {
                 LoadModes(null);
             }
-            StatusText.Text = "已删除";
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_21;
         }
         else
         {
-            StatusText.Text = "删除失败";
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_22;
         }
     }
 
@@ -870,7 +871,7 @@ public partial class CustomModeWindow : Window
             MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
             if (hw == null)
             {
-                StatusText.Text = "后端未连接，无法打开风扇曲线";
+                StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_23;
                 return;
             }
             string targetId = _firmwareMode
@@ -880,7 +881,7 @@ public partial class CustomModeWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开风扇曲线失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_24 + ex.Message;
         }
     }
 
@@ -892,7 +893,7 @@ public partial class CustomModeWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开 CPU 调节失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_25 + ex.Message;
         }
     }
 }

@@ -8,6 +8,7 @@ using MechrevoLite;
 using MechrevoLite.Hardware;
 using MechrevoLite.Mode;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class FanCurveWindow : Window
@@ -37,7 +38,7 @@ public partial class FanCurveWindow : Window
         bool supported = _hw != null && (_hw.IsGcuConnected || _hw.UsesBaolongda || _hw.WujieSmuApu);
         if (!supported)
         {
-            HintText.Text = "后端未连接，无法读取风扇曲线。";
+            HintText.Text = WpfStrings.FanCurveWindow_xaml_Text;
         }
         CpuCurve.Changed += MarkDirty;
         GpuCurve.Changed += MarkDirty;
@@ -48,7 +49,7 @@ public partial class FanCurveWindow : Window
     private void MarkDirty()
     {
         _dirty = true;
-        StatusText.Text = "有未应用的修改";
+        StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_2;
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -57,7 +58,7 @@ public partial class FanCurveWindow : Window
         {
             return;
         }
-        MessageBoxResult result = MessageBox.Show(this, "风扇曲线还有未应用的修改，确定关闭？", "L-Mechrevo",
+        MessageBoxResult result = MessageBox.Show(this, WpfStrings.FanCurveWindow_xaml_MessageBoxShowthis, "L-Mechrevo",
             MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result != MessageBoxResult.Yes)
         {
@@ -125,7 +126,7 @@ public partial class FanCurveWindow : Window
     {
         if (_hw == null || !_hw.IsGcuConnected)
         {
-            StatusText.Text = "GCU 未连接，无法下发风扇曲线";
+            StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_3;
             return;
         }
         if (_hw.UsesBaolongda)
@@ -155,7 +156,7 @@ public partial class FanCurveWindow : Window
             }
             catch (Exception ex)
             {
-                StatusText.Text = "应用失败：" + ex.Message;
+                StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
             }
             return;
         }
@@ -184,7 +185,7 @@ public partial class FanCurveWindow : Window
             }
             catch (Exception ex)
             {
-                StatusText.Text = "应用失败：" + ex.Message;
+                StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
             }
             return;
         }
@@ -198,7 +199,7 @@ public partial class FanCurveWindow : Window
                 PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
                 PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, false);
                 _dirty = false;
-                StatusText.Text = "风扇曲线已保存；下发开关关闭，未推送硬件";
+                StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_4;
                 return;
             }
             PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
@@ -227,16 +228,16 @@ public partial class FanCurveWindow : Window
                     PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
                 }
                 _dirty = false;
-                StatusText.Text = "风扇曲线已下发并回读确认，已写入当前配置档";
+                StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_5;
             }
             else
             {
-                StatusText.Text = "风扇曲线回读未确认，未写入当前配置档";
+                StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_6;
             }
         }
         catch (Exception ex)
         {
-            StatusText.Text = "应用失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
         }
     }
 
@@ -308,7 +309,7 @@ public partial class FanCurveWindow : Window
             GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
         }
         _dirty = true;
-        StatusText.Text = "已恢复默认曲线，点应用后下发";
+        StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_7;
     }
 
     private void SaveWujieTemps(byte[] cpuTemps, byte[] gpuTemps)

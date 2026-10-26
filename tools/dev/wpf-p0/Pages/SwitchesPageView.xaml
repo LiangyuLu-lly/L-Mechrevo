@@ -1,4 +1,4 @@
-<UserControl x:Class="L_Mechrevo.WpfP0.Pages.SwitchesPageView"
+<UserControl xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.Pages.SwitchesPageView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FontFamily="{DynamicResource AppFontFamily}">
@@ -10,8 +10,8 @@
     </UserControl.Resources>
     <ScrollViewer x:Name="SwitchesPage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
         <StackPanel>
-            <TextBlock Text="更多开关" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="以磁贴形式排列的快捷开关" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+            <TextBlock Text="{x:Static loc:WpfStrings.NavSwitches_Content}" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{x:Static loc:WpfStrings.SwitchesPageView_Text}" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
             <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <StackPanel x:Name="MoreSwitchGrid" />

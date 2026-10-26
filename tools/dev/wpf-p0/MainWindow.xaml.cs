@@ -117,7 +117,7 @@ public partial class MainWindow : Window
         };
         ApplyHomeCapabilities();
         RefreshSensors();
-        StatusText.Text = "就绪 · 宽屏四页布局";
+        StatusText.Text = WpfStrings.MainWindow_xaml_Text;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -149,8 +149,8 @@ public partial class MainWindow : Window
         SetMetric(_gpuMetrics, 4, snapshot.GpuMemoryClockMhz ?? 0, "MHz");
         _cpuFanRing?.SetValue(snapshot.CpuFanRpm, fanMax, "rpm");
         _gpuFanRing?.SetValue(snapshot.GpuFanRpm, fanMax, "rpm");
-        if (_cpuDutyText != null) _cpuDutyText.Text = "占空比 " + snapshot.CpuFanDutyPercent + "%";
-        if (_gpuDutyText != null) _gpuDutyText.Text = "占空比 " + snapshot.GpuFanDutyPercent + "%";
+        if (_cpuDutyText != null) _cpuDutyText.Text = WpfStrings.MainWindow_xaml_Text_2 + snapshot.CpuFanDutyPercent + "%";
+        if (_gpuDutyText != null) _gpuDutyText.Text = WpfStrings.MainWindow_xaml_Text_2 + snapshot.GpuFanDutyPercent + "%";
         RefreshHomeExtras();
     }
 
@@ -187,7 +187,7 @@ public partial class MainWindow : Window
         RingGauge ring = new() { Width = 116, Height = 116, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0) };
         TextBlock duty = new()
         {
-            Text = "占空比 --",
+            Text = WpfStrings.MainWindow_xaml_Text_3,
             Style = (Style)FindResource("MutedText"),
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 2, 0, 0)
@@ -363,7 +363,7 @@ public partial class MainWindow : Window
             Close();
             return;
         }
-        StatusText.Text = "没有可恢复的小窗";
+        StatusText.Text = WpfStrings.MainWindow_xaml_Text_4;
     }
 
     private void ApplyRoundedWindowChrome()
@@ -556,7 +556,7 @@ public partial class MainWindow : Window
             Color color = (Color)ColorConverter.ConvertFromString(text);
             Application.Current.Resources["AccentBrush"] = new SolidColorBrush(color);
             Application.Current.Resources["AccentColor"] = color;
-            StatusText.Text = "强调色已切换：" + text;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_5 + text;
         }
     }
 
@@ -620,7 +620,7 @@ public partial class MainWindow : Window
                 perfButton.IsChecked = ReferenceEquals(perfButton, button);
             }
             _owner?.WideSetMode(mode);
-            StatusText.Text = "性能模式已请求：" + button.Content;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_6 + button.Content;
         }
     }
 
@@ -633,7 +633,7 @@ public partial class MainWindow : Window
                 gpuButton.IsChecked = ReferenceEquals(gpuButton, button);
             }
             _owner?.WideSetGpuMode(mode);
-            StatusText.Text = "显卡模式已请求：" + button.Content;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_7 + button.Content;
         }
     }
 
@@ -646,7 +646,7 @@ public partial class MainWindow : Window
                 refreshButton.IsChecked = refreshHz == hz;
             }
             _owner?.WideSetRefresh(hz);
-            StatusText.Text = "刷新率已请求：" + hz + " Hz";
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_8 + hz + " Hz";
         }
     }
 
@@ -770,7 +770,7 @@ public partial class MainWindow : Window
         });
         customContent.Children.Add(new TextBlock
         {
-            Text = "自定义",
+            Text = WpfStrings.MainWindow_xaml_Text_9,
             FontSize = 9,
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 4, 0, 0),
@@ -815,7 +815,7 @@ public partial class MainWindow : Window
         }
         (string info, int mode, string charge) = _owner.WideBattery();
         StackPanel battery = new();
-        battery.Children.Add(new TextBlock { Text = "电池", Style = (Style)FindResource("CardTitle") });
+        battery.Children.Add(new TextBlock { Text = WpfStrings.MainWindow_xaml_Text_10, Style = (Style)FindResource("CardTitle") });
         _batteryInfoText = new TextBlock { Text = info, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 4, 0, 8) };
         battery.Children.Add(_batteryInfoText);
         StackPanel modes = new() { Orientation = Orientation.Horizontal };
@@ -837,7 +837,7 @@ public partial class MainWindow : Window
                     other.IsChecked = ReferenceEquals(other, button);
                 }
                 _owner?.WideSetBatteryMode(target);
-                StatusText.Text = "电池模式已请求：" + labels[target];
+                StatusText.Text = WpfStrings.MainWindow_xaml_Text_11 + labels[target];
             };
             modes.Children.Add(button);
             _batteryModeButtons.Add(button);
@@ -849,17 +849,17 @@ public partial class MainWindow : Window
             battery.Children.Add(_chargeLimitText);
 
             (bool limitEnabled, string lowText, string highText, string limitStatus, bool experiment, bool ecDirect) = _owner.WideChargeLimit();
-            _chargeLimitSwitch = new CheckBox { Content = "限制充电", Style = (Style)FindResource("HeaderSwitch"), IsChecked = limitEnabled, Margin = new Thickness(0, 8, 8, 0) };
+            _chargeLimitSwitch = new CheckBox { Content = WpfStrings.MainWindow_xaml_Content, Style = (Style)FindResource("HeaderSwitch"), IsChecked = limitEnabled, Margin = new Thickness(0, 8, 8, 0) };
             _chargeLimitSwitch.Click += (_, _) => _owner.WideSetChargeLimitEnabled(_chargeLimitSwitch.IsChecked == true);
             _chargeLow = new TextBox { Text = lowText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
             _chargeHigh = new TextBox { Text = highText, Width = 46, Height = 26, Margin = new Thickness(0, 8, 6, 0), VerticalContentAlignment = VerticalAlignment.Center };
-            Button applyLimit = new() { Content = "保存", Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 8, 0, 0) };
+            Button applyLimit = new() { Content = WpfStrings.MainWindow_xaml_Content_2, Style = (Style)FindResource("FlatButton"), Margin = new Thickness(0, 8, 0, 0) };
             applyLimit.Click += (_, _) => _owner.WideApplyChargeLimit(_chargeLow.Text, _chargeHigh.Text);
             StackPanel limitRow = new() { Orientation = Orientation.Horizontal };
             limitRow.Children.Add(_chargeLimitSwitch);
-            limitRow.Children.Add(new TextBlock { Text = "起", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
+            limitRow.Children.Add(new TextBlock { Text = WpfStrings.MainWindow_xaml_Text_12, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
             limitRow.Children.Add(_chargeLow);
-            limitRow.Children.Add(new TextBlock { Text = "停", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
+            limitRow.Children.Add(new TextBlock { Text = WpfStrings.MainWindow_xaml_Text_13, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 4, 0) });
             limitRow.Children.Add(_chargeHigh);
             limitRow.Children.Add(applyLimit);
             battery.Children.Add(limitRow);
@@ -867,14 +867,14 @@ public partial class MainWindow : Window
             battery.Children.Add(_chargeStatus);
         }
         (bool _, string _, string _, string _, bool experimentSlider, bool ecDirectSlider) = _owner.WideChargeLimit();
-        _chargeExperiment = new CheckBox { Content = "无极限充（实验性）", Style = (Style)FindResource("HeaderSwitch"), IsChecked = experimentSlider, Margin = new Thickness(0, 8, 16, 0) };
+        _chargeExperiment = new CheckBox { Content = WpfStrings.MainWindow_xaml_Content_3, Style = (Style)FindResource("HeaderSwitch"), IsChecked = experimentSlider, Margin = new Thickness(0, 8, 16, 0) };
         _chargeExperiment.Click += (_, _) =>
         {
             _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
             if (_chargeExperiment.IsChecked == true && _ecDirect != null) _ecDirect.IsChecked = false;
             UpdateChargeSliderVisibility();
         };
-        _ecDirect = new CheckBox { Content = "关闭 EC 直写", Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirectSlider, Margin = new Thickness(0, 8, 0, 0) };
+        _ecDirect = new CheckBox { Content = WpfStrings.MainWindow_xaml_Content_4, Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirectSlider, Margin = new Thickness(0, 8, 0, 0) };
         _ecDirect.Click += (_, _) =>
         {
             _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
@@ -994,7 +994,7 @@ public partial class MainWindow : Window
         brightnessRow.Children.Add(_displayBrightnessText);
         _autoRefresh = new CheckBox
         {
-            Content = "自动刷新率",
+            Content = WpfStrings.MainWindow_xaml_Content_5,
             Style = (Style)FindResource("HeaderSwitch"),
             IsChecked = auto,
             Margin = new Thickness(0),
@@ -1013,7 +1013,7 @@ public partial class MainWindow : Window
             return;
         }
         StackPanel row = new() { Orientation = Orientation.Horizontal };
-        row.Children.Add(new TextBlock { Text = "核显省电", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+        row.Children.Add(new TextBlock { Text = WpfStrings.MainWindow_xaml_Text_14, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
         string[] labels = { "关", "开", "自动" };
         string[] modes = { "OFF", "ON", "AUTO" };
         for (int i = 0; i < labels.Length; i++)
@@ -1151,7 +1151,7 @@ public partial class MainWindow : Window
         {
             Button fhd = new()
             {
-                Content = "切换 FHD 模式",
+                Content = WpfStrings.MainWindow_xaml_Content_6,
                 Style = (Style)FindResource("FlatButton"),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 0, 8, 8)
@@ -1273,7 +1273,7 @@ public partial class MainWindow : Window
         string? imported = IccHelper.ImportIcc(dialog.FileName);
         if (string.IsNullOrWhiteSpace(imported))
         {
-            StatusText.Text = "ICC 导入失败";
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_15;
             return;
         }
         AppConfig.Set("calib_custom_icc", imported);
@@ -1981,7 +1981,7 @@ public partial class MainWindow : Window
             LightingSettingsStore.Save(topic, settings);
             if (_probe == null)
             {
-                StatusText.Text = "灯光设置已保存（后端未连接）";
+                StatusText.Text = WpfStrings.MainWindow_xaml_Text_16;
                 return;
             }
             if (!powerOn)
@@ -2012,7 +2012,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "灯光编辑失败：" + ex.Message;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_17 + ex.Message;
         }
     }
 
@@ -2094,7 +2094,7 @@ public partial class MainWindow : Window
         {
             CustomModeListPanel.Children.Add(new TextBlock
             {
-                Text = "暂无自定义模式",
+                Text = WpfStrings.MainWindow_xaml_Text_18,
                 Style = (Style)FindResource("MutedText"),
                 Margin = new Thickness(0, 0, 0, 6)
             });
@@ -2118,7 +2118,7 @@ public partial class MainWindow : Window
             };
             Button edit = new()
             {
-                Content = "编辑",
+                Content = WpfStrings.MainWindow_xaml_Content_7,
                 Style = (Style)FindResource("GhostButton"),
                 Padding = new Thickness(12, 5, 12, 5)
             };
@@ -2128,11 +2128,11 @@ public partial class MainWindow : Window
                 {
                     new CustomModeWindow(modeId) { Owner = this }.ShowDialog();
                     BuildCustomModeList();
-                    StatusText.Text = "自定义模式已关闭";
+                    StatusText.Text = WpfStrings.MainWindow_xaml_Text_19;
                 }
                 catch (Exception ex)
                 {
-                    StatusText.Text = "打开自定义模式失败：" + ex.Message;
+                    StatusText.Text = WpfStrings.MainWindow_xaml_Text_20 + ex.Message;
                 }
             };
             Grid.SetColumn(label, 0);
@@ -2149,11 +2149,11 @@ public partial class MainWindow : Window
         {
             new CustomModeWindow { Owner = this }.ShowDialog();
             BuildCustomModeList();
-            StatusText.Text = "自定义模式已关闭";
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_19;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开自定义模式失败：" + ex.Message;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_20 + ex.Message;
         }
     }
 
@@ -2162,11 +2162,11 @@ public partial class MainWindow : Window
         try
         {
             new FanCurveWindow("balanced", showCpu: true, showGpu: false) { Owner = this }.ShowDialog();
-            StatusText.Text = "CPU 风扇曲线已关闭";
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_21;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开 CPU 风扇曲线失败：" + ex.Message;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_22 + ex.Message;
         }
     }
 
@@ -2175,11 +2175,11 @@ public partial class MainWindow : Window
         try
         {
             new FanCurveWindow("balanced", showCpu: false, showGpu: true) { Owner = this }.ShowDialog();
-            StatusText.Text = "GPU 风扇曲线已关闭";
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_23;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开 GPU 风扇曲线失败：" + ex.Message;
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_24 + ex.Message;
         }
     }
 

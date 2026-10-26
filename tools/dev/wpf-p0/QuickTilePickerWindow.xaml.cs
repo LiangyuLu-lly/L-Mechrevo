@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public sealed class QuickChoice
@@ -51,7 +52,7 @@ public partial class QuickTilePickerWindow : Window
             .ToList();
         _choices = new ObservableCollection<QuickChoice>(ordered);
         ChoicesList.ItemsSource = _choices;
-        HintText.Text = "最多 " + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
+        HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
         ChoicesList.PreviewMouseLeftButtonDown += ChoicesList_PreviewMouseLeftButtonDown;
         ChoicesList.PreviewMouseMove += ChoicesList_PreviewMouseMove;
@@ -129,7 +130,7 @@ public partial class QuickTilePickerWindow : Window
             return;
         }
         _choices.Move(from, to);
-        HintText.Text = "最多 " + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
+        HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
     }
 
     private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
@@ -156,7 +157,7 @@ public partial class QuickTilePickerWindow : Window
         {
             choice.IsSelected = false;
             box.IsChecked = false;
-            HintText.Text = "最多只能选 " + _maxSlots + " 个";
+            HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text_2 + _maxSlots + " 个";
             return;
         }
         int oldIndex = _choices.IndexOf(choice);
@@ -173,14 +174,14 @@ public partial class QuickTilePickerWindow : Window
             }
             _choices.Insert(Math.Min(selectedCount, _choices.Count), choice);
         }
-        HintText.Text = "最多 " + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
+        HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedChoices.Count > _maxSlots)
         {
-            HintText.Text = "最多只能选 " + _maxSlots + " 个";
+            HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text_2 + _maxSlots + " 个";
             return;
         }
         DialogResult = true;

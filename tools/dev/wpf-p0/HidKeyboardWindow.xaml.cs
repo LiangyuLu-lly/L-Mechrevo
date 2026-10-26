@@ -5,6 +5,7 @@ using MechrevoLite;
 using MechrevoLite.Hardware;
 using L_Mechrevo.WpfP0.Services;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class HidKeyboardWindow : Window
@@ -133,12 +134,12 @@ public partial class HidKeyboardWindow : Window
                 Extra1Row.Visibility = Visibility.Visible;
                 ConfigureExtra(Extra1Slider, Extra1Label, Extra1Text, "时长", 5, 60, _rgb.ReactiveDuration);
                 ExtraCheck.Visibility = Visibility.Visible;
-                ExtraCheck.Content = "随机颜色";
+                ExtraCheck.Content = WpfStrings.HidKeyboardWindow_xaml_Content;
                 ExtraCheck.IsChecked = _rgb.ReactiveRandom;
                 break;
             case 4:
                 ExtraCheck.Visibility = Visibility.Visible;
-                ExtraCheck.Content = "反向";
+                ExtraCheck.Content = WpfStrings.HidKeyboardWindow_xaml_Content_2;
                 ExtraCheck.IsChecked = _rgb.WheelReverse;
                 break;
             case 5:
@@ -179,33 +180,33 @@ public partial class HidKeyboardWindow : Window
         {
             ColorCountRow.Visibility = Visibility.Visible;
             MultiColorPanel.Visibility = Visibility.Visible;
-            ColorCountLabel.Text = "雨滴颜色数";
+            ColorCountLabel.Text = WpfStrings.HidKeyboardWindow_xaml_Text;
             ColorCountSlider.Minimum = 1;
             ColorCountSlider.Maximum = 5;
             ColorCountSlider.Value = Math.Clamp(_rgb.RainColorCount, 1, 5);
-            MultiColorLabel.Text = "雨滴颜色";
+            MultiColorLabel.Text = WpfStrings.HidKeyboardWindow_xaml_Text_2;
             BuildMultiColors(_rgb.RainColors, 5);
         }
         else if (mode == 8)
         {
             ColorCountRow.Visibility = Visibility.Visible;
             MultiColorPanel.Visibility = Visibility.Visible;
-            ColorCountLabel.Text = "矩阵颜色数";
+            ColorCountLabel.Text = WpfStrings.HidKeyboardWindow_xaml_Text_3;
             ColorCountSlider.Minimum = 1;
             ColorCountSlider.Maximum = 3;
             ColorCountSlider.Value = Math.Clamp(_rgb.MatrixColorCount, 1, 3);
-            MultiColorLabel.Text = "矩阵颜色";
+            MultiColorLabel.Text = WpfStrings.HidKeyboardWindow_xaml_Text_4;
             BuildMultiColors(_rgb.MatrixColors, 3);
         }
         else if (mode == 9)
         {
             ColorCountRow.Visibility = Visibility.Visible;
             MultiColorPanel.Visibility = Visibility.Visible;
-            ColorCountLabel.Text = "静态分区数";
+            ColorCountLabel.Text = WpfStrings.HidKeyboardWindow_xaml_Text_5;
             ColorCountSlider.Minimum = 1;
             ColorCountSlider.Maximum = 10;
             ColorCountSlider.Value = Math.Clamp(_rgb.StaticZones, 1, 10);
-            MultiColorLabel.Text = "分区颜色";
+            MultiColorLabel.Text = WpfStrings.HidKeyboardWindow_xaml_Text_6;
             BuildMultiColors(_rgb.StaticColors, 10);
         }
     }
@@ -441,12 +442,12 @@ public partial class HidKeyboardWindow : Window
                 if (!offReady)
                 {
                     _rgb.KbPowerOn = true;
-                    StatusText.Text = "HID 未连接，关灯失败：" + _rgb.LastError;
+                    StatusText.Text = WpfStrings.HidKeyboardWindow_xaml_Text_7 + _rgb.LastError;
                     return;
                 }
                 _rgb.StopCurrentEffect();
                 _rgb.SaveConfig();
-                StatusText.Text = "HID 键盘灯已关闭";
+                StatusText.Text = WpfStrings.HidKeyboardWindow_xaml_Text_8;
                 return;
             }
             int brightness = Math.Clamp((int)Math.Round(BrightnessSlider.Value), 1, 100);
@@ -454,7 +455,7 @@ public partial class HidKeyboardWindow : Window
             bool ready = _rgb.IsConnected || await _rgb.EnsureHidReadyAsync() || _rgb.Connect();
             if (!ready)
             {
-                StatusText.Text = "HID 连接失败：" + _rgb.LastError;
+                StatusText.Text = WpfStrings.HidKeyboardWindow_xaml_Text_9 + _rgb.LastError;
                 return;
             }
             ApplyEffectParams(SelectedMode);
@@ -468,11 +469,11 @@ public partial class HidKeyboardWindow : Window
             _rgb.StartMode(SelectedMode);
             _rgb.ApplyBrightnessToDevice();
             _rgb.SaveConfig();
-            StatusText.Text = "HID 键盘效果已应用";
+            StatusText.Text = WpfStrings.HidKeyboardWindow_xaml_Text_10;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "应用失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
         }
     }
 

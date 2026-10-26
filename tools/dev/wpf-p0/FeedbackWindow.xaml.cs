@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Windows;
 using MechrevoLite;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class FeedbackWindow : Window
@@ -17,12 +18,12 @@ public partial class FeedbackWindow : Window
         try
         {
             string model = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.Capabilities.Model ?? "";
-            DeviceText.Text = "机型：" + (string.IsNullOrWhiteSpace(model) ? "未知" : model)
+            DeviceText.Text = WpfStrings.FeedbackWindow_xaml_Text + (string.IsNullOrWhiteSpace(model) ? "未知" : model)
                 + "\n系统：" + Environment.OSVersion.VersionString;
         }
         catch
         {
-            DeviceText.Text = "系统：" + Environment.OSVersion.VersionString;
+            DeviceText.Text = WpfStrings.FeedbackWindow_xaml_Text_2 + Environment.OSVersion.VersionString;
         }
     }
 
@@ -46,11 +47,11 @@ public partial class FeedbackWindow : Window
         try
         {
             Clipboard.SetText(BuildInfo());
-            StatusText.Text = "信息已复制";
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_3;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "复制失败：" + ex.Message;
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_4 + ex.Message;
         }
     }
 
@@ -58,13 +59,13 @@ public partial class FeedbackWindow : Window
     {
         try
         {
-            StatusText.Text = "正在导出诊断包…";
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_5;
             await _owner.ExportDiagnosticPackForFeedbackAsync();
-            StatusText.Text = "诊断包导出流程已结束";
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_6;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "导出失败：" + ex.Message;
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_7 + ex.Message;
         }
     }
 
@@ -73,11 +74,11 @@ public partial class FeedbackWindow : Window
         try
         {
             Process.Start(new ProcessStartInfo("https://github.com/LiangyuLu-lly/L-Mechrevo/issues") { UseShellExecute = true });
-            StatusText.Text = "已在浏览器打开 Issues";
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_8;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "打开失败：" + ex.Message;
+            StatusText.Text = WpfStrings.FeedbackWindow_xaml_Text_9 + ex.Message;
         }
     }
 

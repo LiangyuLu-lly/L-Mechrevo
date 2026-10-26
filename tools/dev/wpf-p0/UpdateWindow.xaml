@@ -1,7 +1,7 @@
-<Window x:Class="L_Mechrevo.WpfP0.UpdateWindow"
+<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.UpdateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="检查更新"
+        Title="{x:Static loc:WpfStrings.CheckUpdateButton_Content}"
         Width="620" Height="460"
         MinWidth="520" MinHeight="360"
         WindowStartupLocation="CenterOwner"
@@ -17,7 +17,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel>
-            <TextBlock Text="发现新版本" FontSize="18" FontWeight="Bold" />
+            <TextBlock Text="{x:Static loc:WpfStrings.UpdateWindow_Text}" FontSize="18" FontWeight="Bold" />
             <TextBlock x:Name="VersionText" Style="{DynamicResource MutedText}" Margin="0,6,0,0" />
         </StackPanel>
         <TextBlock x:Name="DateText" Grid.Row="1" Style="{DynamicResource MutedText}" Margin="0,10,0,6" />
@@ -31,9 +31,9 @@
         <Grid Grid.Row="3" Margin="0,12,0,0">
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{DynamicResource MutedText}" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="复制下载链接" Style="{StaticResource FlatButton}" Click="CopyLink_Click" />
-                <Button Content="打开下载页" Style="{StaticResource FlatButton}" Click="OpenLink_Click" />
-                <Button Content="关闭" Style="{StaticResource FlatButton}" Click="Close_Click" Margin="0" />
+                <Button Content="{x:Static loc:WpfStrings.UpdateWindow_Content_2}" Style="{StaticResource FlatButton}" Click="CopyLink_Click" />
+                <Button Content="{x:Static loc:WpfStrings.UpdateWindow_Content}" Style="{StaticResource FlatButton}" Click="OpenLink_Click" />
+                <Button Content="{x:Static loc:WpfStrings.CpuTuningWindow_Content}" Style="{StaticResource FlatButton}" Click="Close_Click" Margin="0" />
             </StackPanel>
         </Grid>
     </Grid>

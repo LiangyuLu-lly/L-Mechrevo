@@ -9,6 +9,7 @@ using MechrevoLite.Hardware;
 using MechrevoLite.Properties;
 using PawnIO;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class CpuTuningWindow : Window
@@ -54,7 +55,7 @@ public partial class CpuTuningWindow : Window
             {
                 OptionsPanel.Children.Add(new TextBlock
                 {
-                    Text = "该平台没有可调的 SMU/CO 选项。",
+                    Text = WpfStrings.CpuTuningWindow_xaml_Text,
                     Style = (Style)FindResource("MutedText")
                 });
                 return;
@@ -71,7 +72,7 @@ public partial class CpuTuningWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "CPU 探针失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_2 + ex.Message;
         }
     }
 
@@ -119,7 +120,7 @@ public partial class CpuTuningWindow : Window
 
         Button apply = new()
         {
-            Content = "应用",
+            Content = WpfStrings.CpuTuningWindow_xaml_Content,
             IsEnabled = option.CanWrite,
             Margin = new Thickness(8, 0, 0, 0),
             Style = (Style)FindResource("FlatButton")
@@ -146,7 +147,7 @@ public partial class CpuTuningWindow : Window
         }
         OptionsPanel.Children.Add(new TextBlock
         {
-            Text = "每核 CO（Curve Optimizer）",
+            Text = WpfStrings.CpuTuningWindow_xaml_Text_3,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 12, 0, 6)
         });
@@ -187,7 +188,7 @@ public partial class CpuTuningWindow : Window
         }
         Button apply = new()
         {
-            Content = "应用每核 CO",
+            Content = WpfStrings.CpuTuningWindow_xaml_Content_2,
             Style = (Style)FindResource("FlatButton"),
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 6, 0, 10)
@@ -207,7 +208,7 @@ public partial class CpuTuningWindow : Window
             }
             catch (Exception ex)
             {
-                StatusText.Text = "每核 CO 应用失败：" + ex.Message;
+                StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_4 + ex.Message;
             }
         };
         OptionsPanel.Children.Add(apply);
@@ -252,7 +253,7 @@ public partial class CpuTuningWindow : Window
         slider.ValueChanged += (_, e) => valueText.Text = ((int)e.NewValue).ToString();
         Button apply = new()
         {
-            Content = "应用",
+            Content = WpfStrings.CpuTuningWindow_xaml_Content,
             IsEnabled = RuntimeCpuTuning.Instance.FMaxWritableCapability,
             Margin = new Thickness(8, 0, 0, 0),
             Style = (Style)FindResource("FlatButton")
@@ -268,7 +269,7 @@ public partial class CpuTuningWindow : Window
             }
             catch (Exception ex)
             {
-                StatusText.Text = "FMax 应用失败：" + ex.Message;
+                StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_5 + ex.Message;
             }
         };
         row.Children.Add(apply);
@@ -289,13 +290,13 @@ public partial class CpuTuningWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "应用失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
         }
     }
 
     private async void Reset_Click(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this, "重置所有 CPU 调节项？", "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, WpfStrings.CpuTuningWindow_xaml_MessageBoxShowthis, "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
         {
             return;
         }
@@ -307,7 +308,7 @@ public partial class CpuTuningWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "重置失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_7 + ex.Message;
         }
     }
 
@@ -325,11 +326,11 @@ public partial class CpuTuningWindow : Window
             {
                 RuntimeCpuTuning.SaveFMax((int)_fmaxSlider.Value);
             }
-            StatusText.Text = "快照已保存";
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_8;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "保存快照失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_9 + ex.Message;
         }
         await Task.CompletedTask;
     }
@@ -342,7 +343,7 @@ public partial class CpuTuningWindow : Window
             IReadOnlyList<int?> saved = RuntimeCpuTuning.LoadSavedPerCore(coreCount);
             if (saved.Count == 0 || saved.All(v => !v.HasValue))
             {
-                StatusText.Text = "没有可读取的每核 CO 快照";
+                StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_10;
                 return;
             }
             int[] values = saved.Select((v, i) => v ?? 0).ToArray();
@@ -359,7 +360,7 @@ public partial class CpuTuningWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = "读取快照失败：" + ex.Message;
+            StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_11 + ex.Message;
         }
     }
 

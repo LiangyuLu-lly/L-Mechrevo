@@ -1,4 +1,4 @@
-<UserControl x:Class="L_Mechrevo.WpfP0.Pages.ScreenPageView"
+<UserControl xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.Pages.ScreenPageView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FontFamily="{DynamicResource AppFontFamily}">
@@ -8,50 +8,50 @@
     </UserControl.Resources>
 <ScrollViewer x:Name="ScreenPage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
                         <StackPanel>
-                            <TextBlock Text="屏幕" Style="{StaticResource PageTitle}" />
-                            <TextBlock Text="刷新率、亮度、屏幕校色与色彩增强" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.NavScreen_Content}" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.ScreenPageView_Text_5}" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
                             <Border x:Name="ScreenCalibrationCard" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <Grid>
-                                        <TextBlock Text="屏幕校色" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
-                                        <ToggleButton x:Name="ScreenCalibrationToggle" Content="启用校色" Style="{StaticResource SegmentButton}" HorizontalAlignment="Right" />
+                                        <TextBlock Text="{x:Static loc:WpfStrings.CalibrationSettingsWindow_Text_3}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                        <ToggleButton x:Name="ScreenCalibrationToggle" Content="{x:Static loc:WpfStrings.ScreenCalibrationToggle_Content}" Style="{StaticResource SegmentButton}" HorizontalAlignment="Right" />
                                     </Grid>
-                                    <TextBlock Text="ICC 校色档位与自定义校色" Style="{StaticResource MutedText}" Margin="0,4,0,12" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.ScreenPageView_Text_4}" Style="{StaticResource MutedText}" Margin="0,4,0,12" />
                                     <WrapPanel x:Name="ScreenCalibrationOptionsPanel" />
-                                    <Button x:Name="ScreenCalibrationSettingsButton" Content="高级设置" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                                    <Button x:Name="ScreenCalibrationSettingsButton" Content="{x:Static loc:WpfStrings.ScreenCalibrationSettingsButton_Content}" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,10,0,0" />
                                     <StackPanel x:Name="ScreenCalibrationSettingsPanel" Visibility="Collapsed" Margin="0,10,0,0">
-                                        <CheckBox x:Name="CalibrationStartupSwitch" Content="开机自动应用校色" Style="{StaticResource HeaderSwitch}" />
-                                        <CheckBox x:Name="CalibrationCustomSwitch" Content="自定义校色（ICC）" Style="{StaticResource HeaderSwitch}" Margin="0,8,0,0" />
+                                        <CheckBox x:Name="CalibrationStartupSwitch" Content="{x:Static loc:WpfStrings.StartupSwitch_Content}" Style="{StaticResource HeaderSwitch}" />
+                                        <CheckBox x:Name="CalibrationCustomSwitch" Content="{x:Static loc:WpfStrings.CalibrationCustomSwitch_Content}" Style="{StaticResource HeaderSwitch}" Margin="0,8,0,0" />
                                         <Grid Margin="0,8,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <ComboBox x:Name="CalibrationIccCombo" Style="{StaticResource RoundCombo}" Height="30" />
-                                            <Button Grid.Column="1" Content="导入 ICC" Style="{StaticResource FlatButton}" Margin="8,0,0,0" x:Name="ScreenPageEventControl1"/>
+                                            <Button Grid.Column="1" Content="{x:Static loc:WpfStrings.ScreenPageView_Content}" Style="{StaticResource FlatButton}" Margin="8,0,0,0" x:Name="ScreenPageEventControl1"/>
                                         </Grid>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                             <Border x:Name="ScreenFeaturesCard" Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <TextBlock Text="显示特性" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.ScreenPageView_Text_3}" Style="{StaticResource CardTitle}" />
                                     <StackPanel x:Name="ScreenFeaturesPanel" Margin="0,8,0,0" />
                                 </StackPanel>
                             </Border>
                             <Border x:Name="ScreenEffectCard" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <Grid>
-                                        <TextBlock Text="色彩增强" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
-                                        <ToggleButton x:Name="ScreenEffectToggle" Content="启用色彩增强" Style="{StaticResource SegmentButton}" HorizontalAlignment="Right" />
+                                        <TextBlock Text="{x:Static loc:WpfStrings.DisplayEffectEditorWindow_Text}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                        <ToggleButton x:Name="ScreenEffectToggle" Content="{x:Static loc:WpfStrings.ScreenEffectToggle_Content}" Style="{StaticResource SegmentButton}" HorizontalAlignment="Right" />
                                     </Grid>
-                                    <TextBlock Text="厂商色彩增强档位与参数编辑" Style="{StaticResource MutedText}" Margin="0,4,0,12" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.ScreenPageView_Text_2}" Style="{StaticResource MutedText}" Margin="0,4,0,12" />
                                     <WrapPanel x:Name="ScreenEffectOptionsPanel" />
-                                    <Button x:Name="ScreenEffectEditButton" Content="编辑参数" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                                    <Button x:Name="ScreenEffectEditButton" Content="{x:Static loc:WpfStrings.ScreenEffectEditButton_Content}" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,10,0,0" />
                                     <StackPanel x:Name="ScreenEffectEditorPanel" Visibility="Collapsed" Margin="0,10,0,0">
                                         <Grid>
-                                            <TextBlock Text="档位参数" Style="{StaticResource CardTitle}" />
-                                            <Button Content="恢复默认" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" x:Name="ScreenPageEventControl2"/>
+                                            <TextBlock Text="{x:Static loc:WpfStrings.ScreenPageView_Text}" Style="{StaticResource CardTitle}" />
+                                            <Button Content="{x:Static loc:WpfStrings.DisplayEffectEditorWindow_Content}" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" x:Name="ScreenPageEventControl2"/>
                                         </Grid>
                                         <StackPanel x:Name="ScreenEffectSliderPanel" Margin="0,8,0,0" />
                                     </StackPanel>
