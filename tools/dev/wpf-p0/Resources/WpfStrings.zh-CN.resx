@@ -1950,4 +1950,31 @@
   <data name="TraySaved" xml:space="preserve">
     <value>托盘菜单已保存</value>
   </data>
+  <data name="OfficialRunning" xml:space="preserve">
+    <value>官方控制台运行中</value>
+  </data>
+  <data name="OfficialInstalled" xml:space="preserve">
+    <value>官方控制台已安装</value>
+  </data>
+  <data name="OfficialNotDetected" xml:space="preserve">
+    <value>未检测到官方控制台</value>
+  </data>
+  <data name="IsolationFailed" xml:space="preserve">
+    <value>隔离操作失败：</value>
+  </data>
+  <data name="PawnDriverInstalled" xml:space="preserve">
+    <value>PawnIO 驱动：已安装</value>
+  </data>
+  <data name="PawnDriverNotInstalled" xml:space="preserve">
+    <value>PawnIO 驱动：未安装</value>
+  </data>
+  <data name="PawnInstallDone" xml:space="preserve">
+    <value>PawnIO 安装完成</value>
+  </data>
+  <data name="PawnInstallReturn" xml:space="preserve">
+    <value>PawnIO 安装返回 </value>
+  </data>
+  <data name="PawnInstallFailed" xml:space="preserve">
+    <value>PawnIO 安装失败：</value>
+  </data>
 </root>

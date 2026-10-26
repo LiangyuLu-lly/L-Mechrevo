@@ -656,4 +656,13 @@ public static class WpfStrings
     public static string TrayGpuDirect => Get("TrayGpuDirect");
     public static string TrayNoCustom => Get("TrayNoCustom");
     public static string TraySaved => Get("TraySaved");
+    public static string OfficialRunning => Get("OfficialRunning");
+    public static string OfficialInstalled => Get("OfficialInstalled");
+    public static string OfficialNotDetected => Get("OfficialNotDetected");
+    public static string IsolationFailed => Get("IsolationFailed");
+    public static string PawnDriverInstalled => Get("PawnDriverInstalled");
+    public static string PawnDriverNotInstalled => Get("PawnDriverNotInstalled");
+    public static string PawnInstallDone => Get("PawnInstallDone");
+    public static string PawnInstallReturn => Get("PawnInstallReturn");
+    public static string PawnInstallFailed => Get("PawnInstallFailed");
 }

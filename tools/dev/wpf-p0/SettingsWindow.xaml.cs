@@ -626,8 +626,8 @@ public partial class SettingsWindow : Window
         var status = OfficialConsoleIsolation.GetStatus(_owner.BackendConnected);
         _isolated = status.Isolated;
         OfficialStatus.Text = status.OfficialUiInstalled
-            ? (status.OfficialUiRunning ? "官方控制台运行中" : "官方控制台已安装")
-            : "未检测到官方控制台";
+            ? (status.OfficialUiRunning ? WpfStrings.OfficialRunning : WpfStrings.OfficialInstalled)
+            : WpfStrings.OfficialNotDetected;
         IsolationButton.Content = status.Isolated ? WpfStrings.CancelIsolation : WpfStrings.IsolateOfficial;
     }
 
@@ -642,7 +642,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Status("隔离操作失败：" + ex.Message);
+            Status(WpfStrings.IsolationFailed + ex.Message);
         }
         finally
         {
@@ -654,8 +654,8 @@ public partial class SettingsWindow : Window
     {
         PawnIOInstaller.Status status = PawnIOInstaller.GetStatus();
         PawnStatus.Text = status.Installed
-            ? "PawnIO 驱动：已安装" + (string.IsNullOrWhiteSpace(status.Version) ? "" : "（" + status.Version + "）")
-            : "PawnIO 驱动：未安装";
+            ? WpfStrings.PawnDriverInstalled + (string.IsNullOrWhiteSpace(status.Version) ? "" : " (" + status.Version + ")")
+            : WpfStrings.PawnDriverNotInstalled;
     }
 
     private async void ReinstallPawnIO_Click(object sender, RoutedEventArgs e)
@@ -664,12 +664,12 @@ public partial class SettingsWindow : Window
         try
         {
             int code = await PawnIOInstaller.RunInstallerAsync();
-            Status(code == 0 ? "PawnIO 安装完成" : "PawnIO 安装返回 " + code);
+            Status(code == 0 ? WpfStrings.PawnInstallDone : WpfStrings.PawnInstallReturn + code);
             RefreshPawnIO();
         }
         catch (Exception ex)
         {
-            Status("PawnIO 安装失败：" + ex.Message);
+            Status(WpfStrings.PawnInstallFailed + ex.Message);
         }
         finally
         {

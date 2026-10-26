@@ -736,7 +736,7 @@
     <value>iGPU-only mode display</value>
   </data>
   <data name="PawnStatus_Text" xml:space="preserve">
-    <value>PawnIO 驱动：检测中…</value>
+    <value>PawnIO driver: checking...</value>
   </data>
   <data name="ReinstallPawnButton_Content" xml:space="preserve">
     <value>Reinstall</value>
@@ -1949,5 +1949,32 @@
   </data>
   <data name="TraySaved" xml:space="preserve">
     <value>Tray menu saved</value>
+  </data>
+  <data name="OfficialRunning" xml:space="preserve">
+    <value>Official console is running</value>
+  </data>
+  <data name="OfficialInstalled" xml:space="preserve">
+    <value>Official console installed</value>
+  </data>
+  <data name="OfficialNotDetected" xml:space="preserve">
+    <value>Official console not detected</value>
+  </data>
+  <data name="IsolationFailed" xml:space="preserve">
+    <value>Isolation failed: </value>
+  </data>
+  <data name="PawnDriverInstalled" xml:space="preserve">
+    <value>PawnIO driver: installed</value>
+  </data>
+  <data name="PawnDriverNotInstalled" xml:space="preserve">
+    <value>PawnIO driver: not installed</value>
+  </data>
+  <data name="PawnInstallDone" xml:space="preserve">
+    <value>PawnIO installation completed</value>
+  </data>
+  <data name="PawnInstallReturn" xml:space="preserve">
+    <value>PawnIO installer returned </value>
+  </data>
+  <data name="PawnInstallFailed" xml:space="preserve">
+    <value>PawnIO installation failed: </value>
   </data>
 </root>
