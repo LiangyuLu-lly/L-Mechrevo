@@ -232,7 +232,7 @@ public partial class OriginalStyleWindow : Window
         };
         _trayIcon.CustomModeRequested += id => _ = ActivateTrayCustomAsync(id);
         _trayIcon.SilentTurboRequested += () => _ = TraySilentTurboAsync();
-        Dispatcher.BeginInvoke(new Action(PreloadOverlayWindow), DispatcherPriority.Background);
+        // 悬浮窗改为按需创建：启动期不再预加载，降低常驻内存。
         SourceInitialized += (_, _) =>
         {
             try
@@ -277,7 +277,13 @@ public partial class OriginalStyleWindow : Window
             NormalizeSegmentDefaults();
             ApplyDarkTitleBar(_dark);
             ApplyRoundedCorners();
-            ReloadBackgroundImage();
+            bool backgroundEnabled = MechrevoLite.AppConfig.Is("ui_bg_enabled");
+            BackgroundToggle.IsChecked = backgroundEnabled;
+            UpdateBackgroundVisibility();
+            if (backgroundEnabled)
+            {
+                ReloadBackgroundImage();
+            }
             _ = Dispatcher.BeginInvoke(new Action(() => _ = ConnectBackendAsync()), System.Windows.Threading.DispatcherPriority.Background);
             if (string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
             {
@@ -3051,6 +3057,10 @@ public partial class OriginalStyleWindow : Window
 
     private void BackgroundToggle_Changed(object sender, RoutedEventArgs e)
     {
+        if (IsLoaded && BackgroundToggle.IsChecked == true && BackgroundImage.Source == null)
+        {
+            ReloadBackgroundImage();
+        }
         UpdateBackgroundVisibility();
         if (IsLoaded)
         {
@@ -5410,6 +5420,10 @@ public partial class OriginalStyleWindow : Window
         BackgroundToggle.IsChecked = on;
         AppConfig.Set("ui_bg_enabled", on ? 1 : 0);
         AppConfig.Flush();
+        if (on)
+        {
+            ReloadBackgroundImage();
+        }
         UpdateBackgroundVisibility();
     }
 

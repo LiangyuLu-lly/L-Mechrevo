@@ -363,7 +363,7 @@
     </Window.Resources>
 
     <Grid>
-        <Image x:Name="BackgroundImage" Source="Assets/background.jpg" Stretch="UniformToFill" Opacity="0.58" Visibility="Collapsed" />
+        <Image x:Name="BackgroundImage" Stretch="UniformToFill" Opacity="0.58" Visibility="Collapsed" />
         <Rectangle x:Name="BackgroundScrim" Fill="#99000000" Opacity="0.45" Visibility="Collapsed" />
 
         <Grid Margin="0">
