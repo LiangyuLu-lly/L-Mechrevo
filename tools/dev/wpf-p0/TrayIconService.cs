@@ -91,6 +91,13 @@ internal sealed class TrayIconService : IDisposable
             ContextMenuStrip = _menu
         };
         _icon.DoubleClick += (_, _) => ShowRequested?.Invoke();
+        _icon.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                ShowRequested?.Invoke();
+            }
+        };
         _menu.Opening += (_, _) => RebuildMenu();
         _menu.ShowCheckMargin = true;
         _menu.ShowImageMargin = false;
