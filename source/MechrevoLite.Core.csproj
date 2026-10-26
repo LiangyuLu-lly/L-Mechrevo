@@ -91,6 +91,7 @@
   <ItemGroup Label="Business resources (Strings only)">
     <Compile Include="MechrevoLite.Properties\Strings.cs" />
     <EmbeddedResource Include="MechrevoLite.Properties.Strings.resx" LogicalName="MechrevoLite.Properties.Strings.resources" />
+    <EmbeddedResource Include="MechrevoLite.Properties.Strings.zh-CN.resx" LogicalName="MechrevoLite.Properties.Strings.zh-CN.resources" />
     <!-- 旧根目录里的配置存储（业务基础设施，实测可编入 Core） -->
     <Compile Include="MechrevoLite\AppConfig.cs" />
     <!-- 被 AppConfig 死代码引用的小枚举（3 行；不是窗体） -->
