@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- task-41：机型分流只读探针（不引用 Core、不改 Core；用反射加载已构建的 MechrevoLite.Core.dll）。
+       用途：非管理员、只读地打印 MachineIdentity 事实 / BackendRouter 路由 / 规则矩阵自测。
+       ⚠️ 只用于开发机取证；不参与 LM 打包。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Core 的业务代码引用 WinForms（Application.StartupPath 等）；探针进程也要带上 WindowsDesktop 框架
+         （不含它时 AppConfig/GpuGenerationProvider 会加载失败 ⇒ 代际事实退化成 Unknown）。 -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>route-probe</AssemblyName>
+    <RootNamespace />
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+</Project>

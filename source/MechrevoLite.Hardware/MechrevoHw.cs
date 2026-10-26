@@ -1978,6 +1978,28 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	/// <summary>
+	/// ⭐⭐ 2026-10-27（task-41）：**路由声明**（来自 <see cref="BackendRouter" /> 的规则表）。
+	/// <para>⚠️ 与 <see cref="ActiveRoute" /> 的区别：<see cref="ActiveRoute" /> 回答"现在实际连着谁"
+	/// （由连接对象推导，未连上 = None）；本属性回答"按机型事实应该走谁"。两者不一致时由
+	/// <see cref="RouteDeclarationMatchesActual" /> / <c>[gate] 机型分类</c> 日志如实暴露（⛔ 不静默换后端）。</para>
+	/// </summary>
+	internal BackendRoute DeclaredRoute
+	{
+		get
+		{
+			BackendRouteDecision decision = BackendRouter.LastDecision;
+			return decision == null ? BackendRoute.None : BackendRouter.ToRoute(decision.Backend);
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 声明后端与实际选中后端是否一致（实际 = <see cref="_activeBackend" />，由探测/连接路径写入）。
+	/// <para>⚠️ 用途只是**审计/日志**：返回值不参与任何硬件下发判断（现有功能判据仍用
+	/// <see cref="ActiveRoute" /> / <c>UsesBaolongda</c> 等，逐位不变）。</para>
+	/// </summary>
+	internal bool RouteDeclarationMatchesActual => DeclaredRoute == BackendRouter.ToRoute(_activeBackend);
+
+	/// <summary>
 	/// ⭐⭐⭐ 2026-10-16：**三态路由查询** —— ⭐「⭐ 这个动作该走谁 ✅」✅。
 	/// <para>⭐ 设计文档 §4.4 / §4.5 ✅。⭐ 目标：⭐ 让「加一条新后端」从**改一遍**变成**改一处** ✅。</para>
 	/// <para>⚠️⚠️ **语义必须严格**（⭐ 见 <see cref="FeatureSupport"/> 各成员注释 ✅）：
@@ -7501,6 +7523,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				_legacyProbed = true;
 				(MechrevoBackendKind kind, object created) = await Task.Run((Func<(MechrevoBackendKind, object)>)MechrevoBackendOrder.Probe).ConfigureAwait(continueOnCapturedContext: false);
+				// ⭐⭐ 2026-10-27（task-41）：路由声明 / 实际后端 / 机型事实**一处对齐**并留痕。
+				//   只读（复用 Probe 里已经采集的 MachineIdentity，不重读 WMI/注册表），不改任何控制流；
+				//   非宝龙达路径也打这一行（原来只有 GCU 兜底分支有 backend 日志）。
+				LogMachineRouteGate(kind);
 				// ⭐⭐ 2026-10-16（宝龙达适配）：宝龙达模具（⭐ 蛟龙16Pro 等）—— ⭐ 必须**排在老接口之前**判，
 				// 因为两者协议同族、老接口的 GUID 校验在宝龙达机上**也会通过**（⭐ 真机实测 GUID 完全一致 ⚠️）
 				// ⇒ ⭐ 若先判老接口，宝龙达后端**永远轮不到**，我们新接的风扇/温度/灯效就都用不上 ✅
@@ -7893,6 +7919,50 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		Logger.WriteLine($"mqtt clientId 回退: {text2} -> {text} (原因: {reason})");
 		return true;
 	}
+	/// <summary>
+	/// ⭐⭐ 2026-10-27（task-41）：<c>[gate] 机型分类</c> —— 一行同时给出「机型事实 + 路由声明 + 实际后端 + 是否一致」。
+	/// <para>事实来源**必须是** <see cref="BackendRouter.LastDecision" /> 里的那一个 <see cref="MachineIdentity" />
+	/// （与路由判定/诊断包共用同一份实例，设计文档 §3.4）；只有路由未运行（如 UI 审计注入通路）时才现场补采。</para>
+	/// <para>⚠️ 只写日志、⛔ 不改变任何后端选择或硬件下发；一致 = Info（默认级别不落盘，诊断包可见），
+	/// 不一致 = <c>WriteError</c>（默认级别也可见）。</para>
+	/// </summary>
+	private static void LogMachineRouteGate(MechrevoBackendKind actual)
+	{
+		try
+		{
+			BackendRouteDecision decision = BackendRouter.LastDecision;
+			MachineIdentity identity;
+			string declared;
+			if (decision != null)
+			{
+				identity = decision.Identity;
+				declared = decision.Backend + "(rule=#" + decision.RuleIndex + " " + decision.Rule + " · decl=" + (decision.DeclarationPassed ? "pass" : "fail") + ")";
+			}
+			else
+			{
+				identity = MachineIdentity.Collect();
+				declared = "(路由未运行)";
+			}
+			BackendRoute declaredRoute = decision == null ? BackendRoute.None : BackendRouter.ToRoute(decision.Backend);
+			BackendRoute actualRoute = BackendRouter.ToRoute(actual);
+			bool consistent = declaredRoute == actualRoute;
+			string message = "[gate] 机型分类：" + identity.Summary
+				+ " ⇒ declared=" + declared
+				+ " · actual=" + actual
+				+ " · 一致=" + consistent;
+			Logger.WriteLineIfChanged("machine-route-gate", message);
+			if (!consistent)
+			{
+				Logger.WriteError("[强化机型分流] ⚠️ [gate] 机型分类：路由声明与实际后端不一致 ⇒ 已按实际后端运行（诊断包会记录）：" + message);
+			}
+		}
+		catch (Exception ex)
+		{
+			// 日志失败绝不影响启动（与启动诊断既有约定一致）。
+			Logger.WriteLine("[gate] 机型分类日志失败（已吞掉，不影响启动）：" + ex.GetType().Name + " " + ex.Message);
+		}
+	}
+
 	// **周期任务平台门控**的启动留痕 —— 非宝龙达机器只打**一行**（去重），说明跳过了哪些宝龙达周期任务 。
 	private static void LogNonBaolongdaPeriodicGateOnce(string backend)
 	{
