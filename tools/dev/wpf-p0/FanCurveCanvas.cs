@@ -61,7 +61,7 @@ public sealed class FanCurveCanvas : FrameworkElement
     {
         base.OnRender(dc);
         var plot = Plot();
-        dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x16, 0x1B, 0x23)), null, new Rect(0, 0, ActualWidth, ActualHeight));
+        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x88, 0x16, 0x1B, 0x23)), null, new Rect(0, 0, ActualWidth, ActualHeight));
         Pen grid = new(new SolidColorBrush(Color.FromArgb(0x35, 0xFF, 0xFF, 0xFF)), 1);
         Pen border = new(new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF)), 1);
         for (int i = 0; i <= 4; i++)
@@ -96,7 +96,7 @@ public sealed class FanCurveCanvas : FrameworkElement
         for (int i = 0; i < _valid; i++)
         {
             Point p = PointAt(i, plot);
-            dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0x16, 0x1B, 0x23)), new Pen(pointBrush, 2), p, 5, 5);
+            dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(0xCC, 0x16, 0x1B, 0x23)), new Pen(pointBrush, 2), p, 5, 5);
             if (_temps[i] is > 0 and < byte.MaxValue)
             {
                 FormattedText temp = new(

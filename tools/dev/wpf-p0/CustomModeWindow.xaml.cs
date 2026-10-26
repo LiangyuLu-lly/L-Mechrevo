@@ -46,6 +46,20 @@ public partial class CustomModeWindow : Window
         LoadModes(initialModeId);
     }
 
+    internal void PrepareInline()
+    {
+        if (ContentScroll.Parent is not Grid grid || ContentScroll.Content is not UIElement inner)
+        {
+            return;
+        }
+        grid.Children.Remove(ContentScroll);
+        if (inner is FrameworkElement element)
+        {
+            Grid.SetRow(element, 1);
+        }
+        grid.Children.Add(inner);
+    }
+
     public void SetDark(bool dark)
     {
     }
@@ -420,7 +434,7 @@ public partial class CustomModeWindow : Window
         try
         {
             PowerPlanCombo.Items.Clear();
-            PowerPlanCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.CustomModeWindow_xaml_Content, Tag = "" });
+            PowerPlanCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.CustomModeWindow_Content_4, Tag = "" });
             foreach ((string guid, string name) in MechrevoLite.Hardware.WinPowerPlan.GetPlans())
             {
                 PowerPlanCombo.Items.Add(new ComboBoxItem { Content = name, Tag = guid });
@@ -590,7 +604,7 @@ public partial class CustomModeWindow : Window
     private void RefreshOptions(int? current)
     {
         RefreshCombo.Items.Clear();
-        RefreshCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.CustomModeWindow_xaml_Content, Tag = "" });
+        RefreshCombo.Items.Add(new ComboBoxItem { Content = WpfStrings.CustomModeWindow_Content_4, Tag = "" });
         try
         {
             foreach (int hz in (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.HzList ?? Array.Empty<int>()).Distinct().OrderByDescending(v => v))

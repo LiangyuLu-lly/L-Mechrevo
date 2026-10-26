@@ -200,11 +200,13 @@ public partial class MainWindow
             if (CpuFanCurveHost.Content == null)
             {
                 _cpuFanInlineWindow = new FanCurveWindow("balanced", showCpu: true, showGpu: false);
+                ((FanCurveWindow)_cpuFanInlineWindow).PrepareInline();
                 MountWindowContent(_cpuFanInlineWindow, CpuFanCurveHost);
             }
             if (GpuFanCurveHost.Content == null)
             {
                 _gpuFanInlineWindow = new FanCurveWindow("balanced", showCpu: false, showGpu: true);
+                ((FanCurveWindow)_gpuFanInlineWindow).PrepareInline();
                 MountWindowContent(_gpuFanInlineWindow, GpuFanCurveHost);
             }
         }
@@ -221,6 +223,39 @@ public partial class MainWindow
             window.Content = null;
             host.Content = content;
         }
+    }
+
+    private static void UnwrapInnerScrollViewer(DependencyObject root)
+    {
+        ScrollViewer? scroll = FindVisualChild<ScrollViewer>(root);
+        if (scroll?.Parent is not Grid grid || scroll.Content is not UIElement inner)
+        {
+            return;
+        }
+        grid.Children.Remove(scroll);
+        if (inner is FrameworkElement element)
+        {
+            Grid.SetRow(element, 1);
+        }
+        grid.Children.Add(inner);
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+            {
+                return match;
+            }
+            T? nested = FindVisualChild<T>(child);
+            if (nested != null)
+            {
+                return nested;
+            }
+        }
+        return null;
     }
 
     private void WireCustomEvents()

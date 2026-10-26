@@ -115,10 +115,10 @@
     <value>Apply</value>
   </data>
   <data name="CustomModeWindow_Text" xml:space="preserve">
-    <value>显存偏移 (MHz)</value>
+    <value>Memory offset (MHz)</value>
   </data>
   <data name="CustomModeWindow_Text_2" xml:space="preserve">
-    <value>核心偏移 (MHz)</value>
+    <value>Core offset (MHz)</value>
   </data>
   <data name="CustomModeWindow_Text_3" xml:space="preserve">
     <value>GPU OC</value>
@@ -991,7 +991,7 @@
     <value>读取快照失败：</value>
   </data>
   <data name="CustomModeWindow_xaml_Content" xml:space="preserve">
-    <value>应用 *</value>
+    <value>Apply *</value>
   </data>
   <data name="CustomModeWindow_xaml_Text" xml:space="preserve">
     <value>有未应用修改</value>
@@ -1030,10 +1030,10 @@
     <value>CPU temperature wall</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_12" xml:space="preserve">
-    <value>PerfModeService 未初始化</value>
+    <value>PerfModeService is not initialized</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_13" xml:space="preserve">
-    <value>应用失败：没有返回下发结果</value>
+    <value>Apply failed: no result returned</value>
   </data>
   <data name="CustomModeWindow_xaml_Text_14" xml:space="preserve">
     <value>已应用：</value>

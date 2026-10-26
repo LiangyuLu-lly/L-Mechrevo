@@ -65,7 +65,7 @@
             <TextBlock x:Name="PowerWallStatusText" Text="" Style="{StaticResource MutedText}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer x:Name="ContentScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
                 <Border x:Name="SystemCard" Style="{StaticResource Card}" Margin="0,0,0,8">
                     <StackPanel>
@@ -110,7 +110,7 @@
                             <ComboBox x:Name="FanBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_4}" Tag="" />
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Tag="1" />
-                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CpuTuningWindow_Content}" Tag="0" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.StateOff}" Tag="0" />
                             </ComboBox>
                         </Grid>
 

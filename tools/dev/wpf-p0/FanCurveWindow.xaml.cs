@@ -46,6 +46,20 @@ public partial class FanCurveWindow : Window
         LoadFromHardware();
     }
 
+    internal void PrepareInline()
+    {
+        TitleText.Visibility = Visibility.Collapsed;
+        HintText.Visibility = Visibility.Collapsed;
+        if (CpuSection.Children.Count > 0 && CpuSection.Children[0] is TextBlock cpuTitle)
+        {
+            cpuTitle.Visibility = Visibility.Collapsed;
+        }
+        if (GpuSection.Children.Count > 0 && GpuSection.Children[0] is TextBlock gpuTitle)
+        {
+            gpuTitle.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private void MarkDirty()
     {
         _dirty = true;
