@@ -5460,16 +5460,21 @@ public partial class OriginalStyleWindow : Window
 
     internal AppServices? Services => _services;
 
-    internal void ShowCompactWindow()
+    internal void PositionCompactBottomRight()
     {
-        Opacity = 1;
-        ShowInTaskbar = true;
         WindowStartupLocation = WindowStartupLocation.Manual;
         Rect area = SystemParameters.WorkArea;
         double compactWidth = double.IsNaN(Width) ? ActualWidth : Width;
         double compactHeight = double.IsNaN(Height) ? ActualHeight : Height;
         Left = area.Right - compactWidth - 16;
         Top = area.Bottom - compactHeight - 16;
+    }
+
+    internal void ShowCompactWindow()
+    {
+        Opacity = 1;
+        ShowInTaskbar = true;
+        PositionCompactBottomRight();
         Show();
         Activate();
     }

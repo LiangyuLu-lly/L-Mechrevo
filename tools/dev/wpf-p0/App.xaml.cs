@@ -72,6 +72,10 @@ public partial class App : Application
             window.Left = -20000;
             window.Top = -20000;
         }
+        else
+        {
+            window.PositionCompactBottomRight();
+        }
         window.Show();
     }
 
