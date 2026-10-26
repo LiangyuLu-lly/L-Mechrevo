@@ -619,6 +619,10 @@ public static class WpfStrings
     public static string BatteryAbnormal => Get("BatteryAbnormal");
     public static string BatteryHealth => Get("BatteryHealth");
     public static string StateOn => Get("StateOn");
+    public static string OsdPerformance => Get("OsdPerformance");
+    public static string OsdLighting => Get("OsdLighting");
+    public static string OsdBrightness => Get("OsdBrightness");
+
     public static string StateOff => Get("StateOff");
     public static string StateAuto => Get("StateAuto");
     public static string StateUnknown => Get("StateUnknown");

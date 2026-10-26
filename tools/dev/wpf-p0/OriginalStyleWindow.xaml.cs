@@ -1205,7 +1205,11 @@ public partial class OriginalStyleWindow : Window
 
     internal void WideSetBrightness(int brightness)
     {
-        BrightnessSlider.Value = Math.Clamp(brightness, 0, 100);
+        int value = Math.Clamp(brightness, 0, 100);
+        _syncingBrightness = true;
+        BrightnessSlider.Value = value;
+        _syncingBrightness = false;
+        OsdService.Show("\uE706", WpfStrings.OsdBrightness, value + "%");
     }
 
     internal void WideSetAutoRefresh(bool enabled)
@@ -2438,6 +2442,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             if (_services != null) { _services.Display.SetBrightness(value); } else { ScreenBrightness.Set(value); }
+            OsdService.Show("\uE706", WpfStrings.OsdBrightness, value + "%");
         }
         catch
         {
@@ -6315,6 +6320,7 @@ public partial class OriginalStyleWindow : Window
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("Keyboard/Ctrl", requested, "用户点击键盘灯光开关");
         }
+        OsdService.Show("\uE706", WpfStrings.OsdLighting, requested ? WpfStrings.StateOn : WpfStrings.StateOff);
     }
 
     private static void SaveChannelEffect(string topic, string effect)

@@ -236,6 +236,10 @@ internal sealed class QuickSwitchService : IQuickSwitchService
                     : ServiceResult.Fail(on ? WpfStrings.QuickFanBoostOnUnconfirmed : WpfStrings.QuickFanBoostOffUnconfirmed);
             }
             ok = await probe.SwitchQuickAsync(key, on).ConfigureAwait(false);
+            if (ok)
+            {
+                L_Mechrevo.WpfP0.OsdService.ShowQuickSwitch(key, on);
+            }
             return ok
                 ? ServiceResult.Success(on ? WpfStrings.QuickResultOn : WpfStrings.QuickResultOff)
                 : ServiceResult.Fail(WpfStrings.QuickUnconfirmed + key);

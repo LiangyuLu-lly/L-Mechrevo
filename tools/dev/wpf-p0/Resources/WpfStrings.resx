@@ -2930,4 +2930,13 @@ Cancel: do not switch</value>
   <data name="PeripheralHidDeviceFormat" xml:space="preserve">
     <value>HID device VID_{0} PID_{1}</value>
   </data>
+  <data name="OsdPerformance" xml:space="preserve">
+    <value>Performance mode</value>
+  </data>
+  <data name="OsdLighting" xml:space="preserve">
+    <value>Lighting</value>
+  </data>
+  <data name="OsdBrightness" xml:space="preserve">
+    <value>Screen brightness</value>
+  </data>
 </root>
