@@ -96,8 +96,13 @@ internal sealed class DisplayService : IDisplayService
         catch
         {
         }
-        int currentHz = SafeCount(static () => ScreenNative.GetRefreshRate(null));
-        int maxHz = SafeCount(static () => ScreenControl.GetMaxRate(null));
+        string? laptopScreen = SafeString(static () => ScreenNative.FindLaptopScreen(false));
+        int currentHz = SafeCount(() => ScreenNative.GetRefreshRate(laptopScreen));
+        if (currentHz < 0)
+        {
+            currentHz = SafeCount(static () => ScreenNative.GetRefreshRate(null));
+        }
+        int maxHz = SafeCount(() => ScreenControl.GetMaxRate(laptopScreen));
         int brightness = ScreenBrightness.TryGet(out int value) ? value : 100;
         return new DisplaySnapshot(
             ScreenWidth: width,
@@ -353,6 +358,18 @@ internal sealed class DisplayService : IDisplayService
             return false;
         }
         return await Task.Run(() => IccHelper.ApplyIcc(iccPath)).ConfigureAwait(false);
+    }
+
+    private static string? SafeString(Func<string?> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static int SafeCount(Func<int> read)
