@@ -95,3 +95,6 @@ desktop.ini
 # ── 七、第三方参考仓库（克隆下来的，⛔ 不进我们的版本控制）────────────────
 _refs/
 
+
+tools/dev/wpf-p0/bin-alt/
+
