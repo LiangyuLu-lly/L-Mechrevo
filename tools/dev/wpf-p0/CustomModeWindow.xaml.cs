@@ -891,7 +891,13 @@ public partial class CustomModeWindow : Window
             string targetId = _firmwareMode
                 ? "fw" + _firmwareVisualMode + "p" + _firmwareProfileIndex
                 : (_current?.Id ?? "balanced");
-            new FanCurveWindow(targetId) { Owner = this }.Show();
+            FanCurveWindow fanWindow = new(targetId);
+            Window? fanOwner = ResolveDialogOwner();
+            if (fanOwner != null)
+            {
+                fanWindow.Owner = fanOwner;
+            }
+            fanWindow.Show();
         }
         catch (Exception ex)
         {
@@ -899,11 +905,27 @@ public partial class CustomModeWindow : Window
         }
     }
 
+    private Window? ResolveDialogOwner()
+    {
+        if (IsVisible && PresentationSource.FromVisual(this) != null)
+        {
+            return this;
+        }
+        Window? main = Application.Current?.MainWindow;
+        return main != null && main.IsVisible && !ReferenceEquals(main, this) ? main : null;
+    }
+
     private void CpuTuning_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            new CpuTuningWindow { Owner = this }.Show();
+            CpuTuningWindow tuningWindow = new();
+            Window? tuningOwner = ResolveDialogOwner();
+            if (tuningOwner != null)
+            {
+                tuningWindow.Owner = tuningOwner;
+            }
+            tuningWindow.Show();
         }
         catch (Exception ex)
         {
