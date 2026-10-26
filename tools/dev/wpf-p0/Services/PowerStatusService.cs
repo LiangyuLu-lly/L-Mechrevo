@@ -28,10 +28,21 @@ internal static class PowerStatusService
                 // CPU/GPU 功耗、显存频率等属于本地采样链，不能只刷新电源输入/电池。
                 HardwareControl.SampleLocalPower();
             }
+            int percent = HardwareControl.GetBatteryChargePercentage();
+            if (percent <= 0)
+            {
+                try
+                {
+                    percent = (int)Math.Round(System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent * 100);
+                }
+                catch
+                {
+                }
+            }
             return new PowerStatusSnapshot(
                 HardwareControl.PowerInput,
                 HardwareControl.batteryRate,
-                HardwareControl.GetBatteryChargePercentage(),
+                percent,
                 System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online,
                 System.Windows.Forms.SystemInformation.PowerStatus.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.Charging),
                 HardwareControl.LocalPowerSamplingUnavailable);

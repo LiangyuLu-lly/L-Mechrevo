@@ -102,7 +102,8 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingBatteryLimit;
     private bool _batteryLimitLoaded;
     private BackendProbe? _backendProbe;
-    private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+    // 托盘/后台默认 2s；悬浮窗打开时临时提到 1s。
+    private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _backendRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
     private bool _connectAttempting;
     private const string QuickTilesConfigKey = "perf_quick_tiles";
@@ -965,7 +966,12 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         _overlayWindow = new OverlayWindow(GetOverlaySnapshot);
-        _overlayWindow.Closed += (_, _) => _overlayWindow = null;
+        _overlayWindow.Closed += (_, _) =>
+        {
+            _overlayWindow = null;
+            UpdateBackendTimerInterval();
+        };
+        _overlayWindow.IsVisibleChanged += (_, _) => UpdateBackendTimerInterval();
     }
 
     private void PreloadOverlayWindow()
@@ -2825,6 +2831,17 @@ public partial class OriginalStyleWindow : Window
         return WideTraySensorEnabled;
     }
 
+    private void UpdateBackendTimerInterval()
+    {
+        TimeSpan interval = _overlayWindow?.IsVisible == true
+            ? TimeSpan.FromSeconds(1)
+            : TimeSpan.FromSeconds(2);
+        if (_backendTimer.Interval != interval)
+        {
+            _backendTimer.Interval = interval;
+        }
+    }
+
     private void UpdateTraySensorTooltip(BackendProbe probe)
     {
         if (!WideTraySensorEnabled || _trayIcon == null || probe.Hw == null)
@@ -2835,10 +2852,20 @@ public partial class OriginalStyleWindow : Window
         try
         {
             MechrevoHw hw = probe.Hw;
-            int battery = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().Percent;
-            string text = "CPU" + hw.CpuTemp + "° " + hw.CpuFanDuty + "%"
-                + " | GPU" + hw.GpuTemp + "° " + hw.GpuFanDuty + "%"
-                + (battery >= 0 ? " | " + battery + "%" : "");
+            L_Mechrevo.WpfP0.Services.PowerStatusSnapshot power = L_Mechrevo.WpfP0.Services.PowerStatusService.Read(sample: true);
+            L_Mechrevo.WpfP0.Services.SensorSnapshot sensor = _services?.Sensors.Read() ?? L_Mechrevo.WpfP0.Services.SensorSnapshot.Empty;
+            int battery = power.Percent;
+            string cpuFan = hw.CpuFanRpm > 0
+                ? " " + hw.CpuFanRpm + "rpm"
+                : " " + hw.CpuFanDuty + "%";
+            string gpuFan = hw.GpuFanRpm > 0
+                ? " " + hw.GpuFanRpm + "rpm"
+                : " " + hw.GpuFanDuty + "%";
+            string cpuPower = sensor.CpuPowerWatts.HasValue ? " " + sensor.CpuPowerWatts.Value.ToString("0") + "W" : "";
+            string gpuPower = sensor.GpuPowerWatts.HasValue ? " " + sensor.GpuPowerWatts.Value.ToString("0") + "W" : "";
+            string text = "CPU" + hw.CpuTemp + "°" + cpuFan + cpuPower
+                + " | GPU" + hw.GpuTemp + "°" + gpuFan + gpuPower
+                + (battery > 0 ? " | " + battery + "%" : "");
             _trayIcon.SetTooltip(text);
         }
         catch
