@@ -823,7 +823,8 @@ public partial class OriginalStyleWindow : Window
         {
             try
             {
-                return IsChargeLimitChannelAvailable(_backendProbe?.Hw);
+                // 宝龙达阈值面板（BatteryLimitWriter）与 GCU 的 EC 限充是两套：这里只回答宝龙达面板。
+                return _backendProbe?.Hw != null && MechrevoLite.BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw);
             }
             catch
             {
@@ -1208,6 +1209,57 @@ public partial class OriginalStyleWindow : Window
         catch
         {
             return ("--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--", "--");
+        }
+    }
+
+    /// <summary>GCU 机型的 EC 限充传输开关（与宝龙达阈值面板是两套）。</summary>
+    internal bool WideEcTransportSupported
+    {
+        get
+        {
+            try
+            {
+                MechrevoHw? hw = _backendProbe?.Hw;
+                return hw != null && !hw.UsesBaolongda
+                    && MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal bool WideEcTransportOn => MechrevoLite.Battery.BatteryControl.LockEnabled();
+
+    internal void WideSetEcTransport(bool on)
+    {
+        try
+        {
+            MechrevoHw? hw = _backendProbe?.Hw;
+            if (hw == null || hw.UsesBaolongda)
+            {
+                return;
+            }
+            MechrevoLite.Battery.BatteryControl.SetLockEnabled(on);
+            if (on)
+            {
+                int percent = MechrevoLite.Battery.BatteryControl.SelectedModePercent();
+                if (MechrevoLite.Battery.BatteryControl.CaptureChargeLimitGesture())
+                {
+                    MechrevoLite.Battery.BatteryControl.ApplyChargeLimitFromUserGesture(percent);
+                }
+            }
+            else
+            {
+                MechrevoLite.Battery.BatteryControl.SetBatteryChargeLimit(100);
+            }
+            StatusText.Text = on ? WpfStrings.BatteryEcTransportOn : WpfStrings.BatteryEcTransportOff;
+            RefreshFromBackend();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_3 + ex.Message;
         }
     }
 
@@ -2028,7 +2080,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             MechrevoHw? hw = _backendProbe?.Hw;
-            supported = IsChargeLimitChannelAvailable(hw);
+            supported = hw != null && BatteryLimitPanel.IsSupportedBoard(hw);
         }
         catch
         {
@@ -2053,7 +2105,7 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            if (_backendProbe?.Hw == null || !IsChargeLimitChannelAvailable(_backendProbe.Hw))
+            if (_backendProbe?.Hw == null || !BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw))
             {
                 return;
             }
@@ -3077,9 +3129,21 @@ public partial class OriginalStyleWindow : Window
             }
         }
         HighlightSegment(button);
+        int mode = int.Parse(text);
+        // GCU 与宝龙达是两套：宝龙达走自身阈值面板；GCU 若已打开 EC 限充，三档改走 EC 直写，
+        // 否则仍走 GCU 官方 BatteryProtection。
+        if (_backendProbe.Hw?.UsesBaolongda != true
+            && MechrevoLite.Battery.BatteryControl.LockEnabled())
+        {
+            int percent = mode switch { 0 => 100, 1 => 80, 2 => 60, _ => 80 };
+            bool ecOk = MechrevoLite.Battery.BatteryControl.CaptureChargeLimitGesture()
+                && MechrevoLite.Battery.BatteryControl.ApplyChargeLimitFromUserGesture(percent);
+            StatusText.Text = ecOk ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
+            return;
+        }
         bool ok = _services != null
-            ? (await _services.Battery.SetModeAsync(int.Parse(text))).Ok
-            : await _backendProbe.SetBatteryModeAsync(int.Parse(text));
+            ? (await _services.Battery.SetModeAsync(mode)).Ok
+            : await _backendProbe.SetBatteryModeAsync(mode);
         StatusText.Text = ok ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
     }
 

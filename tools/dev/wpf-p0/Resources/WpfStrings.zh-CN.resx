@@ -2930,4 +2930,13 @@ GCU：{0} · 宝龙达：{1} · 无界：{2}</value>
   <data name="PeripheralHidDeviceFormat" xml:space="preserve">
     <value>HID 外设 VID_{0} PID_{1}</value>
   </data>
+  <data name="BatteryEcTransport" xml:space="preserve">
+    <value>EC 限充</value>
+  </data>
+  <data name="BatteryEcTransportOn" xml:space="preserve">
+    <value>EC 限充已开启</value>
+  </data>
+  <data name="BatteryEcTransportOff" xml:space="preserve">
+    <value>EC 限充已关闭</value>
+  </data>
 </root>
