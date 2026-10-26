@@ -2428,8 +2428,11 @@ public partial class MainWindow : Window
                 bool hidColorEffect = effect.StartsWith("hid:", StringComparison.Ordinal)
                     && int.TryParse(effect.AsSpan(4), out int hidColorMode) && hidColorMode is 0 or 9;
                 bool breathPalette = singleZoneKeyboard && string.Equals(effect, "Breathing", StringComparison.Ordinal);
-                bool singleColor = !breathPalette && (hidColorEffect || colorMode == 1);
-                bool mixColor = !breathPalette && !hidColorEffect && colorMode == 7;
+                bool keyboardBreathing = topic == "Keyboard/Ctrl"
+                    && string.Equals(effect, "Breathing", StringComparison.Ordinal)
+                    && !singleZoneKeyboard;
+                bool singleColor = !breathPalette && (hidColorEffect || keyboardBreathing || colorMode == 1);
+                bool mixColor = !breathPalette && !keyboardBreathing && !hidColorEffect && colorMode == 7;
                 colorSection.Visibility = singleColor ? Visibility.Visible : Visibility.Collapsed;
                 mixSection.Visibility = mixColor ? Visibility.Visible : Visibility.Collapsed;
                 breathSection.Visibility = breathPalette ? Visibility.Visible : Visibility.Collapsed;
