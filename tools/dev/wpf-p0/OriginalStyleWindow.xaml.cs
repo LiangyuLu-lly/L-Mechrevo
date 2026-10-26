@@ -2006,8 +2006,9 @@ public partial class OriginalStyleWindow : Window
         ToggleButton[] buttons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
         foreach (ToggleButton button in buttons)
         {
-            button.IsEnabled = !on;
-            button.Opacity = on ? 0.45 : 1.0;
+            // 旧版：无极限充/EC 路生效时三档不置灰，点档位直接走 EC 并联动滑块。
+            button.IsEnabled = true;
+            button.Opacity = 1.0;
         }
     }
 
