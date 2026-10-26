@@ -815,22 +815,7 @@ public partial class OriginalStyleWindow : Window
 
     internal event Action? WideUiVisibilityChanged;
 
-    internal bool WideIgpuSavingSupported
-    {
-        get
-        {
-            string mode = AppConfig.GetString("igpu_only_ui") ?? "auto";
-            if (string.Equals(mode, "hide", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-            if (string.Equals(mode, "show", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-            return _backendProbe?.Hw?.SupportsGpuHotSwap == true;
-        }
-    }
+    internal bool WideIgpuSavingSupported => _backendProbe?.Hw?.SupportsGpuHotSwap == true;
 
     internal int WideIgpuSavingMode => _backendProbe?.Hw?.IgpuOnlySaveMode ?? -1;
 

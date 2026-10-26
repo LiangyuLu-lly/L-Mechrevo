@@ -566,6 +566,10 @@ public static class WpfStrings
     public static string GpuHybrid => Get("GpuHybrid");
     public static string GpuDedicated => Get("GpuDedicated");
     public static string GpuIntegrated => Get("GpuIntegrated");
+    public static string GpuModeIntegrated => Get("GpuModeIntegrated");
+    public static string GpuModeHybrid => Get("GpuModeHybrid");
+    public static string GpuModeDedicated => Get("GpuModeDedicated");
+
     public static string AutoRefresh => Get("AutoRefresh");
     public static string BatteryLong => Get("BatteryLong");
     public static string BatteryBalanced => Get("BatteryBalanced");

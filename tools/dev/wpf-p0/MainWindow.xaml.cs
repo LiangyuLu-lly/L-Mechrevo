@@ -631,11 +631,11 @@ public partial class MainWindow : Window
         }
         StatusText.Text = page switch
         {
-            "home" => WpfStrings.PageStatusHome,
-            "screen" => WpfStrings.PageStatusScreen,
-            "lighting" => WpfStrings.PageStatusLighting,
-            "custom" => WpfStrings.NavCustom_Content + " · " + WpfStrings.CustomPageView_Text_5 + " / " + WpfStrings.CustomPageView_Text,
-            "switches" => WpfStrings.NavSwitches_Content + " · " + WpfStrings.SwitchesPageView_Text,
+            "home" => WpfStrings.NavHome_Content,
+            "screen" => WpfStrings.NavScreen_Content,
+            "lighting" => WpfStrings.TitleText_Text_2,
+            "custom" => WpfStrings.NavCustom_Content,
+            "switches" => WpfStrings.NavSwitches_Content,
             _ => WpfStrings.PageStatusReady
         };
     }
@@ -850,6 +850,7 @@ public partial class MainWindow : Window
         };
         QuickTilesGrid.Children.Add(customTile);
         QuickTilesGrid.Columns = Math.Max(1, QuickTilesGrid.Children.Count);
+        RefreshQuickTiles();
     }
 
     private void RefreshQuickTiles()
@@ -862,6 +863,11 @@ public partial class MainWindow : Window
         {
             bool on = _owner.WideQuickTiles().FirstOrDefault(item => item.Key == key).On;
             state.Text = label + (on ? " · " + WpfStrings.StateOn : " · " + WpfStrings.StateOff);
+            button.BorderBrush = on ? (Brush)FindResource("AccentBrush") : (Brush)FindResource("CardBorderBrush");
+            button.BorderThickness = new Thickness(on ? 2 : 1);
+            button.Background = on
+                ? new SolidColorBrush(Color.FromArgb(0x26, 0x4A, 0x9E, 0xFF))
+                : Brushes.Transparent;
         }
     }
 
@@ -1703,9 +1709,9 @@ public partial class MainWindow : Window
             HomePerf静音.IsChecked = perf.Contains(WpfStrings.ModeSilent);
         }
         string gpu = _owner.WideGpuModeText;
-        HomeGpu混合.IsChecked = gpu.Contains(WpfStrings.GpuHybrid);
-        HomeGpu独显.IsChecked = gpu.Contains(WpfStrings.GpuDedicated);
-        HomeGpu集显.IsChecked = gpu.Contains(WpfStrings.GpuIntegrated);
+        HomeGpu混合.IsChecked = gpu.Contains(WpfStrings.GpuModeHybrid) || gpu.Contains(WpfStrings.GpuHybrid);
+        HomeGpu独显.IsChecked = gpu.Contains(WpfStrings.GpuModeDedicated) || gpu.Contains(WpfStrings.GpuDedicated);
+        HomeGpu集显.IsChecked = gpu.Contains(WpfStrings.GpuModeIntegrated) || gpu.Contains(WpfStrings.GpuIntegrated);
         RefreshQuickTiles();
         (string batteryInfo, int batteryMode, string batteryCharge) = _owner.WideBattery();
         if (_batteryInfoText != null) _batteryInfoText.Text = batteryInfo;
@@ -1787,7 +1793,8 @@ public partial class MainWindow : Window
         HomeMidColumn.Width = gpuSupported ? new GridLength(12) : new GridLength(0);
         Grid.SetColumn(HomePerfCard, 0);
         Grid.SetColumnSpan(HomePerfCard, gpuSupported ? 1 : 3);
-        HomeGpu集显.Visibility = caps.IgpuOnly ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpu集显.Visibility = ResolveWideLightVisible("igpu_only_ui", caps.IgpuOnly)
+            ? Visibility.Visible : Visibility.Collapsed;
         HomeGpu独显.Visibility = caps.DgpuDirect ? Visibility.Visible : Visibility.Collapsed;
         bool displaySupported = caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming;
         HomeDisplayCard.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;

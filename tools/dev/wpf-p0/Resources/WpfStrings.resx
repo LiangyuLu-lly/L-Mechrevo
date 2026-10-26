@@ -2945,4 +2945,13 @@ Cancel: do not switch</value>
   <data name="LightInlineBack" xml:space="preserve">
     <value>Back</value>
   </data>
+  <data name="GpuModeIntegrated" xml:space="preserve">
+    <value>Integrated mode</value>
+  </data>
+  <data name="GpuModeHybrid" xml:space="preserve">
+    <value>Hybrid mode</value>
+  </data>
+  <data name="GpuModeDedicated" xml:space="preserve">
+    <value>Dedicated mode</value>
+  </data>
 </root>

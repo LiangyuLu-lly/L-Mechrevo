@@ -54,9 +54,9 @@
                                             <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_15}" Style="{StaticResource CardTitle}" />
                                             <TextBlock x:Name="GpuCurrentText" Text="{x:Static loc:WpfStrings.GpuCurrentText_Text}" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                             <StackPanel Orientation="Horizontal">
-                                                <ToggleButton x:Name="HomeGpu混合" Content="{x:Static loc:WpfStrings.HomePageView_Content_3}" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" />
-                                                <ToggleButton x:Name="HomeGpu独显" Content="{x:Static loc:WpfStrings.HomePageView_Content_2}" Tag="2" Style="{StaticResource SegmentButton}" />
-                                                <ToggleButton x:Name="HomeGpu集显" Content="{x:Static loc:WpfStrings.HomePageView_Content}" Tag="0" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomeGpu集显" Content="{x:Static loc:WpfStrings.GpuModeIntegrated}" Tag="0" Style="{StaticResource SegmentButton}" />
+                                                <ToggleButton x:Name="HomeGpu混合" Content="{x:Static loc:WpfStrings.GpuModeHybrid}" Tag="1" Style="{StaticResource SegmentButton}" IsChecked="True" />
+                                                <ToggleButton x:Name="HomeGpu独显" Content="{x:Static loc:WpfStrings.GpuModeDedicated}" Tag="2" Style="{StaticResource SegmentButton}" />
                                             </StackPanel>
                                             <StackPanel x:Name="HomeIgpuSavingPanel" Margin="0,10,0,0" />
                                         </StackPanel>

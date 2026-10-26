@@ -2945,4 +2945,13 @@ GCU：{0} · 宝龙达：{1} · 无界：{2}</value>
   <data name="LightInlineBack" xml:space="preserve">
     <value>返回</value>
   </data>
+  <data name="GpuModeIntegrated" xml:space="preserve">
+    <value>核显模式</value>
+  </data>
+  <data name="GpuModeHybrid" xml:space="preserve">
+    <value>混合模式</value>
+  </data>
+  <data name="GpuModeDedicated" xml:space="preserve">
+    <value>独显模式</value>
+  </data>
 </root>

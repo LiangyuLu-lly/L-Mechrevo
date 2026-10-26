@@ -1018,29 +1018,12 @@ public partial class SettingsWindow : Window
 
     private void PositionAdjacentToOwner()
     {
-        if (Owner is not Window owner || owner.WindowState == WindowState.Minimized)
-        {
-            return;
-        }
+        // 宽屏设置窗统一居中显示，不再贴主窗右侧。
         Rect area = SystemParameters.WorkArea;
-        if (!owner.IsVisible || owner.Left < area.Left - Width || owner.Top < area.Top - Height)
-        {
-            Left = area.Left + (area.Width - Width) / 2;
-            Top = area.Top + (area.Height - Height) / 2;
-            return;
-        }
-        double targetLeft = owner.Left - Width - 10;
-        if (targetLeft < area.Left)
-        {
-            targetLeft = owner.Left + owner.Width + 10;
-        }
-        if (targetLeft + Width > area.Right)
-        {
-            targetLeft = Math.Max(area.Left, area.Right - Width - 8);
-        }
-        double targetTop = Math.Min(Math.Max(area.Top, owner.Top), area.Bottom - Height - 8);
-        Left = targetLeft;
-        Top = targetTop;
+        double width = Width > 0 ? Width : ActualWidth;
+        double height = Height > 0 ? Height : ActualHeight;
+        Left = area.Left + Math.Max(0, (area.Width - width) / 2);
+        Top = area.Top + Math.Max(0, (area.Height - height) / 2);
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)
