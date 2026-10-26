@@ -11,6 +11,7 @@
             <Color x:Key="AccentColor">#3B82F6</Color>
             <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
             <SolidColorBrush x:Key="WindowBgBrush" Color="#12151B" />
+    <SolidColorBrush x:Key="PopupBrush" Color="#F21B2029" />
             <SolidColorBrush x:Key="CardBrush" Color="#B81B2029" />
     <SolidColorBrush x:Key="DockBrush" Color="#B3161A20" />
             <SolidColorBrush x:Key="CardBorderBrush" Color="#33FFFFFF" />
