@@ -359,8 +359,12 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_17}" Style="{StaticResource CardTitle}" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static loc:WpfStrings.SettingsWindow_Text_17}" Style="{StaticResource CardTitle}" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                                 <ToggleButton x:Name="IgpuAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
                                 <ToggleButton x:Name="IgpuShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
                                 <ToggleButton x:Name="IgpuHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" Margin="0" />
@@ -373,8 +377,12 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_15}" Style="{StaticResource CardTitle}" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static loc:WpfStrings.SettingsWindow_Text_15}" Style="{StaticResource CardTitle}" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                                 <ToggleButton x:Name="StripAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
                                 <ToggleButton x:Name="StripShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
                                 <ToggleButton x:Name="StripHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" Margin="0" />
@@ -387,8 +395,12 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_13}" Style="{StaticResource CardTitle}" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static loc:WpfStrings.SettingsWindow_Text_13}" Style="{StaticResource CardTitle}" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                                 <ToggleButton x:Name="LogoAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
                                 <ToggleButton x:Name="LogoShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
                                 <ToggleButton x:Name="LogoHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" Margin="0" />

@@ -1890,4 +1890,10 @@
   <data name="TrayMenu" xml:space="preserve">
     <value>托盘菜单</value>
   </data>
+  <data name="IsolateOfficial" xml:space="preserve">
+    <value>隔离官方界面与托盘</value>
+  </data>
+  <data name="CancelIsolation" xml:space="preserve">
+    <value>取消隔离</value>
+  </data>
 </root>

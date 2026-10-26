@@ -636,4 +636,6 @@ public static class WpfStrings
     public static string DisplayPhoto => Get("DisplayPhoto");
     public static string Choose => Get("Choose");
     public static string TrayMenu => Get("TrayMenu");
+    public static string IsolateOfficial => Get("IsolateOfficial");
+    public static string CancelIsolation => Get("CancelIsolation");
 }

@@ -626,7 +626,7 @@ public partial class SettingsWindow : Window
         OfficialStatus.Text = status.OfficialUiInstalled
             ? (status.OfficialUiRunning ? "官方控制台运行中" : "官方控制台已安装")
             : "未检测到官方控制台";
-        IsolationButton.Content = status.Isolated ? "取消隔离" : "隔离官方界面与托盘";
+        IsolationButton.Content = status.Isolated ? WpfStrings.CancelIsolation : WpfStrings.IsolateOfficial;
     }
 
     private async void Isolation_Click(object sender, RoutedEventArgs e)

@@ -622,79 +622,79 @@
     <value>选择快捷按钮</value>
   </data>
   <data name="SettingsWindow_Content" xml:space="preserve">
-    <value>打开安装目录</value>
+    <value>Open install folder</value>
   </data>
   <data name="SettingsWindow_Content_2" xml:space="preserve">
-    <value>许可证</value>
+    <value>Licenses</value>
   </data>
   <data name="SettingsWindow_Content_3" xml:space="preserve">
-    <value>项目主页 / 问题反馈</value>
+    <value>Project page / feedback</value>
   </data>
   <data name="SettingsWindow_Content_4" xml:space="preserve">
-    <value>应用内反馈</value>
+    <value>In-app feedback</value>
   </data>
   <data name="CheckUpdateButton_Content" xml:space="preserve">
     <value>Check Updates</value>
   </data>
   <data name="SettingsWindow_Text" xml:space="preserve">
-    <value>界面与功能持续从原版 L-Mechrevo 移植；反馈请附带诊断包。</value>
+    <value>UI and features continue to be ported from the original L-Mechrevo; include a diagnostic bundle when reporting.</value>
   </data>
   <data name="SettingsWindow_Text_2" xml:space="preserve">
-    <value>关于</value>
+    <value>About</value>
   </data>
   <data name="SettingsWindow_Text_3" xml:space="preserve">
-    <value>桌面左键单击切换显示档；拖动可移动，位置会自动保存</value>
+    <value>Left-click toggles the display mode; drag to move; position is saved automatically</value>
   </data>
   <data name="SettingsWindow_Content_5" xml:space="preserve">
-    <value>重置位置</value>
+    <value>Reset position</value>
   </data>
   <data name="SettingsWindow_Content_6" xml:space="preserve">
-    <value>打开/关闭悬浮窗</value>
+    <value>Toggle overlay</value>
   </data>
   <data name="SettingsWindow_Content_7" xml:space="preserve">
-    <value>5 秒</value>
+    <value>5 seconds</value>
   </data>
   <data name="SettingsWindow_Content_8" xml:space="preserve">
-    <value>2 秒</value>
+    <value>2 seconds</value>
   </data>
   <data name="SettingsWindow_Content_9" xml:space="preserve">
-    <value>1 秒</value>
+    <value>1 second</value>
   </data>
   <data name="SettingsWindow_Content_10" xml:space="preserve">
-    <value>0.5 秒</value>
+    <value>0.5 seconds</value>
   </data>
   <data name="SettingsWindow_Text_4" xml:space="preserve">
-    <value>刷新间隔</value>
+    <value>Refresh interval</value>
   </data>
   <data name="SettingsWindow_Text_5" xml:space="preserve">
-    <value>关闭后，悬浮窗也关闭且主界面在后台时暂停传感器读取</value>
+    <value>When disabled, the overlay also closes and sensor reading pauses while the main window is in the background</value>
   </data>
   <data name="TraySensorTooltipCheck_Content" xml:space="preserve">
     <value>Display</value>
   </data>
   <data name="SettingsWindow_Text_6" xml:space="preserve">
-    <value>托盘图标传感器参数</value>
+    <value>Tray icon sensor tooltip</value>
   </data>
   <data name="SettingsWindow_Text_7" xml:space="preserve">
-    <value>不透明度</value>
+    <value>Opacity</value>
   </data>
   <data name="SettingsWindow_Content_11" xml:space="preserve">
-    <value>完整</value>
+    <value>Full</value>
   </data>
   <data name="SettingsWindow_Content_12" xml:space="preserve">
-    <value>极简</value>
+    <value>Minimal</value>
   </data>
   <data name="SettingsWindow_Text_8" xml:space="preserve">
-    <value>显示内容</value>
+    <value>Display content</value>
   </data>
   <data name="SettingsWindow_Text_9" xml:space="preserve">
     <value>User settings only (no logs); the current settings are backed up before importing, restart L-Mechrevo afterwards.</value>
   </data>
   <data name="SettingsWindow_Content_13" xml:space="preserve">
-    <value>导入设置...</value>
+    <value>Import settings...</value>
   </data>
   <data name="SettingsWindow_Content_14" xml:space="preserve">
-    <value>导出设置...</value>
+    <value>Export settings...</value>
   </data>
   <data name="SettingsWindow_Text_10" xml:space="preserve">
     <value>Settings backup</value>
@@ -709,7 +709,7 @@
     <value>Log level</value>
   </data>
   <data name="SettingsWindow_Text_12" xml:space="preserve">
-    <value>Pick "Force show" if this row is missing by mistake; pick "Force hide" to drop it even when the Logo light exists</value>
+    <value>Pick "Always show" if this row is missing by mistake; pick "Always hide" to drop it even when hardware reports it</value>
   </data>
   <data name="LogoHideButton_Content" xml:space="preserve">
     <value>Always hide</value>
@@ -718,19 +718,19 @@
     <value>Always show</value>
   </data>
   <data name="LogoAutoButton_Content" xml:space="preserve">
-    <value>自动 (按硬件)</value>
+    <value>Auto (hardware)</value>
   </data>
   <data name="SettingsWindow_Text_13" xml:space="preserve">
     <value>Logo light row</value>
   </data>
   <data name="SettingsWindow_Text_14" xml:space="preserve">
-    <value>Pick "Force show" if this row is missing by mistake; pick "Force hide" to drop it even when the lightbar exists</value>
+    <value>Pick "Always show" if this row is missing by mistake; pick "Always hide" to drop it even when hardware reports it</value>
   </data>
   <data name="SettingsWindow_Text_15" xml:space="preserve">
     <value>Lightbar row</value>
   </data>
   <data name="SettingsWindow_Text_16" xml:space="preserve">
-    <value>Pick "Always show" if the judgement is wrong</value>
+    <value>Pick "Always show" if auto detection is wrong</value>
   </data>
   <data name="SettingsWindow_Text_17" xml:space="preserve">
     <value>iGPU-only mode display</value>
@@ -754,16 +754,16 @@
     <value>Official console</value>
   </data>
   <data name="SettingsWindow_Text_20" xml:space="preserve">
-    <value>屏幕分辨率模式</value>
+    <value>Display resolution mode</value>
   </data>
   <data name="SettingsWindow_Text_21" xml:space="preserve">
-    <value>MiniLED 分区控光</value>
+    <value>MiniLED local dimming</value>
   </data>
   <data name="SettingsWindow_Text_22" xml:space="preserve">
-    <value>开启后降低 LCD 响应时间；部分面板可能增加轻微过冲。</value>
+    <value>Reduces LCD response time when enabled; some panels may show slight overshoot.</value>
   </data>
   <data name="OverdriveCheck_Content" xml:space="preserve">
-    <value>显示响应加速 (LCD Overdrive)</value>
+    <value>Display response acceleration (LCD Overdrive)</value>
   </data>
   <data name="WaterCoolingCheck_Content" xml:space="preserve">
     <value>Force water cooling menu</value>
@@ -772,31 +772,31 @@
     <value>Startup</value>
   </data>
   <data name="SettingsWindow_Content_17" xml:space="preserve">
-    <value>快捷键</value>
+    <value>Hotkeys</value>
   </data>
   <data name="SettingsWindow_Content_18" xml:space="preserve">
-    <value>中文</value>
+    <value>Chinese</value>
   </data>
   <data name="SettingsWindow_Text_23" xml:space="preserve">
     <value>Language</value>
   </data>
   <data name="SettingsWindow_Text_24" xml:space="preserve">
-    <value>勾选要显示在托盘右键菜单中的项目</value>
+    <value>Choose the items to show in the tray right-click menu</value>
   </data>
   <data name="SettingsWindow_Text_25" xml:space="preserve">
     <value>Tray menu</value>
   </data>
   <data name="SettingsWindow_Text_26" xml:space="preserve">
-    <value>按钮不透明度</value>
+    <value>Button opacity</value>
   </data>
   <data name="SettingsWindow_Text_27" xml:space="preserve">
-    <value>卡片不透明度</value>
+    <value>Card opacity</value>
   </data>
   <data name="SettingsWindow_Text_28" xml:space="preserve">
-    <value>底栏不透明度</value>
+    <value>Bottom bar opacity</value>
   </data>
   <data name="SettingsWindow_Text_29" xml:space="preserve">
-    <value>宽屏背景不透明度</value>
+    <value>Wide background opacity</value>
   </data>
   <data name="SettingsWindow_Content_19" xml:space="preserve">
     <value>Clear</value>
@@ -808,13 +808,13 @@
     <value>未选择</value>
   </data>
   <data name="SettingsWindow_Text_30" xml:space="preserve">
-    <value>宽屏背景图</value>
+    <value>Wide background</value>
   </data>
   <data name="SettingsWindow_Text_31" xml:space="preserve">
-    <value>背景遮罩</value>
+    <value>Background mask</value>
   </data>
   <data name="SettingsWindow_Text_32" xml:space="preserve">
-    <value>背景不透明度</value>
+    <value>Background opacity</value>
   </data>
   <data name="SettingsWindow_Text_33" xml:space="preserve">
     <value>Accent color</value>
@@ -904,46 +904,46 @@
     <value>Current: Balanced</value>
   </data>
   <data name="LightingPageView_Text" xml:space="preserve">
-    <value>全局灯光</value>
+    <value>Global lighting</value>
   </data>
   <data name="LightingPageView_Text_2" xml:space="preserve">
-    <value>键盘、灯带、Logo、铰链与同步灯</value>
+    <value>Keyboard, lightbar, Logo, hinge and sync lights</value>
   </data>
   <data name="ScreenPageView_Text" xml:space="preserve">
-    <value>档位参数</value>
+    <value>Preset parameters</value>
   </data>
   <data name="ScreenEffectEditButton_Content" xml:space="preserve">
-    <value>编辑参数</value>
+    <value>Edit parameters</value>
   </data>
   <data name="ScreenPageView_Text_2" xml:space="preserve">
-    <value>厂商色彩增强档位与参数编辑</value>
+    <value>Vendor color enhancement presets and parameters</value>
   </data>
   <data name="ScreenEffectToggle_Content" xml:space="preserve">
-    <value>启用色彩增强</value>
+    <value>Enable color enhancement</value>
   </data>
   <data name="ScreenPageView_Text_3" xml:space="preserve">
-    <value>显示特性</value>
+    <value>Display features</value>
   </data>
   <data name="ScreenPageView_Content" xml:space="preserve">
-    <value>导入 ICC</value>
+    <value>Import ICC</value>
   </data>
   <data name="CalibrationCustomSwitch_Content" xml:space="preserve">
-    <value>自定义校色（ICC）</value>
+    <value>Custom calibration (ICC)</value>
   </data>
   <data name="ScreenCalibrationSettingsButton_Content" xml:space="preserve">
-    <value>高级设置</value>
+    <value>Advanced settings</value>
   </data>
   <data name="ScreenPageView_Text_4" xml:space="preserve">
-    <value>ICC 校色档位与自定义校色</value>
+    <value>ICC calibration presets and custom calibration</value>
   </data>
   <data name="ScreenCalibrationToggle_Content" xml:space="preserve">
-    <value>启用校色</value>
+    <value>Enable calibration</value>
   </data>
   <data name="ScreenPageView_Text_5" xml:space="preserve">
-    <value>刷新率、亮度、屏幕校色与色彩增强</value>
+    <value>Refresh rate, brightness, calibration and color enhancement</value>
   </data>
   <data name="SwitchesPageView_Text" xml:space="preserve">
-    <value>以磁贴形式排列的快捷开关</value>
+    <value>Quick switches arranged as tiles</value>
   </data>
   <data name="CalibrationSettingsWindow_xaml_MessageBoxShowthis" xml:space="preserve">
     <value>ICC 导入失败。</value>
@@ -1889,5 +1889,11 @@
   </data>
   <data name="TrayMenu" xml:space="preserve">
     <value>Tray menu</value>
+  </data>
+  <data name="IsolateOfficial" xml:space="preserve">
+    <value>Isolate official UI and tray</value>
+  </data>
+  <data name="CancelIsolation" xml:space="preserve">
+    <value>Cancel isolation</value>
   </data>
 </root>
