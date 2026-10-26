@@ -61,9 +61,15 @@ public sealed class FanCurveCanvas : FrameworkElement
     {
         base.OnRender(dc);
         var plot = Plot();
-        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x88, 0x16, 0x1B, 0x23)), null, new Rect(0, 0, ActualWidth, ActualHeight));
-        Pen grid = new(new SolidColorBrush(Color.FromArgb(0x35, 0xFF, 0xFF, 0xFF)), 1);
-        Pen border = new(new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF)), 1);
+        bool dark = AppTheme.IsDark;
+        Color backColor = dark ? Color.FromArgb(0x88, 0x16, 0x1B, 0x23) : Color.FromArgb(0xF2, 0xF5, 0xF7, 0xFA);
+        Color gridColor = dark ? Color.FromArgb(0x35, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x26, 0x00, 0x00, 0x00);
+        Color borderColor = dark ? Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x44, 0x00, 0x00, 0x00);
+        Color labelColor = dark ? Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xAA, 0x1B, 0x20, 0x29);
+        Color pointFill = dark ? Color.FromArgb(0xCC, 0x16, 0x1B, 0x23) : Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+        dc.DrawRectangle(new SolidColorBrush(backColor), null, new Rect(0, 0, ActualWidth, ActualHeight));
+        Pen grid = new(new SolidColorBrush(gridColor), 1);
+        Pen border = new(new SolidColorBrush(borderColor), 1);
         for (int i = 0; i <= 4; i++)
         {
             double y = plot.top + plot.height * i / 4.0;
@@ -74,7 +80,7 @@ public sealed class FanCurveCanvas : FrameworkElement
                 FlowDirection.LeftToRight,
                 new Typeface("Segoe UI"),
                 10,
-                new SolidColorBrush(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF)),
+                new SolidColorBrush(labelColor),
                 1.0);
             dc.DrawText(text, new Point(4, y - 7));
         }
@@ -96,7 +102,7 @@ public sealed class FanCurveCanvas : FrameworkElement
         for (int i = 0; i < _valid; i++)
         {
             Point p = PointAt(i, plot);
-            dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(0xCC, 0x16, 0x1B, 0x23)), new Pen(pointBrush, 2), p, 5, 5);
+            dc.DrawEllipse(new SolidColorBrush(pointFill), new Pen(pointBrush, 2), p, 5, 5);
             if (_temps[i] is > 0 and < byte.MaxValue)
             {
                 FormattedText temp = new(
@@ -105,7 +111,7 @@ public sealed class FanCurveCanvas : FrameworkElement
                     FlowDirection.LeftToRight,
                     new Typeface("Segoe UI"),
                     9,
-                    new SolidColorBrush(Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF)),
+                    new SolidColorBrush(labelColor),
                     1.0);
                 dc.DrawText(temp, new Point(p.X - temp.Width / 2, plot.top + plot.height + 8));
             }
@@ -119,7 +125,7 @@ public sealed class FanCurveCanvas : FrameworkElement
                 FlowDirection.LeftToRight,
                 new Typeface("Segoe UI Semibold"),
                 12,
-                Brushes.White,
+                new SolidColorBrush(dark ? Colors.White : Color.FromRgb(0x1B, 0x20, 0x29)),
                 1.0);
             dc.DrawText(duty, new Point(p.X - duty.Width / 2, p.Y - 26));
         }

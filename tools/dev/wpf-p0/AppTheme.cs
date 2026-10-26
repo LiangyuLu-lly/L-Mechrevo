@@ -6,8 +6,11 @@ namespace L_Mechrevo.WpfP0;
 
 internal static class AppTheme
 {
+    internal static bool IsDark { get; private set; } = true;
+
     internal static void Apply(bool dark)
     {
+        IsDark = dark;
         ResourceDictionary resources = Application.Current.Resources;
         if (dark)
         {
