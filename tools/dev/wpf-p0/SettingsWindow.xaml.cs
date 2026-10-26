@@ -1061,7 +1061,7 @@ public partial class SettingsWindow : Window
 
     private void Status(string text)
     {
-        StatusText.Text = "0.293.5 beta23.5 · " + text;
+        StatusText.Text = "0.293.6 beta23.6 · " + text;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e)

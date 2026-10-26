@@ -827,8 +827,8 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center" Margin="2,0,10,0">
-                        <TextBlock x:Name="StatusText" Text="0.293.5" FontSize="12" />
-                        <TextBlock Text="beta23.5" Style="{StaticResource MutedText}" FontSize="10" />
+                        <TextBlock x:Name="StatusText" Text="0.293.6" FontSize="12" />
+                        <TextBlock Text="beta23.6" Style="{StaticResource MutedText}" FontSize="10" />
                     </StackPanel>
                     <UniformGrid Grid.Column="1" Columns="5" VerticalAlignment="Center">
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">

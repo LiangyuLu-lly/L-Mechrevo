@@ -6346,7 +6346,7 @@ public partial class OriginalStyleWindow : Window
         AppConfig.Flush();
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
-        StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme);
+        StatusText.Text = "0.293.6 / WPF P0 · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme);
     }
 
     internal void SetBackgroundFromSettings(bool on)
@@ -6375,7 +6375,7 @@ public partial class OriginalStyleWindow : Window
         AppConfig.Flush();
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
-        StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme);
+        StatusText.Text = "0.293.6 / WPF P0 · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme);
     }
 
     private void WideButton_Click(object sender, RoutedEventArgs e) => ShowWideWindow();

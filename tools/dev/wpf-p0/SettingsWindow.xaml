@@ -504,7 +504,7 @@
                 </Border>
 
                 <Grid Margin="0,4,0,0">
-                    <TextBlock x:Name="StatusText" Text="0.293.5 beta23.5" Style="{StaticResource Hint}" Margin="0" />
+                    <TextBlock x:Name="StatusText" Text="0.293.6 beta23.6" Style="{StaticResource Hint}" Margin="0" />
                     <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content}" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="OpenFolder_Click" />
                 </Grid>
             </StackPanel>
