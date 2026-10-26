@@ -2939,4 +2939,7 @@ Cancel: do not switch</value>
   <data name="OsdBrightness" xml:space="preserve">
     <value>Screen brightness</value>
   </data>
+  <data name="QuickGcuOsd" xml:space="preserve">
+    <value>GCU-OSD</value>
+  </data>
 </root>

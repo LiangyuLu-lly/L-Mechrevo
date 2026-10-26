@@ -586,6 +586,8 @@ public static class WpfStrings
     public static string QuickFnKey => Get("QuickFnKey");
     public static string QuickCapsLock => Get("QuickCapsLock");
     public static string QuickOsd => Get("QuickOsd");
+    public static string QuickGcuOsd => Get("QuickGcuOsd");
+
     public static string QuickCopilot => Get("QuickCopilot");
     public static string QuickUsb => Get("QuickUsb");
     public static string QuickAcRecovery => Get("QuickAcRecovery");

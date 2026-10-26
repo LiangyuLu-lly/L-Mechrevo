@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using MechrevoLite;
 using MechrevoLite.Hardware;
 using L_Mechrevo.WpfP0.Resources;
 
@@ -58,6 +59,7 @@ internal sealed class QuickSwitchService : IQuickSwitchService
             new("fnkey", WpfStrings.QuickFnKey),
             new("capslock", WpfStrings.QuickCapsLock),
             new("osd", WpfStrings.QuickOsd),
+            new("gcuosd", WpfStrings.QuickGcuOsd),
             new("copilot", WpfStrings.QuickCopilot)
         }),
         new(WpfStrings.QuickGroupPower, new QuickSwitchItem[]
@@ -130,6 +132,7 @@ internal sealed class QuickSwitchService : IQuickSwitchService
             "fnkey" => WpfStrings.QuickFnKey,
             "capslock" => WpfStrings.QuickCapsLock,
             "osd" => WpfStrings.QuickOsd,
+            "gcuosd" => WpfStrings.QuickGcuOsd,
             "copilot" => WpfStrings.QuickCopilot,
             "usb" => WpfStrings.QuickUsb,
             "acrecovery" => WpfStrings.QuickAcRecovery,
@@ -178,12 +181,17 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         {
             return false;
         }
+        if (string.Equals(key, "osd", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
             return false;
         }
-        return probe.SupportsQuick(key) || IsBaolongdaFanBoost(key);
+        string backendKey = string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase) ? "osd" : key;
+        return probe.SupportsQuick(backendKey) || IsBaolongdaFanBoost(key);
     }
 
     public bool GetState(string key)
@@ -192,11 +200,16 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         {
             return false;
         }
+        if (string.Equals(key, "osd", StringComparison.OrdinalIgnoreCase))
+        {
+            return AppConfig.Get("lm_osd_enabled", 1) != 0;
+        }
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
             return false;
         }
+        key = string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase) ? "osd" : key;
         // 宝龙达强冷状态在 MechrevoHw.FanBoostActive（本机通道），probe.QuickState 读的是 GCU 字段。
         if (IsBaolongdaFanBoost(key))
         {
@@ -207,6 +220,13 @@ internal sealed class QuickSwitchService : IQuickSwitchService
 
     public async Task<ServiceResult> SetAsync(string key, bool on)
     {
+        if (string.Equals(key, "osd", StringComparison.OrdinalIgnoreCase))
+        {
+            AppConfig.Set("lm_osd_enabled", on ? 1 : 0);
+            AppConfig.Flush();
+            return ServiceResult.Success(on ? WpfStrings.QuickResultOn : WpfStrings.QuickResultOff);
+        }
+        string backendKey = string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase) ? "osd" : key;
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
@@ -235,7 +255,7 @@ internal sealed class QuickSwitchService : IQuickSwitchService
                     ? ServiceResult.Success(on ? WpfStrings.QuickFanBoostOnConfirmed : WpfStrings.QuickFanBoostOffConfirmed)
                     : ServiceResult.Fail(on ? WpfStrings.QuickFanBoostOnUnconfirmed : WpfStrings.QuickFanBoostOffUnconfirmed);
             }
-            ok = await probe.SwitchQuickAsync(key, on).ConfigureAwait(false);
+            ok = await probe.SwitchQuickAsync(backendKey, on).ConfigureAwait(false);
             if (ok)
             {
                 L_Mechrevo.WpfP0.OsdService.ShowQuickSwitch(key, on);

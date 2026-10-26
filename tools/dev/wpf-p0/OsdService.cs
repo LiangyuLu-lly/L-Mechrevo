@@ -19,6 +19,10 @@ internal static class OsdService
 
     internal static void Show(string glyph, string title, string value)
     {
+        if (MechrevoLite.AppConfig.Get("lm_osd_enabled", 1) == 0)
+        {
+            return;
+        }
         Application? app = Application.Current;
         if (app == null)
         {

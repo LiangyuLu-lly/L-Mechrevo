@@ -2939,4 +2939,7 @@ GCU：{0} · 宝龙达：{1} · 无界：{2}</value>
   <data name="OsdBrightness" xml:space="preserve">
     <value>屏幕亮度</value>
   </data>
+  <data name="QuickGcuOsd" xml:space="preserve">
+    <value>GCU-OSD</value>
+  </data>
 </root>
