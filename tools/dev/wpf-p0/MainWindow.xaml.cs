@@ -2400,7 +2400,7 @@ public partial class MainWindow : Window
         lightApplyTimer.Tick += (_, _) =>
         {
             lightApplyTimer.Stop();
-            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, powerRef?.IsChecked == true);
+            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, powerRef?.IsChecked == true, channelPowerOsd: true);
         };
         _lightCardApplyTimers.Add(lightApplyTimer);
 
@@ -3118,7 +3118,7 @@ public partial class MainWindow : Window
         return best;
     }
 
-    private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, int[] mixColors, int breathingIndex, int[] manualIndexes, bool powerOn)
+    private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, int[] mixColors, int breathingIndex, int[] manualIndexes, bool powerOn, bool channelPowerOsd = false)
     {
         try
         {
@@ -3157,7 +3157,7 @@ public partial class MainWindow : Window
                 StatusText.Text = WpfStrings.StatusLightSavedOffline;
                 return;
             }
-            bool ok = await _owner.WideApplyLightAsync(topic, effect, light, speedValue, colorArgb, powerOn);
+            bool ok = await _owner.WideApplyLightAsync(topic, effect, light, speedValue, colorArgb, powerOn, channelPowerOsd);
             StatusText.Text = ok
                 ? "灯光已下发：" + topic + " / " + effect
                 : "灯光下发失败：" + topic + " / " + effect;

@@ -550,7 +550,48 @@ public partial class OriginalStyleWindow : Window
             && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
     }
 
-    internal async Task<bool> WideApplyLightAsync(string topic, string effect, int light, int speed, int colorArgb, bool on)
+    internal static string LightChannelTitle(string topic)
+    {
+        return topic switch
+        {
+            "Keyboard/Ctrl" => WpfStrings.LightingKeyboard,
+            "HidLightbar/Ctrl" => WpfStrings.LightingStrip,
+            "HidLightbar_Logo/Ctrl" => WpfStrings.LightingLogo,
+            "HidLightbar_Hinge/Ctrl" => WpfStrings.LightingHinge,
+            "HidLightbar_Sync/Ctrl" => WpfStrings.LightingSync,
+            _ => WpfStrings.OsdLighting
+        };
+    }
+
+    internal static string LightChannelGlyph(string topic)
+    {
+        // 键盘 / 灯带 / Logo / 铰链 / 同步使用各自图标，避免全部套显示器图标。
+        return topic switch
+        {
+            "Keyboard/Ctrl" => "\uE765",
+            "HidLightbar/Ctrl" => "\uE706",
+            "HidLightbar_Logo/Ctrl" => "\uE8B7",
+            "HidLightbar_Hinge/Ctrl" => "\uE7C4",
+            "HidLightbar_Sync/Ctrl" => "\uE895",
+            _ => "\uE706"
+        };
+    }
+
+    internal static string LightLevelText(string topic, int light, bool white)
+    {
+        if (white)
+        {
+            return Math.Clamp(light, 1, 2) + "/2";
+        }
+        if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal)
+            || IsGradeLightTopicForOsd(topic, WpfBackend.Hw))
+        {
+            return Math.Clamp(light, 0, 4) + "/4";
+        }
+        return Math.Clamp(light * 25, 0, 100) + "%";
+    }
+
+    internal async Task<bool> WideApplyLightAsync(string topic, string effect, int light, int speed, int colorArgb, bool on, bool channelPowerOsd = false)
     {
         MechrevoHw? hw = _backendProbe?.Hw;
         BackendProbe? probe = _backendProbe;
@@ -560,18 +601,18 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            // 灯光调节 OSD：键盘/Gen40 灯条是档位（x/4、白色 x/2），其它外部通道才显示百分比。
-            bool osdKeyboard = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
-            bool osdWhite = osdKeyboard && IsWhiteBacklightForOsd(hw);
-            bool osdGrade = IsGradeLightTopicForOsd(topic, hw);
-            string osdValue = !on
-                ? WpfStrings.StateOff
-                : osdWhite
-                    ? Math.Clamp(light, 1, 2) + "/2"
-                    : osdKeyboard || osdGrade
-                        ? Math.Clamp(light, 0, 4) + "/4"
-                        : Math.Clamp(light * 25, 0, 100) + "%";
-            OsdService.Show(QuickGlyph("osd"), WpfStrings.OsdLighting, osdValue);
+            // 开关只报通道名+开/关；亮度/颜色/速度才报档位，避免开关也弹“亮度 1/4”。
+            if (channelPowerOsd)
+            {
+                OsdService.Show(LightChannelGlyph(topic), LightChannelTitle(topic),
+                    on ? WpfStrings.StateOn : WpfStrings.StateOff);
+            }
+            else
+            {
+                bool osdWhite = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal) && IsWhiteBacklightForOsd(hw);
+                OsdService.Show(LightChannelGlyph(topic), WpfStrings.OsdLighting,
+                    on ? LightLevelText(topic, light, osdWhite) : WpfStrings.StateOff);
+            }
             if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
             {
                 if (IsHidKeyboard(hw) && effect.StartsWith("hid:", StringComparison.Ordinal))
@@ -6155,6 +6196,7 @@ public partial class OriginalStyleWindow : Window
         if (_backendProbe.Hw?.IsConnected == true)
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar/Ctrl", requested, "用户点击「灯光」开关");
+            OsdService.Show(LightChannelGlyph("HidLightbar/Ctrl"), LightChannelTitle("HidLightbar/Ctrl"), requested ? WpfStrings.StateOn : WpfStrings.StateOff);
         }
         StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_69;
     }
@@ -6255,6 +6297,7 @@ public partial class OriginalStyleWindow : Window
         if (_backendProbe.Hw?.IsConnected == true)
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Hinge/Ctrl", requested, "用户点击「灯光」开关");
+            OsdService.Show(LightChannelGlyph("HidLightbar_Hinge/Ctrl"), LightChannelTitle("HidLightbar_Hinge/Ctrl"), requested ? WpfStrings.StateOn : WpfStrings.StateOff);
         }
         StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_73;
     }
@@ -6324,6 +6367,7 @@ public partial class OriginalStyleWindow : Window
         if (_backendProbe.Hw?.IsConnected == true)
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Sync/Ctrl", requested, "用户点击「灯光」开关");
+            OsdService.Show(LightChannelGlyph("HidLightbar_Sync/Ctrl"), LightChannelTitle("HidLightbar_Sync/Ctrl"), requested ? WpfStrings.StateOn : WpfStrings.StateOff);
         }
         StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_76;
     }
@@ -6395,7 +6439,8 @@ public partial class OriginalStyleWindow : Window
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("Keyboard/Ctrl", requested, "用户点击键盘灯光开关");
         }
-        OsdService.Show(QuickGlyph("osd"), WpfStrings.OsdLighting, requested ? WpfStrings.StateOn : WpfStrings.StateOff);
+        OsdService.Show(LightChannelGlyph("Keyboard/Ctrl"), LightChannelTitle("Keyboard/Ctrl"),
+            requested ? WpfStrings.StateOn : WpfStrings.StateOff);
     }
 
     private static void SaveChannelEffect(string topic, string effect)
@@ -6655,6 +6700,7 @@ public partial class OriginalStyleWindow : Window
         if (_backendProbe?.Hw?.IsConnected == true)
         {
             MechrevoLite.Hardware.LightingSettingsStore.SavePower("HidLightbar_Logo/Ctrl", requested, "用户点击「灯光」开关");
+            OsdService.Show(LightChannelGlyph("HidLightbar_Logo/Ctrl"), LightChannelTitle("HidLightbar_Logo/Ctrl"), requested ? WpfStrings.StateOn : WpfStrings.StateOff);
         }
     }
 

@@ -658,17 +658,17 @@ public partial class LightEditorWindow : Window
             }
             if (ok)
             {
-                bool white = _wujieWhite || _whiteBacklightOnly;
-                bool external = !string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal);
-                string value = white
-                    ? Math.Clamp(_light, 1, 2) + "/2"
-                    : external
-                        ? (_light <= 4 && !string.Equals(_topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
-                            && !string.Equals(_topic, "HidLightbar_Logo/Ctrl", StringComparison.Ordinal)
-                            ? Math.Clamp(_light * 25, 0, 100) + "%"
-                            : Math.Clamp(_light, 0, 4) + "/4")
-                        : Math.Clamp(_light, 0, 4) + "/4";
-                L_Mechrevo.WpfP0.OsdService.Show(OriginalStyleWindow.QuickGlyph("osd"), WpfStrings.OsdLighting, value);
+                if (powerChanged)
+                {
+                    L_Mechrevo.WpfP0.OsdService.Show(OriginalStyleWindow.LightChannelGlyph(_topic),
+                        OriginalStyleWindow.LightChannelTitle(_topic), power ? WpfStrings.StateOn : WpfStrings.StateOff);
+                }
+                else
+                {
+                    bool white = _wujieWhite || _whiteBacklightOnly;
+                    L_Mechrevo.WpfP0.OsdService.Show(OriginalStyleWindow.LightChannelGlyph(_topic), WpfStrings.OsdLighting,
+                        OriginalStyleWindow.LightLevelText(_topic, _light, white));
+                }
             }
             if (!fromAuto || !ok)
             {
