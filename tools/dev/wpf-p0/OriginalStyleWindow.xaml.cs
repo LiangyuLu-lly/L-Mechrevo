@@ -266,7 +266,9 @@ public partial class OriginalStyleWindow : Window
         {
             if (_backendProbe?.Hw != null)
             {
-                _ = _backendProbe.SwitchQuickAsync("fanboost", !(_backendProbe.Hw.FanBoost));
+                _ = _services != null
+                    ? _services.Performance.SwitchFanBoostRawAsync(!(_backendProbe.Hw.FanBoost))
+                    : _backendProbe.SwitchQuickAsync("fanboost", !(_backendProbe.Hw.FanBoost));
             }
         };
         _trayIcon.KeyboardLightingRequested += () => KeyboardLightEdit_Click(this, new RoutedEventArgs());
@@ -572,7 +574,7 @@ public partial class OriginalStyleWindow : Window
             {
                 await _backendProbe.SetKeyboardPowerAsync(true);
             }
-            return await _backendProbe.SetKeyboardEffectAsync(effect);
+            return await SetKeyboardEffectServiceAsync(effect);
         }
         catch
         {
@@ -2021,7 +2023,11 @@ public partial class OriginalStyleWindow : Window
                     ChargeLimitSwitch.IsChecked = false;
                     return;
                 }
-                ok = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: true, out string detail);
+                ServiceResult chargeEnable = _services != null
+                    ? _services.ChargeLimit.EnableThresholdRaw(low, high)
+                    : EnableChargeLimitDirect(low, high);
+                ok = chargeEnable.Ok;
+                string detail = chargeEnable.Detail;
                 if (ok)
                 {
                     BatteryLimitRestore.SaveConfig(true, low, high);
@@ -2034,7 +2040,11 @@ public partial class OriginalStyleWindow : Window
             }
             else
             {
-                ok = BatteryLimitWriter.TryDisable(out string detail);
+                ServiceResult chargeDisable = _services != null
+                    ? _services.ChargeLimit.DisableThresholdRaw()
+                    : DisableChargeLimitDirect();
+                ok = chargeDisable.Ok;
+                string detail = chargeDisable.Detail;
                 if (ok)
                 {
                     BatteryLimitRestore.SaveConfig(false, 0, 0);
@@ -2066,7 +2076,11 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            bool ok = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: true, out string detail);
+            ServiceResult chargeApply = _services != null
+                ? _services.ChargeLimit.EnableThresholdRaw(low, high)
+                : EnableChargeLimitDirect(low, high);
+            bool ok = chargeApply.Ok;
+            string detail = chargeApply.Detail;
             if (ok)
             {
                 BatteryLimitRestore.SaveConfig(true, low, high);
@@ -2082,6 +2096,72 @@ public partial class OriginalStyleWindow : Window
         {
             ChargeLimitStatus.Text = WpfStrings.OriginalStyleWindow_xaml_Text_25 + ex.Message;
         }
+    }
+
+    private static ServiceResult EnableChargeLimitDirect(int low, int high)
+    {
+        bool ok = BatteryLimitWriter.TryEnable(low, high, allowInitialDischarge: true, out string detail);
+        return ok ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+    }
+
+    private static ServiceResult DisableChargeLimitDirect()
+    {
+        bool ok = BatteryLimitWriter.TryDisable(out string detail);
+        return ok ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+    }
+
+    private async Task<bool> SetKeyboardEffectServiceAsync(string effect)
+    {
+        if (_services != null)
+        {
+            return (await _services.Lighting.SetKeyboardEffectAsync(effect)).Ok;
+        }
+        return _backendProbe != null && await _backendProbe.SetKeyboardEffectAsync(effect);
+    }
+
+    private async Task<bool> SetLightbarEffectServiceAsync(string effect)
+    {
+        if (_services != null)
+        {
+            return (await _services.Lighting.SetLightbarEffectAsync(effect)).Ok;
+        }
+        return _backendProbe != null && await _backendProbe.SetLightbarEffectAsync(effect);
+    }
+
+    private async Task<bool> SetLogoEffectServiceAsync(string effect)
+    {
+        if (_services != null)
+        {
+            return (await _services.Lighting.SetLogoEffectAsync(effect)).Ok;
+        }
+        return _backendProbe != null && await _backendProbe.SetLogoEffectAsync(effect);
+    }
+
+    private async Task<bool> SetHingeEffectServiceAsync(string effect)
+    {
+        if (_services != null)
+        {
+            return (await _services.Lighting.SetHingeEffectAsync(effect)).Ok;
+        }
+        return _backendProbe != null && await _backendProbe.SetHingeEffectAsync(effect);
+    }
+
+    private async Task<bool> SetSyncEffectServiceAsync(string effect)
+    {
+        if (_services != null)
+        {
+            return (await _services.Lighting.SetSyncEffectAsync(effect)).Ok;
+        }
+        return _backendProbe != null && await _backendProbe.SetSyncEffectAsync(effect);
+    }
+
+    private async Task<bool> SetLightPowerServiceAsync(string topic, bool on)
+    {
+        if (_services != null)
+        {
+            return (await _services.Lighting.SetLightPowerAsync(topic, on)).Ok;
+        }
+        return _backendProbe != null && await _backendProbe.SetLightPowerAsync(topic, on);
     }
 
     private bool TryReadChargeThreshold(out int low, out int high, out string error)
@@ -2385,7 +2465,9 @@ public partial class OriginalStyleWindow : Window
         _backendProbe?.MarkUserModeSwitch();
         try
         {
-            MechrevoService.ModeSwitchResult result = await _backendProbe!.SwitchModeResultAsync(mode);
+            MechrevoService.ModeSwitchResult result = _services != null
+                ? await _services.Performance.SetModeResultAsync(mode)
+                : await _backendProbe!.SwitchModeResultAsync(mode);
             if (request != _modeRequestId)
             {
                 return;
@@ -2808,16 +2890,19 @@ public partial class OriginalStyleWindow : Window
                 RefreshFromBackend();
                 return;
             }
-            if (_backendProbe.CurrentGpuMode == mode)
+            if ((_services?.Gpu.CurrentMode ?? _backendProbe.CurrentGpuMode) == mode)
             {
-                _backendProbe.ClearGpuRestartPending();
+                if (_services != null) { _services.Gpu.ClearRestartPending(); } else { _backendProbe.ClearGpuRestartPending(); }
                 RefreshFromBackend();
                 return;
             }
-            bool bdOk = _backendProbe.SwitchGpuModeBaolongda(mode, out bool confirmed);
+            bool confirmed;
+            bool bdOk = _services != null
+                ? _services.Gpu.SwitchOnBaolongda(mode, out confirmed).Ok
+                : _backendProbe.SwitchGpuModeBaolongda(mode, out confirmed);
             if (bdOk)
             {
-                _backendProbe.MarkGpuRestartPending(mode);
+                if (_services != null) { _services.Gpu.MarkRestartPending(mode); } else { _backendProbe.MarkGpuRestartPending(mode); }
                 StatusText.Text = confirmed ? "已切到目标模式，重启后生效" : "已请求切换，回读未确认，重启后确认";
             }
             else
@@ -2844,7 +2929,7 @@ public partial class OriginalStyleWindow : Window
                     : await _backendProbe.RequestGpuModeRestartAsync(mode);
                 if (restartOk)
                 {
-                    _backendProbe.MarkGpuRestartPending(mode);
+                    if (_services != null) { _services.Gpu.MarkRestartPending(mode); } else { _backendProbe.MarkGpuRestartPending(mode); }
                     StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_40;
                 }
                 else
@@ -2863,15 +2948,15 @@ public partial class OriginalStyleWindow : Window
         bool ok = _services != null
             ? (await _services.Gpu.SwitchAsync(mode)).Ok
             : await _backendProbe.SwitchGpuModeAsync(mode);
-        await _backendProbe.RefreshGpuModeAsync();
+        if (_services != null) { await _services.Gpu.RefreshAsync(); } else { await _backendProbe.RefreshGpuModeAsync(); }
         int current = _backendProbe.CurrentGpuMode;
         if (ok && current != mode)
         {
-            _backendProbe.MarkGpuRestartPending(mode);
+            if (_services != null) { _services.Gpu.MarkRestartPending(mode); } else { _backendProbe.MarkGpuRestartPending(mode); }
         }
         else if (ok)
         {
-            _backendProbe.ClearGpuRestartPending();
+            if (_services != null) { _services.Gpu.ClearRestartPending(); } else { _backendProbe.ClearGpuRestartPending(); }
         }
         StatusText.Text = ok ? "显卡模式已下发，重启后生效" : "显卡模式下发失败";
         RefreshFromBackend();
@@ -5591,23 +5676,23 @@ public partial class OriginalStyleWindow : Window
         _syncingLighting = false;
         if (!saved.PowerOn)
         {
-            await _backendProbe.SetLightPowerAsync(topic, false);
+            await SetLightPowerServiceAsync(topic, false);
             return;
         }
-        await _backendProbe.SetLightPowerAsync(topic, true);
+        await SetLightPowerServiceAsync(topic, true);
         switch (topic)
         {
             case "HidLightbar/Ctrl":
-                await _backendProbe.SetLightbarEffectAsync(saved.Effect);
+                await SetLightbarEffectServiceAsync(saved.Effect);
                 break;
             case "HidLightbar_Logo/Ctrl":
-                await _backendProbe.SetLogoEffectAsync(saved.Effect);
+                await SetLogoEffectServiceAsync(saved.Effect);
                 break;
             case "HidLightbar_Hinge/Ctrl":
-                await _backendProbe.SetHingeEffectAsync(saved.Effect);
+                await SetHingeEffectServiceAsync(saved.Effect);
                 break;
             default:
-                await _backendProbe.SetSyncEffectAsync(saved.Effect);
+                await SetSyncEffectServiceAsync(saved.Effect);
                 break;
         }
     }
@@ -5713,10 +5798,10 @@ public partial class OriginalStyleWindow : Window
         {
             await _backendProbe.SetKeyboardPowerAsync(false);
         }
-        await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
-        await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
-        await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
-        await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
+        await SetLightPowerServiceAsync("HidLightbar/Ctrl", false);
+        await SetLightPowerServiceAsync("HidLightbar_Logo/Ctrl", false);
+        await SetLightPowerServiceAsync("HidLightbar_Hinge/Ctrl", false);
+        await SetLightPowerServiceAsync("HidLightbar_Sync/Ctrl", false);
     }
 
     private async Task<bool> ApplyLightStripLightAsync(bool restoreEffect = false)
@@ -5730,15 +5815,15 @@ public partial class OriginalStyleWindow : Window
         bool ok;
         if (on)
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", true);
+            ok = await SetLightPowerServiceAsync("HidLightbar/Ctrl", true);
             if (ok && restoreEffect)
             {
-                ok = await _backendProbe.SetLightbarEffectAsync(effect);
+                ok = await SetLightbarEffectServiceAsync(effect);
             }
         }
         else
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar/Ctrl", false);
+            ok = await SetLightPowerServiceAsync("HidLightbar/Ctrl", false);
         }
         return ok;
     }
@@ -5754,15 +5839,15 @@ public partial class OriginalStyleWindow : Window
         bool ok;
         if (on)
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", true);
+            ok = await SetLightPowerServiceAsync("HidLightbar_Hinge/Ctrl", true);
             if (ok && restoreEffect)
             {
-                ok = await _backendProbe.SetHingeEffectAsync(effect);
+                ok = await SetHingeEffectServiceAsync(effect);
             }
         }
         else
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Hinge/Ctrl", false);
+            ok = await SetLightPowerServiceAsync("HidLightbar_Hinge/Ctrl", false);
         }
         return ok;
     }
@@ -5778,15 +5863,15 @@ public partial class OriginalStyleWindow : Window
         bool ok;
         if (on)
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", true);
+            ok = await SetLightPowerServiceAsync("HidLightbar_Sync/Ctrl", true);
             if (ok && restoreEffect)
             {
-                ok = await _backendProbe.SetSyncEffectAsync(effect);
+                ok = await SetSyncEffectServiceAsync(effect);
             }
         }
         else
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Sync/Ctrl", false);
+            ok = await SetLightPowerServiceAsync("HidLightbar_Sync/Ctrl", false);
         }
         return ok;
     }
@@ -5841,7 +5926,7 @@ public partial class OriginalStyleWindow : Window
             SaveChannelEffect("HidLightbar/Ctrl", effect);
             return;
         }
-        bool ok = await _backendProbe.SetLightbarEffectAsync(effect);
+        bool ok = await SetLightbarEffectServiceAsync(effect);
         if (ok)
         {
             SaveChannelEffect("HidLightbar/Ctrl", effect);
@@ -5941,7 +6026,7 @@ public partial class OriginalStyleWindow : Window
             SaveChannelEffect("HidLightbar_Hinge/Ctrl", effect);
             return;
         }
-        bool ok = await _backendProbe.SetHingeEffectAsync(effect);
+        bool ok = await SetHingeEffectServiceAsync(effect);
         if (ok)
         {
             SaveChannelEffect("HidLightbar_Hinge/Ctrl", effect);
@@ -6010,7 +6095,7 @@ public partial class OriginalStyleWindow : Window
             SaveChannelEffect("HidLightbar_Sync/Ctrl", effect);
             return;
         }
-        bool ok = await _backendProbe.SetSyncEffectAsync(effect);
+        bool ok = await SetSyncEffectServiceAsync(effect);
         if (ok)
         {
             SaveChannelEffect("HidLightbar_Sync/Ctrl", effect);
@@ -6275,7 +6360,7 @@ public partial class OriginalStyleWindow : Window
                     return false;
                 }
             }
-            ok = await _backendProbe.SetKeyboardEffectAsync(effect);
+            ok = await SetKeyboardEffectServiceAsync(effect);
             if (ok)
             {
                 MechrevoLite.Hardware.LightingSettingsStore.Save("Keyboard/Ctrl",
@@ -6341,7 +6426,7 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_87;
             return;
         }
-        bool logoOk = await _backendProbe.SetLogoEffectAsync(effect);
+        bool logoOk = await SetLogoEffectServiceAsync(effect);
         if (logoOk)
         {
             SaveChannelEffect("HidLightbar_Logo/Ctrl", effect);
@@ -6360,15 +6445,15 @@ public partial class OriginalStyleWindow : Window
         bool ok;
         if (on)
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", true);
+            ok = await SetLightPowerServiceAsync("HidLightbar_Logo/Ctrl", true);
             if (ok && restoreEffect)
             {
-                ok = await _backendProbe.SetLogoEffectAsync(effect);
+                ok = await SetLogoEffectServiceAsync(effect);
             }
         }
         else
         {
-            ok = await _backendProbe.SetLightPowerAsync("HidLightbar_Logo/Ctrl", false);
+            ok = await SetLightPowerServiceAsync("HidLightbar_Logo/Ctrl", false);
         }
         StatusText.Text = ok ? (on ? "Logo 灯效已下发：" + effect : "Logo 灯已关闭") : "Logo 灯效下发失败";
         return ok;

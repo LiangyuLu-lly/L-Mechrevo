@@ -21,6 +21,12 @@ internal interface IPerformanceService
     /// <summary>切换性能模式（经 <see cref="BackendProbe.SwitchModeResultAsync" />）。</summary>
     Task<ServiceResult> SetModeAsync(int mode);
 
+    /// <summary>Set mode while preserving the raw Superseded semantics (window orchestration; 1:1 with BackendProbe).</summary>
+    Task<MechrevoLite.Hardware.MechrevoService.ModeSwitchResult> SetModeResultAsync(int mode);
+
+    /// <summary>Raw fan-boost path (GCU/Quick only; 1:1 with the window's previous direct call).</summary>
+    Task<bool> SwitchFanBoostRawAsync(bool on);
+
     /// <summary>全部模式定义（内置 + 自定义；只读快照）。</summary>
     IReadOnlyList<PerfModeDefinition> Modes { get; }
 
@@ -71,6 +77,40 @@ internal sealed class PerformanceService : IPerformanceService
         catch (Exception ex)
         {
             return ServiceResult.Fail("模式下发异常：" + ex.GetType().Name);
+        }
+    }
+
+    public async Task<MechrevoLite.Hardware.MechrevoService.ModeSwitchResult> SetModeResultAsync(int mode)
+    {
+        BackendProbe? probe = _backend.Probe;
+        if (probe == null)
+        {
+            return MechrevoLite.Hardware.MechrevoService.ModeSwitchResult.Failed;
+        }
+        try
+        {
+            return await probe.SwitchModeResultAsync(mode).ConfigureAwait(false);
+        }
+        catch
+        {
+            return MechrevoLite.Hardware.MechrevoService.ModeSwitchResult.Failed;
+        }
+    }
+
+    public async Task<bool> SwitchFanBoostRawAsync(bool on)
+    {
+        BackendProbe? probe = _backend.Probe;
+        if (probe == null)
+        {
+            return false;
+        }
+        try
+        {
+            return await probe.SwitchQuickAsync("fanboost", on).ConfigureAwait(false);
+        }
+        catch
+        {
+            return false;
         }
     }
 

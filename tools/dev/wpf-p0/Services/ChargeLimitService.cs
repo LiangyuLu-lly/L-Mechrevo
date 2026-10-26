@@ -24,6 +24,12 @@ internal interface IChargeLimitService
     /// <summary>保存并启用阈值（起充 <paramref name="lowPercent" /> / 停充 <paramref name="highPercent" />）。</summary>
     ServiceResult SaveThreshold(int lowPercent, int highPercent);
 
+    /// <summary>Raw EC write for threshold (no config save; caller keeps BatteryLimitRestore.SaveConfig order).</summary>
+    ServiceResult EnableThresholdRaw(int lowPercent, int highPercent);
+
+    /// <summary>Raw EC write to disable threshold (no config save; caller keeps SaveConfig order).</summary>
+    ServiceResult DisableThresholdRaw();
+
     /// <summary>启用阈值（等价于“保存并启用”）。</summary>
     ServiceResult Enable(int lowPercent, int highPercent);
 
@@ -99,6 +105,32 @@ internal sealed class ChargeLimitService : IChargeLimitService
             SliderEnabled: AppConfig.Is(SliderKey),
             DisplayLimitPercent: SafeCall(BatteryControl.ResolveDisplayLimitPercent, 100),
             SelectedModePercent: SafeCall(BatteryControl.SelectedModePercent, 80));
+    }
+
+    public ServiceResult EnableThresholdRaw(int lowPercent, int highPercent)
+    {
+        try
+        {
+            bool ok = BatteryLimitWriter.TryEnable(lowPercent, highPercent, allowInitialDischarge: true, out string detail);
+            return ok ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult.Fail(ex.GetType().Name);
+        }
+    }
+
+    public ServiceResult DisableThresholdRaw()
+    {
+        try
+        {
+            bool ok = BatteryLimitWriter.TryDisable(out string detail);
+            return ok ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult.Fail(ex.GetType().Name);
+        }
     }
 
     public ServiceResult SaveThreshold(int lowPercent, int highPercent)
