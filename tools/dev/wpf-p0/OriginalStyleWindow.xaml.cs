@@ -107,6 +107,7 @@ public partial class OriginalStyleWindow : Window
     private long _pendingModeTick;
     private int _lastDbVisualMode = int.MinValue;
     private bool _powerSessionEventsHooked;
+    private bool _sessionLocked;
     private bool _lastPowerLineOnline;
     private int _powerSettleGeneration;
     private long _resumeShowSuppressUntil;
@@ -1576,10 +1577,20 @@ public partial class OriginalStyleWindow : Window
             {
                 Logger.WriteLine("[power] KillSmartDisplayControl 失败（已吞掉）：" + ex.Message);
             }
-            // Aura.ApplyAura / AutoCPUTemp 属旧 UI/ModeControl 专有，Core 无同源 API ⇒ 不伪造；
-            // WPF 的灯光恢复已由 ReconcileLightingPowerAsync 承担。
+            // Aura.ApplyAura 属旧 UI；WPF 灯光恢复由 ReconcileLightingPowerAsync 承担。
             _ = ReconcileLightingPowerAsync();
+            if (_sessionLocked)
+            {
+                _sessionLocked = false;
+                _ = CpuTempReapplyService.ReapplyAfterUnlockAsync();
+                Logger.WriteLine("[power] 解锁后重放 CPU 温度墙（旧 AutoCPUTemp 等价）");
+            }
             Logger.WriteLine("[power] SessionSwitch 恢复：" + e.Reason);
+        }
+        else if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock)
+        {
+            _sessionLocked = true;
+            Logger.WriteLine("[power] SessionSwitch 锁定");
         }
     }
 
