@@ -222,8 +222,24 @@ public partial class OriginalStyleWindow : Window
             _hotkeyService?.Dispose();
             _hotkeyService = null;
         };
-        MechrevoLite.Helpers.ToastBridge.FailureCallback = message => ToastService.Show(message, failure: true);
-        MechrevoLite.Helpers.ToastBridge.NoticeCallback = message => ToastService.Show(message);
+        MechrevoLite.Helpers.ToastBridge.FailureCallback = message =>
+        {
+            if (StartupPopupGate.SuppressAutomaticPopup)
+            {
+                Logger.WriteLine("[startup] startup 参数：抑制错误 Toast：" + message);
+                return;
+            }
+            ToastService.Show(message, failure: true);
+        };
+        MechrevoLite.Helpers.ToastBridge.NoticeCallback = message =>
+        {
+            if (StartupPopupGate.SuppressAutomaticPopup)
+            {
+                Logger.WriteLine("[startup] startup 参数：抑制通知 Toast：" + message);
+                return;
+            }
+            ToastService.Show(message);
+        };
         _trayIcon = new TrayIconService();
         _trayIcon.SetTheme(_dark);
         _trayIcon.ShowRequested += ShowFromTray;
@@ -1407,6 +1423,17 @@ public partial class OriginalStyleWindow : Window
             || e.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleConnect)
         {
             MarkResumeShowSuppression("SessionSwitch:" + e.Reason);
+            // ⭐ task-27：旧 Program.SystemEvents_SessionSwitch 的 SmartDisplayControl kill（Core 已有 API）
+            try
+            {
+                MechrevoLite.Helpers.ProcessHelper.KillSmartDisplayControl();
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLine("[power] KillSmartDisplayControl 失败（已吞掉）：" + ex.Message);
+            }
+            // Aura.ApplyAura / AutoCPUTemp 属旧 UI/ModeControl 专有，Core 无同源 API ⇒ 不伪造；
+            // WPF 的灯光恢复已由 ReconcileLightingPowerAsync 承担。
             _ = ReconcileLightingPowerAsync();
             Logger.WriteLine("[power] SessionSwitch 恢复：" + e.Reason);
         }
@@ -1519,14 +1546,7 @@ public partial class OriginalStyleWindow : Window
     // ⭐ task-25：startup 参数（计划任务）下不弹首启引导/更新窗口，仅正常启动弹 ✅
     private static bool IsStartupLaunch()
     {
-        foreach (string arg in Environment.GetCommandLineArgs())
-        {
-            if (string.Equals(arg, "startup", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-        return false;
+        return StartupPopupGate.IsStartupLaunch;
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
