@@ -417,16 +417,40 @@ public partial class OriginalStyleWindow : Window
                         return false;
                     }
                     rgb.Brightness = Math.Clamp(light <= 4 ? light * 25 : light, 1, 100);
-                    if (MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect))
+                    System.Drawing.Color hidColor = System.Drawing.Color.FromArgb(colorArgb);
+                    int hidSpeed = Math.Clamp(speed, 0, 4);
+                    switch (hidMode)
                     {
-                        rgb.StaticColor = System.Drawing.Color.FromArgb(colorArgb);
+                        case 0:
+                            rgb.BreathColor = hidColor;
+                            rgb.BreathSpeed = hidSpeed;
+                            break;
+                        case 3:
+                            rgb.ReactiveColor = hidColor;
+                            break;
+                        case 4:
+                            rgb.WheelSpeed = hidSpeed;
+                            break;
+                        case 5:
+                            rgb.LightningSpeed = hidSpeed;
+                            break;
+                        case 6:
+                            rgb.FlameSpeed = hidSpeed;
+                            break;
+                        case 8:
+                            rgb.MatrixSpeed = hidSpeed;
+                            break;
+                        case 9:
+                            rgb.StaticColor = hidColor;
+                            break;
                     }
                     return await ApplyHidKeyboardAsync(hidMode, on);
                 }
-                if (on)
+                if (!on)
                 {
-                    await probe.SetKeyboardPowerAsync(true);
+                    return await probe.SetKeyboardPowerAsync(false);
                 }
+                await probe.SetKeyboardPowerAsync(true);
                 return await probe.SetKeyboardEffectAsync(effect);
             }
 

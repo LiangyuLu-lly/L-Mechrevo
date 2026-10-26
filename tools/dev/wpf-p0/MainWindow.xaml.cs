@@ -2005,9 +2005,11 @@ public partial class MainWindow : Window
         {
             return !(int.TryParse(effect.AsSpan(4), out int mode) && mode == 9);
         }
-        return effect is "Breathing" or "Wave" or "Impact" or "Raindrop"
-            or "ColorMarquee" or "Rainbow" or "Rotation" or "RainbowWheel"
-            or "FlowRainbow" or "Lightning" or "Flame" or "Matrix" or "Spark";
+        if (effect is "Single" or "Static" or "Off" or "TurnedOff")
+        {
+            return false;
+        }
+        return true;
     }
 
     private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, bool powerOn)
