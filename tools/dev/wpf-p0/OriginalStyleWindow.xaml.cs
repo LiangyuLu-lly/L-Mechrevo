@@ -433,6 +433,34 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    internal async Task<bool> WideApplyWhiteBacklightAsync(int level, bool on)
+    {
+        MechrevoService? service = _backendProbe?.Service ?? WpfBackend.Service;
+        if (service == null)
+        {
+            return false;
+        }
+        try
+        {
+            if (!on)
+            {
+                return _backendProbe != null
+                    ? await _backendProbe.SetKeyboardPowerAsync(false)
+                    : await service.SetKeyboardPower(false);
+            }
+            if (_backendProbe != null)
+            {
+                await _backendProbe.SetKeyboardPowerAsync(true);
+            }
+            int hardwareLevel = level >= 2 ? 4 : 2;
+            return await service.SetKeyboardBrightnessPreservingEffect(hardwareLevel);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal async Task<bool> WideApplyLightAsync(string topic, string effect, int light, int speed, int colorArgb, bool on)
     {
         MechrevoHw? hw = _backendProbe?.Hw;

@@ -2088,8 +2088,10 @@ public partial class MainWindow : Window
     private Border BuildLightCard(string topic, string title, (string Effect, string Name)[] effects, bool hidKeyboard = false, bool whiteKeyboard = false)
     {
         LightChannelSettings settings = LightingSettingsStore.Load(topic, effects[0].Effect);
-        int maxLight = topic == "Keyboard/Ctrl" ? 4 : topic == "HidLightbar_Logo/Ctrl" ? 4 : 100;
-        int light = Math.Clamp(settings.Light, 0, maxLight);
+        int maxLight = whiteKeyboard ? 2 : (topic == "Keyboard/Ctrl" ? 4 : topic == "HidLightbar_Logo/Ctrl" ? 4 : 100);
+        int light = whiteKeyboard
+            ? (settings.Light >= 3 ? 2 : Math.Clamp(settings.Light, 1, 2))
+            : Math.Clamp(settings.Light, 0, maxLight);
         int colorArgb = settings.ColorArgb;
         int breathingIndex = Math.Clamp(settings.BreathingIndex, 1, 4);
         bool singleZoneKeyboard = topic == "Keyboard/Ctrl"
@@ -2349,7 +2351,7 @@ public partial class MainWindow : Window
         right.Children.Add(colorSection);
         right.Children.Add(mixSection);
         right.Children.Add(breathSection);
-        Slider slider = new() { Style = (Style)FindResource("RoundSlider"), Minimum = 0, Maximum = maxLight, Value = light };
+        Slider slider = new() { Style = (Style)FindResource("RoundSlider"), Minimum = whiteKeyboard ? 1 : 0, Maximum = maxLight, Value = light };
         sliderRef = slider;
         TextBlock value = new()
         {
@@ -2464,7 +2466,7 @@ public partial class MainWindow : Window
         if (whiteKeyboard)
         {
             // ⭐⭐ task-17：白色背光键盘按能力只保留「电源 + 4 档亮度」，⛔ 不显示不支持的 RGB 效果/颜色/速度 ✅
-            hint.Text = "白色背光键盘：仅电源与 4 档亮度";
+            hint.Text = "白色背光键盘：仅电源与 2 档亮度";
             effectPanel.Visibility = Visibility.Collapsed;
             colorSection.Visibility = Visibility.Collapsed;
             mixSection.Visibility = Visibility.Collapsed;
@@ -2716,6 +2718,15 @@ public partial class MainWindow : Window
         {
             int light = (int)Math.Round(slider.Value);
             int speedValue = (int)Math.Round(speed.Value);
+            if (topic == "Keyboard/Ctrl" && WideIsWhiteBacklightKeyboard(_probe?.Hw))
+            {
+                if (_owner != null)
+                {
+                    bool whiteOk = await _owner.WideApplyWhiteBacklightAsync(light, powerOn);
+                    StatusText.Text = whiteOk ? "白色背光已下发" : "白色背光下发失败";
+                }
+                return;
+            }
             LightChannelSettings settings = LightingSettingsStore.Load(topic, effect) with
             {
                 Effect = effect,
