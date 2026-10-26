@@ -39,6 +39,11 @@ public partial class MainWindow : Window
     private readonly List<ToggleButton> _effectOptionButtons = new();
     private readonly List<ToggleButton> _lightingIdleButtons = new();
     private readonly Dictionary<string, Slider> _effectSliders = new();
+    private Border? _liquidCard;
+    private Button? _liquidStatusButton;
+    private ComboBox? _liquidPumpCombo;
+    private ComboBox? _liquidFanCombo;
+    private bool _liquidSyncing;
     private readonly Dictionary<string, TextBlock> _effectValues = new();
     private DispatcherTimer? _effectCommitTimer;
     private bool _syncingCalibrationUi;
@@ -80,6 +85,7 @@ public partial class MainWindow : Window
         BuildSensorBlocks();
         BuildQuickTiles();
         BuildHomeExtras();
+        BuildLiquidCard();
         BuildIgpuSavingControls();
         if (_owner != null)
         {
@@ -1461,6 +1467,7 @@ public partial class MainWindow : Window
             button.IsChecked = hz == currentHz;
         }
         if (_autoRefresh != null) _autoRefresh.IsChecked = auto;
+        RefreshLiquidCooling();
         RefreshScreenControls();
         (bool limitEnabled2, string lowText2, string highText2, string limitStatus2, bool experiment2, bool ecDirect2) = _owner.WideChargeLimit();
         if (_chargeLimitSwitch != null) _chargeLimitSwitch.IsChecked = limitEnabled2;
@@ -1522,6 +1529,152 @@ public partial class MainWindow : Window
             && ScreenCalibrationCard.Visibility != Visibility.Visible && ScreenEffectCard.Visibility != Visibility.Visible)
         {
             NavScreen.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void BuildLiquidCard()
+    {
+        if (_owner == null || HomePage == null || _liquidCard != null)
+        {
+            return;
+        }
+        if (HomePage.Content is not StackPanel root)
+        {
+            return;
+        }
+        Border card = new()
+        {
+            Style = (Style)FindResource("Card"),
+            Margin = new Thickness(0, 12, 0, 0),
+            Visibility = _owner.WideLiquidVisible ? Visibility.Visible : Visibility.Collapsed
+        };
+        StackPanel panel = new();
+        Grid header = new();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Viewbox icon = new()
+        {
+            Width = 18,
+            Height = 18,
+            Margin = new Thickness(0, 0, 8, 0),
+            Child = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M8,1 C8,1 3,7 3,10.5 A5,5 0 0 0 13,10.5 C13,7 8,1 8,1 Z"),
+                Fill = (Brush)FindResource("MutedBrush"),
+                Stretch = Stretch.Uniform
+            }
+        };
+        StackPanel titleRow = new() { Orientation = Orientation.Horizontal };
+        titleRow.Children.Add(icon);
+        titleRow.Children.Add(new TextBlock { Text = "水冷系统", Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
+        Grid.SetColumn(titleRow, 0);
+        header.Children.Add(titleRow);
+        _liquidStatusButton = new Button { Content = "未连接", Style = (Style)FindResource("FlatButton"), HorizontalAlignment = HorizontalAlignment.Right };
+        _liquidStatusButton.Click += async (_, _) =>
+        {
+            bool ok = await _owner.WideRefreshLiquidAsync();
+            if (_liquidStatusButton != null)
+            {
+                _liquidStatusButton.Content = _owner.WideLiquidConnected ? "水冷已连接" : "水冷未连接";
+            }
+            StatusText.Text = ok ? "水冷状态已刷新" : "刷新水冷状态失败";
+        };
+        Grid.SetColumn(_liquidStatusButton, 2);
+        header.Children.Add(_liquidStatusButton);
+        panel.Children.Add(header);
+        Grid combos = new() { Margin = new Thickness(0, 8, 0, 0) };
+        combos.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        combos.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        combos.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        combos.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        TextBlock pumpLabel = new() { Text = "水泵", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        combos.Children.Add(pumpLabel);
+        _liquidPumpCombo = CreateLiquidCombo(new[] { ("自动", "-1"), ("45%", "0"), ("60%", "1"), ("90%", "2") });
+        _liquidPumpCombo.SelectionChanged += async (_, _) => await SetLiquidComboAsync(pump: true);
+        Grid.SetColumn(_liquidPumpCombo, 1);
+        combos.Children.Add(_liquidPumpCombo);
+        TextBlock fanLabel = new() { Text = "风扇", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
+        Grid.SetColumn(fanLabel, 2);
+        combos.Children.Add(fanLabel);
+        _liquidFanCombo = CreateLiquidCombo(new[] { ("自动", "-1"), ("40%", "0"), ("50%", "1"), ("60%", "2"), ("90%", "3") });
+        _liquidFanCombo.SelectionChanged += async (_, _) => await SetLiquidComboAsync(pump: false);
+        Grid.SetColumn(_liquidFanCombo, 3);
+        combos.Children.Add(_liquidFanCombo);
+        panel.Children.Add(combos);
+        card.Child = panel;
+        root.Children.Add(card);
+        _liquidCard = card;
+        RefreshLiquidCooling();
+    }
+
+    private static ComboBox CreateLiquidCombo((string Label, string Tag)[] items)
+    {
+        ComboBox combo = new() { Style = (Style)Application.Current.FindResource("RoundCombo"), Width = 110 };
+        foreach ((string label, string tag) in items)
+        {
+            combo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
+        }
+        return combo;
+    }
+
+    private async Task SetLiquidComboAsync(bool pump)
+    {
+        if (_liquidSyncing || _owner == null)
+        {
+            return;
+        }
+        ComboBox? combo = pump ? _liquidPumpCombo : _liquidFanCombo;
+        if (combo?.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        int profile = int.TryParse(item.Tag as string, out int parsed) ? parsed : -1;
+        bool ok = pump
+            ? await _owner.WideSetLiquidPumpAsync(profile)
+            : await _owner.WideSetLiquidFanAsync(profile);
+        StatusText.Text = ok ? (pump ? "水泵档位已下发" : "风扇档位已下发") : "水冷档位下发失败";
+    }
+
+    internal void RefreshLiquidCooling()
+    {
+        if (_liquidCard == null || _owner == null)
+        {
+            return;
+        }
+        bool visible = _owner.WideLiquidVisible;
+        _liquidCard.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!visible)
+        {
+            return;
+        }
+        bool supported = _owner.WideLiquidSupported;
+        if (_liquidStatusButton != null)
+        {
+            _liquidStatusButton.Content = supported
+                ? (_owner.WideLiquidConnected ? "水冷已连接" : "水冷未连接")
+                : "未连接";
+        }
+        if (_liquidPumpCombo != null) _liquidPumpCombo.IsEnabled = supported;
+        if (_liquidFanCombo != null) _liquidFanCombo.IsEnabled = supported;
+        _liquidSyncing = true;
+        SelectLiquidCombo(_liquidPumpCombo, _owner.WideLiquidPump);
+        SelectLiquidCombo(_liquidFanCombo, _owner.WideLiquidFan);
+        _liquidSyncing = false;
+    }
+
+    private static void SelectLiquidCombo(ComboBox? combo, int value)
+    {
+        if (combo == null) return;
+        for (int i = 0; i < combo.Items.Count; i++)
+        {
+            if (combo.Items[i] is ComboBoxItem item
+                && int.TryParse(item.Tag as string, out int tag)
+                && tag == value)
+            {
+                combo.SelectedIndex = i;
+                return;
+            }
         }
     }
 

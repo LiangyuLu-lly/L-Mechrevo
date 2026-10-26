@@ -3448,6 +3448,7 @@ public partial class OriginalStyleWindow : Window
         bool liquidSupported = (caps?.LiquidCooling ?? false) || (hw?.SupportsLiquidCooling ?? false);
         LiquidSection.Visibility = (AppConfig.Is("force_liquid_cooling_menu") || liquidSupported) ? Visibility.Visible : Visibility.Collapsed;
         RefreshLiquidCoolingUi();
+        _wideWindow?.RefreshLiquidCooling();
         LightingSection.Visibility = (KeyboardLightRow.Visibility == Visibility.Visible
             || LightStripRow.Visibility == Visibility.Visible
             || LogoLightRow.Visibility == Visibility.Visible
@@ -3466,6 +3467,74 @@ public partial class OriginalStyleWindow : Window
             return Visibility.Collapsed;
         }
         return supported ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    internal bool WideLiquidVisible =>
+        MechrevoLite.AppConfig.Is("force_liquid_cooling_menu")
+        || _backendProbe?.Hw?.SupportsLiquidCooling == true
+        || _backendProbe?.Capabilities?.LiquidCooling == true;
+
+    internal bool WideLiquidSupported =>
+        _backendProbe?.Hw?.SupportsLiquidCooling == true
+        || _backendProbe?.Capabilities?.LiquidCooling == true;
+
+    internal bool WideLiquidConnected => _backendProbe?.Hw?.LcReportedConnected == true;
+
+    internal int WideLiquidPump => _backendProbe?.Hw?.LcPumpControl ?? -1;
+
+    internal int WideLiquidFan => _backendProbe?.Hw?.LcFanControl ?? -1;
+
+    internal async Task<bool> WideSetLiquidPumpAsync(int profile)
+    {
+        if (_backendProbe?.Service == null || !WideLiquidSupported)
+        {
+            return false;
+        }
+        bool ok = profile < 0
+            ? await _backendProbe.Service.SwitchLcFanAuto()
+            : await _backendProbe.Service.SwitchLcPump(profile);
+        if (ok)
+        {
+            RefreshLiquidCoolingUi();
+            RefreshFromBackend();
+        }
+        return ok;
+    }
+
+    internal async Task<bool> WideSetLiquidFanAsync(int profile)
+    {
+        if (_backendProbe?.Service == null || !WideLiquidSupported)
+        {
+            return false;
+        }
+        bool ok = profile < 0
+            ? await _backendProbe.Service.SwitchLcFanAuto()
+            : await _backendProbe.Service.SwitchLcFan(profile);
+        if (ok)
+        {
+            RefreshLiquidCoolingUi();
+            RefreshFromBackend();
+        }
+        return ok;
+    }
+
+    internal async Task<bool> WideRefreshLiquidAsync()
+    {
+        if (_backendProbe?.Service == null)
+        {
+            return false;
+        }
+        try
+        {
+            await _backendProbe.Service.RefreshLiquidCoolingStatus();
+            RefreshLiquidCoolingUi();
+            RefreshFromBackend();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void RefreshLiquidCoolingUi()

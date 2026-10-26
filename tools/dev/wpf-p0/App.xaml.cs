@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Globalization;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
@@ -60,6 +61,17 @@ public partial class App : Application
             null,
             Timeout.Infinite,
             executeOnlyOnce: false);
+        try
+        {
+            string language = MechrevoLite.AppConfig.GetString("language") ?? "zh-CN";
+            CultureInfo uiCulture = CultureInfo.GetCultureInfo(
+                language.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en-US" : "zh-CN");
+            Thread.CurrentThread.CurrentUICulture = uiCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = uiCulture;
+        }
+        catch
+        {
+        }
         ApplyFont();
         _ = Task.Run(() => MechrevoLite.HardwareControl.EnableLocalMonitoring());
         base.OnStartup(e);

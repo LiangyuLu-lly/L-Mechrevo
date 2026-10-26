@@ -693,7 +693,7 @@
                     <StackPanel x:Name="LiquidSection" Style="{StaticResource Section}" Visibility="Collapsed">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE7FC;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <Viewbox Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"><Path Data="M8,1 C8,1 3,7 3,10.5 A5,5 0 0 0 13,10.5 C13,7 8,1 8,1 Z" Fill="{DynamicResource MutedBrush}" Stretch="Uniform" /></Viewbox>
                                 <TextBlock Text="水冷系统" Style="{StaticResource SectionHeader}" Margin="0" />
                             </StackPanel>
                             <Button x:Name="LiquidStatusButton" Content="未连接" Style="{StaticResource MiniButton}" HorizontalAlignment="Right" Click="LiquidStatus_Click" />
