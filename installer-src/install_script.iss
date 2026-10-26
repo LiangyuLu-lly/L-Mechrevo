@@ -320,8 +320,9 @@ Type: files; Name: "{app}\用前必看.txt"
 Type: files; Name: "{app}\LICENSES\LICENSE.txt"
 
 [Run]
-; 2026-10-05：全新安装前清空用户数据（升级时不执行，见 Check）。卸载全删、升级保留。
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Remove-Item -LiteralPath (Join-Path $env:APPDATA MechrevoLite) -Recurse -Force -ErrorAction SilentlyContinue"""; Flags: runhidden; Check: IsFreshInstallFlag
+; 2026-10-27：不再在全新安装时静默删除 %APPDATA%\MechrevoLite。
+;   原因：卸载项缺失/损坏时 GFreshInstall 会误判为全新安装，直接抹掉用户设置；
+;   设置是否清理只由卸载器交互询问决定，安装器不再替用户做删除决定。
 ; 2026-10-09（owner 拍板：改成可选）：安装期「是否移除官方控制台」由 InitializeSetup 的询问决定，
 ;   答案经 {code:GetVendorConsoleParam} 透传给 Install-Gcu.ps1：-RemoveVendorConsole / -KeepVendorConsole。
 ;   ⭐⭐ 2026-10-15（owner 新口径「并提示是否保留原版控制台」）：**询问改为"是否【保留】"，默认按钮 = 保留**。
@@ -2148,8 +2149,8 @@ end;
 // (see CurStepChanged ssPostInstall) — but only when the GCU variant is unchanged.
 procedure BackupAndUpgrade();
 var
-  GcuRoot, LiveRoot, BackupRoot, Uninst, Q, OldVariant, UserSource, UserFanSource: String;
-  LmRoots, LmLeafs: TArrayOfString;
+  GcuRoot, LiveRoot, BackupRoot, Uninst, Q, OldVariant, UserSource, UserFanSource, AppLocalFile: String;
+  LmRoots, LmLeafs, AppLocalFiles: TArrayOfString;
   I, LmBackupFail: Integer;
   ResultCode: Integer;
 begin
@@ -2216,6 +2217,32 @@ begin
     begin
       LmBackupFail := LmBackupFail + 1;
       Log('LM-UPDATE: LM 用户数据备份失败（第 ' + IntToStr(LmBackupFail) + ' 处）: ' + LmRoots[I]);
+    end;
+  end;
+  // 旧版可能把 config.json / 灯效 cfg 放在安装目录；旧卸载器会删 {app}，必须一并备份。
+  SetArrayLength(AppLocalFiles, 9);
+  AppLocalFiles[0] := 'config.json';
+  AppLocalFiles[1] := 'config.json.bak';
+  AppLocalFiles[2] := 'rgb.cfg';
+  AppLocalFiles[3] := 'lightbar.cfg';
+  AppLocalFiles[4] := 'logolight.cfg';
+  AppLocalFiles[5] := 'keyboard.cfg';
+  AppLocalFiles[6] := 'lighting.user-configured';
+  AppLocalFiles[7] := 'fan_curve_bd.cfg';
+  AppLocalFiles[8] := 'lhm_sensors.txt';
+  for I := 0 to GetArrayLength(AppLocalFiles) - 1 do
+  begin
+    AppLocalFile := ExpandConstant('{app}\') + AppLocalFiles[I];
+    if FileExists(AppLocalFile) then
+    begin
+      ForceDirectories(BackupRoot + '\app-local');
+      if FileCopy(AppLocalFile, BackupRoot + '\app-local\' + AppLocalFiles[I], False) then
+        Log('LM-UPDATE: 安装目录设置已备份: ' + AppLocalFile)
+      else
+      begin
+        LmBackupFail := LmBackupFail + 1;
+        Log('LM-UPDATE: 安装目录设置备份失败: ' + AppLocalFile);
+      end;
     end;
   end;
   if LmBackupFail > 0 then
@@ -2315,6 +2342,16 @@ begin
         begin
           RestoreFail := RestoreFail + 1;
           Log('LM-UPDATE: LM 用户数据回灌失败: ' + BackupRoot + '\' + LmLeafs[J] + ' -> ' + LmRoots[J]);
+        end;
+      end;
+      if DirExists(BackupRoot + '\app-local') then
+      begin
+        if CopyDirContentsLenient(BackupRoot + '\app-local', ExpandConstant('{app}')) then
+          Log('LM-UPDATE: 安装目录设置已回灌: ' + BackupRoot + '\app-local -> {app}')
+        else
+        begin
+          RestoreFail := RestoreFail + 1;
+          Log('LM-UPDATE: 安装目录设置回灌失败: ' + BackupRoot + '\app-local -> {app}');
         end;
       end;
       // 清理备份的条件（2026-10-09 起）：回灌全部成功 且 变体一致；否则一律保留（含 LM 两处 + GCU 档 + ICC）。

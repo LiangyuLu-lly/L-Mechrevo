@@ -65,9 +65,21 @@ public static class AppConfig
 		configFileOverridden = !string.IsNullOrWhiteSpace(environmentVariable);
 		Directory.CreateDirectory(Path.GetDirectoryName(configFile) ?? text2);
 		Directory.CreateDirectory(text2);
-		if (!TryLoadConfig(configFile) && !TryRecoverConfig(configFile) && !TryLoadConfig(configFile + ".bak") && (configFileOverridden || !TryLoadConfig(fallbackConfigFile)))
+		// 旧版把 config.json 放在安装目录；升级时安装目录会被卸载器清掉。这里在配置成功读取后
+		// 同步一份到 %APPDATA%，之后升级即便安装目录被替换也仍能读到用户设置。
+		string appDataConfig = Path.Combine(text2, text);
+		bool loaded = TryLoadConfig(configFile) || TryRecoverConfig(configFile) || TryLoadConfig(configFile + ".bak");
+		if (!loaded && !configFileOverridden)
+		{
+			loaded = TryLoadConfig(fallbackConfigFile);
+		}
+		if (!loaded)
 		{
 			Init();
+		}
+		else if (!configFileOverridden && string.Equals(configFile, startupConfig, StringComparison.OrdinalIgnoreCase))
+		{
+			TryMirrorToAppData(configFile, appDataConfig);
 		}
 		MigrateLogLevelDefault();
 		timer.Elapsed += Timer_Elapsed;
@@ -222,6 +234,11 @@ public static class AppConfig
 				}
 				WriteAtomic(configFile, content);
 				SyncFallbackConfig();
+				if (!configFileOverridden
+					&& string.Equals(Path.GetDirectoryName(configFile), Application.StartupPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+				{
+					TryMirrorToAppData(configFile, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MechrevoLite", "config.json"));
+				}
 				result = true;
 			}
 			catch (Exception ex)
@@ -280,6 +297,27 @@ public static class AppConfig
 			return false;
 		}
 		return !string.IsNullOrEmpty(Path.GetDirectoryName(fallbackConfig));
+	}
+
+	private static void TryMirrorToAppData(string source, string destination)
+	{
+		try
+		{
+			if (string.Equals(source, destination, StringComparison.OrdinalIgnoreCase) || !File.Exists(source))
+			{
+				return;
+			}
+			Directory.CreateDirectory(Path.GetDirectoryName(destination) ?? ".");
+			File.Copy(source, destination, overwrite: true);
+			if (File.Exists(source + ".bak"))
+			{
+				File.Copy(source + ".bak", destination + ".bak", overwrite: true);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("Config mirror to AppData failed: " + ex.Message);
+		}
 	}
 
 	private static void SyncFallbackConfig()
