@@ -45,6 +45,11 @@ public partial class MainWindow : Window
     private ComboBox? _liquidPumpCombo;
     private ComboBox? _liquidFanCombo;
     private bool _liquidSyncing;
+    private Grid? _liquidLightRow;
+    private ComboBox? _liquidLightCombo;
+    private Button? _liquidLightColorButton;
+    private TextBlock? _liquidLightStatus;
+    private bool _liquidLightSyncing;
     private readonly Dictionary<string, TextBlock> _effectValues = new();
     private DispatcherTimer? _effectCommitTimer;
     private bool _syncingCalibrationUi;
@@ -1635,6 +1640,46 @@ public partial class MainWindow : Window
         Grid.SetColumn(_liquidFanCombo, 3);
         combos.Children.Add(_liquidFanCombo);
         panel.Children.Add(combos);
+        Grid lightRow = new() { Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+        lightRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        lightRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        lightRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        lightRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        lightRow.Children.Add(new TextBlock
+        {
+            Text = "灯光",
+            Style = (Style)FindResource("MutedText"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0)
+        });
+        _liquidLightCombo = new ComboBox
+        {
+            Style = (Style)FindResource("RoundCombo"),
+            Margin = new Thickness(0, 0, 12, 0)
+        };
+        _liquidLightCombo.SelectionChanged += async (_, _) => await SetLiquidLightComboAsync();
+        Grid.SetColumn(_liquidLightCombo, 1);
+        lightRow.Children.Add(_liquidLightCombo);
+        _liquidLightColorButton = new Button
+        {
+            Content = "颜色",
+            Style = (Style)FindResource("MiniButton"),
+            MinWidth = 52,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        _liquidLightColorButton.Click += async (_, _) => await PickLiquidLightColorAsync();
+        Grid.SetColumn(_liquidLightColorButton, 2);
+        lightRow.Children.Add(_liquidLightColorButton);
+        _liquidLightStatus = new TextBlock
+        {
+            Style = (Style)FindResource("MutedText"),
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        Grid.SetColumn(_liquidLightStatus, 3);
+        lightRow.Children.Add(_liquidLightStatus);
+        panel.Children.Add(lightRow);
+        _liquidLightRow = lightRow;
         card.Child = panel;
         root.Children.Add(card);
         _liquidCard = card;
@@ -1669,6 +1714,54 @@ public partial class MainWindow : Window
         StatusText.Text = ok ? (pump ? "水泵档位已下发" : "风扇档位已下发") : "水冷档位下发失败";
     }
 
+    private async Task SetLiquidLightComboAsync()
+    {
+        if (_liquidLightSyncing || _owner == null || _liquidLightCombo?.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        string profile = item.Tag as string ?? "";
+        if (profile.Length == 0)
+        {
+            return;
+        }
+        bool ok = await _owner.WideApplyLiquidLightAsync(profile, _owner.WideLiquidLightColor);
+        if (_liquidLightStatus != null)
+        {
+            _liquidLightStatus.Text = ok ? "灯光已下发" : "灯光下发失败";
+        }
+        StatusText.Text = ok ? "水冷灯光已下发" : "水冷灯光下发失败";
+    }
+
+    private async Task PickLiquidLightColorAsync()
+    {
+        if (_owner == null)
+        {
+            return;
+        }
+        ColorPickerWindow picker = new(_owner.WideLiquidLightColor);
+        if (picker.ShowDialog() != true || picker.Result is not System.Drawing.Color color)
+        {
+            return;
+        }
+        LiquidCoolingLightService.SaveColor(color);
+        string profile = _owner.WideLiquidLightProfile;
+        if (!LiquidCoolingLightService.IsCustom(profile))
+        {
+            profile = "custom_static";
+        }
+        bool ok = await _owner.WideApplyLiquidLightAsync(profile, color);
+        if (_liquidLightStatus != null)
+        {
+            _liquidLightStatus.Text = ok ? "颜色已下发" : "颜色下发失败";
+        }
+        StatusText.Text = ok ? "水冷颜色已下发" : "水冷颜色下发失败";
+        if (_liquidLightColorButton != null)
+        {
+            _liquidLightColorButton.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(color.A, color.R, color.G, color.B));
+        }
+    }
+
     internal void RefreshLiquidCooling()
     {
         if (_liquidCard == null || _owner == null)
@@ -1694,6 +1787,50 @@ public partial class MainWindow : Window
         SelectLiquidCombo(_liquidPumpCombo, _owner.WideLiquidPump);
         SelectLiquidCombo(_liquidFanCombo, _owner.WideLiquidFan);
         _liquidSyncing = false;
+        bool lightSupported = _owner.WideLiquidLightSupported;
+        if (_liquidLightRow != null)
+        {
+            _liquidLightRow.Visibility = lightSupported ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (lightSupported)
+        {
+            IReadOnlyList<LiquidLightOption> options = _owner.WideLiquidLightOptions;
+            string saved = _owner.WideLiquidLightProfile;
+            int selected = 0;
+            _liquidLightSyncing = true;
+            try
+            {
+                if (_liquidLightCombo != null)
+                {
+                    _liquidLightCombo.Items.Clear();
+                    for (int i = 0; i < options.Count; i++)
+                    {
+                        LiquidLightOption option = options[i];
+                        _liquidLightCombo.Items.Add(new ComboBoxItem { Content = option.Label, Tag = option.Profile });
+                        if (string.Equals(option.Profile, saved, StringComparison.Ordinal))
+                        {
+                            selected = i;
+                        }
+                    }
+                    _liquidLightCombo.SelectedIndex = selected;
+                    _liquidLightCombo.IsEnabled = true;
+                }
+                if (_liquidLightColorButton != null)
+                {
+                    System.Drawing.Color color = _owner.WideLiquidLightColor;
+                    _liquidLightColorButton.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(color.A, color.R, color.G, color.B));
+                    _liquidLightColorButton.IsEnabled = true;
+                }
+                if (_liquidLightStatus != null)
+                {
+                    _liquidLightStatus.Text = string.IsNullOrWhiteSpace(saved) ? "" : "已保存：" + saved;
+                }
+            }
+            finally
+            {
+                _liquidLightSyncing = false;
+            }
+        }
     }
 
     private static void SelectLiquidCombo(ComboBox? combo, int value)
