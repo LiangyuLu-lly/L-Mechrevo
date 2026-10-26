@@ -360,18 +360,8 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- 更多开关 -->
-                    <ScrollViewer x:Name="SwitchesPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
-                        <StackPanel>
-                            <TextBlock Text="更多开关" Style="{StaticResource PageTitle}" />
-                            <TextBlock Text="以磁贴形式排列的快捷开关" Style="{StaticResource MutedText}" Margin="0,3,0,10" />
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <StackPanel x:Name="MoreSwitchGrid" />
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <!-- 更多开关：按需加载 -->
+                    <ContentControl x:Name="SwitchesHost" Visibility="Collapsed" />
                 </Grid>
             </Grid>
 

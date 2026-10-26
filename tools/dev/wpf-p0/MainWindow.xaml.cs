@@ -49,6 +49,9 @@ public partial class MainWindow : Window
     private bool _wideMaximized;
     private bool _switchingToMini;
     private bool _animatingWindow;
+    private L_Mechrevo.WpfP0.Pages.SwitchesPageView? _switchesView;
+    private ScrollViewer? SwitchesPage;
+    private StackPanel? MoreSwitchGrid;
     private Rect _wideRestoreBounds;
     private CheckBox? _chargeLimitSwitch;
     private TextBox? _chargeLow;
@@ -560,13 +563,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private void EnsureSwitchesView()
+    {
+        if (_switchesView != null)
+        {
+            return;
+        }
+        _switchesView = new L_Mechrevo.WpfP0.Pages.SwitchesPageView();
+        SwitchesPage = _switchesView.SwitchesPage;
+        MoreSwitchGrid = _switchesView.MoreSwitchGrid;
+        SwitchesHost.Content = _switchesView;
+        BuildMoreSwitchTiles();
+    }
+
     private void ApplyPage(string page)
     {
         HomePage.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
         ScreenPage.Visibility = page == "screen" ? Visibility.Visible : Visibility.Collapsed;
         LightingPage.Visibility = page == "lighting" ? Visibility.Visible : Visibility.Collapsed;
         CustomPage.Visibility = page == "custom" ? Visibility.Visible : Visibility.Collapsed;
-        SwitchesPage.Visibility = page == "switches" ? Visibility.Visible : Visibility.Collapsed;
+        if (page == "switches")
+        {
+            EnsureSwitchesView();
+        }
+        SwitchesHost.Visibility = page == "switches" ? Visibility.Visible : Visibility.Collapsed;
         Button[] navs = { NavHome, NavScreen, NavLighting, NavCustom, NavSwitches };
         foreach (Button nav in navs)
         {
@@ -1410,7 +1430,7 @@ public partial class MainWindow : Window
             return;
         }
         ApplyHomeCapabilities();
-        if (MoreSwitchGrid.Children.Count == 0) BuildMoreSwitchTiles();
+        if (MoreSwitchGrid != null && MoreSwitchGrid.Children.Count == 0) BuildMoreSwitchTiles();
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
         string perf = _owner.WidePerformanceText;
