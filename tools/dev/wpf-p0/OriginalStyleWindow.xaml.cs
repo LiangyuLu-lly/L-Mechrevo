@@ -684,6 +684,86 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    /// <summary>
+    /// ⭐⭐ 2026-10-26（task-18）：电池「无极限充（实验行 ＋ 滑块）」是否应显示/创建 ✅
+    /// <para>⭐ 判据与旧 WinForms <c>SettingsForm.ChargeSliderSupported()</c> 逐条对齐：</para>
+    /// <list type="number">
+    /// <item>⭐ 10/16/20/30 系（GcuVariant 家族 <c>1020</c> / <c>30</c>）写 EC 可能损坏硬件 ⇒ 不建行
+    /// （<see cref="EcChargeLimit.IsLegacyGenerationBlocked" />，与 EC 侧同一判据）；</item>
+    /// <item>⭐ 无界只有 **8040 系**开放（其它无界如 7040 系不建此开关/滑块）；</item>
+    /// <item>⭐ 显卡代际 **Gen30 / Unknown** ⇒ 不建行；Gen40 / Gen50 / NoDgpu ⇒ 开放。</item>
+    /// </list>
+    /// <para>⚠️ 这里**不读** <c>ec_charge_limit</c> 当前值：那是「关闭 EC 直写」开关自己的状态，
+    /// 不能反过来决定本行是否存在（否则勾上就丢掉撤销入口）。</para>
+    /// <para>⚠️ P0 首页充电阈值卡片本身只对宝龙达白名单板开放（<see cref="WideChargeLimitVisible" />）⇒
+    /// 非宝龙达 GCU 机型连卡片都不建，实验行自然一并隐藏（保留 GCU 三档按钮，行为不变）。</para>
+    /// </summary>
+    internal bool WideChargeExperimentSupported
+    {
+        get
+        {
+            try
+            {
+                if (!WideChargeLimitVisible)
+                {
+                    return false;
+                }
+                if (MechrevoLite.Hardware.EcChargeLimit.IsLegacyGenerationBlocked())
+                {
+                    return false;
+                }
+                if (_backendProbe?.Hw?.WujieSmuApu == true && !IsWujie8040Series())
+                {
+                    return false;
+                }
+                MechrevoLite.Gpu.DgpuGenerationKind generation = MechrevoLite.Gpu.GpuGenerationProvider.Current().Generation;
+                return generation != MechrevoLite.Gpu.DgpuGenerationKind.Gen30
+                    && generation != MechrevoLite.Gpu.DgpuGenerationKind.Unknown;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// ⭐⭐ 2026-10-26（task-18）：电池「关闭 EC 直写」逃生口是否应显示/创建 ✅
+    /// <para>⭐ 判据：⭐ 充电阈值卡片可见（宝龙达白名单板，见 <see cref="WideChargeLimitVisible" />）**且**
+    /// 不是 10/16/20/30 系（<see cref="EcChargeLimit.IsLegacyGenerationBlocked" />）—— 老代际 EC 直写整条被禁，
+    /// 留着开关只会给出「可点但无下发」的控件。</para>
+    /// <para>⚠️ 刻意**不读** <c>ec_charge_limit</c> 当前值：用户勾上“关闭 EC 直写”后该行若消失，就失去撤销入口
+    /// （旧 WinForms 明确要求这一行永不参与收放）；判据只回答「这台机器该不该有 EC 直写这件事」。</para>
+    /// </summary>
+    internal bool WideEcDirectSupported
+    {
+        get
+        {
+            try
+            {
+                return WideChargeLimitVisible && !MechrevoLite.Hardware.EcChargeLimit.IsLegacyGenerationBlocked();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    /// <summary>⭐ task-18：无界 8040 系判定（与旧 WinForms IsWujie8040Series 同一判据：WujieSmuApu + CPU 名 8xxx）。</summary>
+    private static bool IsWujie8040Series()
+    {
+        try
+        {
+            string cpuName = PawnIO.CpuInfo.Name ?? "";
+            return System.Text.RegularExpressions.Regex.IsMatch(cpuName, @"\b8[0-9]{3}[A-Z]*\b");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal (bool LimitEnabled, string Low, string High, string Status, bool Experiment, bool EcDirect) WideChargeLimit()
     {
         return (ChargeLimitSwitch.IsChecked == true, ChargeLimitLowBox.Text, ChargeLimitHighBox.Text,
@@ -3547,13 +3627,17 @@ public partial class OriginalStyleWindow : Window
         LightHingeRow.Visibility = hasHinge ? Visibility.Visible : Visibility.Collapsed;
         LightSyncRow.Visibility = hasSync ? Visibility.Visible : Visibility.Collapsed;
         InitPerfConfigRow();
-        bool gen30 = hw?.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
         RefreshPerfConfigVisibility(_backendProbe?.CurrentMode ?? -1);
-        ChargeSliderToggle.Visibility = gen30 ? Visibility.Collapsed : Visibility.Visible;
-        EcDirectOffToggle.Visibility = gen30 ? Visibility.Collapsed : Visibility.Visible;
-        if (gen30)
+        // ⭐⭐ 2026-10-26（task-18）：实验行/EC 直写按**能力位**显隐（Gen30 / 宝龙达 / 无界 / GCU），
+        //   不再只看“显卡是不是 Gen30”。不支持 ⇒ 连行都不留（与旧 WinForms ChargeSliderSupported / IsEcDirectWriteAllowed 同源）。
+        bool chargeExperimentSupported = WideChargeExperimentSupported;
+        bool ecDirectSupported = WideEcDirectSupported;
+        ChargeSliderToggle.Visibility = chargeExperimentSupported ? Visibility.Visible : Visibility.Collapsed;
+        EcDirectOffToggle.Visibility = ecDirectSupported ? Visibility.Visible : Visibility.Collapsed;
+        if (!chargeExperimentSupported)
         {
             BatteryLimitSlider.Visibility = Visibility.Collapsed;
+            BatteryLimitSliderText.Visibility = Visibility.Collapsed;
         }
         bool liquidSupported = (caps?.LiquidCooling ?? false) || (hw?.SupportsLiquidCooling ?? false);
         LiquidSection.Visibility = (AppConfig.Is("force_liquid_cooling_menu") || liquidSupported) ? Visibility.Visible : Visibility.Collapsed;

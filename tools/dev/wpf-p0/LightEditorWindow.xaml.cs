@@ -30,17 +30,20 @@ public partial class LightEditorWindow : Window
     private bool _gradeColors;
     private bool _wujieWhite;
     private bool _logoGrade;
+    /// <summary>⭐ 2026-10-26（task-17 · 宽屏白色背光入口）：白色背光键盘只有 电源 + 4 档亮度，没有灯效/颜色/速度 ✅。</summary>
+    private readonly bool _whiteBacklightOnly;
     private int _lightMax = 4;
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private bool _suppressAutoApply;
     private bool _applying;
     private bool _pendingAutoApply;
 
-    public LightEditorWindow(string topic, string title, (string Effect, string Name)[] effects)
+    public LightEditorWindow(string topic, string title, (string Effect, string Name)[] effects, bool whiteBacklightOnly = false)
     {
         InitializeComponent();
         _topic = topic;
         _effects = effects;
+        _whiteBacklightOnly = whiteBacklightOnly && string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
         _keyboard = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
         Title = title;
         TitleText.Text = title;
@@ -113,6 +116,17 @@ public partial class LightEditorWindow : Window
         LoadEffects();
         RefreshColorUi();
         BuildKeyboardExtra();
+        if (_whiteBacklightOnly)
+        {
+            // ⭐⭐ task-17（宽屏白色背光入口）：白色背光键盘按能力只保留「电源 + 4 档亮度」，
+            //    ⛔ 不显示不支持的 RGB 效果/颜色/速度/七色等控件 ✅
+            HintText.Text = "白色背光键盘：仅电源与 4 档亮度";
+            EffectRow.Visibility = Visibility.Collapsed;
+            ColorRow.Visibility = Visibility.Collapsed;
+            MixRow.Visibility = Visibility.Collapsed;
+            SpeedRow.Visibility = Visibility.Collapsed;
+            KeyboardExtraRow.Visibility = Visibility.Collapsed;
+        }
         _suppressAutoApply = false;
         PowerCheck.Checked += (_, _) =>
         {
@@ -207,6 +221,15 @@ public partial class LightEditorWindow : Window
 
     private void RefreshColorUi()
     {
+        if (_whiteBacklightOnly)
+        {
+            // ⭐ task-17：白色背光只有开/关 + 4 档亮度，没有任何 RGB 颜色/效果行 ✅
+            ColorRow.Visibility = Visibility.Collapsed;
+            MixRow.Visibility = Visibility.Collapsed;
+            SpeedRow.Visibility = Visibility.Collapsed;
+            KeyboardExtraRow.Visibility = Visibility.Collapsed;
+            return;
+        }
         string effect = SelectedEffect;
         if (_keyboard)
         {
@@ -571,6 +594,12 @@ public partial class LightEditorWindow : Window
                     if (_wujieWhite)
                     {
                         ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardBrightnessPreservingEffect(_light >= 2 ? 4 : 2);
+                        return ok;
+                    }
+                    if (_whiteBacklightOnly)
+                    {
+                        // ⭐ task-17：白色背光只下发亮度（0..4 档），⛔ 不下发效果/颜色 ✅
+                        ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardBrightnessPreservingEffect(_light);
                         return ok;
                     }
                     bool baolongda = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true;

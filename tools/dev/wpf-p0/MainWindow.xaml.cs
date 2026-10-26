@@ -443,6 +443,13 @@ public partial class MainWindow : Window
             if (_lightingView != null) BuildLightingCards();
             if (_screenView != null) BuildScreenFeatures();
             ApplyHomeCapabilities();
+            // ⭐ 2026-10-26（task-18）：宽屏若在“后端就绪前”打开，充电阈值卡片（含实验行/EC 直写）
+            //   当时因能力位读不到而**未建**；后端就绪后补建一次（不支持机型 Visible=false，不会建）。
+            //   ⚠️ 只在“卡片还没建且现在支持”时补建，避免每次重连都重建整张电池卡。
+            if (_chargeLimitText == null && _owner?.WideChargeLimitVisible == true)
+            {
+                BuildHomeExtras();
+            }
             RefreshHomeExtras();
         }));
     }
@@ -818,6 +825,9 @@ public partial class MainWindow : Window
         battery.Children.Add(new TextBlock { Text = WpfStrings.MainWindow_xaml_Text_10, Style = (Style)FindResource("CardTitle") });
         _batteryInfoText = new TextBlock { Text = info, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 4, 0, 8) };
         battery.Children.Add(_batteryInfoText);
+        // ⭐ task-18：本方法可能在后端就绪后**补建**一次（见 OnBackendReady）⇒ 先清空档位按钮引用，
+        //   避免旧的按钮对象留在列表里（RefreshHomeExtras 会按列表回填 IsChecked）。
+        _batteryModeButtons.Clear();
         StackPanel modes = new() { Orientation = Orientation.Horizontal };
         string[] labels = { WpfStrings.BatteryLong, WpfStrings.BatteryBalanced, WpfStrings.BatteryWorkstation };
         for (int i = 0; i < labels.Length; i++)
@@ -865,57 +875,79 @@ public partial class MainWindow : Window
             battery.Children.Add(limitRow);
             _chargeStatus = new TextBlock { Text = limitStatus, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
             battery.Children.Add(_chargeStatus);
-        }
-        (bool _, string _, string _, string _, bool experimentSlider, bool ecDirectSlider) = _owner.WideChargeLimit();
-        _chargeExperiment = new CheckBox { Content = WpfStrings.MainWindow_xaml_Content_3, Style = (Style)FindResource("HeaderSwitch"), IsChecked = experimentSlider, Margin = new Thickness(0, 8, 16, 0) };
-        _chargeExperiment.Click += (_, _) =>
-        {
-            _owner.WideSetChargeExperiment(_chargeExperiment.IsChecked == true);
-            if (_chargeExperiment.IsChecked == true && _ecDirect != null) _ecDirect.IsChecked = false;
-            UpdateChargeSliderVisibility();
-        };
-        _ecDirect = new CheckBox { Content = WpfStrings.MainWindow_xaml_Content_4, Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirectSlider, Margin = new Thickness(0, 8, 0, 0) };
-        _ecDirect.Click += (_, _) =>
-        {
-            _owner.WideSetEcDirect(_ecDirect.IsChecked == true);
-            if (_ecDirect.IsChecked == true && _chargeExperiment != null)
+
+            // ⭐⭐ 2026-10-26（task-18 · 电池实验行能力位门控）：这两行旧实现放在
+            //   `if (_owner.WideChargeLimitVisible)` **之外** ⇒ 不支持的机型（非宝龙达白名单 /
+            //   10/16/20/30 系 / 无界非 8040 / Gen30）也会出现「可点但无下发」的控件 ❌
+            //   ⇒ 现在按各自能力位**分别**创建：不支持就一个控件都不建（不是建好再隐藏）。
+            bool experimentSupported = _owner.WideChargeExperimentSupported;
+            bool ecDirectSupported = _owner.WideEcDirectSupported;
+            if (experimentSupported || ecDirectSupported)
             {
-                _chargeExperiment.IsChecked = false;
-                UpdateChargeSliderVisibility();
+                StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
+                if (experimentSupported)
+                {
+                    CheckBox experimentBox = new() { Content = WpfStrings.MainWindow_xaml_Content_3, Style = (Style)FindResource("HeaderSwitch"), IsChecked = experiment, Margin = new Thickness(0, 8, 16, 0) };
+                    experimentBox.Click += (_, _) =>
+                    {
+                        _owner.WideSetChargeExperiment(experimentBox.IsChecked == true);
+                        if (experimentBox.IsChecked == true && _ecDirect != null) _ecDirect.IsChecked = false;
+                        UpdateChargeSliderVisibility();
+                    };
+                    _chargeExperiment = experimentBox;
+                    extraLimitRow.Children.Add(experimentBox);
+                }
+                if (ecDirectSupported)
+                {
+                    CheckBox ecDirectBox = new() { Content = WpfStrings.MainWindow_xaml_Content_4, Style = (Style)FindResource("HeaderSwitch"), IsChecked = ecDirect, Margin = new Thickness(0, 8, 0, 0) };
+                    ecDirectBox.Click += (_, _) =>
+                    {
+                        _owner.WideSetEcDirect(ecDirectBox.IsChecked == true);
+                        if (ecDirectBox.IsChecked == true && _chargeExperiment != null)
+                        {
+                            _chargeExperiment.IsChecked = false;
+                            UpdateChargeSliderVisibility();
+                        }
+                    };
+                    _ecDirect = ecDirectBox;
+                    extraLimitRow.Children.Add(ecDirectBox);
+                }
+                battery.Children.Add(extraLimitRow);
             }
-        };
-        StackPanel extraLimitRow = new() { Orientation = Orientation.Horizontal };
-        extraLimitRow.Children.Add(_chargeExperiment);
-        extraLimitRow.Children.Add(_ecDirect);
-        battery.Children.Add(extraLimitRow);
-        (bool sliderOn, int sliderValue) = _owner.WideBatteryLimitSlider();
-        _chargeSlider = new Slider
-        {
-            Minimum = 40,
-            Maximum = 100,
-            Value = sliderValue,
-            Width = 190,
-            Margin = new Thickness(0, 8, 6, 0),
-            Style = (Style)FindResource("RoundSlider"),
-            Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed
-        };
-        _chargeSlider.ValueChanged += (_, _) =>
-        {
-            _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
-            if (_chargeSliderText != null) _chargeSliderText.Text = (int)Math.Round(_chargeSlider.Value) + "%";
-        };
-        _chargeSliderText = new TextBlock
-        {
-            Text = sliderValue + "%",
-            Style = (Style)FindResource("MutedText"),
-            Width = 46,
-            VerticalAlignment = VerticalAlignment.Center,
-            Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed
-        };
-        StackPanel sliderRow = new() { Orientation = Orientation.Horizontal };
-        sliderRow.Children.Add(_chargeSlider);
-        sliderRow.Children.Add(_chargeSliderText);
-        battery.Children.Add(sliderRow);
+
+            // ⭐ task-18：「无极限充」滑块只在该能力支持时创建（旧 WinForms 不支持时 RowCount=3、不建滑块行）。
+            if (experimentSupported)
+            {
+                (bool sliderOn, int sliderValue) = _owner.WideBatteryLimitSlider();
+                _chargeSlider = new Slider
+                {
+                    Minimum = 40,
+                    Maximum = 100,
+                    Value = sliderValue,
+                    Width = 190,
+                    Margin = new Thickness(0, 8, 6, 0),
+                    Style = (Style)FindResource("RoundSlider"),
+                    Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed
+                };
+                _chargeSlider.ValueChanged += (_, _) =>
+                {
+                    _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
+                    if (_chargeSliderText != null) _chargeSliderText.Text = (int)Math.Round(_chargeSlider.Value) + "%";
+                };
+                _chargeSliderText = new TextBlock
+                {
+                    Text = sliderValue + "%",
+                    Style = (Style)FindResource("MutedText"),
+                    Width = 46,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Visibility = sliderOn ? Visibility.Visible : Visibility.Collapsed
+                };
+                StackPanel sliderRow = new() { Orientation = Orientation.Horizontal };
+                sliderRow.Children.Add(_chargeSlider);
+                sliderRow.Children.Add(_chargeSliderText);
+                battery.Children.Add(sliderRow);
+            }
+        }
         Grid batteryLayout = new();
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1685,11 +1717,32 @@ public partial class MainWindow : Window
         {
             return;
         }
+        // ⭐ task-17：重建前先清空（OnBackendReady 会再次调用本方法；原来不清空导致灯光卡整组重复 ❌）
+        LightingCardsGrid.Children.Clear();
         BuildLightingGlobalControls();
-        MechrevoHw? hw = _probe?.Hw;
+        MechrevoHw? hw = _probe?.Hw ?? WpfBackend.Hw;
+        // ⭐⭐ task-17（宽屏 HID / 白色背光入口）：键盘能力分支与迷你窗同判据（KeyboardLightPathPolicy / LightingCatalog）✅
+        bool hidKeyboard = WideIsHidKeyboard(hw);
+        bool whiteKeyboard = WideIsWhiteBacklightKeyboard(hw);
+        if (hidKeyboard || whiteKeyboard)
+        {
+            Logger.WriteLineIfChanged("wide-light-keyboard-kind",
+                $"[wide-light] 键盘通道能力：hid={hidKeyboard} white={whiteKeyboard}（KeyboardType={hw?.Capabilities.KeyboardType ?? -1} solution={hw?.KeyboardSolution ?? ""}）");
+        }
+        (string Effect, string Name)[] keyboardEffects = _owner?.WideKeyboardEffects() ?? Array.Empty<(string, string)>();
+        if (hw?.UsesBaolongda == true && keyboardEffects.Length > 0)
+        {
+            // ⭐ task-17：与迷你窗 EffectsForCurrentBackend 同口径（宝龙达固件只支持 单色/彩虹；
+            //    能力位驱动、⛔ 不硬编码机型）⇒ 宽屏内联卡与完整编辑器都不再露出无效效果 ✅
+            keyboardEffects = new[]
+            {
+                ("Single", MechrevoLite.Properties.Strings.EffectSingle),
+                ("Rainbow", MechrevoLite.Properties.Strings.EffectRainbow)
+            };
+        }
         var channels = new List<(string Topic, string Title, (string Effect, string Name)[] Effects)>
         {
-            ("Keyboard/Ctrl", WpfStrings.LightingKeyboard, _owner?.WideKeyboardEffects() ?? Array.Empty<(string, string)>()),
+            ("Keyboard/Ctrl", WpfStrings.LightingKeyboard, keyboardEffects),
             ("HidLightbar/Ctrl", WpfStrings.LightingStrip, LightingCatalog.LightbarEffects),
             ("HidLightbar_Logo/Ctrl", WpfStrings.LightingLogo,
                 hw is not null && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
@@ -1715,7 +1768,13 @@ public partial class MainWindow : Window
             };
             if (effects.Length > 0 && supported)
             {
-                LightingCardsGrid.Children.Add(BuildLightCard(topic, title, effects));
+                bool isKeyboard = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
+                LightingCardsGrid.Children.Add(BuildLightCard(
+                    topic,
+                    title,
+                    effects,
+                    hidKeyboard: isKeyboard && hidKeyboard,
+                    whiteKeyboard: isKeyboard && whiteKeyboard));
             }
         }
     }
@@ -1752,7 +1811,7 @@ public partial class MainWindow : Window
         _owner?.WideSetLightOffOnBattery(LightingOffBatteryToggle.IsChecked == true);
     }
 
-    private Border BuildLightCard(string topic, string title, (string Effect, string Name)[] effects)
+    private Border BuildLightCard(string topic, string title, (string Effect, string Name)[] effects, bool hidKeyboard = false, bool whiteKeyboard = false)
     {
         LightChannelSettings settings = LightingSettingsStore.Load(topic, effects[0].Effect);
         int maxLight = topic == "Keyboard/Ctrl" ? 4 : topic == "HidLightbar_Logo/Ctrl" ? 4 : 100;
@@ -1764,7 +1823,19 @@ public partial class MainWindow : Window
             && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleZoneRgb(keyboardHw.Capabilities.KeyboardType);
         Slider? sliderRef = null;
         Slider? speedRef = null;
+        bool powerOn = settings.PowerOn;
         string selectedEffect = Array.Exists(effects, item => item.Effect == settings.Effect) ? settings.Effect : effects[0].Effect;
+        if (hidKeyboard && WpfBackend.rgb is { } hidState)
+        {
+            // ⭐ task-17：HID 键盘卡初始状态以 KeyboardRgb 配置为准（与迷你窗 FillKeyboardEffects 同口径）✅
+            string hidEffect = "hid:" + hidState.KbHidMode;
+            if (Array.Exists(effects, item => item.Effect == hidEffect))
+            {
+                selectedEffect = hidEffect;
+            }
+            powerOn = hidState.KbPowerOn;
+            light = Math.Clamp(MechrevoLite.Hardware.KeyboardRgb.MapSoftwareBrightnessToHardwareLevel(hidState.Brightness), 0, maxLight);
+        }
         ToggleButton? powerRef = null;
         Action<string>? updateEffectUi = null;
         bool lightUiSyncing = false;
@@ -1819,18 +1890,28 @@ public partial class MainWindow : Window
         {
             Content = WpfStrings.PowerOn,
             Style = (Style)FindResource("SegmentButton"),
-            IsChecked = settings.PowerOn
+            IsChecked = powerOn
         };
-        Grid.SetColumn(power, 1);
-        header.Children.Add(power);
+        // ⭐⭐ task-17：完整编辑器 / HID 编辑入口（仅能力支持的通道；与 WideApplyLightAsync 的能力判据同源）✅
+        StackPanel headerActions = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        Button? editorButton = BuildLightEditorButton(topic, title, effects, hidKeyboard, whiteKeyboard);
+        if (editorButton != null)
+        {
+            editorButton.Margin = new Thickness(0, 0, 8, 0);
+            headerActions.Children.Add(editorButton);
+        }
+        headerActions.Children.Add(power);
+        Grid.SetColumn(headerActions, 1);
+        header.Children.Add(headerActions);
         powerRef = power;
         left.Children.Add(header);
-        left.Children.Add(new TextBlock
+        TextBlock hint = new()
         {
             Text = WpfStrings.AdjustHint,
             Style = (Style)FindResource("MutedText"),
             Margin = new Thickness(0, 4, 0, 10)
-        });
+        };
+        left.Children.Add(hint);
         WrapPanel effectPanel = new();
         List<ToggleButton> effectButtons = new();
         foreach ((string effect, string name) in effects)
@@ -2105,7 +2186,169 @@ public partial class MainWindow : Window
             }
         };
         updateEffectUi(selectedEffect);
+        if (whiteKeyboard)
+        {
+            // ⭐⭐ task-17：白色背光键盘按能力只保留「电源 + 4 档亮度」，⛔ 不显示不支持的 RGB 效果/颜色/速度 ✅
+            hint.Text = "白色背光键盘：仅电源与 4 档亮度";
+            effectPanel.Visibility = Visibility.Collapsed;
+            colorSection.Visibility = Visibility.Collapsed;
+            mixSection.Visibility = Visibility.Collapsed;
+            breathSection.Visibility = Visibility.Collapsed;
+            speedRow.Visibility = Visibility.Collapsed;
+        }
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 0, 0, 10), Child = layout };
+    }
+
+    /// <summary>
+    /// ⭐⭐ task-17（宽屏 HID / 完整灯光编辑器入口）：与迷你窗 <c>KeyboardLightEdit_Click</c> 同判据 —
+    /// HID 可达（<see cref="KeyboardLightPathPolicy" />）⇒ HID 编辑器；非 HID 固件键盘 ⇒ 完整 <see cref="LightEditorWindow" />。
+    /// </summary>
+    private static bool WideIsHidKeyboard(MechrevoHw? hw)
+    {
+        if (hw == null
+            || hw.UsesBaolongda
+            || hw.WujieSmuApu
+            || KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType))
+        {
+            return false;
+        }
+        KeyboardRgb? rgb = WpfBackend.rgb;
+        if (rgb != null
+            && KeyboardLightPathPolicy.ShouldUseGcuKeyboardFallback(
+                rgb.ControllerAvailability,
+                rgb.IsConnected,
+                WpfBackend.Service != null && hw.IsConnected,
+                hidBrightnessTookEffect: true))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// ⭐⭐ task-17：白色背光键盘判据（能力位驱动，不硬编码机型）：
+    /// 非 HID、非宝龙达；无界 APU 白键盘，或固件效果表为空（<see cref="KeyboardFirmwareEffects.Visible" />）。
+    /// 这类键盘只有「电源 + 4 档亮度」，⛔ 没有 RGB 效果/颜色 ✅。
+    /// </summary>
+    private static bool WideIsWhiteBacklightKeyboard(MechrevoHw? hw)
+    {
+        if (hw == null || !hw.SupportsKeyboard || WideIsHidKeyboard(hw) || hw.UsesBaolongda)
+        {
+            return false;
+        }
+        if (hw.WujieSmuApu)
+        {
+            return true;
+        }
+        return KeyboardFirmwareEffects.Visible(hw.Capabilities.KeyboardType).Length == 0;
+    }
+
+    /// <summary>⭐ task-17：通道能力判据与 <c>OriginalStyleWindow.WideApplyLightAsync</c> 同一套（不硬编码）✅。</summary>
+    private bool WideLightTopicSupported(string topic)
+    {
+        MechrevoHw? hw = _probe?.Hw ?? WpfBackend.Hw;
+        BackendProbe? probe = _probe;
+        return topic switch
+        {
+            "Keyboard/Ctrl" => hw?.SupportsKeyboard ?? false,
+            "HidLightbar/Ctrl" => probe?.SupportsLightbar ?? false,
+            "HidLightbar_Logo/Ctrl" => hw?.SupportsLogoLight == true,
+            "HidLightbar_Hinge/Ctrl" => probe?.SupportsHingeLight ?? false,
+            "HidLightbar_Sync/Ctrl" => probe?.SupportsSyncLight ?? false,
+            _ => false
+        };
+    }
+
+    /// <summary>⭐ task-17：灯光卡「编辑 / HID 编辑」入口；不支持该通道时不创建（⛔ 不做可点但无通路控件）✅。</summary>
+    private Button? BuildLightEditorButton(string topic, string title, (string Effect, string Name)[] effects, bool hidKeyboard, bool whiteKeyboard)
+    {
+        if (!WideLightTopicSupported(topic))
+        {
+            return null;
+        }
+        MechrevoHw? hw = _probe?.Hw ?? WpfBackend.Hw;
+        if (hw?.UsesBaolongda == true && !string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+        {
+            // ⭐ task-17：与迷你窗等价 —— 宝龙达下非键盘通道只有开/关（效果列/编辑入口本来就不给）✅
+            return null;
+        }
+        Button button = new()
+        {
+            Content = hidKeyboard ? "HID 编辑" : WpfStrings.LightSyncEditButton_Content,
+            Style = (Style)FindResource("GhostButton"),
+            Padding = new Thickness(8, 4, 8, 4),
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        button.Click += (_, _) =>
+        {
+            if (hidKeyboard)
+            {
+                OpenWideHidKeyboardEditor(title);
+            }
+            else if (whiteKeyboard)
+            {
+                OpenWideLightEditor(topic, title, Array.Empty<(string, string)>(), whiteBacklightOnly: true);
+            }
+            else
+            {
+                OpenWideLightEditor(topic, title, effects);
+            }
+        };
+        return button;
+    }
+
+    /// <summary>⭐ task-17：打开与迷你窗等价的完整灯光编辑器（颜色/亮度/速度/电源/七色/单分区四色全部保留）✅。</summary>
+    private void OpenWideLightEditor(string topic, string title, (string Effect, string Name)[] effects, bool whiteBacklightOnly = false)
+    {
+        try
+        {
+            Logger.WriteLine("[wide-light] 打开完整灯光编辑器：" + topic + " white=" + whiteBacklightOnly);
+            WpfBackend.Attach(_probe?.Hw, _probe?.Service);
+            new LightEditorWindow(topic, title, effects, whiteBacklightOnly) { Owner = this }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteError("[wide-light] 打开完整灯光编辑器失败：" + ex);
+            StatusText.Text = "灯光编辑器打开失败：" + ex.Message;
+            return;
+        }
+        Logger.WriteLineIfChanged("wide-light-editor-" + topic,
+            $"[wide-light] 完整编辑器已关闭：{topic}（white={whiteBacklightOnly}）⇒ 重载灯光卡 ✅");
+        RebuildLightingCards();
+    }
+
+    /// <summary>⭐ task-17：打开与迷你窗共用的 HID 键盘编辑器（模式/亮度/速度/颜色，按 HID 支持范围）✅。</summary>
+    private void OpenWideHidKeyboardEditor(string title)
+    {
+        try
+        {
+            Logger.WriteLine("[wide-light] 打开 HID 键盘编辑器");
+            WpfBackend.Attach(_probe?.Hw, _probe?.Service);
+            KeyboardRgb? rgb = WpfBackend.rgb;
+            if (rgb == null)
+            {
+                rgb = new KeyboardRgb();
+                rgb.LoadConfig();
+                WpfBackend.rgb = rgb;
+            }
+            new HidKeyboardWindow(rgb) { Owner = this }.ShowDialog();
+            Logger.WriteLineIfChanged("wide-light-hid-editor",
+                $"[wide-light] HID 键盘编辑器已关闭：{title}（mode={rgb.KbHidMode} brightness={rgb.Brightness}）⇒ 重载灯光卡 ✅");
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteError("[wide-light] 打开 HID 键盘编辑器失败：" + ex);
+            StatusText.Text = "HID 键盘编辑器打开失败：" + ex.Message;
+            return;
+        }
+        RebuildLightingCards();
+    }
+
+    private void RebuildLightingCards()
+    {
+        // BuildLightingCards 内部会先清空，重复调用安全 ✅
+        BuildLightingCards();
     }
 
     private static bool EffectSupportsSpeed(string effect)
