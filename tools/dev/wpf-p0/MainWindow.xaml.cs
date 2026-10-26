@@ -1762,6 +1762,9 @@ public partial class MainWindow : Window
         Slider? speedRef = null;
         string selectedEffect = Array.Exists(effects, item => item.Effect == settings.Effect) ? settings.Effect : effects[0].Effect;
         ToggleButton? powerRef = null;
+        Action<string>? updateEffectUi = null;
+        bool lightUiSyncing = false;
+        StackPanel colorSection = new();
         DispatcherTimer lightApplyTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
         lightApplyTimer.Tick += (_, _) =>
         {
@@ -1811,6 +1814,7 @@ public partial class MainWindow : Window
             {
                 selectedEffect = effectId;
                 foreach (ToggleButton item in effectButtons) item.IsChecked = ReferenceEquals(item, button);
+                updateEffectUi?.Invoke(effectId);
                 _ = ApplyLightCardAsync(topic, effectId, sliderRef!, speedRef!, colorArgb, power.IsChecked == true);
             };
             effectButtons.Add(button);
@@ -1892,8 +1896,9 @@ public partial class MainWindow : Window
             };
             presets.Children.Add(preset);
         }
-        right.Children.Add(color);
-        right.Children.Add(presets);
+        colorSection.Children.Add(color);
+        colorSection.Children.Add(presets);
+        right.Children.Add(colorSection);
         Slider slider = new() { Style = (Style)FindResource("RoundSlider"), Minimum = 0, Maximum = maxLight, Value = light };
         sliderRef = slider;
         TextBlock value = new()
@@ -1923,33 +1928,32 @@ public partial class MainWindow : Window
             Value = Math.Clamp(settings.Speed, 0, 4)
         };
         speedRef = speed;
+        Grid speedRow = new() { Margin = new Thickness(0, 0, 0, 0) };
+        speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        TextBlock speedLabel = new() { Text = WpfStrings.Speed, Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
+        TextBlock speedText = new()
         {
-            Grid speedRow = new() { Margin = new Thickness(0, 0, 0, 0) };
-            speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            TextBlock speedLabel = new() { Text = WpfStrings.Speed, Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
-            TextBlock speedText = new()
-            {
-                Text = (int)speed.Value + "/4",
-                Style = (Style)FindResource("MutedText"),
-                Width = 44,
-                TextAlignment = TextAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            speedRow.Children.Add(speedLabel);
-            Grid.SetColumn(speed, 1);
-            speedRow.Children.Add(speed);
-            Grid.SetColumn(speedText, 2);
-            speedRow.Children.Add(speedText);
-            right.Children.Add(speedRow);
-            speed.ValueChanged += (_, _) =>
-            {
-                speedText.Text = (int)Math.Round(speed.Value) + "/4";
-                lightApplyTimer.Stop();
-                lightApplyTimer.Start();
-            };
-        }
+            Text = (int)speed.Value + "/4",
+            Style = (Style)FindResource("MutedText"),
+            Width = 44,
+            TextAlignment = TextAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        speedRow.Children.Add(speedLabel);
+        Grid.SetColumn(speed, 1);
+        speedRow.Children.Add(speed);
+        Grid.SetColumn(speedText, 2);
+        speedRow.Children.Add(speedText);
+        right.Children.Add(speedRow);
+        speed.ValueChanged += (_, _) =>
+        {
+            speedText.Text = (int)Math.Round(speed.Value) + "/4";
+            if (lightUiSyncing) return;
+            lightApplyTimer.Stop();
+            lightApplyTimer.Start();
+        };
         Grid.SetColumn(right, 2);
         layout.Children.Add(right);
         power.Click += (_, _) =>
@@ -1959,10 +1963,51 @@ public partial class MainWindow : Window
         slider.ValueChanged += (_, _) =>
         {
             value.Text = (int)Math.Round(slider.Value) + "/" + maxLight;
+            if (lightUiSyncing) return;
             lightApplyTimer.Stop();
             lightApplyTimer.Start();
         };
+        updateEffectUi = effect =>
+        {
+            lightUiSyncing = true;
+            try
+            {
+                bool colorEnabled = LightingCatalog.LightEffectColorMode(effect) != 0;
+                if (effect.StartsWith("hid:", StringComparison.Ordinal)
+                    && int.TryParse(effect.AsSpan(4), out int hidMode))
+                {
+                    colorEnabled = hidMode is 0 or 9;
+                }
+                colorSection.Visibility = colorEnabled ? Visibility.Visible : Visibility.Collapsed;
+                speedRow.Visibility = EffectSupportsSpeed(effect) ? Visibility.Visible : Visibility.Collapsed;
+                LightChannelSettings effectSettings = LightingSettingsStore.Load(topic, effect);
+                slider.Value = Math.Clamp(effectSettings.Light, 0, maxLight);
+                speed.Value = Math.Clamp(effectSettings.Speed, 0, 4);
+                colorArgb = effectSettings.EffectiveColorArgb();
+                swatch.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255,
+                    (byte)((colorArgb >> 16) & 0xFF), (byte)((colorArgb >> 8) & 0xFF), (byte)(colorArgb & 0xFF)));
+                colorLabel.Text = "#" + colorArgb.ToString("X8");
+                value.Text = (int)Math.Round(slider.Value) + "/" + maxLight;
+                speedText.Text = (int)Math.Round(speed.Value) + "/4";
+            }
+            finally
+            {
+                lightUiSyncing = false;
+            }
+        };
+        updateEffectUi(selectedEffect);
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 0, 0, 10), Child = layout };
+    }
+
+    private static bool EffectSupportsSpeed(string effect)
+    {
+        if (effect.StartsWith("hid:", StringComparison.Ordinal))
+        {
+            return !(int.TryParse(effect.AsSpan(4), out int mode) && mode == 9);
+        }
+        return effect is "Breathing" or "Wave" or "Impact" or "Raindrop"
+            or "ColorMarquee" or "Rainbow" or "Rotation" or "RainbowWheel"
+            or "FlowRainbow" or "Lightning" or "Flame" or "Matrix" or "Spark";
     }
 
     private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, bool powerOn)
