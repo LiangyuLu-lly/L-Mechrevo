@@ -163,6 +163,7 @@ public partial class OriginalStyleWindow : Window
             if (!HasVisibleSensorConsumer())
             {
                 _trayIcon?.SetTooltip("L-Mechrevo");
+                L_Mechrevo.WpfP0.Services.MemoryTrimService.TrimIfIdle(idle: true);
                 return;
             }
             RefreshFromBackend();
@@ -178,6 +179,19 @@ public partial class OriginalStyleWindow : Window
             else
             {
                 _backendRetryTimer.Stop();
+            }
+        };
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!HasVisibleSensorConsumer())
+                    {
+                        L_Mechrevo.WpfP0.Services.MemoryTrimService.TrimIfIdle(idle: true);
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Background);
             }
         };
         Closed += (_, _) =>
@@ -2800,7 +2814,11 @@ public partial class OriginalStyleWindow : Window
         {
             return true;
         }
-        if (_wideWindow?.IsVisible == true || _overlayWindow?.IsVisible == true)
+        if (_wideWindow?.IsVisible == true && _wideWindow.WindowState != WindowState.Minimized)
+        {
+            return true;
+        }
+        if (_overlayWindow?.IsVisible == true)
         {
             return true;
         }
