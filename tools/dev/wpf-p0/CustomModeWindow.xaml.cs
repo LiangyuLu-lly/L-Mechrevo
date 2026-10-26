@@ -22,8 +22,8 @@ public partial class CustomModeWindow : Window
     private bool _loadingUi;
     private bool _dirty;
     private readonly DispatcherTimer _powerWallTimer = new() { Interval = TimeSpan.FromSeconds(2) };
-    private const string UnsetMark = "（未设置）";
-    private const string PowerWallUnsetHint = "本机协议读不回功耗墙的当前值（只写不读）。标题带「（未设置）」= 本次运行还没下发过，不代表机器上没设过。拖动滑块并点【应用】后，这里显示的就是我们下发的值。";
+    private static string UnsetMark => WpfStrings.CustomUnsetMark;
+    private static string PowerWallUnsetHint => WpfStrings.CustomPowerWallUnsetHint;
     private int _firmwareVisualMode;
     private int _firmwareProfileIndex;
     private MechrevoLite.Mode.PerfModeDefinition? _current;
@@ -278,7 +278,7 @@ public partial class CustomModeWindow : Window
             ModeCombo.Items.Clear();
             ModeCombo.Items.Add(new ComboBoxItem
             {
-                Content = ModeName(mode) + " · 配置 " + (_firmwareProfileIndex + 1),
+                Content = ModeName(mode) + string.Format(WpfStrings.CustomConfigSuffixFormat, _firmwareProfileIndex + 1),
                 Tag = mode.Id
             });
             ModeCombo.SelectedIndex = 0;
@@ -288,7 +288,7 @@ public partial class CustomModeWindow : Window
             DeleteButton.IsEnabled = false;
             ApplyButton.IsEnabled = false;
             LoadSettingsToUi(stored);
-            Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode) + " · 配置 " + (_firmwareProfileIndex + 1);
+            Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode) + string.Format(WpfStrings.CustomConfigSuffixFormat, _firmwareProfileIndex + 1);
             StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_3;
         }
         catch (Exception ex)
@@ -516,8 +516,8 @@ public partial class CustomModeWindow : Window
             hw.IsBaolongda30Series,
             MechrevoLite.Hardware.SmuAvailability.IsReady,
             hw.WujieSmuApu);
-        string pl1Base = smu ? MechrevoLite.Properties.Strings.SmuStapmLimitLabel : "CPU 功耗墙 PL1 (W)";
-        string pl2Base = smu ? MechrevoLite.Properties.Strings.SmuFastLimitLabel : "CPU 功耗墙 PL2 (W)";
+        string pl1Base = smu ? MechrevoLite.Properties.Strings.SmuStapmLimitLabel : WpfStrings.CustomPowerPl1Label;
+        string pl2Base = smu ? MechrevoLite.Properties.Strings.SmuFastLimitLabel : WpfStrings.CustomPowerPl2Label;
         Pl1Label.Text = pl1Base + (pl1Unset ? UnsetMark : "");
         Pl2Label.Text = pl2Base + (pl2Unset ? UnsetMark : "");
         TccLabel.Text = WpfStrings.CustomModeWindow_xaml_Text_11 + (tccUnset ? UnsetMark : "");
@@ -743,7 +743,7 @@ public partial class CustomModeWindow : Window
             bool amd = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesAmdPowerFields == true;
             string summary = MechrevoLite.Mode.PerfModeText.Summary(outcome);
             string failure = outcome.AnyFailed
-                ? " · 失败：" + MechrevoLite.Mode.PerfModeText.FailedItems(outcome, amd)
+                ? WpfStrings.CustomFailedSuffix + MechrevoLite.Mode.PerfModeText.FailedItems(outcome, amd)
                 : "";
             string stale = MechrevoLite.Mode.PerfModeText.StaleNote(outcome);
             StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_14 + ModeName(_current) + " · " + summary + failure + stale;
@@ -838,7 +838,7 @@ public partial class CustomModeWindow : Window
         {
             return;
         }
-        TextPromptWindow prompt = new("重命名模式", "输入新的模式名称：", ModeName(_current)) { Owner = this };
+        TextPromptWindow prompt = new(WpfStrings.CustomRenameTitle, WpfStrings.CustomRenamePrompt, ModeName(_current)) { Owner = this };
         if (prompt.ShowDialog() == true && !string.IsNullOrWhiteSpace(prompt.Value))
         {
             MechrevoLite.Mode.PerfModeStore.SaveName(_current.Id, prompt.Value.Trim());
@@ -854,7 +854,7 @@ public partial class CustomModeWindow : Window
             StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_20;
             return;
         }
-        if (MessageBox.Show(this, WpfStrings.CustomModeWindow_xaml_MessageBoxShowthis_2 + ModeName(_current) + "」？", "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, WpfStrings.CustomModeWindow_xaml_MessageBoxShowthis_2 + ModeName(_current) + WpfStrings.CustomDeleteConfirmSuffix, "L-Mechrevo", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
         {
             return;
         }

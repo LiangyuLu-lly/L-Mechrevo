@@ -52,7 +52,7 @@ public partial class QuickTilePickerWindow : Window
             .ToList();
         _choices = new ObservableCollection<QuickChoice>(ordered);
         ChoicesList.ItemsSource = _choices;
-        HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
+        HintText.Text = string.Format(WpfStrings.QuickTilePickerMaxCurrentFormat, _maxSlots, SelectedChoices.Count);
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
         ChoicesList.PreviewMouseLeftButtonDown += ChoicesList_PreviewMouseLeftButtonDown;
         ChoicesList.PreviewMouseMove += ChoicesList_PreviewMouseMove;
@@ -130,7 +130,7 @@ public partial class QuickTilePickerWindow : Window
             return;
         }
         _choices.Move(from, to);
-        HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
+        HintText.Text = string.Format(WpfStrings.QuickTilePickerMaxCurrentFormat, _maxSlots, SelectedChoices.Count);
     }
 
     private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
@@ -157,7 +157,7 @@ public partial class QuickTilePickerWindow : Window
         {
             choice.IsSelected = false;
             box.IsChecked = false;
-            HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text_2 + _maxSlots + " 个";
+            HintText.Text = string.Format(WpfStrings.QuickTilePickerMaxFormat, _maxSlots);
             return;
         }
         int oldIndex = _choices.IndexOf(choice);
@@ -174,14 +174,14 @@ public partial class QuickTilePickerWindow : Window
             }
             _choices.Insert(Math.Min(selectedCount, _choices.Count), choice);
         }
-        HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text + _maxSlots + " 个（当前 " + SelectedChoices.Count + " 个）";
+        HintText.Text = string.Format(WpfStrings.QuickTilePickerMaxCurrentFormat, _maxSlots, SelectedChoices.Count);
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedChoices.Count > _maxSlots)
         {
-            HintText.Text = WpfStrings.QuickTilePickerWindow_xaml_Text_2 + _maxSlots + " 个";
+            HintText.Text = string.Format(WpfStrings.QuickTilePickerMaxFormat, _maxSlots);
             return;
         }
         DialogResult = true;

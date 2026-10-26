@@ -2181,4 +2181,37 @@
   <data name="StatusLightEditFailed" xml:space="preserve">
     <value>Lighting edit failed: {0}</value>
   </data>
+  <data name="CustomUnsetMark" xml:space="preserve">
+    <value>(not set)</value>
+  </data>
+  <data name="CustomPowerWallUnsetHint" xml:space="preserve">
+    <value>The current power-wall value cannot be read back on this platform (write-only). A title marked &quot;(not set)&quot; means this run has not applied a value yet; it does not mean the machine never had one. After dragging the slider and pressing Apply, this shows the value we sent.</value>
+  </data>
+  <data name="CustomConfigSuffixFormat" xml:space="preserve">
+    <value> · Profile {0}</value>
+  </data>
+  <data name="CustomPowerPl1Label" xml:space="preserve">
+    <value>CPU power limit PL1 (W)</value>
+  </data>
+  <data name="CustomPowerPl2Label" xml:space="preserve">
+    <value>CPU power limit PL2 (W)</value>
+  </data>
+  <data name="CustomFailedSuffix" xml:space="preserve">
+    <value> · Failed: </value>
+  </data>
+  <data name="CustomRenameTitle" xml:space="preserve">
+    <value>Rename mode</value>
+  </data>
+  <data name="CustomRenamePrompt" xml:space="preserve">
+    <value>Enter a new mode name:</value>
+  </data>
+  <data name="CustomDeleteConfirmSuffix" xml:space="preserve">
+    <value>&quot;?</value>
+  </data>
+  <data name="QuickTilePickerMaxFormat" xml:space="preserve">
+    <value>Up to {0} items</value>
+  </data>
+  <data name="QuickTilePickerMaxCurrentFormat" xml:space="preserve">
+    <value>Up to {0} items (current {1})</value>
+  </data>
 </root>

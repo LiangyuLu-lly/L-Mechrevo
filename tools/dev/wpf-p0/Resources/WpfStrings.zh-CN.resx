@@ -2181,4 +2181,37 @@
   <data name="StatusLightEditFailed" xml:space="preserve">
     <value>灯光编辑失败：{0}</value>
   </data>
+  <data name="CustomUnsetMark" xml:space="preserve">
+    <value>（未设置）</value>
+  </data>
+  <data name="CustomPowerWallUnsetHint" xml:space="preserve">
+    <value>本机协议读不回功耗墙的当前值（只写不读）。标题带「（未设置）」= 本次运行还没下发过，不代表机器上没设过。拖动滑块并点【应用】后，这里显示的就是我们下发的值。</value>
+  </data>
+  <data name="CustomConfigSuffixFormat" xml:space="preserve">
+    <value> · 配置 {0}</value>
+  </data>
+  <data name="CustomPowerPl1Label" xml:space="preserve">
+    <value>CPU 功耗墙 PL1 (W)</value>
+  </data>
+  <data name="CustomPowerPl2Label" xml:space="preserve">
+    <value>CPU 功耗墙 PL2 (W)</value>
+  </data>
+  <data name="CustomFailedSuffix" xml:space="preserve">
+    <value> · 失败：</value>
+  </data>
+  <data name="CustomRenameTitle" xml:space="preserve">
+    <value>重命名模式</value>
+  </data>
+  <data name="CustomRenamePrompt" xml:space="preserve">
+    <value>输入新的模式名称：</value>
+  </data>
+  <data name="CustomDeleteConfirmSuffix" xml:space="preserve">
+    <value>」？</value>
+  </data>
+  <data name="QuickTilePickerMaxFormat" xml:space="preserve">
+    <value>最多只能选 {0} 个</value>
+  </data>
+  <data name="QuickTilePickerMaxCurrentFormat" xml:space="preserve">
+    <value>最多 {0} 个（当前 {1} 个）</value>
+  </data>
 </root>

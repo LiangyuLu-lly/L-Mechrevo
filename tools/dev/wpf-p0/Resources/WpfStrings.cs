@@ -737,4 +737,17 @@ public static class WpfStrings
     public static string StatusHidEditorOpenFailed => Get("StatusHidEditorOpenFailed");
     public static string StatusLightSavedOffline => Get("StatusLightSavedOffline");
     public static string StatusLightEditFailed => Get("StatusLightEditFailed");
+
+    // 2026-10-26（task-37）：自定义模式/快捷磁贴/首启窗口英文资源收口。
+    public static string CustomUnsetMark => Get("CustomUnsetMark");
+    public static string CustomPowerWallUnsetHint => Get("CustomPowerWallUnsetHint");
+    public static string CustomConfigSuffixFormat => Get("CustomConfigSuffixFormat");
+    public static string CustomPowerPl1Label => Get("CustomPowerPl1Label");
+    public static string CustomPowerPl2Label => Get("CustomPowerPl2Label");
+    public static string CustomFailedSuffix => Get("CustomFailedSuffix");
+    public static string CustomRenameTitle => Get("CustomRenameTitle");
+    public static string CustomRenamePrompt => Get("CustomRenamePrompt");
+    public static string CustomDeleteConfirmSuffix => Get("CustomDeleteConfirmSuffix");
+    public static string QuickTilePickerMaxFormat => Get("QuickTilePickerMaxFormat");
+    public static string QuickTilePickerMaxCurrentFormat => Get("QuickTilePickerMaxCurrentFormat");
 }
