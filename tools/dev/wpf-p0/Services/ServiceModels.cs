@@ -138,3 +138,7 @@ internal static class PerformanceModeLabel
         _ => "—"
     };
 }
+
+/// <summary>⭐ 外设电量（蓝牙/HID 键鼠等；纯数据，⛔ 不含 UI 文案与控件状态）。</summary>
+internal sealed record PeripheralBatteryInfo(string Name, string Source, int Percent);
+

@@ -431,6 +431,18 @@
                     </StackPanel>
                 </Border>
 
+                <Border x:Name="PeripheralBatteryCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="外设电量" Style="{StaticResource CardTitle}" />
+                            <TextBlock x:Name="PeripheralBatteryStatus" Text="" Style="{StaticResource Hint}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0" />
+                        </Grid>
+                        <StackPanel x:Name="PeripheralBatteryPanel" Margin="0,8,0,0" />
+                        <TextBlock Text="读取已连接蓝牙/HID 键鼠的剩余电量；不支持或读取失败时不显示本卡片。"
+                                   Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_4}" Style="{StaticResource CardTitle}" />

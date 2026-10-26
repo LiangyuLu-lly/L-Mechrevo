@@ -12,11 +12,14 @@ using MechrevoLite.Helpers;
 using Microsoft.Win32;
 
 using L_Mechrevo.WpfP0.Resources;
+using L_Mechrevo.WpfP0.Services;
 namespace L_Mechrevo.WpfP0;
 
 public partial class SettingsWindow : Window
 {
     private readonly OriginalStyleWindow _owner;
+    private readonly PeripheralsService _peripheralsService = new();
+    private bool _peripheralRefreshScheduled;
     private bool _syncing = true;
     private bool _overlaySyncing;
     private bool _isolated;
@@ -41,7 +44,115 @@ public partial class SettingsWindow : Window
       ApplyDarkTitleBar();
       RemoveMinMaxButtons();
   };
-  Loaded += (_, _) => PositionAdjacentToOwner();
+  Loaded += (_, _) =>
+  {
+      PositionAdjacentToOwner();
+      SchedulePeripheralBatteryRefresh();
+  };
+    }
+
+    /// <summary>
+    /// ⭐ 外设电量：与旧版 <c>RefreshPeripheralsBattery</c> 同一时机（设置页可见后延迟 2.5s、后台读一次）。
+    /// <para>⛔ 不新增定时器/高频轮询；服务内部 60s 缓存，失败或没有设备时卡片保持隐藏。</para>
+    /// </summary>
+    private void SchedulePeripheralBatteryRefresh()
+    {
+        if (_peripheralRefreshScheduled)
+        {
+            return;
+        }
+        _peripheralRefreshScheduled = true;
+        _ = RefreshPeripheralBatteryAsync();
+    }
+
+    private async Task RefreshPeripheralBatteryAsync()
+    {
+        try
+        {
+            // 旧版 SettingsForm 在界面显示后 Task.Delay(2500) 再调 RefreshPeripheralsBattery，
+            // 这里沿用同一延迟，避免和设置页自身的加载/主题/后端刷新抢资源。
+            await Task.Delay(2500);
+            if (!IsVisible)
+            {
+                _peripheralRefreshScheduled = false;
+                return;
+            }
+
+            IReadOnlyList<PeripheralBatteryInfo> items = await _peripheralsService.GetAsync();
+            ApplyPeripheralBatteries(items);
+        }
+        catch
+        {
+            // 读取失败（无蓝牙/HID 权限、无设备等）：保持卡片隐藏，⛔ 不弹错
+            TryHidePeripheralCard();
+        }
+    }
+
+    private void ApplyPeripheralBatteries(IReadOnlyList<PeripheralBatteryInfo> items)
+    {
+        try
+        {
+            PeripheralBatteryPanel.Children.Clear();
+            if (items == null || items.Count == 0)
+            {
+                TryHidePeripheralCard();
+                return;
+            }
+
+            foreach (PeripheralBatteryInfo item in items.Take(3))
+            {
+                Grid row = new() { Margin = new Thickness(0, 3, 0, 3) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                TextBlock name = new()
+                {
+                    Text = item.Name,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                TextBlock source = new()
+                {
+                    Text = item.Source,
+                    Style = (Style)FindResource("Hint"),
+                    Margin = new Thickness(8, 0, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                TextBlock percent = new()
+                {
+                    Text = item.Percent + "%",
+                    FontWeight = FontWeights.SemiBold,
+                    Margin = new Thickness(10, 0, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(source, 1);
+                Grid.SetColumn(percent, 2);
+                row.Children.Add(name);
+                row.Children.Add(source);
+                row.Children.Add(percent);
+                PeripheralBatteryPanel.Children.Add(row);
+            }
+
+            PeripheralBatteryStatus.Text = items.Count > 3 ? "共 " + items.Count + " 个设备" : "";
+            PeripheralBatteryCard.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            TryHidePeripheralCard();
+        }
+    }
+
+    private void TryHidePeripheralCard()
+    {
+        try
+        {
+            PeripheralBatteryCard.Visibility = Visibility.Collapsed;
+            PeripheralBatteryStatus.Text = "";
+        }
+        catch
+        {
+        }
     }
 
     private void LoadOverlayState()
