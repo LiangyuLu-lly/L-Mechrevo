@@ -2812,9 +2812,9 @@ public partial class OriginalStyleWindow : Window
         {
             MechrevoHw hw = probe.Hw;
             int battery = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().Percent;
-            string text = "CPU " + hw.CpuTemp + "°C " + hw.CpuFanDuty + "% " + hw.CpuFanRpm + "rpm"
-                + " | GPU " + hw.GpuTemp + "°C " + hw.GpuFanDuty + "% " + hw.GpuFanRpm + "rpm"
-                + (battery >= 0 ? " | 电池 " + battery + "%" : "");
+            string text = "CPU" + hw.CpuTemp + "° " + hw.CpuFanDuty + "%"
+                + " | GPU" + hw.GpuTemp + "° " + hw.GpuFanDuty + "%"
+                + (battery >= 0 ? " | " + battery + "%" : "");
             _trayIcon.SetTooltip(text);
         }
         catch
