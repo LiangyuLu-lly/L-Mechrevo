@@ -13,6 +13,7 @@ using MechrevoLite;
 using MechrevoLite.Hardware;
 using MechrevoLite.Display;
 using L_Mechrevo.WpfP0.Services;
+using L_Mechrevo.WpfP0.Resources;
 using Microsoft.Win32;
 
 namespace L_Mechrevo.WpfP0;
@@ -985,7 +986,7 @@ public partial class MainWindow : Window
             _displayRefreshButtons.Add((button, hz));
         }
         StackPanel brightnessRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
-        brightnessRow.Children.Add(new TextBlock { Text = "亮度", Style = (Style)FindResource("MutedText"), Width = 54, VerticalAlignment = VerticalAlignment.Center });
+        brightnessRow.Children.Add(new TextBlock { Text = WpfStrings.Brightness, Style = (Style)FindResource("MutedText"), Width = 54, VerticalAlignment = VerticalAlignment.Center });
         _displayBrightness = new Slider { Minimum = 0, Maximum = 100, Value = brightness, Width = 220, Style = (Style)FindResource("RoundSlider") };
         _displayBrightness.ValueChanged += (_, _) => _owner?.WideSetBrightness((int)Math.Round(_displayBrightness.Value));
         _displayBrightnessText = new TextBlock { Text = brightness + "%", Style = (Style)FindResource("MutedText"), Width = 46, TextAlignment = TextAlignment.Right };
@@ -1567,10 +1568,10 @@ public partial class MainWindow : Window
         };
         StackPanel titleRow = new() { Orientation = Orientation.Horizontal };
         titleRow.Children.Add(icon);
-        titleRow.Children.Add(new TextBlock { Text = "水冷系统", Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
+        titleRow.Children.Add(new TextBlock { Text = WpfStrings.LiquidSystem, Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
         Grid.SetColumn(titleRow, 0);
         header.Children.Add(titleRow);
-        _liquidStatusButton = new Button { Content = "未连接", Style = (Style)FindResource("FlatButton"), HorizontalAlignment = HorizontalAlignment.Right };
+        _liquidStatusButton = new Button { Content = WpfStrings.NotConnected, Style = (Style)FindResource("FlatButton"), HorizontalAlignment = HorizontalAlignment.Right };
         _liquidStatusButton.Click += async (_, _) =>
         {
             bool ok = await _owner.WideRefreshLiquidAsync();
@@ -1588,13 +1589,13 @@ public partial class MainWindow : Window
         combos.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         combos.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         combos.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        TextBlock pumpLabel = new() { Text = "水泵", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        TextBlock pumpLabel = new() { Text = WpfStrings.Pump, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         combos.Children.Add(pumpLabel);
         _liquidPumpCombo = CreateLiquidCombo(new[] { ("自动", "-1"), ("45%", "0"), ("60%", "1"), ("90%", "2") });
         _liquidPumpCombo.SelectionChanged += async (_, _) => await SetLiquidComboAsync(pump: true);
         Grid.SetColumn(_liquidPumpCombo, 1);
         combos.Children.Add(_liquidPumpCombo);
-        TextBlock fanLabel = new() { Text = "风扇", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
+        TextBlock fanLabel = new() { Text = WpfStrings.Fan, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
         Grid.SetColumn(fanLabel, 2);
         combos.Children.Add(fanLabel);
         _liquidFanCombo = CreateLiquidCombo(new[] { ("自动", "-1"), ("40%", "0"), ("50%", "1"), ("60%", "2"), ("90%", "3") });
@@ -1688,14 +1689,14 @@ public partial class MainWindow : Window
         MechrevoHw? hw = _probe?.Hw;
         var channels = new List<(string Topic, string Title, (string Effect, string Name)[] Effects)>
         {
-            ("Keyboard/Ctrl", "键盘灯光", _owner?.WideKeyboardEffects() ?? Array.Empty<(string, string)>()),
-            ("HidLightbar/Ctrl", "灯带", LightingCatalog.LightbarEffects),
-            ("HidLightbar_Logo/Ctrl", "Logo 灯",
+            ("Keyboard/Ctrl", WpfStrings.LightingKeyboard, _owner?.WideKeyboardEffects() ?? Array.Empty<(string, string)>()),
+            ("HidLightbar/Ctrl", WpfStrings.LightingStrip, LightingCatalog.LightbarEffects),
+            ("HidLightbar_Logo/Ctrl", WpfStrings.LightingLogo,
                 hw is not null && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
                     || hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30)
                     ? LightingCatalog.LogoEffectsGen40 : LightingCatalog.CurrentLogoEffects()),
-            ("HidLightbar_Hinge/Ctrl", "铰链灯", LightingCatalog.HingeEffects),
-            ("HidLightbar_Sync/Ctrl", "同步灯", LightingCatalog.SyncEffects)
+            ("HidLightbar_Hinge/Ctrl", WpfStrings.LightingHinge, LightingCatalog.HingeEffects),
+            ("HidLightbar_Sync/Ctrl", WpfStrings.LightingSync, LightingCatalog.SyncEffects)
         };
         bool hasKeyboard = hw?.SupportsKeyboard ?? true;
         bool hasLightbar = hw?.SupportsLightbar ?? true;
@@ -1780,7 +1781,7 @@ public partial class MainWindow : Window
         header.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
         ToggleButton power = new()
         {
-            Content = "开启灯光",
+            Content = WpfStrings.PowerOn,
             Style = (Style)FindResource("SegmentButton"),
             IsChecked = settings.PowerOn
         };
@@ -1790,7 +1791,7 @@ public partial class MainWindow : Window
         left.Children.Add(header);
         left.Children.Add(new TextBlock
         {
-            Text = "请选择效果，颜色与亮度在右侧调整",
+            Text = WpfStrings.AdjustHint,
             Style = (Style)FindResource("MutedText"),
             Margin = new Thickness(0, 4, 0, 10)
         });
@@ -1816,20 +1817,6 @@ public partial class MainWindow : Window
             effectPanel.Children.Add(button);
         }
         left.Children.Add(effectPanel);
-        Button editLight = new()
-        {
-            Content = "编辑详细参数…",
-            Style = (Style)FindResource("GhostButton"),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(10, 4, 10, 4),
-            Margin = new Thickness(0, 0, 0, 4)
-        };
-        editLight.Click += (_, _) =>
-        {
-            new LightEditorWindow(topic, title, effects) { Owner = this }.ShowDialog();
-            BuildLightingCards();
-        };
-        left.Children.Add(editLight);
         Grid.SetColumn(left, 0);
         layout.Children.Add(left);
 
@@ -1921,7 +1908,7 @@ public partial class MainWindow : Window
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         brightness.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        TextBlock brightnessLabel = new() { Text = "亮度", Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
+        TextBlock brightnessLabel = new() { Text = WpfStrings.Brightness, Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
         brightness.Children.Add(brightnessLabel);
         Grid.SetColumn(slider, 1);
         brightness.Children.Add(slider);
@@ -1936,13 +1923,12 @@ public partial class MainWindow : Window
             Value = Math.Clamp(settings.Speed, 0, 4)
         };
         speedRef = speed;
-        if (topic != "Keyboard/Ctrl")
         {
             Grid speedRow = new() { Margin = new Thickness(0, 0, 0, 0) };
             speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             speedRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            TextBlock speedLabel = new() { Text = "速度", Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
+            TextBlock speedLabel = new() { Text = WpfStrings.Speed, Style = (Style)FindResource("MutedText"), Width = 42, VerticalAlignment = VerticalAlignment.Center };
             TextBlock speedText = new()
             {
                 Text = (int)speed.Value + "/4",
