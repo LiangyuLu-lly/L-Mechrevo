@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Resources;
 
 namespace L_Mechrevo.WpfP0.Services;
 
@@ -40,48 +41,48 @@ internal sealed class QuickSwitchService : IQuickSwitchService
 {
     private static readonly QuickSwitchGroup[] GroupCatalog =
     {
-        new("输入设备", new QuickSwitchItem[]
+        new(WpfStrings.QuickGroupInput, new QuickSwitchItem[]
         {
-            new("touchpad", "触摸板"),
+            new("touchpad", WpfStrings.QuickTouchpad),
             new("wifi", "WiFi"),
-            new("bt", "蓝牙"),
-            new("webcam", "摄像头"),
-            new("micmute", "麦克风静音"),
-            new("numpad", "小键盘锁"),
-            new("touchpadtoggle", "触摸板切换键")
+            new("bt", WpfStrings.QuickBluetooth),
+            new("webcam", WpfStrings.QuickWebcam),
+            new("micmute", WpfStrings.QuickMicMute),
+            new("numpad", WpfStrings.QuickNumpad),
+            new("touchpadtoggle", WpfStrings.QuickTouchpadToggle)
         }),
-        new("键盘与热键", new QuickSwitchItem[]
+        new(WpfStrings.QuickGroupKeyboard, new QuickSwitchItem[]
         {
-            new("winkey", "Win键锁"),
-            new("fnkey", "Fn键锁"),
-            new("capslock", "大小写锁定"),
-            new("osd", "OSD提示"),
-            new("copilot", "Copilot键锁")
+            new("winkey", WpfStrings.QuickWinKey),
+            new("fnkey", WpfStrings.QuickFnKey),
+            new("capslock", WpfStrings.QuickCapsLock),
+            new("osd", WpfStrings.QuickOsd),
+            new("copilot", WpfStrings.QuickCopilot)
         }),
-        new("电源与系统", new QuickSwitchItem[]
+        new(WpfStrings.QuickGroupPower, new QuickSwitchItem[]
         {
-            new("usb", "关机USB供电"),
-            new("acrecovery", "来电自启"),
-            new("highperf", "高性能电源"),
-            new("apuboost", "APU 防缩缸"),
-            new("fanboost", "风扇强冷"),
-            new("deepsleep", "深度睡眠"),
-            new("gamewhitelist", "游戏白名单"),
-            new("cpuadvperf", "解锁BIOS菜单"),
-            new("taskbarautohide", "任务栏自动隐藏"),
-            new("transparency", "系统透明效果"),
-            new("darktheme", "系统深色主题"),
-            new("monitoroff", "息屏（不睡眠）"),
-            new("winupdate", "禁用Win更新")
+            new("usb", WpfStrings.QuickUsb),
+            new("acrecovery", WpfStrings.QuickAcRecovery),
+            new("highperf", WpfStrings.QuickHighPerf),
+            new("apuboost", WpfStrings.QuickApuBoost),
+            new("fanboost", WpfStrings.QuickFanBoost),
+            new("deepsleep", WpfStrings.QuickDeepSleep),
+            new("gamewhitelist", WpfStrings.QuickGameWhitelist),
+            new("cpuadvperf", WpfStrings.QuickCpuAdvPerf),
+            new("taskbarautohide", WpfStrings.QuickTaskbarAutoHide),
+            new("transparency", WpfStrings.QuickTransparency),
+            new("darktheme", WpfStrings.QuickDarkTheme),
+            new("monitoroff", WpfStrings.QuickMonitorOff),
+            new("winupdate", WpfStrings.QuickWinUpdate)
         }),
-        new("睡眠省电", new QuickSwitchItem[]
+        new(WpfStrings.QuickGroupSleep, new QuickSwitchItem[]
         {
-            new("sleepnetoff", "待机断开网络"),
-            new("sleepaway", "封杀离开模式"),
-            new("sleepsysreq", "忽略系统策略"),
-            new("sleeprtcwake", "禁用RTC唤醒"),
-            new("sleepdeep", "ACPI深度睡眠"),
-            new("sleephibernate", "30分钟转休眠")
+            new("sleepnetoff", WpfStrings.QuickSleepNetOff),
+            new("sleepaway", WpfStrings.QuickSleepAway),
+            new("sleepsysreq", WpfStrings.QuickSleepSysReq),
+            new("sleeprtcwake", WpfStrings.QuickSleepRtcWake),
+            new("sleepdeep", WpfStrings.QuickSleepDeep),
+            new("sleephibernate", WpfStrings.QuickSleepHibernate)
         })
     };
 

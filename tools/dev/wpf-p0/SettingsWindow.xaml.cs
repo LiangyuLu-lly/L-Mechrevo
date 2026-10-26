@@ -367,7 +367,39 @@ public partial class SettingsWindow : Window
             return;
         }
         AppConfig.Set("language", item.Tag as string ?? "zh-CN");
-        Status("语言已保存，重启后生效");
+        AppConfig.Flush();
+        MessageBoxResult restart = MessageBox.Show(
+            this,
+            WpfStrings.LanguageRestartPrompt,
+            WpfStrings.LanguageRestartTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (restart == MessageBoxResult.Yes)
+        {
+            try
+            {
+                string? exe = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(exe))
+                {
+                    Process.Start(new ProcessStartInfo(
+                        "cmd.exe",
+                        "/c timeout /t 2 >nul & start \"\" \"" + exe + "\"")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    });
+                }
+            }
+            catch
+            {
+            }
+            Application.Current.Shutdown();
+        }
+        else
+        {
+            Status("语言已保存，重启后生效");
+        }
     }
 
     private void LogLevel_Changed(object sender, SelectionChangedEventArgs e)

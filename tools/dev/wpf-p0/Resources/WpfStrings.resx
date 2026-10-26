@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -418,22 +418,22 @@
     <value>Screen</value>
   </data>
   <data name="NavHome_Content" xml:space="preserve">
-    <value>首页</value>
+    <value>Home</value>
   </data>
   <data name="NavTitle_Text" xml:space="preserve">
-    <value>导航</value>
+    <value>Navigation</value>
   </data>
   <data name="MainWindow_Text_5" xml:space="preserve">
-    <value>强调色</value>
+    <value>Accent color</value>
   </data>
   <data name="MainWindow_Content" xml:space="preserve">
-    <value>小窗</value>
+    <value>Mini</value>
   </data>
   <data name="MainWindow_Content_2" xml:space="preserve">
-    <value>切换浅色</value>
+    <value>Toggle light</value>
   </data>
   <data name="MainWindow_Text_6" xml:space="preserve">
-    <value>L-Mechrevo · 宽屏</value>
+    <value>L-Mechrevo · Wide</value>
   </data>
   <data name="LightSyncEditButton_Content" xml:space="preserve">
     <value>Edit</value>
@@ -481,13 +481,13 @@
     <value>Fan</value>
   </data>
   <data name="OriginalStyleWindow_Text_8" xml:space="preserve">
-    <value>水泵</value>
+    <value>Water pump</value>
   </data>
   <data name="LiquidStatusButton_Content" xml:space="preserve">
     <value>Not Connected</value>
   </data>
   <data name="OriginalStyleWindow_Text_9" xml:space="preserve">
-    <value>水冷系统</value>
+    <value>Liquid cooling system</value>
   </data>
   <data name="EcDirectOffToggle_Content" xml:space="preserve">
     <value>关闭 EC 直写充电上限（写入异常时用）</value>
@@ -520,7 +520,7 @@
     <value>Longevity</value>
   </data>
   <data name="BatteryInfo_Text" xml:space="preserve">
-    <value>电池 —</value>
+    <value>Battery —</value>
   </data>
   <data name="OriginalStyleWindow_Text_13" xml:space="preserve">
     <value>Battery</value>
@@ -583,7 +583,7 @@
     <value>Silent</value>
   </data>
   <data name="CurrentModeText_Text" xml:space="preserve">
-    <value>当前：—</value>
+    <value>Current: —</value>
   </data>
   <data name="PerfConfigEditButton_Content" xml:space="preserve">
     <value>配置编辑</value>
@@ -889,19 +889,19 @@
     <value>自定义性能模式与风扇曲线</value>
   </data>
   <data name="HomePageView_Content" xml:space="preserve">
-    <value>集显</value>
+    <value>Integrated</value>
   </data>
   <data name="HomePageView_Content_2" xml:space="preserve">
-    <value>独显</value>
+    <value>Dedicated</value>
   </data>
   <data name="HomePageView_Content_3" xml:space="preserve">
     <value>Hybrid</value>
   </data>
   <data name="GpuCurrentText_Text" xml:space="preserve">
-    <value>当前：混合输出</value>
+    <value>Current: Hybrid output</value>
   </data>
   <data name="PerfCurrentText_Text" xml:space="preserve">
-    <value>当前：平衡</value>
+    <value>Current: Balanced</value>
   </data>
   <data name="LightingPageView_Text" xml:space="preserve">
     <value>全局灯光</value>
@@ -1222,7 +1222,7 @@
     <value>就绪 · 宽屏四页布局</value>
   </data>
   <data name="MainWindow_xaml_Text_2" xml:space="preserve">
-    <value>占空比</value>
+    <value>Duty</value>
   </data>
   <data name="MainWindow_xaml_Text_3" xml:space="preserve">
     <value>占空比 --</value>
@@ -1249,7 +1249,7 @@
     <value>Battery</value>
   </data>
   <data name="MainWindow_xaml_Text_11" xml:space="preserve">
-    <value>电池模式已请求：</value>
+    <value>Battery mode requested: </value>
   </data>
   <data name="MainWindow_xaml_Content" xml:space="preserve">
     <value>Charge limit</value>
@@ -1264,10 +1264,10 @@
     <value>停</value>
   </data>
   <data name="MainWindow_xaml_Content_3" xml:space="preserve">
-    <value>无极限充（实验性）</value>
+    <value>Unlimited charge (experimental)</value>
   </data>
   <data name="MainWindow_xaml_Content_4" xml:space="preserve">
-    <value>关闭 EC 直写</value>
+    <value>EC direct write off</value>
   </data>
   <data name="MainWindow_xaml_Content_5" xml:space="preserve">
     <value>Auto Refresh</value>
@@ -1628,5 +1628,227 @@
   </data>
   <data name="OriginalStyleWindow_xaml_Content_5" xml:space="preserve">
     <value>Custom calibration</value>
+  </data>
+  <data name="SensorTemp" xml:space="preserve">
+    <value>Temperature</value>
+  </data>
+  <data name="SensorUsage" xml:space="preserve">
+    <value>Usage</value>
+  </data>
+  <data name="SensorPower" xml:space="preserve">
+    <value>Power</value>
+  </data>
+  <data name="SensorFrequency" xml:space="preserve">
+    <value>Frequency</value>
+  </data>
+  <data name="SensorCoreFrequency" xml:space="preserve">
+    <value>Core clock</value>
+  </data>
+  <data name="SensorVramFrequency" xml:space="preserve">
+    <value>Memory clock</value>
+  </data>
+  <data name="SensorDuty" xml:space="preserve">
+    <value>Duty</value>
+  </data>
+  <data name="ModeSilent" xml:space="preserve">
+    <value>Silent</value>
+  </data>
+  <data name="ModeBalanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="ModeTurbo" xml:space="preserve">
+    <value>Turbo</value>
+  </data>
+  <data name="ModeCustom" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="GpuHybrid" xml:space="preserve">
+    <value>Hybrid</value>
+  </data>
+  <data name="GpuDedicated" xml:space="preserve">
+    <value>Dedicated</value>
+  </data>
+  <data name="GpuIntegrated" xml:space="preserve">
+    <value>Integrated</value>
+  </data>
+  <data name="AutoRefresh" xml:space="preserve">
+    <value>Auto Refresh</value>
+  </data>
+  <data name="BatteryLong" xml:space="preserve">
+    <value>Long life</value>
+  </data>
+  <data name="BatteryBalanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="BatteryWorkstation" xml:space="preserve">
+    <value>Workstation</value>
+  </data>
+  <data name="ChargeExperimental" xml:space="preserve">
+    <value>Unlimited charge (experimental)</value>
+  </data>
+  <data name="EcDirectOff" xml:space="preserve">
+    <value>EC direct write off</value>
+  </data>
+  <data name="LiquidConnected" xml:space="preserve">
+    <value>Liquid cooling connected</value>
+  </data>
+  <data name="LiquidDisconnected" xml:space="preserve">
+    <value>Liquid cooling not connected</value>
+  </data>
+  <data name="QuickGroupInput" xml:space="preserve">
+    <value>Input devices</value>
+  </data>
+  <data name="QuickGroupKeyboard" xml:space="preserve">
+    <value>Keyboard &amp; hotkeys</value>
+  </data>
+  <data name="QuickGroupPower" xml:space="preserve">
+    <value>Power &amp; system</value>
+  </data>
+  <data name="QuickGroupSleep" xml:space="preserve">
+    <value>Sleep &amp; power saving</value>
+  </data>
+  <data name="QuickTouchpad" xml:space="preserve">
+    <value>Touchpad</value>
+  </data>
+  <data name="QuickWifi" xml:space="preserve">
+    <value>WiFi</value>
+  </data>
+  <data name="QuickBluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+  </data>
+  <data name="QuickWebcam" xml:space="preserve">
+    <value>Webcam</value>
+  </data>
+  <data name="QuickMicMute" xml:space="preserve">
+    <value>Mic mute</value>
+  </data>
+  <data name="QuickNumpad" xml:space="preserve">
+    <value>Numpad lock</value>
+  </data>
+  <data name="QuickTouchpadToggle" xml:space="preserve">
+    <value>Touchpad toggle</value>
+  </data>
+  <data name="QuickWinKey" xml:space="preserve">
+    <value>Win key lock</value>
+  </data>
+  <data name="QuickFnKey" xml:space="preserve">
+    <value>Fn key lock</value>
+  </data>
+  <data name="QuickCapsLock" xml:space="preserve">
+    <value>Caps lock</value>
+  </data>
+  <data name="QuickOsd" xml:space="preserve">
+    <value>OSD</value>
+  </data>
+  <data name="QuickCopilot" xml:space="preserve">
+    <value>Copilot key lock</value>
+  </data>
+  <data name="QuickUsb" xml:space="preserve">
+    <value>USB power off</value>
+  </data>
+  <data name="QuickAcRecovery" xml:space="preserve">
+    <value>AC recovery</value>
+  </data>
+  <data name="QuickHighPerf" xml:space="preserve">
+    <value>High performance</value>
+  </data>
+  <data name="QuickApuBoost" xml:space="preserve">
+    <value>APU anti-degrade</value>
+  </data>
+  <data name="QuickFanBoost" xml:space="preserve">
+    <value>Fan boost</value>
+  </data>
+  <data name="QuickDeepSleep" xml:space="preserve">
+    <value>Deep sleep</value>
+  </data>
+  <data name="QuickGameWhitelist" xml:space="preserve">
+    <value>Game whitelist</value>
+  </data>
+  <data name="QuickCpuAdvPerf" xml:space="preserve">
+    <value>Unlock BIOS menu</value>
+  </data>
+  <data name="QuickTaskbarAutoHide" xml:space="preserve">
+    <value>Taskbar auto-hide</value>
+  </data>
+  <data name="QuickTransparency" xml:space="preserve">
+    <value>Transparency</value>
+  </data>
+  <data name="QuickDarkTheme" xml:space="preserve">
+    <value>Dark theme</value>
+  </data>
+  <data name="QuickMonitorOff" xml:space="preserve">
+    <value>Turn off display</value>
+  </data>
+  <data name="QuickWinUpdate" xml:space="preserve">
+    <value>Disable Windows Update</value>
+  </data>
+  <data name="QuickSleepNetOff" xml:space="preserve">
+    <value>Network off in sleep</value>
+  </data>
+  <data name="QuickSleepAway" xml:space="preserve">
+    <value>Disable away mode</value>
+  </data>
+  <data name="QuickSleepSysReq" xml:space="preserve">
+    <value>Ignore system policy</value>
+  </data>
+  <data name="QuickSleepRtcWake" xml:space="preserve">
+    <value>Disable RTC wake</value>
+  </data>
+  <data name="QuickSleepDeep" xml:space="preserve">
+    <value>ACPI deep sleep</value>
+  </data>
+  <data name="QuickSleepHibernate" xml:space="preserve">
+    <value>Hibernate after 30 min</value>
+  </data>
+  <data name="LanguageRestartTitle" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="LanguageRestartPrompt" xml:space="preserve">
+    <value>Language changes require a restart of L-Mechrevo. Restart now?</value>
+  </data>
+  <data name="CurrentPrefix" xml:space="preserve">
+    <value>Current: </value>
+  </data>
+  <data name="GpuEcoMode" xml:space="preserve">
+    <value>Integrated mode</value>
+  </data>
+  <data name="GpuDirectMode" xml:space="preserve">
+    <value>Dedicated direct</value>
+  </data>
+  <data name="GpuHybridMode" xml:space="preserve">
+    <value>Hybrid mode</value>
+  </data>
+  <data name="BatteryCharging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+  <data name="BatteryFull" xml:space="preserve">
+    <value>Full</value>
+  </data>
+  <data name="BatteryNotCharging" xml:space="preserve">
+    <value>Not charging</value>
+  </data>
+  <data name="BatteryDischarging" xml:space="preserve">
+    <value>Discharging</value>
+  </data>
+  <data name="BatteryAbnormal" xml:space="preserve">
+    <value>Battery abnormal</value>
+  </data>
+  <data name="BatteryHealth" xml:space="preserve">
+    <value>Battery health</value>
+  </data>
+  <data name="StateOn" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="StateOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="StateAuto" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="StateUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="NavMoreSwitches" xml:space="preserve">
+    <value>More switches</value>
   </data>
 </root>

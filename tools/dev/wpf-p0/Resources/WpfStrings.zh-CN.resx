@@ -1629,4 +1629,226 @@
   <data name="OriginalStyleWindow_xaml_Content_5" xml:space="preserve">
     <value>自定义校色</value>
   </data>
+  <data name="SensorTemp" xml:space="preserve">
+    <value>温度</value>
+  </data>
+  <data name="SensorUsage" xml:space="preserve">
+    <value>使用率</value>
+  </data>
+  <data name="SensorPower" xml:space="preserve">
+    <value>功耗</value>
+  </data>
+  <data name="SensorFrequency" xml:space="preserve">
+    <value>频率</value>
+  </data>
+  <data name="SensorCoreFrequency" xml:space="preserve">
+    <value>核心频率</value>
+  </data>
+  <data name="SensorVramFrequency" xml:space="preserve">
+    <value>显存频率</value>
+  </data>
+  <data name="SensorDuty" xml:space="preserve">
+    <value>占空比</value>
+  </data>
+  <data name="ModeSilent" xml:space="preserve">
+    <value>静音</value>
+  </data>
+  <data name="ModeBalanced" xml:space="preserve">
+    <value>平衡</value>
+  </data>
+  <data name="ModeTurbo" xml:space="preserve">
+    <value>狂暴</value>
+  </data>
+  <data name="ModeCustom" xml:space="preserve">
+    <value>自定义</value>
+  </data>
+  <data name="GpuHybrid" xml:space="preserve">
+    <value>混合</value>
+  </data>
+  <data name="GpuDedicated" xml:space="preserve">
+    <value>独显</value>
+  </data>
+  <data name="GpuIntegrated" xml:space="preserve">
+    <value>集显</value>
+  </data>
+  <data name="AutoRefresh" xml:space="preserve">
+    <value>自动刷新率</value>
+  </data>
+  <data name="BatteryLong" xml:space="preserve">
+    <value>长效模式</value>
+  </data>
+  <data name="BatteryBalanced" xml:space="preserve">
+    <value>平衡模式</value>
+  </data>
+  <data name="BatteryWorkstation" xml:space="preserve">
+    <value>工作站模式</value>
+  </data>
+  <data name="ChargeExperimental" xml:space="preserve">
+    <value>无极限充（实验性）</value>
+  </data>
+  <data name="EcDirectOff" xml:space="preserve">
+    <value>关闭 EC 直写</value>
+  </data>
+  <data name="LiquidConnected" xml:space="preserve">
+    <value>水冷已连接</value>
+  </data>
+  <data name="LiquidDisconnected" xml:space="preserve">
+    <value>水冷未连接</value>
+  </data>
+  <data name="QuickGroupInput" xml:space="preserve">
+    <value>输入设备</value>
+  </data>
+  <data name="QuickGroupKeyboard" xml:space="preserve">
+    <value>键盘与热键</value>
+  </data>
+  <data name="QuickGroupPower" xml:space="preserve">
+    <value>电源与系统</value>
+  </data>
+  <data name="QuickGroupSleep" xml:space="preserve">
+    <value>睡眠省电</value>
+  </data>
+  <data name="QuickTouchpad" xml:space="preserve">
+    <value>触摸板</value>
+  </data>
+  <data name="QuickWifi" xml:space="preserve">
+    <value>WiFi</value>
+  </data>
+  <data name="QuickBluetooth" xml:space="preserve">
+    <value>蓝牙</value>
+  </data>
+  <data name="QuickWebcam" xml:space="preserve">
+    <value>摄像头</value>
+  </data>
+  <data name="QuickMicMute" xml:space="preserve">
+    <value>麦克风静音</value>
+  </data>
+  <data name="QuickNumpad" xml:space="preserve">
+    <value>小键盘锁</value>
+  </data>
+  <data name="QuickTouchpadToggle" xml:space="preserve">
+    <value>触摸板切换键</value>
+  </data>
+  <data name="QuickWinKey" xml:space="preserve">
+    <value>Win键锁</value>
+  </data>
+  <data name="QuickFnKey" xml:space="preserve">
+    <value>Fn键锁</value>
+  </data>
+  <data name="QuickCapsLock" xml:space="preserve">
+    <value>大小写锁定</value>
+  </data>
+  <data name="QuickOsd" xml:space="preserve">
+    <value>OSD提示</value>
+  </data>
+  <data name="QuickCopilot" xml:space="preserve">
+    <value>Copilot键锁</value>
+  </data>
+  <data name="QuickUsb" xml:space="preserve">
+    <value>关机USB供电</value>
+  </data>
+  <data name="QuickAcRecovery" xml:space="preserve">
+    <value>来电自启</value>
+  </data>
+  <data name="QuickHighPerf" xml:space="preserve">
+    <value>高性能电源</value>
+  </data>
+  <data name="QuickApuBoost" xml:space="preserve">
+    <value>APU 防缩缸</value>
+  </data>
+  <data name="QuickFanBoost" xml:space="preserve">
+    <value>风扇强冷</value>
+  </data>
+  <data name="QuickDeepSleep" xml:space="preserve">
+    <value>深度睡眠</value>
+  </data>
+  <data name="QuickGameWhitelist" xml:space="preserve">
+    <value>游戏白名单</value>
+  </data>
+  <data name="QuickCpuAdvPerf" xml:space="preserve">
+    <value>解锁BIOS菜单</value>
+  </data>
+  <data name="QuickTaskbarAutoHide" xml:space="preserve">
+    <value>任务栏自动隐藏</value>
+  </data>
+  <data name="QuickTransparency" xml:space="preserve">
+    <value>系统透明效果</value>
+  </data>
+  <data name="QuickDarkTheme" xml:space="preserve">
+    <value>系统深色主题</value>
+  </data>
+  <data name="QuickMonitorOff" xml:space="preserve">
+    <value>息屏（不睡眠）</value>
+  </data>
+  <data name="QuickWinUpdate" xml:space="preserve">
+    <value>禁用Win更新</value>
+  </data>
+  <data name="QuickSleepNetOff" xml:space="preserve">
+    <value>待机断开网络</value>
+  </data>
+  <data name="QuickSleepAway" xml:space="preserve">
+    <value>封杀离开模式</value>
+  </data>
+  <data name="QuickSleepSysReq" xml:space="preserve">
+    <value>忽略系统策略</value>
+  </data>
+  <data name="QuickSleepRtcWake" xml:space="preserve">
+    <value>禁用RTC唤醒</value>
+  </data>
+  <data name="QuickSleepDeep" xml:space="preserve">
+    <value>ACPI深度睡眠</value>
+  </data>
+  <data name="QuickSleepHibernate" xml:space="preserve">
+    <value>30分钟转休眠</value>
+  </data>
+  <data name="LanguageRestartTitle" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="LanguageRestartPrompt" xml:space="preserve">
+    <value>语言切换需要重启 L-Mechrevo 才能生效，是否立即重启？</value>
+  </data>
+  <data name="CurrentPrefix" xml:space="preserve">
+    <value>当前：</value>
+  </data>
+  <data name="GpuEcoMode" xml:space="preserve">
+    <value>核显模式</value>
+  </data>
+  <data name="GpuDirectMode" xml:space="preserve">
+    <value>独显直连</value>
+  </data>
+  <data name="GpuHybridMode" xml:space="preserve">
+    <value>混合模式</value>
+  </data>
+  <data name="BatteryCharging" xml:space="preserve">
+    <value>充电中</value>
+  </data>
+  <data name="BatteryFull" xml:space="preserve">
+    <value>已充满</value>
+  </data>
+  <data name="BatteryNotCharging" xml:space="preserve">
+    <value>未充电</value>
+  </data>
+  <data name="BatteryDischarging" xml:space="preserve">
+    <value>放电中</value>
+  </data>
+  <data name="BatteryAbnormal" xml:space="preserve">
+    <value>电池异常</value>
+  </data>
+  <data name="BatteryHealth" xml:space="preserve">
+    <value>电池健康</value>
+  </data>
+  <data name="StateOn" xml:space="preserve">
+    <value>开</value>
+  </data>
+  <data name="StateOff" xml:space="preserve">
+    <value>关</value>
+  </data>
+  <data name="StateAuto" xml:space="preserve">
+    <value>自动</value>
+  </data>
+  <data name="StateUnknown" xml:space="preserve">
+    <value>未知</value>
+  </data>
+  <data name="NavMoreSwitches" xml:space="preserve">
+    <value>更多开关</value>
+  </data>
 </root>

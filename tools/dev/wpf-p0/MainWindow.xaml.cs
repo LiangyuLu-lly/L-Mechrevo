@@ -209,8 +209,8 @@ public partial class MainWindow : Window
 
         StackPanel metrics = new() { Margin = new Thickness(14, 2, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         (string Label, double Maximum)[] rows = cpu
-            ? new[] { ("温度", 100.0), ("使用率", 100.0), ("功耗", 100.0), ("频率", 6000.0) }
-            : new[] { ("温度", 100.0), ("使用率", 100.0), ("功耗", 200.0), ("核心频率", 3000.0), ("显存频率", 12000.0) };
+            ? new[] { (WpfStrings.SensorTemp, 100.0), (WpfStrings.SensorUsage, 100.0), (WpfStrings.SensorPower, 100.0), (WpfStrings.SensorFrequency, 6000.0) }
+            : new[] { (WpfStrings.SensorTemp, 100.0), (WpfStrings.SensorUsage, 100.0), (WpfStrings.SensorPower, 200.0), (WpfStrings.SensorCoreFrequency, 3000.0), (WpfStrings.SensorVramFrequency, 12000.0) };
         List<(RoundedBar Bar, TextBlock Value, string Unit)> target = cpu ? _cpuMetrics : _gpuMetrics;
         foreach ((string label, double maximum) in rows)
         {
@@ -270,7 +270,7 @@ public partial class MainWindow : Window
         SetNavContent(NavScreen, _navCollapsed, "\uE7F4", "屏幕", glyphFont, textFont);
         SetNavContent(NavLighting, _navCollapsed, "\uE706", "灯光", glyphFont, textFont);
         SetNavContent(NavCustom, _navCollapsed, "\uE70F", "自定义", glyphFont, textFont);
-        SetNavContent(NavSwitches, _navCollapsed, "\uE712", "更多开关", glyphFont, textFont);
+        SetNavContent(NavSwitches, _navCollapsed, "\uE712", WpfStrings.NavMoreSwitches, glyphFont, textFont);
         SetDockNavContent(NavDockOverlay, _navCollapsed, "\uE8A7", "悬浮窗", glyphFont, textFont);
         SetDockNavContent(NavDockSettings, _navCollapsed, "\uE713", "设置", glyphFont, textFont);
         SetDockNavContent(NavDockSponsor, _navCollapsed, "\uEB51", "赞助", glyphFont, textFont);
@@ -729,7 +729,7 @@ public partial class MainWindow : Window
             };
             TextBlock state = new()
             {
-                Text = label + (on ? " · 开" : " · 关"),
+                Text = label + (on ? " · " + WpfStrings.StateOn : " · " + WpfStrings.StateOff),
                 FontSize = 9,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 4, 0, 0),
@@ -803,7 +803,7 @@ public partial class MainWindow : Window
         foreach ((string key, Button button, TextBlock state, string label) in _quickTileButtons)
         {
             bool on = _owner.WideQuickTiles().FirstOrDefault(item => item.Key == key).On;
-            state.Text = label + (on ? " · 开" : " · 关");
+            state.Text = label + (on ? " · " + WpfStrings.StateOn : " · " + WpfStrings.StateOff);
         }
     }
 
@@ -819,7 +819,7 @@ public partial class MainWindow : Window
         _batteryInfoText = new TextBlock { Text = info, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 4, 0, 8) };
         battery.Children.Add(_batteryInfoText);
         StackPanel modes = new() { Orientation = Orientation.Horizontal };
-        string[] labels = { "长效模式", "平衡模式", "工作站模式" };
+        string[] labels = { WpfStrings.BatteryLong, WpfStrings.BatteryBalanced, WpfStrings.BatteryWorkstation };
         for (int i = 0; i < labels.Length; i++)
         {
             int target = i;
@@ -1014,7 +1014,7 @@ public partial class MainWindow : Window
         }
         StackPanel row = new() { Orientation = Orientation.Horizontal };
         row.Children.Add(new TextBlock { Text = WpfStrings.MainWindow_xaml_Text_14, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
-        string[] labels = { "关", "开", "自动" };
+        string[] labels = { WpfStrings.StateOff, WpfStrings.StateOn, WpfStrings.StateAuto };
         string[] modes = { "OFF", "ON", "AUTO" };
         for (int i = 0; i < labels.Length; i++)
         {
@@ -1440,14 +1440,14 @@ public partial class MainWindow : Window
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
         string perf = _owner.WidePerformanceText;
-        HomePerf平衡.IsChecked = perf.Contains("平衡");
-        HomePerf狂暴.IsChecked = perf.Contains("狂暴");
-        HomePerf自定义.IsChecked = perf.Contains("自定义");
-        HomePerf静音.IsChecked = perf.Contains("静音");
+        HomePerf平衡.IsChecked = perf.Contains(WpfStrings.ModeBalanced);
+        HomePerf狂暴.IsChecked = perf.Contains(WpfStrings.ModeTurbo);
+        HomePerf自定义.IsChecked = perf.Contains(WpfStrings.ModeCustom);
+        HomePerf静音.IsChecked = perf.Contains(WpfStrings.ModeSilent);
         string gpu = _owner.WideGpuModeText;
-        HomeGpu混合.IsChecked = gpu.Contains("混合");
-        HomeGpu独显.IsChecked = gpu.Contains("独显");
-        HomeGpu集显.IsChecked = gpu.Contains("核显");
+        HomeGpu混合.IsChecked = gpu.Contains(WpfStrings.GpuHybrid);
+        HomeGpu独显.IsChecked = gpu.Contains(WpfStrings.GpuDedicated);
+        HomeGpu集显.IsChecked = gpu.Contains(WpfStrings.GpuIntegrated);
         RefreshQuickTiles();
         (string batteryInfo, int batteryMode, string batteryCharge) = _owner.WideBattery();
         if (_batteryInfoText != null) _batteryInfoText.Text = batteryInfo;
@@ -1577,7 +1577,7 @@ public partial class MainWindow : Window
             bool ok = await _owner.WideRefreshLiquidAsync();
             if (_liquidStatusButton != null)
             {
-                _liquidStatusButton.Content = _owner.WideLiquidConnected ? "水冷已连接" : "水冷未连接";
+                _liquidStatusButton.Content = _owner.WideLiquidConnected ? WpfStrings.LiquidConnected : WpfStrings.LiquidDisconnected;
             }
             StatusText.Text = ok ? "水冷状态已刷新" : "刷新水冷状态失败";
         };
@@ -1653,8 +1653,8 @@ public partial class MainWindow : Window
         if (_liquidStatusButton != null)
         {
             _liquidStatusButton.Content = supported
-                ? (_owner.WideLiquidConnected ? "水冷已连接" : "水冷未连接")
-                : "未连接";
+                ? (_owner.WideLiquidConnected ? WpfStrings.LiquidConnected : WpfStrings.LiquidDisconnected)
+                : WpfStrings.NotConnected;
         }
         if (_liquidPumpCombo != null) _liquidPumpCombo.IsEnabled = supported;
         if (_liquidFanCombo != null) _liquidFanCombo.IsEnabled = supported;

@@ -445,7 +445,7 @@ public partial class OriginalStyleWindow : Window
             }
             catch
             {
-                return "当前：—";
+                return WpfStrings.CurrentPrefix + "—";
             }
         }
     }
@@ -456,14 +456,14 @@ public partial class OriginalStyleWindow : Window
         {
             try
             {
-                if (GpuEcoButton.IsChecked == true) return "当前：核显模式";
-                if (GpuDirectButton.IsChecked == true) return "当前：独显直连";
-                if (GpuHybridButton.IsChecked == true) return "当前：混合模式";
-                return "当前：—";
+                if (GpuEcoButton.IsChecked == true) return WpfStrings.CurrentPrefix + WpfStrings.GpuEcoMode;
+                if (GpuDirectButton.IsChecked == true) return WpfStrings.CurrentPrefix + WpfStrings.GpuDirectMode;
+                if (GpuHybridButton.IsChecked == true) return WpfStrings.CurrentPrefix + WpfStrings.GpuHybridMode;
+                return WpfStrings.CurrentPrefix + "—";
             }
             catch
             {
-                return "当前：—";
+                return WpfStrings.CurrentPrefix + "—";
             }
         }
     }
@@ -2931,7 +2931,7 @@ public partial class OriginalStyleWindow : Window
             }
         }
         string health = SettingsText.BatteryHealthText(hw);
-        string abnormal = hw.BatteryAbnormal ? " · 电池异常" : "";
+        string abnormal = hw.BatteryAbnormal ? " · " + WpfStrings.BatteryAbnormal : "";
         string powerState = "";
         try
         {
@@ -2939,10 +2939,10 @@ public partial class OriginalStyleWindow : Window
             bool charging = power.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.Charging);
             string source = FormatPowerSource(power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online);
             string state = charging
-                ? "充电中"
+                ? WpfStrings.BatteryCharging
                 : (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online
-                    ? (hw.BatteryPercent >= 99 ? "已充满" : "未充电")
-                    : "放电中");
+                    ? (hw.BatteryPercent >= 99 ? WpfStrings.BatteryFull : WpfStrings.BatteryNotCharging)
+                    : WpfStrings.BatteryDischarging);
             powerState = " · " + source + " · " + state;
         }
         catch
@@ -2979,12 +2979,12 @@ public partial class OriginalStyleWindow : Window
         }
         UpdateGpuButtons(displayGpu, pending);
         bool skipModeUi = false;
-        CurrentModeText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_47 + (mode switch
+        CurrentModeText.Text = WpfStrings.CurrentPrefix + (mode switch
         {
-            2 => "静音",
-            1 => "狂暴",
-            0 => "平衡",
-            3 or 4 => "自定义",
+            2 => WpfStrings.ModeSilent,
+            1 => WpfStrings.ModeTurbo,
+            0 => WpfStrings.ModeBalanced,
+            3 or 4 => WpfStrings.ModeCustom,
             _ => "—"
         });
         if (_pendingMode >= 0)
