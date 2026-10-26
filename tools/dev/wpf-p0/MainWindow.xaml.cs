@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private DispatcherTimer? _effectCommitTimer;
     private bool _syncingCalibrationUi;
     private bool _syncingScreenEffect;
+    private bool? _screenBackendConnected;
     private string _currentEffectMode = "";
     private readonly List<(ToggleButton Button, Func<bool> Get, Action<bool> Set)> _screenFeatures = new();
     private Window? _inlineWindow;
@@ -77,6 +78,8 @@ public partial class MainWindow : Window
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
     private readonly List<ToggleButton> _batteryModeButtons = new();
     private readonly List<(string Key, Button Button, TextBlock State, string Label)> _quickTileButtons = new();
+    /// <summary>⭐ task-26：每张灯光卡的 150 ms 合并计时器；重建卡片时统一 Stop（避免对已拆掉的卡补发旧值）✅。</summary>
+    private readonly List<DispatcherTimer> _lightCardApplyTimers = new();
 
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
@@ -156,6 +159,8 @@ public partial class MainWindow : Window
         _gpuFanRing?.SetValue(snapshot.GpuFanRpm, fanMax, "rpm");
         if (_cpuDutyText != null) _cpuDutyText.Text = WpfStrings.MainWindow_xaml_Text_2 + snapshot.CpuFanDutyPercent + "%";
         if (_gpuDutyText != null) _gpuDutyText.Text = WpfStrings.MainWindow_xaml_Text_2 + snapshot.GpuFanDutyPercent + "%";
+        // ⭐ task-26：连接状态可能后变（GCU 服务重连/掉线）⇒ 每次传感器 tick 顺带校正一次屏幕页门控（有缓存，只在变化时改 UI）
+        UpdateScreenBackendGating();
         RefreshHomeExtras();
     }
 
@@ -447,6 +452,7 @@ public partial class MainWindow : Window
             BuildMoreSwitchTiles();
             if (_lightingView != null) BuildLightingCards();
             if (_screenView != null) BuildScreenFeatures();
+            UpdateScreenBackendGating();
             ApplyHomeCapabilities();
             // ⭐ 2026-10-26（task-18）：宽屏若在“后端就绪前”打开，充电阈值卡片（含实验行/EC 直写）
             //   当时因能力位读不到而**未建**；后端就绪后补建一次（不支持机型 Visible=false，不会建）。
@@ -600,6 +606,8 @@ public partial class MainWindow : Window
         else if (page == "lighting") EnsureLightingView();
         else if (page == "custom") EnsureCustomView();
         else if (page == "switches") EnsureSwitchesView();
+        // ⭐ task-26：切到屏幕页时立即按连接状态门控一次（页面按需创建时 BuildScreenControls 也会做）
+        if (page == "screen") UpdateScreenBackendGating();
         HomeHost.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
         ScreenHost.Visibility = page == "screen" ? Visibility.Visible : Visibility.Collapsed;
         LightingHost.Visibility = page == "lighting" ? Visibility.Visible : Visibility.Collapsed;
@@ -1118,6 +1126,8 @@ public partial class MainWindow : Window
             _effectCommitTimer.Stop();
             await CommitEffectProfileAsync();
         };
+        // ⭐ task-26：屏幕页创建后立即按当前后端连接状态做一次门控（未连接 ⇒ 编辑/开关禁用并提示）
+        UpdateScreenBackendGating();
     }
 
     private void BuildCalibrationOptions()
@@ -1250,12 +1260,25 @@ public partial class MainWindow : Window
 
     private void ScreenCalibrationToggle_Click(object sender, RoutedEventArgs e)
     {
+        if (!IsWideBackendConnected)
+        {
+            // task-26：未连接时点了也不下发（开关已禁用，这里是键盘/并发路径的兜底）
+            ScreenCalibrationToggle.IsChecked = !(ScreenCalibrationToggle.IsChecked == true);
+            StatusText.Text = "后端未连接：校色开关需连接后生效";
+            return;
+        }
         _owner?.WideSetCalibrationEnabled(ScreenCalibrationToggle.IsChecked == true);
         BuildCalibrationOptions();
     }
 
     private void ScreenEffectToggle_Click(object sender, RoutedEventArgs e)
     {
+        if (!IsWideBackendConnected)
+        {
+            ScreenEffectToggle.IsChecked = !(ScreenEffectToggle.IsChecked == true);
+            StatusText.Text = "后端未连接：色彩增强开关需连接后生效";
+            return;
+        }
         _owner?.WideSetDisplayEffectEnabled(ScreenEffectToggle.IsChecked == true);
         BuildEffectOptions();
     }
@@ -1265,6 +1288,11 @@ public partial class MainWindow : Window
         bool show = ScreenCalibrationSettingsPanel.Visibility != Visibility.Visible;
         ScreenCalibrationSettingsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (show) LoadCalibrationSettings();
+        if (!IsWideBackendConnected && show)
+        {
+            // task-26：本地 ICC 设置仍可用；只提示需要后端的开关/档位
+            StatusText.Text = "后端未连接：校色开关/档位需连接后生效；本地 ICC 设置仍可用";
+        }
     }
 
     private void CalibrationStartupSwitch_Click(object sender, RoutedEventArgs e)
@@ -1331,6 +1359,12 @@ public partial class MainWindow : Window
 
     private void ScreenEffectEditButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!IsWideBackendConnected)
+        {
+            // task-26：未连接时编辑面板打不开（按钮本身已被门控禁用；这里是兜底）
+            StatusText.Text = "后端未连接：屏幕效果编辑器暂不可用";
+            return;
+        }
         bool show = ScreenEffectEditorPanel.Visibility != Visibility.Visible;
         ScreenEffectEditorPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (show) BuildEffectEditor();
@@ -1433,6 +1467,11 @@ public partial class MainWindow : Window
 
     private async void ScreenEffectReset_Click(object sender, RoutedEventArgs e)
     {
+        if (!IsWideBackendConnected)
+        {
+            StatusText.Text = "后端未连接：色彩增强重置暂不可用";
+            return;
+        }
         if (_probe?.Service == null || string.IsNullOrWhiteSpace(_currentEffectMode)) return;
         if (await _probe.Service.ResetDisplayEffectProfile(_currentEffectMode))
         {
@@ -1457,6 +1496,62 @@ public partial class MainWindow : Window
         ScreenEffectToggle.IsChecked = effectEnabled;
         if (_effectOptionButtons.Count != effectOptions.Length) BuildEffectOptions();
         for (int i = 0; i < _effectOptionButtons.Count; i++) _effectOptionButtons[i].IsChecked = i == effectSelected;
+    }
+
+    /// <summary>⭐ task-26：宽屏后端是否已连接（BackendProbe 或迷你窗当前后端，任一在线即视为已连接）✅。</summary>
+    private bool IsWideBackendConnected =>
+        _probe?.Connected == true || _owner?.CurrentBackend?.Connected == true;
+
+    /// <summary>
+    /// ⭐ task-26（P2 真机前收口）：屏幕页「后端未连接门控」——
+    /// 需要后端的编辑/开关/特性在未连接时**禁用 + tooltip/状态栏提示**，避免"可点但无任何效果"；
+    /// ⚠️ 校色「设置」里含**本地 ICC**（导入/选中/开机应用，与 GCU 无关）⇒ 不整体禁用，只提示需要后端的部分。
+    /// ⭐ 只改 IsEnabled/可见性/提示文本，⛔ 不改任何能力位、⛔ 不伪造可用性。
+    /// </summary>
+    private void UpdateScreenBackendGating()
+    {
+        // 屏幕页是按需创建的：未创建时本方法只做无操作（等 EnsureScreenView→BuildScreenControls 再调用）
+        if (ScreenEffectEditButton is null || ScreenEffectToggle is null || ScreenCalibrationToggle is null)
+        {
+            return;
+        }
+        bool connected = IsWideBackendConnected;
+        if (_screenBackendConnected == connected)
+        {
+            return;   // 状态未变化：不重复改 UI（传感器 2 s tick 会周期调用）
+        }
+        _screenBackendConnected = connected;
+        try
+        {
+            string? tip = connected ? null : "后端未连接：需要 GCU/厂商服务在线后才可编辑";
+            ScreenEffectEditButton.IsEnabled = connected;
+            ScreenEffectEditButton.ToolTip = tip;
+            ScreenEffectToggle.IsEnabled = connected;
+            ScreenEffectToggle.ToolTip = tip;
+            ScreenEffectOptionsPanel.IsEnabled = connected;
+            ScreenCalibrationToggle.IsEnabled = connected;
+            ScreenCalibrationToggle.ToolTip = tip;
+            ScreenCalibrationOptionsPanel.IsEnabled = connected;
+            ScreenFeaturesPanel.IsEnabled = connected;
+            if (ScreenCalibrationSettingsButton is not null)
+            {
+                ScreenCalibrationSettingsButton.ToolTip = connected
+                    ? null
+                    : "后端未连接：校色开关/档位需连接后生效；本地 ICC 设置仍可用";
+            }
+            if (!connected && ScreenEffectEditorPanel is not null)
+            {
+                ScreenEffectEditorPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch
+        {
+            // UI 门控失败不影响功能（只影响是否可点）；异常吞掉，避免影响 2 s 刷新
+        }
+        Logger.WriteLineIfChanged("wide-screen-backend-gate",
+            connected
+                ? "[wide-screen] 后端已连接 ⇒ 启用屏幕效果编辑/校色开关/档位/显示特性 ✅"
+                : "[wide-screen] 后端未连接 ⇒ 禁用屏幕效果编辑/校色开关/档位/显示特性（本地 ICC 设置保留）✅");
     }
 
     private void UpdateChargeSliderVisibility()
@@ -1664,7 +1759,10 @@ public partial class MainWindow : Window
         _liquidLightColorButton = new Button
         {
             Content = "颜色",
-            Style = (Style)FindResource("MiniButton"),
+            // ⚠️ task-26 收口：宽屏根资源里没有 "MiniButton"（各子窗口有自己的局部同名样式）⇒
+            //   原来直接 FindResource 会在宽窗构造时抛 ResourceReferenceKeyNotFoundException（启动崩溃）。
+            //   ⭐ 有就用，没有回退到既有 FlatButton（⛔ 不新增/不伪造样式资源；等 MainWindow.xaml 补定义后自动恢复）。
+            Style = TryFindResource("MiniButton") as Style ?? (Style)FindResource("FlatButton"),
             MinWidth = 52,
             Margin = new Thickness(0, 0, 8, 0)
         };
@@ -1856,18 +1954,39 @@ public partial class MainWindow : Window
             return;
         }
         // ⭐ task-17：重建前先清空（OnBackendReady 会再次调用本方法；原来不清空导致灯光卡整组重复 ❌）
+        // ⭐ task-26：先把旧卡的合并计时器停掉再拆 UI，避免旧卡 pending 的 slider 值在重建后补发 ✅
+        foreach (DispatcherTimer timer in _lightCardApplyTimers)
+        {
+            timer.Stop();
+        }
+        _lightCardApplyTimers.Clear();
         LightingCardsGrid.Children.Clear();
         BuildLightingGlobalControls();
         MechrevoHw? hw = _probe?.Hw ?? WpfBackend.Hw;
-        // ⭐⭐ task-17（宽屏 HID / 白色背光入口）：键盘能力分支与迷你窗同判据（KeyboardLightPathPolicy / LightingCatalog）✅
-        bool hidKeyboard = WideIsHidKeyboard(hw);
-        bool whiteKeyboard = WideIsWhiteBacklightKeyboard(hw);
-        if (hidKeyboard || whiteKeyboard)
+        // ⭐⭐ task-17/task-26（宽屏 HID / 白色背光入口）：能力判定与迷你窗同判据；
+        //    判定异常/无设备一律按「不支持」处理 ⇒ 不建对应入口、⛔ 不伪造能力 ✅
+        bool hidKeyboard = false;
+        bool whiteKeyboard = false;
+        try
         {
-            Logger.WriteLineIfChanged("wide-light-keyboard-kind",
-                $"[wide-light] 键盘通道能力：hid={hidKeyboard} white={whiteKeyboard}（KeyboardType={hw?.Capabilities.KeyboardType ?? -1} solution={hw?.KeyboardSolution ?? ""}）");
+            hidKeyboard = WideIsHidKeyboard(hw);
+            whiteKeyboard = WideIsWhiteBacklightKeyboard(hw);
         }
-        (string Effect, string Name)[] keyboardEffects = _owner?.WideKeyboardEffects() ?? Array.Empty<(string, string)>();
+        catch (Exception ex)
+        {
+            Logger.WriteError("[wide-light] 键盘能力判定异常（按不支持处理，⛔ 不伪造能力）：" + ex);
+        }
+        LogKeyboardCapabilityDecision(hw, hidKeyboard, whiteKeyboard);
+        (string Effect, string Name)[] keyboardEffects;
+        try
+        {
+            keyboardEffects = _owner?.WideKeyboardEffects() ?? Array.Empty<(string, string)>();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteError("[wide-light] 读取键盘效果表失败（本次不建键盘卡，⛔ 不伪造能力）：" + ex);
+            keyboardEffects = Array.Empty<(string, string)>();
+        }
         if (hw?.UsesBaolongda == true && keyboardEffects.Length > 0)
         {
             // ⭐ task-17：与迷你窗 EffectsForCurrentBackend 同口径（宝龙达固件只支持 单色/彩虹；
@@ -2013,6 +2132,7 @@ public partial class MainWindow : Window
             lightApplyTimer.Stop();
             _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, powerRef?.IsChecked == true);
         };
+        _lightCardApplyTimers.Add(lightApplyTimer);
 
         Grid layout = new();
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -2343,24 +2463,32 @@ public partial class MainWindow : Window
     /// </summary>
     private static bool WideIsHidKeyboard(MechrevoHw? hw)
     {
-        if (hw == null
-            || hw.UsesBaolongda
-            || hw.WujieSmuApu
-            || KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType))
+        try
         {
+            if (hw == null
+                || hw.UsesBaolongda
+                || hw.WujieSmuApu
+                || KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(hw.Capabilities.KeyboardType))
+            {
+                return false;
+            }
+            KeyboardRgb? rgb = WpfBackend.rgb;
+            if (rgb != null
+                && KeyboardLightPathPolicy.ShouldUseGcuKeyboardFallback(
+                    rgb.ControllerAvailability,
+                    rgb.IsConnected,
+                    WpfBackend.Service != null && hw.IsConnected,
+                    hidBrightnessTookEffect: true))
+            {
+                return false;
+            }
+            return true;
+        }
+        catch
+        {
+            // task-26：能力读取异常 ⇒ 按「非 HID」处理（⛔ 不伪造 HID 能力；入口不出现，页面不崩）
             return false;
         }
-        KeyboardRgb? rgb = WpfBackend.rgb;
-        if (rgb != null
-            && KeyboardLightPathPolicy.ShouldUseGcuKeyboardFallback(
-                rgb.ControllerAvailability,
-                rgb.IsConnected,
-                WpfBackend.Service != null && hw.IsConnected,
-                hidBrightnessTookEffect: true))
-        {
-            return false;
-        }
-        return true;
     }
 
     /// <summary>
@@ -2370,15 +2498,70 @@ public partial class MainWindow : Window
     /// </summary>
     private static bool WideIsWhiteBacklightKeyboard(MechrevoHw? hw)
     {
-        if (hw == null || !hw.SupportsKeyboard || WideIsHidKeyboard(hw) || hw.UsesBaolongda)
+        try
         {
+            if (hw == null || !hw.SupportsKeyboard || WideIsHidKeyboard(hw) || hw.UsesBaolongda)
+            {
+                return false;
+            }
+            if (hw.WujieSmuApu)
+            {
+                return true;
+            }
+            return KeyboardFirmwareEffects.Visible(hw.Capabilities.KeyboardType).Length == 0;
+        }
+        catch
+        {
+            // task-26：能力读取异常 ⇒ 按「非白色背光」处理（⛔ 不伪造能力；不隐藏入口，页面不崩）
             return false;
         }
-        if (hw.WujieSmuApu)
+    }
+
+    /// <summary>
+    /// ⭐⭐ task-26：补齐键盘能力位判定日志，供验收/真机从日志确认「HID/白色背光入口为什么出现或不出现」。
+    /// ⚠️ 只写日志（WriteLineIfChanged 去重），⛔ 不改任何可见性/能力值 ✅。
+    /// </summary>
+    private void LogKeyboardCapabilityDecision(MechrevoHw? hw, bool hidKeyboard, bool whiteKeyboard)
+    {
+        try
         {
-            return true;
+            int keyboardType = -1;
+            int firmwareVisible = -1;
+            string solution = "";
+            bool supportsKeyboard = false;
+            bool usesBaolongda = false;
+            bool wujie = false;
+            bool gcuZonePath = false;
+            if (hw != null)
+            {
+                keyboardType = hw.Capabilities.KeyboardType;
+                solution = hw.KeyboardSolution;
+                supportsKeyboard = hw.SupportsKeyboard;
+                usesBaolongda = hw.UsesBaolongda;
+                wujie = hw.WujieSmuApu;
+                gcuZonePath = KeyboardFirmwareEffects.IsGcuZoneKeyboardPath(keyboardType);
+                firmwareVisible = KeyboardFirmwareEffects.Visible(keyboardType).Length;
+            }
+            string reason = hw == null
+                ? "hw=null（后端尚未就绪）"
+                : !supportsKeyboard
+                    ? "SupportsKeyboard=false（无键盘灯能力）"
+                    : usesBaolongda
+                        ? "UsesBaolongda=true（固件键盘，走单色/彩虹）"
+                        : wujie
+                            ? "WujieSmuApu=true（白色背光：仅电源+亮度）"
+                            : gcuZonePath
+                                ? "IsGcuZoneKeyboardPath=true（固件/HID 回退路径）"
+                                : hidKeyboard ? "HID 可达（KeyboardRgb 已连接且未回退）" : "非 HID 固件键盘";
+            Logger.WriteLineIfChanged("wide-light-keyboard-cap",
+                $"[wide-light] 键盘能力判定：hid={hidKeyboard} white={whiteKeyboard} hw={(hw == null ? "null" : "ok")}"
+                + $" connected={IsWideBackendConnected} KeyboardType={keyboardType} solution={solution}"
+                + $" firmwareVisible={firmwareVisible} rgb={(WpfBackend.rgb == null ? "null" : "ok")} 原因={reason}");
         }
-        return KeyboardFirmwareEffects.Visible(hw.Capabilities.KeyboardType).Length == 0;
+        catch (Exception ex)
+        {
+            Logger.WriteError("[wide-light] 键盘能力判定日志失败（已吞掉，不影响入口）：" + ex.GetType().Name);
+        }
     }
 
     /// <summary>⭐ task-17：通道能力判据与 <c>OriginalStyleWindow.WideApplyLightAsync</c> 同一套（不硬编码）✅。</summary>
@@ -2459,6 +2642,14 @@ public partial class MainWindow : Window
     /// <summary>⭐ task-17：打开与迷你窗共用的 HID 键盘编辑器（模式/亮度/速度/颜色，按 HID 支持范围）✅。</summary>
     private void OpenWideHidKeyboardEditor(string title)
     {
+        // task-26：无设备/后端未连接 ⇒ 只提示不打开（⛔ 不伪造能力；HidKeyboardWindow 需要真实 KeyboardRgb）
+        if (!IsWideBackendConnected || (_probe?.Hw ?? WpfBackend.Hw) is null)
+        {
+            Logger.WriteLineIfChanged("wide-light-hid-no-device",
+                $"[wide-light] HID 编辑入口：无设备或后端未连接（connected={IsWideBackendConnected} hw={((_probe?.Hw ?? WpfBackend.Hw) == null ? "null" : "ok")}）⇒ 只提示，不打开 ✅");
+            StatusText.Text = "后端未连接：HID 键盘编辑器暂不可用";
+            return;
+        }
         try
         {
             Logger.WriteLine("[wide-light] 打开 HID 键盘编辑器");
