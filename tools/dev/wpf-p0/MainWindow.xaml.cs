@@ -1589,11 +1589,14 @@ public partial class MainWindow : Window
         if (MoreSwitchGrid != null && MoreSwitchGrid.Children.Count == 0) BuildMoreSwitchTiles();
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
-        string perf = _owner.WidePerformanceText;
-        HomePerf平衡.IsChecked = perf.Contains(WpfStrings.ModeBalanced);
-        HomePerf狂暴.IsChecked = perf.Contains(WpfStrings.ModeTurbo);
-        HomePerf自定义.IsChecked = perf.Contains(WpfStrings.ModeCustom);
-        HomePerf静音.IsChecked = perf.Contains(WpfStrings.ModeSilent);
+        if (!_owner.WideModeSwitchPending)
+        {
+            string perf = _owner.WidePerformanceText;
+            HomePerf平衡.IsChecked = perf.Contains(WpfStrings.ModeBalanced);
+            HomePerf狂暴.IsChecked = perf.Contains(WpfStrings.ModeTurbo);
+            HomePerf自定义.IsChecked = perf.Contains(WpfStrings.ModeCustom);
+            HomePerf静音.IsChecked = perf.Contains(WpfStrings.ModeSilent);
+        }
         string gpu = _owner.WideGpuModeText;
         HomeGpu混合.IsChecked = gpu.Contains(WpfStrings.GpuHybrid);
         HomeGpu独显.IsChecked = gpu.Contains(WpfStrings.GpuDedicated);

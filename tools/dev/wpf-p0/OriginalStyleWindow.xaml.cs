@@ -102,6 +102,7 @@ public partial class OriginalStyleWindow : Window
     private long _pendingKeyboardPowerTick;
     private bool _syncingPerfConfig;
     private int _pendingMode = -1;
+    private bool _modeSwitchInFlight;
     private int _modeRequestId;
     private long _pendingModeTick;
     private int _lastDbVisualMode = int.MinValue;
@@ -2362,39 +2363,53 @@ public partial class OriginalStyleWindow : Window
         int request = ++_modeRequestId;
         _pendingMode = mode;
         _pendingModeTick = Environment.TickCount64;
-        MechrevoService.ModeSwitchResult result = await _backendProbe!.SwitchModeResultAsync(mode);
-        if (request != _modeRequestId)
+        _modeSwitchInFlight = true;
+        try
         {
-            return;
-        }
-        if (result == MechrevoService.ModeSwitchResult.Superseded)
-        {
-            return;
-        }
-        bool ok = result == MechrevoService.ModeSwitchResult.Ok;
-        BackendStatus.Text = ok ? "模式已下发" : "模式下发失败";
-        if (!ok)
-        {
-            _pendingMode = -1;
-        }
-        if (ok)
-        {
-            MechrevoLite.Mode.PerfModeKind? kind = mode switch
+            MechrevoService.ModeSwitchResult result = await _backendProbe!.SwitchModeResultAsync(mode);
+            if (request != _modeRequestId)
             {
-                2 => MechrevoLite.Mode.PerfModeKind.Silent,
-                1 => MechrevoLite.Mode.PerfModeKind.Turbo,
-                0 => MechrevoLite.Mode.PerfModeKind.Balanced,
-                _ => null
-            };
-            if (kind.HasValue)
-            {
-                MechrevoLite.Mode.PerfModeStore.ActiveModeId = MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind.Value);
+                return;
             }
-            SyncGpuDbForMode(mode, "WPF 切档");
-            SyncCustomWindowMode(mode);
+            if (result == MechrevoService.ModeSwitchResult.Superseded)
+            {
+                _pendingMode = -1;
+                return;
+            }
+            bool ok = result == MechrevoService.ModeSwitchResult.Ok;
+            BackendStatus.Text = ok ? "模式已下发" : "模式下发失败";
+            if (!ok)
+            {
+                _pendingMode = -1;
+            }
+            if (ok)
+            {
+                MechrevoLite.Mode.PerfModeKind? kind = mode switch
+                {
+                    2 => MechrevoLite.Mode.PerfModeKind.Silent,
+                    1 => MechrevoLite.Mode.PerfModeKind.Turbo,
+                    0 => MechrevoLite.Mode.PerfModeKind.Balanced,
+                    _ => null
+                };
+                if (kind.HasValue)
+                {
+                    MechrevoLite.Mode.PerfModeStore.ActiveModeId = MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind.Value);
+                }
+                SyncGpuDbForMode(mode, "WPF 切档");
+                SyncCustomWindowMode(mode);
+            }
         }
-        RefreshFromBackend();
+        finally
+        {
+            if (request == _modeRequestId)
+            {
+                _modeSwitchInFlight = false;
+                RefreshFromBackend();
+            }
+        }
     }
+
+    internal bool WideModeSwitchPending => _modeSwitchInFlight || _pendingMode >= 0;
 
     private static int VisualModeForId(string? id)
     {
@@ -3543,7 +3558,7 @@ public partial class OriginalStyleWindow : Window
             displayGpu = currentGpu;
         }
         UpdateGpuButtons(displayGpu, pending);
-        bool skipModeUi = false;
+        bool skipModeUi = _modeSwitchInFlight;
         CurrentModeText.Text = WpfStrings.CurrentPrefix + (mode switch
         {
             2 => WpfStrings.ModeSilent,
@@ -3552,9 +3567,9 @@ public partial class OriginalStyleWindow : Window
             3 or 4 => WpfStrings.ModeCustom,
             _ => "—"
         });
-        if (_pendingMode >= 0)
+        if (!_modeSwitchInFlight && _pendingMode >= 0)
         {
-            if (mode == _pendingMode || Environment.TickCount64 - _pendingModeTick > 4000)
+            if (mode == _pendingMode || Environment.TickCount64 - _pendingModeTick > 15000)
             {
                 _pendingMode = -1;
             }
@@ -4629,12 +4644,9 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool on = GpuOverclockSwitch.IsChecked == true;
+        StatusText.Text = on ? "显卡超频：开（下发中…）" : "显卡超频：关（下发中…）";
         bool ok = await _backendProbe.ApplyGpuOverclockAsync(on);
-        if (!ok)
-        {
-            GpuOverclockSwitch.IsChecked = !on;
-        }
-        StatusText.Text = ok ? "显卡超频：" + (on ? "开" : "关") : "显卡超频下发失败";
+        StatusText.Text = ok ? "显卡超频：" + (on ? "开" : "关") : "显卡超频下发失败（开关保持按钮状态）";
     }
 
     private void InitScreenColorControls()
