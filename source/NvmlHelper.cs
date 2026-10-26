@@ -602,6 +602,18 @@ public static class NvmlHelper
 
 	/// <summary>2026-10-22（JIGUANG 待机亮屏）：采样泵判定 NVML 卡死 ⇒ 本进程停止一切 NVML 原生调用。
 	/// <para>卡在原生调用里的线程无法安全终止，只能保证不再产生新的调用（不再叠加卡死线程）。</para></summary>
+	/// <summary>
+	/// 进程级永久停用 NVML 原生调用。用于已知会触发原生访问冲突的机型/进程，
+	/// 停用后所有 Get* 返回 null，调用方必须走 GCU/外部采样兜底，⛔ 不得再回退到原生。
+	/// </summary>
+	public static void DisableNativeForProcess(string reason)
+	{
+		lock (_lock)
+		{
+			DisableLocked(reason);
+		}
+	}
+
 	internal static void QuarantineAfterNativeHang(string reason)
 	{
 		lock (_lock)

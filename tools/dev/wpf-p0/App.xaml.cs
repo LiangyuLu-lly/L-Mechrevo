@@ -29,6 +29,9 @@ public partial class App : Application
             Shutdown();
             return;
         }
+        // task-40：JIGUANG 机型已知 NVML 原生 AV（0xc0000005），在采样泵启动前先停用进程内 NVML。
+        L_Mechrevo.WpfP0.Services.NvmlSafetyPolicy.Apply();
+
         bool startupLaunch = false;
         foreach (string arg in e.Args)
         {

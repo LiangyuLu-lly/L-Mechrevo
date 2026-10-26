@@ -33,10 +33,15 @@ internal sealed class SensorService : ISensorService
         try
         {
             // 后端暂时未连上时仍使用本地采样值（LHM/NVML），不要整页归零。
-            float? gpuMemoryClock = NvmlHelper.GetGpuMemoryClockMhz();
+            float? gpuMemoryClock = NvmlHelper.Unavailable ? null : NvmlHelper.GetGpuMemoryClockMhz();
             int? gpuMemoryClockMhz = gpuMemoryClock.HasValue && gpuMemoryClock.Value > 0
                 ? (int)Math.Round(gpuMemoryClock.Value)
-                : null;
+                : NvidiaSmiSensor.GetMemoryClockMhz();
+            float? gpuPower = HardwareControl.gpuPower;
+            if (!gpuPower.HasValue && NvmlHelper.Unavailable)
+            {
+                gpuPower = NvidiaSmiSensor.GetPowerWatts();
+            }
             return new SensorSnapshot(
                 HardwareAvailable: true,
                 CpuTempC: connected ? hw!.CpuTemp : HardwareControl.cpuTemp,
@@ -51,7 +56,7 @@ internal sealed class SensorService : ISensorService
                 GpuCoreFrequencyMhz: connected ? hw!.GpuCoreFreq : HardwareControl.gpuCoreFreq,
                 FanRpmMaxForPercent: connected ? hw!.FanRpmMaxForPercent : 5000,
                 CpuPowerWatts: HardwareControl.cpuPower,
-                GpuPowerWatts: HardwareControl.gpuPower,
+                GpuPowerWatts: gpuPower,
                 GpuMemoryClockMhz: gpuMemoryClockMhz,
                 GpuVramUsagePercent: HardwareControl.vramUsage ?? -1);
         }
