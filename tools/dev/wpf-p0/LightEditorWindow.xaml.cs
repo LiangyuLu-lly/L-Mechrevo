@@ -552,12 +552,12 @@ public partial class LightEditorWindow : Window
             }
             bool manualKeyboard = string.Equals(_topic, "Keyboard/Ctrl", StringComparison.Ordinal)
                 && string.Equals(effect, "Manual", StringComparison.Ordinal);
-            int applySpeed = manualKeyboard ? _manualInterval : _speed;
+            int applySpeed = _keyboard ? (manualKeyboard ? _manualInterval : 0) : _speed;
             LightChannelSettings next = _settings with
             {
                 Effect = effect,
                 Light = (_wujieWhite || _whiteBacklightOnly) ? (_light >= 2 ? 4 : 2) : _light,
-                Speed = applySpeed,
+                Speed = manualKeyboard ? _manualInterval : (_keyboard ? _settings.Speed : _speed),
                 ColorArgb = _colorArgb,
                 UsePresetColor = _usePresetColor,
                 MonochromeIndex = _monochromeIndex,

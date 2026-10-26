@@ -2252,6 +2252,10 @@ public partial class MainWindow : Window
         WrapPanel breathPanel = new();
         List<Button> breathButtons = new();
         List<Button> mixButtons = new();
+        StackPanel manualSection = new();
+        WrapPanel manualPanel = new();
+        List<Button> manualButtons = new();
+        int[] manualIndexes = (settings.ManualIndexes ?? LightChannelSettings.DefaultManualIndexes).ToArray();
         int[] mixColors = (LightingSettingsStore.Load(topic, "ColorMarquee").MixColors ?? LightChannelSettings.DefaultMixColors).ToArray();
         void RefreshMixButtons()
         {
@@ -2279,7 +2283,7 @@ public partial class MainWindow : Window
         lightApplyTimer.Tick += (_, _) =>
         {
             lightApplyTimer.Stop();
-            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, powerRef?.IsChecked == true);
+            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, powerRef?.IsChecked == true);
         };
         _lightCardApplyTimers.Add(lightApplyTimer);
 
@@ -2326,7 +2330,7 @@ public partial class MainWindow : Window
                 selectedEffect = effectId;
                 foreach (ToggleButton item in effectButtons) item.IsChecked = ReferenceEquals(item, button);
                 updateEffectUi?.Invoke(effectId);
-                _ = ApplyLightCardAsync(topic, effectId, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, effectId, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, power.IsChecked == true);
             };
             effectButtons.Add(button);
             effectPanel.Children.Add(button);
@@ -2372,7 +2376,7 @@ public partial class MainWindow : Window
                 colorArgb = picked.ToArgb();
                 swatch.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255, picked.R, picked.G, picked.B));
                 colorLabel.Text = "#" + colorArgb.ToString("X8");
-                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, power.IsChecked == true);
             }
         };
         WrapPanel presets = new() { Margin = new Thickness(0, 0, 0, 8) };
@@ -2403,7 +2407,7 @@ public partial class MainWindow : Window
                 colorArgb = presetArgb;
                 swatch.Background = preset.Background;
                 colorLabel.Text = "#" + colorArgb.ToString("X8");
-                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, power.IsChecked == true);
             };
             presets.Children.Add(preset);
         }
@@ -2432,7 +2436,7 @@ public partial class MainWindow : Window
                     mixColors[index] = picked.ToArgb();
                     RefreshMixButtons();
                     SaveMixColors();
-                    _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, power.IsChecked == true);
+                    _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, power.IsChecked == true);
                 }
             };
             mixButtons.Add(mixSwatch);
@@ -2461,16 +2465,60 @@ public partial class MainWindow : Window
                 {
                     breathButtons[j].BorderThickness = new Thickness(j + 1 == breathingIndex ? 2 : 0);
                 }
-                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, power.IsChecked == true);
+                _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, power.IsChecked == true);
             };
             breathButtons.Add(breathSwatch);
             breathPanel.Children.Add(breathSwatch);
         }
         breathSection.Children.Add(new TextBlock { Text = WpfStrings.LightBreathingColor, Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 0, 0, 4) });
         breathSection.Children.Add(breathPanel);
+        void RefreshManualButtons()
+        {
+            for (int i = 0; i < manualButtons.Count && i < manualIndexes.Length; i++)
+            {
+                System.Drawing.Color c = System.Drawing.Color.FromArgb(
+                    LightChannelSettings.ManualPalette[Math.Clamp(manualIndexes[i], 1, 29) - 1]);
+                manualButtons[i].Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B));
+                manualButtons[i].ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+            }
+        }
+        for (int i = 0; i < 6; i++)
+        {
+            int index = i;
+            manualIndexes[index] = Math.Clamp(manualIndexes[index], 1, 29);
+            System.Drawing.Color c = System.Drawing.Color.FromArgb(
+                LightChannelSettings.ManualPalette[manualIndexes[index] - 1]);
+            Button manualSwatch = new()
+            {
+                Width = 24,
+                Height = 24,
+                Margin = new Thickness(0, 0, 6, 6),
+                Padding = new Thickness(0),
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(c.A, c.R, c.G, c.B)),
+                BorderBrush = (Brush)FindResource("CardBorderBrush"),
+                BorderThickness = new Thickness(1),
+                ToolTip = $"#{c.R:X2}{c.G:X2}{c.B:X2}"
+            };
+            manualSwatch.Click += (_, _) =>
+            {
+                ColorPickerWindow picker = new(System.Drawing.Color.FromArgb(
+                    LightChannelSettings.ManualPalette[Math.Clamp(manualIndexes[index], 1, 29) - 1])) { Owner = this };
+                if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
+                {
+                    manualIndexes[index] = NearestManualPaletteIndex(picked);
+                    RefreshManualButtons();
+                    _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, power.IsChecked == true);
+                }
+            };
+            manualButtons.Add(manualSwatch);
+            manualPanel.Children.Add(manualSwatch);
+        }
+        manualSection.Children.Add(new TextBlock { Text = "手动分区颜色", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 0, 0, 4) });
+        manualSection.Children.Add(manualPanel);
         right.Children.Add(colorSection);
         right.Children.Add(mixSection);
         right.Children.Add(breathSection);
+        right.Children.Add(manualSection);
         Slider slider = new() { Style = (Style)FindResource("RoundSlider"), Minimum = whiteKeyboard ? 1 : 0, Maximum = maxLight, Value = light };
         sliderRef = slider;
         TextBlock value = new()
@@ -2523,7 +2571,7 @@ public partial class MainWindow : Window
         right.Children.Add(speedRow);
         speed.ValueChanged += (_, _) =>
         {
-            speedText.Text = (int)Math.Round(speed.Value) + "/4";
+            speedText.Text = (int)Math.Round(speed.Value) + "/" + (int)speed.Maximum;
             if (lightUiSyncing) return;
             lightApplyTimer.Stop();
             lightApplyTimer.Start();
@@ -2532,7 +2580,7 @@ public partial class MainWindow : Window
         layout.Children.Add(right);
         power.Click += (_, _) =>
         {
-            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, power.IsChecked == true);
+            _ = ApplyLightCardAsync(topic, selectedEffect, sliderRef!, speedRef!, colorArgb, mixColors, breathingIndex, manualIndexes, power.IsChecked == true);
         };
         slider.ValueChanged += (_, _) =>
         {
@@ -2550,7 +2598,8 @@ public partial class MainWindow : Window
                 int hidColorMode = -1;
                 bool hidColorEffect = hidEffect
                     && int.TryParse(effect.AsSpan(4), out hidColorMode) && hidColorMode is 0 or 9;
-                bool breathPalette = singleZoneKeyboard && string.Equals(effect, "Breathing", StringComparison.Ordinal);
+                bool manual = keyboardChannel && !hidEffect && string.Equals(effect, "Manual", StringComparison.Ordinal);
+                bool breathPalette = keyboardChannel && !hidEffect && singleZoneKeyboard && string.Equals(effect, "Breathing", StringComparison.Ordinal);
                 bool singleColor;
                 bool mixColor;
                 if (hidEffect)
@@ -2564,6 +2613,13 @@ public partial class MainWindow : Window
                     singleColor = colorMode == 1;
                     mixColor = colorMode == 7;
                 }
+                else if (keyboardChannel)
+                {
+                    singleColor = !manual && !breathPalette
+                        && !string.Equals(effect, "Rainbow", StringComparison.Ordinal)
+                        && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect);
+                    mixColor = false;
+                }
                 else
                 {
                     // 老 LightForm：非 Gen40 灯条/Logo/铰链/同步没有七色混色；
@@ -2571,10 +2627,14 @@ public partial class MainWindow : Window
                     singleColor = !breathPalette && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect);
                     mixColor = false;
                 }
+                bool speedApplicable = EffectSupportsSpeed(topic, effect, hidEffect);
+                (int speedMin, int speedMax, string speedLabelText) = EffectSpeedInfo(topic, effect);
                 colorSection.Visibility = singleColor ? Visibility.Visible : Visibility.Collapsed;
                 mixSection.Visibility = mixColor ? Visibility.Visible : Visibility.Collapsed;
                 breathSection.Visibility = breathPalette ? Visibility.Visible : Visibility.Collapsed;
-                speedRow.Visibility = EffectSupportsSpeed(effect) ? Visibility.Visible : Visibility.Collapsed;
+                manualSection.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
+                speedRow.Visibility = speedApplicable ? Visibility.Visible : Visibility.Collapsed;
+                speedLabel.Text = speedLabelText;
                 LightChannelSettings effectSettings = LightingSettingsStore.Load(topic, effect);
                 if (breathPalette)
                 {
@@ -2583,6 +2643,15 @@ public partial class MainWindow : Window
                     {
                         breathButtons[j].BorderThickness = new Thickness(j + 1 == breathingIndex ? 2 : 0);
                     }
+                }
+                if (manual)
+                {
+                    manualIndexes = (effectSettings.ManualIndexes ?? LightChannelSettings.DefaultManualIndexes).ToArray();
+                    for (int j = 0; j < manualIndexes.Length; j++)
+                    {
+                        manualIndexes[j] = Math.Clamp(manualIndexes[j], 1, 29);
+                    }
+                    RefreshManualButtons();
                 }
                 if (mixColor && effectSettings.MixColors is { Length: 7 } savedMix)
                 {
@@ -2593,13 +2662,15 @@ public partial class MainWindow : Window
                     ? effectSettings.Light
                     : Math.Clamp(effectSettings.Light * 25, 0, 100);
                 slider.Value = Math.Clamp(effectLight, 0, maxLight);
-                speed.Value = Math.Clamp(effectSettings.Speed, 0, 4);
+                speed.Minimum = speedMin;
+                speed.Maximum = speedMax;
+                speed.Value = Math.Clamp(effectSettings.Speed, speedMin, speedMax);
                 colorArgb = effectSettings.EffectiveColorArgb();
                 swatch.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(255,
                     (byte)((colorArgb >> 16) & 0xFF), (byte)((colorArgb >> 8) & 0xFF), (byte)(colorArgb & 0xFF)));
                 colorLabel.Text = "#" + colorArgb.ToString("X8");
                 value.Text = (int)Math.Round(slider.Value) + "/" + maxLight;
-                speedText.Text = (int)Math.Round(speed.Value) + "/4";
+                speedText.Text = (int)Math.Round(speed.Value) + "/" + speedMax;
             }
             finally
             {
@@ -2615,6 +2686,7 @@ public partial class MainWindow : Window
             colorSection.Visibility = Visibility.Collapsed;
             mixSection.Visibility = Visibility.Collapsed;
             breathSection.Visibility = Visibility.Collapsed;
+            manualSection.Visibility = Visibility.Collapsed;
             speedRow.Visibility = Visibility.Collapsed;
         }
         return new Border { Style = (Style)FindResource("Card"), Margin = new Thickness(0, 0, 0, 10), Child = layout };
@@ -2887,20 +2959,49 @@ public partial class MainWindow : Window
             && hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40;
     }
 
-    private static bool EffectSupportsSpeed(string effect)
+    private static bool EffectSupportsSpeed(string topic, string effect, bool hidKeyboard)
     {
-        if (effect.StartsWith("hid:", StringComparison.Ordinal))
-        {
-            return !(int.TryParse(effect.AsSpan(4), out int mode) && mode == 9);
-        }
-        if (effect is "Single" or "Static" or "Off" or "TurnedOff")
+        if (hidKeyboard || effect.StartsWith("hid:", StringComparison.Ordinal))
         {
             return false;
         }
-        return true;
+        if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+        {
+            return string.Equals(effect, "Manual", StringComparison.Ordinal);
+        }
+        return effect is not ("Single" or "Static" or "Off" or "TurnedOff");
     }
 
-    private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, int[] mixColors, int breathingIndex, bool powerOn)
+    private static (int Min, int Max, string Label) EffectSpeedInfo(string topic, string effect)
+    {
+        if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal)
+            && string.Equals(effect, "Manual", StringComparison.Ordinal))
+        {
+            return (2, 10, "色彩间隔");
+        }
+        return (0, 4, WpfStrings.Speed);
+    }
+
+    private static int NearestManualPaletteIndex(System.Drawing.Color color)
+    {
+        int best = 1;
+        int bestDistance = int.MaxValue;
+        for (int i = 0; i < LightChannelSettings.ManualPalette.Length; i++)
+        {
+            System.Drawing.Color candidate = System.Drawing.Color.FromArgb(LightChannelSettings.ManualPalette[i]);
+            int distance = (candidate.R - color.R) * (candidate.R - color.R)
+                + (candidate.G - color.G) * (candidate.G - color.G)
+                + (candidate.B - color.B) * (candidate.B - color.B);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = i + 1;
+            }
+        }
+        return best;
+    }
+
+    private async Task ApplyLightCardAsync(string topic, string effect, Slider slider, Slider speed, int colorArgb, int[] mixColors, int breathingIndex, int[] manualIndexes, bool powerOn)
     {
         try
         {
@@ -2910,7 +3011,8 @@ public partial class MainWindow : Window
             int light = keyboardChannel || gradeLightChannel
                 ? sliderLight
                 : Math.Clamp(sliderLight * 4 / 100, 0, 4);
-            int speedValue = (int)Math.Round(speed.Value);
+            bool speedApplicable = EffectSupportsSpeed(topic, effect, effect.StartsWith("hid:", StringComparison.Ordinal));
+            int speedValue = speedApplicable ? (int)Math.Round(speed.Value) : 0;
             if (topic == "Keyboard/Ctrl" && WideIsWhiteBacklightKeyboard(_probe?.Hw))
             {
                 if (_owner != null)
@@ -2927,6 +3029,7 @@ public partial class MainWindow : Window
                 Speed = speedValue,
                 ColorArgb = colorArgb,
                 MixColors = (int[])mixColors.Clone(),
+                ManualIndexes = (int[])manualIndexes.Clone(),
                 BreathingIndex = breathingIndex,
                 UsePresetColor = false,
                 PowerOn = powerOn

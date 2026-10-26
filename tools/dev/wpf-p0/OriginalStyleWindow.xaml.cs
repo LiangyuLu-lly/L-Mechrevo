@@ -531,6 +531,9 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
+            // 灯光调节 OSD：宽屏卡/小窗所有通道都经过这里；无 OSD 设置时 OsdService 内部会忽略。
+            OsdService.Show(QuickGlyph("osd"), WpfStrings.OsdLighting,
+                on ? (light > 0 ? light + "%" : WpfStrings.StateOn) : WpfStrings.StateOff);
             if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
             {
                 if (IsHidKeyboard(hw) && effect.StartsWith("hid:", StringComparison.Ordinal))
@@ -543,27 +546,14 @@ public partial class OriginalStyleWindow : Window
                     }
                     rgb.Brightness = Math.Clamp(light <= 4 ? light * 25 : light, 1, 100);
                     System.Drawing.Color hidColor = System.Drawing.Color.FromArgb(colorArgb);
-                    int hidSpeed = Math.Clamp(speed, 0, 4);
+                    // HID 每模式的速度/颜色由 HID 编辑器维护；宽屏卡只切模式，⛔ 不用固件速度覆盖。
                     switch (hidMode)
                     {
                         case 0:
                             rgb.BreathColor = hidColor;
-                            rgb.BreathSpeed = hidSpeed;
                             break;
                         case 3:
                             rgb.ReactiveColor = hidColor;
-                            break;
-                        case 4:
-                            rgb.WheelSpeed = hidSpeed;
-                            break;
-                        case 5:
-                            rgb.LightningSpeed = hidSpeed;
-                            break;
-                        case 6:
-                            rgb.FlameSpeed = hidSpeed;
-                            break;
-                        case 8:
-                            rgb.MatrixSpeed = hidSpeed;
                             break;
                         case 9:
                             rgb.StaticColor = hidColor;
