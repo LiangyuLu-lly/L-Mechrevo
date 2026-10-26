@@ -986,6 +986,60 @@ public partial class MainWindow : Window
                 battery.Children.Add(sliderRow);
             }
         }
+        // GCU 没有宝龙达阈值面板，但「无极限充 / 关闭 EC 直写」属于 EC 传输，必须单独显示。
+        if (!_owner.WideChargeLimitVisible)
+        {
+            bool gcuExperiment = _owner.WideChargeExperimentSupported;
+            bool gcuEcDirect = _owner.WideEcDirectSupported;
+            if (gcuExperiment || gcuEcDirect)
+            {
+                StackPanel gcuExtraRow = new() { Orientation = Orientation.Horizontal };
+                if (gcuExperiment)
+                {
+                    CheckBox gcuExperimentBox = new() { Content = WpfStrings.MainWindow_xaml_Content_3, Style = (Style)FindResource("HeaderSwitch"), IsChecked = _owner.WideBatteryLimitSlider().Toggle, Margin = new Thickness(0, 8, 16, 0) };
+                    gcuExperimentBox.Click += (_, _) =>
+                    {
+                        _owner.WideSetChargeExperiment(gcuExperimentBox.IsChecked == true);
+                        if (gcuExperimentBox.IsChecked == true && _ecDirect != null) _ecDirect.IsChecked = false;
+                        UpdateChargeSliderVisibility();
+                    };
+                    _chargeExperiment = gcuExperimentBox;
+                    gcuExtraRow.Children.Add(gcuExperimentBox);
+                }
+                if (gcuEcDirect)
+                {
+                    CheckBox gcuEcDirectBox = new() { Content = WpfStrings.MainWindow_xaml_Content_4, Style = (Style)FindResource("HeaderSwitch"), IsChecked = _owner.WideEcDirectSupported && !AppConfig.Is("ec_charge_limit"), Margin = new Thickness(0, 8, 0, 0) };
+                    gcuEcDirectBox.Click += (_, _) =>
+                    {
+                        _owner.WideSetEcDirect(gcuEcDirectBox.IsChecked == true);
+                        if (gcuEcDirectBox.IsChecked == true && _chargeExperiment != null)
+                        {
+                            _chargeExperiment.IsChecked = false;
+                            UpdateChargeSliderVisibility();
+                        }
+                    };
+                    _ecDirect = gcuEcDirectBox;
+                    gcuExtraRow.Children.Add(gcuEcDirectBox);
+                }
+                battery.Children.Add(gcuExtraRow);
+            }
+            if (gcuExperiment)
+            {
+                (bool gcuSliderOn, int gcuSliderValue) = _owner.WideBatteryLimitSlider();
+                _chargeSlider = new Slider { Minimum = 40, Maximum = 100, Value = gcuSliderValue, Width = 190, Margin = new Thickness(0, 8, 6, 0), Style = (Style)FindResource("RoundSlider"), Visibility = gcuSliderOn ? Visibility.Visible : Visibility.Collapsed };
+                _chargeSlider.ValueChanged += (_, _) =>
+                {
+                    _owner.WideSetBatteryLimitSlider((int)Math.Round(_chargeSlider.Value));
+                    if (_chargeSliderText != null) _chargeSliderText.Text = (int)Math.Round(_chargeSlider.Value) + "%";
+                };
+                _chargeSliderText = new TextBlock { Text = gcuSliderValue + "%", Style = (Style)FindResource("MutedText"), Width = 46, VerticalAlignment = VerticalAlignment.Center, Visibility = gcuSliderOn ? Visibility.Visible : Visibility.Collapsed };
+                StackPanel gcuSliderRow = new() { Orientation = Orientation.Horizontal };
+                gcuSliderRow.Children.Add(_chargeSlider);
+                gcuSliderRow.Children.Add(_chargeSliderText);
+                battery.Children.Add(gcuSliderRow);
+            }
+        }
+
         Grid batteryLayout = new();
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         batteryLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });

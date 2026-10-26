@@ -853,7 +853,7 @@ public partial class OriginalStyleWindow : Window
         {
             try
             {
-                if (!WideChargeLimitVisible)
+                if (!WideChargeLimitVisible && !WideEcTransportSupported)
                 {
                     return false;
                 }
@@ -890,7 +890,8 @@ public partial class OriginalStyleWindow : Window
         {
             try
             {
-                return WideChargeLimitVisible && !MechrevoLite.Hardware.EcChargeLimit.IsLegacyGenerationBlocked();
+                return (WideChargeLimitVisible || WideEcTransportSupported)
+                    && !MechrevoLite.Hardware.EcChargeLimit.IsLegacyGenerationBlocked();
             }
             catch
             {
@@ -3112,11 +3113,6 @@ public partial class OriginalStyleWindow : Window
 
     private async void BatteryMode_Click(object sender, RoutedEventArgs e)
     {
-        if (ChargeSliderToggle.IsChecked == true)
-        {
-            StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_42;
-            return;
-        }
         if (sender is not ToggleButton button || button.Tag is not string text || _backendProbe == null)
         {
             return;
@@ -3130,14 +3126,30 @@ public partial class OriginalStyleWindow : Window
         }
         HighlightSegment(button);
         int mode = int.Parse(text);
+        int percentForMode = mode switch { 0 => 100, 1 => 80, 2 => 60, _ => 80 };
+        // 无极限充 / EC 限充生效时，三档只作为 EC 上限值来源，写 EC 0x7B9，不发 GCU 档位。
+        if (ChargeSliderToggle.IsChecked == true)
+        {
+            bool sliderOk = MechrevoLite.Battery.BatteryControl.CaptureChargeLimitGesture()
+                && MechrevoLite.Battery.BatteryControl.ApplyChargeLimitFromUserGesture(percentForMode);
+            if (sliderOk)
+            {
+                BatteryLimitSlider.Value = Math.Clamp(percentForMode, 40, 100);
+                StatusText.Text = WpfStrings.BatteryModeSent;
+            }
+            else
+            {
+                StatusText.Text = WpfStrings.BatteryModeFailed;
+            }
+            return;
+        }
         // GCU 与宝龙达是两套：宝龙达走自身阈值面板；GCU 若已打开 EC 限充，三档改走 EC 直写，
         // 否则仍走 GCU 官方 BatteryProtection。
         if (_backendProbe.Hw?.UsesBaolongda != true
             && MechrevoLite.Battery.BatteryControl.LockEnabled())
         {
-            int percent = mode switch { 0 => 100, 1 => 80, 2 => 60, _ => 80 };
             bool ecOk = MechrevoLite.Battery.BatteryControl.CaptureChargeLimitGesture()
-                && MechrevoLite.Battery.BatteryControl.ApplyChargeLimitFromUserGesture(percent);
+                && MechrevoLite.Battery.BatteryControl.ApplyChargeLimitFromUserGesture(percentForMode);
             StatusText.Text = ecOk ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
             return;
         }
