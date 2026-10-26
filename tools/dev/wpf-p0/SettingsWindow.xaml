@@ -440,6 +440,14 @@
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,6,0,0">
+                            <TextBlock Text="托盘图标传感器参数" VerticalAlignment="Center" />
+                            <CheckBox x:Name="TraySensorTooltipCheck" Content="显示" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Click="TraySensorTooltip_Click" />
+                        </Grid>
+                        <TextBlock Text="关闭后，悬浮窗也关闭且主界面在后台时暂停传感器读取"
+                                   Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                        <Grid Margin="0,6,0,0">
                             <TextBlock Text="刷新间隔" VerticalAlignment="Center" />
                             <ComboBox x:Name="OverlayIntervalCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
                                       SelectionChanged="OverlayInterval_Changed">

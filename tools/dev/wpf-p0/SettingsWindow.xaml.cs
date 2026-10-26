@@ -153,6 +153,7 @@ public partial class SettingsWindow : Window
         FollowSystemCheck.IsChecked = AppConfig.Is("ui_theme_follow_system");
         StartupCheck.IsChecked = Startup.IsScheduled();
         WaterCoolingCheck.IsChecked = AppConfig.Is("force_liquid_cooling_menu");
+        TraySensorTooltipCheck.IsChecked = _owner.WideTraySensorEnabled;
         DisplayCard.Visibility = _owner.SupportsLcdOverdrive || _owner.SupportsMiniled || _owner.SupportsFhd || _owner.SupportsHdrControl
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -799,6 +800,18 @@ public partial class SettingsWindow : Window
     private void Hotkeys_Click(object sender, RoutedEventArgs e)
     {
         new HotkeySettingsWindow { Owner = this }.ShowDialog();
+    }
+
+    private void TraySensorTooltip_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncing)
+        {
+            return;
+        }
+        _owner.WideSetTraySensorEnabled(TraySensorTooltipCheck.IsChecked == true);
+        Status(TraySensorTooltipCheck.IsChecked == true
+            ? "托盘图标显示传感器参数已开启"
+            : "托盘图标显示传感器参数已关闭；后台无悬浮窗时暂停传感器读取");
     }
 
     private void OpenFeedback_Click(object sender, RoutedEventArgs e)

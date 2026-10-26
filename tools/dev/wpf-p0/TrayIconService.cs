@@ -103,6 +103,29 @@ internal sealed class TrayIconService : IDisposable
         RebuildMenu();
     }
 
+    internal void SetTooltip(string? text)
+    {
+        if (_disposed || _icon == null)
+        {
+            return;
+        }
+        try
+        {
+            string value = string.IsNullOrWhiteSpace(text) ? "L-Mechrevo" : text!;
+            if (value.Length > 63)
+            {
+                value = value.Substring(0, 63);
+            }
+            if (!string.Equals(_icon.Text, value, StringComparison.Ordinal))
+            {
+                _icon.Text = value;
+            }
+        }
+        catch
+        {
+        }
+    }
+
     internal void SetTheme(bool dark)
     {
         try

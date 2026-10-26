@@ -156,10 +156,16 @@ public partial class OriginalStyleWindow : Window
         ApplyButtonOpacity();
         _backendTimer.Tick += (_, _) =>
         {
-            if (_backendProbe != null)
+            if (_backendProbe == null)
             {
-                RefreshFromBackend();
+                return;
             }
+            if (!HasVisibleSensorConsumer())
+            {
+                _trayIcon?.SetTooltip("L-Mechrevo");
+                return;
+            }
+            RefreshFromBackend();
         };
         _lightingIdleTimer.Tick += (_, _) => CheckLightingIdle();
         _lightingIdleTimer.Start();
@@ -2769,6 +2775,54 @@ public partial class OriginalStyleWindow : Window
         return "外接电源";
     }
 
+    internal bool WideTraySensorEnabled => MechrevoLite.AppConfig.Get("tray_sensor_tooltip", 1) == 1;
+
+    internal void WideSetTraySensorEnabled(bool enabled)
+    {
+        MechrevoLite.AppConfig.Set("tray_sensor_tooltip", enabled ? 1 : 0);
+        MechrevoLite.AppConfig.Flush();
+        if (!enabled)
+        {
+            _trayIcon?.SetTooltip("L-Mechrevo");
+        }
+        RefreshFromBackend();
+    }
+
+    private bool HasVisibleSensorConsumer()
+    {
+        if (IsVisible && WindowState != WindowState.Minimized)
+        {
+            return true;
+        }
+        if (_wideWindow?.IsVisible == true || _overlayWindow?.IsVisible == true)
+        {
+            return true;
+        }
+        return WideTraySensorEnabled;
+    }
+
+    private void UpdateTraySensorTooltip(BackendProbe probe)
+    {
+        if (!WideTraySensorEnabled || _trayIcon == null || probe.Hw == null)
+        {
+            _trayIcon?.SetTooltip("L-Mechrevo");
+            return;
+        }
+        try
+        {
+            MechrevoHw hw = probe.Hw;
+            int battery = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().Percent;
+            string text = "CPU " + hw.CpuTemp + "°C " + hw.CpuFanDuty + "% " + hw.CpuFanRpm + "rpm"
+                + " | GPU " + hw.GpuTemp + "°C " + hw.GpuFanDuty + "% " + hw.GpuFanRpm + "rpm"
+                + (battery >= 0 ? " | 电池 " + battery + "%" : "");
+            _trayIcon.SetTooltip(text);
+        }
+        catch
+        {
+            _trayIcon.SetTooltip("L-Mechrevo");
+        }
+    }
+
     private void RefreshFromBackend()
     {
         BackendProbe? probe = _backendProbe;
@@ -2777,6 +2831,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         BackendLine.Text = probe.Snapshot();
+        UpdateTraySensorTooltip(probe);
         HookHardwareState(probe.Hw);
         try
         {
@@ -5410,8 +5465,11 @@ public partial class OriginalStyleWindow : Window
         Opacity = 1;
         ShowInTaskbar = true;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width - Width) / 2;
-        Top = SystemParameters.WorkArea.Top + (SystemParameters.WorkArea.Height - Height) / 2;
+        Rect area = SystemParameters.WorkArea;
+        double compactWidth = double.IsNaN(Width) ? ActualWidth : Width;
+        double compactHeight = double.IsNaN(Height) ? ActualHeight : Height;
+        Left = area.Right - compactWidth - 16;
+        Top = area.Bottom - compactHeight - 16;
         Show();
         Activate();
     }
