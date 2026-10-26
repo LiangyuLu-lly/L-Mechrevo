@@ -2289,27 +2289,17 @@ public partial class MainWindow : Window
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) });
 
         StackPanel left = new();
-        Grid header = new();
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
         ToggleButton power = new()
         {
             Content = WpfStrings.PowerOn,
             Style = (Style)FindResource("SegmentButton"),
-            IsChecked = powerOn
+            IsChecked = powerOn,
+            Margin = new Thickness(12, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
         };
-        // ⭐⭐ task-17：完整编辑器 / HID 编辑入口（仅能力支持的通道；与 WideApplyLightAsync 的能力判据同源）✅
-        StackPanel headerActions = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        Button? editorButton = BuildLightEditorButton(topic, title, effects, hidKeyboard, whiteKeyboard);
-        if (editorButton != null)
-        {
-            editorButton.Margin = new Thickness(0, 0, 8, 0);
-            headerActions.Children.Add(editorButton);
-        }
-        headerActions.Children.Add(power);
-        Grid.SetColumn(headerActions, 1);
-        header.Children.Add(headerActions);
+        StackPanel header = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        header.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle"), VerticalAlignment = VerticalAlignment.Center });
+        header.Children.Add(power);
         powerRef = power;
         left.Children.Add(header);
         TextBlock hint = new()
