@@ -117,6 +117,8 @@ public partial class OriginalStyleWindow : Window
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private bool _batteryLimitLoaded;
+    private bool? _chargeLimitChannelProbe;
+    private long _chargeLimitChannelProbeTick;
     private BackendProbe? _backendProbe;
     // 托盘/后台默认 2s；悬浮窗打开时临时提到 1s。
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
@@ -779,20 +781,49 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    /// <summary>
+    /// 充电阈值 UI 分流：宝龙达白名单直接可用；其它机型只有 EC 通道**真实可读**时才显示，
+    /// 避免出现“能点但读取失败：需要 PawnIO/本机型不支持”的控件。
+    /// </summary>
+    private bool IsChargeLimitChannelAvailable(MechrevoHw? hw)
+    {
+        if (hw == null)
+        {
+            return false;
+        }
+        try
+        {
+            if (MechrevoLite.BatteryLimitPanel.IsSupportedBoard(hw))
+            {
+                return true;
+            }
+            if (!MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine())
+            {
+                return false;
+            }
+            long now = Environment.TickCount64;
+            if (_chargeLimitChannelProbe is bool cached && now - _chargeLimitChannelProbeTick < 10000)
+            {
+                return cached;
+            }
+            bool readable = MechrevoLite.Hardware.BatteryLimitWriter.TryReadState(out _, out _, out _, out _);
+            _chargeLimitChannelProbe = readable;
+            _chargeLimitChannelProbeTick = now;
+            return readable;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal bool WideChargeLimitVisible
     {
         get
         {
             try
             {
-                MechrevoHw? hw = _backendProbe?.Hw;
-                if (hw == null)
-                {
-                    return false;
-                }
-                // 宝龙达白名单或本机 EC 通道可用（同方/GCU 机型）；不可用机型仍隐藏。
-                return MechrevoLite.BatteryLimitPanel.IsSupportedBoard(hw)
-                    || MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine();
+                return IsChargeLimitChannelAvailable(_backendProbe?.Hw);
             }
             catch
             {
@@ -1997,8 +2028,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             MechrevoHw? hw = _backendProbe?.Hw;
-            supported = hw != null && (BatteryLimitPanel.IsSupportedBoard(hw)
-                || MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine());
+            supported = IsChargeLimitChannelAvailable(hw);
         }
         catch
         {
@@ -2023,9 +2053,7 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            if (_backendProbe?.Hw == null
-                || (!BatteryLimitPanel.IsSupportedBoard(_backendProbe.Hw)
-                    && !MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine()))
+            if (_backendProbe?.Hw == null || !IsChargeLimitChannelAvailable(_backendProbe.Hw))
             {
                 return;
             }

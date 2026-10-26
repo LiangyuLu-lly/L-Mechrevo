@@ -433,7 +433,7 @@
     <value>切换浅色</value>
   </data>
   <data name="MainWindow_Text_6" xml:space="preserve">
-    <value>L-Mechrevo · 宽屏</value>
+    <value>L-Mechrevo</value>
   </data>
   <data name="LightSyncEditButton_Content" xml:space="preserve">
     <value>编辑</value>
@@ -1219,7 +1219,7 @@
     <value>保存成功，但后端未连接，未下发</value>
   </data>
   <data name="MainWindow_xaml_Text" xml:space="preserve">
-    <value>就绪 · 宽屏四页布局</value>
+    <value>就绪</value>
   </data>
   <data name="MainWindow_xaml_Text_2" xml:space="preserve">
     <value>占空比 </value>

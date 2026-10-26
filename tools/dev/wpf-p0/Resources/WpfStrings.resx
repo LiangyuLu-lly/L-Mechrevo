@@ -433,7 +433,7 @@
     <value>Toggle light</value>
   </data>
   <data name="MainWindow_Text_6" xml:space="preserve">
-    <value>L-Mechrevo · Wide</value>
+    <value>L-Mechrevo</value>
   </data>
   <data name="LightSyncEditButton_Content" xml:space="preserve">
     <value>Edit</value>
@@ -1219,7 +1219,7 @@
     <value>Saved, but the backend is not connected so nothing was sent</value>
   </data>
   <data name="MainWindow_xaml_Text" xml:space="preserve">
-    <value>Ready · Wide four-page layout</value>
+    <value>Ready</value>
   </data>
   <data name="MainWindow_xaml_Text_2" xml:space="preserve">
     <value>Duty</value>

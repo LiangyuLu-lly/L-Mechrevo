@@ -1616,7 +1616,14 @@ public partial class MainWindow : Window
         {
             _batteryModeButtons[i].IsChecked = i == batteryMode;
         }
-        if (_chargeLimitText != null) _chargeLimitText.Text = _owner.WideBattery().Charge;
+        if (_chargeLimitText != null)
+        {
+            string chargeText = _owner.WideBattery().Charge;
+            _chargeLimitText.Text = chargeText;
+            _chargeLimitText.Visibility = !string.IsNullOrWhiteSpace(chargeText)
+                && !string.Equals(chargeText, _chargeStatus?.Text, StringComparison.Ordinal)
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
         (string info, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
         DisplayInfoText.Text = info;
         if (_displayBrightnessText != null) _displayBrightnessText.Text = brightness + "%";
