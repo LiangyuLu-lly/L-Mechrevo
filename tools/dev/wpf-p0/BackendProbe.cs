@@ -217,6 +217,29 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal void MarkUserModeSwitch()
+    {
+        try
+        {
+            _service?.MarkUserModeSwitch();
+        }
+        catch
+        {
+        }
+    }
+
+    internal async Task<int> RefreshCurrentModeAsync()
+    {
+        try
+        {
+            return _service == null ? -1 : await _service.RefreshCurrentModeAsync(_service.CurrentMode).ConfigureAwait(false);
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
     internal async Task<MechrevoService.ModeSwitchResult> SwitchModeResultAsync(int mode)
     {
         try

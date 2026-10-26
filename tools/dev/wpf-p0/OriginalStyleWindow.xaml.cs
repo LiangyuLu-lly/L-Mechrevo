@@ -2364,6 +2364,7 @@ public partial class OriginalStyleWindow : Window
         _pendingMode = mode;
         _pendingModeTick = Environment.TickCount64;
         _modeSwitchInFlight = true;
+        _backendProbe?.MarkUserModeSwitch();
         try
         {
             MechrevoService.ModeSwitchResult result = await _backendProbe!.SwitchModeResultAsync(mode);
@@ -2380,6 +2381,12 @@ public partial class OriginalStyleWindow : Window
             BackendStatus.Text = ok ? "模式已下发" : "模式下发失败";
             if (!ok)
             {
+                // 旧版失败后会 RefreshCurrentModeAsync 再回填；不能拿缓存的 CurrentMode 直接回弹。
+                int actualMode = await _backendProbe!.RefreshCurrentModeAsync();
+                if (actualMode >= 0)
+                {
+                    Logger.WriteLine("[perfmode] 切档失败，回读实际档=" + actualMode);
+                }
                 _pendingMode = -1;
             }
             if (ok)
