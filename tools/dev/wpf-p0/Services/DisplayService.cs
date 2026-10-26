@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using MechrevoLite;
 using MechrevoLite.Display;
 using MechrevoLite.Hardware;
+using L_Mechrevo.WpfP0.Resources;
 
 namespace L_Mechrevo.WpfP0.Services;
 
@@ -65,12 +66,12 @@ internal sealed class DisplayService : IDisplayService
 {
     private static readonly DisplayEffectOption[] EffectModes =
     {
-        new("VibrantMode", "多彩"),
-        new("InternetMode", "上网"),
-        new("VideoMode", "视频"),
-        new("LowBlueMode", "低蓝光"),
-        new("CinemaMode", "影院"),
-        new("PhotoMode", "照片")
+        new("VibrantMode", WpfStrings.DisplayVibrant),
+        new("InternetMode", WpfStrings.DisplayInternet),
+        new("VideoMode", WpfStrings.DisplayVideo),
+        new("LowBlueMode", WpfStrings.DisplayLowBlue),
+        new("CinemaMode", WpfStrings.DisplayCinema),
+        new("PhotoMode", WpfStrings.DisplayPhoto)
     };
 
     private readonly BackendAccessor _backend;

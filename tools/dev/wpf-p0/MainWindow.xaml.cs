@@ -545,8 +545,8 @@ public partial class MainWindow : Window
         _dark = !_dark;
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
-        ThemeButton.Content = _dark ? "切换浅色" : "切换深色";
-        StatusText.Text = "L-Mechrevo · " + (_dark ? "深色" : "浅色") + "主题";
+        ThemeButton.Content = _dark ? WpfStrings.ToggleLightTheme : WpfStrings.ToggleDarkTheme;
+        StatusText.Text = "L-Mechrevo · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme) + WpfStrings.ThemeWord;
     }
 
     private void AccentButton_Click(object sender, RoutedEventArgs e)
@@ -605,8 +605,8 @@ public partial class MainWindow : Window
             "home" => "首页 · 传感器 / 性能 / 显卡 / 显示",
             "screen" => "屏幕 · 刷新率 / 亮度 / 校色 / 色彩增强",
             "lighting" => "灯光 · 页面内直接编辑",
-            "custom" => "自定义 · 自定义模式 / 风扇曲线",
-            "switches" => "更多开关 · 磁贴布局",
+            "custom" => WpfStrings.NavCustom_Content + " · " + WpfStrings.CustomPageView_Text_5 + " / " + WpfStrings.CustomPageView_Text,
+            "switches" => WpfStrings.NavSwitches_Content + " · " + WpfStrings.SwitchesPageView_Text,
             _ => "就绪"
         };
     }
@@ -2074,82 +2074,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private void BuildCustomModeList()
-    {
-        if (CustomModeListPanel == null) return;
-        CustomModeListPanel.Children.Clear();
-        List<MechrevoLite.Mode.PerfModeDefinition> customs = new();
-        try
-        {
-            MechrevoLite.Mode.PerfModeService? service = MechrevoLite.Mode.PerfModeService.Instance;
-            if (service != null)
-            {
-                customs.AddRange(service.Modes.Where(mode => mode.IsCustom));
-            }
-        }
-        catch
-        {
-        }
-        if (customs.Count == 0)
-        {
-            CustomModeListPanel.Children.Add(new TextBlock
-            {
-                Text = WpfStrings.MainWindow_xaml_Text_18,
-                Style = (Style)FindResource("MutedText"),
-                Margin = new Thickness(0, 0, 0, 6)
-            });
-            return;
-        }
-        foreach (MechrevoLite.Mode.PerfModeDefinition custom in customs)
-        {
-            string modeId = custom.Id;
-            string name = string.IsNullOrWhiteSpace(custom.UserName)
-                ? MechrevoLite.Mode.PerfModeText.Name(custom)
-                : custom.UserName;
-            Grid row = new() { Margin = new Thickness(0, 0, 0, 8) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            TextBlock label = new()
-            {
-                Text = name,
-                Style = (Style)FindResource("MutedText"),
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis
-            };
-            Button edit = new()
-            {
-                Content = WpfStrings.MainWindow_xaml_Content_7,
-                Style = (Style)FindResource("GhostButton"),
-                Padding = new Thickness(12, 5, 12, 5)
-            };
-            edit.Click += (_, _) =>
-            {
-                try
-                {
-                    new CustomModeWindow(modeId) { Owner = this }.ShowDialog();
-                    BuildCustomModeList();
-                    StatusText.Text = WpfStrings.MainWindow_xaml_Text_19;
-                }
-                catch (Exception ex)
-                {
-                    StatusText.Text = WpfStrings.MainWindow_xaml_Text_20 + ex.Message;
-                }
-            };
-            Grid.SetColumn(label, 0);
-            Grid.SetColumn(edit, 1);
-            row.Children.Add(label);
-            row.Children.Add(edit);
-            CustomModeListPanel.Children.Add(row);
-        }
-    }
-
     private void CustomMode_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             new CustomModeWindow { Owner = this }.ShowDialog();
-            BuildCustomModeList();
-            StatusText.Text = WpfStrings.MainWindow_xaml_Text_19;
+                StatusText.Text = WpfStrings.MainWindow_xaml_Text_19;
         }
         catch (Exception ex)
         {

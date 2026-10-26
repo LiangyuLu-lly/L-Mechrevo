@@ -169,6 +169,7 @@ public static class WpfStrings
     public static string OriginalStyleWindow_Text_8 => Get("OriginalStyleWindow_Text_8");
     public static string LiquidStatusButton_Content => Get("LiquidStatusButton_Content");
     public static string OriginalStyleWindow_Text_9 => Get("OriginalStyleWindow_Text_9");
+    public static string EcDirectOff => Get("EcDirectOff");
     public static string EcDirectOffToggle_Content => Get("EcDirectOffToggle_Content");
     public static string ChargeSliderToggle_Content => Get("ChargeSliderToggle_Content");
     public static string ChargeLimitStatus_Text => Get("ChargeLimitStatus_Text");
@@ -568,7 +569,6 @@ public static class WpfStrings
     public static string BatteryBalanced => Get("BatteryBalanced");
     public static string BatteryWorkstation => Get("BatteryWorkstation");
     public static string ChargeExperimental => Get("ChargeExperimental");
-    public static string EcDirectOff => Get("EcDirectOff");
     public static string LiquidConnected => Get("LiquidConnected");
     public static string LiquidDisconnected => Get("LiquidDisconnected");
     public static string QuickGroupInput => Get("QuickGroupInput");
@@ -623,4 +623,17 @@ public static class WpfStrings
     public static string StateAuto => Get("StateAuto");
     public static string StateUnknown => Get("StateUnknown");
     public static string NavMoreSwitches => Get("NavMoreSwitches");
+    public static string LightTheme => Get("LightTheme");
+    public static string DarkTheme => Get("DarkTheme");
+    public static string ToggleLightTheme => Get("ToggleLightTheme");
+    public static string ToggleDarkTheme => Get("ToggleDarkTheme");
+    public static string ThemeWord => Get("ThemeWord");
+    public static string DisplayVibrant => Get("DisplayVibrant");
+    public static string DisplayInternet => Get("DisplayInternet");
+    public static string DisplayVideo => Get("DisplayVideo");
+    public static string DisplayLowBlue => Get("DisplayLowBlue");
+    public static string DisplayCinema => Get("DisplayCinema");
+    public static string DisplayPhoto => Get("DisplayPhoto");
+    public static string Choose => Get("Choose");
+    public static string TrayMenu => Get("TrayMenu");
 }

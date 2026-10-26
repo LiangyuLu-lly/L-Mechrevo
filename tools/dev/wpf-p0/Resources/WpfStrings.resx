@@ -127,13 +127,13 @@
     <value>Fan switch sensitivity</value>
   </data>
   <data name="CustomModeWindow_Text_5" xml:space="preserve">
-    <value>风扇 / 超频</value>
+    <value>Fan / OC</value>
   </data>
   <data name="CustomModeWindow_Text_6" xml:space="preserve">
-    <value>GPU 功耗上限 (W)</value>
+    <value>GPU power limit (W)</value>
   </data>
   <data name="CustomModeWindow_Text_7" xml:space="preserve">
-    <value>GPU 功耗上限 TGP (W)</value>
+    <value>GPU power limit TGP (W)</value>
   </data>
   <data name="CustomModeWindow_Text_8" xml:space="preserve">
     <value>GPU dynamic boost</value>
@@ -142,7 +142,7 @@
     <value>CPU temperature wall</value>
   </data>
   <data name="CustomModeWindow_Text_9" xml:space="preserve">
-    <value>温度 / GPU 动态加速</value>
+    <value>Temperature / GPU dynamic boost</value>
   </data>
   <data name="CustomModeWindow_Text_10" xml:space="preserve">
     <value>SMU 快速时间 (s)</value>
@@ -157,7 +157,7 @@
     <value>STAPM 时间窗 (s)</value>
   </data>
   <data name="CustomModeWindow_Text_14" xml:space="preserve">
-    <value>CPU 峰值功耗 fPPT (W)</value>
+    <value>CPU peak power fPPT (W)</value>
   </data>
   <data name="Pl2Label_Text" xml:space="preserve">
     <value>CPU power wall PL2 (W)</value>
@@ -166,7 +166,7 @@
     <value>CPU power wall PL1 (W)</value>
   </data>
   <data name="CustomModeWindow_Text_15" xml:space="preserve">
-    <value>CPU 功耗</value>
+    <value>CPU power</value>
   </data>
   <data name="CustomModeWindow_Content_3" xml:space="preserve">
     <value>On</value>
@@ -202,7 +202,7 @@
     <value>Turbo disabled (CPU stays at base frequency)</value>
   </data>
   <data name="CustomModeWindow_Text_18" xml:space="preserve">
-    <value>CPU 睿频模式</value>
+    <value>CPU boost mode</value>
   </data>
   <data name="CustomModeWindow_Text_19" xml:space="preserve">
     <value>Power plan</value>
@@ -235,7 +235,7 @@
     <value>Mode</value>
   </data>
   <data name="CustomModeWindow_Text_23" xml:space="preserve">
-    <value>性能模式 · 自定义</value>
+    <value>Performance mode · Custom</value>
   </data>
   <data name="CustomModeWindow_Title" xml:space="preserve">
     <value>Mode</value>
@@ -247,16 +247,16 @@
     <value>Vibrancy</value>
   </data>
   <data name="PushFanCurveCheck_Content" xml:space="preserve">
-    <value>下发风扇曲线</value>
+    <value>Push fan curve</value>
   </data>
   <data name="WujieIndependentCheck_Content" xml:space="preserve">
     <value>CPU/GPU 独立控制</value>
   </data>
   <data name="FanCurveWindow_Text" xml:space="preserve">
-    <value>GPU 风扇</value>
+    <value>GPU fan</value>
   </data>
   <data name="FanCurveWindow_Text_2" xml:space="preserve">
-    <value>CPU 风扇</value>
+    <value>CPU fan</value>
   </data>
   <data name="HintText_Text" xml:space="preserve">
     <value>拖动曲线点调整占空比；温度轴来自硬件。</value>
@@ -490,7 +490,7 @@
     <value>Liquid cooling system</value>
   </data>
   <data name="EcDirectOffToggle_Content" xml:space="preserve">
-    <value>关闭 EC 直写充电上限（写入异常时用）</value>
+    <value>Turn off EC direct charging limit (use if writes fail)</value>
   </data>
   <data name="ChargeSliderToggle_Content" xml:space="preserve">
     <value>Enable stepless charge limit (experimental)</value>
@@ -571,7 +571,7 @@
     <value>Camera</value>
   </data>
   <data name="OriginalStyleWindow_Text_20" xml:space="preserve">
-    <value>强冷</value>
+    <value>Strong cooling</value>
   </data>
   <data name="OriginalStyleWindow_Text_21" xml:space="preserve">
     <value>Quick switches</value>
@@ -595,7 +595,7 @@
     <value>Light</value>
   </data>
   <data name="WideButton_Content" xml:space="preserve">
-    <value>宽屏</value>
+    <value>Wide</value>
   </data>
   <data name="BackendStatus_Text" xml:space="preserve">
     <value>● GCU status unknown</value>
@@ -784,7 +784,7 @@
     <value>勾选要显示在托盘右键菜单中的项目</value>
   </data>
   <data name="SettingsWindow_Text_25" xml:space="preserve">
-    <value>托盘菜单</value>
+    <value>Tray menu</value>
   </data>
   <data name="SettingsWindow_Text_26" xml:space="preserve">
     <value>按钮不透明度</value>
@@ -802,7 +802,7 @@
     <value>Clear</value>
   </data>
   <data name="SettingsWindow_Content_20" xml:space="preserve">
-    <value>选择...</value>
+    <value>Choose...</value>
   </data>
   <data name="WideBackgroundPathText_Text" xml:space="preserve">
     <value>未选择</value>
@@ -862,31 +862,31 @@
     <value>发现新版本</value>
   </data>
   <data name="CustomPageView_Content" xml:space="preserve">
-    <value>打开 GPU 风扇曲线</value>
+    <value>Open GPU fan curve</value>
   </data>
   <data name="CustomPageView_Text" xml:space="preserve">
-    <value>温度 / 转速曲线与平滑</value>
+    <value>Temperature / RPM curve and smoothing</value>
   </data>
   <data name="CustomPageView_Text_2" xml:space="preserve">
-    <value>GPU 风扇曲线</value>
+    <value>GPU fan curve</value>
   </data>
   <data name="CustomPageView_Content_2" xml:space="preserve">
-    <value>打开 CPU 风扇曲线</value>
+    <value>Open CPU fan curve</value>
   </data>
   <data name="CustomPageView_Text_3" xml:space="preserve">
-    <value>CPU 风扇曲线</value>
+    <value>CPU fan curve</value>
   </data>
   <data name="CustomPageView_Content_3" xml:space="preserve">
-    <value>新建 / 管理自定义模式</value>
+    <value>New / Manage custom modes</value>
   </data>
   <data name="CustomPageView_Text_4" xml:space="preserve">
-    <value>CPU / GPU 功耗与模式参数</value>
+    <value>CPU / GPU power and mode parameters</value>
   </data>
   <data name="CustomPageView_Text_5" xml:space="preserve">
-    <value>自定义模式</value>
+    <value>Custom modes</value>
   </data>
   <data name="CustomPageView_Text_6" xml:space="preserve">
-    <value>自定义性能模式与风扇曲线</value>
+    <value>Custom performance modes and fan curves</value>
   </data>
   <data name="HomePageView_Content" xml:space="preserve">
     <value>Integrated</value>
@@ -1078,10 +1078,10 @@
     <value>打开 CPU 调节失败：</value>
   </data>
   <data name="FanCurveWindow_xaml_Text" xml:space="preserve">
-    <value>后端未连接，无法读取风扇曲线。</value>
+    <value>Backend not connected. Cannot read fan curve.</value>
   </data>
   <data name="FanCurveWindow_xaml_Text_2" xml:space="preserve">
-    <value>有未应用的修改</value>
+    <value>Fan curve changed; push to apply.</value>
   </data>
   <data name="FanCurveWindow_xaml_MessageBoxShowthis" xml:space="preserve">
     <value>风扇曲线还有未应用的修改，确定关闭？</value>
@@ -1850,5 +1850,44 @@
   </data>
   <data name="NavMoreSwitches" xml:space="preserve">
     <value>More switches</value>
+  </data>
+  <data name="LightTheme" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="DarkTheme" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="ToggleLightTheme" xml:space="preserve">
+    <value>Switch to light</value>
+  </data>
+  <data name="ToggleDarkTheme" xml:space="preserve">
+    <value>Switch to dark</value>
+  </data>
+  <data name="ThemeWord" xml:space="preserve">
+    <value>theme</value>
+  </data>
+  <data name="DisplayVibrant" xml:space="preserve">
+    <value>Vibrant</value>
+  </data>
+  <data name="DisplayInternet" xml:space="preserve">
+    <value>Internet</value>
+  </data>
+  <data name="DisplayVideo" xml:space="preserve">
+    <value>Video</value>
+  </data>
+  <data name="DisplayLowBlue" xml:space="preserve">
+    <value>Low blue light</value>
+  </data>
+  <data name="DisplayCinema" xml:space="preserve">
+    <value>Cinema</value>
+  </data>
+  <data name="DisplayPhoto" xml:space="preserve">
+    <value>Photo</value>
+  </data>
+  <data name="Choose" xml:space="preserve">
+    <value>Choose...</value>
+  </data>
+  <data name="TrayMenu" xml:space="preserve">
+    <value>Tray menu</value>
   </data>
 </root>

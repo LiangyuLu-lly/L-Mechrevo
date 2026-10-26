@@ -63,10 +63,9 @@ public partial class MainWindow
 
     private Pages.CustomPageView? _customView;
     private ScrollViewer CustomPage = null!;
-    private Button CustomPageEventControl1 = null!;
-    private StackPanel CustomModeListPanel = null!;
-    private Button CustomPageEventControl2 = null!;
-    private Button CustomPageEventControl3 = null!;
+    private ContentControl CustomModeHost = null!;
+    private ContentControl CpuFanCurveHost = null!;
+    private ContentControl GpuFanCurveHost = null!;
 
     private void EnsureHomeView()
     {
@@ -148,12 +147,11 @@ public partial class MainWindow
         if (_customView != null) return;
         _customView = new Pages.CustomPageView();
         CustomPage = _customView.CustomPage;
-        CustomPageEventControl1 = _customView.CustomPageEventControl1;
-        CustomModeListPanel = _customView.CustomModeListPanel;
-        CustomPageEventControl2 = _customView.CustomPageEventControl2;
-        CustomPageEventControl3 = _customView.CustomPageEventControl3;
+        CustomModeHost = _customView.CustomModeHost;
+        CpuFanCurveHost = _customView.CpuFanCurveHost;
+        GpuFanCurveHost = _customView.GpuFanCurveHost;
         CustomHost.Content = _customView;
-        BuildCustomModeList();
+        EmbedCustomEditors();
         WireCustomEvents();
     }
 
@@ -186,11 +184,47 @@ public partial class MainWindow
         LightingOffBatteryToggle.Click += LightingOffBatteryToggle_Click;
     }
 
+    private Window? _customModeInlineWindow;
+    private Window? _cpuFanInlineWindow;
+    private Window? _gpuFanInlineWindow;
+
+    private void EmbedCustomEditors()
+    {
+        try
+        {
+            if (CustomModeHost.Content == null)
+            {
+                _customModeInlineWindow = new CustomModeWindow();
+                MountWindowContent(_customModeInlineWindow, CustomModeHost);
+            }
+            if (CpuFanCurveHost.Content == null)
+            {
+                _cpuFanInlineWindow = new FanCurveWindow("balanced", showCpu: true, showGpu: false);
+                MountWindowContent(_cpuFanInlineWindow, CpuFanCurveHost);
+            }
+            if (GpuFanCurveHost.Content == null)
+            {
+                _gpuFanInlineWindow = new FanCurveWindow("balanced", showCpu: false, showGpu: true);
+                MountWindowContent(_gpuFanInlineWindow, GpuFanCurveHost);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "自定义编辑器加载失败：" + ex.Message;
+        }
+    }
+
+    private static void MountWindowContent(Window window, ContentControl host)
+    {
+        if (window.Content is UIElement content)
+        {
+            window.Content = null;
+            host.Content = content;
+        }
+    }
+
     private void WireCustomEvents()
     {
-        CustomPageEventControl1.Click += CustomMode_Click;
-        CustomPageEventControl2.Click += FanCurveCpu_Click;
-        CustomPageEventControl3.Click += FanCurveGpu_Click;
     }
 
 }

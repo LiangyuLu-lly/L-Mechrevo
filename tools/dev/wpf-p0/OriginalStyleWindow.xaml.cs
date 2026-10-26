@@ -133,7 +133,7 @@ public partial class OriginalStyleWindow : Window
         _dark = ResolveStartupDarkTheme();
         AppTheme.Apply(_dark);
         ApplySavedAccent();
-        ThemeButton.Content = _dark ? "浅色" : "深色";
+        ThemeButton.Content = _dark ? WpfStrings.LightTheme : WpfStrings.DarkTheme;
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         InitializeQuickTileDrag();
         Closed += (_, _) =>
@@ -3875,7 +3875,7 @@ public partial class OriginalStyleWindow : Window
         {
             DisplayEffectCombo.Items.Clear();
             string[] modes = { "VibrantMode", "InternetMode", "VideoMode", "LowBlueMode", "CinemaMode", "PhotoMode" };
-            string[] labels = { "多彩", "上网", "视频", "低蓝光", "影院", "照片" };
+            string[] labels = { WpfStrings.DisplayVibrant, WpfStrings.DisplayInternet, WpfStrings.DisplayVideo, WpfStrings.DisplayLowBlue, WpfStrings.DisplayCinema, WpfStrings.DisplayPhoto };
             for (int i = 0; i < modes.Length; i++)
             {
                 DisplayEffectCombo.Items.Add(new ComboBoxItem { Content = labels[i], Tag = modes[i] });
@@ -5522,12 +5522,12 @@ public partial class OriginalStyleWindow : Window
         ApplyDockOpacity();
         ApplyButtonOpacity();
         _trayIcon?.SetTheme(_dark);
-        ThemeButton.Content = _dark ? "浅色" : "深色";
+        ThemeButton.Content = _dark ? WpfStrings.LightTheme : WpfStrings.DarkTheme;
         AppConfig.Set("ui_dark_theme", _dark ? 1 : 0);
         AppConfig.Flush();
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
-        StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
+        StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme);
     }
 
     internal void SetBackgroundFromSettings(bool on)
@@ -5551,12 +5551,12 @@ public partial class OriginalStyleWindow : Window
         ApplyDockOpacity();
         ApplyButtonOpacity();
         _trayIcon?.SetTheme(_dark);
-        ThemeButton.Content = _dark ? "浅色" : "深色";
+        ThemeButton.Content = _dark ? WpfStrings.LightTheme : WpfStrings.DarkTheme;
         AppConfig.Set("ui_dark_theme", _dark ? 1 : 0);
         AppConfig.Flush();
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();
-        StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? "深色" : "浅色");
+        StatusText.Text = "0.293.5 / WPF P0 · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme);
     }
 
     private void WideButton_Click(object sender, RoutedEventArgs e) => ShowWideWindow();

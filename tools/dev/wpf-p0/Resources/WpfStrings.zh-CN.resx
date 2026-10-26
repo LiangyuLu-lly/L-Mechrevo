@@ -1851,4 +1851,43 @@
   <data name="NavMoreSwitches" xml:space="preserve">
     <value>更多开关</value>
   </data>
+  <data name="LightTheme" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="DarkTheme" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="ToggleLightTheme" xml:space="preserve">
+    <value>切换浅色</value>
+  </data>
+  <data name="ToggleDarkTheme" xml:space="preserve">
+    <value>切换深色</value>
+  </data>
+  <data name="ThemeWord" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="DisplayVibrant" xml:space="preserve">
+    <value>多彩</value>
+  </data>
+  <data name="DisplayInternet" xml:space="preserve">
+    <value>上网</value>
+  </data>
+  <data name="DisplayVideo" xml:space="preserve">
+    <value>视频</value>
+  </data>
+  <data name="DisplayLowBlue" xml:space="preserve">
+    <value>低蓝光</value>
+  </data>
+  <data name="DisplayCinema" xml:space="preserve">
+    <value>影院</value>
+  </data>
+  <data name="DisplayPhoto" xml:space="preserve">
+    <value>照片</value>
+  </data>
+  <data name="Choose" xml:space="preserve">
+    <value>选择...</value>
+  </data>
+  <data name="TrayMenu" xml:space="preserve">
+    <value>托盘菜单</value>
+  </data>
 </root>
