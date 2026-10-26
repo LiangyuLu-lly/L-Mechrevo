@@ -1977,4 +1977,73 @@
   <data name="PawnInstallFailed" xml:space="preserve">
     <value>PawnIO installation failed: </value>
   </data>
+  <data name="QuickTileToggled" xml:space="preserve">
+    <value>Quick switch toggled: </value>
+  </data>
+  <data name="QuickTileToggleFailed" xml:space="preserve">
+    <value>Quick switch failed: </value>
+  </data>
+  <data name="MoreSwitchToggled" xml:space="preserve">
+    <value>More switch toggled: </value>
+  </data>
+  <data name="MoreSwitchToggleFailed" xml:space="preserve">
+    <value>More switch failed: </value>
+  </data>
+  <data name="QuickSwitchedOnPrefix" xml:space="preserve">
+    <value>On: </value>
+  </data>
+  <data name="QuickSwitchedOffPrefix" xml:space="preserve">
+    <value>Off: </value>
+  </data>
+  <data name="QuickBackendOffline" xml:space="preserve">
+    <value>Backend not connected</value>
+  </data>
+  <data name="QuickUnsupported" xml:space="preserve">
+    <value>Not supported on this device: </value>
+  </data>
+  <data name="QuickFanBoostBackendUnavailable" xml:space="preserve">
+    <value>Fan boost channel unavailable on this device</value>
+  </data>
+  <data name="QuickFanBoostOnConfirmed" xml:space="preserve">
+    <value>Fan boost enabled (read-back confirmed)</value>
+  </data>
+  <data name="QuickFanBoostOffConfirmed" xml:space="preserve">
+    <value>Fan boost disabled (original curve restored)</value>
+  </data>
+  <data name="QuickFanBoostOnUnconfirmed" xml:space="preserve">
+    <value>Fan boost sent but read-back not confirmed</value>
+  </data>
+  <data name="QuickFanBoostOffUnconfirmed" xml:space="preserve">
+    <value>Fan boost disable not confirmed</value>
+  </data>
+  <data name="QuickResultOn" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="QuickResultOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="QuickUnconfirmed" xml:space="preserve">
+    <value>Apply not confirmed: </value>
+  </data>
+  <data name="QuickApplyFailed" xml:space="preserve">
+    <value>Apply failed: </value>
+  </data>
+  <data name="IgpuSavingCurrentOn" xml:space="preserve">
+    <value>Current: On</value>
+  </data>
+  <data name="IgpuSavingCurrentOff" xml:space="preserve">
+    <value>Current: Off</value>
+  </data>
+  <data name="IgpuSavingCurrentAuto" xml:space="preserve">
+    <value>Current: Auto</value>
+  </data>
+  <data name="IgpuSavingCurrentUnknown" xml:space="preserve">
+    <value>Current: Unknown</value>
+  </data>
+  <data name="IgpuSavingCurrentUnsupported" xml:space="preserve">
+    <value>Current: not supported on this model</value>
+  </data>
+  <data name="AutoOption" xml:space="preserve">
+    <value>Auto</value>
+  </data>
 </root>

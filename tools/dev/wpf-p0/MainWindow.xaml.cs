@@ -675,7 +675,9 @@ public partial class MainWindow : Window
         if (sender is Button button && button.Tag is string key)
         {
             bool ok = _owner != null && await _owner.WideToggleQuickAsync(key);
-            StatusText.Text = ok ? "快捷开关已切换：" + key : "快捷开关失败：" + key;
+            // task-33：状态串走资源；key 的显示名也按当前语言取（英文模式不再拼中文 name）。
+            string label = QuickSwitchService.Label(key);
+            StatusText.Text = (ok ? WpfStrings.QuickTileToggled : WpfStrings.QuickTileToggleFailed) + label;
         }
     }
 
@@ -684,7 +686,8 @@ public partial class MainWindow : Window
         if (sender is Button button && button.Tag is string key)
         {
             bool ok = _owner != null && await _owner.WideToggleQuickAsync(key);
-            StatusText.Text = ok ? "更多开关已切换：" + key : "更多开关失败：" + key;
+            string label = QuickSwitchService.Label(key);
+            StatusText.Text = (ok ? WpfStrings.MoreSwitchToggled : WpfStrings.MoreSwitchToggleFailed) + label;
         }
     }
 
@@ -696,7 +699,7 @@ public partial class MainWindow : Window
         {
             MoreSwitchGrid.Children.Add(new TextBlock
             {
-                Text = group,
+                Text = QuickSwitchService.GroupTitle(group),
                 Style = (Style)FindResource("MutedText"),
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
@@ -706,9 +709,11 @@ public partial class MainWindow : Window
             foreach ((string key, string label, bool on) in items)
             {
                 string switchKey = key;
+                // task-33：迷你窗回退目录里的 label 是硬编码中文；按 key 重新取当前语言显示名。
+                string displayLabel = QuickSwitchService.Label(key, label);
                 ToggleButton tile = new()
                 {
-                    Content = label,
+                    Content = displayLabel,
                     Style = (Style)FindResource("SegmentButton"),
                     IsChecked = on,
                     Margin = new Thickness(0, 0, 8, 8),
@@ -722,7 +727,7 @@ public partial class MainWindow : Window
                         .SelectMany(groupItems => groupItems.Items)
                         .FirstOrDefault(item => item.Key == switchKey).On;
                     tile.IsChecked = actual;
-                    StatusText.Text = (actual ? "已开启：" : "已关闭：") + label;
+                    StatusText.Text = (actual ? WpfStrings.QuickSwitchedOnPrefix : WpfStrings.QuickSwitchedOffPrefix) + displayLabel;
                 };
                 row.Children.Add(tile);
             }
@@ -740,6 +745,8 @@ public partial class MainWindow : Window
         _quickTileButtons.Clear();
         foreach ((string key, string label, string glyph, bool on) in _owner.WideQuickTiles())
         {
+            // task-33：迷你窗目录 label 是硬编码中文；按 key 取当前语言显示名（en-US 下为英文）。
+            string displayLabel = QuickSwitchService.Label(key, label);
             TextBlock icon = new()
             {
                 Text = glyph,
@@ -749,9 +756,12 @@ public partial class MainWindow : Window
             };
             TextBlock state = new()
             {
-                Text = label + (on ? " · " + WpfStrings.StateOn : " · " + WpfStrings.StateOff),
+                Text = displayLabel + (on ? " · " + WpfStrings.StateOn : " · " + WpfStrings.StateOff),
                 FontSize = 9,
                 HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                // task-33：英文标签更长（如 Turn off display · Off）⇒ 允许两行，避免底部磁贴被裁字。
+                TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 4, 0, 0),
                 Style = (Style)FindResource("MutedText")
             };
@@ -778,7 +788,7 @@ public partial class MainWindow : Window
                 }
             };
             QuickTilesGrid.Children.Add(tile);
-            _quickTileButtons.Add((key, tile, state, label));
+            _quickTileButtons.Add((key, tile, state, displayLabel));
         }
         StackPanel customContent = new();
         customContent.Children.Add(new TextBlock
@@ -1100,9 +1110,16 @@ public partial class MainWindow : Window
         }
         if (_igpuSavingState != null)
         {
+            // task-33：动态状态串（开/关/自动/未知）走资源，中文保持原文。
             _igpuSavingState.Text = supported
-                ? mode switch { 0 => "当前：开", 1 => "当前：关", 3 => "当前：自动", _ => "当前：未知" }
-                : "当前：机型不支持";
+                ? mode switch
+                {
+                    0 => WpfStrings.IgpuSavingCurrentOn,
+                    1 => WpfStrings.IgpuSavingCurrentOff,
+                    3 => WpfStrings.IgpuSavingCurrentAuto,
+                    _ => WpfStrings.IgpuSavingCurrentUnknown
+                }
+                : WpfStrings.IgpuSavingCurrentUnsupported;
         }
     }
 
@@ -1724,14 +1741,14 @@ public partial class MainWindow : Window
         combos.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         TextBlock pumpLabel = new() { Text = WpfStrings.Pump, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         combos.Children.Add(pumpLabel);
-        _liquidPumpCombo = CreateLiquidCombo(new[] { ("自动", "-1"), ("45%", "0"), ("60%", "1"), ("90%", "2") });
+        _liquidPumpCombo = CreateLiquidCombo(new[] { (WpfStrings.AutoOption, "-1"), ("45%", "0"), ("60%", "1"), ("90%", "2") });
         _liquidPumpCombo.SelectionChanged += async (_, _) => await SetLiquidComboAsync(pump: true);
         Grid.SetColumn(_liquidPumpCombo, 1);
         combos.Children.Add(_liquidPumpCombo);
         TextBlock fanLabel = new() { Text = WpfStrings.Fan, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
         Grid.SetColumn(fanLabel, 2);
         combos.Children.Add(fanLabel);
-        _liquidFanCombo = CreateLiquidCombo(new[] { ("自动", "-1"), ("40%", "0"), ("50%", "1"), ("60%", "2"), ("90%", "3") });
+        _liquidFanCombo = CreateLiquidCombo(new[] { (WpfStrings.AutoOption, "-1"), ("40%", "0"), ("50%", "1"), ("60%", "2"), ("90%", "3") });
         _liquidFanCombo.SelectionChanged += async (_, _) => await SetLiquidComboAsync(pump: false);
         Grid.SetColumn(_liquidFanCombo, 3);
         combos.Children.Add(_liquidFanCombo);

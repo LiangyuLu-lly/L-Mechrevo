@@ -1977,4 +1977,73 @@
   <data name="PawnInstallFailed" xml:space="preserve">
     <value>PawnIO 安装失败：</value>
   </data>
+  <data name="QuickTileToggled" xml:space="preserve">
+    <value>快捷开关已切换：</value>
+  </data>
+  <data name="QuickTileToggleFailed" xml:space="preserve">
+    <value>快捷开关失败：</value>
+  </data>
+  <data name="MoreSwitchToggled" xml:space="preserve">
+    <value>更多开关已切换：</value>
+  </data>
+  <data name="MoreSwitchToggleFailed" xml:space="preserve">
+    <value>更多开关失败：</value>
+  </data>
+  <data name="QuickSwitchedOnPrefix" xml:space="preserve">
+    <value>已开启：</value>
+  </data>
+  <data name="QuickSwitchedOffPrefix" xml:space="preserve">
+    <value>已关闭：</value>
+  </data>
+  <data name="QuickBackendOffline" xml:space="preserve">
+    <value>后端未连接</value>
+  </data>
+  <data name="QuickUnsupported" xml:space="preserve">
+    <value>本机不支持该开关：</value>
+  </data>
+  <data name="QuickFanBoostBackendUnavailable" xml:space="preserve">
+    <value>本机强冷通道不可用</value>
+  </data>
+  <data name="QuickFanBoostOnConfirmed" xml:space="preserve">
+    <value>强冷已开启（回读确认）</value>
+  </data>
+  <data name="QuickFanBoostOffConfirmed" xml:space="preserve">
+    <value>强冷已关闭（已恢复原曲线）</value>
+  </data>
+  <data name="QuickFanBoostOnUnconfirmed" xml:space="preserve">
+    <value>强冷已下发但回读未确认</value>
+  </data>
+  <data name="QuickFanBoostOffUnconfirmed" xml:space="preserve">
+    <value>强冷关闭未确认</value>
+  </data>
+  <data name="QuickResultOn" xml:space="preserve">
+    <value>已开启</value>
+  </data>
+  <data name="QuickResultOff" xml:space="preserve">
+    <value>已关闭</value>
+  </data>
+  <data name="QuickUnconfirmed" xml:space="preserve">
+    <value>下发未确认：</value>
+  </data>
+  <data name="QuickApplyFailed" xml:space="preserve">
+    <value>下发异常：</value>
+  </data>
+  <data name="IgpuSavingCurrentOn" xml:space="preserve">
+    <value>当前：开</value>
+  </data>
+  <data name="IgpuSavingCurrentOff" xml:space="preserve">
+    <value>当前：关</value>
+  </data>
+  <data name="IgpuSavingCurrentAuto" xml:space="preserve">
+    <value>当前：自动</value>
+  </data>
+  <data name="IgpuSavingCurrentUnknown" xml:space="preserve">
+    <value>当前：未知</value>
+  </data>
+  <data name="IgpuSavingCurrentUnsupported" xml:space="preserve">
+    <value>当前：机型不支持</value>
+  </data>
+  <data name="AutoOption" xml:space="preserve">
+    <value>自动</value>
+  </data>
 </root>

@@ -665,4 +665,29 @@ public static class WpfStrings
     public static string PawnInstallDone => Get("PawnInstallDone");
     public static string PawnInstallReturn => Get("PawnInstallReturn");
     public static string PawnInstallFailed => Get("PawnInstallFailed");
+
+    // 2026-10-26（task-33）：快捷开关/更多开关动态中文收口（磁贴标签与 开/关/自动/未知 状态、下发结果）。
+    public static string QuickTileToggled => Get("QuickTileToggled");
+    public static string QuickTileToggleFailed => Get("QuickTileToggleFailed");
+    public static string MoreSwitchToggled => Get("MoreSwitchToggled");
+    public static string MoreSwitchToggleFailed => Get("MoreSwitchToggleFailed");
+    public static string QuickSwitchedOnPrefix => Get("QuickSwitchedOnPrefix");
+    public static string QuickSwitchedOffPrefix => Get("QuickSwitchedOffPrefix");
+    public static string QuickBackendOffline => Get("QuickBackendOffline");
+    public static string QuickUnsupported => Get("QuickUnsupported");
+    public static string QuickFanBoostBackendUnavailable => Get("QuickFanBoostBackendUnavailable");
+    public static string QuickFanBoostOnConfirmed => Get("QuickFanBoostOnConfirmed");
+    public static string QuickFanBoostOffConfirmed => Get("QuickFanBoostOffConfirmed");
+    public static string QuickFanBoostOnUnconfirmed => Get("QuickFanBoostOnUnconfirmed");
+    public static string QuickFanBoostOffUnconfirmed => Get("QuickFanBoostOffUnconfirmed");
+    public static string QuickResultOn => Get("QuickResultOn");
+    public static string QuickResultOff => Get("QuickResultOff");
+    public static string QuickUnconfirmed => Get("QuickUnconfirmed");
+    public static string QuickApplyFailed => Get("QuickApplyFailed");
+    public static string IgpuSavingCurrentOn => Get("IgpuSavingCurrentOn");
+    public static string IgpuSavingCurrentOff => Get("IgpuSavingCurrentOff");
+    public static string IgpuSavingCurrentAuto => Get("IgpuSavingCurrentAuto");
+    public static string IgpuSavingCurrentUnknown => Get("IgpuSavingCurrentUnknown");
+    public static string IgpuSavingCurrentUnsupported => Get("IgpuSavingCurrentUnsupported");
+    public static string AutoOption => Get("AutoOption");
 }

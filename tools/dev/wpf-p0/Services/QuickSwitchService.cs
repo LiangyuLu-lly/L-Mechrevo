@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using MechrevoLite.Hardware;
@@ -100,6 +101,77 @@ internal sealed class QuickSwitchService : IQuickSwitchService
 
     public IReadOnlyList<QuickSwitchItem> AllItems => FlatCatalog;
 
+    /// <summary>
+    /// ⭐ 按 key 取当前语言的显示名（task-33：英文模式快捷开关/更多开关动态标签收口）。
+    /// <para>⚠️ 迷你窗的快捷磁贴目录仍带着旧的中文 name（OriginalStyleWindow.QuickTileCatalog），
+    /// 宽屏只拿到 label 文本；这里按 key 重新取资源，保证 en-US 下显示 English ✅。
+    /// 未登记的 key 回退调用方给的 label（行为不变）。</para>
+    /// </summary>
+    internal static string Label(string key, string? fallback = null)
+    {
+        // ⭐ 中文保持原文：迷你窗目录里的中文短名（强冷/麦克风/息屏…）与「更多开关」里的长名不同，
+        //    zh 下必须沿用调用方 label（行为/文案零变化），只有非中文语言才换成资源里的译名 ✅。
+        //    ⚠️ 调用方没给 label 时（状态栏里带 key 的旧文案）zh 也继续显示 key，保持原文。
+        if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("zh", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(fallback) ? (key ?? string.Empty) : fallback!;
+        }
+
+        string text = (key ?? string.Empty).ToLowerInvariant() switch
+        {
+            "touchpad" => WpfStrings.QuickTouchpad,
+            "wifi" => WpfStrings.QuickWifi,
+            "bt" => WpfStrings.QuickBluetooth,
+            "webcam" => WpfStrings.QuickWebcam,
+            "micmute" => WpfStrings.QuickMicMute,
+            "numpad" => WpfStrings.QuickNumpad,
+            "touchpadtoggle" => WpfStrings.QuickTouchpadToggle,
+            "winkey" => WpfStrings.QuickWinKey,
+            "fnkey" => WpfStrings.QuickFnKey,
+            "capslock" => WpfStrings.QuickCapsLock,
+            "osd" => WpfStrings.QuickOsd,
+            "copilot" => WpfStrings.QuickCopilot,
+            "usb" => WpfStrings.QuickUsb,
+            "acrecovery" => WpfStrings.QuickAcRecovery,
+            "highperf" => WpfStrings.QuickHighPerf,
+            "apuboost" => WpfStrings.QuickApuBoost,
+            "fanboost" => WpfStrings.QuickFanBoost,
+            "deepsleep" => WpfStrings.QuickDeepSleep,
+            "gamewhitelist" => WpfStrings.QuickGameWhitelist,
+            "cpuadvperf" => WpfStrings.QuickCpuAdvPerf,
+            "taskbarautohide" => WpfStrings.QuickTaskbarAutoHide,
+            "transparency" => WpfStrings.QuickTransparency,
+            "darktheme" => WpfStrings.QuickDarkTheme,
+            "monitoroff" => WpfStrings.QuickMonitorOff,
+            "winupdate" => WpfStrings.QuickWinUpdate,
+            "sleepnetoff" => WpfStrings.QuickSleepNetOff,
+            "sleepaway" => WpfStrings.QuickSleepAway,
+            "sleepsysreq" => WpfStrings.QuickSleepSysReq,
+            "sleeprtcwake" => WpfStrings.QuickSleepRtcWake,
+            "sleepdeep" => WpfStrings.QuickSleepDeep,
+            "sleephibernate" => WpfStrings.QuickSleepHibernate,
+            _ => string.Empty
+        };
+        if (!string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+        return string.IsNullOrWhiteSpace(fallback) ? (key ?? string.Empty) : fallback!;
+    }
+
+    /// <summary>
+    /// ⭐ 分组标题本地化（task-33）：后端未就绪时 <c>WideMoreSwitches()</c> 会回退到硬编码中文组名，
+    /// 这里按中文原文翻译；已经是当前语言的标题原样返回（逻辑不变）。
+    /// </summary>
+    internal static string GroupTitle(string title) => title switch
+    {
+        "输入设备" => WpfStrings.QuickGroupInput,
+        "键盘与热键" => WpfStrings.QuickGroupKeyboard,
+        "电源与系统" => WpfStrings.QuickGroupPower,
+        "睡眠省电" => WpfStrings.QuickGroupSleep,
+        _ => title
+    };
+
     public bool Supports(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
@@ -138,11 +210,11 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.QuickBackendOffline);
         }
         if (!Supports(key))
         {
-            return ServiceResult.Fail("本机不支持该开关：" + key);
+            return ServiceResult.Fail(WpfStrings.QuickUnsupported + key);
         }
         try
         {
@@ -152,25 +224,25 @@ internal sealed class QuickSwitchService : IQuickSwitchService
                 MechrevoHw? hw = _backend.Hw;
                 if (hw == null)
                 {
-                    return ServiceResult.Fail("后端未连接");
+                    return ServiceResult.Fail(WpfStrings.QuickBackendOffline);
                 }
                 bool handled = hw.TrySetFanBoostViaBackend(on, out bool confirmed);
                 if (!handled)
                 {
-                    return ServiceResult.Fail("本机强冷通道不可用");
+                    return ServiceResult.Fail(WpfStrings.QuickFanBoostBackendUnavailable);
                 }
                 return confirmed
-                    ? ServiceResult.Success(on ? "强冷已开启（回读确认）" : "强冷已关闭（已恢复原曲线）")
-                    : ServiceResult.Fail(on ? "强冷已下发但回读未确认" : "强冷关闭未确认");
+                    ? ServiceResult.Success(on ? WpfStrings.QuickFanBoostOnConfirmed : WpfStrings.QuickFanBoostOffConfirmed)
+                    : ServiceResult.Fail(on ? WpfStrings.QuickFanBoostOnUnconfirmed : WpfStrings.QuickFanBoostOffUnconfirmed);
             }
             ok = await probe.SwitchQuickAsync(key, on).ConfigureAwait(false);
             return ok
-                ? ServiceResult.Success(on ? "已开启" : "已关闭")
-                : ServiceResult.Fail("下发未确认：" + key);
+                ? ServiceResult.Success(on ? WpfStrings.QuickResultOn : WpfStrings.QuickResultOff)
+                : ServiceResult.Fail(WpfStrings.QuickUnconfirmed + key);
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("下发异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.QuickApplyFailed + ex.GetType().Name);
         }
     }
 
