@@ -93,10 +93,6 @@
     <EmbeddedResource Include="MechrevoLite.Properties.Strings.resx" LogicalName="MechrevoLite.Properties.Strings.resources" />
     <EmbeddedResource Include="MechrevoLite.Properties.Strings.zh-CN.resx" LogicalName="MechrevoLite.Properties.Strings.zh-CN.resources" />
     <!-- 旧 L-Mechrevo.csproj 的内嵌载荷/注册表；Core 拆分时遗漏，2026-10-26 补回 -->
-    <EmbeddedResource Include="LMechrevo.RyzenSMU.bin" LogicalName="LMechrevo.RyzenSMU.bin" />
-    <EmbeddedResource Include="LMechrevo.IntelMSR.bin" LogicalName="LMechrevo.IntelMSR.bin" />
-    <EmbeddedResource Include="LMechrevo.LpcACPIEC.bin" LogicalName="LMechrevo.LpcACPIEC.bin" />
-    <EmbeddedResource Include="LMechrevo.LpcIO.bin" LogicalName="LMechrevo.LpcIO.bin" />
     <EmbeddedResource Include="LMechrevo.model-registry.json" LogicalName="LMechrevo.model-registry.json" />
     <EmbeddedResource Include="MechrevoLite.Diagnostics\LMechrevo.gcu-payload-baseline.txt" LogicalName="LMechrevo.gcu-payload-baseline.txt" />
     <!-- 旧根目录里的配置存储（业务基础设施，实测可编入 Core） -->
@@ -137,5 +133,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="L-Mechrevo.WpfP0" />
+  </ItemGroup>
+  <ItemGroup Label="PawnIO modules (external, not embedded)">
+    <None Include="LMechrevo.RyzenSMU.bin" Link="PawnIO\LMechrevo.RyzenSMU.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="LMechrevo.IntelMSR.bin" Link="PawnIO\LMechrevo.IntelMSR.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="LMechrevo.LpcACPIEC.bin" Link="PawnIO\LMechrevo.LpcACPIEC.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="LMechrevo.LpcIO.bin" Link="PawnIO\LMechrevo.LpcIO.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

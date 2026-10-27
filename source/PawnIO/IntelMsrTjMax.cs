@@ -32,7 +32,7 @@ internal static class IntelMsrTjMax
 			try
 			{
 				using PawnIOWrapper pawn = new PawnIOWrapper();
-				using Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("LMechrevo.IntelMSR.bin");
+				using Stream? stream = MechrevoLite.Hardware.PawnIOModuleLoader.Open("LMechrevo.IntelMSR.bin");
 				if (stream == null)
 				{
 					return 0;

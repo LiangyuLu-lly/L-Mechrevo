@@ -1234,7 +1234,7 @@ internal static class EcPortIo
 
 	private static byte[] LoadModuleResource()
 	{
-		using Stream stream = typeof(EcPortIo).Assembly.GetManifestResourceStream(ModuleResourceName);
+		using Stream? stream = PawnIOModuleLoader.Open(ModuleResourceName);
 		if (stream == null)
 		{
 			return null;

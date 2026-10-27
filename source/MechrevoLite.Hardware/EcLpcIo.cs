@@ -1061,7 +1061,7 @@ internal static class EcLpcIo
 
 	private static byte[] LoadModuleResource()
 	{
-		using Stream stream = typeof(EcLpcIo).Assembly.GetManifestResourceStream(ModuleResourceName);
+		using Stream? stream = PawnIOModuleLoader.Open(ModuleResourceName);
 		if (stream == null)
 		{
 			return null;

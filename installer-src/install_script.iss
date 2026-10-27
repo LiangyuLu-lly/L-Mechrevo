@@ -133,7 +133,11 @@ Source: "..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}\LICENSES"; Flags: ignorever
 ; 2026-10-10 合规：内嵌的 RyzenSMU.bin 为 LGPL-2.1-or-later，必须随二进制分发许可文本。
 ; 0.290.6 曾以 COPYING.PawnIO.txt 之名分发同一文件（见 _upstream\0.290.6\extract\install_script.iss:32），
 ; 当前 installer-src 漏掉了它，且我方的 PawnIO 归属段落也被删除 —— 两处一并恢复。
-Source: "files\COPYING.PawnIO.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
+; 2026-10-27：PawnIO 模块改为外部文件，不再内嵌 MechrevoLite.Core.dll
+Source: "files\PawnIO\LMechrevo.RyzenSMU.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversion
+Source: "files\PawnIO\LMechrevo.IntelMSR.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversion
+Source: "files\PawnIO\LMechrevo.LpcACPIEC.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversion
+Source: "files\PawnIO\LMechrevo.LpcIO.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversionSource: "files\COPYING.PawnIO.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 ; 2026-10-10：app 仍在调用 {app}\Install-PawnIO.ps1（source\MechrevoLite\CpuTuningForm.cs:1710），
 ; 但当前 installer-src\files 里没有它 —— 恢复，否则「下载 PawnIO 驱动」按钮静默失败。
 Source: "files\Install-PawnIO.ps1"; DestDir: "{app}"; Flags: ignoreversion 
@@ -315,6 +319,7 @@ Type: files; Name: "{app}\LICENSE"
 Type: files; Name: "{app}\LICENSE.txt"
 Type: files; Name: "{app}\THIRD_PARTY_NOTICES.txt"
 Type: files; Name: "{app}\THIRD-PARTY-NOTICES.md"
+Type: files; Name: "{app}\PawnIO\*.bin"
 Type: files; Name: "{app}\COPYING.PawnIO.txt"
 Type: files; Name: "{app}\更新日志.txt"
 Type: files; Name: "{app}\用前必看.txt"

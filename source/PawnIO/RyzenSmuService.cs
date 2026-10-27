@@ -103,8 +103,9 @@ public sealed class RyzenSmuService : IDisposable
 
 	public bool Initialize(Assembly assembly)
 	{
-		string name = assembly.GetManifestResourceNames().FirstOrDefault((string n) => n.EndsWith("RyzenSMU.bin")) ?? throw new InvalidOperationException("RyzenSMU.bin not found.");
-		using Stream stream = assembly.GetManifestResourceStream(name);
+		using Stream? stream = MechrevoLite.Hardware.PawnIOModuleLoader.Open("LMechrevo.RyzenSMU.bin")
+			?? assembly.GetManifestResourceStream(assembly.GetManifestResourceNames().FirstOrDefault((string n) => n.EndsWith("RyzenSMU.bin")) ?? "")
+			?? throw new InvalidOperationException("RyzenSMU.bin not found.");
 		using MemoryStream memoryStream = new MemoryStream();
 		stream.CopyTo(memoryStream);
 		return Initialize(memoryStream.ToArray());

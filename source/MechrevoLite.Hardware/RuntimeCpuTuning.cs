@@ -368,7 +368,7 @@ internal sealed class RuntimeCpuTuning : IDisposable
 				// ==================================================================================
 				if (_intel == null)
 				{
-					using Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("LMechrevo.IntelMSR.bin")
+					using Stream stream = PawnIOModuleLoader.Open("LMechrevo.IntelMSR.bin")
 						?? throw new IOException("IntelMSR.bin missing");
 					using MemoryStream memoryStream = new MemoryStream();
 					stream.CopyTo(memoryStream);
