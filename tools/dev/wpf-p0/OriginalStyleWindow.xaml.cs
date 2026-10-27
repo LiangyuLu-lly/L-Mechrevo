@@ -5254,8 +5254,20 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool on = GpuOverclockSwitch.IsChecked == true;
+        MechrevoService.GpuOverclockEnabled = on;
+        int modeBefore = _backendProbe.CurrentMode;
         StatusText.Text = on ? WpfStrings.GpuOverclockOnPending : WpfStrings.GpuOverclockOffPending;
         bool ok = await _backendProbe.ApplyGpuOverclockAsync(on);
+        // 部分 50 GCU 在只写 OC 字段后会把 operating mode 落回平衡；超频开关本身不应切模式，
+        // 原来在狂暴档时把档位恢复回去（不改变 OC 字段）。
+        if (ok && modeBefore == 1)
+        {
+            int actual = await _backendProbe.RefreshCurrentModeAsync();
+            if (actual >= 0 && actual != 1)
+            {
+                await SwitchModeAsync(1);
+            }
+        }
         StatusText.Text = ok ? WpfStrings.GpuOverclockPrefix + (on ? WpfStrings.IgpuSavingOnPreview_Content : WpfStrings.OriginalStyleWindow_Content_5) : WpfStrings.GpuOverclockFailed;
     }
 
