@@ -1145,6 +1145,15 @@ public partial class MainWindow : Window
 
         (string displayInfo, int currentHz, int maxHz, bool auto, int brightness) = _owner.WideDisplay();
         DisplayInfoText.Text = displayInfo;
+        // BuildHomeExtras 会在后端就绪时重建；先清掉上一次的亮度行/自动刷新，避免出现两排亮度。
+        DisplayDetailsPanel.Children.Clear();
+        for (int i = DisplayInfoRow.Children.Count - 1; i >= 0; i--)
+        {
+            if (!ReferenceEquals(DisplayInfoRow.Children[i], DisplayInfoText))
+            {
+                DisplayInfoRow.Children.RemoveAt(i);
+            }
+        }
         BuildRefreshRateButtons(_owner.WideRefreshRates(), currentHz);
         StackPanel brightnessRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         brightnessRow.Children.Add(new TextBlock { Text = WpfStrings.Brightness, Style = (Style)FindResource("MutedText"), Width = 54, VerticalAlignment = VerticalAlignment.Center });

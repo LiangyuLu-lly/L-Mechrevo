@@ -1309,7 +1309,16 @@ public partial class OriginalStyleWindow : Window
         _syncingBrightness = true;
         BrightnessSlider.Value = value;
         _syncingBrightness = false;
-        OsdService.Show(QuickGlyph("monitoroff"), WpfStrings.OsdBrightness, value + "%");
+        // 程序化回写滑块时上面的 ValueChanged 会被 _syncingBrightness 跳过；宽屏必须在这里
+        // 真正下发亮度，否则两个滑块都只是改 UI、硬件不变。
+        try
+        {
+            if (_services != null) { _services.Display.SetBrightness(value); } else { ScreenBrightness.Set(value); }
+            OsdService.Show(QuickGlyph("monitoroff"), WpfStrings.OsdBrightness, value + "%");
+        }
+        catch
+        {
+        }
     }
 
     internal void WideSetAutoRefresh(bool enabled)
