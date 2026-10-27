@@ -5248,6 +5248,7 @@ public partial class OriginalStyleWindow : Window
             || PerfConfigBalancedGroup.Visibility == Visibility.Visible
             || PerfConfigTurboGroup.Visibility == Visibility.Visible;
         PerfConfigRow.Visibility = (show && anyModeVisible) ? Visibility.Visible : Visibility.Collapsed;
+        PerfConfigPanel.Visibility = (show && anyModeVisible) ? Visibility.Visible : Visibility.Collapsed;
         PerfConfigEditButton.Visibility = (show && anyModeVisible) ? Visibility.Visible : Visibility.Collapsed;
     }
 
