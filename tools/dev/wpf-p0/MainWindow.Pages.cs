@@ -199,9 +199,13 @@ public partial class MainWindow
             if (CustomModeHost.Content == null)
             {
                 _customModeInlineWindow = new CustomModeWindow();
-                if (_owner != null && _customModeInlineWindow is CustomModeWindow customEditor)
+                if (_customModeInlineWindow is CustomModeWindow customEditor)
                 {
-                    customEditor.BindMode(_owner.WideCustomModeId);
+                    customEditor.PrepareWideInline();
+                    if (_owner != null)
+                    {
+                        customEditor.BindMode(_owner.WideCustomModeId);
+                    }
                 }
                 MountWindowContent(_customModeInlineWindow, CustomModeHost);
             }

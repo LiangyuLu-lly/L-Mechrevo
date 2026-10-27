@@ -44,7 +44,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
+        <StackPanel x:Name="HeaderPanel">
             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_23}" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
             <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
@@ -230,10 +230,10 @@
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+        <StackPanel x:Name="ActionPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
             <Button x:Name="ApplyButton" Content="{x:Static loc:WpfStrings.ApplyButton_Content}" Style="{StaticResource ApplyButton}" Click="Apply_Click" />
             <Button Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_2}" Style="{StaticResource FooterButton}" Click="Restore_Click" />
-            <Button Content="{x:Static loc:WpfStrings.CustomModeWindow_Content}" Style="{StaticResource FooterButton}" Click="FanCurve_Click" />
+            <Button x:Name="FanCurveButton" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content}" Style="{StaticResource FooterButton}" Click="FanCurve_Click" />
             <Button Content="{x:Static loc:WpfStrings.TitleText_Text}" Style="{StaticResource FooterButton}" Click="CpuTuning_Click" />
         </StackPanel>
     </Grid>

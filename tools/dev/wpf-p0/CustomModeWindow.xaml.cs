@@ -197,6 +197,18 @@ public partial class CustomModeWindow : Window
         return MechrevoLite.Mode.PerfModeText.Name(mode);
     }
 
+    /// <summary>宽屏内嵌：操作按钮移到顶部；右侧已有风扇曲线卡，隐藏该按钮。</summary>
+    internal void PrepareWideInline()
+    {
+        FanCurveButton.Visibility = Visibility.Collapsed;
+        if (ActionPanel.Parent is Panel parent)
+        {
+            parent.Children.Remove(ActionPanel);
+        }
+        ActionPanel.Margin = new Thickness(0, 10, 0, 0);
+        HeaderPanel.Children.Add(ActionPanel);
+    }
+
     public void BindMode(string id)
     {
         LoadModes(id);
