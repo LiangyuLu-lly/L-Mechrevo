@@ -2764,7 +2764,8 @@ public partial class OriginalStyleWindow : Window
             L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
             if (!MechrevoLite.Hardware.GpuDbControl.Supported())
             {
-                Logger.WriteLine("[db] 跳过：gen=" + (_backendProbe?.Hw?.DgpuGeneration.ToString() ?? "?")
+                Logger.WriteLineIfChanged("db-skip",
+                    "[db] 跳过：gen=" + (_backendProbe?.Hw?.DgpuGeneration.ToString() ?? "?")
                     + " · gcuVariant=" + MechrevoLite.Hardware.GcuIdentity.Variant
                     + " · gcu=" + (_backendProbe?.Hw?.IsGcuConnected == true));
                 return;
