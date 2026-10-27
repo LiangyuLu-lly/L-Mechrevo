@@ -612,7 +612,8 @@ public partial class CustomModeWindow : Window
         DbSwitch.IsEnabled = hw.GpuDynamicBoostAdjustable;
         GpuTgpSlider.IsEnabled = hw.GpuTgpAdjustable;
         FanSensitivitySwitch.IsEnabled = hw.SupportsFanSwitchSpeed;
-        GpuOcSwitch.IsEnabled = hw.SupportsGpuOverclock;
+        GpuOcSwitch.IsEnabled = hw.SupportsGpuOverclock
+                && string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase);
         if (!hw.GpuTgpAdjustable)
         {
             GpuTgpSlider.Opacity = 0.45;

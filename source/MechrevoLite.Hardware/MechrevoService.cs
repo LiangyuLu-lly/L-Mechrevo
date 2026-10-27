@@ -1507,6 +1507,12 @@ public class MechrevoService
 		{
 			return false;
 		}
+		// 40 系 40 GCU 不认 LCHWOC/OverClockingSwitch；只有实际 50 GCU 才执行。
+		if (!string.Equals(GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
+		{
+			Logger.WriteLine("[gpu-oc] 跳过：实际 GCU 变体=" + GcuIdentity.Variant + "（仅 50 GCU 支持）");
+			return false;
+		}
 		if (!_hw.SupportsGpuOverclock && !_hw.Capabilities.OverclockSettings)
 		{
 			return false;
@@ -1551,6 +1557,11 @@ public class MechrevoService
 		// 2026-10-15（C-1 第 2 步分类 ①）：MQTT 下发入口 ⇒ 真正需要 GCU。
 		if (hw == null || !hw.IsGcuConnected)
 		{
+			return false;
+		}
+		if (!string.Equals(GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
+		{
+			Logger.WriteLine("[gpu-oc] 跳过恢复：实际 GCU 变体=" + GcuIdentity.Variant + "（仅 50 GCU 支持）");
 			return false;
 		}
 		try

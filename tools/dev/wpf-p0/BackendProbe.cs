@@ -359,7 +359,11 @@ internal sealed class BackendProbe : IDisposable
         get
         {
             MechrevoHw? hw = _hw;
-            return hw != null && (hw.SupportsGpuOverclock || hw.Capabilities?.OverclockSettings == true || hw.GcuGpuOverclockAvailable);
+            // GPU 超频走 GCU 的 LCHWOC/OverClockingSwitch；40 系 40 GCU 不认这些字段，
+            // 只有实际 50 GCU 才显示/执行（40 系装 50 GCU 时 GcuIdentity 也会是 50）。
+            bool gcu50 = string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase);
+            return hw != null && hw.IsGcuConnected && gcu50
+                && (hw.SupportsGpuOverclock || hw.Capabilities?.OverclockSettings == true || hw.GcuGpuOverclockAvailable);
         }
     }
 
