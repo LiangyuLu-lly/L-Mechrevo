@@ -30,7 +30,7 @@ public partial class LightEditorWindow : Window
     private bool _gradeColors;
     private bool _wujieWhite;
     private bool _logoGrade;
-    /// <summary>⭐ 2026-10-26（task-17 · 宽屏白色背光入口）：白色背光键盘只有 电源 + 4 档亮度，没有灯效/颜色/速度 ✅。</summary>
+    /// <summary>⭐ 2026-10-26（task-17 · 宽屏白色背光入口）：白色背光键盘只有 电源 + 2 档亮度，没有灯效/颜色/速度 ✅。</summary>
     private readonly bool _whiteBacklightOnly;
     private int _lightMax = 4;
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
@@ -77,9 +77,20 @@ public partial class LightEditorWindow : Window
             _wujieWhite = hw?.WujieSmuApu == true
                 && hw.KeyboardStatusSeen
                 && string.Equals(hw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
-            _lightMax = _wujieWhite ? 2 : (bd ? Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
-            LightSlider.Minimum = bd || _wujieWhite ? 1 : 0;
-            LightSlider.Maximum = _lightMax;
+            // task-17 白色背光实际只有 2 档（暗/亮），不是 4 档；
+            // 旧注释/旧范围写成 0..4 会让 UI 出现第 3/4 档但下发无效。
+            if (_whiteBacklightOnly)
+            {
+                _lightMax = 2;
+                LightSlider.Minimum = 1;
+                LightSlider.Maximum = 2;
+            }
+            else
+            {
+                _lightMax = _wujieWhite ? 2 : (bd ? Math.Max(1, MechrevoHw.EffectiveKeyboardBrightnessMax()) : 4);
+                LightSlider.Minimum = bd || _wujieWhite ? 1 : 0;
+                LightSlider.Maximum = _lightMax;
+            }
         }
         _settings = LightingSettingsStore.Load(topic, effects.Length > 0 ? effects[0].Effect : "Single");
         _light = Math.Clamp(_settings.Light, (int)LightSlider.Minimum, (int)LightSlider.Maximum);
@@ -621,8 +632,9 @@ public partial class LightEditorWindow : Window
                     }
                     if (_whiteBacklightOnly)
                     {
-                        // ⭐ task-17：白色背光只下发亮度（0..4 档），⛔ 不下发效果/颜色 ✅
-                        ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardBrightnessPreservingEffect(_light);
+                        // task-17：白色背光只有 2 档亮度，硬件协议用 2/4 两档；
+                        // 不下发效果/颜色。
+                        ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardBrightnessPreservingEffect(_light >= 2 ? 4 : 2);
                         return ok;
                     }
                     bool baolongda = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true;

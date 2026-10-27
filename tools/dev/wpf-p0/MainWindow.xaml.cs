@@ -2887,7 +2887,7 @@ public partial class MainWindow : Window
         updateEffectUi(selectedEffect);
         if (whiteKeyboard)
         {
-            // ⭐⭐ task-17：白色背光键盘按能力只保留「电源 + 4 档亮度」，⛔ 不显示不支持的 RGB 效果/颜色/速度 ✅
+            // task-17：白色背光键盘按能力只保留「电源 + 2 档亮度」，⛔ 不显示不支持的 RGB 效果/颜色/速度
             hint.Text = WpfStrings.LightWhiteKeyboardHint;
             effectPanel.Visibility = Visibility.Collapsed;
             colorSection.Visibility = Visibility.Collapsed;
