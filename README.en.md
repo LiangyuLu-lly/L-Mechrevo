@@ -6,9 +6,31 @@ L-Mechrevo is an open-source control center for Mechrevo laptops (Mechrevo / Uni
 
 ## Interface overview
 
-The main window is a scrollable dashboard. Top to bottom: performance modes, live telemetry, GPU mode, display, battery, liquid cooling, lighting, and extra switches. The footer holds the hardware overlay toggle, settings, update check, donate, and exit. Each section header has an arrow that collapses or expands it, and the collapsed state is remembered.
+The main window comes in two layouts, **compact** and **wide**, with the same controls and different information density:
 
-<img src="docs/images/1-dashboard.png" width="420" alt="Main dashboard">
+- Compact: a small vertical window for everyday tray use.
+- Wide: a horizontal dashboard for keeping full telemetry and settings on screen.
+- Both support collapsible sections, hotkeys, the hardware overlay and tray actions.
+
+<p>
+<img src="docs/images/1-dashboard.png" width="330" alt="Compact window">
+<img src="docs/images/1-dashboard-wide.png" width="760" alt="Wide dashboard">
+</p>
+
+### Appearance
+
+The UI is not limited to a fixed light/dark pair:
+
+- **Light / dark / follow system** modes.
+- **Accent color** from presets or a custom color.
+- **Background image** for the compact window and the wide window separately.
+- **Opacity** for the background, backdrop, footer, cards and buttons.
+- **Background overlay** strength for text readability.
+- **Wide-only background** so the wide layout can use a different image.
+
+<img src="docs/images/settings-appearance.png" width="520" alt="Appearance settings">
+
+<img src="docs/images/mini-background.png" width="300" alt="Custom background example">
 
 ## Features
 
@@ -26,9 +48,9 @@ The performance section on the dashboard shows segmented buttons. Tap to switch;
 
 The tray right-click menu can switch modes too, with entries "Silent (Office)", "Balanced (Game)", and "Turbo (Enhanced)". The active mode gets a check mark.
 
-### Custom performance mode (4 slots)
+### Custom performance mode (multiple slots)
 
-Tap "Custom" on the dashboard to open a separate window. Four slot buttons (Custom 1 to 4) sit at the top; each slot stores a complete parameter set and selecting a slot applies it. The active slot shows "Custom N active".
+Tap "Custom" on the dashboard to open a separate window. The dropdown at the top lets you create and manage multiple slots (Custom 1, 2, 3...); each slot stores a complete parameter set and selecting a slot applies it. The active slot shows "Custom N active".
 
 <img src="docs/images/2-custom-mode.png" width="420" alt="Custom performance mode">
 
@@ -67,7 +89,7 @@ The lighting section lists one row per channel: keyboard, lightbar, logo. Each r
 Two global settings sit at the top of the lighting section:
 
 - **Turn all lights off on battery**: unplugging the charger extinguishes every light; plugging back in restores them.
-- **Sleep timer**: off / 10 s (software) / 10 min to 2 h. After the machine sits idle for the set time all lights go out, and any input brings them back.
+- **Sleep timer**: off / 10 s / 15 s / 20 s / 30 s / 45 s / 1 min to 3 h. After the machine sits idle for the set time all lights go out, and any input brings them back.
 
 ### Liquid cooling (external water cooler)
 
@@ -126,7 +148,7 @@ Every toggle sends its command on tap and disables briefly until the command is 
 
 - **Live telemetry**: a row under the performance section shows CPU / GPU temperature, power draw, fan speed, and duty cycle.
 - **Hardware overlay**: a desktop overlay with four layouts you can click through and drag anywhere (footer "Overlay" toggle).
-- **Day / night theme**: switched in the footer "Settings" dialog.
+- **Appearance**: light / dark / follow system, accent color, background image, background opacity and wide-layout background; see "Interface overview → Appearance".
 - **Official console**: detects whether the vendor console is running and can isolate its UI and tray with one click, keeping only the GCU background service. Reversible at any time.
 - **In-app updates**: silently checks for new versions; the "Check updates" button grows a badge when one exists. Downloads are verified by SHA-256 before the updater launches.
 - **Launch at login**: implemented as a per-user scheduled task, no administrator rights needed ("Extra switches → Power & system → Launch at login").
@@ -169,7 +191,7 @@ Tap a segment in the performance panel; the active mode highlights. Silent Turbo
 
 ### Custom mode slots
 
-Tap "Custom" to open the custom mode window and pick slot Custom 1 to 4 at the top. Each slot holds the Windows power plan, turbo mode, CPU power limits (PL1 / PL2, plus PL4 on some models), GPU TGP target, GPU dynamic boost, fan shift sensitivity, GPU overclock, and a "Fan curve" button. Changes save to the selected slot immediately; "Reset slot to defaults" restores the current slot.
+Tap "Custom" to open the custom mode window and create or pick any number of slots (Custom 1, 2, 3...) at the top. Each slot holds the Windows power plan, turbo mode, CPU power limits (PL1 / PL2, plus PL4 on some models), GPU TGP target, GPU dynamic boost, fan shift sensitivity, GPU overclock, and a "Fan curve" button. Changes save to the selected slot immediately; "Reset slot to defaults" restores the current slot.
 
 ### Keyboard, lightbar, and logo lighting
 
@@ -219,6 +241,22 @@ Yes. Power limits, overclocking, and fan curves can affect stability and hardwar
 
 **The driver or antivirus blocked the install or update?**
 The installer deploys GCU service payloads and drivers, which some antivirus products or system policies may block. Allow the installer and the program folder in your antivirus and retry; if a driver was blocked and never deployed, the related features won't work.
+
+## Acknowledgements
+
+This project builds on these projects and community references:
+
+- **[G-Helper](https://github.com/seerge/g-helper)**: application framework and hardware-control approach (GPL-3.0-only).
+- **[PawnIO](https://github.com/namazso/PawnIO) / [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules)**: low-level driver and SMU/MSR/EC modules (driver GPL-2.0, modules LGPL-2.1-or-later).
+- **[irusanov/SMUDebugTool](https://github.com/irusanov/SMUDebugTool) / [ZenStates-Core](https://github.com/irusanov/ZenStates-Core)**: AMD SMU protocol reference (GPL-3.0).
+- **[FlyGoat/RyzenAdj](https://github.com/FlyGoat/RyzenAdj)**: AMD SMU commands and power parameters (LGPL-3.0).
+- **[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)**: sensor readings (MPL-2.0).
+- **[MQTTnet](https://github.com/dotnet/MQTTnet)**, **[HidSharp](https://github.com/IntergatedCircuits/HidSharp)**, **[NvAPIWrapper](https://github.com/falahati/NvAPIWrapper)**, **[Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json)**: communication and hardware-access dependencies.
+- **[BetterRGB](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive)**: keyboard HID protocol reference.
+- **[IYATT-yx/NullSignal](https://github.com/IYATT-yx/NullSignal)**: virtual-display screen-off approach.
+- **[JiaolongControl](https://github.com/GaoXanSheng/JiaolongControl)**: Baolongda interface facts (MIT).
+
+The exact versions, license texts and the distinction between derived code and protocol references are documented in `THIRD_PARTY_NOTICES.txt` and `LICENSES\` in the release package.
 
 ## License and corresponding source code
 
