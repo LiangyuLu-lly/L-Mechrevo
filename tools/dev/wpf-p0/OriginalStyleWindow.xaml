@@ -52,9 +52,9 @@
             <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Margin" Value="0,0,3,0" />
-            <Setter Property="Padding" Value="2,2" />
-            <Setter Property="Height" Value="44" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="Padding" Value="1,1" />
+            <Setter Property="Height" Value="38" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -493,7 +493,7 @@
 
                     <!-- 快捷开关 -->
                     <StackPanel x:Name="QuickSection" Style="{StaticResource Section}">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_21}" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_21}" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                         <local:AdaptivePanel x:Name="QuickTileGrid" AllowDrop="True">
                             <ToggleButton x:Name="FanTile" Style="{StaticResource Tile}" Tag="fanboost" Click="QuickTile_Click" IsChecked="True">
                                 <StackPanel>
@@ -503,37 +503,37 @@
                                               Data="M8,8 C6,5 6,2 8,1 C10,2 10,5 8,8 Z M8,8 C11,6 14,7 15,9 C13,11 10,10 8,8 Z M8,8 C10,11 10,14 8,15 C6,14 6,11 8,8 Z M8,8 C5,10 2,9 1,7 C3,5 6,6 8,8 Z M8,7 A1,1 0 1 1 8,9 A1,1 0 1 1 8,7 Z" />
                                     </Canvas>
                                 </Viewbox>
-                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_20}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_20}" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="CameraTile" Style="{StaticResource Tile}" Tag="webcam" Click="QuickTile_Click" IsChecked="True">
                                 <StackPanel>
-                                    <TextBlock Text="&#xE722;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_19}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="&#xE722;" FontFamily="Segoe MDL2 Assets" FontSize="14" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_19}" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="MicTile" Style="{StaticResource Tile}" Tag="micmute" Click="QuickTile_Click">
                                 <StackPanel>
-                                    <TextBlock Text="&#xE720;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_18}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="&#xE720;" FontFamily="Segoe MDL2 Assets" FontSize="14" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_18}" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="WinKeyTile" Style="{StaticResource Tile}" Tag="winkey" Click="QuickTile_Click">
                                 <StackPanel>
-                                    <TextBlock Text="&#xE765;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_17}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="&#xE765;" FontFamily="Segoe MDL2 Assets" FontSize="14" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_17}" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="ScreenOffTile" Style="{StaticResource Tile}" Tag="monitoroff" Click="QuickTile_Click">
                                 <StackPanel>
-                                    <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_16}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="14" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_16}" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="CustomTile" Style="{StaticResource Tile}" Click="CustomTile_Click">
                                 <StackPanel>
-                                    <TextBlock x:Name="CustomTileIcon" Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-                                    <TextBlock x:Name="CustomTileLabel" Text="{x:Static loc:WpfStrings.NavCustom_Content}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock x:Name="CustomTileIcon" Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="14" HorizontalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                                    <TextBlock x:Name="CustomTileLabel" Text="{x:Static loc:WpfStrings.NavCustom_Content}" FontSize="9" HorizontalAlignment="Center" Margin="0,2,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                                 </StackPanel>
                             </ToggleButton>
                         </local:AdaptivePanel>
