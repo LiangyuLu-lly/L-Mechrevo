@@ -1942,7 +1942,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	internal bool IsUmiMachine => BackendRouter.LastDecision?.Identity?.IsUmi == true;
 
 	/// <summary>Intel NUC X15（型号含 NUC/X15 或板号 LAPKC*）。</summary>
-	internal bool IsIntelNucMachine => BackendRouter.LastDecision?.Identity?.IsIntelNuc == true;
+	internal bool IsIntelNucMachine =>
+		BackendRouter.LastDecision?.Identity?.IsIntelNuc == true
+		// 路由尚未落 LastDecision 时（首次能力刷新）也要能识别 LAPKC/NUC 板，
+		// 否则第三档会被永久隐藏。
+		|| BoardWhitelist.ReadBoardProduct().StartsWith("LAPKC", StringComparison.OrdinalIgnoreCase);
 
 	/// <summary>把 ACPI H2RAM 读到的 NUC 风扇值回写到门面属性，供所有 UI/曲线读取。</summary>
 	internal void ApplyIntelNucFanSpeeds(int mainFanRpm, int secondFanRpm)
