@@ -407,6 +407,10 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsUmiMachine == true && string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal))
+            {
+                return UmiLightbar.SetPower(on);
+            }
             return _service != null && await _service.SetLightPower(topic, on).ConfigureAwait(false);
         }
         catch
@@ -509,6 +513,10 @@ internal sealed class BackendProbe : IDisposable
         try
         {
             (int light, int speed, Color? color) = ReadLightArgs("HidLightbar/Ctrl", effect, keyboard: false);
+            if (_hw?.IsUmiMachine == true)
+            {
+                return UmiLightbar.SetEffect(effect, color, light);
+            }
             return _service != null && await _service.SetLightEffect("HidLightbar/Ctrl", effect, light, speed, "None", color, true).ConfigureAwait(false);
         }
         catch

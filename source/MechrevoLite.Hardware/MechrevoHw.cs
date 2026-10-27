@@ -1031,7 +1031,7 @@ public class MechrevoHw : IDisposable
 	{
 		get
 		{
-			return Capabilities.Lightbar || Capabilities.RgbLightbar || LightbarStatusSeen;
+			return Capabilities.Lightbar || Capabilities.RgbLightbar || LightbarStatusSeen || IsUmiMachine;
 		}
 	}
 
