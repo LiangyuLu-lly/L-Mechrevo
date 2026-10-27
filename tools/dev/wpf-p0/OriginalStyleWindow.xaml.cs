@@ -1282,7 +1282,7 @@ public partial class OriginalStyleWindow : Window
 
     internal void WideSetLightIdleSeconds(int seconds)
     {
-        if (_services != null) { _services.Lighting.SetLightIdleSeconds(seconds); return; }
+        if (_services != null) { DashboardCommands.SetLightIdleSeconds(seconds); return; }
         if (_backendProbe?.Hw?.UsesBaolongda == true)
         {
             MechrevoHw.SetKeyboardAutoOffSeconds(seconds);
@@ -1303,8 +1303,15 @@ public partial class OriginalStyleWindow : Window
 
     internal void WideSetLightOffOnBattery(bool on)
     {
-        AppConfig.Set("lighting_off_on_battery", on ? 1 : 0);
-        AppConfig.Flush();
+        if (_services != null)
+        {
+            DashboardCommands.SetLightOffOnBattery(on);
+        }
+        else
+        {
+            AppConfig.Set("lighting_off_on_battery", on ? 1 : 0);
+            AppConfig.Flush();
+        }
         _ = ReconcileLightingPowerAsync();
     }
 
@@ -1455,7 +1462,7 @@ public partial class OriginalStyleWindow : Window
         // 真正下发亮度，否则两个滑块都只是改 UI、硬件不变。
         try
         {
-            if (_services != null) { _services.Display.SetBrightness(value); } else { ScreenBrightness.Set(value); }
+            if (_services != null) { DashboardCommands.SetBrightness(value); } else { ScreenBrightness.Set(value); }
             OsdService.Show(QuickGlyph("monitoroff"), WpfStrings.OsdBrightness, value + "%");
         }
         catch
@@ -3600,7 +3607,7 @@ public partial class OriginalStyleWindow : Window
         }
         bool on = AutoRefreshSwitch.IsChecked == true;
         bool ok = _services != null
-            ? (await _services.Display.SetAutoRefreshAsync(on)).Ok
+            ? (await DashboardCommands.SetAutoRefreshAsync(on)).Ok
             : await _backendProbe.SwitchAutoRefreshAsync(on);
         AppConfig.Set("screen_auto", on ? 1 : 0);
         AppConfig.Flush();
@@ -4952,12 +4959,7 @@ public partial class OriginalStyleWindow : Window
 
     internal async Task<bool> WideSetLiquidFanAsync(int profile)
     {
-        WaterCoolerRoutingService? routing = EnsureWaterCoolerRouting();
-        if (routing == null || !routing.IsGcuRoute && !routing.IsBleRoute)
-        {
-            return false;
-        }
-        bool ok = await routing.SetFanAsync(profile);
+        bool ok = await DashboardCommands.SetLiquidFanAsync(profile);
         if (ok)
         {
             RefreshLiquidCoolingUi();
