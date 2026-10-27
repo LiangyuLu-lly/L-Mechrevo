@@ -34,7 +34,6 @@
                                                 <ToggleButton x:Name="HomePerf静音" Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_23}" Tag="2" Style="{StaticResource SegmentButton}" />
                                                 <ToggleButton x:Name="HomePerf平衡" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_13}" Tag="0" Style="{StaticResource SegmentButton}" IsChecked="True" />
                                                 <ToggleButton x:Name="HomePerf狂暴" Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_22}" Tag="1" Style="{StaticResource SegmentButton}" />
-                                                <ToggleButton x:Name="HomePerf静音狂暴" Content="{x:Static loc:WpfStrings.SilentTurbo}" Tag="silentturbo" Style="{StaticResource SegmentButton}" Visibility="Collapsed" />
 
                                                 <ToggleButton x:Name="HomePerf自定义" Content="{x:Static loc:WpfStrings.NavCustom_Content}" Tag="3" Style="{StaticResource SegmentButton}" />
                                             </WrapPanel>

@@ -651,17 +651,41 @@ public partial class MainWindow : Window
         };
     }
 
+    private void EnsureWideSilentTurboButton(bool visible)
+    {
+        if (visible && HomePerf静音狂暴 == null && HomePerf狂暴.Parent is Panel panel)
+        {
+            ToggleButton button = new()
+            {
+                Content = WpfStrings.SilentTurbo,
+                Tag = "silentturbo",
+                Style = (Style)FindResource("SegmentButton")
+            };
+            button.Click += Mode_Click;
+            int index = panel.Children.IndexOf(HomePerf狂暴);
+            panel.Children.Insert(index < 0 ? panel.Children.Count : index, button);
+            HomePerf静音狂暴 = button;
+        }
+        else if (!visible && HomePerf静音狂暴 != null)
+        {
+            if (HomePerf静音狂暴.Parent is Panel parent) parent.Children.Remove(HomePerf静音狂暴);
+            HomePerf静音狂暴 = null;
+        }
+    }
+
     private void Mode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton button)
         {
             return;
         }
-        foreach (ToggleButton perfButton in new[] { HomePerf静音, HomePerf平衡, HomePerf静音狂暴, HomePerf狂暴, HomePerf自定义 })
+        List<ToggleButton> perfButtons = new() { HomePerf静音, HomePerf平衡, HomePerf狂暴, HomePerf自定义 };
+        if (HomePerf静音狂暴 != null) perfButtons.Add(HomePerf静音狂暴);
+        foreach (ToggleButton perfButton in perfButtons)
         {
             perfButton.IsChecked = ReferenceEquals(perfButton, button);
         }
-        if (ReferenceEquals(button, HomePerf静音狂暴))
+        if (HomePerf静音狂暴 != null && ReferenceEquals(button, HomePerf静音狂暴))
         {
             _owner?.WideSetSilentTurbo();
             StatusText.Text = WpfStrings.MainWindow_xaml_Text_6 + button.Content;
@@ -1760,7 +1784,7 @@ public partial class MainWindow : Window
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
         bool silentTurboVisible = _owner.WideSilentTurboVisible;
-        HomePerf静音狂暴.Visibility = silentTurboVisible ? Visibility.Visible : Visibility.Collapsed;
+        EnsureWideSilentTurboButton(silentTurboVisible);
         HomePerf狂暴.Content = silentTurboVisible ? WpfStrings.TurboHighEnergy : WpfStrings.ModeTurbo;
         if (!_owner.WideModeSwitchPending)
         {
@@ -1768,7 +1792,7 @@ public partial class MainWindow : Window
             bool silentTurboActive = _owner.WideSilentTurboActive;
             HomePerf静音.IsChecked = currentMode == 2;
             HomePerf平衡.IsChecked = currentMode == 0;
-            HomePerf静音狂暴.IsChecked = currentMode == 1 && silentTurboActive;
+            if (HomePerf静音狂暴 != null) HomePerf静音狂暴.IsChecked = currentMode == 1 && silentTurboActive;
             HomePerf狂暴.IsChecked = currentMode == 1 && !silentTurboActive;
             HomePerf自定义.IsChecked = currentMode is 3 or 4;
         }

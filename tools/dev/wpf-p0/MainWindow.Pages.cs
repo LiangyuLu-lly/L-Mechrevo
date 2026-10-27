@@ -17,7 +17,7 @@ public partial class MainWindow
     private TextBlock PerfCurrentText = null!;
     private ToggleButton HomePerf静音 = null!;
     private ToggleButton HomePerf平衡 = null!;
-    private ToggleButton HomePerf静音狂暴 = null!;
+    private ToggleButton? HomePerf静音狂暴;
     private ToggleButton HomePerf狂暴 = null!;
     private ToggleButton HomePerf自定义 = null!;
     private Border HomeGpuCard = null!;
@@ -82,7 +82,6 @@ public partial class MainWindow
         PerfCurrentText = _homeView.PerfCurrentText;
         HomePerf静音 = _homeView.HomePerf静音;
         HomePerf平衡 = _homeView.HomePerf平衡;
-        HomePerf静音狂暴 = _homeView.HomePerf静音狂暴;
         HomePerf狂暴 = _homeView.HomePerf狂暴;
         HomePerf自定义 = _homeView.HomePerf自定义;
         HomeGpuCard = _homeView.HomeGpuCard;
@@ -162,7 +161,6 @@ public partial class MainWindow
     {
         HomePerf静音.Click += Mode_Click;
         HomePerf平衡.Click += Mode_Click;
-        HomePerf静音狂暴.Click += Mode_Click;
         HomePerf狂暴.Click += Mode_Click;
         HomePerf自定义.Click += Mode_Click;
         HomeGpu混合.Click += Gpu_Click;
