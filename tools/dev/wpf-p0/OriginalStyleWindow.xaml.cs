@@ -68,6 +68,7 @@ public partial class OriginalStyleWindow : Window
     };
     private object? _miniCachedContent;
     private AppServices? _services;
+    private DashboardCommands? _dashboardCommands;
     internal event Action? BackendReady;
     internal BackendProbe? CurrentBackend => _backendProbe;
     private bool _overlayPreloaded;
@@ -859,18 +860,13 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    /// <summary>宽屏/迷你窗共享命令入口（第二步命令收口）。</summary>
+    internal DashboardCommands DashboardCommands =>
+        _dashboardCommands ??= new DashboardCommands(_services, _backendProbe);
+
     internal async Task<bool> WideToggleQuickAsync(string key)
     {
-        if (_services != null)
-        {
-            return (await _services.QuickSwitches.ToggleAsync(key)).Ok;
-        }
-        if (_backendProbe == null)
-        {
-            return false;
-        }
-        bool current = _backendProbe.QuickState(key);
-        return await _backendProbe.SwitchQuickAsync(key, !current);
+        return await DashboardCommands.ToggleQuickAsync(key);
     }
 
     internal string WidePerformanceText
@@ -3623,7 +3619,7 @@ public partial class OriginalStyleWindow : Window
         {
             on = !on;
         }
-        bool ok = await _backendProbe.SwitchQuickAsync(key, on);
+        bool ok = await DashboardCommands.SetQuickAsync(key, on);
         StatusText.Text = ok ? WpfStrings.QuickSentPrefix + key : WpfStrings.QuickFailedPrefix + key;
     }
 
@@ -4033,7 +4029,7 @@ public partial class OriginalStyleWindow : Window
     {
         if (sender is CheckBox box && box.Tag is string key && _backendProbe != null)
         {
-            bool ok = await _backendProbe.SwitchQuickAsync(key, box.IsChecked == true);
+            bool ok = await DashboardCommands.SetQuickAsync(key, box.IsChecked == true);
             if (!ok)
             {
                 box.IsChecked = !(box.IsChecked == true);

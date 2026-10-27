@@ -735,7 +735,7 @@ public partial class MainWindow : Window
     {
         if (sender is Button button && button.Tag is string key)
         {
-            bool ok = _owner != null && await _owner.WideToggleQuickAsync(key);
+            bool ok = _owner != null && await _owner.DashboardCommands.ToggleQuickAsync(key);
             // task-33：状态串走资源；key 的显示名也按当前语言取（英文模式不再拼中文 name）。
             string label = QuickSwitchService.Label(key);
             StatusText.Text = (ok ? WpfStrings.QuickTileToggled : WpfStrings.QuickTileToggleFailed) + label;
@@ -746,7 +746,7 @@ public partial class MainWindow : Window
     {
         if (sender is Button button && button.Tag is string key)
         {
-            bool ok = _owner != null && await _owner.WideToggleQuickAsync(key);
+            bool ok = _owner != null && await _owner.DashboardCommands.ToggleQuickAsync(key);
             string label = QuickSwitchService.Label(key);
             StatusText.Text = (ok ? WpfStrings.MoreSwitchToggled : WpfStrings.MoreSwitchToggleFailed) + label;
         }
@@ -783,7 +783,7 @@ public partial class MainWindow : Window
                 tile.Click += async (_, _) =>
                 {
                     bool target = tile.IsChecked == true;
-                    await _owner.WideToggleQuickAsync(switchKey);
+                    await _owner.DashboardCommands.ToggleQuickAsync(switchKey);
                     bool actual = _owner.WideMoreSwitches()
                         .SelectMany(groupItems => groupItems.Items)
                         .FirstOrDefault(item => item.Key == switchKey).On;
