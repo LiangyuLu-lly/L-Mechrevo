@@ -716,7 +716,8 @@ public partial class CustomModeWindow : Window
     /// <summary>FPPT >= PL2 >= PL1；拖动任意一个时把另一端推到合法范围。</summary>
     private void SyncPowerWalls(string source)
     {
-        if (_loadingUi || _syncingPowerWalls)
+        if (_loadingUi || _syncingPowerWalls
+            || Pl1Slider == null || Pl2Slider == null || Pl4Slider == null)
         {
             return;
         }

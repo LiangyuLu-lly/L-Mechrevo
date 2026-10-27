@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -4552,6 +4552,7 @@ public partial class OriginalStyleWindow : Window
             await probe.RefreshGpuModeAsync();
             ApplyCapabilities();
             BackendReady?.Invoke();
+            ScheduleCapabilityWarmup();
             ShowFirstRunGuidesIfNeeded();
             StartSilentUpdateCheckIfAllowed();
             _backendTimer.Start();
@@ -5314,6 +5315,7 @@ public partial class OriginalStyleWindow : Window
         }
         catch (Exception ex)
         {
+            Logger.WriteError("[custom-open] 打开自定义模式失败：" + ex);
             StatusText.Text = WpfStrings.MainWindow_xaml_Text_20 + ex.Message;
         }
     }
