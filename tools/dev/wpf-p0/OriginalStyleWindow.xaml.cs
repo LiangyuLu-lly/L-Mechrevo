@@ -2669,11 +2669,11 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_30 + (selected.Content as TextBlock)?.Text;
             int mode = selected == SilentModeButton ? 2
                 : selected == BalancedModeButton ? 0
-                : selected == SilentTurboModeButton ? 1
+                : SilentTurboModeButton != null && selected == SilentTurboModeButton ? 1
                 : selected == TurboModeButton ? 1
                 : selected == CustomModeButton ? 3
                 : -1;
-            bool? silentTurbo = ReferenceEquals(selected, SilentTurboModeButton) ? true
+            bool? silentTurbo = SilentTurboModeButton != null && ReferenceEquals(selected, SilentTurboModeButton) ? true
                 : ReferenceEquals(selected, TurboModeButton) ? false
                 : null;
             if (ReferenceEquals(selected, CustomModeButton))
@@ -3018,6 +3018,12 @@ public partial class OriginalStyleWindow : Window
     }
 
     private bool _igpuSavingBusy;
+    private ToggleButton? SilentTurboModeButton;
+    private Grid? IgpuSavingPreviewRow;
+    private ToggleButton? IgpuSavingOffPreview;
+    private ToggleButton? IgpuSavingOnPreview;
+    private ToggleButton? IgpuSavingAutoPreview;
+    private TextBlock? IgpuSavingPreviewStatus;
 
     private async void IgpuSavingPreview_Click(object sender, RoutedEventArgs e)
     {
@@ -3027,6 +3033,59 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private void BuildIgpuSavingRow()
+    {
+        if (IgpuSavingHost == null || IgpuSavingPreviewRow != null)
+        {
+            return;
+        }
+        Grid row = new() { Margin = new Thickness(0, 4, 0, 0) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        TextBlock label = new()
+        {
+            Text = WpfStrings.OriginalStyleWindow_Text_14,
+            Style = (Style)FindResource("RowLabel"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0)
+        };
+        row.Children.Add(label);
+        StackPanel buttons = new() { Orientation = Orientation.Horizontal };
+        Grid.SetColumn(buttons, 1);
+        ToggleButton CreateButton(string content, string tag, string? width = "76")
+        {
+            ToggleButton button = new()
+            {
+                Content = content,
+                Tag = tag,
+                Style = (Style)FindResource("GpuSegment"),
+                Width = 76,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            button.Click += IgpuSavingPreview_Click;
+            buttons.Children.Add(button);
+            return button;
+        }
+        IgpuSavingOffPreview = CreateButton(WpfStrings.OriginalStyleWindow_Content_5, "OFF");
+        IgpuSavingOnPreview = CreateButton(WpfStrings.IgpuSavingOnPreview_Content, "ON");
+        IgpuSavingAutoPreview = CreateButton(WpfStrings.OriginalStyleWindow_Content_6, "AUTO");
+        IgpuSavingAutoPreview.IsChecked = true;
+        IgpuSavingAutoPreview.Margin = new Thickness(0);
+        row.Children.Add(buttons);
+        IgpuSavingPreviewStatus = new TextBlock
+        {
+            Text = WpfStrings.IgpuSavingPreviewStatus_Text,
+            Style = (Style)FindResource("MutedText"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(IgpuSavingPreviewStatus, 2);
+        row.Children.Add(IgpuSavingPreviewStatus);
+        IgpuSavingPreviewRow = row;
+        IgpuSavingHost.Children.Clear();
+        IgpuSavingHost.Children.Add(row);
+    }
+
     private void VisualiseIgpuSaving()
     {
         MechrevoHw? hardware = _backendProbe?.Hw;
@@ -3034,15 +3093,26 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        IgpuSavingPreviewRow.Visibility = (hardware.SupportsGpuHotSwap || UiQaShowAll.Enabled)
-            ? Visibility.Visible : Visibility.Collapsed;
+        bool igpuSavingVisible = hardware.SupportsGpuHotSwap || UiQaShowAll.Enabled;
+        if (igpuSavingVisible && IgpuSavingPreviewRow == null)
+        {
+            BuildIgpuSavingRow();
+        }
+        if (IgpuSavingPreviewRow == null)
+        {
+            return;
+        }
+        IgpuSavingPreviewRow.Visibility = igpuSavingVisible ? Visibility.Visible : Visibility.Collapsed;
         int mode = hardware.IgpuOnlySaveMode;
-        IgpuSavingOffPreview.IsChecked = mode == 1;
-        IgpuSavingOnPreview.IsChecked = mode == 0;
-        IgpuSavingAutoPreview.IsChecked = mode == 3;
-        IgpuSavingPreviewStatus.Text = _igpuSavingBusy
-            ? WpfStrings.SwitchingEllipsis
-            : mode switch { 0 => WpfStrings.IgpuSavingCurrentOn, 1 => WpfStrings.IgpuSavingCurrentOff, 3 => WpfStrings.IgpuSavingCurrentAuto, _ => WpfStrings.IgpuSavingCurrentUnknown };
+        if (IgpuSavingOffPreview != null) IgpuSavingOffPreview.IsChecked = mode == 1;
+        if (IgpuSavingOnPreview != null) IgpuSavingOnPreview.IsChecked = mode == 0;
+        if (IgpuSavingAutoPreview != null) IgpuSavingAutoPreview.IsChecked = mode == 3;
+        if (IgpuSavingPreviewStatus != null)
+        {
+            IgpuSavingPreviewStatus.Text = _igpuSavingBusy
+                ? WpfStrings.SwitchingEllipsis
+                : mode switch { 0 => WpfStrings.IgpuSavingCurrentOn, 1 => WpfStrings.IgpuSavingCurrentOff, 3 => WpfStrings.IgpuSavingCurrentAuto, _ => WpfStrings.IgpuSavingCurrentUnknown };
+        }
     }
 
     private async Task<bool> TryForceIgpuSavingAsync(MechrevoService service, string mode, bool occupancyAlreadyConfirmed)
@@ -4079,7 +4149,7 @@ public partial class OriginalStyleWindow : Window
         {
             SilentModeButton.IsChecked = mode == 2;
             BalancedModeButton.IsChecked = mode == 0;
-            SilentTurboModeButton.IsChecked = silentTurboActive;
+            if (SilentTurboModeButton != null) SilentTurboModeButton.IsChecked = silentTurboActive;
             TurboModeButton.IsChecked = mode == 1 && !silentTurboActive;
             CustomModeButton.IsChecked = mode is 3 or 4;
             RefreshModeHighlights();
@@ -4457,6 +4527,33 @@ public partial class OriginalStyleWindow : Window
         BackendStatus.ToolTip = tooltip;
     }
 
+    private void EnsureSilentTurboButton(bool allowed)
+    {
+        if (allowed && SilentTurboModeButton == null)
+        {
+            ToggleButton button = new()
+            {
+                Tag = "#FB7185",
+                Style = (Style)FindResource("ModeSegment"),
+                Content = WpfStrings.SilentTurbo
+            };
+            button.Click += ModeButton_Click;
+            int index = ModeGrid.Children.IndexOf(TurboModeButton);
+            if (index < 0) index = ModeGrid.Children.Count;
+            ModeGrid.Children.Insert(index, button);
+            SilentTurboModeButton = button;
+        }
+        if (SilentTurboModeButton == null)
+        {
+            return;
+        }
+        if (!allowed)
+        {
+            ModeGrid.Children.Remove(SilentTurboModeButton);
+            SilentTurboModeButton = null;
+        }
+    }
+
     private void ApplyCapabilities()
     {
         if (_backendProbe?.Capabilities is not MechrevoDeviceCapabilities caps)
@@ -4483,7 +4580,7 @@ public partial class OriginalStyleWindow : Window
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
             bool silentTurboAllowed = caps.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported
                 || UiQaShowAll.Enabled;
-            SilentTurboModeButton.Visibility = silentTurboAllowed ? Visibility.Visible : Visibility.Collapsed;
+            EnsureSilentTurboButton(silentTurboAllowed);
             if (TurboModeButton.Content is TextBlock turboLabel)
             {
                 turboLabel.Text = silentTurboAllowed ? WpfStrings.TurboHighEnergy : WpfStrings.OriginalStyleWindow_Text_22;
