@@ -404,6 +404,61 @@ public partial class OriginalStyleWindow : Window
         Hide();
     }
 
+    private bool _customModeCycleBusy;
+
+    /// <summary>
+    /// Ctrl+Alt+4：连续按依次循环「自定义 1/2/3...」，每次都按保存的配置重新下发一次，
+    /// OSD 标题固定为「性能模式」，内容显示该自定义档的名字（不是笼统的“自定义”）。
+    /// </summary>
+    private async Task CycleCustomModeFromHotkeyAsync()
+    {
+        if (_customModeCycleBusy)
+        {
+            return;
+        }
+        MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+        if (perf == null)
+        {
+            return;
+        }
+        List<MechrevoLite.Mode.PerfModeDefinition> customs = perf.Modes
+            .Where(mode => mode.IsCustom)
+            .ToList();
+        if (customs.Count == 0)
+        {
+            RequestMode(3);
+            return;
+        }
+        string currentId = perf.DisplayedModeId;
+        int currentIndex = customs.FindIndex(mode => string.Equals(mode.Id, currentId, StringComparison.Ordinal));
+        MechrevoLite.Mode.PerfModeDefinition target = customs[(currentIndex + 1) % customs.Count];
+        _customModeCycleBusy = true;
+        try
+        {
+            MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(
+                target.Id, "hotkey custom cycle", forceParameters: true);
+            if (outcome != null)
+            {
+                _pendingMode = 3;
+                _pendingModeTick = Environment.TickCount64;
+                RefreshFromBackend();
+                OsdService.Show(string.Empty, WpfStrings.OsdPerformance, MechrevoLite.Mode.PerfModeText.Name(target));
+            }
+            else
+            {
+                StatusText.Text = WpfStrings.MainWindow_xaml_Text_20 + target.Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_20 + ex.Message;
+        }
+        finally
+        {
+            _customModeCycleBusy = false;
+        }
+    }
+
     private void RequestMode(int mode)
     {
         if (_backendProbe == null)

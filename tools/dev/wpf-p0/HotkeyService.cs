@@ -38,6 +38,8 @@ internal sealed class HotkeyService : IDisposable
     internal static HotkeyService? Current { get; private set; }
 
     internal event Action<int>? ModeRequested;
+    /// <summary>Ctrl+Alt+4：每按一次循环到下一个自定义档（不是固定切到"自定义"）。</summary>
+    internal event Action? CustomModeCycleRequested;
     internal event Action? OverlayRequested;
     internal event Action? SettingsRequested;
     internal event Action? ShowRequested;
@@ -149,7 +151,7 @@ internal sealed class HotkeyService : IDisposable
                 case 1: ModeRequested?.Invoke(2); handled = true; break;
                 case 2: ModeRequested?.Invoke(0); handled = true; break;
                 case 3: ModeRequested?.Invoke(1); handled = true; break;
-                case 4: ModeRequested?.Invoke(3); handled = true; break;
+                case 4: CustomModeCycleRequested?.Invoke(); handled = true; break;
                 case 5: OverlayRequested?.Invoke(); handled = true; break;
                 case 6: SettingsRequested?.Invoke(); handled = true; break;
                 case 7: ShowRequested?.Invoke(); handled = true; break;
