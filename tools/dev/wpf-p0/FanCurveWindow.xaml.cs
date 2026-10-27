@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using MechrevoLite;
 using MechrevoLite.Hardware;
 using MechrevoLite.Mode;
@@ -17,6 +18,7 @@ public partial class FanCurveWindow : Window
     private readonly MechrevoHw? _hw;
     private bool _dirty;
     private WujieFanEcController? _wujieController;
+    private readonly DispatcherTimer _activeModeRefreshTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
 
     public FanCurveWindow(string modeId, bool showCpu = true, bool showGpu = true)
     {
@@ -44,7 +46,13 @@ public partial class FanCurveWindow : Window
         GpuCurve.Changed += MarkDirty;
         Closing += OnClosing;
         Closed += OnClosed;
+        _activeModeRefreshTimer.Tick += (_, _) =>
+        {
+            _activeModeRefreshTimer.Stop();
+            OnActiveModeChanged(force: true);
+        };
         MechrevoLite.Mode.PerfModeService.Instance?.ActiveChanged += OnActiveModeChanged;
+        MechrevoLite.Mode.PerfModeService.Instance?.Applied += OnAppliedMode;
         LoadFromHardware();
     }
 
@@ -54,27 +62,43 @@ public partial class FanCurveWindow : Window
         if (perf != null)
         {
             perf.ActiveChanged -= OnActiveModeChanged;
+            perf.Applied -= OnAppliedMode;
         }
+        _activeModeRefreshTimer.Stop();
+    }
+
+    private void OnAppliedMode(MechrevoLite.Mode.PerfApplyOutcome outcome)
+    {
+        OnActiveModeChanged();
+    }
+
+    private void OnActiveModeChanged()
+    {
+        OnActiveModeChanged(force: false);
     }
 
     /// <summary>切换自定义/性能档后，已打开的风扇曲线窗口立即切到新档并重载曲线。</summary>
-    private void OnActiveModeChanged()
+    private void OnActiveModeChanged(bool force)
     {
         if (!Dispatcher.CheckAccess())
         {
-            Dispatcher.BeginInvoke(new Action(OnActiveModeChanged));
+            Dispatcher.BeginInvoke(new Action(() => OnActiveModeChanged(force)));
             return;
         }
         string? id = MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId;
-        if (!string.IsNullOrWhiteSpace(id))
+        if (string.IsNullOrWhiteSpace(id))
         {
-            SetModeId(id);
+            return;
         }
+        SetModeId(id, force);
+        // 档位切换的硬件回读/保存可能晚于 ActiveChanged 一瞬；再补一次强制刷新。
+        _activeModeRefreshTimer.Stop();
+        _activeModeRefreshTimer.Start();
     }
 
-    internal void SetModeId(string modeId)
+    internal void SetModeId(string modeId, bool force = false)
     {
-        if (string.Equals(_modeId, modeId, StringComparison.Ordinal))
+        if (!force && string.Equals(_modeId, modeId, StringComparison.Ordinal))
         {
             return;
         }

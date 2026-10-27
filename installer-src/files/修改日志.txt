@@ -15,6 +15,7 @@ r83（2026-10-27 · 0.293.6 beta23.6 · WPF 主界面打包）
 - FanCurveWindow 订阅 PerfModeService.ActiveChanged：切自定义档后立刻 SetModeId+LoadFromHardware；宽屏内嵌风扇曲线同样生效。
 - 深色主题 MutedBrush #9BA6B5→#CBD5E1、新增 HeaderStatBrush #E2E9F2 供标题行状态文字，标题图标随 Muted 提亮；浅色不变。
 - 赞助页：安装器补 files\Assets\Resources\qrcode{1..4}，DestDir={app}\Assets\Resources（WPF XAML 的 Assets/Resources 路径）；设置页鸣谢按钮移到最底部，关于文案去掉“正代更新”。
+- FanCurveWindow 增加 Applied 订阅与 450ms 延迟强制重载：解决 ActiveChanged 与硬件回读/保存之间的竞态，宽屏内嵌曲线同步。
 - 静音狂暴在迷你/宽屏/托盘可见；自定义模式高亮/绑定/自动下发修复。
 - GPU 超频仅实际 50 GCU 显示/执行；DB 只在静音/平衡/狂暴处理，不碰自定义。
 - PL1/PL2/fPPT 强制 fPPT>=PL2>=PL1；自定义切换自动按保存配置下发一次。
