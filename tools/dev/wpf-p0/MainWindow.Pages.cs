@@ -265,7 +265,46 @@ public partial class MainWindow
     private void WireCustomEvents()
     {
     }
-    /// <summary>离开非首页时释放该页视觉树与字段，下次进入再重建；首页常驻，避免传感器计时器空引用。</summary>
+    private static int WidePageCacheSeconds()
+    {
+        int seconds = MechrevoLite.AppConfig.Get("wide_page_cache_seconds", 300);
+        string? env = Environment.GetEnvironmentVariable("LMECHREVO_PAGE_CACHE_SECONDS");
+        if (int.TryParse(env, out int overrideSeconds))
+        {
+            return Math.Clamp(overrideSeconds, 2, 1800);
+        }
+        return Math.Clamp(seconds, 30, 1800);
+    }
+
+    private bool IsPageViewLoaded(string page) => page switch
+    {
+        "screen" => _screenView != null,
+        "lighting" => _lightingView != null,
+        "custom" => _customView != null,
+        "switches" => _switchesView != null,
+        _ => false
+    };
+
+    private void EvictIdlePageViews()
+    {
+        long now = Environment.TickCount64;
+        long ttl = WidePageCacheSeconds() * 1000L;
+        foreach (string page in new[] { "screen", "lighting", "custom", "switches" })
+        {
+            if (string.Equals(page, _activePage, StringComparison.Ordinal) || !IsPageViewLoaded(page))
+            {
+                continue;
+            }
+            if (now - _pageLastAccess.GetValueOrDefault(page, 0) < ttl)
+            {
+                continue;
+            }
+            Logger.WriteLine("[wide-mem] 页面超过 " + (ttl / 1000) + "s 未打开，释放视图：" + page);
+            ReleasePageView(page);
+        }
+    }
+
+    /// <summary>超过 TTL 未被打开的页面释放视觉树与字段；TTL 内保留以保住滚动/展开状态。首页常驻。</summary>
     private void ReleasePageView(string page)
     {
         switch (page)

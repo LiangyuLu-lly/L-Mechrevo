@@ -62,6 +62,8 @@ public partial class MainWindow : Window
     private bool _wideMaximized;
     private bool _switchingToMini;
     private string _activePage = "home";
+    private readonly Dictionary<string, long> _pageLastAccess = new() { ["home"] = Environment.TickCount64 };
+    private readonly DispatcherTimer _pageEvictionTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private bool _animatingWindow;
     private L_Mechrevo.WpfP0.Pages.SwitchesPageView? _switchesView;
     private ScrollViewer? SwitchesPage;
@@ -116,6 +118,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _sensorTimer.Stop();
+            _pageEvictionTimer.Stop();
             if (_switchingToMini || _owner == null)
             {
                 return;
@@ -613,11 +616,8 @@ public partial class MainWindow : Window
 
     private void ApplyPage(string page)
     {
-        if (!string.Equals(_activePage, page, StringComparison.Ordinal))
-        {
-            ReleasePageView(_activePage);
-            _activePage = page;
-        }
+        _activePage = page;
+        _pageLastAccess[page] = Environment.TickCount64;
         if (page == "home") EnsureHomeView();
         else if (page == "screen") EnsureScreenView();
         else if (page == "lighting") EnsureLightingView();
