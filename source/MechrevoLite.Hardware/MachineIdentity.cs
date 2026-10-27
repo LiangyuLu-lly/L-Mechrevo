@@ -37,10 +37,14 @@ internal sealed record MachineIdentity(
 	string WujieApuSource,
 	string Summary)
 {
-	/// <summary>UMI / Intel NUC X15：型号名含 Umi，或板号 LAPKC*。</summary>
-	public bool IsUmi => (Model ?? "").Contains("Umi", StringComparison.OrdinalIgnoreCase)
-		|| (Board ?? "").Contains("Umi", StringComparison.OrdinalIgnoreCase)
+	/// <summary>UMI 机器：型号名包含 Umi。</summary>
+	public bool IsUmi => (Model ?? "").Contains("Umi", StringComparison.OrdinalIgnoreCase);
+
+	/// <summary>Intel NUC X15：型号含 NUC/X15，或板号 LAPKC*。</summary>
+	public bool IsIntelNuc => (Model ?? "").Contains("NUC", StringComparison.OrdinalIgnoreCase)
+		|| (Model ?? "").Contains("X15", StringComparison.OrdinalIgnoreCase)
 		|| (Board ?? "").StartsWith("LAPKC", StringComparison.OrdinalIgnoreCase);
+
 
 	/// <summary>WMI 类 <c>root\WMI:MICommonInterface</c>（老同方 / 宝龙达共用入口）。</summary>
 	private const string MifsWmiClass = "root\\WMI:MICommonInterface";

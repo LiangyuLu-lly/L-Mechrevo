@@ -1031,7 +1031,7 @@ public class MechrevoHw : IDisposable
 	{
 		get
 		{
-			return Capabilities.Lightbar || Capabilities.RgbLightbar || LightbarStatusSeen || IsUmiMachine;
+			return Capabilities.Lightbar || Capabilities.RgbLightbar || LightbarStatusSeen || IsIntelNucMachine;
 		}
 	}
 
@@ -1938,8 +1938,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// </summary>
 	internal bool UsesBaolongda => _baolongda != null;
 
-	/// <summary>UMI / Intel NUC X15（型号名含 Umi 或板号 LAPKC*）。</summary>
+	/// <summary>UMI 机器（型号名含 Umi）。</summary>
 	internal bool IsUmiMachine => BackendRouter.LastDecision?.Identity?.IsUmi == true;
+
+	/// <summary>Intel NUC X15（型号含 NUC/X15 或板号 LAPKC*）。</summary>
+	internal bool IsIntelNucMachine => BackendRouter.LastDecision?.Identity?.IsIntelNuc == true;
 
 	/// <summary>
 	/// ⭐⭐ 2026-10-16：本会话是否在用**任一种"内置档位"后端**（⭐ 老同方 或 ⭐ 宝龙达 ✅）。

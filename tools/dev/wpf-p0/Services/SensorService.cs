@@ -46,7 +46,7 @@ internal sealed class SensorService : ISensorService
                 : NvidiaSmiSensor.GetMemoryClockMhz();
             int umiMain = -1;
             int umiSecond = -1;
-            bool umiFan = hw != null && hw.IsUmiMachine
+            bool umiFan = hw != null && hw.IsIntelNucMachine
                 && UmiFanReader.TryReadFanRpm(out umiMain, out umiSecond);
             float? gpuPower = HardwareControl.gpuPower;
             if (!gpuPower.HasValue && NvmlHelper.Unavailable)
