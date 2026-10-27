@@ -34,6 +34,14 @@ The UI is not limited to a fixed light/dark pair:
 
 <img src="docs/images/wide-background-20261028.png" width="760" alt="Wide custom wallpaper example">
 
+## Source
+
+The current source tree is in the repository root:
+
+- `source/`: shared hardware/business code
+- `tools/dev/wpf-p0/`: WPF UI
+- `tools/core-shims/`: Core compatibility shims
+
 ## Features
 
 ### Performance modes

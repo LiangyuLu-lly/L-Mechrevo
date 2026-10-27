@@ -34,6 +34,14 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 <img src="docs/images/wide-background-20261028.png" width="760" alt="宽屏自定义壁纸示例">
 
+## 源码
+
+当前源码在仓库根目录：
+
+- `source/`：共享硬件与业务代码
+- `tools/dev/wpf-p0/`：WPF 界面
+- `tools/core-shims/`：Core 兼容层
+
 ## 功能特性
 
 ### 性能模式

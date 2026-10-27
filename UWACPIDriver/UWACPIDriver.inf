@@ -1,0 +1,80 @@
+;
+; UWACPIDriver.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System ; TODO: specify appropriate Class
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider=%ManufacturerName%
+CatalogFile=UWACPIDriver.cat
+DriverVer = 10/28/2025,10.48.11.331
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+UWACPIDriver_Device_CoInstaller_CopyFiles = 11
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+UWACPIDriver.sys  = 1,,
+;
+
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTamd64
+
+[Standard.NTamd64]
+%UWACPIDriver.DeviceDesc%=UWACPIDriver_Device, ACPI\INOU0000 ; TODO: edit hw-id
+
+[UWACPIDriver_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+UWACPIDriver.sys
+
+;-------------- Service installation
+[UWACPIDriver_Device.NT.Services]
+AddService = UWACPIDriver,%SPSVCINST_ASSOCSERVICE%, UWACPIDriver_Service_Inst
+
+; -------------- UWACPIDriver driver install sections
+[UWACPIDriver_Service_Inst]
+DisplayName    = %UWACPIDriver.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\UWACPIDriver.sys
+
+;
+;--- UWACPIDriver_Device Coinstaller installation ------
+;
+
+[UWACPIDriver_Device.NT.CoInstallers]
+AddReg=UWACPIDriver_Device_CoInstaller_AddReg
+CopyFiles=UWACPIDriver_Device_CoInstaller_CopyFiles
+
+[UWACPIDriver_Device_CoInstaller_AddReg]
+;
+
+
+[UWACPIDriver_Device_CoInstaller_CopyFiles]
+;
+
+
+[UWACPIDriver_Device.NT.Wdf]
+KmdfService =  UWACPIDriver, UWACPIDriver_wdfsect
+[UWACPIDriver_wdfsect]
+KmdfLibraryVersion = 1.15
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="Uniwill" ;TODO: Replace with your manufacturer name
+DiskName = "UWACPIDriver Installation Disk"
+UWACPIDriver.DeviceDesc = "ACPIDriver"
+UWACPIDriver.SVCDESC = "UWACPIDriver Service"

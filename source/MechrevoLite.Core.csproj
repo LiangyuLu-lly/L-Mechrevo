@@ -1,0 +1,143 @@
+<Project>
+
+  <!-- ==========================================================================================
+       task-11（可行性探针）：把「业务代码」从旧 WinForms 工程 `L-Mechrevo.csproj` 拆成独立 Core 程序集。
+       ⚠️ 本文件只用于**可行性验证 / 骨架**：不迁移文件、不改旧工程、不改 WPF；是否保留/转正由 Lead 决定。
+       ✅ 2026-10-26：兼容 shim 后已 0 错误；WPF 已切到本 Core 引用（详见 WPF业务Core-Shim-20261026.md）。
+       做法：EnableDefaultCompileItems=false + 显式 Include 业务目录/根文件；框架与 8 个第三方引用与旧工程一致。
+       ========================================================================================== -->
+
+  <!-- ⭐ 隔离中间/输出目录：本 csproj 与旧工程同在 source\ 下，默认会共用 source\obj\project.assets.json。
+       必须在 Sdk.props 之前设置，故本项目采用**显式 SDK 导入**（不用 <Project Sdk="..."> 简写）。 -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj\MechrevoLite.Core\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(MSBuildProjectDirectory)\obj\MechrevoLite.Core\</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>bin\MechrevoLite.Core\</BaseOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <AssemblyName>MechrevoLite.Core</AssemblyName>
+    <RootNamespace>MechrevoLite</RootNamespace>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- 与旧工程一致：UseWindowsForms=true ⇒ 先排除"缺 WinForms/System.Drawing 引用"这类框架级差异，
+         留下的错误才是真正的"业务代码与旧 UI 耦合"阻塞（实测分类见文档）。 -->
+    <UseWindowsForms>True</UseWindowsForms>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+    <!-- ⭐ 关键：不自动吃 source/**/*.cs（否则会把旧 WinForms UI 目录也编进来，探针就失去意义） -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- 与旧工程一致的告警豁免；Nullable 与旧工程一样是关闭的（业务文件里有大量 ? 注解，属既有告警） -->
+    <NoWarn>$(NoWarn);WFO1000;CA1416;CS8632</NoWarn>
+  </PropertyGroup>
+
+  <!-- ===== 业务目录（第一阶段：全部纳入，测量真实阻塞） ===== -->
+  <ItemGroup Label="Business dirs (all)">
+    <Compile Include="PawnIO\**\*.cs" />
+    <Compile Include="MechrevoLite.Battery\**\*.cs" />
+    <Compile Include="MechrevoLite.Diagnostics\**\*.cs" />
+    <Compile Include="MechrevoLite.Display\**\*.cs" />
+    <Compile Include="MechrevoLite.Fan\**\*.cs" />
+    <Compile Include="MechrevoLite.Gpu\**\*.cs" />
+    <Compile Include="MechrevoLite.Gpu.NVidia\**\*.cs" />
+    <Compile Include="MechrevoLite.Hardware\**\*.cs" />
+    <Compile Include="MechrevoLite.Helpers\**\*.cs" />
+    <Compile Include="MechrevoLite.Mode\**\*.cs" />
+    <Compile Include="MechrevoLite.Update\**\*.cs" />
+    <Compile Include="MechrevoLite.Usage\**\*.cs" />
+    <!-- 第二阶段：5 个"纯旧 UI 形态"文件剔除（WinForms 窗体/控件，属 UI 层；保留会导致声明期错误） -->
+    <Compile Remove="MechrevoLite.Helpers\DonateControl.cs" />
+    <Compile Remove="MechrevoLite.Helpers\ToastForm.cs" />
+    <Compile Remove="MechrevoLite.Update\UpdateForm.cs" />
+    <Compile Remove="MechrevoLite.Gpu\GPUModeControl.cs" />
+    <Compile Remove="MechrevoLite.Mode\ModeControl.cs" />
+  </ItemGroup>
+
+  <!-- ===== 业务根文件（旧工程 source\ 根目录下、非窗体的业务基础设施） ===== -->
+  <ItemGroup Label="Business root files">
+    <Compile Include="AmdDisplay.cs" />
+    <Compile Include="CrashRingBuffer.cs" />
+    <Compile Include="Logger.cs" />
+    <Compile Include="NativeDriverGuard.cs" />
+    <Compile Include="NativeMethods.cs" />
+    <Compile Include="NvidiaSmi.cs" />
+    <Compile Include="NvmlHelper.cs" />
+    <Compile Include="StartupTaskPlan.cs" />
+    <!-- 反编译产物：被业务代码使用的只读集合/内联数组辅助类型（源码里真实存在） -->
+    <Compile Include="--y__InlineArray19.cs" />
+    <Compile Include="--z__ReadOnlyArray.cs" />
+    <Compile Include="--z__ReadOnlySingleElementList.cs" />
+    <!-- 旧根目录里的业务协调器/探针（非窗体；业务代码大量引用） -->
+    <Compile Include="MechrevoLite\HardwareControl.cs" />
+    <Compile Include="MechrevoLite\ScreenGateProbe.cs" />
+    <Compile Include="MechrevoLite\SettingsBackup.cs" />
+    <Compile Include="MechrevoLite\GcuPackageImport.cs" />
+    <Compile Include="MechrevoLite\KeyboardLightingDecision.cs" />
+    <Compile Include="MechrevoLite\WujieFanCurveAutoApply.cs" />
+    <Compile Include="Startup.cs" />
+    <!-- 旧入口的 ACPI 门面（纯 Win32/业务类型，非窗体；Program shim 需要它的类型） -->
+    <Compile Include="MechrevoLite\AsusACPI.cs" />
+    <!-- ⭐ task-12：旧 WinForms UI 的兼容 shim（在 source 外，显式 Link 编入 Core） -->
+    <Compile Include="..\tools\core-shims\CoreUiShims.cs" Link="CoreUiShims.cs" />
+  </ItemGroup>
+
+  <!-- ===== 业务资源（Strings 可编入 Core；旧 UI 的 Resources/Fans resx 不属 Core） ===== -->
+  <ItemGroup Label="Business resources (Strings only)">
+    <Compile Include="MechrevoLite.Properties\Strings.cs" />
+    <EmbeddedResource Include="MechrevoLite.Properties.Strings.resx" LogicalName="MechrevoLite.Properties.Strings.resources" />
+    <EmbeddedResource Include="MechrevoLite.Properties.Strings.zh-CN.resx" LogicalName="MechrevoLite.Properties.Strings.zh-CN.resources" />
+    <!-- 旧 L-Mechrevo.csproj 的内嵌载荷/注册表；Core 拆分时遗漏，2026-10-26 补回 -->
+    <EmbeddedResource Include="LMechrevo.model-registry.json" LogicalName="LMechrevo.model-registry.json" />
+    <EmbeddedResource Include="MechrevoLite.Diagnostics\LMechrevo.gcu-payload-baseline.txt" LogicalName="LMechrevo.gcu-payload-baseline.txt" />
+    <!-- 旧根目录里的配置存储（业务基础设施，实测可编入 Core） -->
+    <Compile Include="MechrevoLite\AppConfig.cs" />
+    <!-- 被 AppConfig 死代码引用的小枚举（3 行；不是窗体） -->
+    <Compile Include="MechrevoLite\AsusFan.cs" />
+  </ItemGroup>
+
+  <!-- ===== 与旧工程相同的 8 个第三方程序集（HintPath 复用 lm_pkg_files\{app}） ===== -->
+  <ItemGroup Label="Third-party references (same set as L-Mechrevo.csproj)">
+    <Reference Include="Microsoft.Win32.TaskScheduler">
+      <HintPath>..\lm_pkg_files\{app}\Microsoft.Win32.TaskScheduler.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Management">
+      <HintPath>..\lm_pkg_files\{app}\System.Management.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\lm_pkg_files\{app}\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Probe">
+      <HintPath>..\lm_pkg_files\{app}\Probe.dll</HintPath>
+    </Reference>
+    <Reference Include="LibreHardwareMonitorLib">
+      <HintPath>..\lm_pkg_files\{app}\LibreHardwareMonitorLib.dll</HintPath>
+    </Reference>
+    <Reference Include="MQTTnet">
+      <HintPath>..\lm_pkg_files\{app}\MQTTnet.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Windows.SDK.NET">
+      <HintPath>..\lm_pkg_files\{app}\Microsoft.Windows.SDK.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="NvAPIWrapper">
+      <HintPath>..\lm_pkg_files\{app}\NvAPIWrapper.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="L-Mechrevo.WpfP0" />
+  </ItemGroup>
+  <ItemGroup Label="PawnIO modules (external, not embedded)">
+    <None Include="LMechrevo.RyzenSMU.bin" Link="PawnIO\LMechrevo.RyzenSMU.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="LMechrevo.IntelMSR.bin" Link="PawnIO\LMechrevo.IntelMSR.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="LMechrevo.LpcACPIEC.bin" Link="PawnIO\LMechrevo.LpcACPIEC.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="LMechrevo.LpcIO.bin" Link="PawnIO\LMechrevo.LpcIO.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

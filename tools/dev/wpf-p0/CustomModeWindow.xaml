@@ -1,0 +1,240 @@
+<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.CustomModeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{x:Static loc:WpfStrings.CustomModeWindow_Title}"
+        Width="640" Height="780"
+        MinWidth="560" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBgBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="Normal"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
+    <Window.Resources>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style x:Key="MiniButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="MinWidth" Value="52" />
+        </Style>
+        <Style x:Key="FooterButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinWidth" Value="94" />
+            <Setter Property="Padding" Value="14,5" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+        <Style x:Key="ApplyButton" TargetType="Button" BasedOn="{StaticResource FooterButton}">
+            <Setter Property="Background" Value="#C62828" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#C62828" />
+        </Style>
+    </Window.Resources>
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel x:Name="HeaderPanel">
+            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_23}" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_22}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ComboBox x:Name="ModeCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" SelectionChanged="ModeCombo_SelectionChanged" />
+                <Button x:Name="NewButton" Content="{x:Static loc:WpfStrings.NewButton_Content}" Grid.Column="2" Style="{StaticResource MiniButton}" Click="New_Click" Margin="8,0,0,0" />
+                <Button x:Name="RenameButton" Content="{x:Static loc:WpfStrings.RenameButton_Content}" Grid.Column="3" Style="{StaticResource MiniButton}" Click="Rename_Click" Margin="6,0,0,0" />
+                <Button x:Name="DeleteButton" Content="{x:Static loc:WpfStrings.DeleteButton_Content}" Grid.Column="4" Style="{StaticResource MiniButton}" Click="Delete_Click" Margin="6,0,0,0" />
+            </Grid>
+            <TextBlock x:Name="StatusText" Text="" Style="{StaticResource MutedText}" FontSize="10" TextWrapping="Wrap" Margin="0,2,0,2" />
+            <TextBlock x:Name="RouteHintText" Text="" Style="{StaticResource MutedText}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,2" />
+            <TextBlock x:Name="PowerWallStatusText" Text="" Style="{StaticResource MutedText}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed" />
+        </StackPanel>
+
+        <ScrollViewer x:Name="ContentScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <Border x:Name="SystemCard" Style="{StaticResource Card}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_21}" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_20}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="PowerModeCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_4}" Tag="" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_14}" Tag="0" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_13}" Tag="1" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_12}" Tag="2" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_19}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="PowerPlanCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" SelectionChanged="PowerPlan_SelectionChanged" />
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_18}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="CpuBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_4}" Tag="" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_11}" Tag="0" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_10}" Tag="1" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_9}" Tag="2" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_8}" Tag="3" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_7}" Tag="4" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_6}" Tag="5" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_5}" Tag="6" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_17}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="RefreshCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" />
+                        </Grid>
+                        <Grid x:Name="FanBoostRow" Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_16}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="FanBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_4}" Tag="" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Tag="1" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.StateOff}" Tag="0" />
+                            </ComboBox>
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="CpuPowerCard" Style="{StaticResource Card}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_15}" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="Pl1Label" Text="{x:Static loc:WpfStrings.Pl1Label_Text}" VerticalAlignment="Center" />
+                            <Slider x:Name="Pl1Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="200" Value="65" ValueChanged="Pl1_Changed" />
+                            <TextBlock x:Name="Pl1Text" Grid.Column="2" Text="65" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="Pl2Label" Text="{x:Static loc:WpfStrings.Pl2Label_Text}" VerticalAlignment="Center" />
+                            <Slider x:Name="Pl2Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="200" Value="65" ValueChanged="Pl2_Changed" />
+                            <TextBlock x:Name="Pl2Text" Grid.Column="2" Text="65" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="Pl4Row" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_14}" VerticalAlignment="Center" />
+                            <Slider x:Name="Pl4Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="Pl4_Changed" />
+                            <TextBlock x:Name="Pl4Text" Grid.Column="2" Text="100" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="StapmTimeRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_13}" VerticalAlignment="Center" />
+                            <Slider x:Name="StapmTimeSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="28" ValueChanged="StapmTime_Changed" />
+                            <TextBlock x:Name="StapmTimeText" Grid.Column="2" Text="28" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="SmuSlowLimitRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_12}" VerticalAlignment="Center" />
+                            <Slider x:Name="SmuSlowLimitSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="65" ValueChanged="SmuSlowLimit_Changed" />
+                            <TextBlock x:Name="SmuSlowLimitText" Grid.Column="2" Text="65" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="SmuSlowTimeRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_11}" VerticalAlignment="Center" />
+                            <Slider x:Name="SmuSlowTimeSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="28" ValueChanged="SmuSlowTime_Changed" />
+                            <TextBlock x:Name="SmuSlowTimeText" Grid.Column="2" Text="28" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="SmuFastTimeRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_10}" VerticalAlignment="Center" />
+                            <Slider x:Name="SmuFastTimeSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="5" ValueChanged="SmuFastTime_Changed" />
+                            <TextBlock x:Name="SmuFastTimeText" Grid.Column="2" Text="5" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="TempGpuCard" Style="{StaticResource Card}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_9}" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="TccLabel" Text="{x:Static loc:WpfStrings.TccLabel_Text}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="TccSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="TccSwitch_Changed" Unchecked="TccSwitch_Changed" />
+                            <Slider x:Name="TccSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="75" Maximum="100" Value="95" ValueChanged="Tcc_Changed" />
+                            <TextBlock x:Name="TccText" Grid.Column="3" Text="95" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_8}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="DbSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="DbSwitch_Changed" Unchecked="DbSwitch_Changed" />
+                            <Slider x:Name="DbSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="30" Value="25" ValueChanged="Db_Changed" />
+                            <TextBlock x:Name="DbText" Grid.Column="3" Text="25" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_7}" VerticalAlignment="Center" />
+                            <Slider x:Name="GpuTgpSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="GpuTgp_Changed" />
+                            <TextBlock x:Name="GpuTgpText" Grid.Column="2" Text="100" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="GpuPowerLimitRow" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_6}" VerticalAlignment="Center" />
+                            <Slider x:Name="GpuPowerLimitSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="0" ValueChanged="GpuPowerLimit_Changed" />
+                            <TextBlock x:Name="GpuPowerLimitText" Grid.Column="2" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="FanCard" Style="{StaticResource Card}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_5}" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_4}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="FanSensitivitySwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="FanSensitivitySwitch_Changed" Unchecked="FanSensitivitySwitch_Changed" />
+                            <Slider x:Name="FanDelaySlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="1000" Value="300" ValueChanged="FanDelay_Changed" />
+                            <TextBlock x:Name="FanDelayText" Grid.Column="3" Text="300" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_3}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="GpuOcSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="GpuOcSwitch_Changed" Unchecked="GpuOcSwitch_Changed" />
+                            <StackPanel Grid.Column="2" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_2}" VerticalAlignment="Center" />
+                            <Slider x:Name="CoreOffsetSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="-500" Maximum="500" Value="0" ValueChanged="CoreOffset_Changed" />
+                            <TextBlock x:Name="CoreOffsetText" Grid.Column="2" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text}" VerticalAlignment="Center" />
+                            <Slider x:Name="MemoryOffsetSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="-1000" Maximum="2000" Value="0" ValueChanged="MemoryOffset_Changed" />
+                            <TextBlock x:Name="MemoryOffsetText" Grid.Column="2" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel x:Name="ActionPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+            <Button x:Name="ApplyButton" Content="{x:Static loc:WpfStrings.ApplyButton_Content}" Style="{StaticResource ApplyButton}" Click="Apply_Click" />
+            <Button Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_2}" Style="{StaticResource FooterButton}" Click="Restore_Click" />
+            <Button x:Name="FanCurveButton" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content}" Style="{StaticResource FooterButton}" Click="FanCurve_Click" />
+            <Button Content="{x:Static loc:WpfStrings.TitleText_Text}" Style="{StaticResource FooterButton}" Click="CpuTuning_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

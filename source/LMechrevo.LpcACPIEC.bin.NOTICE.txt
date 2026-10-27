@@ -1,0 +1,29 @@
+LMechrevo.LpcACPIEC.bin
+=======================
+
+This file is the PawnIO LpcACPIEC module, embedded into L-Mechrevo as a managed resource
+(L-Mechrevo.csproj) and therefore redistributed as part of L-Mechrevo.
+
+Upstream : https://github.com/namazso/PawnIO.Modules
+Licence  : GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later)
+Copyright: (C) 2023 namazso <admin@namazso.eu>
+Licence text: ../LICENSES/LGPL-2.1.txt  (= upstream COPYING, byte-identical)
+Module source: LpcACPIEC.p in the upstream repository, at tag 0.2.11 (the tag this binary was built from).
+
+This copy is unmodified. SHA-256 of this file:
+  C38FD116E7AFF4D1FDB0A494E296BE0A6708E5A22FC72F14587442FB7F8F7906
+
+Interface exposed by the module (verbatim from upstream LpcACPIEC.p):
+  ioctl_pio_read  (in: port ; out: value)  -- port allowlist: 0x62, 0x66 only
+  ioctl_pio_write (in: port, value)        -- port allowlist: 0x62, 0x66 only
+  Callers should acquire the "\BaseNamedObjects\Access_EC" mutant before calling.
+
+The EC mailbox transport implemented in ../source/MechrevoLite.Hardware/EcPortIo.cs follows the
+ITE IT5570 EC mailbox convention (command 0x92 read / 0x93 write over data port 0x62 with the
+status/command port 0x66), as documented by the JiaoLong16Pro-Battery-threshold project and by
+the vendor control centre EC path. Only protocol facts (port roles, command bytes, address
+layout) were taken; no third-party code was copied.
+
+⚠️ This module grants raw port I/O for ports 0x62/0x66 only. It is loaded lazily, only while a
+   caller actually needs XRAM access, and is never used to reach ports outside that allowlist.
+   WinRing0 / inpoutx64 are deliberately NOT used (their drivers are non-compliant to redistribute).

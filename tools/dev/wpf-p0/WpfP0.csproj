@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>L-Mechrevo</AssemblyName>
+    <Version>0.293.6</Version>
+    <AssemblyVersion>0.293.6.0</AssemblyVersion>
+    <FileVersion>0.293.6.0</FileVersion>
+    <InformationalVersion>0.293.6-beta23.6</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <RootNamespace>L_Mechrevo.WpfP0</RootNamespace>
+    <StartupObject>L_Mechrevo.WpfP0.App</StartupObject>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\source\MechrevoLite.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\Fonts\HarmonyOS_Sans_SC_Regular.ttf" Link="Fonts\HarmonyOS_Sans_SC_Regular.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\HarmonyOS_Sans_SC_Bold.ttf" Link="Fonts\HarmonyOS_Sans_SC_Bold.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\LICENSES\**\*" Link="LICENSES\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Resources\qrcode1.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Resources\qrcode2.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Resources\qrcode3.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Resources\qrcode4.png" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\background.jpg" />
+    <Resource Include="Assets\Icons\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+</Project>

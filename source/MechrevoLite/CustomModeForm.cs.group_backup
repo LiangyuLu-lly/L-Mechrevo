@@ -1,0 +1,1492 @@
+using System;
+using MechrevoLite.Properties;using System.Collections.Generic;
+using MechrevoLite.Properties;using System.Drawing;
+using MechrevoLite.Properties;using System.IO;
+using MechrevoLite.Properties;using System.Linq;
+using MechrevoLite.Properties;using System.Text.Json;
+using MechrevoLite.Properties;using System.Threading;
+using MechrevoLite.Properties;using System.Threading.Tasks;
+using MechrevoLite.Properties;using System.Windows.Forms;
+using MechrevoLite.Properties;using MechrevoLite.Hardware;
+using MechrevoLite.Properties;using MechrevoLite.Helpers;
+using MechrevoLite.Properties;using MechrevoLite.UI;
+using MechrevoLite.Properties;
+namespace MechrevoLite;
+
+public class CustomModeForm : RForm
+{
+	internal const int RowLogicalHeight = 26;
+
+	internal static string SwitchPendingText => Strings.SwitchPending;
+
+	internal static string SwitchUnconfirmedText => Strings.SwitchUnconfirmed;
+
+	internal static string GcuDisconnectedText => Strings.GcuDisconnected;
+
+	internal static string FanTableTimeoutText => Strings.FanTableNotReady;
+
+	internal const int SwitchGraceAttempts = 4;
+
+	internal const int SwitchGraceDelayMs = 500;
+
+	private readonly Dictionary<string, string> _pending = new Dictionary<string, string>();
+
+	private readonly System.Windows.Forms.Timer _debounce;
+
+	private readonly SemaphoreSlim _saveLock = new SemaphoreSlim(1, 1);
+
+	private readonly List<string> _rowLabels = new List<string>();
+
+	private int _minContentWidth;
+
+	private bool _syncing;
+
+	private bool _refreshingHardwareState;
+
+	private Panel _scrollHost;
+
+	private int _laidOutContentHeight;
+
+	private RSlider _pl1;
+
+	private RSlider _pl2;
+
+	private RSlider _pl4;
+
+	private RSlider _tcc;
+
+	private RSlider _tgp;
+
+	private RSlider _db;
+
+	private RSlider _coreOc;
+
+	private RSlider _memOc;
+
+	private RNumericUpDown _pl1Val;
+
+	private RNumericUpDown _pl2Val;
+
+	private RNumericUpDown _pl4Val;
+
+	private RNumericUpDown _tccVal;
+
+	private RNumericUpDown _tgpVal;
+
+	private RNumericUpDown _dbVal;
+
+	private RNumericUpDown _coreOcVal;
+
+	private RNumericUpDown _memOcVal;
+
+	private RSlider _fanSwitchSpeed;
+
+	private RNumericUpDown _fanSwitchSpeedVal;
+
+	private RCheckBox _dbChk;
+
+	private RCheckBox _tccChk;
+
+	private RCheckBox _ocChk;
+
+	private RCheckBox _fanSwitchSpeedChk;
+
+	private bool _gpuOcCoreAdjustable;
+
+	private bool _gpuOcMemoryAdjustable;
+
+	private bool _gpuOcArmed;
+
+	private FlowLayoutPanel _gpuOcAdminRow;
+
+	private RComboBox _planCombo;
+
+	private RComboBox _boostCombo;
+
+	private bool _syncingWinPower;
+
+	private int _currentIdx = -1;
+
+	private int _pendingProfileIndex = -1;
+
+	private int _switchGeneration;
+
+	private Label _status;
+
+	private Label _powerWallStatus;
+
+	private readonly System.Windows.Forms.Timer _powerWallTimer = new System.Windows.Forms.Timer
+	{
+		Interval = 2000
+	};
+
+	private RButton[] _profileBtns;
+
+	internal static Action? RestartAsAdminOverride { get; set; }
+
+	internal static bool SwitchShouldReportFailure(bool serviceConfirmed, int hardwareProfile, int requestedProfile)
+	{
+		if (!serviceConfirmed)
+		{
+			return hardwareProfile != requestedProfile;
+		}
+		return false;
+	}
+
+	private int D(int value)
+	{
+		return ResponsiveLayout.LogicalToDevice(this, value);
+	}
+
+	public CustomModeForm()
+	{
+		BackColor = UiVisualStyle.Window;
+		ForeColor = UiVisualStyle.Text;
+		Text = Strings.CustomPerformanceMode;
+		FormBorderStyle = FormBorderStyle.Sizable;
+		MaximizeBox = false;
+		StartPosition = FormStartPosition.Manual;
+		ClientSize = new Size(D(820), D(200));
+		InitTheme(setDPI: true);
+		WinPowerPlan.EnsureProfileSettings();
+		Panel panel = (_scrollHost = new Panel
+		{
+			Dock = DockStyle.Fill,
+			AutoScroll = true,
+			BackColor = UiVisualStyle.Window
+		});
+		Controls.Add(panel);
+		TableLayoutPanel tableLayoutPanel = new TableLayoutPanel
+		{
+			Dock = DockStyle.Top,
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			ColumnCount = 1,
+			Padding = new Padding(D(12), D(8), D(12), D(8)),
+			Margin = Padding.Empty,
+			BackColor = UiVisualStyle.Window
+		};
+		tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+		panel.Controls.Add(tableLayoutPanel);
+		int rowCount = 0;
+		FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel
+		{
+			AutoSize = true,
+			FlowDirection = FlowDirection.LeftToRight,
+			WrapContents = true,
+			BackColor = UiVisualStyle.Window,
+			Margin = new Padding(0, 0, 0, D(6))
+		};
+		_status = new Label
+		{
+			Text = Strings.SelectCustomProfile,
+			ForeColor = UiVisualStyle.Muted,
+			AutoSize = true,
+			Margin = Padding.Empty
+		};
+		flowLayoutPanel.Controls.Add(_status);
+		_powerWallStatus = new Label
+		{
+			Name = "labelPowerWallVerdict",
+			Text = "",
+			ForeColor = UiVisualStyle.Muted,
+			AutoSize = true,
+			Margin = new Padding(D(8), 0, 0, 0),
+			Visible = false
+		};
+		flowLayoutPanel.Controls.Add(_powerWallStatus);
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayoutPanel.Controls.Add(flowLayoutPanel, 0, rowCount++);
+		FlowLayoutPanel flowLayoutPanel2 = new FlowLayoutPanel
+		{
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			FlowDirection = FlowDirection.LeftToRight,
+			WrapContents = false,
+			BackColor = UiVisualStyle.Window,
+			Margin = new Padding(0, 0, 0, D(6))
+		};
+		_profileBtns = new RButton[4];
+		for (int i = 0; i < 4; i++)
+		{
+			int idx = i;
+			RButton rButton = new RButton
+			{
+				Text = string.Format(Strings.CustomProfileN, i + 1),
+				AutoSize = true,
+				Margin = new Padding((i != 0) ? D(2) : 0, 0, (i != 3) ? D(2) : 0, 0),
+				Cursor = Cursors.Hand,
+				Tag = i
+			};
+			rButton.Click += async (object? _, EventArgs _) =>
+			{
+				await ActivateProfileAsync(idx);
+			};
+			flowLayoutPanel2.Controls.Add(rButton);
+			_profileBtns[i] = rButton;
+		}
+		UiVisualStyle.ApplySegmentGroup(_profileBtns);
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayoutPanel.Controls.Add(flowLayoutPanel2, 0, rowCount++);
+		TableLayoutPanel table = new TableLayoutPanel
+		{
+			Name = "paramTable",
+			Dock = DockStyle.Top,
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			ColumnCount = 1,
+			BackColor = UiVisualStyle.Surface,
+			Padding = new Padding(D(10), D(8), D(10), D(8)),
+			Margin = new Padding(0, 0, 0, D(6))
+		};
+		table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+		int tableRow = 0;
+		List<TableLayoutPanel> paramRows = new List<TableLayoutPanel>();
+		MechrevoHw hw = Program.hw;
+		_planCombo = new RComboBox
+		{
+			DropDownStyle = ComboBoxStyle.DropDownList,
+			DisplayMember = "Key"
+		};
+		foreach (var (value, key) in WinPowerPlan.GetPlans())
+		{
+			_planCombo.Items.Add(new KeyValuePair<string, string>(key, value));
+		}
+		_planCombo.SelectedIndexChanged += (object? _, EventArgs _) =>
+		{
+			if (!_syncingWinPower && _currentIdx >= 0)
+			{
+				string powerPlanGuid = GetPowerPlanGuid(_planCombo.SelectedItem);
+				if (powerPlanGuid != null)
+				{
+					bool flag = WinPowerPlan.SetActivePlan(powerPlanGuid);
+					bool flag2 = flag && (_boostCombo.SelectedIndex < 0 || WinPowerPlan.SetBoost(_boostCombo.SelectedIndex));
+					if (flag)
+					{
+						AppConfig.Set(WinPowerPlan.GetProfilePlanKey(_currentIdx), powerPlanGuid);
+						if (flag2 && _boostCombo.SelectedIndex >= 0)
+						{
+							AppConfig.Set(WinPowerPlan.GetProfileBoostKey(_currentIdx), _boostCombo.SelectedIndex);
+						}
+						AppConfig.Flush();
+					}
+					if (!flag)
+					{
+						LoadWindowsPowerSettings(_currentIdx);
+						_status.Text = Strings.PowerPlanUnconfirmedNotSaved;
+						_status.ForeColor = UiVisualStyle.Danger;
+					}
+					else if (!flag2)
+					{
+						LoadWindowsPowerSettings(_currentIdx);
+						_status.Text = Strings.PowerPlanConfirmedTurboUnconfirmed;
+						_status.ForeColor = UiVisualStyle.Warn;
+					}
+					else
+					{
+						_status.Text = Strings.PowerPlanTurboConfirmed;
+						_status.ForeColor = UiVisualStyle.Ok;
+					}
+					Logger.WriteLine($"Custom profile {_currentIdx} power plan requested: {powerPlanGuid} planConfirmed={flag} boostConfirmed={flag2}");
+				}
+			}
+		};
+		AddComboRow(Strings.PowerPlan, _planCombo);
+		_boostCombo = new RComboBox
+		{
+			DropDownStyle = ComboBoxStyle.DropDownList
+		};
+		(string, int)[] boostModes = WinPowerPlan.BoostModes;
+		for (int num = 0; num < boostModes.Length; num++)
+		{
+			string item = boostModes[num].Item1;
+			_boostCombo.Items.Add(item);
+		}
+		_boostCombo.SelectedIndexChanged += (object? _, EventArgs _) =>
+		{
+			if (!_syncingWinPower && _currentIdx >= 0)
+			{
+				int selectedIndex = _boostCombo.SelectedIndex;
+				if (selectedIndex >= 0)
+				{
+					if (WinPowerPlan.SetBoost(selectedIndex))
+					{
+						AppConfig.Set(WinPowerPlan.GetProfileBoostKey(_currentIdx), selectedIndex);
+						AppConfig.Flush();
+						_status.Text = Strings.TurboBoostConfirmed;
+						_status.ForeColor = UiVisualStyle.Ok;
+					}
+					else
+					{
+						LoadWindowsPowerSettings(_currentIdx);
+						_status.Text = Strings.TurboBoostUnconfirmedNotSaved;
+						_status.ForeColor = UiVisualStyle.Danger;
+					}
+				}
+			}
+		};
+		AddComboRow(Strings.TurboBoostMode, _boostCombo);
+		(int, int, int, bool) tuple2 = DeviceRange(hw?.Pl1Minimum ?? (-1), hw?.Pl1Maximum ?? (-1), hw?.Pl1 ?? 0);
+		(int, int, int, bool) tuple3 = DeviceRange(hw?.Pl2Minimum ?? (-1), hw?.Pl2Maximum ?? (-1), hw?.Pl2 ?? 0);
+		(RSlider, RNumericUpDown) tuple4 = AddSliderRow(Strings.CpuPl1, tuple2.Item1, tuple2.Item2, tuple2.Item3, (int v) =>
+		{
+			Queue("PL1", v.ToString());
+		});
+		_pl1 = tuple4.Item1;
+		_pl1Val = tuple4.Item2;
+		tuple4 = AddSliderRow(Strings.CpuPl2, tuple3.Item1, tuple3.Item2, tuple3.Item3, (int v) =>
+		{
+			Queue("PL2", v.ToString());
+		});
+		_pl2 = tuple4.Item1;
+		_pl2Val = tuple4.Item2;
+		(int, int, int, bool) tuple5 = DeviceRange(hw?.Pl4Minimum ?? (-1), hw?.Pl4Maximum ?? (-1), hw?.Pl4 ?? 0);
+		tuple4 = AddSliderRow((hw != null && hw.UsesAmdPowerFields) ? Strings.CpuFppt : Strings.CpuPl4, tuple5.Item1, tuple5.Item2, tuple5.Item3, (int v) =>
+		{
+			Queue("PL4", v.ToString());
+		});
+		_pl4 = tuple4.Item1;
+		_pl4Val = tuple4.Item2;
+		_tccChk = AddCheckRow(Strings.CpuTempWall, hw?.TccSwitch ?? false, (bool on) =>
+		{
+			Queue("CpuTccOffsetSwitch", on ? "1" : "0");
+			_tcc.Enabled = on;
+		});
+		(int, int, int, bool) tuple6 = DeviceRange(hw?.TccMinimum ?? (-1), hw?.TccMaximum ?? (-1), hw?.TccTarget ?? 0);
+		(_tcc, _tccVal) = AddSliderRow(Strings.TempWallValue, tuple6.Item1, tuple6.Item2, tuple6.Item3, (int v) =>
+		{
+			Queue("CpuTccOffset", v.ToString());
+		});
+		_tccChk.Enabled = tuple6.Item4;
+		(int, int, int, bool) tuple8 = DeviceRange(hw?.GpuTgpMinimum ?? (-1), hw?.GpuTgpMaximum ?? (-1), hw?.GpuTgp ?? 0);
+		tuple4 = AddSliderRow(Strings.GpuTgpTarget, tuple8.Item1, tuple8.Item2, tuple8.Item3, (int v) =>
+		{
+			Queue("GpuConfigurableTGPTarget", v.ToString());
+		});
+		_tgp = tuple4.Item1;
+		_tgpVal = tuple4.Item2;
+		_dbChk = AddCheckRow(Strings.GpuDynamicBoost, hw?.GpuDbSwitch ?? false, (bool on) =>
+		{
+			Queue("GpuDynamicBoostSwitch", on ? "1" : "0");
+			_db.Enabled = on;
+		});
+		(int, int, int, bool) tuple9 = DeviceRange(hw?.GpuDbMinimum ?? (-1), hw?.GpuDbMaximum ?? (-1), hw?.GpuDb ?? 0);
+		(_db, _dbVal) = AddSliderRow(Strings.DynamicBoostValue, tuple9.Item1, tuple9.Item2, tuple9.Item3, (int v) =>
+		{
+			Queue("GpuDynamicBoost", v.ToString());
+		});
+		_dbChk.Enabled = tuple9.Item4;
+		_fanSwitchSpeedChk = AddCheckRow(Strings.FanSwitchSensitivity, hw?.FanSwitchSpeedEnabled ?? false, (bool on) =>
+		{
+			Queue("FanSwitchSpeedEnabled", on ? "1" : "0");
+			RSlider fanSwitchSpeed = _fanSwitchSpeed;
+			bool enabled = (_fanSwitchSpeedVal.Enabled = on);
+			fanSwitchSpeed.Enabled = enabled;
+		});
+		(int, int, int, bool) tuple11 = DeviceRange(hw?.FanSwitchSpeedMinimum ?? (-1), hw?.FanSwitchSpeedMaximum ?? (-1), hw?.FanSwitchSpeed ?? 0);
+		(_fanSwitchSpeed, _fanSwitchSpeedVal) = AddSliderRow(Strings.GearShiftDelay, tuple11.Item1, tuple11.Item2, tuple11.Item3, (int v) =>
+		{
+			Queue("FanSwitchSpeed", v.ToString());
+		});
+		_fanSwitchSpeed.SmallChange = (_fanSwitchSpeed.LargeChange = 100);
+		_fanSwitchSpeedVal.Increment = 100m;
+		_fanSwitchSpeedChk.Enabled = hw?.SupportsFanSwitchSpeed ?? false;
+		_ocChk = AddCheckRow(Strings.GpuOverclock, hw?.GpuOverclockEnabled ?? false, (bool on) =>
+		{
+			_gpuOcArmed = on;
+			Queue("OverClockingSwitch", on ? "1" : "0");
+			SyncGpuOverclockDependents();
+		});
+		(int, int, int, bool) tuple13 = DeviceRange(hw?.GpuCoreOffsetUserMinimum ?? (-1), hw?.GpuCoreOffsetUserMaximum ?? (-1), hw?.EffectiveGpuCoreClockOffset ?? 0, allowNegative: true);
+		tuple4 = AddSliderRow(Strings.CoreClockOffset, tuple13.Item1, tuple13.Item2, tuple13.Item3, (int v) =>
+		{
+			Queue("GpuCoreClockOffsetOC", v.ToString());
+		});
+		_coreOc = tuple4.Item1;
+		_coreOcVal = tuple4.Item2;
+		(int, int, int, bool) tuple14 = DeviceRange(hw?.GpuMemoryOffsetUserMinimum ?? (-1), hw?.GpuMemoryOffsetUserMaximum ?? (-1), hw?.EffectiveGpuMemoryClockOffset ?? 0, allowNegative: true);
+		(_memOc, _memOcVal) = AddSliderRow(Strings.MemClockOffset, tuple14.Item1, tuple14.Item2, tuple14.Item3, (int v) =>
+		{
+			Queue("GpuMemoryClockOffsetOC", v.ToString());
+		});
+		_ocChk.Enabled = IsOcCheckboxEnabled(hw, tuple13.Item4 || tuple14.Item4);
+		_gpuOcCoreAdjustable = tuple13.Item4;
+		_gpuOcMemoryAdjustable = tuple14.Item4;
+		SyncGpuOverclockDependents();
+		_gpuOcAdminRow = new FlowLayoutPanel
+		{
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			FlowDirection = FlowDirection.LeftToRight,
+			WrapContents = false,
+			BackColor = UiVisualStyle.Surface,
+			Margin = new Padding(0, D(2), 0, 0),
+			Visible = false
+		};
+		_gpuOcAdminRow.Controls.Add(new Label
+		{
+			Text = Strings.OverclockNeedsAdmin,
+			ForeColor = UiVisualStyle.Warn,
+			AutoSize = true,
+			Margin = new Padding(0, D(6), D(12), D(2))
+		});
+		RButton rButton2 = new RButton
+		{
+			Name = "buttonRestartAsAdmin",
+			Text = Strings.RestartAsAdmin,
+			AutoSize = true,
+			Cursor = Cursors.Hand,
+			Margin = new Padding(0, 0, 0, 0)
+		};
+		rButton2.Click += (object? _, EventArgs _) =>
+		{
+			RestartAsAdmin();
+		};
+		_gpuOcAdminRow.Controls.Add(rButton2);
+		table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		table.Controls.Add(_gpuOcAdminRow, 0, tableRow++);
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayoutPanel.Controls.Add(table, 0, rowCount++);
+		FlowLayoutPanel flowLayoutPanel3 = new FlowLayoutPanel
+		{
+			AutoSize = true,
+			FlowDirection = FlowDirection.LeftToRight,
+			WrapContents = false,
+			BackColor = UiVisualStyle.Window
+		};
+		RButton rButton3 = new RButton
+		{
+			Text = Strings.RestoreCurrentDefaults,
+			Width = D(120),
+			Height = D(28),
+			Margin = new Padding(0, 0, D(12), 0),
+			BackColor = UiVisualStyle.SurfaceRaised,
+			ForeColor = UiVisualStyle.Text,
+			BorderColor = UiVisualStyle.Border,
+			Cursor = Cursors.Hand
+		};
+		rButton3.Click += async (object? _, EventArgs _) =>
+		{
+			if (Program.service != null)
+			{
+				MechrevoHw hw2 = Program.hw;
+				if (hw2 != null && hw2.IsConnected && MessageBox.Show(Strings.RestoreDefaultsPrompt, "L-Mechrevo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+				{
+					_status.Text = Strings.Restoring;
+					await Task.Run(async () =>
+					{
+						await Program.hw.Publish("Fan/Control", new Dictionary<string, object> { ["Action"] = "RESTORE_OPERATING_MODE_DETAIL" });
+						await Program.hw.Publish("Fan/Control", new Dictionary<string, object>
+						{
+							["Action"] = "RESTORE_FAN_SPEED_CURVE_SETTING",
+							["Name"] = Program.hw.TableName
+						});
+					});
+					_status.Text = Strings.RestoreSent;
+				}
+			}
+		};
+		flowLayoutPanel3.Controls.Add(rButton3);
+		RButton rButton4 = new RButton
+		{
+			Text = Strings.FanCurve,
+			Width = D(96),
+			Height = D(28),
+			Margin = new Padding(0, 0, D(12), 0),
+			BackColor = UiVisualStyle.SurfaceRaised,
+			ForeColor = UiVisualStyle.Text,
+			BorderColor = UiVisualStyle.Border,
+			Cursor = Cursors.Hand
+		};
+		rButton4.Click += (object? _, EventArgs _) =>
+		{
+			FanCurveForm fanCurveForm = new FanCurveForm();
+			AddOwnedForm(fanCurveForm);
+			fanCurveForm.Location = new Point(Math.Max(0, Left - fanCurveForm.Width - 10), Top);
+			fanCurveForm.Show();
+		};
+		flowLayoutPanel3.Controls.Add(rButton4);
+		Label label = new Label
+		{
+			Text = Strings.ParamsSavedToProfile,
+			ForeColor = UiVisualStyle.Muted,
+			AutoSize = true,
+			Margin = new Padding(0, D(7), 0, 0),
+			Font = UiVisualStyle.Font(8.5f)
+		};
+		flowLayoutPanel3.Controls.Add(label);
+		tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayoutPanel.Controls.Add(flowLayoutPanel3, 0, rowCount++);
+		tableLayoutPanel.RowCount = rowCount;
+		int num3 = 0;
+		using (Graphics dc = CreateGraphics())
+		{
+			using Font font = UiVisualStyle.Font(9.5f);
+			foreach (string rowLabel in _rowLabels)
+			{
+				num3 = Math.Max(num3, TextRenderer.MeasureText(dc, rowLabel, font, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width);
+			}
+		}
+		int num4 = num3 + D(8) + D(12);
+		int num5 = D(104);
+		int num6 = D(52) + D(30) + D(27);
+		int val = num4 + num5 + num6;
+		int val2 = rButton3.Width + rButton3.Margin.Horizontal + rButton4.Width + rButton4.Margin.Horizontal + label.GetPreferredSize(Size.Empty).Width + label.Margin.Horizontal + D(8);
+		int num7 = 0;
+		RButton[] profileBtns = _profileBtns;
+		foreach (RButton rButton5 in profileBtns)
+		{
+			num7 += rButton5.PreferredSize.Width + rButton5.Margin.Horizontal;
+		}
+		_minContentWidth = Math.Max(val, Math.Max(val2, num7)) + tableLayoutPanel.Padding.Horizontal + table.Padding.Horizontal + D(8);
+		foreach (TableLayoutPanel item2 in paramRows)
+		{
+			item2.ColumnStyles[0] = new ColumnStyle(SizeType.Absolute, num4);
+			item2.ColumnStyles[2] = new ColumnStyle(SizeType.Absolute, num6);
+		}
+		MinimumSize = new Size(_minContentWidth + D(24), D(280));
+		ClientSize = new Size(_minContentWidth, ClientSize.Height);
+		_debounce = new System.Windows.Forms.Timer
+		{
+			Interval = 400
+		};
+		_debounce.Tick += async (object? _, EventArgs _) =>
+		{
+			_debounce.Stop();
+			await FlushPendingAsync();
+		};
+		if (Program.hw != null)
+		{
+			Program.hw.CustomModeChanged += OnCustomChanged;
+			FormClosed += (object? _, FormClosedEventArgs _) =>
+			{
+				Program.hw.CustomModeChanged -= OnCustomChanged;
+				_debounce.Stop();
+				_debounce.Dispose();
+				_powerWallTimer.Stop();
+				_powerWallTimer.Dispose();
+			};
+		}
+		else
+		{
+			FormClosed += (object? _, FormClosedEventArgs _) =>
+			{
+				_debounce.Dispose();
+				_powerWallTimer.Stop();
+				_powerWallTimer.Dispose();
+			};
+		}
+		FormClosing += (object? _, FormClosingEventArgs e) =>
+		{
+			if (e.CloseReason == CloseReason.UserClosing)
+			{
+				e.Cancel = true;
+				Hide();
+			}
+		};
+		_powerWallTimer.Tick += (object? _, EventArgs _) =>
+		{
+			UpdatePowerWallVerdict();
+		};
+		VisibleChanged += async (object? _, EventArgs _) =>
+		{
+			if (!Visible)
+			{
+				_gpuOcArmed = false;
+			}
+			_powerWallTimer.Enabled = Visible && !Program.UiAuditMode;
+			if (Visible && !Program.UiAuditMode)
+			{
+				LoadWindowsPowerSettings(CurrentConfigurationProfile());
+				ResizeToContent();
+				await RefreshHardwareStateAsync();
+			}
+		};
+		LoadWindowsPowerSettings(CurrentConfigurationProfile());
+		OnCustomChanged();
+		UiVisualStyle.ApplyWindow(this);
+		UiVisualStyle.ApplySection(table);
+		ResizeToContent();
+		RCheckBox AddCheckRow(string text, bool on, Action<bool> onChanged)
+		{
+			TableLayoutPanel tableLayoutPanel2 = MakeRow();
+			tableLayoutPanel2.Controls.Add(MakeLabel(text, subtitle: false), 0, 0);
+			RCheckBox chk = new RCheckBox
+			{
+				Text = Strings.Enable,
+				Checked = on,
+				ForeColor = UiVisualStyle.Text,
+				BackColor = UiVisualStyle.Window,
+				AutoSize = true,
+				Anchor = AnchorStyles.Left,
+				Margin = Padding.Empty
+			};
+			chk.Tag = tableLayoutPanel2;
+			chk.CheckedChanged += (object? _, EventArgs _) =>
+			{
+				if (!_syncing)
+				{
+					onChanged(chk.Checked);
+				}
+			};
+			tableLayoutPanel2.Controls.Add(chk, 1, 0);
+			return chk;
+		}
+		void AddComboRow(string text, RComboBox combo)
+		{
+			TableLayoutPanel row = MakeRow();
+			row.Controls.Add(MakeLabel(text, subtitle: true), 0, 0);
+			combo.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+			combo.Margin = Padding.Empty;
+			row.Controls.Add(combo, 1, 0);
+			row.SetColumnSpan(combo, 2);
+			combo.FontChanged += (object? _, EventArgs _) =>
+			{
+				SyncRowHeight();
+			};
+			combo.HandleCreated += (object? _, EventArgs _) =>
+			{
+				SyncRowHeight();
+			};
+			SyncRowHeight();
+			int num8 = 0;
+			foreach (object item3 in combo.Items)
+			{
+				num8 = Math.Max(num8, TextRenderer.MeasureText(item3.ToString() ?? "", combo.Font).Width);
+			}
+			combo.DropDownWidth = num8 + 30;
+			void SyncRowHeight()
+			{
+				row.Height = Math.Max(row.Height, combo.Height);
+			}
+		}
+		(RSlider bar, RNumericUpDown valueInput) AddSliderRow(string text, int min, int max, int value2, Action<int> onChanged)
+		{
+			TableLayoutPanel tableLayoutPanel2 = MakeRow();
+			tableLayoutPanel2.Controls.Add(MakeLabel(text, subtitle: true), 0, 0);
+			RSlider bar = new RSlider
+			{
+				Minimum = min,
+				Maximum = max,
+				Value = Math.Clamp(value2, min, max),
+				Dock = DockStyle.Fill,
+				Margin = Padding.Empty
+			};
+			bar.Tag = tableLayoutPanel2;
+			bar.Enabled = max > min;
+			RNumericUpDown valueInput = new RNumericUpDown
+			{
+				Minimum = min,
+				Maximum = max,
+				Value = bar.Value,
+				Increment = 1m,
+				DecimalPlaces = 0,
+				TextAlign = HorizontalAlignment.Right,
+				Anchor = (AnchorStyles.Left | AnchorStyles.Right),
+				Margin = Padding.Empty,
+				MinimumSize = new Size(D(52), 0),
+				Enabled = (max > min)
+			};
+			valueInput.HideNativeSpinButtons();
+			RButton decChip = MakeSpinChip("−", valueInput.DownButton, D(6));
+			RButton incChip = MakeSpinChip("+", valueInput.UpButton, D(2));
+			valueInput.EnabledChanged += (object? _, EventArgs _) =>
+			{
+				RButton rButton7 = decChip;
+				bool enabled3 = (incChip.Enabled = valueInput.Enabled);
+				rButton7.Enabled = enabled3;
+			};
+			RButton rButton6 = decChip;
+			bool enabled = (incChip.Enabled = valueInput.Enabled);
+			rButton6.Enabled = enabled;
+			int lastSent = int.MinValue;
+			bar.ValueChanged += (object? _, EventArgs _) =>
+			{
+				if (valueInput.Value != (decimal)bar.Value)
+				{
+					valueInput.Value = bar.Value;
+				}
+				if (!_syncing && bar.Value != lastSent)
+				{
+					lastSent = bar.Value;
+					onChanged(bar.Value);
+				}
+			};
+			valueInput.ValueChanged += (object? _, EventArgs _) =>
+			{
+				int num8 = decimal.ToInt32(valueInput.Value);
+				if (bar.Value != num8)
+				{
+					bar.Value = num8;
+				}
+			};
+			TableLayoutPanel tableLayoutPanel3 = new TableLayoutPanel
+			{
+				Dock = DockStyle.Fill,
+				ColumnCount = 3,
+				RowCount = 1,
+				Margin = Padding.Empty,
+				BackColor = UiVisualStyle.Surface
+			};
+			tableLayoutPanel3.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+			tableLayoutPanel3.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(30)));
+			tableLayoutPanel3.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, D(27)));
+			tableLayoutPanel3.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			tableLayoutPanel3.Controls.Add(valueInput, 0, 0);
+			tableLayoutPanel3.Controls.Add(decChip, 1, 0);
+			tableLayoutPanel3.Controls.Add(incChip, 2, 0);
+			tableLayoutPanel2.Controls.Add(bar, 1, 0);
+			tableLayoutPanel2.Controls.Add(tableLayoutPanel3, 2, 0);
+			return (bar: bar, valueInput: valueInput);
+			RButton MakeSpinChip(string glyph, Action click, int leftMargin)
+			{
+				RButton rButton7 = new RButton
+				{
+					Tag = "mini-chip",
+					Text = glyph,
+					Anchor = AnchorStyles.Left,
+					Margin = new Padding(leftMargin, 0, 0, 0),
+					BackColor = UiVisualStyle.Surface,
+					ForeColor = UiVisualStyle.Text,
+					BorderColor = UiVisualStyle.Border,
+					Cursor = Cursors.Hand
+				};
+				Size size = TextRenderer.MeasureText(glyph, rButton7.Font, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+				int num8 = Math.Max(D(22), Math.Max(size.Width + D(8), size.Height + D(6)));
+				rButton7.Size = new Size(num8, num8);
+				rButton7.Click += (object? _, EventArgs _) =>
+				{
+					click();
+				};
+				return rButton7;
+			}
+		}
+		Label MakeLabel(string text, bool subtitle)
+		{
+			_rowLabels.Add(text);
+			Label label2 = new Label
+			{
+				Text = text,
+				ForeColor = UiVisualStyle.Text,
+				AutoSize = false,
+				Dock = DockStyle.Fill,
+				TextAlign = ContentAlignment.MiddleLeft,
+				Margin = Padding.Empty
+			};
+			if (subtitle)
+			{
+				label2.Font = UiVisualStyle.Font(9.5f);
+			}
+			label2.Padding = new Padding(D(4), 0, subtitle ? D(8) : 0, 0);
+			return label2;
+		}
+		TableLayoutPanel MakeRow()
+		{
+			TableLayoutPanel tableLayoutPanel2 = new TableLayoutPanel
+			{
+				Dock = DockStyle.Top,
+				ColumnCount = 3,
+				RowCount = 1,
+				Height = D(26),
+				Margin = Padding.Empty,
+				BackColor = UiVisualStyle.Surface
+			};
+			tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0f));
+			tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+			tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0f));
+			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			table.Controls.Add(tableLayoutPanel2, 0, tableRow++);
+			paramRows.Add(tableLayoutPanel2);
+			return tableLayoutPanel2;
+		}
+	}
+
+	private void ResizeToContent()
+	{
+		if (IsDisposed)
+		{
+			return;
+		}
+		ResponsiveLayout.PerformLayoutTree(this);
+		bool flag = false;
+		if (ClientSize.Width < _minContentWidth)
+		{
+			ClientSize = new Size(_minContentWidth, ClientSize.Height);
+			flag = true;
+		}
+		int num = ResponsiveLayout.VisibleContentBottom(_scrollHost);
+		if (num != _laidOutContentHeight || flag)
+		{
+			_laidOutContentHeight = num;
+			int num2 = Height - ClientSize.Height;
+			int num3 = Math.Max(num, MinimumSize.Height - num2);
+			if (ClientSize.Height != num3)
+			{
+				ClientSize = new Size(ClientSize.Width, num3);
+			}
+		}
+	}
+
+	protected override void OnShown(EventArgs e)
+	{
+		base.OnShown(e);
+		ResizeToContent();
+	}
+
+	private void UpdatePowerWallVerdict()
+	{
+		if (Program.UiAuditMode)
+		{
+			return;
+		}
+		HardwareControl.SampleLocalPower();
+		PowerWallVerdict powerWallVerdict = HardwareControl.powerWall.Evaluate(DateTime.Now);
+		string text = (((uint)(powerWallVerdict - 1) > 1u) ? "" : HardwareControl.powerWall.Describe(DateTime.Now));
+		string text2 = text;
+		if (_powerWallStatus.Text != text2)
+		{
+			_powerWallStatus.Text = text2;
+			if (powerWallVerdict == PowerWallVerdict.NotEnforced)
+			{
+				Logger.WriteLine("PowerWall: " + text2);
+			}
+		}
+		_powerWallStatus.Visible = text2.Length > 0;
+		_powerWallStatus.ForeColor = ((powerWallVerdict == PowerWallVerdict.NotEnforced) ? UiVisualStyle.Warn : UiVisualStyle.Muted);
+	}
+
+	private void Queue(string field, string value)
+	{
+		_pending[field] = value;
+		_debounce.Stop();
+		_debounce.Start();
+	}
+
+	internal static bool IsOcCheckboxEnabled(MechrevoHw? hw, bool rangesAdjustable)
+	{
+		int num;
+		if (hw != null && hw.GpuOverclockWritable)
+		{
+			MechrevoDeviceCapabilities capabilities = hw.Capabilities;
+			if (capabilities != null)
+			{
+				num = (capabilities.OverclockSettings ? 1 : 0);
+				goto IL_001e;
+			}
+		}
+		num = 0;
+		goto IL_001e;
+		IL_001e:
+		return (byte)((uint)num & (rangesAdjustable ? 1u : 0u)) != 0;
+	}
+
+	internal async Task<bool> ActivateProfileAsync(int index)
+	{
+		bool flag = ((index < 0 || index > 3) ? true : false);
+		if (flag || Program.service == null)
+		{
+			return false;
+		}
+		MechrevoHw hw = Program.hw;
+		if (hw == null || !hw.IsConnected)
+		{
+			_status.Text = Strings.GcuDisconnected;
+			_status.ForeColor = UiVisualStyle.Danger;
+			return false;
+		}
+		_debounce.Stop();
+		await FlushPendingAsync();
+		_gpuOcArmed = false;
+		int previousProfile = CurrentConfigurationProfile();
+		int generation = ++_switchGeneration;
+		_pendingProfileIndex = index;
+		SelectProfileButton(index);
+		_status.Text = Strings.SwitchPending;
+		_status.ForeColor = UiVisualStyle.Warn;
+		Task<bool> switchTask = Program.service.SwitchCustomProfile(index);
+		ApplyProfileFromFile(index);
+		bool serviceConfirmed = await switchTask;
+		bool flag2 = serviceConfirmed;
+		if (!flag2)
+		{
+			for (int attempt = 0; attempt < 4; attempt++)
+			{
+				if (generation != _switchGeneration)
+				{
+					break;
+				}
+				MechrevoHw? hw2 = Program.hw;
+				if (hw2 != null && hw2.CustomProfileIndex == index)
+				{
+					break;
+				}
+				await Task.Delay(500);
+			}
+			flag2 = !SwitchShouldReportFailure(serviceConfirmed: false, Program.hw?.CustomProfileIndex ?? (-1), index);
+		}
+		if (generation != _switchGeneration)
+		{
+			return false;
+		}
+		_pendingProfileIndex = -1;
+		if (flag2)
+		{
+			if (!serviceConfirmed)
+			{
+				AppConfig.Set("custom_last_profile", index);
+				AppConfig.Flush();
+			}
+			LoadWindowsPowerSettings(index);
+			bool flag3 = WinPowerPlan.ApplyProfile(index);
+			_status.Text = (flag3 ? string.Format(Strings.CustomProfileActivated, index + 1) : string.Format(Strings.CustomProfileActivatedPowerUnconfirmed, index + 1));
+			_status.ForeColor = (flag3 ? UiVisualStyle.Ok : UiVisualStyle.Warn);
+			ApplyProfileFromFile(index);
+			_ = ReconcileProfileFromFileAsync(index, generation);
+		}
+		else
+		{
+			SelectProfileButton(previousProfile);
+			LoadWindowsPowerSettings(previousProfile);
+			_status.Text = Strings.SwitchUnconfirmed;
+			_status.ForeColor = UiVisualStyle.Danger;
+		}
+		return flag2;
+	}
+
+	private async Task ReconcileProfileFromFileAsync(int index, int generation)
+	{
+		try
+		{
+			await Task.Delay(1000);
+			if (generation != _switchGeneration || IsDisposed || Program.hw == null || Program.service == null)
+			{
+				return;
+			}
+			MechrevoHw hw = Program.hw;
+			string file = Path.Combine(AppContext.BaseDirectory, "GCU", "AiStoneService", "MyControlCenter", "UserPofiles", "Mode4_Profile" + (index + 1) + ".json");
+			if (!File.Exists(file))
+			{
+				return;
+			}
+			using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(file));
+			JsonElement root = doc.RootElement;
+			bool amd = hw.UsesAmdPowerFields;
+			Dictionary<string, string> diffs = new Dictionary<string, string>();
+			void Check(string setKey, int expected, int actual)
+			{
+				if (expected != actual)
+				{
+					diffs[setKey] = expected.ToString();
+				}
+			}
+			if (root.TryGetProperty("CPU", out JsonElement cpu))
+			{
+				if (TryGetJsonInt(cpu, amd ? "AmdSPL" : "PL1", out int v))
+				{
+					Check("PL1", v, hw.Pl1);
+				}
+				if (TryGetJsonInt(cpu, amd ? "AmdSPPT" : "PL2", out v))
+				{
+					Check("PL2", v, hw.Pl2);
+				}
+				if (TryGetJsonInt(cpu, amd ? "AmdFPPT" : "PL4", out v))
+				{
+					Check("PL4", v, hw.Pl4);
+				}
+				if (TryGetJsonInt(cpu, "TccOffsetSwitch", out v))
+				{
+					Check("CpuTccOffsetSwitch", v, hw.TccSwitch ? 1 : 0);
+				}
+				int tcc = TryGetJsonInt(cpu, "AmdTccTarget", out int t) ? t : (TryGetJsonInt(cpu, "TccOffset", out t) ? t : (-1));
+				if (tcc >= 0)
+				{
+					Check("CpuTccOffset", Math.Clamp(tcc, hw.TccMinimum, hw.TccMaximum), hw.TccTarget);
+				}
+			}
+			if (root.TryGetProperty("GPU", out JsonElement gpu))
+			{
+				if (TryGetJsonInt(gpu, "DynamicBoostSwitch", out int v))
+				{
+					Check("GpuDynamicBoostSwitch", v, hw.GpuDbSwitch ? 1 : 0);
+				}
+				if (TryGetJsonInt(gpu, "DynamicBoost", out v))
+				{
+					Check("GpuDynamicBoost", v, hw.GpuDb);
+				}
+				if (TryGetJsonInt(gpu, "CoreClockOffsetOC", out v))
+				{
+					Check("GpuCoreClockOffsetOC", v, hw.EffectiveGpuCoreClockOffset);
+				}
+				if (TryGetJsonInt(gpu, "MemoryClockOffsetOC", out v))
+				{
+					Check("GpuMemoryClockOffsetOC", v, hw.EffectiveGpuMemoryClockOffset);
+				}
+			}
+			if (root.TryGetProperty("FAN", out JsonElement fan))
+			{
+				if (TryGetJsonInt(fan, "FanSwitchSpeedEnabled", out int v))
+				{
+					Check("FanSwitchSpeedEnabled", v, hw.FanSwitchSpeedEnabled ? 1 : 0);
+				}
+				if (TryGetJsonInt(fan, "FanSwitchSpeed", out v))
+				{
+					Check("FanSwitchSpeed", v, hw.FanSwitchSpeed);
+				}
+			}
+			if (root.TryGetProperty("OverClockingEnabled", out JsonElement oc) && oc.ValueKind == JsonValueKind.Number)
+			{
+				Check("OverClockingSwitch", oc.GetInt32(), hw.OcSwitch ? 1 : 0);
+			}
+			if (diffs.Count > 0)
+			{
+				Logger.WriteLine("Reconcile 重应用: " + string.Join(", ", diffs.Select((KeyValuePair<string, string> kv) => kv.Key + "=" + kv.Value)));
+				await Program.service.SetCustomDetail(diffs);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("ReconcileProfileFromFile failed: " + ex.Message);
+		}
+	}
+
+	private void ApplyProfileFromFile(int index)
+	{
+		MechrevoHw hw = Program.hw;
+		if (hw == null)
+		{
+			return;
+		}
+		string file = Path.Combine(AppContext.BaseDirectory, "GCU", "AiStoneService", "MyControlCenter", "UserPofiles", "Mode4_Profile" + (index + 1) + ".json");
+		if (!File.Exists(file))
+		{
+			return;
+		}
+		try
+		{
+			using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(file));
+			JsonElement root = doc.RootElement;
+			bool amd = hw.UsesAmdPowerFields;
+			_syncing = true;
+			try
+			{
+				if (root.TryGetProperty("CPU", out JsonElement cpu))
+				{
+					string k1 = amd ? "AmdSPL" : "PL1";
+					string k2 = amd ? "AmdSPPT" : "PL2";
+					string k3 = amd ? "AmdFPPT" : "PL4";
+					if (TryGetJsonInt(cpu, k1, out int v))
+					{
+						SetSliderSafe(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, v);
+					}
+					if (TryGetJsonInt(cpu, k2, out v))
+					{
+						SetSliderSafe(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, v);
+					}
+					if (TryGetJsonInt(cpu, k3, out v))
+					{
+						SetSliderSafe(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, v);
+					}
+					if (TryGetJsonInt(cpu, "TccOffsetSwitch", out int sw))
+					{
+						_tccChk.Checked = sw == 1;
+						_tcc.Enabled = sw == 1 && hw.TccMinimum < hw.TccMaximum;
+					}
+					int tcc = TryGetJsonInt(cpu, "AmdTccTarget", out int t) ? t : (TryGetJsonInt(cpu, "TccOffset", out t) ? t : (-1));
+					if (tcc >= 0)
+					{
+						SetSliderSafe(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, tcc);
+					}
+				}
+				if (root.TryGetProperty("GPU", out JsonElement gpu))
+				{
+					if (TryGetJsonInt(gpu, "DynamicBoostSwitch", out int sw))
+					{
+						_dbChk.Checked = sw == 1;
+						_db.Enabled = sw == 1 && hw.GpuDbMinimum < hw.GpuDbMaximum;
+					}
+					if (TryGetJsonInt(gpu, "DynamicBoost", out int v))
+					{
+						SetSliderSafe(_db, _dbVal, hw.GpuDbMinimum, hw.GpuDbMaximum, v);
+					}
+					if (TryGetJsonInt(gpu, "CoreClockOffsetOC", out v))
+					{
+						SetSliderSafe(_coreOc, _coreOcVal, hw.GpuCoreOffsetUserMinimum, hw.GpuCoreOffsetUserMaximum, v);
+					}
+					if (TryGetJsonInt(gpu, "MemoryClockOffsetOC", out v))
+					{
+						SetSliderSafe(_memOc, _memOcVal, hw.GpuMemoryOffsetUserMinimum, hw.GpuMemoryOffsetUserMaximum, v);
+					}
+				}
+				if (root.TryGetProperty("FAN", out JsonElement fan))
+				{
+					if (TryGetJsonInt(fan, "FanSwitchSpeedEnabled", out int sw))
+					{
+						_fanSwitchSpeedChk.Checked = sw == 1;
+						_fanSwitchSpeed.Enabled = sw == 1 && hw.FanSwitchSpeedMinimum < hw.FanSwitchSpeedMaximum;
+					}
+					if (TryGetJsonInt(fan, "FanSwitchSpeed", out int v))
+					{
+						SetSliderSafe(_fanSwitchSpeed, _fanSwitchSpeedVal, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum, v);
+					}
+				}
+				if (root.TryGetProperty("OverClockingEnabled", out JsonElement oc) && oc.ValueKind == JsonValueKind.Number)
+				{
+					_ocChk.Checked = oc.GetInt32() == 1;
+				}
+			}
+			finally
+			{
+				_syncing = false;
+			}
+			ResizeToContent();
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("ApplyProfileFromFile failed: " + ex.Message);
+		}
+	}
+
+	private static bool TryGetJsonInt(JsonElement obj, string name, out int value)
+	{
+		value = 0;
+		if (obj.TryGetProperty(name, out JsonElement el))
+		{
+			if (el.ValueKind == JsonValueKind.Number && el.TryGetInt32(out value))
+			{
+				return true;
+			}
+			if (el.ValueKind == JsonValueKind.String && int.TryParse(el.GetString(), out value))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static void SetSliderSafe(RSlider bar, RNumericUpDown valueInput, int min, int max, int value)
+	{
+		if (min < max)
+		{
+			bar.Minimum = min;
+			bar.Maximum = max;
+			bar.Value = Math.Clamp(value, min, max);
+			valueInput.Minimum = min;
+			valueInput.Maximum = max;
+			valueInput.Value = bar.Value;
+		}
+	}
+
+	private void SelectProfileButton(int index)
+	{
+		for (int i = 0; i < _profileBtns.Length; i++)
+		{
+			_profileBtns[i].Activated = i == index;
+		}
+	}
+
+	private async Task FlushPendingAsync()
+	{
+		if (Program.service == null)
+		{
+			return;
+		}
+		await _saveLock.WaitAsync();
+		try
+		{
+			while (_pending.Count > 0)
+			{
+				Dictionary<string, string> customDetail = new Dictionary<string, string>(_pending);
+				_pending.Clear();
+				bool flag = await Program.service.SetCustomDetail(customDetail);
+				_status.Text = (flag ? Strings.ParamsConfirmed : Strings.ParamsReverted);
+				_status.ForeColor = (flag ? UiVisualStyle.Ok : UiVisualStyle.Danger);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("Custom profile update failed: " + ex.Message);
+			_status.Text = Strings.ParamsSaveFailed;
+			_status.ForeColor = UiVisualStyle.Danger;
+		}
+		finally
+		{
+			if (_pending.Count > 0)
+			{
+				_debounce.Start();
+			}
+			_saveLock.Release();
+		}
+	}
+
+	private static (int Min, int Max, int Value, bool Adjustable) DeviceRange(int minimum, int maximum, int current, bool allowNegative = false)
+	{
+		if ((allowNegative || minimum >= 0) && maximum > minimum)
+		{
+			return (Min: minimum, Max: maximum, Value: Math.Clamp(current, minimum, maximum), Adjustable: true);
+		}
+		if (Program.UiAuditMode)
+		{
+			return (Min: 0, Max: 100, Value: Math.Clamp(current, 0, 100), Adjustable: true);
+		}
+		int num = Math.Max(0, current);
+		return (Min: num, Max: num, Value: num, Adjustable: false);
+	}
+
+	internal static string? GetPowerPlanGuid(object? selectedItem)
+	{
+		if (!(selectedItem is KeyValuePair<string, string> keyValuePair) || !Guid.TryParse(keyValuePair.Value, out var result))
+		{
+			return null;
+		}
+		return result.ToString();
+	}
+
+	private int CurrentConfigurationProfile()
+	{
+		int num = Program.hw?.CustomProfileIndex ?? (-1);
+		if (num < 0 || num > 3)
+		{
+			return Math.Clamp(AppConfig.Get("custom_last_profile", 0), 0, 3);
+		}
+		return num;
+	}
+
+	private void LoadWindowsPowerSettings(int profileIndex)
+	{
+		if ((profileIndex < 0 || profileIndex > 3) ? true : false)
+		{
+			return;
+		}
+		_syncingWinPower = true;
+		try
+		{
+			_currentIdx = profileIndex;
+			WinPowerPlan.ProfileSettings orCreateProfileSettings = WinPowerPlan.GetOrCreateProfileSettings(profileIndex);
+			string plan = orCreateProfileSettings.Plan;
+			_planCombo.SelectedIndex = -1;
+			for (int i = 0; i < _planCombo.Items.Count; i++)
+			{
+				if (_planCombo.Items[i] is KeyValuePair<string, string> keyValuePair && keyValuePair.Value.Equals(plan, StringComparison.OrdinalIgnoreCase))
+				{
+					_planCombo.SelectedIndex = i;
+					break;
+				}
+			}
+			if (_planCombo.SelectedIndex < 0 && _planCombo.Items.Count > 0)
+			{
+				_planCombo.SelectedIndex = 0;
+			}
+			int num = orCreateProfileSettings.Boost;
+			if (num < 0 || num >= _boostCombo.Items.Count)
+			{
+				num = Array.FindIndex(WinPowerPlan.BoostModes, ((string Name, int Value) m) => m.Name.Contains("系统自动"));
+				if (num < 0)
+				{
+					num = 0;
+				}
+			}
+			_boostCombo.SelectedIndex = num;
+		}
+		finally
+		{
+			_syncingWinPower = false;
+		}
+	}
+
+	internal async Task<bool> RefreshHardwareStateAsync()
+	{
+		if (_refreshingHardwareState)
+		{
+			return false;
+		}
+		MechrevoHw hw = Program.hw;
+		if (hw == null || !hw.IsConnected)
+		{
+			_status.Text = Strings.GcuDisconnected;
+			_status.ForeColor = UiVisualStyle.Danger;
+			return false;
+		}
+		_refreshingHardwareState = true;
+		try
+		{
+			Task<bool> ocTask = Task.Run((Func<bool>)hw.EnsureDirectGpuOverclock);
+			Task<bool> stateTask = hw.RequestCustomModePageStateAsync(TimeSpan.FromMilliseconds(2500L));
+			await Task.WhenAll(ocTask, stateTask);
+			if (!stateTask.Result)
+			{
+				_status.Text = Strings.FanTableNotReady;
+				_status.ForeColor = UiVisualStyle.Danger;
+				return false;
+			}
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("Custom mode status refresh failed: " + ex.Message);
+			_status.Text = Strings.FanTableNotReady;
+			_status.ForeColor = UiVisualStyle.Danger;
+			return false;
+		}
+		finally
+		{
+			_refreshingHardwareState = false;
+			OnCustomChanged();
+		}
+	}
+
+	private static void SetRowVisible(Control control, bool visible, Control? value = null)
+	{
+		if (control.Tag is Control control2)
+		{
+			control2.Visible = visible;
+		}
+		if (value != null)
+		{
+			value.Visible = visible;
+		}
+	}
+
+	private static bool ApplyRange(RSlider bar, RNumericUpDown valueInput, int minimum, int maximum, int current, bool allowNegative = false)
+	{
+		(int, int, int, bool) tuple = DeviceRange(minimum, maximum, current, allowNegative);
+		bar.Minimum = Math.Min(bar.Minimum, tuple.Item1);
+		bar.Maximum = Math.Max(bar.Maximum, tuple.Item2);
+		bar.Value = Math.Clamp(tuple.Item3, bar.Minimum, bar.Maximum);
+		bar.Minimum = tuple.Item1;
+		bar.Maximum = tuple.Item2;
+		bar.Value = tuple.Item3;
+		valueInput.Minimum = Math.Min(valueInput.Minimum, tuple.Item1);
+		valueInput.Maximum = Math.Max(valueInput.Maximum, tuple.Item2);
+		valueInput.Value = tuple.Item3;
+		valueInput.Minimum = tuple.Item1;
+		valueInput.Maximum = tuple.Item2;
+		bar.Enabled = tuple.Item4;
+		valueInput.Enabled = tuple.Item4;
+		SetRowVisible(bar, tuple.Item4, valueInput);
+		return tuple.Item4;
+	}
+
+	private void SyncGpuOverclockDependents()
+	{
+		bool flag = _ocChk.Checked && _ocChk.Enabled;
+		RSlider coreOc = _coreOc;
+		bool enabled = (_coreOcVal.Enabled = flag && _gpuOcCoreAdjustable);
+		coreOc.Enabled = enabled;
+		RSlider memOc = _memOc;
+		enabled = (_memOcVal.Enabled = flag && _gpuOcMemoryAdjustable);
+		memOc.Enabled = enabled;
+	}
+
+	private void RestartAsAdmin()
+	{
+		if (!NativeMethods.HasFreshUserInput())
+		{
+			Logger.WriteLine("Restart-as-admin ignored: no fresh user input.");
+			return;
+		}
+		Action restartAsAdminOverride = RestartAsAdminOverride;
+		if (restartAsAdminOverride != null)
+		{
+			restartAsAdminOverride();
+			return;
+		}
+		Logger.WriteLine("Restart-as-admin requested by user (GPU overclock requires elevation).");
+		ProcessHelper.RunAsAdmin();
+	}
+
+	private void OnCustomChanged()
+	{
+		try
+		{
+			if (IsDisposed)
+			{
+				return;
+			}
+			if (InvokeRequired)
+			{
+				BeginInvoke(OnCustomChanged);
+				return;
+			}
+			MechrevoHw hw = Program.hw;
+			if (hw == null)
+			{
+				return;
+			}
+			_syncing = true;
+			try
+			{
+				int num = ((_pendingProfileIndex >= 0) ? _pendingProfileIndex : hw.CustomProfileIndex);
+				for (int i = 0; i < _profileBtns.Length; i++)
+				{
+					_profileBtns[i].Activated = num == i;
+				}
+				ApplyRange(_pl1, _pl1Val, hw.Pl1Minimum, hw.Pl1Maximum, hw.Pl1);
+				ApplyRange(_pl2, _pl2Val, hw.Pl2Minimum, hw.Pl2Maximum, hw.Pl2);
+				ApplyRange(_pl4, _pl4Val, hw.Pl4Minimum, hw.Pl4Maximum, hw.Pl4);
+				bool flag = ApplyRange(_tcc, _tccVal, hw.TccMinimum, hw.TccMaximum, hw.TccTarget);
+				bool enabled = ApplyRange(_tgp, _tgpVal, hw.GpuTgpMinimum, hw.GpuTgpMaximum, hw.GpuTgp);
+				bool flag2 = ApplyRange(_db, _dbVal, hw.GpuDbMinimum, hw.GpuDbMaximum, hw.GpuDb);
+				bool supportsGpuOverclock = hw.SupportsGpuOverclock;
+				bool gpuOverclockRequiresElevation = hw.GpuOverclockRequiresElevation;
+				bool flag3 = supportsGpuOverclock && !gpuOverclockRequiresElevation;
+				bool num2 = (hw.OcSwitch || hw.GpuOverclockEnabled) & supportsGpuOverclock;
+				bool flag4 = (num2 || _gpuOcArmed) & supportsGpuOverclock;
+				if (num2)
+				{
+					_gpuOcCoreAdjustable = ApplyRange(_coreOc, _coreOcVal, hw.GpuCoreOffsetUserMinimum, hw.GpuCoreOffsetUserMaximum, hw.EffectiveGpuCoreClockOffset, allowNegative: true);
+					_gpuOcMemoryAdjustable = ApplyRange(_memOc, _memOcVal, hw.GpuMemoryOffsetUserMinimum, hw.GpuMemoryOffsetUserMaximum, hw.EffectiveGpuMemoryClockOffset, allowNegative: true);
+				}
+				else if (_gpuOcArmed & supportsGpuOverclock)
+				{
+					_gpuOcCoreAdjustable = hw.GpuCoreOffsetAdjustable;
+					_gpuOcMemoryAdjustable = hw.GpuMemoryOffsetAdjustable;
+				}
+				bool flag5 = ApplyRange(_fanSwitchSpeed, _fanSwitchSpeedVal, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum, hw.FanSwitchSpeed);
+				SetRowVisible(_tccChk, flag);
+				SetRowVisible(_dbChk, flag2);
+				SetRowVisible(_ocChk, supportsGpuOverclock);
+				SetRowVisible(_fanSwitchSpeedChk, hw.SupportsFanSwitchSpeed);
+				SetRowVisible(_fanSwitchSpeed, hw.SupportsFanSwitchSpeed, _fanSwitchSpeedVal);
+				_fanSwitchSpeedChk.Checked = hw.FanSwitchSpeedEnabled;
+				_fanSwitchSpeedChk.Enabled = hw.SupportsFanSwitchSpeed;
+				RSlider fanSwitchSpeed = _fanSwitchSpeed;
+				bool enabled2 = (_fanSwitchSpeedVal.Enabled = (hw.SupportsFanSwitchSpeed && hw.FanSwitchSpeedEnabled) & flag5);
+				fanSwitchSpeed.Enabled = enabled2;
+				_tgp.Enabled = enabled;
+				_dbChk.Checked = hw.GpuDbSwitch;
+				_dbChk.Enabled = flag2;
+				_db.Enabled = hw.GpuDbSwitch & flag2;
+				int num3 = CurrentConfigurationProfile();
+				if (num3 != _currentIdx || _planCombo.SelectedIndex < 0)
+				{
+					LoadWindowsPowerSettings(num3);
+				}
+				_tccChk.Checked = hw.TccSwitch;
+				_tccChk.Enabled = flag;
+				_tcc.Enabled = hw.TccSwitch & flag;
+				_ocChk.Checked = flag3 & flag4;
+				_ocChk.Enabled = flag3 && hw.Capabilities.OverclockSettings;
+				if (_gpuOcAdminRow != null)
+				{
+					_gpuOcAdminRow.Visible = supportsGpuOverclock & gpuOverclockRequiresElevation;
+				}
+				SyncGpuOverclockDependents();
+				if (hw.CustomProfileIndex >= 0 && _pendingProfileIndex < 0)
+				{
+					_status.Text = string.Format(Strings.CustomProfileActivated, hw.CustomProfileIndex + 1);
+					_status.ForeColor = UiVisualStyle.Ok;
+				}
+				ResizeToContent();
+			}
+			finally
+			{
+				_syncing = false;
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("Custom mode UI refresh failed: " + ex.Message);
+		}
+	}
+}
