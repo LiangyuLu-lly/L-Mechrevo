@@ -778,7 +778,8 @@ public partial class OriginalStyleWindow : Window
                 }
                 await probe.SetKeyboardPowerAsync(true);
                 System.Drawing.Color? keyboardColor = (hw?.UsesBaolongda == true
-                    || string.Equals(effect, "Single", StringComparison.Ordinal))
+                    || string.Equals(effect, "Single", StringComparison.Ordinal)
+                    || string.Equals(effect, "Breathing", StringComparison.Ordinal))
                     ? System.Drawing.Color.FromArgb(colorArgb)
                     : null;
                 MechrevoService? keyboardService = probe.Service;
