@@ -1,5 +1,5 @@
-# L-Mechrevo
-
+# L-Mechrevo-Next
+在原版基础上进行大量优化 适配更多机型 重构UI
 **中文** | [English](README.en.md)
 
 L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的开源控制台，运行在 Windows 托盘。它通过机器上已有的 GCU 硬件服务读取传感器状态并下发控制命令，把性能模式、自定义功耗、键盘灯效、屏幕与电池等常用控制收进一个轻量窗口；机型不支持的入口会自动隐藏。
