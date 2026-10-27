@@ -157,10 +157,12 @@ Every toggle sends its command on tap and disables briefly until the command is 
 
 ## Download
 
-Two packages are available on the [Releases](https://github.com/LiangyuLu-lly/L-Mechrevo/releases) page:
+NoGCU packages are available on the [Releases](https://github.com/xmsjx/L-Mechrevo-Next/releases) page:
 
-- `L-Mechrevo-<version>-setup.exe`: full installer, bundles the .NET runtime and the GCU service payload. Grab this for a first install.
-- `L-Mechrevo-<version>-unsigned.zip`: the auto-update package for existing installs. The app prompts when a new version is detected; you can also download the zip manually and replace the program files yourself.
+- `LM-<version>-NoGCU-setup.exe`: fresh installer without the GCU service payload; for machines that already have the official GCU service / official console backend.
+- `L-Mechrevo-<version>-NoGCU-unsigned.zip`: auto-update package without the GCU payload. The app prompts when a new version is detected; you can also download the zip manually and replace the program files yourself.
+
+Current release: `0.293.6 beta23.6`.
 
 ## System requirements
 
@@ -171,9 +173,9 @@ Two packages are available on the [Releases](https://github.com/LiangyuLu-lly/L-
 
 ## Installation and first run
 
-1. Download `L-Mechrevo-<version>-setup.exe` from Releases.
+1. Download `LM-<version>-NoGCU-setup.exe` from Releases.
 2. Run the installer and follow the wizard.
-3. The installer detects your GPU generation (RTX 40 / 50 series) and deploys the matching GCU service payload and driver.
+3. The installer only installs the LM application; the GCU service/driver must already be provided by the official console or an existing installation.
 4. Start the app for the first time after installation.
 5. If the installer asks for a reboot, reboot once before use.
 6. The app lives in the system tray; double-click the tray icon to open the main window.
@@ -242,7 +244,7 @@ Move the mouse or press any key and the screen lights up again.
 Yes. Power limits, overclocking, and fan curves can affect stability and hardware lifespan. Evaluate for yourself; you do this at your own risk.
 
 **The driver or antivirus blocked the install or update?**
-The installer deploys GCU service payloads and drivers, which some antivirus products or system policies may block. Allow the installer and the program folder in your antivirus and retry; if a driver was blocked and never deployed, the related features won't work.
+The installer and program folder may be blocked by some antivirus products or system policies; allow them and retry. This NoGCU package does not deploy any GCU service payload.
 
 ## Acknowledgements
 
@@ -267,7 +269,7 @@ Under GPLv3 §6(b): for three years from the distribution of this version, any t
 
 ## Feedback
 
-Issues are welcome at [Issues](https://github.com/LiangyuLu-lly/L-Mechrevo/issues). Please include: the model, the app version (visible at the bottom of the main window), and reproduction steps.
+Issues are welcome at [Issues](https://github.com/xmsjx/L-Mechrevo-Next/issues). Please include: the model, the app version (visible at the bottom of the main window), and reproduction steps.
 
 ## Disclaimer
 
