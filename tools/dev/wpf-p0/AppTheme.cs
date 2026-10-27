@@ -21,7 +21,8 @@ internal static class AppTheme
             resources["ControlBrush"] = Brush("#22FFFFFF");
             resources["ControlHoverBrush"] = Brush("#2AFFFFFF");
             resources["TextBrush"] = Brush("#F3F5F8");
-            resources["MutedBrush"] = Brush("#9BA6B5");
+            resources["MutedBrush"] = Brush("#CBD5E1");
+            resources["HeaderStatBrush"] = Brush("#E2E9F2");
             resources["TrackBrush"] = Brush("#35FFFFFF");
             resources["PopupBrush"] = Brush("#F21B2029");
             resources["SegmentCheckedBackgroundBrush"] = Brush("#22FFFFFF");
@@ -37,6 +38,7 @@ internal static class AppTheme
             resources["ControlHoverBrush"] = Brush("#26000000");
             resources["TextBrush"] = Brush("#1B2029");
             resources["MutedBrush"] = Brush("#5A6574");
+            resources["HeaderStatBrush"] = Brush("#3E4A59");
             resources["TrackBrush"] = Brush("#26000000");
             resources["PopupBrush"] = Brush("#FFFFFFFF");
             resources["SegmentCheckedBackgroundBrush"] = Brush("#1A3B82F6");
