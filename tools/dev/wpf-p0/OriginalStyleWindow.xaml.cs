@@ -431,6 +431,7 @@ public partial class OriginalStyleWindow : Window
                 MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "wide-home", forceParameters: true);
                 if (outcome?.ModeSwitched == true)
                 {
+                    SyncGpuDbForMode(ResolveDisplayMode(_backendProbe), "WPF 自定义档");
                     RefreshFromBackend();
                     RefreshWideCustomEditor();
                     return;
@@ -1636,6 +1637,7 @@ public partial class OriginalStyleWindow : Window
                 return;
             }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "tray");
+            SyncGpuDbForMode(ResolveDisplayMode(_backendProbe), "托盘自定义档");
             if (outcome?.AnyFailed == true)
             {
                 ToastService.Show(WpfStrings.PerfCustomSwitchFailed, failure: true);
@@ -2762,6 +2764,9 @@ public partial class OriginalStyleWindow : Window
             L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
             if (!MechrevoLite.Hardware.GpuDbControl.Supported())
             {
+                Logger.WriteLine("[db] 跳过：gen=" + (_backendProbe?.Hw?.DgpuGeneration.ToString() ?? "?")
+                    + " · gcuVariant=" + MechrevoLite.Hardware.GcuIdentity.Variant
+                    + " · gcu=" + (_backendProbe?.Hw?.IsGcuConnected == true));
                 return;
             }
             if (mode == _lastDbVisualMode)
