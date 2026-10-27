@@ -73,6 +73,10 @@ public partial class CustomModeWindow : Window
         {
         _firmwareMode = false;
         ModeCombo.IsEnabled = true;
+        NewButton.Visibility = Visibility.Visible;
+        RenameButton.Visibility = Visibility.Visible;
+        DeleteButton.Visibility = Visibility.Visible;
+        ApplyButton.Visibility = Visibility.Visible;
         NewButton.IsEnabled = true;
         RenameButton.IsEnabled = true;
         DeleteButton.IsEnabled = true;
@@ -331,10 +335,11 @@ public partial class CustomModeWindow : Window
             });
             ModeCombo.SelectedIndex = 0;
             ModeCombo.IsEnabled = false;
-            NewButton.IsEnabled = false;
-            RenameButton.IsEnabled = false;
-            DeleteButton.IsEnabled = false;
-            // 固件配置编辑必须允许应用；只禁用模式管理。
+            // 固件配置编辑只针对当前模式的某一个配置，模式管理按钮不适用 ⇒ 直接隐藏，避免“看得见点不了”。
+            NewButton.Visibility = Visibility.Collapsed;
+            RenameButton.Visibility = Visibility.Collapsed;
+            DeleteButton.Visibility = Visibility.Collapsed;
+            ApplyButton.Visibility = Visibility.Visible;
             ApplyButton.IsEnabled = true;
             LoadSettingsToUi(stored);
             Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode) + string.Format(WpfStrings.CustomConfigSuffixFormat, _firmwareProfileIndex + 1);
