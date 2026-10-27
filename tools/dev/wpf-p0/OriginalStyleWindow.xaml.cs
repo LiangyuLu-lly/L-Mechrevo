@@ -1439,8 +1439,8 @@ public partial class OriginalStyleWindow : Window
         try
         {
             string? laptopScreen = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
-            bool fallback = _backendProbe?.Hw?.UsesBaolongda == true;
-            IReadOnlyList<int> rates = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(laptopScreen, fallback);
+            // 认不出内屏时按当前显示设备枚举，避免外接屏整行刷新率消失或回落到 180。
+            IReadOnlyList<int> rates = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(laptopScreen, allowCurrentDeviceFallback: true);
             return rates.Distinct().OrderBy(v => v).ToArray();
         }
         catch
@@ -3065,25 +3065,44 @@ public partial class OriginalStyleWindow : Window
         try
         {
             AutoRefreshSwitch.IsChecked = AppConfig.Is("screen_auto");
-            int min = ScreenControl.MIN_RATE > 0 ? ScreenControl.MIN_RATE : 60;
-            int max = 0;
-            try
+        int min = ScreenControl.MIN_RATE > 0 ? ScreenControl.MIN_RATE : 60;
+        // 不再硬编码 180：优先枚举当前活动屏/内屏的真实档位。
+        // 内屏 165 / 外接 144 都按实际值显示；认不出内屏时退化为当前显示设备。
+        string? laptop = ScreenNative.FindLaptopScreen(false);
+        int max = 0;
+        try
+        {
+            max = ScreenNative.GetMaxRefreshRate(laptop);
+        }
+        catch
+        {
+        }
+        try
+        {
+            IReadOnlyList<int> rates = ScreenNative.GetAvailableRefreshRates(laptop, allowCurrentDeviceFallback: true);
+            if (rates.Count > 0)
             {
-                max = ScreenNative.GetMaxRefreshRate(ScreenNative.FindLaptopScreen(false));
+                int measured = rates.Max();
+                if (measured > max)
+                {
+                    max = measured;
+                }
             }
-            catch
-            {
-            }
-            if (max <= min)
-            {
-                max = 180;
-            }
-            _refreshHighHz = max;
-            Refresh180Button.Tag = max.ToString();
-            Refresh180Button.Content = max + "Hz";
-            Refresh60Button.Tag = min.ToString();
-            Refresh60Button.Content = min + "Hz";
-            int current = ScreenNative.GetRefreshRate(ScreenNative.FindLaptopScreen(false));
+        }
+        catch
+        {
+        }
+        if (max <= min)
+        {
+            int currentFallback = ScreenNative.GetRefreshRate(laptop);
+            max = currentFallback > min ? currentFallback : min;
+        }
+        _refreshHighHz = max;
+        Refresh180Button.Tag = max.ToString();
+        Refresh180Button.Content = max + "Hz";
+        Refresh60Button.Tag = min.ToString();
+        Refresh60Button.Content = min + "Hz";
+        int current = ScreenNative.GetRefreshRate(laptop);
             bool high = current > min;
             Refresh180Button.IsChecked = high;
             Refresh60Button.IsChecked = !high;
