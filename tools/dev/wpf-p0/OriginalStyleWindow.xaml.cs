@@ -412,6 +412,44 @@ public partial class OriginalStyleWindow : Window
         _ = SwitchModeAsync(1, true);
     }
 
+    internal string WideCustomModeId => ResolveCustomModeId();
+
+    internal void WideActivateCustomMode()
+    {
+        _ = WideActivateCustomModeAsync();
+    }
+
+    private async Task WideActivateCustomModeAsync()
+    {
+        MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+        string id = ResolveCustomModeId();
+        if (perf != null && !string.IsNullOrWhiteSpace(id)
+            && id.StartsWith("custom", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "wide-home", forceParameters: true);
+                if (outcome?.ModeSwitched == true)
+                {
+                    RefreshFromBackend();
+                    RefreshWideCustomEditor();
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLine("[perfmode] 宽屏切自定义失败，回退 ChangeMode(3): " + ex.Message);
+            }
+        }
+        await SwitchModeAsync(3);
+        RefreshWideCustomEditor();
+    }
+
+    internal void RefreshWideCustomEditor()
+    {
+        _wideWindow?.RefreshCustomModeEditor();
+    }
+
     internal void WideSetMode(int mode)
     {
         RequestMode(mode);
@@ -2811,6 +2849,7 @@ public partial class OriginalStyleWindow : Window
                 }
                 SyncGpuDbForMode(mode, "WPF 切档");
                 SyncCustomWindowMode(mode);
+                RefreshWideCustomEditor();
             }
         }
         finally

@@ -627,6 +627,7 @@ public partial class MainWindow : Window
         else if (page == "switches") EnsureSwitchesView();
         // ⭐ task-26：切到屏幕页时立即按连接状态门控一次（页面按需创建时 BuildScreenControls 也会做）
         if (page == "screen") UpdateScreenBackendGating();
+        if (page == "custom") RefreshCustomModeEditor();
         HomeHost.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
         ScreenHost.Visibility = page == "screen" ? Visibility.Visible : Visibility.Collapsed;
         LightingHost.Visibility = page == "lighting" ? Visibility.Visible : Visibility.Collapsed;
@@ -663,6 +664,12 @@ public partial class MainWindow : Window
         if (ReferenceEquals(button, HomePerf静音狂暴))
         {
             _owner?.WideSetSilentTurbo();
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_6 + button.Content;
+            return;
+        }
+        if (ReferenceEquals(button, HomePerf自定义))
+        {
+            _owner?.WideActivateCustomMode();
             StatusText.Text = WpfStrings.MainWindow_xaml_Text_6 + button.Content;
             return;
         }
@@ -2168,6 +2175,24 @@ public partial class MainWindow : Window
             return false;
         }
         return supported;
+    }
+
+    internal void RefreshCustomModeEditor()
+    {
+        if (_customModeInlineWindow is CustomModeWindow editor)
+        {
+            try
+            {
+                string id = _owner?.WideCustomModeId ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId;
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    editor.BindMode(id);
+                }
+            }
+            catch
+            {
+            }
+        }
     }
 
     private void ApplyWideUiVisibilityFromOwner()

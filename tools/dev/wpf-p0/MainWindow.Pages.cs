@@ -199,6 +199,10 @@ public partial class MainWindow
             if (CustomModeHost.Content == null)
             {
                 _customModeInlineWindow = new CustomModeWindow();
+                if (_owner != null && _customModeInlineWindow is CustomModeWindow customEditor)
+                {
+                    customEditor.BindMode(_owner.WideCustomModeId);
+                }
                 MountWindowContent(_customModeInlineWindow, CustomModeHost);
             }
             if (CpuFanCurveHost.Content == null)
