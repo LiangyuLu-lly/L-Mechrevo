@@ -3389,6 +3389,16 @@ public partial class OriginalStyleWindow : Window
             RefreshFromBackend();
             return;
         }
+        string modeName = button.Content?.ToString() ?? (WpfStrings.ModeNamePrefix + mode);
+        // 当前已经是目标显卡模式：不再弹「切换并重启」确认框，直接回显当前态。
+        int currentGpuMode = _services?.Gpu.CurrentMode ?? _backendProbe.CurrentGpuMode;
+        if (currentGpuMode == mode)
+        {
+            if (_services != null) { _services.Gpu.ClearRestartPending(); } else { _backendProbe.ClearGpuRestartPending(); }
+            StatusText.Text = WpfStrings.CurrentPrefix + modeName;
+            RefreshFromBackend();
+            return;
+        }
         if (_backendProbe.IsBaolongda)
         {
             if (mode == 0)
@@ -3419,7 +3429,6 @@ public partial class OriginalStyleWindow : Window
             RefreshFromBackend();
             return;
         }
-        string modeName = button.Content?.ToString() ?? (WpfStrings.ModeNamePrefix + mode);
         if (!_backendProbe.IsBaolongda)
         {
             GpuRestartPromptWindow prompt = new GpuRestartPromptWindow(modeName) { Owner = this };
