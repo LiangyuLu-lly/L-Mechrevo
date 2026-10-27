@@ -498,14 +498,16 @@
                             <Button x:Name="CheckUpdateButton" Content="{x:Static loc:WpfStrings.CheckUpdateButton_Content}" Style="{StaticResource FlatButton}" Click="CheckUpdate_Click" Margin="0,0,8,0" />
                             <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_4}" Style="{StaticResource FlatButton}" Click="OpenFeedback_Click" Margin="0,0,8,0" />
                             <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_3}" Style="{StaticResource FlatButton}" Click="OpenIssues_Click" />
-                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_2}" Style="{StaticResource FlatButton}" Click="OpenLicenses_Click" Margin="8,0,0,0" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <Grid Margin="0,4,0,0">
                     <TextBlock x:Name="StatusText" Text="0.293.6 beta23.6" Style="{StaticResource Hint}" Margin="0" />
-                    <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content}" Style="{StaticResource FlatButton}" HorizontalAlignment="Right" Click="OpenFolder_Click" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_2}" Style="{StaticResource FlatButton}" Click="OpenLicenses_Click" Margin="0,0,8,0" />
+                        <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content}" Style="{StaticResource FlatButton}" Click="OpenFolder_Click" />
+                    </StackPanel>
                 </Grid>
             </StackPanel>
         </ScrollViewer>

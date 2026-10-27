@@ -84,7 +84,12 @@ Source: "files\Resources\qrcode1.jpg"; DestDir: "{app}\Resources"; Flags: ignore
 Source: "files\Resources\qrcode2.jpg"; DestDir: "{app}\Resources"; Flags: ignoreversion 
 Source: "files\Resources\qrcode3.png"; DestDir: "{app}\Resources"; Flags: ignoreversion 
 Source: "files\Resources\qrcode4.png"; DestDir: "{app}\Resources"; Flags: ignoreversion
-; ⭐⭐ 2026-10-17 修复（真机反馈「熄屏不睡眠点不动 · 报错缺失组件 usbmmidd_v2」）：
+
+Source: "files\Resources\qrcode1.jpg"; DestDir: "{app}\Assets\Resources"; Flags: ignoreversion
+Source: "files\Resources\qrcode2.jpg"; DestDir: "{app}\Assets\Resources"; Flags: ignoreversion
+Source: "files\Resources\qrcode3.png"; DestDir: "{app}\Assets\Resources"; Flags: ignoreversion
+Source: "files\Resources\qrcode4.png"; DestDir: "{app}\Assets\Resources"; Flags: ignoreversion
+;   ⭐⭐ 2026-10-17 修复（真机反馈「熄屏不睡眠点不动 · 报错缺失组件 usbmmidd_v2」）：
 ;   ⚠️ 根因：⭐ 驱动组件【一直在】`installer-src\files\usbmmidd_v2`（7 个文件 ✅），
 ;      但 ⛔ **本文件的 [Files] 从来没有引用过它**（`git log -S usbmmidd -- installer-src/install_script.iss` 空 ✅）
 ;      ⇒ ⭐ 装完 `{app}\usbmmidd_v2` 根本不存在 ⇒ ⭐ `VirtualDisplayBlank.VerifyDriverFiles` 判缺失

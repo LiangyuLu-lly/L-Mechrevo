@@ -625,7 +625,7 @@
     <value>Open install folder</value>
   </data>
   <data name="SettingsWindow_Content_2" xml:space="preserve">
-    <value>Licenses &amp; acknowledgements</value>
+    <value>Credits</value>
   </data>
   <data name="SettingsWindow_Content_3" xml:space="preserve">
     <value>Project page / feedback</value>
@@ -637,7 +637,7 @@
     <value>Check Updates</value>
   </data>
   <data name="SettingsWindow_Text" xml:space="preserve">
-    <value>L-Mechrevo is the official successor line; include a diagnostic bundle when reporting.</value>
+    <value>Include a diagnostic bundle when reporting.</value>
   </data>
   <data name="SettingsWindow_Text_2" xml:space="preserve">
     <value>About</value>
