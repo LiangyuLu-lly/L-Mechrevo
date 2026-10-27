@@ -467,21 +467,31 @@
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
                         </local:AdaptivePanel>
-                        <WrapPanel x:Name="PerfConfigRow" Margin="0,4,0,0" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
-                                <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_23}" Style="{StaticResource MutedText}" Width="42" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                <ComboBox x:Name="PerfConfigSilentCombo" Style="{StaticResource RoundCombo}" Width="76" Tag="2" SelectionChanged="PerfConfig_SelectionChanged" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
-                                <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Content_13}" Style="{StaticResource MutedText}" Width="42" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                <ComboBox x:Name="PerfConfigBalancedCombo" Style="{StaticResource RoundCombo}" Width="76" Tag="0" SelectionChanged="PerfConfig_SelectionChanged" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
-                                <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_22}" Style="{StaticResource MutedText}" Width="42" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                <ComboBox x:Name="PerfConfigTurboCombo" Style="{StaticResource RoundCombo}" Width="76" Tag="1" SelectionChanged="PerfConfig_SelectionChanged" />
-                            </StackPanel>
-                            <Button x:Name="PerfConfigEditButton" Content="{x:Static loc:WpfStrings.PerfConfigEditButton_Content}" Style="{StaticResource MiniButton}" Margin="0,0,0,4" VerticalAlignment="Center" Visibility="Collapsed" Click="PerfConfigEdit_Click" />
-                        </WrapPanel>
+                        <StackPanel x:Name="PerfConfigRow" Margin="0,4,0,0" Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid x:Name="PerfConfigSilentGroup" Grid.Column="0" Margin="0,0,4,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_23}" Style="{StaticResource MutedText}" Width="30" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <ComboBox x:Name="PerfConfigSilentCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" MinWidth="60" MaxWidth="96" HorizontalAlignment="Stretch" Tag="2" SelectionChanged="PerfConfig_SelectionChanged" />
+                                </Grid>
+                                <Grid x:Name="PerfConfigBalancedGroup" Grid.Column="1" Margin="0,0,4,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Content_13}" Style="{StaticResource MutedText}" Width="30" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <ComboBox x:Name="PerfConfigBalancedCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" MinWidth="60" MaxWidth="96" HorizontalAlignment="Stretch" Tag="0" SelectionChanged="PerfConfig_SelectionChanged" />
+                                </Grid>
+                                <Grid x:Name="PerfConfigTurboGroup" Grid.Column="2" Margin="0,0,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_22}" Style="{StaticResource MutedText}" Width="30" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <ComboBox x:Name="PerfConfigTurboCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" MinWidth="60" MaxWidth="96" HorizontalAlignment="Stretch" Tag="1" SelectionChanged="PerfConfig_SelectionChanged" />
+                                </Grid>
+                            </Grid>
+                            <Button x:Name="PerfConfigEditButton" Content="{x:Static loc:WpfStrings.PerfConfigEditButton_Content}" Style="{StaticResource MiniButton}" Margin="0,4,0,0" HorizontalAlignment="Left" Visibility="Collapsed" Click="PerfConfigEdit_Click" />
+                        </StackPanel>
                     </StackPanel>
 
                     <TextBlock x:Name="BackendLine" Visibility="Collapsed" />

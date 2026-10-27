@@ -134,7 +134,7 @@ public partial class OriginalStyleWindow : Window
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _backendRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
     private readonly DispatcherTimer _statusResetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-    private readonly string _statusResetText = L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion;
+    private readonly string _statusResetText = L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion.Split('-')[0];
     private bool _connectAttempting;
     private const string QuickTilesConfigKey = "perf_quick_tiles";
     private const string QuickTilesEmptySentinel = "-";
@@ -4650,6 +4650,8 @@ public partial class OriginalStyleWindow : Window
   SyncLightSwitchesFromHardware();
   bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
+            // 原版只保证静音/平衡；部分 30 系机型没有狂暴档 ⇒ 隐藏狂暴按钮，30 系配置行随之隐藏。
+            TurboModeButton.Visibility = (caps.TurboMode || UiQaShowAll.Enabled) ? Visibility.Visible : Visibility.Collapsed;
             bool silentTurboAllowed = caps.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported
                 || UiQaShowAll.Enabled;
             EnsureSilentTurboButton(silentTurboAllowed);
@@ -5181,8 +5183,15 @@ public partial class OriginalStyleWindow : Window
         MechrevoHw? hw = _backendProbe?.Hw;
         bool profileConfig = hw?.SupportsModeProfileConfig == true;
         bool show = profileConfig && currentMode >= 0 && currentMode <= 2;
-        PerfConfigRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        PerfConfigEditButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        // 30 系配置下拉必须和对应性能模式按钮一起显隐；部分 30 系只有静音/平衡两档。
+        PerfConfigSilentGroup.Visibility = SilentModeButton.Visibility;
+        PerfConfigBalancedGroup.Visibility = BalancedModeButton.Visibility;
+        PerfConfigTurboGroup.Visibility = TurboModeButton.Visibility;
+        bool anyModeVisible = PerfConfigSilentGroup.Visibility == Visibility.Visible
+            || PerfConfigBalancedGroup.Visibility == Visibility.Visible
+            || PerfConfigTurboGroup.Visibility == Visibility.Visible;
+        PerfConfigRow.Visibility = (show && anyModeVisible) ? Visibility.Visible : Visibility.Collapsed;
+        PerfConfigEditButton.Visibility = (show && anyModeVisible) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RefreshPerfConfigSelections()
