@@ -601,10 +601,10 @@
     <value>● GCU status unknown</value>
   </data>
   <data name="OriginalStyleWindow_Text_24" xml:space="preserve">
-    <value>L-Mechrevo · Classic mini window</value>
+    <value>L-Mechrevo</value>
   </data>
   <data name="OriginalStyleWindow_Title" xml:space="preserve">
-    <value>L-Mechrevo · Classic mini window P0</value>
+    <value>L-Mechrevo</value>
   </data>
   <data name="OverlayWindow_Title" xml:space="preserve">
     <value>L-Mechrevo overlay</value>
