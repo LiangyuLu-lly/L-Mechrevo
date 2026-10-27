@@ -26,12 +26,12 @@
     </Window.Resources>
     <Border x:Name="OverlayCard" Background="#E60B0D10" BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="10" Padding="10,5">
-        <StackPanel>
+        <StackPanel Grid.IsSharedSizeScope="True">
             <Grid x:Name="GpuRow">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol0" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol1" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol2" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol3" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol4" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol5" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol6" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol7" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol8" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="GpuLabel" Text="GPU:" Foreground="#22C55E" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
                 <TextBlock x:Name="GpuTempText" Grid.Column="1" Text="—" Margin="8,0,0,0" FontSize="12" VerticalAlignment="Center" />
@@ -47,9 +47,9 @@
             </Grid>
             <Grid x:Name="CpuRow" Margin="0,3,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol0" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol1" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol2" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol3" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol4" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol5" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol6" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol7" /><ColumnDefinition Width="Auto" SharedSizeGroup="OverlayCol8" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="CpuLabel" Text="CPU:" Foreground="#22D3EE" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
                 <TextBlock x:Name="CpuTempText" Grid.Column="1" Text="—" Margin="8,0,0,0" FontSize="12" VerticalAlignment="Center" />
