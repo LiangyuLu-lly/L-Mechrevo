@@ -6217,6 +6217,14 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         int timeoutSeconds = AppConfig.Get("lighting_idle_seconds", 0);
+        // 亚分钟选项由 LM 软件计时；1s tick 保证“20秒”实际落在 20~21s，而不是 2s tick 拖到 22s+。
+        TimeSpan desiredTick = timeoutSeconds > 0 && timeoutSeconds < 60
+            ? TimeSpan.FromSeconds(1)
+            : TimeSpan.FromSeconds(2);
+        if (_lightingIdleTimer.Interval != desiredTick)
+        {
+            _lightingIdleTimer.Interval = desiredTick;
+        }
         if (timeoutSeconds <= 0)
         {
             if (_lightingIdleSuspended)
