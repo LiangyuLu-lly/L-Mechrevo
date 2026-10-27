@@ -23,6 +23,7 @@ public partial class CustomModeWindow : Window
     private bool _dirty;
     private bool _syncingPowerWalls;
     private readonly DispatcherTimer _powerWallTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private bool _powerWallBusy;
     private static string UnsetMark => WpfStrings.CustomUnsetMark;
     private static string PowerWallUnsetHint => WpfStrings.CustomPowerWallUnsetHint;
     private int _firmwareVisualMode;
@@ -41,7 +42,7 @@ public partial class CustomModeWindow : Window
             new RoutedEventHandler((_, _) => MarkDirty()), true);
         AddHandler(ComboBox.SelectionChangedEvent,
             new SelectionChangedEventHandler((_, _) => MarkDirty()), true);
-        _powerWallTimer.Tick += (_, _) => UpdatePowerWallStatus();
+        _powerWallTimer.Tick += async (_, _) => await UpdatePowerWallStatusAsync();
         Loaded += (_, _) => _powerWallTimer.Start();
         Closed += (_, _) => _powerWallTimer.Stop();
         LoadModes(initialModeId);
@@ -148,18 +149,41 @@ public partial class CustomModeWindow : Window
         StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text;
     }
 
-    private void UpdatePowerWallStatus()
+    /// <summary>
+    /// 功耗墙状态每 2 秒刷新一次；采样可能走 LHM/ACPI，放到后台线程，
+    /// 避免某个传感器驱动阻塞 UI 线程导致自定义窗口「未响应」。
+    /// </summary>
+    private async Task UpdatePowerWallStatusAsync()
     {
+        if (_powerWallBusy)
+        {
+            return;
+        }
+        _powerWallBusy = true;
         try
         {
-            L_Mechrevo.WpfP0.Services.PowerStatusService.SampleLocalPower();
-            string text = L_Mechrevo.WpfP0.Services.PowerStatusService.ReadPowerWallText();
+            string text = await Task.Run(() =>
+            {
+                L_Mechrevo.WpfP0.Services.PowerStatusService.SampleLocalPower();
+                return L_Mechrevo.WpfP0.Services.PowerStatusService.ReadPowerWallText();
+            });
+            if (!IsLoaded)
+            {
+                return;
+            }
             PowerWallStatusText.Text = text;
             PowerWallStatusText.Visibility = string.IsNullOrWhiteSpace(text) ? Visibility.Collapsed : Visibility.Visible;
         }
         catch
         {
-            PowerWallStatusText.Visibility = Visibility.Collapsed;
+            if (IsLoaded)
+            {
+                PowerWallStatusText.Visibility = Visibility.Collapsed;
+            }
+        }
+        finally
+        {
+            _powerWallBusy = false;
         }
     }
 
