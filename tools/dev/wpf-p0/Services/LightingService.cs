@@ -56,6 +56,9 @@ internal interface ILightingService
     /// <summary>设置自动关灯秒数（只落盘/写硬件设置；电源状态核对仍由窗口触发）。</summary>
     ServiceResult SetLightIdleSeconds(int seconds);
 
+    /// <summary>把当前自动关灯配置同步给 GCU 固件计时器（0 = 关闭）。</summary>
+    void ApplyHardwareLightIdleTimer();
+
     /// <summary>离电时是否关灯（config）。</summary>
     bool LightOffOnBattery { get; }
 
@@ -218,6 +221,8 @@ internal sealed class LightingService : ILightingService
         }
         AppConfig.Set(IdleSecondsKey, normalized);
         AppConfig.Flush();
+        // 非宝龙达 GCU 的自动关灯在固件里；仅改 config 不会关掉固件计时器。
+        ApplyHardwareLightIdleTimer();
         try
         {
             KeyboardRgb? rgb = L_Mechrevo.WpfP0.Services.WpfBackend.rgb;
@@ -231,6 +236,30 @@ internal sealed class LightingService : ILightingService
         {
         }
         return ServiceResult.Success(WpfStrings.LightAutoOffSaved);
+    }
+
+    public void ApplyHardwareLightIdleTimer()
+    {
+        try
+        {
+            if (_backend.IsBaolongda)
+            {
+                return;
+            }
+            MechrevoService? service = _backend.Service;
+            if (service == null)
+            {
+                return;
+            }
+            int seconds = AppConfig.Get(IdleSecondsKey, 0);
+            int minutes = seconds <= 0 ? 0 : Math.Max(1, seconds / 60);
+            _ = service.PublishKeyboardCloseTimer(minutes);
+            Logger.WriteLine("[light] 已同步 GCU 自动关灯计时器：" + (minutes <= 0 ? "关闭" : minutes + " 分钟"));
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[light] 同步 GCU 自动关灯计时器失败：" + ex.Message);
+        }
     }
 
     public bool LightOffOnBattery => AppConfig.Is(OffOnBatteryKey);

@@ -18,9 +18,6 @@ internal sealed class WaterCoolerRoutingService : IDisposable
     private readonly MechrevoHw? _hw;
     private readonly MechrevoService? _service;
     private WaterCoolerBle? _ble;
-    // 风扇/水泵可以走 BLE，但灯效仍可能由 GCU 控制（耀世七彩效果就是这样）。
-    // 灯效和连接路由分开，避免 BLE 路由把 GCU 灯效选项/下发一起换掉。
-    private bool _gcuLightAvailable;
     private int _initStarted;
     private int _connecting;
     private SystemBluetoothConnectionObservation _observation;
@@ -68,16 +65,10 @@ internal sealed class WaterCoolerRoutingService : IDisposable
         }
         try
         {
-            _gcuLightAvailable = _service != null && _hw?.SupportsLiquidCooling == true;
-            // GCU 能力位只代表「固件支持水冷」，不等于水冷已经连上。
-            // 耀世等机型实际是 BLE 水冷：只要 GCU 没有回报已连接，就继续探测 BLE，
-            // 否则会把 BLE 已连接的水冷错误地显示成 GCU「水冷未连接」。
-            bool gcuLiquidSupported = _hw?.SupportsLiquidCooling == true;
-            if (gcuLiquidSupported && _hw?.LcReportedConnected == true)
-            {
-                Route = LiquidCoolingControlRoute.Gcu;
-                return;
-            }
+            // 与旧版 GetLiquidCoolingRoute 对齐：GCU 必须“可控制且状态新鲜”，
+            // 单看 SupportsLiquidCooling / LcReportedConnected 都不够。
+            bool gcuControllable = _hw?.LcGcuControllable == true
+                && _hw.IsLcStatusFresh(TimeSpan.FromSeconds(15));
             _ble = new WaterCoolerBle();
             _ble.ConnectionChanged += _ =>
             {
@@ -114,9 +105,8 @@ internal sealed class WaterCoolerRoutingService : IDisposable
                 Route = LiquidCoolingControlRoute.BluetoothObserved;
                 return;
             }
-            if (gcuLiquidSupported)
+            if (gcuControllable)
             {
-                // 没有 BLE 设备时才回落到 GCU（此时 GCU 仍报未连接是真实状态）。
                 Route = LiquidCoolingControlRoute.Gcu;
                 return;
             }
@@ -254,15 +244,15 @@ internal sealed class WaterCoolerRoutingService : IDisposable
         return false;
     }
 
-    internal bool SupportsLight => _gcuLightAvailable
-        || (IsGcuRoute && LiquidCoolingLightService.SupportsColor(_hw))
-        || (IsBleRoute && _ble?.IsConnected == true);
+    internal bool SupportsLight => IsGcuRoute
+        ? LiquidCoolingLightService.SupportsColor(_hw)
+        : IsBleRoute && _ble?.IsConnected == true;
 
     internal IReadOnlyList<LiquidLightOption> LightOptions
     {
         get
         {
-            if (_gcuLightAvailable || IsGcuRoute)
+            if (IsGcuRoute)
             {
                 return LiquidCoolingLightService.Options(_hw);
             }
@@ -276,25 +266,25 @@ internal sealed class WaterCoolerRoutingService : IDisposable
         }
     }
 
-    internal Color LightColor => (_gcuLightAvailable || IsGcuRoute)
+    internal Color LightColor => IsGcuRoute
         ? LiquidCoolingLightService.SavedColor
         : (_ble?.SavedLightColor ?? LiquidCoolingLightService.SavedColor);
 
-    internal string LightProfile => (_gcuLightAvailable || IsGcuRoute)
+    internal string LightProfile => IsGcuRoute
         ? LiquidCoolingLightService.SavedProfile
         : (_ble?.SavedLightProfile ?? LiquidCoolingLightService.SavedProfile);
 
     internal async Task<bool> ApplyLightAsync(string profile, Color color)
     {
-        // 灯效优先 GCU（耀世七彩等原厂效果在 GCU 侧）；失败再退 BLE。
-        if ((_gcuLightAvailable || IsGcuRoute) && _service != null)
+        // 与旧版一致：GCU 路由才走 GCU 灯效；BLE 路由走 BLE，不互相兜底。
+        if (IsGcuRoute)
         {
-            bool gcuOk = await _service.LcApplyLightProfile(profile, color, persist: true, requireReadback: false).ConfigureAwait(false);
-            if (gcuOk)
+            bool ok = await LiquidCoolingLightService.ApplyAsync(_service, _hw, profile, color).ConfigureAwait(false);
+            if (ok && _service != null)
             {
-                return true;
+                _ = _service.RefreshLiquidCoolingStatus();
             }
-            Logger.WriteLine("[water] GCU 灯效下发失败，尝试 BLE 灯效兜底：" + profile);
+            return ok;
         }
         if (IsBleRoute && _ble != null)
         {

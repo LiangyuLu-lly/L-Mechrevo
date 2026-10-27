@@ -4769,6 +4769,7 @@ public partial class OriginalStyleWindow : Window
             FillKeyboardEffects();
   FillLightChannelEffects();
   FillLightIdleOptions();
+  _services?.Lighting.ApplyHardwareLightIdleTimer();
   L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.ApplyKeyboardAutoOffSetting();
   SyncLightSwitchesFromHardware();
   bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
