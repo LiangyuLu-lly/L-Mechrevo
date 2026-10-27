@@ -48,6 +48,10 @@ internal sealed class SensorService : ISensorService
             int umiSecond = -1;
             bool umiFan = hw != null && hw.IsIntelNucMachine
                 && UmiFanReader.TryReadFanRpm(out umiMain, out umiSecond);
+            if (umiFan)
+            {
+                hw!.ApplyIntelNucFanSpeeds(umiMain, umiSecond);
+            }
             float? gpuPower = HardwareControl.gpuPower;
             if (!gpuPower.HasValue && NvmlHelper.Unavailable)
             {

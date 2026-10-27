@@ -508,6 +508,11 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal bool ApplyIntelNucLightbar(string effect, int light, System.Drawing.Color? color)
+    {
+        return _hw?.IsIntelNucMachine == true && UmiLightbar.SetEffect(effect, color, light);
+    }
+
     internal async Task<bool> SetLightbarEffectAsync(string effect)
     {
         try

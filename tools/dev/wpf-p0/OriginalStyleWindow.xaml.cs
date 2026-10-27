@@ -820,6 +820,11 @@ public partial class OriginalStyleWindow : Window
             System.Drawing.Color? lightColor = MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleColorEffect(effect)
                 ? System.Drawing.Color.FromArgb(colorArgb)
                 : null;
+            if (string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+                && hw?.IsIntelNucMachine == true)
+            {
+                return probe.ApplyIntelNucLightbar(effect, light, lightColor);
+            }
             return await lightService.SetLightEffect(topic, effect, light, speed, "None", lightColor, true);
         }
         catch
