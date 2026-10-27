@@ -54,8 +54,11 @@ internal static class WujieFanEc
 	/// <summary>低温交还后重新接管温度（℃）：45℃ 交还、48℃ 接管（3℃ 回差，避免阈值附近反复横跳）。</summary>
 	internal const int HandoffResumeTemperatureC = 48;
 
-	/// <summary>副扇可用下限（%）：低于该值副扇可能被判堵转闭锁。</summary>
+	/// <summary>直写后端（direct）的副扇下限（%）：低于该值副扇可能被判堵转闭锁。</summary>
 	internal const int FanFloorPercent = 20;
+
+	/// <summary>table 后端下限（%）：上游 WUJIE 实机验证 5% 即可，EC 自身约 1745 RPM 地板。</summary>
+	internal const int TableFanFloorPercent = 5;
 
 	/// <summary>是否无界（APU 无独显）机型；诊断/UI 只在这个平台启用。</summary>
 	internal static bool IsWujiePlatform()

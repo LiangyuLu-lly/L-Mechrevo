@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using MechrevoLite.Hardware;
 using MechrevoLite.Mode;
@@ -7,7 +7,7 @@ namespace MechrevoLite;
 
 /// <summary>
 /// 2026-10-22（机主：无界开机且在自定义模式上再启用风扇曲线）：
-/// 开机后若当前是**自定义档**，按该档已保存的点位自动启动 Wujie 25Hz EC 控制器。
+/// 开机后若当前是**自定义档**，按该档已保存的点位自动启动 Wujie EC 控制器（table 优先，direct 回退）。
 /// <para>触发条件：无界 APU + 当前 Active 是自定义档 + 该档有 CpuFanDuty/GpuFanDuty + FanCurveOn 未显式关闭。</para>
 /// <para>温度轴用 <see cref="WujieFanEcController.DefaultTemperatures"/>（保存的只有占空比点位）。</para>
 /// </summary>
