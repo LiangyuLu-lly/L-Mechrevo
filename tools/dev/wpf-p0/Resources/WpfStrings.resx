@@ -991,7 +991,7 @@
     <value>Failed to load snapshot: </value>
   </data>
   <data name="CustomModeWindow_xaml_Content" xml:space="preserve">
-    <value>Apply *</value>
+    <value>Apply</value>
   </data>
   <data name="CustomModeWindow_xaml_Text" xml:space="preserve">
     <value>There are unapplied changes</value>

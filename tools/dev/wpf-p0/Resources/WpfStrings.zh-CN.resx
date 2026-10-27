@@ -991,7 +991,7 @@
     <value>读取快照失败：</value>
   </data>
   <data name="CustomModeWindow_xaml_Content" xml:space="preserve">
-    <value>应用 *</value>
+    <value>应用</value>
   </data>
   <data name="CustomModeWindow_xaml_Text" xml:space="preserve">
     <value>有未应用修改</value>

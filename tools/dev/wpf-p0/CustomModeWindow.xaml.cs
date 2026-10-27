@@ -21,6 +21,7 @@ public partial class CustomModeWindow : Window
     private int _modeComboSyncDepth;
     private bool _loadingUi;
     private bool _dirty;
+    private bool _syncingPowerWalls;
     private readonly DispatcherTimer _powerWallTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private static string UnsetMark => WpfStrings.CustomUnsetMark;
     private static string PowerWallUnsetHint => WpfStrings.CustomPowerWallUnsetHint;
@@ -693,9 +694,64 @@ public partial class CustomModeWindow : Window
         }
     }
 
-    private void Pl1_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (Pl1Text != null) Pl1Text.Text = ((int)e.NewValue).ToString(); }
-    private void Pl2_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (Pl2Text != null) Pl2Text.Text = ((int)e.NewValue).ToString(); }
-    private void Pl4_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (Pl4Text != null) Pl4Text.Text = ((int)e.NewValue).ToString(); }
+    private void Pl1_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (Pl1Text != null) Pl1Text.Text = ((int)e.NewValue).ToString();
+        SyncPowerWalls("pl1");
+    }
+
+    private void Pl2_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (Pl2Text != null) Pl2Text.Text = ((int)e.NewValue).ToString();
+        SyncPowerWalls("pl2");
+    }
+
+    private void Pl4_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (Pl4Text != null) Pl4Text.Text = ((int)e.NewValue).ToString();
+        SyncPowerWalls("fppt");
+    }
+
+    /// <summary>FPPT >= PL2 >= PL1；拖动任意一个时把另一端推到合法范围。</summary>
+    private void SyncPowerWalls(string source)
+    {
+        if (_loadingUi || _syncingPowerWalls)
+        {
+            return;
+        }
+        _syncingPowerWalls = true;
+        try
+        {
+            int pl1 = (int)Math.Round(Pl1Slider.Value);
+            int pl2 = (int)Math.Round(Pl2Slider.Value);
+            int fppt = (int)Math.Round(Pl4Slider.Value);
+            if (string.Equals(source, "pl1", StringComparison.Ordinal))
+            {
+                pl2 = Math.Max(pl2, pl1);
+                fppt = Math.Max(fppt, pl2);
+            }
+            else if (string.Equals(source, "pl2", StringComparison.Ordinal))
+            {
+                pl1 = Math.Min(pl1, pl2);
+                fppt = Math.Max(fppt, pl2);
+            }
+            else if (string.Equals(source, "fppt", StringComparison.Ordinal))
+            {
+                pl2 = Math.Min(pl2, fppt);
+                pl1 = Math.Min(pl1, pl2);
+            }
+            if ((int)Math.Round(Pl2Slider.Value) != pl2) Pl2Slider.Value = pl2;
+            if ((int)Math.Round(Pl4Slider.Value) != fppt) Pl4Slider.Value = fppt;
+            if ((int)Math.Round(Pl1Slider.Value) != pl1) Pl1Slider.Value = pl1;
+            if (Pl1Text != null) Pl1Text.Text = pl1.ToString();
+            if (Pl2Text != null) Pl2Text.Text = pl2.ToString();
+            if (Pl4Text != null) Pl4Text.Text = fppt.ToString();
+        }
+        finally
+        {
+            _syncingPowerWalls = false;
+        }
+    }
     private void Tcc_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (TccText != null) TccText.Text = ((int)e.NewValue).ToString(); }
     private void Db_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (DbText != null) DbText.Text = ((int)e.NewValue).ToString(); }
     private void GpuTgp_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuTgpText != null) GpuTgpText.Text = ((int)e.NewValue).ToString(); }

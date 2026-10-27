@@ -1635,7 +1635,7 @@ public partial class OriginalStyleWindow : Window
             {
                 return;
             }
-            MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "tray");
+            MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "tray", forceParameters: true);
             if (outcome?.AnyFailed == true)
             {
                 ToastService.Show(WpfStrings.PerfCustomSwitchFailed, failure: true);
