@@ -43,7 +43,33 @@ public partial class FanCurveWindow : Window
         CpuCurve.Changed += MarkDirty;
         GpuCurve.Changed += MarkDirty;
         Closing += OnClosing;
+        Closed += OnClosed;
+        MechrevoLite.Mode.PerfModeService.Instance?.ActiveChanged += OnActiveModeChanged;
         LoadFromHardware();
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
+        if (perf != null)
+        {
+            perf.ActiveChanged -= OnActiveModeChanged;
+        }
+    }
+
+    /// <summary>切换自定义/性能档后，已打开的风扇曲线窗口立即切到新档并重载曲线。</summary>
+    private void OnActiveModeChanged()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action(OnActiveModeChanged));
+            return;
+        }
+        string? id = MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId;
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            SetModeId(id);
+        }
     }
 
     internal void SetModeId(string modeId)
