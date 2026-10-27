@@ -2952,6 +2952,7 @@ public partial class OriginalStyleWindow : Window
             if (request == _modeRequestId)
             {
                 _modeSwitchInFlight = false;
+                RefreshPerfConfigSelections();
                 RefreshFromBackend();
             }
         }
@@ -5270,14 +5271,21 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            ComboBox[] combos = { PerfConfigSilentCombo, PerfConfigBalancedCombo, PerfConfigTurboCombo };
-            _syncingPerfConfig = true;
-            foreach (ComboBox combo in combos)
+            // 显式绑定三个视觉模式，⛔ 不再依赖 ComboBox.Tag 反查；
+            // 避免切模式/切配置时把另一个模式的配置号读到当前下拉。
+            (ComboBox Combo, int VisualMode)[] combos =
             {
-                if (combo.Tag is string tag && int.TryParse(tag, out int visualMode))
-                {
-                    combo.SelectedIndex = Math.Clamp(MechrevoLite.Mode.ModeProfileConfig.Get(visualMode), 0, Math.Max(0, combo.Items.Count - 1));
-                }
+                (PerfConfigSilentCombo, 2),
+                (PerfConfigBalancedCombo, 0),
+                (PerfConfigTurboCombo, 1)
+            };
+            _syncingPerfConfig = true;
+            foreach ((ComboBox combo, int visualMode) in combos)
+            {
+                combo.SelectedIndex = Math.Clamp(
+                    MechrevoLite.Mode.ModeProfileConfig.Get(visualMode),
+                    0,
+                    Math.Max(0, combo.Items.Count - 1));
             }
             _syncingPerfConfig = false;
         }
@@ -5295,10 +5303,14 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         MechrevoLite.Mode.ModeProfileConfig.Set(visualMode, combo.SelectedIndex);
+        // 先立即回填三行，保证当前下拉/其它模式下拉不读旧值。
+        RefreshPerfConfigSelections();
         if (_backendProbe != null && _backendProbe.Service?.CurrentMode == visualMode)
         {
-            await _backendProbe.SwitchModeAsync(visualMode);
+            // 走统一切档入口：会标记 pending、等 backend 确认，finally 再刷新 UI。
+            await SwitchModeAsync(visualMode);
         }
+        RefreshPerfConfigSelections();
         StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_54 + combo.SelectedIndex + WpfStrings.ModeSeparatorSuffix + visualMode + WpfStrings.ClosingParen;
     }
 
