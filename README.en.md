@@ -28,9 +28,9 @@ The UI is not limited to a fixed light/dark pair:
 - **Background overlay** strength for text readability.
 - **Wide-only background** so the wide layout can use a different image.
 
-<img src="docs/images/settings-appearance.png" width="520" alt="Appearance settings">
+<img src="docs/images/settings-appearance.png" width="380" alt="Appearance settings">
 
-<img src="docs/images/mini-background.png" width="300" alt="Custom background example">
+<img src="docs/images/mini-background.png" width="460" alt="Custom background example">
 
 ## Features
 

@@ -28,9 +28,9 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 - **背景遮罩**：独立调节背景图上的遮罩强度，保证文字可读。
 - **宽屏专用背景**：宽屏可以使用与迷你窗不同的背景图。
 
-<img src="docs/images/settings-appearance.png" width="520" alt="外观与设置">
+<img src="docs/images/settings-appearance.png" width="380" alt="外观与设置">
 
-<img src="docs/images/mini-background.png" width="300" alt="自定义背景示例">
+<img src="docs/images/mini-background.png" width="460" alt="自定义背景示例">
 
 ## 功能特性
 
