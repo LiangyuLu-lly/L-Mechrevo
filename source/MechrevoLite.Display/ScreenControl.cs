@@ -271,8 +271,8 @@ public static class ScreenControl
 			}
 		}
 		bool screenAuto = AppConfig.Is("screen_auto");
-		bool overdriveSetting = Program.acpi.IsOverdriveSupported() && !AppConfig.IsNoOverdrive();
-		int overdrive = ((!AppConfig.IsNoOverdrive()) ? Program.acpi.DeviceGet(327705u) : 0);
+		bool overdriveSetting = Program.acpi?.IsOverdriveSupported() == true && !AppConfig.IsNoOverdrive();
+		int overdrive = ((!AppConfig.IsNoOverdrive()) ? (Program.acpi?.DeviceGet(327705u) ?? 0) : 0);
 		bool hdr = false;
 		bool acm = false;
 		try
@@ -285,7 +285,7 @@ public static class ScreenControl
 		}
 		bool screenEnabled = frequency >= 0;
 		int fhd = -1;
-		int hdrControl = Program.acpi.DeviceGet(327793u);
+		int hdrControl = Program.acpi?.DeviceGet(327793u) ?? -1;
 		if (hdrControl >= 0)
 		{
 			Logger.WriteLine($"HDR Control Status: {hdrControl}");
@@ -303,9 +303,14 @@ public static class ScreenControl
 		// 2026-10-12 screen-diag: 与 SettingsForm.VisualiseScreen 入口那行**配对**，用于对照两端，
 		// 看清 maxFrequency / screenEnabled 传到 UI 时到底是几（无 GCU 时刷新率整块消失的定位用）。
 		Logger.WriteLine($"InitScreen -> screen={laptopScreen ?? "(null)"} confidence={screenConfidence} freq={frequency} maxFreq={maxFrequency} screenEnabled={screenEnabled} MIN_RATE={MIN_RATE} MAX_RATE={MAX_RATE} cfgMaxFreq={AppConfig.Get("max_frequency")}");
-		Program.settingsForm.BeginInvoke(() =>
+		// WPF 进程没有 WinForms settingsForm：旧回调必须判空，否则切换刷新率时会在
+		// InitScreen 里抛 NullReference，界面只看到「Win32 切换失败」。
+		if (Program.settingsForm != null)
 		{
-			Program.settingsForm.VisualiseScreen(screenEnabled, screenAuto, frequency, maxFrequency, overdrive, overdriveSetting, hdr, acm, fhd, hdrControl);
-		});
+			Program.settingsForm.BeginInvoke(() =>
+			{
+				Program.settingsForm.VisualiseScreen(screenEnabled, screenAuto, frequency, maxFrequency, overdrive, overdriveSetting, hdr, acm, fhd, hdrControl);
+			});
+		}
 	}
 }
