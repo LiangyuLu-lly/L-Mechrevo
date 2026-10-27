@@ -57,6 +57,15 @@ public partial class OriginalStyleWindow : Window
     private OverlayWindow? _overlayWindow;
     private readonly L_Mechrevo.WpfP0.Services.BackendHost _backendHost = new();
     private MainWindow? _wideWindow;
+    private readonly DispatcherTimer _wideWindowCacheTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(1)
+    };
+    private readonly DispatcherTimer _miniRenderCacheTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(1)
+    };
+    private object? _miniCachedContent;
     private AppServices? _services;
     internal event Action? BackendReady;
     internal BackendProbe? CurrentBackend => _backendProbe;
@@ -6868,8 +6877,87 @@ public partial class OriginalStyleWindow : Window
 
     private void WideButton_Click(object sender, RoutedEventArgs e) => ShowWideWindow();
 
+    /// <summary>宽屏切迷你后延迟释放宽屏窗口；TTL 内切回直接复用隐藏窗口。</summary>
+    internal void ScheduleWideWindowRelease()
+    {
+        int seconds = AppConfig.Get("wide_window_cache_seconds", 120);
+        string? env = Environment.GetEnvironmentVariable("LMECHREVO_WIDE_WINDOW_CACHE_SECONDS");
+        if (int.TryParse(env, out int overrideSeconds))
+        {
+            seconds = overrideSeconds;
+        }
+        seconds = Math.Clamp(seconds, 5, 1800);
+        _wideWindowCacheTimer.Stop();
+        _wideWindowCacheTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1000, seconds * 1000L));
+        _wideWindowCacheTimer.Tick -= WideWindowCacheTimer_Tick;
+        _wideWindowCacheTimer.Tick += WideWindowCacheTimer_Tick;
+        _wideWindowCacheTimer.Start();
+        Logger.WriteLine("[wide-mem] 宽屏窗口已隐藏，将在 " + seconds + "s 后释放渲染");
+    }
+
+    private void WideWindowCacheTimer_Tick(object? sender, EventArgs e)
+    {
+        _wideWindowCacheTimer.Stop();
+        MainWindow? window = _wideWindow;
+        if (window == null || window.IsVisible)
+        {
+            return;
+        }
+        Logger.WriteLine("[wide-mem] 宽屏窗口缓存到期，释放窗口渲染");
+        _wideWindow = null;
+        try
+        {
+            window.Close();
+        }
+        catch
+        {
+        }
+    }
+
+    /// <summary>迷你窗切宽屏后延迟释放迷你窗视觉树渲染；TTL 内切回复用原 Content。</summary>
+    internal void ScheduleMiniRenderRelease()
+    {
+        int seconds = AppConfig.Get("mini_window_render_cache_seconds", 120);
+        string? env = Environment.GetEnvironmentVariable("LMECHREVO_MINI_RENDER_CACHE_SECONDS");
+        if (int.TryParse(env, out int overrideSeconds))
+        {
+            seconds = overrideSeconds;
+        }
+        seconds = Math.Clamp(seconds, 5, 1800);
+        _miniRenderCacheTimer.Stop();
+        _miniRenderCacheTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1000, seconds * 1000L));
+        _miniRenderCacheTimer.Tick -= MiniRenderCacheTimer_Tick;
+        _miniRenderCacheTimer.Tick += MiniRenderCacheTimer_Tick;
+        _miniRenderCacheTimer.Start();
+        Logger.WriteLine("[wide-mem] 迷你窗已隐藏，将在 " + seconds + "s 后释放渲染");
+    }
+
+    private void MiniRenderCacheTimer_Tick(object? sender, EventArgs e)
+    {
+        _miniRenderCacheTimer.Stop();
+        if (IsVisible || Content == null)
+        {
+            return;
+        }
+        Logger.WriteLine("[wide-mem] 迷你窗缓存到期，释放视觉树渲染");
+        _miniCachedContent = Content;
+        Content = null;
+    }
+
+    private void RestoreMiniRendering()
+    {
+        _miniRenderCacheTimer.Stop();
+        if (_miniCachedContent == null)
+        {
+            return;
+        }
+        Content = _miniCachedContent;
+        _miniCachedContent = null;
+    }
+
     internal void ShowWideWindow()
     {
+        _wideWindowCacheTimer.Stop();
         if (_wideWindow == null)
         {
             MainWindow window = new(this, _backendProbe);
@@ -6881,6 +6969,7 @@ public partial class OriginalStyleWindow : Window
         Opacity = 0;
         ShowInTaskbar = false;
         Hide();
+        ScheduleMiniRenderRelease();
         if (_wideWindow.WindowState == WindowState.Minimized)
         {
             _wideWindow.WindowState = WindowState.Normal;
@@ -6908,6 +6997,7 @@ public partial class OriginalStyleWindow : Window
 
     internal void ShowCompactWindow()
     {
+        RestoreMiniRendering();
         Opacity = 1;
         ShowInTaskbar = true;
         PositionCompactBottomRight();

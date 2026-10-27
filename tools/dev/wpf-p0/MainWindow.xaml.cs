@@ -382,7 +382,9 @@ public partial class MainWindow : Window
             AppConfig.Set("last_window_mode", "mini");
             AppConfig.Flush();
             _owner.ShowCompactWindow();
-            Close();
+            // 先隐藏，若 TTL 内切回宽屏可秒开；超时后再真正销毁渲染。
+            Hide();
+            _owner.ScheduleWideWindowRelease();
             return;
         }
         StatusText.Text = WpfStrings.MainWindow_xaml_Text_4;
