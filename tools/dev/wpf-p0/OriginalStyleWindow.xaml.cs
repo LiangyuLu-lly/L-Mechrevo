@@ -68,7 +68,7 @@ public partial class OriginalStyleWindow : Window
     };
     private object? _miniCachedContent;
     private AppServices? _services;
-    private DashboardCommands? _dashboardCommands;
+    private IDashboardCommands? _dashboardCommands;
     internal event Action? BackendReady;
     internal BackendProbe? CurrentBackend => _backendProbe;
     private bool _overlayPreloaded;
@@ -861,8 +861,8 @@ public partial class OriginalStyleWindow : Window
     }
 
     /// <summary>宽屏/迷你窗共享命令入口（第二步命令收口）。</summary>
-    internal DashboardCommands DashboardCommands =>
-        _dashboardCommands ??= new DashboardCommands(_services, _backendProbe);
+    internal IDashboardCommands DashboardCommands =>
+        _dashboardCommands ??= new DashboardCommands(_services, _backendProbe, () => EnsureWaterCoolerRouting());
 
     internal async Task<bool> WideToggleQuickAsync(string key)
     {
