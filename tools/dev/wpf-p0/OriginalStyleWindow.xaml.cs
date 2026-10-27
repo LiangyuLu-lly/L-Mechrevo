@@ -4723,7 +4723,13 @@ public partial class OriginalStyleWindow : Window
   bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
             // 原版只保证静音/平衡；部分 30 系机型没有狂暴档 ⇒ 隐藏狂暴按钮，30 系配置行随之隐藏。
-            TurboModeButton.Visibility = (caps.TurboMode || UiQaShowAll.Enabled) ? Visibility.Visible : Visibility.Collapsed;
+            // UMI/NUC 30 的 ItemSupport.TurboModeSupport 可能是 0，但原厂 CreatorCenter
+        // 仍提供办公/游戏/狂飙三档，且 GCU OperatingMode 支持 0/1/2。
+        // 对支持「模式 × 配置」的 30 系，不能只凭这一位隐藏第三档。
+        bool vendor30Modes = hw?.SupportsModeProfileConfig == true;
+        TurboModeButton.Visibility = (caps.TurboMode || UiQaShowAll.Enabled || vendor30Modes)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
             bool silentTurboAllowed = caps.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported
                 || UiQaShowAll.Enabled;
             EnsureSilentTurboButton(silentTurboAllowed);
