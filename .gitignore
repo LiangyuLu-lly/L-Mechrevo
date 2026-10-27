@@ -99,3 +99,5 @@ _refs/
 
 tools/dev/wpf-p0/bin-alt/
 
+
+tools/dev/nuc-perfkey-probe/perfkey-*.txt
