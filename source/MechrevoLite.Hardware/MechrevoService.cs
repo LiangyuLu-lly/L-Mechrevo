@@ -3410,21 +3410,25 @@ public class MechrevoService
 		return flag;
 	}
 
-	public async Task<bool> PublishKeyboardCloseTimer(int minutes)
+	/// <summary>兼容旧入口：参数按分钟，转发到秒口径。</summary>
+	public Task<bool> PublishKeyboardCloseTimer(int minutes) =>
+		PublishKeyboardCloseTimerSeconds(minutes > 0 ? minutes * 60 : 0);
+
+	/// <summary>GCU Setting/Control 的 Mins 字段实际按秒计数（10/15/.../600/3600）。</summary>
+	public async Task<bool> PublishKeyboardCloseTimerSeconds(int seconds)
 	{
-		_ = 1;
 		try
 		{
 			if (!_hw.SupportsKeyboard && !_hw.SupportsLightbar)
 			{
 				return false;
 			}
-			if (minutes > 0)
+			if (seconds > 0)
 			{
 				await _hw.Publish("Setting/Control", new Dictionary<string, object>
 				{
 					["Action"] = "KEYBOARD_LIGHTBAR_TIMER_ON",
-					["Mins"] = minutes
+					["Mins"] = seconds
 				});
 			}
 			else

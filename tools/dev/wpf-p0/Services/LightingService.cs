@@ -252,9 +252,9 @@ internal sealed class LightingService : ILightingService
                 return;
             }
             int seconds = AppConfig.Get(IdleSecondsKey, 0);
-            int minutes = seconds <= 0 ? 0 : Math.Max(1, seconds / 60);
-            _ = service.PublishKeyboardCloseTimer(minutes);
-            Logger.WriteLine("[light] 已同步 GCU 自动关灯计时器：" + (minutes <= 0 ? "关闭" : minutes + " 分钟"));
+            // GCU 的 Mins 字段按秒计数：10/15/20/30/45/60/.../10800。
+            _ = service.PublishKeyboardCloseTimerSeconds(seconds);
+            Logger.WriteLine("[light] 已同步 GCU 自动关灯计时器：" + (seconds <= 0 ? "关闭" : seconds + " 秒"));
         }
         catch (Exception ex)
         {
