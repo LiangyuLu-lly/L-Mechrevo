@@ -50,6 +50,7 @@ Source: "files\Install-InpOut.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "files\LICENSE-InpOut32.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "files\L-Mechrevo.deps.json"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\L-Mechrevo.dll"; DestDir: "{app}"; Flags: ignoreversion 
+Source: "files\MechrevoLite.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "files\L-Mechrevo.dll.config"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\L-Mechrevo.exe"; DestDir: "{app}"; Flags: ignoreversion 
 ; 2026-10-13（r25）：⛔ 【不再打包启动壳】。用户原话：
@@ -92,6 +93,7 @@ Source: "files\Resources\qrcode4.png"; DestDir: "{app}\Resources"; Flags: ignore
 ;   ⚠️ 许可：⭐ 该驱动按自带 `usbmmidd_v2\License.txt`（Amyuni）分发，⛔ 不另给许可文本（原样带上 ✅）
 Source: "files\usbmmidd_v2\*"; DestDir: "{app}\usbmmidd_v2"; Flags: ignoreversion 
 Source: "files\zh-CN\L-Mechrevo.resources.dll"; DestDir: "{app}\zh-CN"; Flags: ignoreversion 
+Source: "files\zh-CN\MechrevoLite.Core.resources.dll"; DestDir: "{app}\zh-CN"; Flags: ignoreversion 
 Source: "files\zh-CN\Microsoft.Win32.TaskScheduler.resources.dll"; DestDir: "{app}\zh-CN"; Flags: ignoreversion 
 Source: "files\THIRD_PARTY_NOTICES,2.txt"; DestDir: "{app}\LICENSES"; DestName: "THIRD_PARTY_NOTICES.txt"; Flags: ignoreversion
 

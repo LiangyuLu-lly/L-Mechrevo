@@ -1,3 +1,30 @@
+r83（2026-10-27 · 0.293.6 beta23.6 · WPF 主界面打包）
+
+一、打包/安装器
+- 安装包从旧 WinForms 产物迁到当前 WPF 产物：更新 L-Mechrevo.dll/exe/deps/runtimeconfig，新增 MechrevoLite.Core.dll，并同步 [Files] 清单。
+- 覆盖升级前备份 %APPDATA%\MechrevoLite、%ProgramData%\MechrevoLite、程序目录 config/cfg/风扇曲线/灯效/校色；升级后回灌。
+- 卸载交互式询问是否删除用户数据，默认保留；静默卸载不删除。
+- 版本仍为 0.293.6 beta23.6。
+
+二、WPF 界面/模式
+- 迷你窗、宽屏、悬浮窗、自定义页、风扇曲线窗口接入；浅色主题、托盘、宽屏/迷你切换。
+- 静音狂暴在迷你/宽屏/托盘可见；自定义模式高亮/绑定/自动下发修复。
+- GPU 超频仅实际 50 GCU 显示/执行；DB 只在静音/平衡/狂暴处理，不碰自定义。
+- PL1/PL2/fPPT 强制 fPPT>=PL2>=PL1；自定义切换自动按保存配置下发一次。
+- 30 系界面显示模式×配置行和配置编辑，隐藏自定义按钮。
+- Ctrl+Alt+4 循环自定义档，OSD 显示配置名；操作提示 5 秒复位 0.293.6。
+- 悬浮窗 CPU/GPU 逐列对齐；关于页/鸣谢/版本号修正。
+
+三、无界/星耀/风扇
+- 无界风扇新增 fanctl table 后端（写 8 字节表 + 0x0727 bit6 锁存 + 0x07C5 bit7 隔离，10s 心跳，45/48℃ 交还回差，5s 软着陆宽限）；direct 保留，wujie_fan_backend=direct 可强制回退。
+- 无界 CPU 频率 LHM 单位判断修复：仅 <20 的值按 GHz 换算，600/800MHz 不再变 600/800GHz。
+- 星耀 AMD 新增窄判据 XingyaoAmdSmuApu/SmuCustomApu，仅 SMU 自定义链路（PL1/PL2/Tcc/STAPM）使用；风扇 EC/限充/键盘仍只认无界。
+- 关于页鸣谢补 https://github.com/Qxingyue/-14XA-Uniwill-EC-。
+
+四、性能
+- 页面/宽屏窗口/迷你渲染 TTL 释放；静音狂暴、核显省电、宽屏静音狂暴按能力动态创建。
+- 悬浮窗/窗口布局修复。
+
 r82（2026-10-23 · 0.293.5.1 beta23.5.1 稳定性补丁 · 旧UI）
 
 一、稳定性

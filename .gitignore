@@ -50,6 +50,7 @@ GCUService_unpacked.7z
 #    ⚠️ 其余 `installer-src/files/*.dll` 是**第三方依赖**（随包分发、不是我们生成的）
 #       ⇒ ⚠️ 体积不小（Microsoft.Windows.SDK.NET.dll 24 MB）但**必须能重建出安装包** ⇒ ⭐ 保留 ✅
 installer-src/files/L-Mechrevo.dll
+installer-src/files/MechrevoLite.Core.dll
 installer-src/files/L-Mechrevo.exe
 installer-src/files/L-Mechrevo.pdb
 installer-src/files/L-Mechrevo.deps.json
