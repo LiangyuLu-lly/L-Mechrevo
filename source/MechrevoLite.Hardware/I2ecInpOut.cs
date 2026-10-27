@@ -16,6 +16,12 @@ namespace MechrevoLite.Hardware;
 /// </summary>
 internal static class I2ecInpOut
 {
+	/// <summary>2026-10-27（table 后端）：I2EC 序列中的一步写；<paramref name="DelayAfterMs" /> 用于锁存脉冲的 50ms 间隔。</summary>
+	internal readonly record struct I2ecWriteStep(int Address, int Value, int DelayAfterMs = 0);
+
+	/// <summary>2026-10-27（table 后端）：序列写完后的回读校验项（地址 + 期望字节）。</summary>
+	internal readonly record struct I2ecVerifyStep(int Address, int Expected);
+
 	private const short PortAddrHigh = 0x681;
 
 	private const short PortAddrLow = 0x682;
@@ -372,6 +378,72 @@ internal static class I2ecInpOut
 				{
 					detail = "回读不一致：写 0x" + (value & 0xFF).ToString("X2") + " / 读 0x" + readBack.ToString("X2");
 					return false;
+				}
+				detail = "ok";
+				return true;
+			}
+			catch (Exception ex)
+			{
+				detail = ex.GetType().Name + " " + ex.Message;
+				return false;
+			}
+			finally
+			{
+				ExitEcMutex(held);
+			}
+		}
+	}
+
+	/// <summary>
+	/// 2026-10-27（task-43 · table 后端）：**整段 I2EC 写序列**（锁一次端口锁 → 连续写 → 可选回读校验）。
+	/// <para>⭐ 为什么必须新增：曲线表 16 字节 + 隔离位 + 锁存脉冲（含 50ms 间隔）是**一组不可分割**的操作；
+	/// 若逐字节调用 <see cref="TryWriteEcByte" />，每次都会释放跨进程文件锁，别的进程（ACPI 电池驱动/另一实例）
+	/// 可能插进“地址高→地址低→数据”三步之间 ⇒ 撕裂写（历史事故：0x0409 被写成 0xA0）。
+	/// 本方法在整个序列期间独占进程内 <c>Gate</c> 与跨进程 <c>i2ec.lock</c> ✅。</para>
+	/// <para>⚠️ 序列总时长受 <see cref="I2ecWriteStep.DelayAfterMs" /> 控制（锁存脉冲需要 50ms），
+	/// 调用方应保持序列短小（本项目只写表前 8 字节）。</para>
+	/// </summary>
+	internal static bool TryWriteEcSequence(IReadOnlyList<I2ecWriteStep> steps, IReadOnlyList<I2ecVerifyStep> verifySteps, out string detail)
+	{
+		detail = "";
+		if (steps == null || steps.Count == 0)
+		{
+			detail = "空写序列";
+			return false;
+		}
+		if (!EnsureInitialized(out detail))
+		{
+			return false;
+		}
+		lock (Gate)
+		{
+			if (!TryEnterEcMutex(out bool held))
+			{
+				detail = "I2EC 忙（等待全局互斥体超时）";
+				return false;
+			}
+			try
+			{
+				foreach (I2ecWriteStep step in steps)
+				{
+					WriteByte(step.Address, step.Value & 0xFF);
+					if (step.DelayAfterMs > 0)
+					{
+						Thread.Sleep(Math.Min(step.DelayAfterMs, 200));
+					}
+				}
+				if (verifySteps != null)
+				{
+					foreach (I2ecVerifyStep verify in verifySteps)
+					{
+						int actual = ReadByte(verify.Address);
+						if (actual != (verify.Expected & 0xFF))
+						{
+							detail = "回读不一致 0x" + verify.Address.ToString("X4") + "：写 0x"
+								+ (verify.Expected & 0xFF).ToString("X2") + " / 读 0x" + actual.ToString("X2");
+							return false;
+						}
+					}
 				}
 				detail = "ok";
 				return true;

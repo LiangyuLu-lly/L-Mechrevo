@@ -28,6 +28,32 @@ internal static class WujieFanEc
 
 	internal const int RegisterFan2RpmHigh = 0x046C;
 
+	// ⭐⭐ 2026-10-27（task-43 · 参考 fanctl 的 table 后端，仅取寄存器事实/做法，⛔ 未复制 Python）：
+	//   曲线表 0x0F20(fan1)/0x0F50(fan2) 各 48 字节，但**只写前 8 字节**（EC 取前 8 字节最大值，实测索引不随温度变化）；
+	//   0x0727 bit6 = 表锁存，0x07C5 bit7 = 主副扇输出隔离；两者都按“出厂基线绝对写”避免 read-modify-write 撕裂事故。
+	internal const int RegisterFanTableFan1 = 0x0F20;
+
+	internal const int RegisterFanTableFan2 = 0x0F50;
+
+	internal const int RegisterFanTableLatch = 0x0727;
+
+	internal const int RegisterFanIsolate = 0x07C5;
+
+	/// <summary>表后端只写每张表前 8 字节（EC 取前 8 字节最大值；同时避开 0x38/0x3A 电源寄存器地址低字节）。</summary>
+	internal const int FanTableActiveLength = 8;
+
+	/// <summary>表后端心跳周期（ms）：先读目标，只有 EC 真的偏离（&gt; <see cref="TableDriftToleranceRaw" />）才重锁。</summary>
+	internal const int TableHeartbeatMs = 10000;
+
+	/// <summary>心跳允许的目标漂移（raw，0..200 满量程）。</summary>
+	internal const int TableDriftToleranceRaw = 8;
+
+	/// <summary>锁存脉冲间隔（ms）：先写 <c>base &amp; ~0x40</c> → 50ms → <c>base | 0x40</c>。</summary>
+	internal const int TableLatchPulseMs = 50;
+
+	/// <summary>低温交还后重新接管温度（℃）：45℃ 交还、48℃ 接管（3℃ 回差，避免阈值附近反复横跳）。</summary>
+	internal const int HandoffResumeTemperatureC = 48;
+
 	/// <summary>副扇可用下限（%）：低于该值副扇可能被判堵转闭锁。</summary>
 	internal const int FanFloorPercent = 20;
 
@@ -203,7 +229,8 @@ internal static class WujieFanEc
 			}
 			sb.AppendLine($"模式 0x200D=0x{mode:X2}（bit0/1={(((mode & 0x03) == 0x03) ? "读写模式" : "非读写模式")}）");
 			sb.AppendLine($"占空比：主扇={duty1}/200 · 副扇={duty2}/200 · CPU={tempC}℃ · 主扇={fan1Rpm}rpm · 副扇={fan2Rpm}rpm");
-			sb.AppendLine("参考语义：占空比 0..200 → 0..100%；低于 20% 副扇可能被判堵转闭锁；写入需 25Hz 持续维持（EC 会覆写）。");
+			sb.AppendLine("参考语义：占空比 0..200 → 0..100%；低于 20% 副扇可能被判堵转闭锁；"
+				+ "table 后端默认优先（0x0F20/0x0F50 前 8 字节 + 0x0727 bit6 锁存 + 0x07C5 bit7 隔离），失败/显式配置时回退 25Hz direct 直写。");
 			sb.AppendLine("边界：本段只读；写曲线尚未接入 UI（下一步：25Hz 控制器 + FanCurveForm 无界分支）。");
 			// 2026-10-22（机主：无界能不能走宝龙达那条 PawnIO 路子）：只读探测 LPC EC-RAM 通道是否能摸到无界的
 			// 温度/转速/占空比地址。若能读到合理值，就可以把写入也挪到 PawnIO（不再依赖 inpoutx64）。
