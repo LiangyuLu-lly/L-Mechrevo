@@ -170,6 +170,8 @@ NoGCU packages are available on the [Releases](https://github.com/xmsjx/L-Mechre
 - `LM-<version>-NoGCU-setup.exe`: fresh installer without the GCU service payload; for machines that already have the official GCU service / official console backend.
 - `L-Mechrevo-<version>-NoGCU-unsigned.zip`: auto-update package without the GCU payload. The app prompts when a new version is detected; you can also download the zip manually and replace the program files yourself.
 
+- Optional: place `GCU.7z` next to the installer; setup detects it and installs GCU automatically. Without it, only the LM application is installed.
+
 Current release: `0.293.6 beta23.6`.
 
 ## System requirements
