@@ -822,7 +822,9 @@ public partial class OriginalStyleWindow : Window
             if (string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
                 && hw?.IsIntelNucMachine == true)
             {
-                return probe.ApplyIntelNucLightbar(effect, light, lightColor);
+                bool rawOk = probe.ApplyIntelNucLightbar(effect, light, lightColor);
+                Logger.WriteError("[umi-lightbar] apply topic=" + topic + " effect=" + effect + " light=" + light + " raw=" + rawOk);
+                return rawOk;
             }
             return await lightService.SetLightEffect(topic, effect, light, speed, "None", lightColor, true);
         }
@@ -4347,6 +4349,9 @@ public partial class OriginalStyleWindow : Window
         SyncRefreshRateState();
         RefreshPerfConfigVisibility(mode);
         RefreshPerfConfigSelections();
+        // 能力位晚到/首次构建时 backend 未就绪会让 MoreGroupsPanel 为空；
+        // 这里每次刷新补建一次（已构建时 BuildMoreSwitches 会立即返回）。
+        BuildMoreSwitches();
         SyncGpuDbForMode(mode, "WPF 后端模式同步");
         if (!skipModeUi)
         {
