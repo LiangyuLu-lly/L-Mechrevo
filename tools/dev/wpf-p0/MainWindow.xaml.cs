@@ -2187,6 +2187,8 @@ public partial class MainWindow : Window
                 if (!string.IsNullOrWhiteSpace(id))
                 {
                     editor.BindMode(id);
+                    if (_cpuFanInlineWindow is FanCurveWindow cpuFan) cpuFan.SetModeId(id);
+                    if (_gpuFanInlineWindow is FanCurveWindow gpuFan) gpuFan.SetModeId(id);
                 }
             }
             catch

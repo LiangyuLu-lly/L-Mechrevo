@@ -209,15 +209,16 @@ public partial class MainWindow
                 }
                 MountWindowContent(_customModeInlineWindow, CustomModeHost);
             }
+            string fanModeId = _owner?.WideCustomModeId ?? "balanced";
             if (CpuFanCurveHost.Content == null)
             {
-                _cpuFanInlineWindow = new FanCurveWindow("balanced", showCpu: true, showGpu: false);
+                _cpuFanInlineWindow = new FanCurveWindow(fanModeId, showCpu: true, showGpu: false);
                 ((FanCurveWindow)_cpuFanInlineWindow).PrepareInline();
                 MountWindowContent(_cpuFanInlineWindow, CpuFanCurveHost);
             }
             if (GpuFanCurveHost.Content == null)
             {
-                _gpuFanInlineWindow = new FanCurveWindow("balanced", showCpu: false, showGpu: true);
+                _gpuFanInlineWindow = new FanCurveWindow(fanModeId, showCpu: false, showGpu: true);
                 ((FanCurveWindow)_gpuFanInlineWindow).PrepareInline();
                 MountWindowContent(_gpuFanInlineWindow, GpuFanCurveHost);
             }

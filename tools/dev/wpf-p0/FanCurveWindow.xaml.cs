@@ -13,7 +13,7 @@ namespace L_Mechrevo.WpfP0;
 
 public partial class FanCurveWindow : Window
 {
-    private readonly string _modeId;
+    private string _modeId;
     private readonly MechrevoHw? _hw;
     private bool _dirty;
     private WujieFanEcController? _wujieController;
@@ -43,6 +43,16 @@ public partial class FanCurveWindow : Window
         CpuCurve.Changed += MarkDirty;
         GpuCurve.Changed += MarkDirty;
         Closing += OnClosing;
+        LoadFromHardware();
+    }
+
+    internal void SetModeId(string modeId)
+    {
+        if (string.Equals(_modeId, modeId, StringComparison.Ordinal))
+        {
+            return;
+        }
+        _modeId = modeId;
         LoadFromHardware();
     }
 
