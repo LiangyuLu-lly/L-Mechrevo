@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     private Window? _inlineWindow;
     private bool _wideMaximized;
     private bool _switchingToMini;
+    private string _activePage = "home";
     private bool _animatingWindow;
     private L_Mechrevo.WpfP0.Pages.SwitchesPageView? _switchesView;
     private ScrollViewer? SwitchesPage;
@@ -612,6 +613,11 @@ public partial class MainWindow : Window
 
     private void ApplyPage(string page)
     {
+        if (!string.Equals(_activePage, page, StringComparison.Ordinal))
+        {
+            ReleasePageView(_activePage);
+            _activePage = page;
+        }
         if (page == "home") EnsureHomeView();
         else if (page == "screen") EnsureScreenView();
         else if (page == "lighting") EnsureLightingView();

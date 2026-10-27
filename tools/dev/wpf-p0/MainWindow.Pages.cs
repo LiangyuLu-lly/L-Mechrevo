@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -264,5 +265,69 @@ public partial class MainWindow
     private void WireCustomEvents()
     {
     }
+    /// <summary>离开非首页时释放该页视觉树与字段，下次进入再重建；首页常驻，避免传感器计时器空引用。</summary>
+    private void ReleasePageView(string page)
+    {
+        switch (page)
+        {
+            case "screen":
+                _effectCommitTimer?.Stop();
+                _screenFeatures.Clear();
+                _effectSliders.Clear();
+                ScreenHost.Content = null;
+                _screenView = null;
+                ScreenPage = null!;
+                ScreenCalibrationCard = null!;
+                ScreenCalibrationToggle = null!;
+                ScreenCalibrationOptionsPanel = null!;
+                ScreenCalibrationSettingsButton = null!;
+                ScreenCalibrationSettingsPanel = null!;
+                CalibrationStartupSwitch = null!;
+                CalibrationCustomSwitch = null!;
+                CalibrationIccCombo = null!;
+                ScreenPageEventControl1 = null!;
+                ScreenFeaturesCard = null!;
+                ScreenFeaturesPanel = null!;
+                ScreenEffectCard = null!;
+                ScreenEffectToggle = null!;
+                ScreenEffectOptionsPanel = null!;
+                ScreenEffectEditButton = null!;
+                ScreenEffectEditorPanel = null!;
+                ScreenPageEventControl2 = null!;
+                ScreenEffectSliderPanel = null!;
+                break;
+            case "lighting":
+                foreach (DispatcherTimer timer in _lightCardApplyTimers) timer.Stop();
+                _lightCardApplyTimers.Clear();
+                foreach (LightEditorWindow editor in _inlineLightEditors) editor.Close();
+                _inlineLightEditors.Clear();
+                if (_inlineLightEditorWindow != null) { _inlineLightEditorWindow.Close(); _inlineLightEditorWindow = null; }
+                LightingHost.Content = null;
+                _lightingView = null;
+                LightingPage = null!;
+                LightingOffBatteryToggle = null!;
+                LightingIdlePanel = null!;
+                LightingCardsGrid = null!;
+                break;
+            case "custom":
+                if (_customModeInlineWindow != null) { _customModeInlineWindow.Close(); _customModeInlineWindow = null; }
+                if (_cpuFanInlineWindow != null) { _cpuFanInlineWindow.Close(); _cpuFanInlineWindow = null; }
+                if (_gpuFanInlineWindow != null) { _gpuFanInlineWindow.Close(); _gpuFanInlineWindow = null; }
+                CustomHost.Content = null;
+                _customView = null;
+                CustomPage = null!;
+                CustomModeHost = null!;
+                CpuFanCurveHost = null!;
+                GpuFanCurveHost = null!;
+                break;
+            case "switches":
+                SwitchesHost.Content = null;
+                _switchesView = null;
+                SwitchesPage = null;
+                MoreSwitchGrid = null;
+                break;
+        }
+    }
+
 
 }
