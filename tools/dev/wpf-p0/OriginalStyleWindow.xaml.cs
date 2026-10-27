@@ -2428,7 +2428,7 @@ public partial class OriginalStyleWindow : Window
                     return;
                 }
                 ServiceResult chargeEnable = _services != null
-                    ? _services.ChargeLimit.EnableThresholdRaw(low, high)
+                    ? DashboardCommands.EnableChargeLimitRaw(low, high)
                     : EnableChargeLimitDirect(low, high);
                 ok = chargeEnable.Ok;
                 string detail = chargeEnable.Detail;
@@ -2445,7 +2445,7 @@ public partial class OriginalStyleWindow : Window
             else
             {
                 ServiceResult chargeDisable = _services != null
-                    ? _services.ChargeLimit.DisableThresholdRaw()
+                    ? DashboardCommands.DisableChargeLimitRaw()
                     : DisableChargeLimitDirect();
                 ok = chargeDisable.Ok;
                 string detail = chargeDisable.Detail;
@@ -2481,7 +2481,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             ServiceResult chargeApply = _services != null
-                ? _services.ChargeLimit.EnableThresholdRaw(low, high)
+                ? DashboardCommands.EnableChargeLimitRaw(low, high)
                 : EnableChargeLimitDirect(low, high);
             bool ok = chargeApply.Ok;
             string detail = chargeApply.Detail;
@@ -2892,9 +2892,7 @@ public partial class OriginalStyleWindow : Window
         _backendProbe?.MarkUserModeSwitch();
         try
         {
-            MechrevoService.ModeSwitchResult result = _services != null
-                ? await _services.Performance.SetModeResultAsync(mode)
-                : await _backendProbe!.SwitchModeResultAsync(mode);
+            MechrevoService.ModeSwitchResult result = await DashboardCommands.SetPerformanceModeResultAsync(mode);
             if (request != _modeRequestId)
             {
                 return;
@@ -3499,7 +3497,7 @@ public partial class OriginalStyleWindow : Window
             if (prompt.Result == GpuPromptResult.SwitchAndRestart)
             {
                 bool restartOk = _services != null
-                    ? (await _services.Gpu.RequestRestartAsync(mode)).Ok
+                    ? (await DashboardCommands.RequestGpuRestartAsync(mode)).Ok
                     : await _backendProbe.RequestGpuModeRestartAsync(mode);
                 if (restartOk)
                 {
@@ -3520,7 +3518,7 @@ public partial class OriginalStyleWindow : Window
         }
         HighlightSegment(button);
         bool ok = _services != null
-            ? (await _services.Gpu.SwitchAsync(mode)).Ok
+            ? (await DashboardCommands.SetGpuModeAsync(mode)).Ok
             : await _backendProbe.SwitchGpuModeAsync(mode);
         if (_services != null) { await _services.Gpu.RefreshAsync(); } else { await _backendProbe.RefreshGpuModeAsync(); }
         int current = _backendProbe.CurrentGpuMode;
@@ -3582,7 +3580,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool ok = _services != null
-            ? (await _services.Battery.SetModeAsync(mode)).Ok
+            ? (await DashboardCommands.SetBatteryModeAsync(mode)).Ok
             : await _backendProbe.SetBatteryModeAsync(mode);
         StatusText.Text = ok ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
     }

@@ -13,12 +13,15 @@ internal interface IDashboardCommands
     Task<bool> ToggleQuickAsync(string key);
     Task<bool> SetQuickAsync(string key, bool on);
     Task<ServiceResult> SetPerformanceModeAsync(int visualMode);
+    Task<MechrevoLite.Hardware.MechrevoService.ModeSwitchResult> SetPerformanceModeResultAsync(int visualMode);
     Task<ServiceResult> SetFanBoostAsync(bool on);
     Task<ServiceResult> ToggleFanBoostAsync();
     Task<ServiceResult> SetGpuModeAsync(int mode);
     Task<ServiceResult> RequestGpuRestartAsync(int mode);
     Task<ServiceResult> SetBatteryModeAsync(int mode);
     Task<ServiceResult> SaveChargeLimitAsync(int lowPercent, int highPercent);
+    ServiceResult EnableChargeLimitRaw(int lowPercent, int highPercent);
+    ServiceResult DisableChargeLimitRaw();
     Task<ServiceResult> SetChargeSliderEnabledAsync(bool on);
     Task<ServiceResult> SetEcDirectWriteAsync(bool on);
     Task<ServiceResult> SetLightPowerAsync(string topic, bool on);
@@ -79,6 +82,11 @@ internal sealed class DashboardCommands : IDashboardCommands
     public Task<ServiceResult> SetPerformanceModeAsync(int visualMode) =>
         _services != null ? _services.Performance.SetModeAsync(visualMode) : Task.FromResult(ServiceResult.Fail("服务未就绪"));
 
+    public Task<MechrevoLite.Hardware.MechrevoService.ModeSwitchResult> SetPerformanceModeResultAsync(int visualMode) =>
+        _services != null
+            ? _services.Performance.SetModeResultAsync(visualMode)
+            : Task.FromResult(MechrevoLite.Hardware.MechrevoService.ModeSwitchResult.Failed);
+
     public Task<ServiceResult> SetFanBoostAsync(bool on) =>
         _services != null ? _services.Performance.SetFanBoostAsync(on) : Task.FromResult(ServiceResult.Fail("服务未就绪"));
 
@@ -96,6 +104,12 @@ internal sealed class DashboardCommands : IDashboardCommands
 
     public Task<ServiceResult> SaveChargeLimitAsync(int lowPercent, int highPercent) =>
         Task.FromResult(_services != null ? _services.ChargeLimit.SaveThreshold(lowPercent, highPercent) : ServiceResult.Fail("服务未就绪"));
+
+    public ServiceResult EnableChargeLimitRaw(int lowPercent, int highPercent) =>
+        _services != null ? _services.ChargeLimit.EnableThresholdRaw(lowPercent, highPercent) : ServiceResult.Fail("服务未就绪");
+
+    public ServiceResult DisableChargeLimitRaw() =>
+        _services != null ? _services.ChargeLimit.DisableThresholdRaw() : ServiceResult.Fail("服务未就绪");
 
     public Task<ServiceResult> SetChargeSliderEnabledAsync(bool on) =>
         Task.FromResult(_services != null ? _services.ChargeLimit.SetSliderEnabled(on) : ServiceResult.Fail("服务未就绪"));
