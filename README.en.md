@@ -32,6 +32,8 @@ The UI is not limited to a fixed light/dark pair:
 
 <img src="docs/images/mini-background.png" width="460" alt="Custom background example">
 
+<img src="docs/images/wide-background-20261028.png" width="760" alt="Wide custom wallpaper example">
+
 ## Features
 
 ### Performance modes

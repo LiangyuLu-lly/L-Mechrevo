@@ -32,6 +32,8 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 <img src="docs/images/mini-background.png" width="460" alt="自定义背景示例">
 
+<img src="docs/images/wide-background-20261028.png" width="760" alt="宽屏自定义壁纸示例">
+
 ## 功能特性
 
 ### 性能模式
