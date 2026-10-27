@@ -137,7 +137,8 @@ Source: "..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}\LICENSES"; Flags: ignorever
 Source: "files\PawnIO\LMechrevo.RyzenSMU.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversion
 Source: "files\PawnIO\LMechrevo.IntelMSR.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversion
 Source: "files\PawnIO\LMechrevo.LpcACPIEC.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversion
-Source: "files\PawnIO\LMechrevo.LpcIO.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversionSource: "files\COPYING.PawnIO.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
+Source: "files\PawnIO\LMechrevo.LpcIO.bin"; DestDir: "{app}\PawnIO"; Flags: ignoreversion
+Source: "files\COPYING.PawnIO.txt"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 ; 2026-10-10：app 仍在调用 {app}\Install-PawnIO.ps1（source\MechrevoLite\CpuTuningForm.cs:1710），
 ; 但当前 installer-src\files 里没有它 —— 恢复，否则「下载 PawnIO 驱动」按钮静默失败。
 Source: "files\Install-PawnIO.ps1"; DestDir: "{app}"; Flags: ignoreversion 
