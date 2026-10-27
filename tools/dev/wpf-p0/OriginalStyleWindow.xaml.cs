@@ -390,6 +390,19 @@ public partial class OriginalStyleWindow : Window
         _ = SwitchModeAsync(mode);
     }
 
+    internal bool WideSilentTurboVisible => _backendProbe?.Capabilities?.SilentTurboAvailability
+        == MechrevoLite.Hardware.FeatureAvailability.Supported || UiQaShowAll.Enabled;
+
+    internal int WideCurrentMode => _backendProbe != null ? ResolveDisplayMode(_backendProbe) : VisualModeForId(MechrevoLite.Mode.PerfModeStore.ActiveModeId);
+
+    internal bool WideSilentTurboActive => WideCurrentMode == 1 && WideSilentTurboVisible
+        && MechrevoService.IsSilentTurboActive;
+
+    internal void WideSetSilentTurbo()
+    {
+        _ = SwitchModeAsync(1, true);
+    }
+
     internal void WideSetMode(int mode)
     {
         RequestMode(mode);
@@ -1562,14 +1575,7 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
-        await SwitchModeAsync(1);
-        try
-        {
-            await _backendProbe.Service.SwitchTurboSubMode(silent: true);
-        }
-        catch
-        {
-        }
+        await SwitchModeAsync(1, silentTurbo: true);
         RefreshFromBackend();
     }
 
@@ -2616,9 +2622,13 @@ public partial class OriginalStyleWindow : Window
             StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_30 + (selected.Content as TextBlock)?.Text;
             int mode = selected == SilentModeButton ? 2
                 : selected == BalancedModeButton ? 0
+                : selected == SilentTurboModeButton ? 1
                 : selected == TurboModeButton ? 1
                 : selected == CustomModeButton ? 3
                 : -1;
+            bool? silentTurbo = ReferenceEquals(selected, SilentTurboModeButton) ? true
+                : ReferenceEquals(selected, TurboModeButton) ? false
+                : null;
             if (ReferenceEquals(selected, CustomModeButton))
             {
                 _pendingMode = 3;
@@ -2630,7 +2640,7 @@ public partial class OriginalStyleWindow : Window
             {
                 _pendingMode = mode;
                 _pendingModeTick = Environment.TickCount64;
-                _ = SwitchModeAsync(mode);
+                _ = SwitchModeAsync(mode, silentTurbo);
             }
         }
     }
@@ -2719,16 +2729,20 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    private async Task SwitchModeAsync(int mode)
+    private async Task SwitchModeAsync(int mode, bool? silentTurbo = null)
     {
         int request = ++_modeRequestId;
         _pendingMode = mode;
         _pendingModeTick = Environment.TickCount64;
         _modeSwitchInFlight = true;
+        bool turboSubModeSupported = _backendProbe?.Capabilities?.SilentTurboAvailability
+            == MechrevoLite.Hardware.FeatureAvailability.Supported;
         string osdMode = mode switch
         {
             2 => WpfStrings.ModeSilent,
-            1 => WpfStrings.ModeTurbo,
+            1 => silentTurbo == true
+                ? WpfStrings.SilentTurbo
+                : silentTurbo == false && turboSubModeSupported ? WpfStrings.TurboHighEnergy : WpfStrings.ModeTurbo,
             0 => WpfStrings.ModeBalanced,
             _ => WpfStrings.ModeCustom
         };
@@ -2749,6 +2763,15 @@ public partial class OriginalStyleWindow : Window
                 return;
             }
             bool ok = result == MechrevoService.ModeSwitchResult.Ok;
+            if (ok && mode == 1 && silentTurbo == true && !turboSubModeSupported)
+            {
+                ok = false;
+            }
+            else if (ok && mode == 1 && silentTurbo.HasValue && turboSubModeSupported)
+            {
+                ok = _backendProbe?.Service != null
+                    && await _backendProbe.Service.SwitchTurboSubMode(silentTurbo.Value);
+            }
             BackendStatus.Text = ok ? WpfStrings.OriginalStyleWindow_xaml_Text_8 : WpfStrings.PerfModeFailed;
             if (!ok)
             {
@@ -2765,13 +2788,17 @@ public partial class OriginalStyleWindow : Window
                 MechrevoLite.Mode.PerfModeKind? kind = mode switch
                 {
                     2 => MechrevoLite.Mode.PerfModeKind.Silent,
-                    1 => MechrevoLite.Mode.PerfModeKind.Turbo,
+                    1 => silentTurbo == true
+                        ? MechrevoLite.Mode.PerfModeKind.SilentTurbo
+                        : MechrevoLite.Mode.PerfModeKind.Turbo,
                     0 => MechrevoLite.Mode.PerfModeKind.Balanced,
                     _ => null
                 };
                 if (kind.HasValue)
                 {
-                    MechrevoLite.Mode.PerfModeStore.ActiveModeId = MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind.Value);
+                    string activeId = MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind.Value);
+                    MechrevoLite.Mode.PerfModeStore.ActiveModeId = activeId;
+                    MechrevoLite.Mode.PerfModeService.Instance?.NotifyExternalSwitch(activeId);
                 }
                 SyncGpuDbForMode(mode, "WPF 切档");
                 SyncCustomWindowMode(mode);
@@ -2803,6 +2830,7 @@ public partial class OriginalStyleWindow : Window
         {
             "silent" => 2,
             "balanced" => 0,
+            "silentturbo" => 1,
             "turbo" => 1,
             _ => -1
         };
@@ -3970,10 +3998,15 @@ public partial class OriginalStyleWindow : Window
         }
         UpdateGpuButtons(displayGpu, pending);
         bool skipModeUi = _modeSwitchInFlight;
+        bool silentTurboSupported = probe.Capabilities?.SilentTurboAvailability
+            == MechrevoLite.Hardware.FeatureAvailability.Supported;
+        bool silentTurboActive = mode == 1 && silentTurboSupported && MechrevoService.IsSilentTurboActive;
         CurrentModeText.Text = WpfStrings.CurrentPrefix + (mode switch
         {
             2 => WpfStrings.ModeSilent,
-            1 => WpfStrings.ModeTurbo,
+            1 => silentTurboActive
+                ? WpfStrings.SilentTurbo
+                : silentTurboSupported ? WpfStrings.TurboHighEnergy : WpfStrings.ModeTurbo,
             0 => WpfStrings.ModeBalanced,
             3 or 4 => WpfStrings.ModeCustom,
             _ => "—"
@@ -3993,7 +4026,8 @@ public partial class OriginalStyleWindow : Window
         {
             SilentModeButton.IsChecked = mode == 2;
             BalancedModeButton.IsChecked = mode == 0;
-            TurboModeButton.IsChecked = mode == 1;
+            SilentTurboModeButton.IsChecked = silentTurboActive;
+            TurboModeButton.IsChecked = mode == 1 && !silentTurboActive;
             CustomModeButton.IsChecked = mode is 3 or 4;
             RefreshModeHighlights();
         }
@@ -4394,6 +4428,13 @@ public partial class OriginalStyleWindow : Window
   SyncLightSwitchesFromHardware();
   bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
+            bool silentTurboAllowed = caps.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported
+                || UiQaShowAll.Enabled;
+            SilentTurboModeButton.Visibility = silentTurboAllowed ? Visibility.Visible : Visibility.Collapsed;
+            if (TurboModeButton.Content is TextBlock turboLabel)
+            {
+                turboLabel.Text = silentTurboAllowed ? WpfStrings.TurboHighEnergy : WpfStrings.OriginalStyleWindow_Text_22;
+            }
             BuildMoreSwitches();
             BackendProbe probe = _backendProbe;
             FanTile.Visibility = probe.SupportsQuick("fanboost") ? Visibility.Visible : Visibility.Collapsed;

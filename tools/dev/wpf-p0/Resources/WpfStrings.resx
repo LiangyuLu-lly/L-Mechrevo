@@ -2954,4 +2954,10 @@ Cancel: do not switch</value>
   <data name="GpuModeDedicated" xml:space="preserve">
     <value>Dedicated mode</value>
   </data>
+  <data name="SilentTurbo" xml:space="preserve">
+    <value>Silent Turbo</value>
+  </data>
+  <data name="TurboHighEnergy" xml:space="preserve">
+    <value>High Energy Turbo</value>
+  </data>
 </root>

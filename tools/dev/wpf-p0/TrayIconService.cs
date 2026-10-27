@@ -192,7 +192,7 @@ internal sealed class TrayIconService : IDisposable
                 }
                 if (state?.TurboVisible == true)
                 {
-                    _menu.Items.Add(MenuItem(WpfStrings.TrayTurbo, mode == 1 && state?.SilentTurboOn != true, () => ModeRequested?.Invoke(1)));
+                    _menu.Items.Add(MenuItem(state?.SilentTurboVisible == true ? WpfStrings.TurboHighEnergy : WpfStrings.TrayTurbo, mode == 1 && state?.SilentTurboOn != true, () => ModeRequested?.Invoke(1)));
                 }
                 if (state?.FanBoostVisible == true)
                 {

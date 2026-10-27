@@ -2954,4 +2954,10 @@ GCU：{0} · 宝龙达：{1} · 无界：{2}</value>
   <data name="GpuModeDedicated" xml:space="preserve">
     <value>独显模式</value>
   </data>
+  <data name="SilentTurbo" xml:space="preserve">
+    <value>静音狂暴</value>
+  </data>
+  <data name="TurboHighEnergy" xml:space="preserve">
+    <value>高能狂暴</value>
+  </data>
 </root>

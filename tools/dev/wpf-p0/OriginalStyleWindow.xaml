@@ -457,6 +457,11 @@
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
+                            <ToggleButton x:Name="SilentTurboModeButton" Tag="#FB7185" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
+                                <TextBlock Text="{x:Static loc:WpfStrings.SilentTurbo}" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                           FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                           FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </ToggleButton>
                             <ToggleButton x:Name="TurboModeButton" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
                                 <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_22}" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"

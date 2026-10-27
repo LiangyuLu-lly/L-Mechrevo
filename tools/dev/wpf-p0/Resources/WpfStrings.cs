@@ -661,6 +661,8 @@ public static class WpfStrings
     public static string TraySilent => Get("TraySilent");
     public static string TrayBalanced => Get("TrayBalanced");
     public static string TraySilentTurbo => Get("TraySilentTurbo");
+    public static string SilentTurbo => Get("SilentTurbo");
+    public static string TurboHighEnergy => Get("TurboHighEnergy");
     public static string TrayTurbo => Get("TrayTurbo");
     public static string TrayFanBoost => Get("TrayFanBoost");
     public static string TrayGpuIntegrated => Get("TrayGpuIntegrated");
