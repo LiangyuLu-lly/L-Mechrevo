@@ -2939,9 +2939,6 @@ public partial class OriginalStyleWindow : Window
             }
             if (ok)
             {
-                // 高性能电源是“性能模式按钮点击”驱动的 Windows 电源模式联动；
-                // 这里直接走 PerfModeService，不等 GCU 回读，也不依赖 ActiveModeId 回写。
-                MechrevoLite.Mode.PerfModeService.Instance?.ApplyWindowsPowerOverlayForUiMode(mode, silentTurbo == true);
                 MechrevoLite.Mode.PerfModeKind? kind = mode switch
                 {
                     2 => MechrevoLite.Mode.PerfModeKind.Silent,
@@ -2956,6 +2953,9 @@ public partial class OriginalStyleWindow : Window
                     string activeId = MechrevoLite.Mode.PerfModeDefinition.BuiltInId(kind.Value);
                     MechrevoLite.Mode.PerfModeStore.ActiveModeId = activeId;
                     MechrevoLite.Mode.PerfModeService.Instance?.NotifyExternalSwitch(activeId);
+                    // 先更新 ActiveModeId，再按当前档位完整配置应用 Windows 电源模式；
+                    // 自定义配置里的 WindowsPowerMode 会覆盖高性能电源的默认映射。
+                    MechrevoLite.Mode.PerfModeService.Instance?.ApplyWindowsPowerOverlayForActiveMode();
                 }
                 SyncGpuDbForMode(mode, "WPF 切档");
                 SyncCustomWindowMode(mode);

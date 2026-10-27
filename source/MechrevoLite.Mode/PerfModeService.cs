@@ -534,6 +534,16 @@ internal sealed class PerfModeService
 		}
 	}
 	// <para>映射：2=静音 ⇒ 最佳能效 · 0=平衡 ⇒ 平衡 · 1=狂暴/静音狂暴 ⇒ 最佳性能</para>
+	/// <summary>按“当前已激活档位”的完整配置应用 Windows 电源模式；自定义档的 WindowsPowerMode 优先。</summary>
+	public void ApplyWindowsPowerOverlayForActiveMode()
+	{
+		if (Active == null)
+		{
+			return;
+		}
+		ApplyWindowsPowerOverlay(Active.Id);
+	}
+
 	public void ApplyWindowsPowerOverlayForUiMode(int mode, bool silentTurbo)
 	{
 		if (!WindowsPowerOverlayEnabled)
@@ -573,17 +583,20 @@ internal sealed class PerfModeService
 
 	private void ApplyWindowsPowerOverlay(string modeId)
 	{
-		if (AppConfig.Get("bd_power_overlay", 1) == 0)
-		{
-			return;
-		}
 		PerfModeDefinition mode = Find(modeId);
 		if ((object)mode == null)
 		{
 			return;
 		}
+		// 档位配置里明确设置的 WindowsPowerMode 优先级高于“高性能电源”总开关；
+		// 只有未明确配置时才由总开关 + 档位类型默认映射决定。
+		bool explicitWindowsMode = mode.Settings.WindowsPowerMode.HasValue;
+		if (!explicitWindowsMode && AppConfig.Get("bd_power_overlay", 1) == 0)
+		{
+			return;
+		}
 		int overlay;
-		if (mode.Settings.WindowsPowerMode.HasValue)
+		if (explicitWindowsMode)
 		{
 			overlay = mode.Settings.WindowsPowerMode.Value;
 		}
