@@ -1791,6 +1791,7 @@ public partial class MainWindow : Window
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
         bool silentTurboVisible = _owner.WideSilentTurboVisible;
+        HomePerf狂暴.Visibility = _owner.WideTurboModeVisible ? Visibility.Visible : Visibility.Collapsed;
         EnsureWideSilentTurboButton(silentTurboVisible);
         HomePerf狂暴.Content = silentTurboVisible ? WpfStrings.TurboHighEnergy : WpfStrings.ModeTurbo;
         if (!_owner.WideModeSwitchPending)
