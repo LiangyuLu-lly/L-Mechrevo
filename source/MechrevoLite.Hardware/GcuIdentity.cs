@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -96,16 +97,34 @@ internal static class GcuIdentity
 		}
 	}
 
-	/// <summary>已安装 GCU 的 GCUService.exe 候选路径（落盘目录名以 AiStoneService 为准，兼容旧 UniwillService）。</summary>
+	/// <summary>已安装 GCU 的 GCUService.exe 候选路径（落盘目录名以 AiStoneService 为准，兼容旧 UniwillService）。
+	/// 除 LM 自带 GCU 目录外，也检查厂商控制台在 Program Files\OEM 下的安装位置；40 系装 50 GCU
+	/// 或用户保留官方控制台时，实际载荷可能只在官方目录里。</summary>
 	private static string[] ServiceExeCandidates()
 	{
+		List<string> candidates = new List<string>();
 		string root = Path.Combine(AppContext.BaseDirectory, "GCU");
-		return new string[]
+		candidates.Add(Path.Combine(root, "AiStoneService", "MyControlCenter", "GCUService.exe"));
+		candidates.Add(Path.Combine(root, "UniwillService", "MyControlCenter", "GCUService.exe"));
+		candidates.Add(Path.Combine(root, "GCUService.exe"));
+		try
 		{
-			Path.Combine(root, "AiStoneService", "MyControlCenter", "GCUService.exe"),
-			Path.Combine(root, "UniwillService", "MyControlCenter", "GCUService.exe"),
-			Path.Combine(root, "GCUService.exe")
-		};
+			string oem = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OEM");
+			if (Directory.Exists(oem))
+			{
+				foreach (string dir in Directory.EnumerateDirectories(oem))
+				{
+					candidates.Add(Path.Combine(dir, "AiStoneService", "MyControlCenter", "GCUService.exe"));
+					candidates.Add(Path.Combine(dir, "UniwillService", "MyControlCenter", "GCUService.exe"));
+					candidates.Add(Path.Combine(dir, "GCUService.exe"));
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[gcu] 枚举官方控制台目录失败（忽略）：" + ex.Message);
+		}
+		return candidates.ToArray();
 	}
 
 	private static string DetectFromInstalledPackage()
