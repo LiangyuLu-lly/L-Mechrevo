@@ -26,6 +26,13 @@ internal sealed class SensorService : ISensorService
         _backend = backend;
     }
 
+    private static int Prefer(int backend, int local)
+    {
+        // 30/50 GCU 某些遥测字段为 0/未就绪；旧版直接读 LHM/NVML 本地值，
+        // 这里在 backend 值为空时回退到本地采样，避免整页显示 --。
+        return backend > 0 ? backend : local;
+    }
+
     public SensorSnapshot Read()
     {
         MechrevoHw? hw = _backend.Hw;
@@ -44,16 +51,16 @@ internal sealed class SensorService : ISensorService
             }
             return new SensorSnapshot(
                 HardwareAvailable: true,
-                CpuTempC: connected ? hw!.CpuTemp : HardwareControl.cpuTemp,
-                GpuTempC: connected ? hw!.GpuTemp : HardwareControl.gpuTemp,
-                CpuFanRpm: connected ? hw!.CpuFanRpm : HardwareControl.cpuFanRPM,
-                GpuFanRpm: connected ? hw!.GpuFanRpm : HardwareControl.gpuFanRPM,
-                CpuUsagePercent: connected ? hw!.CpuUsage : (HardwareControl.cpuUsage ?? 0),
-                GpuUsagePercent: connected ? hw!.GpuUsage : (HardwareControl.gpuUsage ?? 0),
-                CpuFanDutyPercent: connected ? hw!.CpuFanDuty : (HardwareControl.cpuFan ?? 0),
-                GpuFanDutyPercent: connected ? hw!.GpuFanDuty : (HardwareControl.gpuFan ?? 0),
-                CpuFrequencyMhz: connected ? hw!.CpuFrequency : HardwareControl.cpuFrequency,
-                GpuCoreFrequencyMhz: connected ? hw!.GpuCoreFreq : HardwareControl.gpuCoreFreq,
+                CpuTempC: Prefer(connected ? hw!.CpuTemp : -1, HardwareControl.cpuTemp),
+                GpuTempC: Prefer(connected ? hw!.GpuTemp : -1, HardwareControl.gpuTemp),
+                CpuFanRpm: Prefer(connected ? hw!.CpuFanRpm : -1, HardwareControl.cpuFanRPM),
+                GpuFanRpm: Prefer(connected ? hw!.GpuFanRpm : -1, HardwareControl.gpuFanRPM),
+                CpuUsagePercent: Prefer(connected ? hw!.CpuUsage : -1, HardwareControl.cpuUsage ?? 0),
+                GpuUsagePercent: Prefer(connected ? hw!.GpuUsage : -1, HardwareControl.gpuUsage ?? 0),
+                CpuFanDutyPercent: Prefer(connected ? hw!.CpuFanDuty : -1, HardwareControl.cpuFan ?? 0),
+                GpuFanDutyPercent: Prefer(connected ? hw!.GpuFanDuty : -1, HardwareControl.gpuFan ?? 0),
+                CpuFrequencyMhz: Prefer(connected ? hw!.CpuFrequency : -1, HardwareControl.cpuFrequency),
+                GpuCoreFrequencyMhz: Prefer(connected ? hw!.GpuCoreFreq : -1, HardwareControl.gpuCoreFreq),
                 FanRpmMaxForPercent: connected ? hw!.FanRpmMaxForPercent : 5000,
                 CpuPowerWatts: HardwareControl.cpuPower,
                 GpuPowerWatts: gpuPower,
