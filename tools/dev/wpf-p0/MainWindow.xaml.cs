@@ -659,7 +659,7 @@ public partial class MainWindow : Window
             {
                 Content = WpfStrings.SilentTurbo,
                 Tag = "silentturbo",
-                Style = (Style)FindResource("SegmentButton")
+                Style = (_homeView?.TryFindResource("HomePerfSegment") as Style) ?? (Style)FindResource("SegmentButton")
             };
             button.Click += Mode_Click;
             int index = panel.Children.IndexOf(HomePerf狂暴);

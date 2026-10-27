@@ -33,7 +33,7 @@ public partial class LightEditorWindow : Window
     /// <summary>⭐ 2026-10-26（task-17 · 宽屏白色背光入口）：白色背光键盘只有 电源 + 4 档亮度，没有灯效/颜色/速度 ✅。</summary>
     private readonly bool _whiteBacklightOnly;
     private int _lightMax = 4;
-    private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
+    private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
     private bool _suppressAutoApply;
     private bool _applying;
     private bool _inline;
@@ -562,6 +562,8 @@ public partial class LightEditorWindow : Window
         _applying = true;
         try
         {
+            // 单键 RGB 的 HID/固件写可能较慢；先让出一次 UI 线程，避免拖动时窗口被判无响应。
+            await Task.Yield();
             string effect = SelectedEffect;
             bool power = PowerCheck.IsChecked == true;
             bool powerWasOn = _settings.PowerOn;

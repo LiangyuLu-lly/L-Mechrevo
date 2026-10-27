@@ -368,6 +368,7 @@ public partial class OriginalStyleWindow : Window
             Dispatcher.BeginInvoke(new Action(UpdateContentWidth), System.Windows.Threading.DispatcherPriority.Loaded);
             ApplySavedQuickTiles();
             ApplyMoreSectionState();
+            ApplySectionCollapseStates();
             RefreshBrightness();
             InitBatteryControls();
             InitLightingControls();
@@ -3730,6 +3731,49 @@ public partial class OriginalStyleWindow : Window
         bool expanded = AppConfig.Is(MoreOpenConfigKey);
         MoreGroupsPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         MoreArrow.Text = expanded ? "▾" : "▸";
+    }
+
+    private const string LightingOpenConfigKey = "group_lighting_open";
+    private const string LiquidOpenConfigKey = "group_lc_open";
+
+    private void ApplySectionCollapseStates()
+    {
+        bool lighting = !AppConfig.Exists(LightingOpenConfigKey) || AppConfig.Is(LightingOpenConfigKey);
+        bool liquid = !AppConfig.Exists(LiquidOpenConfigKey) || AppConfig.Is(LiquidOpenConfigKey);
+        SetSectionExpanded(LightingBody, LightingArrow, lighting);
+        SetSectionExpanded(LiquidBody, LiquidArrow, liquid);
+    }
+
+    private static void SetSectionExpanded(StackPanel body, TextBlock arrow, bool expanded)
+    {
+        body.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        arrow.Text = expanded ? "▾" : "▸";
+    }
+
+    private void ToggleSection(StackPanel body, TextBlock arrow, string key)
+    {
+        bool expanded = body.Visibility != Visibility.Visible;
+        SetSectionExpanded(body, arrow, expanded);
+        AppConfig.Set(key, expanded ? 1 : 0);
+        AppConfig.Flush();
+    }
+
+    private void LightingHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+        {
+            return;
+        }
+        ToggleSection(LightingBody, LightingArrow, LightingOpenConfigKey);
+    }
+
+    private void LiquidHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+        {
+            return;
+        }
+        ToggleSection(LiquidBody, LiquidArrow, LiquidOpenConfigKey);
     }
 
     private void MoreHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

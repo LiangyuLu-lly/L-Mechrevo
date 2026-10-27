@@ -65,7 +65,11 @@ internal sealed class WaterCoolerRoutingService : IDisposable
         }
         try
         {
-            if (_hw?.SupportsLiquidCooling == true)
+            // GCU 能力位只代表「固件支持水冷」，不等于水冷已经连上。
+            // 耀世等机型实际是 BLE 水冷：只要 GCU 没有回报已连接，就继续探测 BLE，
+            // 否则会把 BLE 已连接的水冷错误地显示成 GCU「水冷未连接」。
+            bool gcuLiquidSupported = _hw?.SupportsLiquidCooling == true;
+            if (gcuLiquidSupported && _hw?.LcReportedConnected == true)
             {
                 Route = LiquidCoolingControlRoute.Gcu;
                 return;
@@ -104,6 +108,12 @@ internal sealed class WaterCoolerRoutingService : IDisposable
             if (_observation.IsConnected)
             {
                 Route = LiquidCoolingControlRoute.BluetoothObserved;
+                return;
+            }
+            if (gcuLiquidSupported)
+            {
+                // 没有 BLE 设备时才回落到 GCU（此时 GCU 仍报未连接是真实状态）。
+                Route = LiquidCoolingControlRoute.Gcu;
                 return;
             }
             Route = LiquidCoolingControlRoute.None;

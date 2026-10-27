@@ -683,13 +683,15 @@
 
                     <!-- 水冷 -->
                     <StackPanel x:Name="LiquidSection" Style="{StaticResource Section}" Visibility="Collapsed">
-                        <Grid>
+                        <Grid x:Name="LiquidHeader" Cursor="Hand" MouseLeftButtonUp="LiquidHeader_MouseLeftButtonUp">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="LiquidArrow" Text="▾" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
                                 <Viewbox Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"><Path Data="M8,1 C8,1 3,7 3,10.5 A5,5 0 0 0 13,10.5 C13,7 8,1 8,1 Z" Fill="{DynamicResource MutedBrush}" Stretch="Uniform" /></Viewbox>
                                 <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_9}" Style="{StaticResource SectionHeader}" Margin="0" />
                             </StackPanel>
                             <Button x:Name="LiquidStatusButton" Content="{x:Static loc:WpfStrings.LiquidStatusButton_Content}" Style="{StaticResource MiniButton}" HorizontalAlignment="Right" Click="LiquidStatus_Click" />
                         </Grid>
+                        <StackPanel x:Name="LiquidBody">
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -713,12 +715,13 @@
                                 <ComboBoxItem Content="90%" Tag="3" />
                             </ComboBox>
                         </Grid>
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- 灯光 -->
                     <StackPanel x:Name="LightingSection" Style="{StaticResource Section}">
-                        <Grid>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE706;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="{x:Static loc:WpfStrings.TitleText_Text_2}" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
+                        <Grid x:Name="LightingHeader" Cursor="Hand" MouseLeftButtonUp="LightingHeader_MouseLeftButtonUp">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock x:Name="LightingArrow" Text="▾" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,4,0" VerticalAlignment="Center" /><TextBlock Text="&#xE706;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="{x:Static loc:WpfStrings.TitleText_Text_2}" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_6}" Style="{StaticResource StatText}" Margin="0,0,8,0" />
                                 <ComboBox x:Name="LightIdleCombo" Width="96" Style="{StaticResource RoundCombo}" SelectionChanged="LightIdleCombo_SelectionChanged">
@@ -730,6 +733,7 @@
                                 </ComboBox>
                             </StackPanel>
                         </Grid>
+                        <StackPanel x:Name="LightingBody">
                         <CheckBox x:Name="LightOffOnBatteryCheck" Content="{x:Static loc:WpfStrings.LightOffOnBatteryCheck_Content}" Style="{StaticResource RowSwitch}" Click="LightOffOnBattery_Click" />
                         <Grid x:Name="KeyboardLightRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
@@ -795,6 +799,7 @@
                             </ComboBox>
                             <Button x:Name="LightSyncEditButton" Grid.Column="3" Content="{x:Static loc:WpfStrings.LightSyncEditButton_Content}" Style="{StaticResource MiniButton}" Click="LightSyncEdit_Click" />
                         </Grid>
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- 更多开关 -->
