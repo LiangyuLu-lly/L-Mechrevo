@@ -13,7 +13,7 @@ The main window comes in two layouts, **compact** and **wide**, with the same co
 - Both support collapsible sections, hotkeys, the hardware overlay and tray actions.
 
 <p>
-<img src="docs/images/1-dashboard.png" width="330" alt="Compact window">
+<img src="docs/images/1-dashboard-mini-20261028.png" width="330" alt="Compact window">
 <img src="docs/images/1-dashboard-wide.png" width="760" alt="Wide dashboard">
 </p>
 

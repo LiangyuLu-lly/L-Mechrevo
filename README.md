@@ -13,7 +13,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 - 两种形态都支持折叠分组、快捷键、悬浮窗和托盘操作。
 
 <p>
-<img src="docs/images/1-dashboard.png" width="330" alt="迷你窗">
+<img src="docs/images/1-dashboard-mini-20261028.png" width="330" alt="迷你窗">
 <img src="docs/images/1-dashboard-wide.png" width="760" alt="宽屏主页">
 </p>
 
