@@ -83,6 +83,7 @@ public partial class MainWindow : Window
     private readonly List<(ToggleButton Button, int Hz)> _displayRefreshButtons = new();
     private string _refreshRatesSignature = "";
     private readonly List<ToggleButton> _batteryModeButtons = new();
+    private StackPanel? _batteryModePanel;
     private readonly List<(string Key, Button Button, TextBlock State, string Label)> _quickTileButtons = new();
     private readonly Dictionary<string, bool> _quickTilePending = new();
     private readonly Dictionary<string, long> _quickTilePendingTick = new();
@@ -984,6 +985,7 @@ public partial class MainWindow : Window
             _batteryModeButtons.Add(button);
         }
         modes.Visibility = _owner.WideBatteryModeVisible ? Visibility.Visible : Visibility.Collapsed;
+        _batteryModePanel = modes;
         battery.Children.Add(modes);
         if (_owner.WideChargeLimitVisible)
         {
@@ -1779,6 +1781,10 @@ public partial class MainWindow : Window
         if (_owner == null)
         {
             return;
+        }
+        if (_batteryModePanel != null)
+        {
+            _batteryModePanel.Visibility = _owner.WideBatteryModeVisible ? Visibility.Visible : Visibility.Collapsed;
         }
         ApplyHomeCapabilities();
         if (MoreSwitchGrid != null && MoreSwitchGrid.Children.Count == 0) BuildMoreSwitchTiles();
