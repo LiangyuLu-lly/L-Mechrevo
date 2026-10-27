@@ -2547,8 +2547,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		case "osd":
 		case "highperf":
 		case "apuboost":
-			// NUC/Intel 平台没有 AMD APU 防缩缸通道；隐藏而不是显示无效开关。
-			return BackendRouter.LastDecision?.Identity?.IsIntelNuc != true && CpuVendor.IsAmd;
+			// APU 防缩缸实际是 Windows 电源计划策略（Processor performance boost mode），
+			// 不依赖 AMD/GCU 硬件；Intel 机器也应有这个开关。
+			return true;
 		case "usb":
 			// NUC 30 没有关机 USB 供电通道，避免点亮后无效。
 			return BackendRouter.LastDecision?.Identity?.IsIntelNuc != true;
