@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 # 变体判定 + 7z 载荷映射（2026-10-14 重写；同日按 owner 纠偏更新落地口径）：随包载荷已从
 # 「base + 覆盖层树」改成「5 个独立完整 7z」，安装期由 Install-Gcu.ps1 按选中变体解压并【直接】
 # 落到
@@ -183,11 +183,12 @@ function Resolve-GcuVariant {
     if ($null -eq $archive) { throw "internal error: archive for variant '$forced' is not in the catalog" }
 
     return [pscustomobject]@{
-        Variant     = $forced
-        Archive     = $archive.FileName
-        ArchivePath = $archive.RelPath
-        DisplayName = $archive.DisplayName
-        Note        = ($notes -join " | ")
+        Variant        = $forced
+        PayloadVariant = $archive.PayloadVariant
+        Archive        = $archive.FileName
+        ArchivePath    = $archive.RelPath
+        DisplayName    = $archive.DisplayName
+        Note           = ($notes -join " | ")
     }
 }
 
@@ -211,11 +212,12 @@ $script:Archives = [ordered]@{
     #   40.7z / 50.7z / WJXY.7z -> <name>\AiStoneService
     # ServiceDir is the name INSIDE the archive (used to locate the tree to copy);
     # it is NOT the name on disk - see Install-Gcu.ps1 Get-GcuServiceLeafName.
-    "1020" = [pscustomobject]@{ Variant = "1020"; FileName = "1020.7z"; RelPath = "payload\1020.7z"; InnerRoot = "20";    ServiceDir = "UniwillService"; DisplayName = "1020 series (legacy GamingCenterU)" }
-    "30"   = [pscustomobject]@{ Variant = "30";   FileName = "30.7z";   RelPath = "payload\30.7z";   InnerRoot = "30";    ServiceDir = "UniwillService"; DisplayName = "30 series" }
-    "40"   = [pscustomobject]@{ Variant = "40";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "40 series (temporary: 50 payload; 40 archive not shipped)" }
-    "50"   = [pscustomobject]@{ Variant = "50";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "50 series" }
-    "WJXY" = [pscustomobject]@{ Variant = "WJXY"; FileName = "WJXY.7z"; RelPath = "payload\WJXY.7z"; InnerRoot = "WJXY"; ServiceDir = "AiStoneService"; DisplayName = "WJXY special variant (XINGYAO / LNL machines)" }
+    "1020" = [pscustomobject]@{ Variant = "1020"; PayloadVariant = "1020"; FileName = "1020.7z"; RelPath = "payload\1020.7z"; InnerRoot = "20";    ServiceDir = "UniwillService"; DisplayName = "1020 series (legacy GamingCenterU)" }
+    "30"   = [pscustomobject]@{ Variant = "30";   PayloadVariant = "30";   FileName = "30.7z";   RelPath = "payload\30.7z";   InnerRoot = "30";    ServiceDir = "UniwillService"; DisplayName = "30 series" }
+    # 40 系当前实际安装的是 50 系 GCU 载荷；注册表必须记录实际载荷版本 50，而不是机器代际 40。
+    "40"   = [pscustomobject]@{ Variant = "40";   PayloadVariant = "50";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "40 series (temporary: 50 payload; 40 archive not shipped)" }
+    "50"   = [pscustomobject]@{ Variant = "50";   PayloadVariant = "50";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "50 series" }
+    "WJXY" = [pscustomobject]@{ Variant = "WJXY"; PayloadVariant = "WJXY"; FileName = "WJXY.7z"; RelPath = "payload\WJXY.7z"; InnerRoot = "WJXY"; ServiceDir = "AiStoneService"; DisplayName = "WJXY special variant (XINGYAO / LNL machines)" }
 }
 
 # The archives are staged flat, one per variant, under the -StagingRoot the setup passes ({tmp}).
@@ -401,7 +403,7 @@ $sel = Resolve-GcuVariant -Variant $Variant -GpuName @($GpuName) -GpuDeviceId @(
 
 # ---- judgement log: one line the field bundle can collect ----
 # Format (single line, ASCII): GcuVariantSelection | variant=<V> | archive=<file> | note=<...>
-$logLine = ("GcuVariantSelection | variant={0} | archive={1} | note={2}" -f $sel.Variant, $sel.Archive, $sel.Note)
+$logLine = ("GcuVariantSelection | variant={0} | payload={1} | archive={2} | note={3}" -f $sel.Variant, $sel.PayloadVariant, $sel.Archive, $sel.Note)
 if ($LogFile) {
     try { Add-Content -LiteralPath $LogFile -Value $logLine -Encoding ASCII -ErrorAction Stop } catch { }
 }
@@ -413,7 +415,8 @@ if ($LogFile) {
 #   selection.Variant / Archive / Note 重新打成同格式的一行（见其 GcuVariantSelection Write-Log）。
 if (-not $AsJson) { Write-Host $logLine }
 if (-not [string]::IsNullOrWhiteSpace($OutputFile)) {
-    Set-Content -LiteralPath $OutputFile -Value $sel.Variant -Encoding ASCII -Force
+    # 升级回灌比较用的是实际载荷版本，不是机器代际选择键；40 系载荷实际为 50。
+    Set-Content -LiteralPath $OutputFile -Value $sel.PayloadVariant -Encoding ASCII -Force
 }
 
 if ($AsJson) {

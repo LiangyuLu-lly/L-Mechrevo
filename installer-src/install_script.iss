@@ -243,7 +243,8 @@ Source: "files\GCU\payload\1020.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: S
 Source: "files\GCU\payload\30.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 #ifndef NOGCU_PAYLOAD
-; 2026-10-21（机主要求）：暂时不随包提供 40 载荷 —— 40 系改用 50 载荷（GcuVariant 仍如实写 40，不提示用户）。
+; 2026-10-21（机主要求）：暂时不随包提供 40 载荷 —— 40 系改用 50 载荷。
+; 2026-10-27：GcuVariant 改为记录**实际载荷版本**（40 系装 50 载荷 ⇒ 写 50），不再是机器代际 40。
 ; Source: "files\GCU\payload\40.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 #ifndef NOGCU_PAYLOAD
@@ -2130,7 +2131,7 @@ begin
   if not GCuVariantAsked then
   begin
     GCuVariantAsked := True;
-    Log('LM-GCU: 变体一律走 Auto 判据（40B 询问已于 2026-10-14 移除；40 系 = 40，机型含 XINGYAO/LNL = WJXY）');
+    Log('LM-GCU: 变体一律走 Auto 判据（40B 询问已于 2026-10-14 移除；40 系载荷实际为 50，注册表写 50；机型含 XINGYAO/LNL = WJXY）');
   end;
   Result := GetEffectiveGcuVariant();
 end;

@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 # ASCII-only by design (Windows PowerShell 5.1 reads .ps1 as ANSI without a BOM).
 # This is the GCU payload installer the Inno Setup package runs AFTER copying files.
 # It installs the one shipped GCU payload, copies it under
@@ -1918,7 +1918,12 @@ function Set-InstallMarker {
     try {
         $key = 'HKLM:\SOFTWARE\L-Mechrevo'
         if (-not (Test-Path -LiteralPath $key)) { New-Item -Path $key -Force | Out-Null }
-        Set-ItemProperty -LiteralPath $key -Name 'GcuVariant' -Value $Selection.Variant
+        $markerVariant = $Selection.Variant
+        if ($Selection.PSObject.Properties.Name -contains 'PayloadVariant' -and -not [string]::IsNullOrWhiteSpace([string]$Selection.PayloadVariant)) {
+            $markerVariant = [string]$Selection.PayloadVariant
+        }
+        Set-ItemProperty -LiteralPath $key -Name 'GcuVariant' -Value $markerVariant
+        Write-Log ("  GcuVariant marker = {0} (selection={1}, payload={2})" -f $markerVariant, $Selection.Variant, $markerVariant)
         # 2026-10-14: the service dir now comes from the unpacked archive's own layout
         # (UniwillService for 1020/30, AiStoneService for 40/50/WJXY).
         $serviceDirName = $null
