@@ -751,6 +751,14 @@ internal sealed class BackendProbe : IDisposable
         {
             return _hw.FanBoost;
         }
+        if (string.Equals(key, "highperf", StringComparison.OrdinalIgnoreCase))
+        {
+            return MechrevoLite.Mode.PerfModeService.Instance?.WindowsPowerOverlayEnabled == true;
+        }
+        if (string.Equals(key, "apuboost", StringComparison.OrdinalIgnoreCase))
+        {
+            return MechrevoLite.Mode.PerfModeService.Instance?.ApuAntiDegradeEnabled == true;
+        }
         return _hw.QuickSwitches.TryGetValue(key, out bool value) && value;
     }
 

@@ -3023,6 +3023,7 @@ public class MechrevoService
 					return false;
 				}
 				perf.WindowsPowerOverlayEnabled = on;
+				_hw.QuickSwitches["highperf"] = on;
 				Logger.WriteLine($"SwitchQuick(highperf,{on}) ⭐ 走**Windows 电源模式联动**（不依赖 GCU）");
 				return true;
 			}
@@ -3036,6 +3037,7 @@ public class MechrevoService
 					return false;
 				}
 				perfBoost.ApuAntiDegradeEnabled = on;
+				_hw.QuickSwitches["apuboost"] = on;
 				Logger.WriteLine($"SwitchQuick(apuboost,{on}) ⭐ 走 Windows 电源策略（boost mode=5）");
 				return true;
 			}
@@ -3146,13 +3148,17 @@ public class MechrevoService
 			//   实现见 `MechrevoLite.Helpers.NativeLockKey`：读状态 `GetKeyState`（只看锁定位）、
 			//   写状态 `keybd_event`（带扩展键标志，按下＋抬起一次），并且**幂等**（已到位就不发）。
 			if (string.Equals(key, "capslock", StringComparison.Ordinal)
-				|| (string.Equals(key, "numpad", StringComparison.Ordinal) && _hw.UsesBaolongda))
+				|| (string.Equals(key, "numpad", StringComparison.Ordinal) && (_hw.UsesBaolongda || _hw.IsIntelNucMachine || _hw.IsUmiMachine)))
 			{
 				bool isCapsLock = string.Equals(key, "capslock", StringComparison.Ordinal);
 				bool keyOk = isCapsLock
 					? MechrevoLite.Helpers.NativeLockKey.TrySetCapsLock(on, out string keyNote)
 					: MechrevoLite.Helpers.NativeLockKey.TrySetNumLock(on, out keyNote);
 				Logger.WriteError($"SwitchQuick({key},{on}) ⭐ 走系统锁定键（模拟按键 · 纯 user32）⇒ ⭐ 回读确认={keyOk} · {keyNote}（⛔ 未发任何 MQTT ✅）");
+				if (keyOk)
+				{
+					_hw.QuickSwitches[key] = on;
+				}
 				return keyOk;
 			}
 			string action = key switch

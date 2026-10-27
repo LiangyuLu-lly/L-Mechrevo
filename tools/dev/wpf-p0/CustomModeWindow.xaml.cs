@@ -859,35 +859,13 @@ public partial class CustomModeWindow : Window
                 string fwId = "fw" + _firmwareVisualMode + "p" + _firmwareProfileIndex;
                 MechrevoLite.Mode.PerfModeStore.SaveSettings(fwId, edited);
                 MechrevoLite.Mode.ModeProfileConfig.Set(_firmwareVisualMode, _firmwareProfileIndex);
-                int currentVisual = L_Mechrevo.WpfP0.Services.WpfBackend.Service?.CurrentMode ?? -1;
-                if (currentVisual == _firmwareVisualMode)
-                {
-                    MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
-                    MechrevoLite.Mode.PerfApplyOutcome? fwOutcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-firmware-profile");
-                    if (fwOutcome == null)
-                    {
-                        StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_13;
-                        return;
-                    }
-                    _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
-                    bool fwAmd = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesAmdPowerFields == true;
-                    string fwSummary = MechrevoLite.Mode.PerfModeText.Summary(fwOutcome);
-                    string fwFailure = fwOutcome.AnyFailed
-                        ? WpfStrings.CustomFailedSuffix + MechrevoLite.Mode.PerfModeText.FailedItems(fwOutcome, fwAmd)
-                        : "";
-                    StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_14 + ModeName(_current) + " · " + fwSummary + fwFailure;
-                    ToolTip = MechrevoLite.Mode.PerfModeText.Details(fwOutcome, fwAmd);
-                    if (!fwOutcome.AnyFailed)
-                    {
-                        _dirty = false;
-                        ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
-                    }
-                }
-                else
-                {
-                    _dirty = false;
-                    StatusText.Text = "配置已保存：模式 " + _firmwareVisualMode + " · 配置 " + (_firmwareProfileIndex + 1) + "（切到该模式后下发）";
-                }
+                // 30 系固件配置只写 fwXpY；不能把同一份字段写进内置档 turbo/balanced/silent，
+                // 否则内置档会被改成 NeedsFirmwareSlot，后续切档走固件槽重放并失败。
+                _settings = edited;
+                _dirty = false;
+                ToolTip = null;
+                ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
+                StatusText.Text = "配置已保存：模式 " + _firmwareVisualMode + " · 配置 " + (_firmwareProfileIndex + 1) + "（切到该模式后生效）";
                 return;
             }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");

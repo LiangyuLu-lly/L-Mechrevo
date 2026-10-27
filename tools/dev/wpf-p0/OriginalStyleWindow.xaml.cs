@@ -3028,6 +3028,38 @@ public partial class OriginalStyleWindow : Window
         return stored;
     }
 
+    private void Normalize30BuiltInProfiles()
+    {
+        try
+        {
+            MechrevoHw? hw = _backendProbe?.Hw;
+            if (hw == null || !hw.IsIntelNucMachine || hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.Gen30)
+            {
+                return;
+            }
+            if (AppConfig.Get("perf_30_builtin_reset_v1", 0) == 1)
+            {
+                return;
+            }
+            foreach (string id in new[] { "silent", "balanced", "turbo" })
+            {
+                MechrevoLite.Mode.PerfModeSettings settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(id);
+                if (settings.NeedsFirmwareSlot)
+                {
+                    MechrevoLite.Mode.PerfModeStore.ResetSettings(id);
+                    Logger.WriteLine("[perfmode] 30 系内置档被配置编辑器改写成固件槽：恢复内置默认 " + id);
+                }
+            }
+            MechrevoLite.Mode.PerfModeStore.SaveSlots(Array.Empty<MechrevoLite.Mode.FirmwareSlotState>());
+            AppConfig.Set("perf_30_builtin_reset_v1", 1);
+            AppConfig.Flush();
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[perfmode] 30 内置档清理失败：" + ex.Message);
+        }
+    }
+
     private async Task RestorePerfModeOnStartupAsync()
     {
         if (_perfRestoreStarted)
@@ -3040,6 +3072,7 @@ public partial class OriginalStyleWindow : Window
             MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
             if (perf != null)
             {
+                Normalize30BuiltInProfiles();
                 await perf.ReconcileForStartupAsync().ConfigureAwait(true);
                 await perf.ReplayLocalProfileOnStartupAsync().ConfigureAwait(true);
                 try
