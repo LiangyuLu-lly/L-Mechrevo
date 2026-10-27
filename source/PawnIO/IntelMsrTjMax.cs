@@ -7,7 +7,7 @@ namespace PawnIO;
 
 /// <summary>
 /// 读取 Intel CPU 的 TjMax（MSR 0x1A2 MSR_TEMPERATURE_TARGET，bits 23:16）。
-/// <para>只读；模块 = 内嵌 LMechrevo.IntelMSR.bin（PawnIO.Modules，LGPL-2.1-or-later）。</para>
+/// <para>只读；模块 = 外部 PawnIO\LMechrevo.IntelMSR.bin（PawnIO.Modules，LGPL-2.1-or-later）。</para>
 /// <para>失败返回 0（不影响调用方；有 GCU 上报的 TjMax 时优先用 GCU 的）。</para>
 /// </summary>
 internal static class IntelMsrTjMax

@@ -1,4 +1,4 @@
-// ==============================================================================================
+﻿// ==============================================================================================
 // L-Mechrevo — AMD SMU / PawnIO service layer.
 //
 // 本文件属于 L-Mechrevo（GPL-3.0-only，见仓库根 LICENSE）。
@@ -104,8 +104,7 @@ public sealed class RyzenSmuService : IDisposable
 	public bool Initialize(Assembly assembly)
 	{
 		using Stream? stream = MechrevoLite.Hardware.PawnIOModuleLoader.Open("LMechrevo.RyzenSMU.bin")
-			?? assembly.GetManifestResourceStream(assembly.GetManifestResourceNames().FirstOrDefault((string n) => n.EndsWith("RyzenSMU.bin")) ?? "")
-			?? throw new InvalidOperationException("RyzenSMU.bin not found.");
+			?? throw new InvalidOperationException("RyzenSMU.bin not found. 请确认安装目录 PawnIO\\LMechrevo.RyzenSMU.bin 存在。");
 		using MemoryStream memoryStream = new MemoryStream();
 		stream.CopyTo(memoryStream);
 		return Initialize(memoryStream.ToArray());

@@ -15,7 +15,7 @@ namespace MechrevoLite.Hardware;
 
 // 2026-10-05 step7A: ported from upstream 0.290.6 (清单 A-29, AMD branch only).
 // 2026-10-10 intel（⑦B，用户原话「intel功能合并」）：**Intel 分支合并完成** —— 这里不再是留桩。
-//   * 二进制资源 LMechrevo.IntelMSR.bin（PawnIO 模块，原样取自上游 0.290.6）已随程序集内嵌
+//   * 外部模块 PawnIO\LMechrevo.IntelMSR.bin（PawnIO 模块）
 //     （见 source\L-Mechrevo.csproj），由 PawnIO\IntelOcMailbox.cs 载入并读写 MSR 0x150 的 OC 邮箱；
 //   * 只碰 domain 0（core）/ 2（cache）：Probe 读能力与当前值，Apply 写电压偏移(-150..0 mV)/倍频，
 //     Restore 写回**探针第一次成功读到的基线**；倍频只在**非混合架构**上给（IsHybrid()==false）；
@@ -357,7 +357,7 @@ internal sealed class RuntimeCpuTuning : IDisposable
 				// 2026-10-10 intel（⑦B，用户原话「intel功能合并」）：**Intel 分支**（替换原 step-7B 留桩）。
 				//
 				// 逐字对齐上游（作者 0.290.6 `RuntimeCpuTuning.Probe` 的 Intel 段）：
-				//   1) 惰性载入嵌入资源 LMechrevo.IntelMSR.bin（签名模块；载入失败 -> CpuTuneProbeFailed）；
+				//   1) 惰性载入外部 PawnIO\LMechrevo.IntelMSR.bin（签名模块；载入失败 -> CpuTuneProbeFailed）；
 				//   2) 对 domain 0（core）/ 2（cache）各探一次：Probe() 读能力(命令 1) + 当前值(命令 16)；
 				//      * intel-core / intel-cache —— 电压偏移，范围 -150..0 mV；CanWrite 还要看
 				//        VoltageSupported **且** 本会话没被固件拒过（_denied）；
