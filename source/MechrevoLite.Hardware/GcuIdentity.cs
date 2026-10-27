@@ -109,6 +109,17 @@ internal static class GcuIdentity
 		candidates.Add(Path.Combine(root, "GCUService.exe"));
 		try
 		{
+			// WPF 便携/alt 构建可能不在安装目录，但机器上装有 LM 的 GCU；补查安装目录。
+			string installedRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "L-Mechrevo", "GCU");
+			candidates.Add(Path.Combine(installedRoot, "AiStoneService", "MyControlCenter", "GCUService.exe"));
+			candidates.Add(Path.Combine(installedRoot, "UniwillService", "MyControlCenter", "GCUService.exe"));
+			candidates.Add(Path.Combine(installedRoot, "GCUService.exe"));
+		}
+		catch
+		{
+		}
+		try
+		{
 			string oem = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OEM");
 			if (Directory.Exists(oem))
 			{
