@@ -2949,6 +2949,11 @@ public class MechrevoService
 				return Task.FromResult(result: false);
 			}
 			bool flag = MechrevoLite.Helpers.AudioEndpointMic.TrySetMute(on, out string note);
+			// 现场 GetMute 确认后回灌镜像；否则下一次 Toggle 仍读旧值，表现为只能静音、再点无效。
+			if (flag)
+			{
+				_hw.QuickSwitches["micmute"] = on;
+			}
 			Logger.WriteLine($"SwitchMicMute({on}) confirmed={flag} note={note}");
 			return Task.FromResult(flag);
 		}

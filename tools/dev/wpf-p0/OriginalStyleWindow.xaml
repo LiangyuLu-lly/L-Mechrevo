@@ -632,7 +632,7 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE83F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_13}" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <TextBlock x:Name="BatteryInfo" Text="{x:Static loc:WpfStrings.BatteryInfo_Text}" Style="{StaticResource StatText}" HorizontalAlignment="Right" />
                         </Grid>
-                        <local:AdaptivePanel Margin="0,0,0,10">
+                        <local:AdaptivePanel x:Name="BatteryModePanel" Margin="0,0,0,10">
                             <ToggleButton x:Name="BatteryLongButton" Content="{x:Static loc:WpfStrings.BatteryLongButton_Content}" Style="{StaticResource BatterySegment}" Tag="0" Click="BatteryMode_Click" IsChecked="True" />
                             <ToggleButton x:Name="BatteryBalancedButton" Content="{x:Static loc:WpfStrings.BatteryBalancedButton_Content}" Style="{StaticResource BatterySegment}" Tag="1" Click="BatteryMode_Click" />
                             <ToggleButton x:Name="BatteryWorkButton" Content="{x:Static loc:WpfStrings.BatteryWorkButton_Content}" Style="{StaticResource BatterySegment}" Tag="2" Click="BatteryMode_Click" Margin="0" />

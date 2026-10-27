@@ -5574,6 +5574,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				maskOk = FanWriter.TrySetManualMask(true, true, out maskDetail);
 			}
+			// 40 系宝龙达在部分机型 ACPI/LPC EC 写不进去（诊断：通道=None / 0xB20 写失败），
+			// 但 WMI 功能号 20/21 本身可用；强冷走 WMI 手动风扇兜底。
+			if ((!targetsOk || !maskOk) && _baolongda?.Wmi is BaolongdaWmi fanWmi)
+			{
+				bool speed0 = fanWmi.TrySetMaxFanSpeed(0, (byte)units);
+				bool speed1 = fanWmi.TrySetMaxFanSpeed(1, (byte)units);
+				bool switch0 = fanWmi.TrySetFanManualSwitch(0, true);
+				bool switch1 = fanWmi.TrySetFanManualSwitch(1, true);
+				if (speed0 && speed1 && switch0 && switch1)
+				{
+					targetsOk = true;
+					maskOk = true;
+					targetDetail = "WMI 功能号 21=" + units + " · 20=1/1";
+					maskDetail = "WMI 功能号 20 开启";
+					Logger.WriteLine("[fan] 强冷：EC 写入失败 ⇒ 已切换 WMI 功能号 20/21 手动风扇兜底");
+				}
+			}
 			// ⭐⭐ 2026-10-18（机主诊断包 · 强冷已写入但确认太急）：⭐ 3900→6000 RPM 需要更久 ⇒
 			//   改为**最多 10 s 轮询**（每 500 ms 读一次功能号 13，取**最大值**），满足任一条件即确认：
 			//   ① 峰值 ≥ 目标×90%  ② 峰值 ≥ 原值×1.15；⛔ 轮询期间**不再写**（只读 13）✅
@@ -5620,6 +5637,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// 关闭：恢复快照（含 Enabled 状态）
 		FanWriter.TryReleaseToFirmware(out string releaseOnOff);
+		if (_baolongda?.Wmi is BaolongdaWmi offWmi)
+		{
+			offWmi.TrySetFanManualSwitch(0, false);
+			offWmi.TrySetFanManualSwitch(1, false);
+			offWmi.TrySetMaxFanSpeed(0, 0);
+			offWmi.TrySetMaxFanSpeed(1, 0);
+		}
 		_fanBoostActive = false;
 		// ⭐ 强冷结束 ⇒ 平滑状态清零（⭐ 让恢复后的闭环从真实温度重新收敛，⛔ 不沿用强冷前的旧平滑值）
 		ResetBaolongdaFanCurveSmoothing();

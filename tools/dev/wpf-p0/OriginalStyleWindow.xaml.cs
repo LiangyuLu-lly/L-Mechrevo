@@ -1097,6 +1097,12 @@ public partial class OriginalStyleWindow : Window
                 {
                     return false;
                 }
+                // 宝龙达使用专属「限制充电」面板（限制充电开关 + 充/停充阈值），
+                // 不再叠加 GCU 的三档/EC 滑块。
+                if (_backendProbe?.Hw?.UsesBaolongda == true)
+                {
+                    return false;
+                }
                 MechrevoLite.Gpu.DgpuGenerationKind generation = MechrevoLite.Gpu.GpuGenerationProvider.Current().Generation;
                 return generation != MechrevoLite.Gpu.DgpuGenerationKind.Gen30
                     && generation != MechrevoLite.Gpu.DgpuGenerationKind.Unknown;
@@ -1334,6 +1340,9 @@ public partial class OriginalStyleWindow : Window
         }
         return result.ToArray();
     }
+
+    /// <summary>宝龙达的充电上限是专属「限制充电」三档面板；通用三档/EC 滑块只给 GCU 机型。</summary>
+    internal bool WideBatteryModeVisible => _backendProbe?.Hw?.UsesBaolongda != true;
 
     internal (string Info, int Mode, string Charge) WideBattery()
     {
@@ -2325,9 +2334,13 @@ public partial class OriginalStyleWindow : Window
             supported = false;
         }
         Visibility visibility = supported ? Visibility.Visible : Visibility.Collapsed;
+        bool baolongda = _backendProbe?.Hw?.UsesBaolongda == true;
+        BatteryModePanel.Visibility = baolongda ? Visibility.Collapsed : Visibility.Visible;
         ChargeLimitRow.Visibility = visibility;
         ChargeLimitInputRow.Visibility = visibility;
         ChargeLimitStatus.Visibility = visibility;
+        ChargeSliderToggle.Visibility = (visibility == Visibility.Visible && !baolongda) ? Visibility.Visible : Visibility.Collapsed;
+        EcDirectOffToggle.Visibility = (visibility == Visibility.Visible && !baolongda) ? Visibility.Visible : Visibility.Collapsed;
         if (!supported)
         {
             return;
@@ -6206,7 +6219,6 @@ public partial class OriginalStyleWindow : Window
         _lastLightingRestoreTick = now;
         if (_backendProbe == null
             || !MechrevoLite.Hardware.LightingSettingsStore.HasUserLightingIntent()
-            || L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true
             || L_Mechrevo.WpfP0.Services.WpfBackend.IsLightingTemporarilySuspended
             || _lightingPowerSuspended
             || _lightingIdleSuspended)
@@ -6818,7 +6830,9 @@ public partial class OriginalStyleWindow : Window
         if (KeyboardLightSwitch.IsChecked != true)
         {
             SaveChannelEffect("Keyboard/Ctrl", effect);
-            return;
+            _syncingLighting = true;
+            KeyboardLightSwitch.IsChecked = true;
+            _syncingLighting = false;
         }
         await ApplyKeyboardLightAsync();
     }

@@ -983,6 +983,7 @@ public partial class MainWindow : Window
             modes.Children.Add(button);
             _batteryModeButtons.Add(button);
         }
+        modes.Visibility = _owner.WideBatteryModeVisible ? Visibility.Visible : Visibility.Collapsed;
         battery.Children.Add(modes);
         if (_owner.WideChargeLimitVisible)
         {
