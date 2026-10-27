@@ -1938,6 +1938,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// </summary>
 	internal bool UsesBaolongda => _baolongda != null;
 
+	/// <summary>UMI / Intel NUC X15（型号名含 Umi 或板号 LAPKC*）。</summary>
+	internal bool IsUmiMachine => BackendRouter.LastDecision?.Identity?.IsUmi == true;
+
 	/// <summary>
 	/// ⭐⭐ 2026-10-16：本会话是否在用**任一种"内置档位"后端**（⭐ 老同方 或 ⭐ 宝龙达 ✅）。
 	/// <para>⭐ 存在的理由：⭐ 两者**协议同族、档位映射逐字相同**（⭐ 真机已验证 ✅）⇒

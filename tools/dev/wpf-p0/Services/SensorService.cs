@@ -44,6 +44,10 @@ internal sealed class SensorService : ISensorService
             int? gpuMemoryClockMhz = gpuMemoryClock.HasValue && gpuMemoryClock.Value > 0
                 ? (int)Math.Round(gpuMemoryClock.Value)
                 : NvidiaSmiSensor.GetMemoryClockMhz();
+            int umiMain = -1;
+            int umiSecond = -1;
+            bool umiFan = hw != null && hw.IsUmiMachine
+                && UmiFanReader.TryReadFanRpm(out umiMain, out umiSecond);
             float? gpuPower = HardwareControl.gpuPower;
             if (!gpuPower.HasValue && NvmlHelper.Unavailable)
             {
@@ -53,8 +57,8 @@ internal sealed class SensorService : ISensorService
                 HardwareAvailable: true,
                 CpuTempC: Prefer(connected ? hw!.CpuTemp : -1, HardwareControl.cpuTemp),
                 GpuTempC: Prefer(connected ? hw!.GpuTemp : -1, HardwareControl.gpuTemp),
-                CpuFanRpm: Prefer(connected ? hw!.CpuFanRpm : -1, HardwareControl.cpuFanRPM),
-                GpuFanRpm: Prefer(connected ? hw!.GpuFanRpm : -1, HardwareControl.gpuFanRPM),
+                CpuFanRpm: umiFan && umiMain >= 0 ? umiMain : Prefer(connected ? hw!.CpuFanRpm : -1, HardwareControl.cpuFanRPM),
+                GpuFanRpm: umiFan && umiSecond >= 0 ? umiSecond : Prefer(connected ? hw!.GpuFanRpm : -1, HardwareControl.gpuFanRPM),
                 CpuUsagePercent: Prefer(connected ? hw!.CpuUsage : -1, HardwareControl.cpuUsage ?? 0),
                 GpuUsagePercent: Prefer(connected ? hw!.GpuUsage : -1, HardwareControl.gpuUsage ?? 0),
                 CpuFanDutyPercent: Prefer(connected ? hw!.CpuFanDuty : -1, HardwareControl.cpuFan ?? 0),
