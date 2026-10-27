@@ -2939,6 +2939,9 @@ public partial class OriginalStyleWindow : Window
             }
             if (ok)
             {
+                // 高性能电源是“性能模式按钮点击”驱动的 Windows 电源模式联动；
+                // 这里直接走 PerfModeService，不等 GCU 回读，也不依赖 ActiveModeId 回写。
+                MechrevoLite.Mode.PerfModeService.Instance?.ApplyWindowsPowerOverlayForUiMode(mode, silentTurbo == true);
                 MechrevoLite.Mode.PerfModeKind? kind = mode switch
                 {
                     2 => MechrevoLite.Mode.PerfModeKind.Silent,
