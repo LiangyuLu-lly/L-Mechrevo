@@ -570,10 +570,7 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource MutedBrush}" Margin="0,0,8,0" VerticalAlignment="Center" /><TextBlock Text="{x:Static loc:WpfStrings.NavScreen_Content}" Style="{StaticResource SectionHeader}" Margin="0" /></StackPanel>
                             <CheckBox x:Name="AutoRefreshSwitch" Content="{x:Static loc:WpfStrings.AutoRefreshSwitch_Content}" Style="{StaticResource HeaderSwitch}" HorizontalAlignment="Right" Click="AutoRefresh_Click" />
                         </Grid>
-                        <local:AdaptivePanel Margin="0,0,0,6">
-                            <ToggleButton x:Name="Refresh180Button" Content="180" Style="{StaticResource RefreshSegment}" Tag="180" Click="RefreshRate_Click" IsChecked="True" />
-                            <ToggleButton x:Name="Refresh60Button" Content="60" Style="{StaticResource RefreshSegment}" Tag="60" Click="RefreshRate_Click" Margin="0" />
-                        </local:AdaptivePanel>
+                        <local:AdaptivePanel x:Name="RefreshRatePanel" Margin="0,0,0,6" />
                         <Grid Margin="0,2,0,6">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />

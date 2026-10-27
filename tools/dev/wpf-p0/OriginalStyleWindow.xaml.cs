@@ -350,7 +350,6 @@ public partial class OriginalStyleWindow : Window
             defaultMode.IsChecked = true;
             UpdateModeBorders(defaultMode);
             HighlightSegment(GpuDirectButton);
-            HighlightSegment(Refresh180Button);
             HighlightSegment(BatteryLongButton);
         }
         MainScroll.SizeChanged += delegate
@@ -554,7 +553,9 @@ public partial class OriginalStyleWindow : Window
         bool ok;
         try
         {
-            ScreenControl.SetScreen(hertz);
+            // 对当前活动显示设备直接调用 Win32 ChangeDisplaySettingsEx；
+            // 不再先 FindLaptopScreen 把外接屏场景导到错误目标。
+            ScreenNative.SetRefreshRate(null, hertz);
             ok = true;
         }
         catch (Exception ex)
@@ -565,7 +566,6 @@ public partial class OriginalStyleWindow : Window
         if (ok)
         {
             // 旧版：ChangeDisplaySettingsEx 后模式异步落地，短重试回读；对不上目标时仍高亮用户点的那档。
-            string? laptop = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
             int readback = -1;
             for (int attempt = 0; attempt < 6; attempt++)
             {
@@ -573,15 +573,14 @@ public partial class OriginalStyleWindow : Window
                 {
                     await Task.Delay(150);
                 }
-                readback = MechrevoLite.Display.ScreenNative.GetRefreshRate(laptop);
+                readback = MechrevoLite.Display.ScreenNative.GetRefreshRate(null);
                 if (readback > 0 && Math.Abs(readback - hertz) <= 2)
                 {
                     break;
                 }
             }
             int highlight = readback > 0 && Math.Abs(readback - hertz) <= 2 ? readback : hertz;
-            Refresh60Button.IsChecked = highlight < _refreshHighHz;
-            Refresh180Button.IsChecked = highlight >= _refreshHighHz;
+            SelectMiniRefreshButton(highlight);
         }
         if (_backendProbe.Hw?.IsGcuConnected == true)
         {
@@ -1438,9 +1437,8 @@ public partial class OriginalStyleWindow : Window
     {
         try
         {
-            string? laptopScreen = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
-            // 认不出内屏时按当前显示设备枚举，避免外接屏整行刷新率消失或回落到 180。
-            IReadOnlyList<int> rates = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(laptopScreen, allowCurrentDeviceFallback: true);
+            // 23.5.1：当前显示设备（内屏或外接屏）的 Windows API 档位。
+            IReadOnlyList<int> rates = MechrevoLite.Display.ScreenNative.GetAvailableRefreshRates(null, allowCurrentDeviceFallback: true);
             return rates.Distinct().OrderBy(v => v).ToArray();
         }
         catch
@@ -2229,9 +2227,6 @@ public partial class OriginalStyleWindow : Window
         GpuHybridButton.IsChecked = false;
         GpuDirectButton.IsChecked = true;
         HighlightSegment(GpuDirectButton);
-        Refresh180Button.IsChecked = true;
-        Refresh60Button.IsChecked = false;
-        HighlightSegment(Refresh180Button);
         BatteryLongButton.IsChecked = true;
         BatteryBalancedButton.IsChecked = false;
         BatteryWorkButton.IsChecked = false;
@@ -3058,58 +3053,88 @@ public partial class OriginalStyleWindow : Window
         ClearSegmentBorders(ModeGrid);
     }
 
-    private int _refreshHighHz = 180;
+    private int _refreshHighHz;
+    private readonly List<ToggleButton> _miniRefreshButtons = new();
+    private string _miniRefreshRateSignature = "";
 
     private void SyncRefreshRateState()
     {
         try
         {
             AutoRefreshSwitch.IsChecked = AppConfig.Is("screen_auto");
-        int min = ScreenControl.MIN_RATE > 0 ? ScreenControl.MIN_RATE : 60;
-        // 不再硬编码 180：优先枚举当前活动屏/内屏的真实档位。
-        // 内屏 165 / 外接 144 都按实际值显示；认不出内屏时退化为当前显示设备。
-        string? laptop = ScreenNative.FindLaptopScreen(false);
-        int max = 0;
-        try
-        {
-            max = ScreenNative.GetMaxRefreshRate(laptop);
-        }
-        catch
-        {
-        }
-        try
-        {
-            IReadOnlyList<int> rates = ScreenNative.GetAvailableRefreshRates(laptop, allowCurrentDeviceFallback: true);
-            if (rates.Count > 0)
+            int min = ScreenControl.MIN_RATE > 0 ? ScreenControl.MIN_RATE : 60;
+            // 23.5.1 口径：直接查询当前活动显示设备（内屏或外接屏）。
+            int current = ScreenNative.GetRefreshRate(null);
+            IReadOnlyList<int> rates = ScreenNative.GetAvailableRefreshRates(null, allowCurrentDeviceFallback: true);
+            List<int> list = rates.Where(r => r >= min).Distinct().OrderBy(r => r).ToList();
+            if (list.Count == 0)
             {
-                int measured = rates.Max();
-                if (measured > max)
-                {
-                    max = measured;
-                }
+                list.Add(min);
+                if (current > min) list.Add(current);
+                list = list.Distinct().OrderBy(r => r).ToList();
             }
+            int max = list[^1];
+            _refreshHighHz = max;
+            string signature = string.Join(",", list);
+            if (!string.Equals(signature, _miniRefreshRateSignature, StringComparison.Ordinal))
+            {
+                _miniRefreshRateSignature = signature;
+                RebuildMiniRefreshButtons(list);
+            }
+            SelectMiniRefreshButton(current > 0 ? current : max);
         }
         catch
         {
         }
-        if (max <= min)
+    }
+
+    private void RebuildMiniRefreshButtons(IReadOnlyList<int> rates)
+    {
+        if (RefreshRatePanel == null)
         {
-            int currentFallback = ScreenNative.GetRefreshRate(laptop);
-            max = currentFallback > min ? currentFallback : min;
+            return;
         }
-        _refreshHighHz = max;
-        Refresh180Button.Tag = max.ToString();
-        Refresh180Button.Content = max + "Hz";
-        Refresh60Button.Tag = min.ToString();
-        Refresh60Button.Content = min + "Hz";
-        int current = ScreenNative.GetRefreshRate(laptop);
-            bool high = current > min;
-            Refresh180Button.IsChecked = high;
-            Refresh60Button.IsChecked = !high;
-            HighlightSegment(high ? Refresh180Button : Refresh60Button);
-        }
-        catch
+        RefreshRatePanel.Children.Clear();
+        _miniRefreshButtons.Clear();
+        int count = Math.Max(1, rates.Count);
+        foreach (int hz in rates)
         {
+            ToggleButton button = new()
+            {
+                Content = hz + "Hz",
+                Tag = hz.ToString(),
+                Style = (Style)FindResource("RefreshSegment"),
+                Margin = new Thickness(count > 1 ? 2 : 0, 0, count > 1 ? 2 : 0, 0)
+            };
+            button.Click += RefreshRate_Click;
+            RefreshRatePanel.Children.Add(button);
+            _miniRefreshButtons.Add(button);
+        }
+    }
+
+    private void SelectMiniRefreshButton(int hz)
+    {
+        ToggleButton? selected = null;
+        foreach (ToggleButton button in _miniRefreshButtons)
+        {
+            int rate = int.TryParse(button.Tag as string, out int parsed) ? parsed : -1;
+            bool on = rate > 0 && Math.Abs(rate - hz) <= 2;
+            button.IsChecked = on;
+            if (on) selected = button;
+        }
+        HighlightMiniRefresh();
+        if (selected != null)
+        {
+            HighlightSegment(selected);
+        }
+    }
+
+    private void HighlightMiniRefresh()
+    {
+        ToggleButton? selected = _miniRefreshButtons.FirstOrDefault(b => b.IsChecked == true);
+        if (selected != null)
+        {
+            HighlightSegment(selected);
         }
     }
 
@@ -3564,8 +3589,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         int requested = int.Parse(text);
-        Refresh180Button.IsChecked = requested >= _refreshHighHz;
-        Refresh60Button.IsChecked = requested < _refreshHighHz;
+        SelectMiniRefreshButton(requested);
         HighlightSegment(button);
         WideSetRefresh(requested);
     }
@@ -3756,7 +3780,7 @@ public partial class OriginalStyleWindow : Window
             }
         }
         HighlightChecked(GpuEcoButton, GpuHybridButton, GpuDirectButton);
-        HighlightChecked(Refresh180Button, Refresh60Button);
+        HighlightMiniRefresh();
         HighlightChecked(BatteryLongButton, BatteryBalancedButton, BatteryWorkButton);
     }
 
