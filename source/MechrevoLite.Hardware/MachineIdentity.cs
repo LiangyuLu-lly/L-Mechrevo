@@ -43,7 +43,9 @@ internal sealed record MachineIdentity(
 	/// <summary>Intel NUC X15：型号含 NUC/X15，或板号 LAPKC*。</summary>
 	public bool IsIntelNuc => (Model ?? "").Contains("NUC", StringComparison.OrdinalIgnoreCase)
 		|| (Model ?? "").Contains("X15", StringComparison.OrdinalIgnoreCase)
-		|| (Board ?? "").StartsWith("LAPKC", StringComparison.OrdinalIgnoreCase);
+		|| (Board ?? "").StartsWith("LAPKC", StringComparison.OrdinalIgnoreCase)
+		// 暂时 Umi/NUC 共用同一套模具与 ACPI 硬件层；先按 NUC 控制台适配。
+		|| IsUmi;
 
 
 	/// <summary>WMI 类 <c>root\WMI:MICommonInterface</c>（老同方 / 宝龙达共用入口）。</summary>
