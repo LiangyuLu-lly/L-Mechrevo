@@ -974,6 +974,19 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    /// <summary>宽屏点选色彩增强档位：立即下发，不依赖 ComboBox 的 SelectionChanged 是否被抑制。</summary>
+    internal async Task WideApplyDisplayEffectModeAsync(int index)
+    {
+        if (_backendProbe == null || index < 0 || index >= DisplayEffectCombo.Items.Count)
+        {
+            return;
+        }
+        _syncingDisplayEffect = true;
+        DisplayEffectCombo.SelectedIndex = index;
+        _syncingDisplayEffect = false;
+        await ApplySelectedDisplayEffectModeAsync();
+    }
+
     internal void WideOpenDisplayEffectEditor()
     {
         DisplayEffectEdit_Click(DisplayEffectEditButton, new RoutedEventArgs());
@@ -5739,6 +5752,15 @@ public partial class OriginalStyleWindow : Window
     private async void DisplayEffectCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncingDisplayEffect || _backendProbe == null || DisplayEffectSwitch.IsChecked != true)
+        {
+            return;
+        }
+        await ApplySelectedDisplayEffectModeAsync();
+    }
+
+    private async Task ApplySelectedDisplayEffectModeAsync()
+    {
+        if (_backendProbe == null || DisplayEffectSwitch.IsChecked != true)
         {
             return;
         }
