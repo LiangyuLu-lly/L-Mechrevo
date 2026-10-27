@@ -1949,6 +1949,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	{
 		if (mainFanRpm >= 0) CpuFanRpm = mainFanRpm;
 		if (secondFanRpm >= 0) GpuFanRpm = secondFanRpm;
+		// 与 GCU Fan/Status 同口径：读到风扇就刷新“新鲜度”，否则迷你窗的
+		// FanDutyText 会因 IsFanInfoFresh=false 把百分比整段省略。
+		System.Threading.Interlocked.Exchange(ref _fanInfoReceivedAt, Environment.TickCount64);
 	}
 
 	internal void ApplyIntelNucFanDuty(int mainDutyPercent, int secondDutyPercent)
