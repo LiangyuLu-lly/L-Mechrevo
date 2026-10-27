@@ -2806,7 +2806,7 @@ public partial class MainWindow : Window
                 bool hidColorEffect = hidEffect
                     && int.TryParse(effect.AsSpan(4), out hidColorMode) && hidColorMode is 0 or 9;
                 bool manual = keyboardChannel && !hidEffect && string.Equals(effect, "Manual", StringComparison.Ordinal);
-                bool breathPalette = keyboardChannel && !hidEffect && string.Equals(effect, "Breathing", StringComparison.Ordinal);
+                bool breathPalette = keyboardChannel && !hidEffect && singleZoneKeyboard && string.Equals(effect, "Breathing", StringComparison.Ordinal);
                 bool singleColor;
                 bool mixColor;
                 if (hidEffect)
@@ -3247,10 +3247,7 @@ public partial class MainWindow : Window
                 StatusText.Text = WpfStrings.StatusLightSavedOffline;
                 return;
             }
-            int applyColorArgb = string.Equals(effect, "Breathing", StringComparison.Ordinal)
-                ? LightChannelSettings.BreathingPalette[Math.Clamp(breathingIndex, 1, 4) - 1]
-                : colorArgb;
-            bool ok = await _owner.WideApplyLightAsync(topic, effect, light, speedValue, applyColorArgb, powerOn, channelPowerOsd);
+            bool ok = await _owner.WideApplyLightAsync(topic, effect, light, speedValue, colorArgb, powerOn, channelPowerOsd);
             StatusText.Text = ok
                 ? "灯光已下发：" + topic + " / " + effect
                 : "灯光下发失败：" + topic + " / " + effect;

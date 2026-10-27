@@ -273,7 +273,7 @@ public partial class LightEditorWindow : Window
             bool singleZone = L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null
                 && KeyboardFirmwareEffects.IsSingleZoneRgb(L_Mechrevo.WpfP0.Services.WpfBackend.Hw.Capabilities.KeyboardType);
             bool colorVisible = !wujie && !keyboardManual && !keyboardRainbow
-                && !keyboardBreathing
+                && (!keyboardBreathing || !singleZone)
                 && KeyboardFirmwareEffects.IsSingleColorEffect(effect);
             ColorRow.Visibility = colorVisible ? Visibility.Visible : Visibility.Collapsed;
             UpdateColorButton();
@@ -374,8 +374,9 @@ public partial class LightEditorWindow : Window
         }
         string effect = SelectedEffect;
         bool manual = string.Equals(effect, "Manual", StringComparison.Ordinal);
-        // 23.5.1 行为：呼吸颜色面板对所有键盘显示；单键 RGB 也要显示 4 色呼吸。
-        bool breathing = string.Equals(effect, "Breathing", StringComparison.Ordinal);
+        bool breathing = string.Equals(effect, "Breathing", StringComparison.Ordinal)
+            && L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null
+            && MechrevoLite.Hardware.KeyboardFirmwareEffects.IsSingleZoneRgb(L_Mechrevo.WpfP0.Services.WpfBackend.Hw.Capabilities.KeyboardType);
         SpeedRow.Visibility = Visibility.Collapsed;
         PerKeyPanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
         ManualPalettePanel.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
@@ -637,14 +638,10 @@ public partial class LightEditorWindow : Window
                         return ok;
                     }
                     bool baolongda = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesBaolongda == true;
-                    int applyColorArgb = string.Equals(effect, "Breathing", StringComparison.Ordinal)
-                        ? LightChannelSettings.BreathingPalette[Math.Clamp(_breathingIndex, 1, 4) - 1]
-                        : _colorArgb;
                     System.Drawing.Color? color = baolongda
-                        ? System.Drawing.Color.FromArgb(applyColorArgb)
-                        : ((string.Equals(effect, "Single", StringComparison.Ordinal)
-                            || string.Equals(effect, "Breathing", StringComparison.Ordinal))
-                            ? System.Drawing.Color.FromArgb(applyColorArgb)
+                        ? System.Drawing.Color.FromArgb(L_Mechrevo.WpfP0.Services.WpfBackend.Hw != null ? _settings.EffectiveColorArgb() : _colorArgb)
+                        : (string.Equals(effect, "Single", StringComparison.Ordinal)
+                            ? System.Drawing.Color.FromArgb(_colorArgb)
                             : null);
                     ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetKeyboardEffect(effect, _light, applySpeed, "None", color, save: true);
                     if (ok)
