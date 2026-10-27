@@ -205,7 +205,18 @@ public partial class CustomModeWindow : Window
         {
             parent.Children.Remove(ActionPanel);
         }
-        ActionPanel.Margin = new Thickness(0, 10, 0, 0);
+        ActionPanel.Margin = new Thickness(0, 6, 0, 12);
+        foreach (object child in ActionPanel.Children)
+        {
+            if (child is Button button)
+            {
+                button.Height = 30;
+                button.MinWidth = 78;
+                button.Padding = new Thickness(12, 3, 12, 3);
+                button.FontSize = 11;
+                button.Margin = new Thickness(0, 0, 6, 0);
+            }
+        }
         HeaderPanel.Children.Add(ActionPanel);
     }
 
