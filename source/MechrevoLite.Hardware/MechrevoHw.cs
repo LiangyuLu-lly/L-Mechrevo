@@ -2555,8 +2555,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			// 不依赖 AMD/GCU 硬件；Intel 机器也应有这个开关。
 			return true;
 		case "usb":
-			// NUC 30 没有关机 USB 供电通道，避免点亮后无效。
-			return BackendRouter.LastDecision?.Identity?.IsIntelNuc != true;
+			// 30 系 NUC/UMI 的关机 USB 供电走 Setting/Control 的 USB_CHARGER_ON/OFF；
+			// 能力位可能没上报，不能因此隐藏（旧版/原厂控制台都可下发）。
+			return true;
 		case "fanboost":
 		case "micmute":
 		case "deepsleep":
