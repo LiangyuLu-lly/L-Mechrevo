@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -334,7 +334,8 @@ public partial class CustomModeWindow : Window
             NewButton.IsEnabled = false;
             RenameButton.IsEnabled = false;
             DeleteButton.IsEnabled = false;
-            ApplyButton.IsEnabled = false;
+            // 固件配置编辑必须允许应用；只禁用模式管理。
+            ApplyButton.IsEnabled = true;
             LoadSettingsToUi(stored);
             Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode) + string.Format(WpfStrings.CustomConfigSuffixFormat, _firmwareProfileIndex + 1);
             StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_3;
@@ -634,12 +635,15 @@ public partial class CustomModeWindow : Window
         SetSliderRange(GpuTgpSlider, hw.GpuTgpMinimum, hw.GpuTgpMaximum);
         SetSliderRange(DbSlider, hw.GpuDbMinimum, hw.GpuDbMaximum);
         SetSliderRange(FanDelaySlider, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum);
-        TccSwitch.IsEnabled = hw.TccAdjustable;
-        DbSwitch.IsEnabled = hw.GpuDynamicBoostAdjustable;
-        GpuTgpSlider.IsEnabled = hw.GpuTgpAdjustable;
-        FanSensitivitySwitch.IsEnabled = hw.SupportsFanSwitchSpeed;
-        GpuOcSwitch.IsEnabled = hw.SupportsGpuOverclock
-                && string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase);
+        // 30 系固件配置编辑器是完整参数页；能力位滞后时不能把整页做成只读。
+        bool vendorProfile = _firmwareMode;
+        TccSwitch.IsEnabled = hw.TccAdjustable || vendorProfile;
+        DbSwitch.IsEnabled = hw.GpuDynamicBoostAdjustable || vendorProfile;
+        GpuTgpSlider.IsEnabled = hw.GpuTgpAdjustable || vendorProfile;
+        FanSensitivitySwitch.IsEnabled = hw.SupportsFanSwitchSpeed || vendorProfile;
+        GpuOcSwitch.IsEnabled = (hw.SupportsGpuOverclock
+                && string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
+                || vendorProfile;
         if (!hw.GpuTgpAdjustable)
         {
             GpuTgpSlider.Opacity = 0.45;
@@ -786,6 +790,8 @@ public partial class CustomModeWindow : Window
     private void SmuSlowTime_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (SmuSlowTimeText != null) SmuSlowTimeText.Text = ((int)e.NewValue).ToString(); }
     private void SmuFastTime_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (SmuFastTimeText != null) SmuFastTimeText.Text = ((int)e.NewValue).ToString(); }
     private void DbSwitch_Changed(object sender, RoutedEventArgs e) { if (DbSlider != null && DbSwitch != null) DbSlider.IsEnabled = DbSwitch.IsChecked == true; }
+    private void TccSwitch_Changed(object sender, RoutedEventArgs e) { if (TccSlider != null && TccSwitch != null) TccSlider.IsEnabled = TccSwitch.IsChecked == true; MarkDirty(); }
+    private void GpuOcSwitch_Changed(object sender, RoutedEventArgs e) { bool on = GpuOcSwitch?.IsChecked == true; if (CoreOffsetSlider != null) CoreOffsetSlider.IsEnabled = on; if (MemoryOffsetSlider != null) MemoryOffsetSlider.IsEnabled = on; MarkDirty(); }
     private void GpuPowerLimit_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (GpuPowerLimitText != null) GpuPowerLimitText.Text = ((int)e.NewValue).ToString(); }
     private void FanDelay_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (FanDelayText != null) FanDelayText.Text = ((int)e.NewValue).ToString(); }
     private void FanSensitivitySwitch_Changed(object sender, RoutedEventArgs e) { if (FanDelaySlider != null && FanSensitivitySwitch != null) FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true; }
@@ -839,6 +845,42 @@ public partial class CustomModeWindow : Window
                     ? fbValue == 1 : (bool?)null,
                 RefreshHz = ReadInt(RefreshCombo)
             };
+            if (_firmwareMode)
+            {
+                string fwId = "fw" + _firmwareVisualMode + "p" + _firmwareProfileIndex;
+                MechrevoLite.Mode.PerfModeStore.SaveSettings(fwId, edited);
+                MechrevoLite.Mode.ModeProfileConfig.Set(_firmwareVisualMode, _firmwareProfileIndex);
+                int currentVisual = L_Mechrevo.WpfP0.Services.WpfBackend.Service?.CurrentMode ?? -1;
+                if (currentVisual == _firmwareVisualMode)
+                {
+                    MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
+                    MechrevoLite.Mode.PerfApplyOutcome? fwOutcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-firmware-profile");
+                    if (fwOutcome == null)
+                    {
+                        StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_13;
+                        return;
+                    }
+                    _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
+                    bool fwAmd = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.UsesAmdPowerFields == true;
+                    string fwSummary = MechrevoLite.Mode.PerfModeText.Summary(fwOutcome);
+                    string fwFailure = fwOutcome.AnyFailed
+                        ? WpfStrings.CustomFailedSuffix + MechrevoLite.Mode.PerfModeText.FailedItems(fwOutcome, fwAmd)
+                        : "";
+                    StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_14 + ModeName(_current) + " · " + fwSummary + fwFailure;
+                    ToolTip = MechrevoLite.Mode.PerfModeText.Details(fwOutcome, fwAmd);
+                    if (!fwOutcome.AnyFailed)
+                    {
+                        _dirty = false;
+                        ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
+                    }
+                }
+                else
+                {
+                    _dirty = false;
+                    StatusText.Text = "配置已保存：模式 " + _firmwareVisualMode + " · 配置 " + (_firmwareProfileIndex + 1) + "（切到该模式后下发）";
+                }
+                return;
+            }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");
             if (outcome == null)
             {

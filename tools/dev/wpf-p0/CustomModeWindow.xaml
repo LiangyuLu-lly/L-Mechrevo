@@ -171,7 +171,7 @@
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock x:Name="TccLabel" Text="{x:Static loc:WpfStrings.TccLabel_Text}" VerticalAlignment="Center" />
-                            <CheckBox x:Name="TccSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <CheckBox x:Name="TccSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="TccSwitch_Changed" Unchecked="TccSwitch_Changed" />
                             <Slider x:Name="TccSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="75" Maximum="100" Value="95" ValueChanged="Tcc_Changed" />
                             <TextBlock x:Name="TccText" Grid.Column="3" Text="95" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
@@ -210,7 +210,7 @@
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_3}" VerticalAlignment="Center" />
-                            <CheckBox x:Name="GpuOcSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <CheckBox x:Name="GpuOcSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="GpuOcSwitch_Changed" Unchecked="GpuOcSwitch_Changed" />
                             <StackPanel Grid.Column="2" />
                         </Grid>
                         <Grid Margin="0,4,0,0">
