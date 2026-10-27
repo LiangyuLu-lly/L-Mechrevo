@@ -5504,6 +5504,23 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 	}
 
+	/// <summary>
+	/// ⭐ 星耀 AMD（XINGYAO / P916F）SMU 自定义窄判据：星耀平台 + AMD + 无 NVIDIA 独显 + SMU 就绪。
+	/// <para>⚠️ 与 <see cref="WujieSmuApu" /> **互斥**：本次只把星耀用于 SMU 自定义链路，
+	/// ⛔ 不改 <c>WujieSmuApu</c> 语义，也不打开无界专属的风扇 EC／EC 限充／键盘等。</para>
+	/// </summary>
+	internal bool XingyaoAmdSmuApu
+	{
+		get
+		{
+			WujieSmuGate.LogXingyaoPredicate();
+			return WujieSmuGate.IsXingyaoSmuAllowed();
+		}
+	}
+
+	/// <summary>⭐ SMU 自定义后端合并判据：无界 APU 或 星耀 AMD（仅 SMU 链路使用）。</summary>
+	internal bool SmuCustomApu => WujieSmuApu || XingyaoAmdSmuApu;
+
 	/// <summary>无界机型 PawnIO 缺失提示只记一次（避免刷屏）。</summary>
 	private static bool _wujiePawnIoWarned;
 	/// <summary>⭐ 最近一次只读验证结论（⭐ UI 说明行/日志用）✅</summary>

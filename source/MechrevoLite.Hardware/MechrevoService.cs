@@ -889,7 +889,7 @@ public class MechrevoService
 			return false;
 		}
 		// （机主：PL1/PL2 不可调 · 日志 WriteFirmwareField:PL1=120 -> Failed）
-		if (_hw != null && (_hw.UsesBaolongda || _hw.WujieSmuApu) && fields != null && fields.Count > 0)
+		if (_hw != null && (_hw.UsesBaolongda || _hw.SmuCustomApu) && fields != null && fields.Count > 0)
 		{
 			List<string> consumedKeys = new List<string>();
 			foreach (KeyValuePair<string, string> kv in fields)
@@ -3996,7 +3996,7 @@ public class MechrevoService
 	private bool TryApplyPowerLimitViaBackend(string key, string rawValue)
 	{
 		MechrevoHw hw = _hw;
-		if (hw == null || (!hw.UsesBaolongda && !hw.WujieSmuApu))
+		if (hw == null || (!hw.UsesBaolongda && !hw.SmuCustomApu))
 		{
 			return false; // ⭐ 不是宝龙达/无界 APU 在管事 ⇒ ⭐ 原样交给 GCU ✅
 		}
@@ -4018,10 +4018,10 @@ public class MechrevoService
 			return true; // ⭐ 已接管 ⇒ ⛔ 不让它走 GCU ✅
 		}
 		// 40 系（宝龙达 MRID6-23）有功能号 23 ⇒  继续走下面的原 WMI 路径，**行为不变**
-		if (hw.IsBaolongda30Series || hw.WujieSmuApu)
+		if (hw.IsBaolongda30Series || hw.SmuCustomApu)
 		{
 			// 不可用 ⇒ 如实 false + 日志（30 系**没有** WMI 23 可退回， 不假装成功）。
-			if (!PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady, hw.WujieSmuApu))
+			if (!PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, SmuAvailability.IsReady, hw.SmuCustomApu))
 			{
 				Logger.WriteError("[smu] 不可用 ⇒ 30 系功耗墙**未下发**（原因：" + SmuAvailability.Reason + "）⇒ 如实失败");
 				return false;
@@ -4136,8 +4136,8 @@ public class MechrevoService
 		}
 		if (isSlowLimit)
 		{
-			int slowMin = (hw.WujieSmuApu ? WujieSmuGate.PlMinWatts : BaolongdaProfile.PlMinWatts);
-			int slowMax = (hw.WujieSmuApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl2MaxWatts);
+			int slowMin = (hw.SmuCustomApu ? WujieSmuGate.PlMinWatts : BaolongdaProfile.PlMinWatts);
+			int slowMax = (hw.SmuCustomApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl2MaxWatts);
 			if (result < slowMin || result > slowMax)
 			{
 				Logger.WriteError($"[smu] slow 限值拒绝下发：{result}W 不在 {slowMin}..{slowMax}W");
@@ -4170,7 +4170,7 @@ public class MechrevoService
 				Logger.WriteError("[smu] slow 回读异常（已吞掉）：" + exSlowRb.GetType().Name);
 			}
 			// Wujie：fast(fPPT) 必须 ≥ slow(GCU PL2)，否则固件可能忽略 fast ⇒ 自动抬 fast 并记日志
-			if (hw.WujieSmuApu && hw.Pl2 > 0 && result > hw.Pl2)
+			if (hw.SmuCustomApu && hw.Pl2 > 0 && result > hw.Pl2)
 			{
 				PawnIO.SmuStatus raiseFast = smu.SetFastLimit(result);
 				Logger.WriteError($"[smu] Wujie：slow={result}W > 当前 fast={hw.Pl2}W ⇒ 同步抬 fast={result}W（{raiseFast}）");
@@ -4265,9 +4265,9 @@ public class MechrevoService
 		LinkPowerLimitPair(hw, isPl1, isPl2, ref pl1, ref pl2);
 		// ② 取值夹取（与 WMI 路径同一组范围；⛔ 不写 0 = "未设置"）
 		// ⭐⭐ 无界 APU（机主口径）：PL1/PL2 上限 = 90W（下限沿用现有 SMU 常量 15W）；宝龙达 30 系保持原范围 ✅
-		int plMin = (hw.WujieSmuApu ? WujieSmuGate.PlMinWatts : BaolongdaProfile.PlMinWatts);
-		int pl1Max = (hw.WujieSmuApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl1MaxWatts);
-		int pl2Max = (hw.WujieSmuApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl2MaxWatts);
+		int plMin = (hw.SmuCustomApu ? WujieSmuGate.PlMinWatts : BaolongdaProfile.PlMinWatts);
+		int pl1Max = (hw.SmuCustomApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl1MaxWatts);
+		int pl2Max = (hw.SmuCustomApu ? WujieSmuGate.PlMaxWatts : BaolongdaProfile.Pl2MaxWatts);
 		if (pl1 > 0)
 		{
 			pl1 = Math.Clamp(pl1, plMin, pl1Max);
@@ -4281,7 +4281,7 @@ public class MechrevoService
 			tempWallC = Math.Clamp(tempWallC, BaolongdaProfile.TccMinCelsius, BaolongdaProfile.TccMaxCelsius);
 		}
 		// Wujie：fast(PL2) < slow(PL1) ⇒ 自动把 fast 抬到 slow（记日志提示）
-		if (hw.WujieSmuApu && pl1 > 0 && pl2 > 0 && pl2 < pl1)
+		if (hw.SmuCustomApu && pl1 > 0 && pl2 > 0 && pl2 < pl1)
 		{
 			Logger.WriteError("[smu] Wujie 应用：PL2(" + pl2 + ") < PL1(" + pl1 + ") ⇒ fast 自动抬到 slow=" + pl1 + "（固件要求 fast ≥ slow 才不被忽略）");
 			pl2 = pl1;
@@ -4301,7 +4301,7 @@ public class MechrevoService
 		bool wroteWall = false;
 		string pl1Status;
 		string pl2Status;
-		if (hw.WujieSmuApu)
+		if (hw.SmuCustomApu)
 		{
 			if (Logger.TryMarkChanged("wujie-smu-uxte", "1"))
 			{
@@ -4367,9 +4367,9 @@ public class MechrevoService
 			smu.SetAllLimits(pl1, pl2, pl1, out PawnIO.SmuStatus stapmStatus, out PawnIO.SmuStatus fastStatus, out PawnIO.SmuStatus slowStatus);
 			pl1Status = $"stapm={stapmStatus}/slow={slowStatus}";
 			pl2Status = fastStatus.ToString();
-			ok = stapmStatus == PawnIO.SmuStatus.OK && fastStatus == PawnIO.SmuStatus.OK && (hw.WujieSmuApu || slowStatus == PawnIO.SmuStatus.OK);
+			ok = stapmStatus == PawnIO.SmuStatus.OK && fastStatus == PawnIO.SmuStatus.OK && (hw.SmuCustomApu || slowStatus == PawnIO.SmuStatus.OK);
 			// 无界：PL1 只以 STAPM 为准（slow 由「慢速功率限制」行单独管理），避免回读 slow 被固件钳住导致整体判失败
-			wrotePl1 = stapmStatus == PawnIO.SmuStatus.OK && (hw.WujieSmuApu || slowStatus == PawnIO.SmuStatus.OK);
+			wrotePl1 = stapmStatus == PawnIO.SmuStatus.OK && (hw.SmuCustomApu || slowStatus == PawnIO.SmuStatus.OK);
 			wrotePl2 = fastStatus == PawnIO.SmuStatus.OK;
 			if (!ok)
 			{
@@ -4391,7 +4391,7 @@ public class MechrevoService
 				PawnIO.SmuStatus st = smu.SetStapmLimit(pl1);
 				PawnIO.SmuStatus sl = smu.SetSlowLimit(pl1);
 				pl1Status = $"stapm={st} slow={sl}";
-				wrotePl1 = st == PawnIO.SmuStatus.OK && (hw.WujieSmuApu || sl == PawnIO.SmuStatus.OK);
+				wrotePl1 = st == PawnIO.SmuStatus.OK && (hw.SmuCustomApu || sl == PawnIO.SmuStatus.OK);
 				ok &= wrotePl1;
 				if (wrotePl1)
 				{
@@ -4442,7 +4442,7 @@ public class MechrevoService
 			verified = true;
 			verifyDetail = "无写入（无需回读）";
 		}
-		else if (hw.WujieSmuApu)
+		else if (hw.SmuCustomApu)
 		{
 			// 2026-10-21（机主：行为对齐 UXTU；UXTU 用 RyzenAdj 只写不读回）：
 			// 兼容模式下命令被 SMU 接受即视为已下发，不再拿 PM 表回读去判失败。
@@ -4504,7 +4504,7 @@ public class MechrevoService
 				Thread.Sleep(200);
 			}
 			// 2026-10-21（无界）：刷新接口/字段口径都不同 —— PL1 写的是 STAPM（不是 slow），fPPT=Fast。
-			if (hw.WujieSmuApu)
+			if (hw.SmuCustomApu)
 			{
 				hw.RefreshWujieSmuSnapshot();
 			}
@@ -4519,13 +4519,13 @@ public class MechrevoService
 				detail = $"第 {attempt + 1} 次回读失败（没有快照）";
 				continue;
 			}
-			int readPl1 = (int)Math.Round(hw.WujieSmuApu ? snapshot.Stapm : snapshot.Slow, MidpointRounding.AwayFromZero);
+			int readPl1 = (int)Math.Round(hw.SmuCustomApu ? snapshot.Stapm : snapshot.Slow, MidpointRounding.AwayFromZero);
 			int readPl2 = (int)Math.Round(snapshot.Fast, MidpointRounding.AwayFromZero);
 			int readWall = (int)Math.Round(snapshot.TctlTemp, MidpointRounding.AwayFromZero);
 			bool matchPl1 = (pl1 <= 0) || Math.Abs(readPl1 - pl1) <= 1;
 			bool matchPl2 = (pl2 <= 0) || Math.Abs(readPl2 - pl2) <= 1;
 			bool matchWall = (tempWallC <= 0) || Math.Abs(readWall - tempWallC) <= 1;
-			detail = $"读回 PL1{(hw.WujieSmuApu ? "(stapm)" : "(slow)")}={readPl1}W PL2(fast)={readPl2}W tctl={readWall}℃ "
+			detail = $"读回 PL1{(hw.SmuCustomApu ? "(stapm)" : "(slow)")}={readPl1}W PL2(fast)={readPl2}W tctl={readWall}℃ "
 				+ $"⇒ 一致 PL1={matchPl1} PL2={matchPl2} 温度墙={matchWall}（第 {attempt + 1} 次）";
 			if (matchPl1 && matchPl2 && matchWall)
 			{

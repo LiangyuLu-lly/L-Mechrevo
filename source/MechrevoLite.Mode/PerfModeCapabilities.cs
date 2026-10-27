@@ -62,8 +62,10 @@ public sealed record PerfModeCapabilities
 	// <b>「本机自定义档的功耗是不是真的走 SMU」的唯一纯判据</b>（可单测；不碰硬件）。
 	internal static bool UsesSmuForCustomPower(bool usesBaolongda, bool isBaolongda30Series, bool smuReady, bool wujieApu = false)
 	{
-		// （机主拍板：无界 APU 直接开放 SMU 自定义）：新增「无界 APU」分支 ——
-		return (usesBaolongda && isBaolongda30Series && smuReady) || (wujieApu && smuReady);
+		// 无界 APU / 星耀 AMD 都只在「SMU 自定义」链路开放；星耀走独立窄判据，
+		// 不改 WujieSmuApu 语义（无界专属风扇EC/限充/键盘不会因此打开）。
+		bool xingyaoApu = !wujieApu && !usesBaolongda && MechrevoLite.Hardware.WujieSmuGate.IsXingyaoAmdApu();
+		return (usesBaolongda && isBaolongda30Series && smuReady) || (wujieApu && smuReady) || (xingyaoApu && smuReady);
 	}
 	// ⇒ 厂商 MQTT）**必然失败**；而它其实有另一条可用通路
 	public bool SupportsDirectGpuOverclock { get; init; }

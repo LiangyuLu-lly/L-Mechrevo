@@ -2901,7 +2901,7 @@ public partial class OriginalStyleWindow : Window
         }
         MechrevoHw? hw = probe.Hw;
         // 宝龙达 / 无界没有原生自定义固件档：ActiveModeId 才是权威。
-        if (hw?.UsesBaolongda == true || hw?.WujieSmuApu == true)
+        if (hw?.UsesBaolongda == true || hw?.SmuCustomApu == true)
         {
             if (string.Equals(MechrevoLite.Mode.PerfModeStore.ActiveModeId, "custom", StringComparison.OrdinalIgnoreCase)
                 || (MechrevoLite.Mode.PerfModeStore.ActiveModeId?.StartsWith("custom", StringComparison.OrdinalIgnoreCase) ?? false))

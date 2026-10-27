@@ -194,7 +194,7 @@ internal sealed class PerfModeService
 		{
 			perfApplyOutcome = await PerfModeRunner.RunAsync(modeId, steps, _backend, ct).ConfigureAwait(continueOnCapturedContext: false);
 			// 但 PL1/PL2/温度墙会走 WMI 23 真下发 ⇒ 标记 LocalApply，让 ModeSwitched 按"字段全成功"判定
-			if (_hw != null && (_hw.UsesBaolongda || _hw.WujieSmuApu))
+			if (_hw != null && (_hw.UsesBaolongda || _hw.SmuCustomApu))
 			{
 				perfApplyOutcome = perfApplyOutcome with { LocalApply = true };
 			}
@@ -703,7 +703,7 @@ internal sealed class PerfModeService
 		PerfModeSettings expectedSettings = mode.Settings;
 		MechrevoHw hw = _hw;
 		// （无界 APU）：无 GCU 也可走本机 SMU 应用/启动恢复 ⇒ 连接判据放宽（其它机型不变）
-		if (hw == null || (!hw.IsConnected && !hw.WujieSmuApu))
+		if (hw == null || (!hw.IsConnected && !hw.SmuCustomApu))
 		{
 			Logger.WriteLine("PerfModes: activate(" + modeId + ") refused, GCU not connected");
 			// ⭐⭐ 2026-10-16（宝龙达 · 诚实性）：⭐ 失败原因【按后端如实写】✅ ——
@@ -720,7 +720,7 @@ internal sealed class PerfModeService
 			return perfApplyOutcome;
 		}
 		// （机主定稿）：无界 + 当前自定义档 ⇒ 明确记录"跳过性能档位下发"（来源=应用/对账）
-		if (hw.WujieSmuApu && mode.IsCustom)
+		if (hw.SmuCustomApu && mode.IsCustom)
 		{
 			string suppressLog = "[perfmode] 无界 APU：当前为自定义档 ⇒ 跳过性能档位下发（来源=应用/对账）";
 			if (Logger.TryMarkChanged("wujie-skip-mode-dispatch-activate", suppressLog))
@@ -1163,7 +1163,7 @@ internal sealed class PerfModeService
 		PerfModeStore.ActiveModeId = mode.Id;
 		PerfModeStore.SetActiveFor(PowerSourceKey(), mode.Id);
 		PerfModeStore.LastCustomId = mode.Id;
-		string backendName = ((_hw != null && _hw.WujieSmuApu) ? "无界 APU" : "宝龙达");
+		string backendName = ((_hw != null && _hw.SmuCustomApu) ? (_hw.WujieSmuApu ? "无界 APU" : "星耀 AMD") : "宝龙达");
 		string activateLog = "[perfmode] " + backendName + "：选自定义档 ⇒ 本机配置激活（ActiveModeId=" + previousActive + " → " + mode.Id + "（已落盘 perf_active）· 不发固件档命令）";
 		if (Logger.TryMarkChanged("wujie-local-profile-active", activateLog))
 		{
@@ -1186,11 +1186,11 @@ internal sealed class PerfModeService
 		}
 		// 同方 GCU（30/40 系）按 LM 本地保存的自定义档恢复（更新/重装 GCU 后不丢配置）
 		bool gen40Gcu = hw.IsGcuConnected && (hw.DgpuGeneration == DgpuGenerationKind.Gen40 || hw.DgpuGeneration == DgpuGenerationKind.Gen30);
-		if (!hw.WujieSmuApu && !hw.UsesBaolongda && !gen40Gcu)
+		if (!hw.SmuCustomApu && !hw.UsesBaolongda && !gen40Gcu)
 		{
 			return;
 		}
-		bool isWujie = hw.WujieSmuApu;
+		bool isWujie = hw.SmuCustomApu;
 		bool isBaolongda = !isWujie && hw.UsesBaolongda;
 		bool isGcu = !isWujie && !isBaolongda;
 		if (isBaolongda)
@@ -1248,7 +1248,7 @@ internal sealed class PerfModeService
 		}
 		// ⭐ 把当前模式设为该档（持久化 + RaiseActiveChanged）✅
 		ActivateLocalProfile(mode.Id);
-		string backendLabel = isWujie ? "无界 APU" : (isBaolongda ? "宝龙达" : "同方 GCU");
+		string backendLabel = isWujie ? (hw.WujieSmuApu ? "无界 APU" : "星耀 AMD") : (isBaolongda ? "宝龙达" : "同方 GCU");
 		string modeLog = isWujie
 			? "[perfmode] 无界 APU 启动恢复（晚于 GCU 各项）：ActiveModeId=" + mode.Id + " ⇒ 重放 SMU"
 			: "[perfmode] 宝龙达启动恢复：ActiveModeId=" + mode.Id + " ⇒ 模式=自定义";
@@ -1458,7 +1458,7 @@ internal sealed class PerfModeService
 			}
 			// 而这里原来只在 ActiveModeId == mode.Id 时才走硬件下发 ⇒
 			bool isActiveMode = string.Equals(ActiveModeId, mode.Id, StringComparison.Ordinal);
-			bool localCustomApply = PerfApplyGate.ShouldApplyLocalCustom(_hw != null && _hw.UsesBaolongda, mode.IsCustom, isActiveMode, _hw != null && _hw.WujieSmuApu);
+			bool localCustomApply = PerfApplyGate.ShouldApplyLocalCustom(_hw != null && _hw.UsesBaolongda, mode.IsCustom, isActiveMode, _hw != null && _hw.SmuCustomApu);
 			if (localCustomApply)
 			{
 				MechrevoHw hw = _hw;
@@ -1660,7 +1660,7 @@ internal sealed class PerfModeService
 				{
 					return ResetBaolongdaCustomLocally(hw);
 				}
-				if (mode.IsCustom && hw.WujieSmuApu)
+				if (mode.IsCustom && hw.SmuCustomApu)
 				{
 					return ResetWujieCustomLocally(hw);
 				}
@@ -1948,17 +1948,17 @@ internal sealed class PerfModeService
 				return;
 			}
 			MechrevoHw hw = _hw;
-			if (hw == null || (!hw.IsConnected && !hw.WujieSmuApu))
+			if (hw == null || (!hw.IsConnected && !hw.SmuCustomApu))
 			{
 				return;
 			}
 			// 无界 APU 的本机自定义档**优先于固件回读**（无固件档语义）——
-			if (hw.WujieSmuApu || hw.UsesBaolongda)
+			if (hw.SmuCustomApu || hw.UsesBaolongda)
 			{
 				PerfModeDefinition persisted = Find(ActiveModeId);
 				if ((object)persisted != null && persisted.IsCustom)
 				{
-					string keepMsg = "[perfmode] " + (hw.WujieSmuApu ? "无界 APU" : "宝龙达") + "：固件模式回读 ⇒ 保持本机自定义档（ActiveModeId=" + persisted.Id + "，⛔ 不覆盖）";
+					string keepMsg = "[perfmode] " + (hw.SmuCustomApu ? (hw.WujieSmuApu ? "无界 APU" : "星耀 AMD") : "宝龙达") + "：固件模式回读 ⇒ 保持本机自定义档（ActiveModeId=" + persisted.Id + "，⛔ 不覆盖）";
 					if (Logger.TryMarkChanged("wujie-external-mode-change", keepMsg))
 					{
 						Logger.WriteError(keepMsg);
@@ -2087,7 +2087,7 @@ internal sealed class PerfModeService
 		{
 			target = Find(PerfModeStore.ActiveFor(powerKey));
 			// 无界 APU：插拔电源不自动跳到「按电源来源记住的自定义档」，保持当前档
-			if (_hw != null && _hw.WujieSmuApu && (object)target != null && target.IsCustom
+			if (_hw != null && _hw.SmuCustomApu && (object)target != null && target.IsCustom
 				&& !string.Equals(target.Id, ActiveModeId, StringComparison.Ordinal))
 			{
 				Logger.WriteLine("[perfmode] 无界 APU：电源变化 ⇒ 保持当前档，不自动跳自定义（" + target.Id + "）");

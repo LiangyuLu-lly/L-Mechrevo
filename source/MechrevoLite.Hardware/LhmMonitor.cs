@@ -626,8 +626,11 @@ public class LhmMonitor : IDisposable
 						}
 						else if (sensor.SensorType == SensorType.Clock && item.HardwareType == HardwareType.Cpu && !CpuClockMhz.HasValue && IsCpuClockSensorName(sensor.Name))
 						{
-							float num5 = sensor.Value.Value;
-							CpuClockMhz = num5 * ((num5 < 1000f) ? 1000f : 1f);
+							float rawClock = sensor.Value.Value;
+							// 有的 AMD/LHM 时钟传感器在低频时直接给 MHz（空闲 600、800），
+							// 旧逻辑把所有 <1000 都当成 GHz ×1000 ⇒ 600MHz 被显示成 600GHz。
+							// 只有明确的 GHz 量级（<20）才换算；600/800 这类按 MHz 原样保留。
+							CpuClockMhz = (rawClock > 0f && rawClock < 20f) ? rawClock * 1000f : rawClock;
 						}
 						// ⭐⭐ 2026-10-18（机主：30 系 CPU 温度 80℃ 不动 · 诊断包 lm-…-161007）：
 						//   ⚠️ 原来这里用 `!CpuTemperature.HasValue` 做闸门（⭐ 一旦有值就再也不进）

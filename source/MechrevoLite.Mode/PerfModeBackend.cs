@@ -28,7 +28,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 	// <para> 每次抑制落一行去重日志；宝龙达/GCU/同方（WujieSmuApu=false）不进入 </para>
 	private bool SuppressWujieModeSwitch(string source)
 	{
-		if (_hw == null || !_hw.WujieSmuApu)
+		if (_hw == null || !_hw.SmuCustomApu)
 		{
 			return false;
 		}
@@ -49,8 +49,10 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		ArgumentNullException.ThrowIfNull(hw, "hw");
 		// 这里改成 **只读缓存值** IsReadyCached（ 不触发探测）——
 		bool wujieApu = hw.WujieSmuApu;
+		bool xingyaoApu = hw.XingyaoAmdSmuApu;
+		bool smuCustomApu = wujieApu || xingyaoApu;
 		// 宝龙达 30 系保持原「只读缓存」口径（行为逐位不变）
-		bool smuReady = (hw.IsBaolongda30Series && SmuAvailability.IsReadyCached) || (wujieApu && SmuAvailability.IsReady);
+		bool smuReady = (hw.IsBaolongda30Series && SmuAvailability.IsReadyCached) || (smuCustomApu && SmuAvailability.IsReady);
 		return new PerfModeCapabilities
 		{
 			UsesAmdPowerFields = hw.UsesAmdPowerFields,
@@ -79,13 +81,13 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//   ⇒ ⭐ 所以按后端【如实申报】：⭐ 宝龙达 ⇒ false ⇒ ⭐ 规划器不生成那两步 ✅
 			//      ⇒ ⭐ 不再出现"注定失败"的档位步（⭐ 它会让 Runner 提前 break、把后面所有步骤一起废掉 ❌）✅
 			//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda == false` ⇒ true ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsFirmwareSlot = !hw.UsesBaolongda && !hw.WujieSmuApu,
+			SupportsFirmwareSlot = !hw.UsesBaolongda && !smuCustomApu,
 			// 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）： 功耗墙三项（PL1 / PL2 / 温度墙）
-			SupportsWmiPowerFields = hw.UsesBaolongda || hw.WujieSmuApu,
+			SupportsWmiPowerFields = hw.UsesBaolongda || smuCustomApu,
 			// 本后端自定义档的功耗**到底走不走 SMU** —— 唯一判据 PerfModeCapabilities.UsesSmuForCustomPower
-			SupportsSmuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, smuReady, wujieApu),
+			SupportsSmuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, smuReady, smuCustomApu),
 			// 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** （GCU 机型那条 WriteFirmwareField 路径照旧）。
-			WujieSmuLocalOnly = hw.WujieSmuApu,
+			WujieSmuLocalOnly = smuCustomApu,
 			SupportsDirectGpuOverclock = hw.UsesBaolongda
 		};
 	}

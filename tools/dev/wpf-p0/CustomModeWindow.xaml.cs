@@ -168,7 +168,7 @@ public partial class CustomModeWindow : Window
         try
         {
             MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
-            if (hw?.UsesBaolongda == true || hw?.WujieSmuApu == true)
+            if (hw?.UsesBaolongda == true || hw?.SmuCustomApu == true)
             {
                 RouteHintText.Text = MechrevoLite.Properties.Strings.PerfModeHintLocalApply;
                 return;
@@ -384,7 +384,7 @@ public partial class CustomModeWindow : Window
                 limitsHw.UsesBaolongda,
                 limitsHw.IsBaolongda30Series,
                 MechrevoLite.Hardware.SmuAvailability.IsReady,
-                limitsHw.WujieSmuApu);
+                limitsHw.SmuCustomApu);
             StapmTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
             SmuSlowLimitRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
             SmuSlowTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
@@ -402,13 +402,14 @@ public partial class CustomModeWindow : Window
         FanCard.Opacity = locked ? 0.45 : 1.0;
         MechrevoHw? hwForRows = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
         bool apuOrNoDgpu = hwForRows != null
-            && (hwForRows.WujieSmuApu || hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu);
+            && (hwForRows.SmuCustomApu || hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu);
         bool wujieApu = hwForRows?.WujieSmuApu == true;
+        bool smuCustomApu = hwForRows?.SmuCustomApu == true;
         bool smuPowerRows = hwForRows != null && MechrevoLite.Mode.PerfModeCapabilities.UsesSmuForCustomPower(
             hwForRows.UsesBaolongda,
             hwForRows.IsBaolongda30Series,
             MechrevoLite.Hardware.SmuAvailability.IsReady,
-            wujieApu);
+            smuCustomApu);
         bool pl4Supported = hwForRows != null && hwForRows.Pl4Minimum >= 0 && hwForRows.Pl4Maximum > hwForRows.Pl4Minimum;
         Pl4Row.Visibility = !apuOrNoDgpu && pl4Supported ? Visibility.Visible : Visibility.Collapsed;
         FanBoostRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
@@ -525,7 +526,7 @@ public partial class CustomModeWindow : Window
 
     private void ApplyPowerWallVisuals(MechrevoHw? hw)
     {
-        if (hw == null || (!hw.UsesBaolongda && !hw.WujieSmuApu))
+        if (hw == null || (!hw.UsesBaolongda && !hw.SmuCustomApu))
         {
             Pl1Label.Text = WpfStrings.CustomModeWindow_xaml_Text_9;
             Pl2Label.Text = WpfStrings.CustomModeWindow_xaml_Text_10;
@@ -539,7 +540,7 @@ public partial class CustomModeWindow : Window
             hw.UsesBaolongda,
             hw.IsBaolongda30Series,
             MechrevoLite.Hardware.SmuAvailability.IsReady,
-            hw.WujieSmuApu);
+            hw.SmuCustomApu);
         string pl1Base = smu ? MechrevoLite.Properties.Strings.SmuStapmLimitLabel : WpfStrings.CustomPowerPl1Label;
         string pl2Base = smu ? MechrevoLite.Properties.Strings.SmuFastLimitLabel : WpfStrings.CustomPowerPl2Label;
         Pl1Label.Text = pl1Base + (pl1Unset ? UnsetMark : "");
@@ -590,7 +591,7 @@ public partial class CustomModeWindow : Window
 
     private void ApplyHardwareControlLimits(MechrevoHw hw)
     {
-        if (hw.WujieSmuApu)
+        if (hw.SmuCustomApu)
         {
             Pl1Slider.Minimum = MechrevoLite.Hardware.WujieSmuGate.PlMinWatts;
             Pl1Slider.Maximum = MechrevoLite.Hardware.WujieSmuGate.PlMaxWatts;
@@ -877,7 +878,7 @@ public partial class CustomModeWindow : Window
             bool gcuMachine = newModeHw != null
                 && newModeHw.IsGcuConnected
                 && !newModeHw.UsesBaolongda
-                && !newModeHw.WujieSmuApu;
+                && !newModeHw.SmuCustomApu;
             if (gcuMachine)
             {
                 MechrevoLite.Mode.PerfModeStore.SaveSettings(mode.Id, new MechrevoLite.Mode.PerfModeSettings

@@ -77,6 +77,73 @@ internal static class WujieSmuGate
 	}
 
 	/// <summary>
+	/// ⭐ 星耀 AMD（XINGYAO / P916F）**窄判据**：星耀平台 + AMD + 无 NVIDIA 独显（不含 SMU 就绪）。
+	/// <para>与 <see cref="IsWujieApu" /> **互斥**：无界机型继续走原判据，星耀不改变
+	/// <c>WujieSmuApu</c> 语义，也不打开无界专属的风扇 EC／EC 限充／键盘协议。</para>
+	/// </summary>
+	internal static bool IsXingyaoAmdApu()
+	{
+		try
+		{
+			if (!XingyaoPmc2.IsXingyaoPlatform())
+			{
+				return false;
+			}
+			WujieSmuVerdict verdict = Evaluate();
+			// 无界机型保持原判据（避免 WJXY 载荷同时命中时把无界当星耀）
+			return !verdict.IsWujie && verdict.IsAmd && !verdict.HasNvidia;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>⭐ 星耀 AMD **且** SMU 通路可用 ⇒ 允许「SMU 自定义」（窄判据全真）。</summary>
+	internal static bool IsXingyaoSmuAllowed()
+	{
+		try
+		{
+			return IsXingyaoAmdApu() && SmuAvailability.IsReady;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// ⭐ 只读诊断日志（去重）：星耀 AMD 平台才打印，便于机主确认「SMU 自定义」是否开放；
+	/// ⛔ 不改变任何能力/不写硬件。
+	/// </summary>
+	internal static void LogXingyaoPredicate()
+	{
+		try
+		{
+			if (!XingyaoPmc2.IsXingyaoPlatform())
+			{
+				return;
+			}
+			WujieSmuVerdict verdict = Evaluate();
+			bool xingyao = !verdict.IsWujie && verdict.IsAmd && !verdict.HasNvidia;
+			bool allowed = xingyao && verdict.SmuReady;
+			string message = "[smu-ui] 星耀 AMD 判据：model=" + verdict.Model
+				+ " · xingyao=" + xingyao + " · amd=" + verdict.IsAmd
+				+ " · noNvidia=" + (!verdict.HasNvidia) + " · smuReady=" + verdict.SmuReady
+				+ " ⇒ SMU自定义=" + (allowed ? "True" : "False")
+				+ (allowed ? "（仅 SMU 自定义；无界专属风扇EC/限充/键盘保持关闭）" : "");
+			if (Logger.TryMarkChanged("xingyao-smu-gate", message))
+			{
+				Logger.WriteError(message);
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("[smu-ui] 星耀 AMD 判据异常（已吞掉，按不开放处理）：" + ex.Message);
+		}
+	}
+
+	/// <summary>
 	/// ⭐⭐ 机主要求的默认可见日志（去重）：
 	/// `[smu-ui] 无界 APU：SMU自定义=True（model=… · code=… · smuVer=…）· PL上限=90W` ✅
 	/// </summary>
