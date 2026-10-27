@@ -46,11 +46,19 @@ internal sealed class SensorService : ISensorService
                 : NvidiaSmiSensor.GetMemoryClockMhz();
             int umiMain = -1;
             int umiSecond = -1;
+            int umiMainDuty = -1;
+            int umiSecondDuty = -1;
             bool umiFan = hw != null && hw.IsIntelNucMachine
                 && UmiFanReader.TryReadFanRpm(out umiMain, out umiSecond);
+            bool umiDuty = hw != null && hw.IsIntelNucMachine
+                && UmiFanReader.TryReadFanDuty(out umiMainDuty, out umiSecondDuty);
             if (umiFan)
             {
                 hw!.ApplyIntelNucFanSpeeds(umiMain, umiSecond);
+            }
+            if (umiDuty)
+            {
+                hw!.ApplyIntelNucFanDuty(umiMainDuty, umiSecondDuty);
             }
             float? gpuPower = HardwareControl.gpuPower;
             if (!gpuPower.HasValue && NvmlHelper.Unavailable)
@@ -65,8 +73,8 @@ internal sealed class SensorService : ISensorService
                 GpuFanRpm: umiFan && umiSecond >= 0 ? umiSecond : Prefer(connected ? hw!.GpuFanRpm : -1, HardwareControl.gpuFanRPM),
                 CpuUsagePercent: Prefer(connected ? hw!.CpuUsage : -1, HardwareControl.cpuUsage ?? 0),
                 GpuUsagePercent: Prefer(connected ? hw!.GpuUsage : -1, HardwareControl.gpuUsage ?? 0),
-                CpuFanDutyPercent: Prefer(connected ? hw!.CpuFanDuty : -1, HardwareControl.cpuFan ?? 0),
-                GpuFanDutyPercent: Prefer(connected ? hw!.GpuFanDuty : -1, HardwareControl.gpuFan ?? 0),
+                CpuFanDutyPercent: umiDuty && umiMainDuty >= 0 ? umiMainDuty : Prefer(connected ? hw!.CpuFanDuty : -1, HardwareControl.cpuFan ?? 0),
+                GpuFanDutyPercent: umiDuty && umiSecondDuty >= 0 ? umiSecondDuty : Prefer(connected ? hw!.GpuFanDuty : -1, HardwareControl.gpuFan ?? 0),
                 CpuFrequencyMhz: Prefer(connected ? hw!.CpuFrequency : -1, HardwareControl.cpuFrequency),
                 GpuCoreFrequencyMhz: Prefer(connected ? hw!.GpuCoreFreq : -1, HardwareControl.gpuCoreFreq),
                 FanRpmMaxForPercent: connected ? hw!.FanRpmMaxForPercent : 5000,

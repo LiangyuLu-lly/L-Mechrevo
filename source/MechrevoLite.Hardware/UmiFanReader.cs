@@ -57,6 +57,30 @@ internal static class UmiFanReader
         }
     }
 
+    internal static bool TryReadFanDuty(out int mainDutyPercent, out int secondDutyPercent)
+    {
+        mainDutyPercent = -1;
+        secondDutyPercent = -1;
+        nint handle = CreateFile(DevicePath, 0xC0000000u, 3u, IntPtr.Zero, 3u, 0u, IntPtr.Zero);
+        if (handle == new nint(-1)) handle = IntPtr.Zero;
+        if (handle == IntPtr.Zero)
+        {
+            return false;
+        }
+        try
+        {
+            int main = ReadByte(handle, 1883);  // 0x75B
+            int second = ReadByte(handle, 1884); // 0x75C
+            if (main >= 0) mainDutyPercent = Math.Clamp(main / 2, 0, 100);
+            if (second >= 0) secondDutyPercent = Math.Clamp(second / 2, 0, 100);
+            return main >= 0 || second >= 0;
+        }
+        finally
+        {
+            CloseHandle(handle);
+        }
+    }
+
     private static bool TryReadWord(nint handle, ushort highAddress, ushort lowAddress, out int value)
     {
         value = -1;

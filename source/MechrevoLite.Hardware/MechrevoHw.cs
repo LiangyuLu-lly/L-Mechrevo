@@ -1951,6 +1951,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		if (secondFanRpm >= 0) GpuFanRpm = secondFanRpm;
 	}
 
+	internal void ApplyIntelNucFanDuty(int mainDutyPercent, int secondDutyPercent)
+	{
+		if (mainDutyPercent >= 0) CpuFanDuty = mainDutyPercent;
+		if (secondDutyPercent >= 0) GpuFanDuty = secondDutyPercent;
+	}
+
 	/// <summary>
 	/// ⭐⭐ 2026-10-16：本会话是否在用**任一种"内置档位"后端**（⭐ 老同方 或 ⭐ 宝龙达 ✅）。
 	/// <para>⭐ 存在的理由：⭐ 两者**协议同族、档位映射逐字相同**（⭐ 真机已验证 ✅）⇒
