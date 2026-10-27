@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -132,6 +133,8 @@ public partial class OriginalStyleWindow : Window
     // 托盘/后台默认 2s；悬浮窗打开时临时提到 1s。
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _backendRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+    private readonly DispatcherTimer _statusResetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+    private readonly string _statusResetText = L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion;
     private bool _connectAttempting;
     private const string QuickTilesConfigKey = "perf_quick_tiles";
     private const string QuickTilesEmptySentinel = "-";
@@ -169,6 +172,19 @@ public partial class OriginalStyleWindow : Window
     public OriginalStyleWindow()
     {
         InitializeComponent();
+        _statusResetTimer.Tick += (_, _) =>
+        {
+            _statusResetTimer.Stop();
+            if (StatusText != null)
+            {
+                StatusText.Text = _statusResetText;
+            }
+        };
+        System.ComponentModel.DependencyPropertyDescriptor? statusTextDescriptor =
+            System.ComponentModel.DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty, typeof(TextBlock));
+        statusTextDescriptor?.AddValueChanged(StatusText, (_, _) => ScheduleStatusReset());
+        Loaded += (_, _) => ScheduleStatusReset();
+        Closed += (_, _) => _statusResetTimer.Stop();
         _dark = ResolveStartupDarkTheme();
         AppTheme.Apply(_dark);
         ApplySavedAccent();
@@ -6981,6 +6997,20 @@ public partial class OriginalStyleWindow : Window
     internal bool BackendConnected => _backendProbe?.Connected == true;
 
     internal bool IsBackgroundEnabled => BackgroundToggle.IsChecked == true;
+
+    private void ScheduleStatusReset()
+    {
+        if (!IsLoaded || StatusText == null)
+        {
+            return;
+        }
+        _statusResetTimer.Stop();
+        if (string.Equals(StatusText.Text, _statusResetText, StringComparison.Ordinal))
+        {
+            return;
+        }
+        _statusResetTimer.Start();
+    }
 
     internal void ApplyThemeFromSettings(bool dark)
     {

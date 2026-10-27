@@ -276,7 +276,7 @@ public partial class SettingsWindow : Window
         HdrControlCheck.IsChecked = _owner.HdrControlOn;
         FhdRow.Visibility = _owner.SupportsFhd ? Visibility.Visible : Visibility.Collapsed;
         FhdButton.Content = _owner.FhdOn ? "UHD" : "FHD";
-        AboutVersionText.Text = "L-Mechrevo " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion + " " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseLabel;
+        AboutVersionText.Text = "L-Mechrevo " + L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseLabel;
 
         string language = AppConfig.GetString("language") ?? "zh-CN";
         LanguageCombo.SelectedIndex = language.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
