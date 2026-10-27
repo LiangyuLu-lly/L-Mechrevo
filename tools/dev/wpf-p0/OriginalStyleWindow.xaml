@@ -311,20 +311,20 @@
 
         <Style x:Key="HeaderSwitch" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="10" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal">
-                            <Border x:Name="Track" Width="32" Height="18" CornerRadius="9"
+                            <Border x:Name="Track" Width="24" Height="14" CornerRadius="7"
                                     Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
                                 <Grid>
-                                    <Ellipse x:Name="Knob" Width="16" Height="16" Fill="White"
-                                             VerticalAlignment="Top" HorizontalAlignment="Left" Margin="1,1,0,0" />
+                                    <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"
+                                             VerticalAlignment="Center" HorizontalAlignment="Left" Margin="1,0,0,0" />
                                 </Grid>
                             </Border>
-                            <ContentPresenter Margin="6,0,0,0" VerticalAlignment="Center" />
+                            <ContentPresenter Margin="5,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
