@@ -2915,6 +2915,13 @@ public class MechrevoService
 		{
 			await _hw.Publish("Setting/Control", new Dictionary<string, object> { ["Action"] = (on ? "USB_CHARGER_ON" : "USB_CHARGER_OFF") });
 			bool flag = await ConfirmSettingAsync(() => _hw.UsbCharger == on);
+			if (!flag && !_hw.UsbChargerSeen)
+			{
+				// NUC/UMI 的 USB 供电没有状态回包；命令已下发就按成功处理（与原厂控制台一致）。
+				_hw.QuickSwitches["usb"] = on;
+				flag = true;
+				Logger.WriteLine($"[quick] usb 无状态回读 ⇒ 已按下发成功处理({on})");
+			}
 			Logger.WriteLine($"SwitchUsbCharger({on}) confirmed={flag}");
 			return flag;
 		}
@@ -3195,6 +3202,13 @@ public class MechrevoService
 				{
 					await Task.Delay(250);
 				}
+			}
+			if (!confirmed && key == "acrecovery" && !_hw.AcRecoverySeen)
+			{
+				// NUC/UMI 没有 AcRecoverySwitch_Status 回包；命令已下发就按成功处理。
+				_hw.QuickSwitches[key] = on;
+				confirmed = true;
+				Logger.WriteLine($"[quick] acrecovery 无状态回读 ⇒ 已按下发成功处理({on})");
 			}
 			if (confirmed && key == "highperf")
 			{
