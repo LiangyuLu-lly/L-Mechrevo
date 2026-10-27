@@ -384,7 +384,9 @@ public partial class OriginalStyleWindow : Window
                 ReloadBackgroundImage();
             }
             _ = Dispatcher.BeginInvoke(new Action(() => _ = ConnectBackendAsync()), System.Windows.Threading.DispatcherPriority.Background);
-            if (string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
+            // 静默开机启动只驻留托盘，不在这里弹宽屏；否则会出现“宽屏一闪又消失”。
+            if (!L_Mechrevo.WpfP0.Services.StartupPopupGate.IsStartupLaunch
+                && string.Equals(AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
             {
                 _ = Dispatcher.BeginInvoke(new Action(ShowWideWindow), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
@@ -7105,7 +7107,14 @@ public partial class OriginalStyleWindow : Window
                 if (!offReady)
                 {
                     rgb.KbPowerOn = true;
-                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_80 + rgb.LastError;
+                    if (L_Mechrevo.WpfP0.Services.StartupPopupGate.SuppressAutomaticPopup)
+                    {
+                        Logger.WriteLine("[startup] HID 关灯暂不可用，静默重试：" + rgb.LastError);
+                    }
+                    else
+                    {
+                        StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_80 + rgb.LastError;
+                    }
                     return false;
                 }
                 rgb.StopCurrentEffect();
@@ -7116,8 +7125,17 @@ public partial class OriginalStyleWindow : Window
             bool ready = rgb.IsConnected || await rgb.EnsureHidReadyAsync() || rgb.Connect();
             if (!ready)
             {
-                rgb.KbPowerOn = !on;
-                StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_82 + rgb.LastError;
+                if (!L_Mechrevo.WpfP0.Services.StartupPopupGate.SuppressAutomaticPopup)
+                {
+                    rgb.KbPowerOn = !on;
+                    StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_82 + rgb.LastError;
+                }
+                else
+                {
+                    // 静默启动期间 HID 设备可能还没枚举完成：不弹错误、不回滚用户配置，
+                    // 由 ApplyHidKeyboardAsync 的 ScheduleHidRetry 后台重试。
+                    Logger.WriteLine("[startup] HID 暂不可用，静默重试：" + rgb.LastError);
+                }
                 return false;
             }
             rgb.Brightness = Math.Clamp(rgb.Brightness, 1, 100);
