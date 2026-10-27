@@ -125,6 +125,7 @@ public partial class OriginalStyleWindow : Window
     private int _cleanExitMarked;
     private string _customWindowModeId = "";
     private bool _perfConfigBuilt;
+    private bool _gpuPromptOpen;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
     private bool _batteryLimitLoaded;
@@ -3487,8 +3488,22 @@ public partial class OriginalStyleWindow : Window
         }
         if (!_backendProbe.IsBaolongda)
         {
+            // 对话框打开期间冻结 GPU 按钮刷新，否则 2s 后端 tick 会把刚点的按钮弹回当前模式。
+            _gpuPromptOpen = true;
+            foreach (ToggleButton item in new[] { GpuEcoButton, GpuHybridButton, GpuDirectButton })
+            {
+                item.IsChecked = ReferenceEquals(item, button);
+            }
+            HighlightSegment(button);
             GpuRestartPromptWindow prompt = new GpuRestartPromptWindow(modeName) { Owner = this };
-            prompt.ShowDialog();
+            try
+            {
+                prompt.ShowDialog();
+            }
+            finally
+            {
+                _gpuPromptOpen = false;
+            }
             if (prompt.Result == GpuPromptResult.Cancel)
             {
                 RefreshFromBackend();
@@ -3503,6 +3518,8 @@ public partial class OriginalStyleWindow : Window
                 {
                     if (_services != null) { _services.Gpu.MarkRestartPending(mode); } else { _backendProbe.MarkGpuRestartPending(mode); }
                     StatusText.Text = WpfStrings.OriginalStyleWindow_xaml_Text_40;
+                    // 立刻显示黄色待重启态；后续后端刷新会按 pending 保持。
+                    UpdateGpuButtons(mode, pending: true);
                 }
                 else
                 {
@@ -3525,6 +3542,7 @@ public partial class OriginalStyleWindow : Window
         if (ok && current != mode)
         {
             if (_services != null) { _services.Gpu.MarkRestartPending(mode); } else { _backendProbe.MarkGpuRestartPending(mode); }
+            UpdateGpuButtons(mode, pending: true);
         }
         else if (ok)
         {
@@ -4311,7 +4329,10 @@ public partial class OriginalStyleWindow : Window
             pending = false;
             displayGpu = currentGpu;
         }
-        UpdateGpuButtons(displayGpu, pending);
+        if (!_gpuPromptOpen)
+        {
+            UpdateGpuButtons(displayGpu, pending);
+        }
         bool skipModeUi = _modeSwitchInFlight;
         bool silentTurboSupported = probe.Capabilities?.SilentTurboAvailability
             == MechrevoLite.Hardware.FeatureAvailability.Supported;
