@@ -2547,8 +2547,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		case "osd":
 		case "highperf":
 		case "apuboost":
-		case "fanboost":
+			// NUC/Intel 平台没有 AMD APU 防缩缸通道；隐藏而不是显示无效开关。
+			return BackendRouter.LastDecision?.Identity?.IsIntelNuc != true && CpuVendor.IsAmd;
 		case "usb":
+			// NUC 30 没有关机 USB 供电通道，避免点亮后无效。
+			return BackendRouter.LastDecision?.Identity?.IsIntelNuc != true;
+		case "fanboost":
 		case "micmute":
 		case "deepsleep":
 		case "gamewhitelist":

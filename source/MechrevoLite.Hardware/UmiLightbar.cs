@@ -99,10 +99,11 @@ internal static class UmiLightbar
 
             if (color.HasValue)
             {
-                int scale = Math.Clamp(lightLevel, 1, 4);
-                int r = Math.Clamp(color.Value.R * scale / 4 * 2, 0, 255);
-                int g = Math.Clamp(color.Value.G * scale / 4 * 2, 0, 255);
-                int b = Math.Clamp(color.Value.B * scale / 4 * 2, 0, 255);
+                // 控制台的 R/G/B_level 是 0..100，固件再 *2；UI 的 ARGB 是 0..255。
+                // 旧写法把 0..255 再乘亮度，实际写入严重偏色/偏亮，导致“设置和显示不一致”。
+                int r = Math.Clamp(color.Value.R * 100 / 255 * 2, 0, 255);
+                int g = Math.Clamp(color.Value.G * 100 / 255 * 2, 0, 255);
+                int b = Math.Clamp(color.Value.B * 100 / 255 * 2, 0, 255);
                 Write(handle, AcR, (byte)r);
                 Write(handle, AcG, (byte)g);
                 Write(handle, AcB, (byte)b);

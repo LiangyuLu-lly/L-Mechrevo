@@ -2304,7 +2304,9 @@ public partial class MainWindow : Window
         var channels = new List<(string Topic, string Title, (string Effect, string Name)[] Effects)>
         {
             ("Keyboard/Ctrl", WpfStrings.LightingKeyboard, keyboardEffects),
-            ("HidLightbar/Ctrl", WpfStrings.LightingStrip, LightingCatalog.LightbarEffects),
+            ("HidLightbar/Ctrl", WpfStrings.LightingStrip, hw?.IsIntelNucMachine == true
+                ? new[] { ("Single", MechrevoLite.Properties.Strings.EffectSingle), ("Rainbow", MechrevoLite.Properties.Strings.EffectRainbow) }
+                : LightingCatalog.LightbarEffects),
             ("HidLightbar_Logo/Ctrl", WpfStrings.LightingLogo,
                 hw is not null && (hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen40
                     || hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30)

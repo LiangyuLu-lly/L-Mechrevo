@@ -317,8 +317,12 @@ public partial class CustomModeWindow : Window
             };
             string storeId = "fw" + visualMode + "p" + _firmwareProfileIndex;
             MechrevoLite.Mode.PerfModeSettings stored = MechrevoLite.Mode.PerfModeStore.LoadSettings(storeId);
-            if (stored.IsUntouched)
+            bool fanAllZero = (stored.CpuFanDuty == null || stored.CpuFanDuty.All(v => v == 0))
+                && (stored.GpuFanDuty == null || stored.GpuFanDuty.All(v => v == 0));
+            if (stored.IsUntouched || fanAllZero)
             {
+                // 旧版配置编辑器可能把 fwXpY 的风扇曲线写成全 0；
+                // 首次打开必须回退到厂商默认曲线，不能让用户看到 0% 再手动“恢复默认”。
                 stored = MechrevoLite.Mode.VendorModeDefaults.ComposeProfile(kind, L_Mechrevo.WpfP0.Services.WpfBackend.Hw, _firmwareProfileIndex);
             }
             MechrevoLite.Mode.PerfModeDefinition mode = new(

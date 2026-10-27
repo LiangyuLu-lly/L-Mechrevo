@@ -4384,6 +4384,13 @@ public partial class OriginalStyleWindow : Window
         SyncRefreshRateState();
         RefreshPerfConfigVisibility(mode);
         RefreshPerfConfigSelections();
+        // 能力位是异步到达的；每次刷新都重新确认 NUC 第三档可见，避免只显示静音/平衡。
+        if (hw.IsIntelNucMachine && !_modeSwitchInFlight
+            && TurboModeButton.Visibility != Visibility.Visible)
+        {
+            TurboModeButton.Visibility = Visibility.Visible;
+            RefreshPerfConfigVisibility(mode);
+        }
         // 能力位晚到/首次构建时 backend 未就绪会让 MoreGroupsPanel 为空；
         // 这里每次刷新补建一次（已构建时 BuildMoreSwitches 会立即返回）。
         BuildMoreSwitches();
@@ -5879,12 +5886,27 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static (string Effect, string Name)[] CurrentLightbarEffectsForBackend()
+    {
+        MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
+        if (hw?.IsIntelNucMachine == true)
+        {
+            // NUC 灯带只有单色/彩虹两档，其余名称下发无效。
+            return new[]
+            {
+                ("Single", MechrevoLite.Properties.Strings.EffectSingle),
+                ("Rainbow", MechrevoLite.Properties.Strings.EffectRainbow)
+            };
+        }
+        return LightingCatalog.LightbarEffects;
+    }
+
     private void FillLightChannelEffects()
     {
         _syncingLighting = true;
         try
         {
-            FillEffects(LightStripEffectCombo, EffectsForCurrentBackend(LightingCatalog.LightbarEffects), "HidLightbar/Ctrl");
+            FillEffects(LightStripEffectCombo, EffectsForCurrentBackend(CurrentLightbarEffectsForBackend()), "HidLightbar/Ctrl");
             FillEffects(LogoEffectCombo, CurrentLogoEffectsForBackend(), "HidLightbar_Logo/Ctrl");
             FillEffects(LightHingeEffectCombo, EffectsForCurrentBackend(LightingCatalog.HingeEffects), "HidLightbar_Hinge/Ctrl");
             FillEffects(LightSyncEffectCombo, EffectsForCurrentBackend(LightingCatalog.SyncEffects), "HidLightbar_Sync/Ctrl");
@@ -6434,7 +6456,7 @@ public partial class OriginalStyleWindow : Window
         }
         string defaultEffect = topic switch
         {
-            "HidLightbar/Ctrl" => LightingCatalog.LightbarEffects[0].Effect,
+            "HidLightbar/Ctrl" => CurrentLightbarEffectsForBackend()[0].Effect,
             "HidLightbar_Logo/Ctrl" => CurrentLogoEffectsForBackend()[0].Effect,
             "HidLightbar_Hinge/Ctrl" => LightingCatalog.HingeEffects[0].Effect,
             _ => LightingCatalog.SyncEffects[0].Effect
@@ -6716,7 +6738,7 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         L_Mechrevo.WpfP0.Services.WpfBackend.Attach(_backendProbe.Hw, _backendProbe.Service);
-        OpenLightEditor("HidLightbar/Ctrl", WpfStrings.LightTitleLightbar, EffectsForCurrentBackend(LightingCatalog.LightbarEffects));
+        OpenLightEditor("HidLightbar/Ctrl", WpfStrings.LightTitleLightbar, EffectsForCurrentBackend(CurrentLightbarEffectsForBackend()));
     }
 
     private KeyboardRgb? EnsureKeyboardRgb()
