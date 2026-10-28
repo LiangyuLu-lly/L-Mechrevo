@@ -2607,9 +2607,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"wifi" => WifiSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Wifi)), 
 			"bt" => BluetoothSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Bluetooth)), 
 			// 现在只读**缓存值**（HasCameraCached，未探测 = false， 不枚举）；
-			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCameraCached || CameraPrivacy.Available)),
-			"winkey" => WinKeySeen, 
-			"fnkey" => FnKeySeen || UsesBaolongda, 
+			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCameraCached || CameraPrivacy.Available)) || IsIntelNucMachine || IsUmiMachine,
+			"winkey" => WinKeySeen || IsIntelNucMachine || IsUmiMachine, 
+			"fnkey" => FnKeySeen || UsesBaolongda || IsIntelNucMachine || IsUmiMachine, 
 			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：这两个**不是 WMI 开关** ——
 			//   宝龙达的 WMI 功能号表（8 起）里只有 `FnLock=11` / `TPLock=12`，没有它们；
 			//   它们本来就是键盘自身的锁定键 ⇒ 由 Windows 的键盘状态机负责，靠"模拟一次按键"切换
