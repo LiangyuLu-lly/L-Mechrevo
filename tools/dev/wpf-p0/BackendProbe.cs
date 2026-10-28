@@ -27,13 +27,24 @@ internal sealed class BackendProbe : IDisposable
             MechrevoLite.Hardware.GcuIdentity.Prewarm();
             _hw = new MechrevoHw();
             bool ok = await _hw.ConnectAsync().ConfigureAwait(false);
+            if (!ok && (_hw.IsIntelNucMachine || _hw.IsUmiMachine))
+            {
+                // NUC/UMI 的性能档、快捷键和大部分灯光/传感器走本地 ACPI/EC；
+                // GCU 服务没起来时仍让窗口进入“已就绪”，否则性能键监听不会启动。
+                ok = true;
+                LastError = "";
+                Logger.WriteLine("[backend] NUC/UMI GCU 未连接，使用本地 ACPI/EC 模式");
+            }
             if (ok)
             {
                 L_Mechrevo.WpfP0.Services.WpfBackend.acpi ??= new AsusACPI();
                 _service = new MechrevoService(_hw);
             }
             Connected = ok;
-            LastError = ok ? "" : "ConnectAsync 返回 false";
+            if (!ok)
+            {
+                LastError = "ConnectAsync 返回 false";
+            }
             return ok;
         }
         catch (Exception ex)
