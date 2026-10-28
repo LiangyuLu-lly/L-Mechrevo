@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>BdProfileSelfTest</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace />
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\BaolongdaProfile.cs" Link="BaolongdaProfile.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Hardware\BoardWhitelist.cs" Link="BoardWhitelist.cs" />
+    <Compile Include="..\..\..\source\MechrevoLite.Gpu\DgpuGenerationKind.cs" Link="DgpuGenerationKind.cs" />
+  </ItemGroup>
+</Project>

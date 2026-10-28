@@ -19,6 +19,9 @@ public partial class CalibrationSettingsWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) => ApplyDarkTitleBar();
         LoadState();
+        CloudButton.Visibility = (L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsIntelNucMachine == true)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void LoadState()
@@ -97,6 +100,39 @@ public partial class CalibrationSettingsWindow : Window
         }
         AppConfig.Set("calib_custom_icc", name);
         AppConfig.Flush();
+    }
+
+    private async void CloudButton_Click(object sender, RoutedEventArgs e)
+    {
+        CloudButton.IsEnabled = false;
+        try
+        {
+            MechrevoLite.Display.CloudIccFetcher.Result result = await MechrevoLite.Display.CloudIccFetcher.FetchAsync();
+            if (!result.Ok || string.IsNullOrWhiteSpace(result.FileName))
+            {
+                MessageBox.Show(this, result.Detail, "云端获取 ICC", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            AppConfig.Set("calib_custom_icc", result.FileName);
+            AppConfig.Set("calib_custom_on", 1);
+            AppConfig.Flush();
+            CustomSwitch.IsChecked = true;
+            IccCombo.IsEnabled = true;
+            ImportButton.IsEnabled = true;
+            RefreshIccList();
+            int index = IccCombo.Items.IndexOf(result.FileName);
+            if (index >= 0) IccCombo.SelectedIndex = index;
+            MessageBox.Show(this, result.Detail + Environment.NewLine + Environment.NewLine + result.FileName,
+                "云端获取 ICC", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "云端获取 ICC 失败：" + ex.Message, "云端获取 ICC", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            CloudButton.IsEnabled = true;
+        }
     }
 
     private void ImportButton_Click(object sender, RoutedEventArgs e)

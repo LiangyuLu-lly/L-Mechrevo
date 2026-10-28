@@ -156,6 +156,7 @@ public class MechrevoHw : IDisposable
 	// 后端选择：唯一真源是 MechrevoBackendOrder.Candidates（有序候选表），本处只存**结果**。
 	// ⭐ 加新后端（例如宝龙达）只需在候选表里加一项，本文件不用改任何 else/if。
 	private MechrevoBackendKind _activeBackend;
+	private bool _nucLocalReady;
 
 	// 老机型 WMI 后端（root\WMI:MICommonInterface）。⚠️ 字段与职责对照《差异与合并计划》A-22。
 	private bool _allowLegacyProbe;
@@ -1921,7 +1922,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⚠️ 判据是**后端在不在**，不是"有没有跟 GCU 说过话"：老接口在而 GCU 从未连上时本属性为 true
 	/// ⇒ 依赖 GCU 上报的功能仍必须各自用 <see cref="IsGcuConnected" /> / 能力位把关（已逐点分类，见本轮报告 ②）。
 	/// </summary>
-	public bool IsConnected => UsesBuiltInModes || IsGcuConnected;
+	public bool IsConnected => UsesBuiltInModes || IsGcuConnected || _nucLocalReady;
+
+	internal void MarkNucLocalReady()
+	{
+		_nucLocalReady = true;
+	}
 
 	/// <summary>
 	/// 2026-10-15（C-1 第 2 步）：本会话是否在用**老机型 WMI 后端**（<c>root\WMI:MICommonInterface</c>）。
@@ -2447,6 +2453,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	public bool CanSwitchGpuMode(int mode)
 	{
+		// UMI 30 系有显卡模式切换硬件，但能力位可能不上报；只放两档（混合/直连）。
+		if (IsUmiMachine && IsGcuConnected && (mode == 1 || mode == 2))
+		{
+			return true;
+		}
 		return mode switch
 		{
 			0 => SupportsDgpuDirect || SupportsIgpuOnly, 
@@ -2584,7 +2595,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		get
 		{
 			bool oldPredicate = SupportsFanBoost || UsesBaolongda;
-			bool visible = oldPredicate || WujieSmuApu;
+			// NUC/UMI 的强冷走本地 EC 0x751 bit6，不依赖 GCU 能力位。
+			bool visible = oldPredicate || WujieSmuApu || IsIntelNucMachine || IsUmiMachine;
 			string message = "[fan] 强冷可见性：backend=" + ActiveBackend + " · caps.FanBoost=" + Capabilities.FanBoost
 				+ " · 旧判据=" + oldPredicate + " ⇒ visible=" + visible;
 			if (Logger.TryMarkChanged("fan-boost-visible", message))
@@ -2602,9 +2614,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"wifi" => WifiSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Wifi)), 
 			"bt" => BluetoothSeen || (UsesBaolongda && RadioSwitch.Available(RadioSwitchKind.Bluetooth)), 
 			// 现在只读**缓存值**（HasCameraCached，未探测 = false， 不枚举）；
-			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCameraCached || CameraPrivacy.Available)),
-			"winkey" => WinKeySeen, 
-			"fnkey" => FnKeySeen || UsesBaolongda, 
+			"webcam" => WebcamSeen || (UsesBaolongda && (CameraPnpControl.HasCameraCached || CameraPrivacy.Available)) || IsIntelNucMachine || IsUmiMachine,
+			"winkey" => WinKeySeen || IsIntelNucMachine || IsUmiMachine, 
+			"fnkey" => FnKeySeen || UsesBaolongda || IsIntelNucMachine || IsUmiMachine, 
 			// ⭐⭐ 2026-10-17（大小写锁定 / 数字小键盘锁定）：这两个**不是 WMI 开关** ——
 			//   宝龙达的 WMI 功能号表（8 起）里只有 `FnLock=11` / `TPLock=12`，没有它们；
 			//   它们本来就是键盘自身的锁定键 ⇒ 由 Windows 的键盘状态机负责，靠"模拟一次按键"切换
@@ -2626,11 +2638,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"usb" => !UsesBaolongda, 
 			"deepsleep" => DeepSleepSeen, 
 			"copilot" => CopilotSeen, 
-			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen, 
+			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen || IsIntelNucMachine || IsUmiMachine, 
 			// ⇒ 界面显示"下发被拒、已回滚"（机主日志 [QS-apply] 键=highperf 下发结果=False）
 			"highperf" => true, 
 			// （风扇强冷 · 无 GCU）：宝龙达用本机通道（EC 目标档/掩码 + 13 回读）
-		"fanboost" => SupportsFanBoostQuickSwitch,
+		"fanboost" => SupportsFanBoostQuickSwitch || IsIntelNucMachine || IsUmiMachine,
 		// （APU 防缩缸）： 纯 Windows 电源策略 ⇒ 所有机型可用
 		"apuboost" => true, 
 			"lightbar" => SupportsLightbar, 
@@ -7633,6 +7645,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// 注：级别过滤下（默认 error）本行不进日志，用户可见的信号是顶部状态：非 GCU 后端显示「● 已就绪」。
 				Logger.WriteLine($"Hardware backend: GCU (MQTT). IsGcuServiceInstalled={IsGcuServiceInstalled}, legacyProbe={kind}");
 			}
+			// NUC/UMI 直接走本地 ACPI/EC：不再尝试连接 GCU/MQTT。
+			if (IsIntelNucMachine || IsUmiMachine)
+			{
+				Logger.WriteLine("[backend] NUC/UMI 本地 ACPI 模式：跳过 GCU/MQTT");
+				MarkNucLocalReady();
+				return true;
+			}
 			if (UsesBuiltInModes)
 			{
 				// ⭐ 2026-10-16：⭐ 老同方 与 ⭐ 宝龙达 ⭐ 共用这一支（⭐ 两者都靠 ReadBuiltInMode 读档位 ✅）
@@ -10479,8 +10498,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// 回退（2026-10-03）：热切换执行停用（与核显省电重叠），统一走重启后应用
 		// 2026-10-03：热切换执行已删除（与核显省电功能重叠）
-		bool useMuxTarget = mode == 0 && SupportsDgpuDirect && !SupportsIgpuOnly;
-		GpuRouteCommand gpuRouteCommand = GpuRouteCommandLayer.BuildSwitchCommand(mode, SupportsDgpuDirect, SupportsIgpuOnly, DgpuGeneration);
+		bool umiGpuSwitch = IsUmiMachine && IsGcuConnected;
+		bool supportsDgpuDirect = SupportsDgpuDirect || umiGpuSwitch;
+		bool useMuxTarget = mode == 0 && supportsDgpuDirect && !SupportsIgpuOnly;
+		GpuRouteCommand gpuRouteCommand = GpuRouteCommandLayer.BuildSwitchCommand(mode, supportsDgpuDirect, SupportsIgpuOnly, DgpuGeneration);
 		if ((object)gpuRouteCommand == null)
 		{
 			Logger.WriteLine($"SetGpuMode({mode}) rejected: action not in dGPU generation {DgpuGeneration} vocabulary");

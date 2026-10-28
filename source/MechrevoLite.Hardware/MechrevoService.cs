@@ -1877,6 +1877,11 @@ public class MechrevoService
 
 	public async Task<bool> ApplyDisplayEffectProfile(DisplayEffectProfile profile)
 	{
+		if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+		{
+			return SoftwareColorEnhancement.ApplyProfile(profile.Name, profile.Brightness, profile.ColorTemp,
+				profile.ColorR, profile.ColorG, profile.ColorB, profile.VibrantValue, profile.Constrast, profile.Gamma);
+		}
 		if (profile == null || string.IsNullOrWhiteSpace(profile.Name))
 		{
 			return false;
@@ -1907,6 +1912,10 @@ public class MechrevoService
 
 	public async Task<bool> ResetDisplayEffectProfile(string mode)
 	{
+		if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+		{
+			return SoftwareColorEnhancement.Reset();
+		}
 		if (string.IsNullOrWhiteSpace(mode))
 		{
 			return false;
@@ -2978,6 +2987,85 @@ public class MechrevoService
 			if (!_hw.SupportsQuickSwitch(key))
 			{
 				return false;
+			}
+			// NUC/UMI 的 Fn 锁 / 摄像头 / Win 键锁走 ACPI EC，不经过 GCU 能力位。
+			if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+			{
+				if (string.Equals(key, "touchpad", StringComparison.Ordinal))
+				{
+					bool tpOk = NucQuickSwitches.TrySetTouchpad(on, out bool tpConfirmed);
+					_hw.QuickSwitches["touchpad"] = tpConfirmed ? on : _hw.QuickSwitches.TryGetValue("touchpad", out bool oldTp) && oldTp;
+					Logger.WriteLine($"SwitchQuick(touchpad,{on}) ⭐ NUC/UMI ACPI EC + PTP ⇒ 确认={tpConfirmed}");
+					return tpConfirmed;
+				}
+				if (string.Equals(key, "usb", StringComparison.Ordinal))
+				{
+					bool usbOk = NucQuickSwitches.TryPulseUsbCharging();
+					_hw.QuickSwitches["usb"] = on;
+					Logger.WriteLine($"SwitchQuick(usb,{on}) ⭐ NUC/UMI EC trigger bit4 ⇒ 写入={usbOk}");
+					return usbOk;
+				}
+				if (string.Equals(key, "acrecovery", StringComparison.Ordinal))
+				{
+					bool acOk = NucQuickSwitches.TrySetAcRecovery(on, out bool acConfirmed);
+					_hw.QuickSwitches["acrecovery"] = acConfirmed ? on : _hw.QuickSwitches.TryGetValue("acrecovery", out bool oldAc) && oldAc;
+					Logger.WriteLine($"SwitchQuick(acrecovery,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={acConfirmed}");
+					return acConfirmed;
+				}
+				if (string.Equals(key, "fanboost", StringComparison.Ordinal))
+				{
+					bool fbOk = NucQuickSwitches.TrySetFanBoost(on, out bool fbConfirmed);
+					_hw.QuickSwitches["fanboost"] = fbConfirmed ? on : _hw.QuickSwitches.TryGetValue("fanboost", out bool oldFb) && oldFb;
+					Logger.WriteLine($"SwitchQuick(fanboost,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={fbConfirmed}");
+					return fbConfirmed;
+				}
+				if (string.Equals(key, "fnkey", StringComparison.Ordinal))
+				{
+					bool nucOk = NucQuickSwitches.TrySetFnLock(on, out bool nucConfirmed);
+					_hw.QuickSwitches["fnkey"] = nucConfirmed ? on : _hw.QuickSwitches.TryGetValue("fnkey", out bool oldFn) && oldFn;
+					Logger.WriteLine($"SwitchQuick(fnkey,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={nucConfirmed}");
+					return nucConfirmed;
+				}
+				if (string.Equals(key, "webcam", StringComparison.Ordinal))
+				{
+					// 优先做 Windows PnP 设备禁用/启用；EC 断电位只是辅助，
+					// 单写 EC 位并不能保证相机设备从系统中消失。
+					if (CameraPnpControl.HasCamera)
+					{
+						(bool camOk, string camDetail) = await Task.Run(() =>
+						{
+							bool ok = CameraPnpControl.TrySetEnabled(on, out bool _, out string detail);
+							return (ok, detail);
+						}).ConfigureAwait(continueOnCapturedContext: false);
+						if (camOk)
+						{
+							_hw.QuickSwitches["webcam"] = on;
+							// 同时同步 EC 断电位，保持硬件/系统状态一致。
+							NucQuickSwitches.TrySetCamera(on, out bool ecConfirmed);
+							Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI Windows PnP ⇒ 确认={camOk}（{camDetail}）EC={ecConfirmed}");
+							return true;
+						}
+						Logger.WriteLine($"SwitchQuick(webcam,{on}) PnP 失败（{camDetail}）⇒ 尝试 EC 断电位");
+					}
+					bool nucOk = NucQuickSwitches.TrySetCamera(on, out bool nucConfirmed);
+					if (nucOk)
+					{
+						_hw.QuickSwitches["webcam"] = on;
+						Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI ACPI EC（PnP 不可用）⇒ 确认={nucConfirmed}");
+						return nucConfirmed;
+					}
+					return false;
+				}
+				if (string.Equals(key, "winkey", StringComparison.Ordinal))
+				{
+					bool nucOk = NucQuickSwitches.TrySetWinKeyLock(on, out bool nucConfirmed);
+					if (nucOk)
+					{
+						_hw.QuickSwitches["winkey"] = on;
+					}
+					Logger.WriteLine($"SwitchQuick(winkey,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={nucConfirmed}");
+					return nucConfirmed;
+				}
 			}
 			// ⭐⭐ 2026-10-16（宝龙达 · 窄范围）：⭐ **Fn 键锁 / 触摸板 走 WMI**（⭐ 它没有 GCU ✅）
 			//   ⭐ 依据：⭐ 真机诊断包已回读到 ⭐ `Fn锁=0` ✅ / ⭐ `触摸板=1` ✅ ⇒ ⭐ **硬件支持** ✅

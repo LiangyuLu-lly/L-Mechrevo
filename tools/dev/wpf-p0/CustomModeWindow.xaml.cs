@@ -138,6 +138,18 @@ public partial class CustomModeWindow : Window
         }
 }
 
+    private void ContentScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Handled || ContentScroll == null)
+        {
+            return;
+        }
+        // 鼠标在 Slider / ComboBox 上时，子控件会把滚轮吃掉；这里统一转发给外层页面，
+        // 保证自定义界面任意位置滚轮都能上下滚动。
+        ContentScroll.ScrollToVerticalOffset(ContentScroll.VerticalOffset - e.Delta);
+        e.Handled = true;
+    }
+
     private void MarkDirty()
     {
         if (_loadingUi || _firmwareMode || _current == null)
@@ -264,6 +276,14 @@ public partial class CustomModeWindow : Window
         }
         try
         {
+            MechrevoLite.Hardware.MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
+            if (hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true)
+            {
+                // 本地 ACPI/EC 自定义档：不走 GCU 固件槽，直接标记 ActiveModeId。
+                MechrevoLite.Mode.PerfModeStore.ActiveModeId = id;
+                perf.NotifyExternalSwitch(id);
+                return true;
+            }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "wpf-editor", forceParameters: true);
             return outcome?.ModeSwitched == true;
         }
@@ -424,10 +444,13 @@ public partial class CustomModeWindow : Window
             SmuSlowTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
             SmuFastTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
         }
+        bool nucDirectRows = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsIntelNucMachine == true
+            || L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsUmiMachine == true;
         bool locked = L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
             && PerfModeCapabilities.IsGen40Plus(lockHw)
-            && _current?.IsCustom != true;
+            && _current?.IsCustom != true
+            && !nucDirectRows;
         CpuPowerCard.IsEnabled = !locked;
         TempGpuCard.IsEnabled = !locked;
         FanCard.IsEnabled = !locked;
@@ -644,20 +667,31 @@ public partial class CustomModeWindow : Window
         SetSliderRange(GpuTgpSlider, hw.GpuTgpMinimum, hw.GpuTgpMaximum);
         SetSliderRange(DbSlider, hw.GpuDbMinimum, hw.GpuDbMaximum);
         SetSliderRange(FanDelaySlider, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum);
+        bool nucDirectUi = hw.IsIntelNucMachine || hw.IsUmiMachine;
+        if (nucDirectUi)
+        {
+            SetSliderRange(Pl1Slider, 5, 200);
+            SetSliderRange(Pl2Slider, 5, 250);
+            SetSliderRange(Pl4Slider, 5, 250);
+            SetSliderRange(TccSlider, 75, 100);
+            SetSliderRange(GpuTgpSlider, 60, 175);
+            SetSliderRange(DbSlider, 0, 30);
+            SetSliderRange(FanDelaySlider, 100, 10000);
+        }
         // 30 系固件配置编辑器是完整参数页；能力位滞后时不能把整页做成只读。
         bool vendorProfile = _firmwareMode;
-        TccSwitch.IsEnabled = hw.TccAdjustable || vendorProfile;
-        DbSwitch.IsEnabled = hw.GpuDynamicBoostAdjustable || vendorProfile;
-        GpuTgpSlider.IsEnabled = hw.GpuTgpAdjustable || vendorProfile;
-        FanSensitivitySwitch.IsEnabled = hw.SupportsFanSwitchSpeed || vendorProfile;
-        GpuOcSwitch.IsEnabled = (hw.SupportsGpuOverclock
+        TccSwitch.IsEnabled = nucDirectUi || hw.TccAdjustable || vendorProfile;
+        DbSwitch.IsEnabled = nucDirectUi || hw.GpuDynamicBoostAdjustable || vendorProfile;
+        GpuTgpSlider.IsEnabled = nucDirectUi || hw.GpuTgpAdjustable || vendorProfile;
+        FanSensitivitySwitch.IsEnabled = nucDirectUi || hw.SupportsFanSwitchSpeed || vendorProfile;
+        GpuOcSwitch.IsEnabled = nucDirectUi || (hw.SupportsGpuOverclock
                 && string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
                 || vendorProfile;
-        if (!hw.GpuTgpAdjustable)
+        if (!hw.GpuTgpAdjustable && !nucDirectUi)
         {
             GpuTgpSlider.Opacity = 0.45;
         }
-        if (!hw.GpuDynamicBoostAdjustable)
+        if (!hw.GpuDynamicBoostAdjustable && !nucDirectUi)
         {
             DbSwitch.Opacity = 0.45;
             DbSlider.Opacity = 0.45;
@@ -866,6 +900,39 @@ public partial class CustomModeWindow : Window
                 ToolTip = null;
                 ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
                 StatusText.Text = "配置已保存：模式 " + _firmwareVisualMode + " · 配置 " + (_firmwareProfileIndex + 1) + "（切到该模式后生效）";
+                return;
+            }
+            bool nucDirect = WpfBackend.Hw?.IsIntelNucMachine == true || WpfBackend.Hw?.IsUmiMachine == true;
+            if (nucDirect)
+            {
+                if (_current?.Id != null) MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
+                string gpuDetail = "";
+                bool gpuOk = MechrevoLite.Hardware.NucGpuPower.TryApply(
+                    edited.GpuTgp ?? 0,
+                    edited.GpuDynamicBoostOn == true,
+                    edited.GpuDynamicBoost ?? 0,
+                    edited.GpuOverclockOn == true ? edited.GpuCoreOffset : null,
+                    edited.GpuOverclockOn == true ? edited.GpuMemoryOffset : null,
+                    out gpuDetail);
+                bool ok = MechrevoLite.Hardware.NucPerformanceMode.TryApplyCustom(
+                    edited.Pl1, edited.Pl2, edited.Pl4, edited.TccTarget, out string detail);
+                bool rampOk = MechrevoLite.Hardware.NucFanTable.TrySetFanRamp(
+                    edited.FanSwitchSpeedOn == true, edited.FanSwitchSpeedMs ?? 300, out string rampDetail);
+                bool curveOn = edited.FanCurveOn != false
+                    && (edited.CpuFanDuty != null || edited.GpuFanDuty != null);
+                bool isolatedOk = MechrevoLite.Hardware.NucFanTable.TrySetFanIsolated(curveOn, out string isolatedDetail);
+                ok = ok && rampOk && isolatedOk && gpuOk;
+                detail += " " + rampDetail + " " + isolatedDetail + " " + gpuDetail;
+                _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
+                StatusText.Text = ok
+                    ? "自定义功耗墙已应用：" + detail
+                    : "自定义功耗墙应用失败：" + detail;
+                ToolTip = detail;
+                if (ok)
+                {
+                    _dirty = false;
+                    ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
+                }
                 return;
             }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");

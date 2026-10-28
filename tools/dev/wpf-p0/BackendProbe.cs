@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using MechrevoLite.Helpers;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -27,19 +28,52 @@ internal sealed class BackendProbe : IDisposable
             MechrevoLite.Hardware.GcuIdentity.Prewarm();
             _hw = new MechrevoHw();
             bool ok = await _hw.ConnectAsync().ConfigureAwait(false);
+            if (!ok && (_hw.IsIntelNucMachine || _hw.IsUmiMachine))
+            {
+                // NUC/UMI 的性能档、快捷键和大部分灯光/传感器走本地 ACPI/EC；
+                // GCU 服务没起来时仍让窗口进入“已就绪”，否则性能键监听不会启动。
+                ok = true;
+                LastError = "";
+                Logger.WriteLine("[backend] NUC/UMI GCU 未连接，使用本地 ACPI/EC 模式");
+            }
             if (ok)
             {
                 L_Mechrevo.WpfP0.Services.WpfBackend.acpi ??= new AsusACPI();
                 _service = new MechrevoService(_hw);
             }
             Connected = ok;
-            LastError = ok ? "" : "ConnectAsync 返回 false";
+            if (!ok)
+            {
+                LastError = "ConnectAsync 返回 false";
+            }
             return ok;
         }
         catch (Exception ex)
         {
             LastError = ex.GetType().Name + ": " + ex.Message;
             Connected = false;
+            return false;
+        }
+    }
+
+    /// <summary>NUC/UMI 不依赖 GCU 时把探针标成本地就绪（仅当 Hw 已识别出机型）。</summary>
+    internal bool TryEnableNucUmiLocalReady()
+    {
+        try
+        {
+            if (_hw == null || !(_hw.IsIntelNucMachine || _hw.IsUmiMachine))
+            {
+                return false;
+            }
+            _service ??= new MechrevoService(_hw);
+            _hw.MarkNucLocalReady();
+            Connected = true;
+            LastError = "";
+            Logger.WriteLine("[backend] NUC/UMI 本地 ACPI/EC 就绪（GCU 未连接）");
+            return true;
+        }
+        catch
+        {
             return false;
         }
     }
@@ -98,7 +132,9 @@ internal sealed class BackendProbe : IDisposable
 
     internal int CurrentMode => _service?.CurrentMode ?? -1;
 
-    internal int BatteryMode => _hw?.BatteryProtection ?? -1;
+    private int _nucBatteryMode = -1;
+
+    internal int BatteryMode => _nucBatteryMode >= 0 ? _nucBatteryMode : (_hw?.BatteryProtection ?? -1);
 
     internal int GpuMode => _hw?.GpuMode ?? -1;
 
@@ -191,6 +227,10 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                return SoftwareColorEnhancement.Apply(mode);
+            }
             if (_service == null || _hw == null || !_hw.DisplayEffectProfiles.TryGetValue(mode, out DisplayEffectProfile? profile))
             {
                 return false;
@@ -217,6 +257,14 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal void SyncNucQuickSwitches()
+    {
+        if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+        {
+            NucQuickSwitches.Sync(_hw);
+        }
+    }
+
     internal void MarkUserModeSwitch()
     {
         try
@@ -232,6 +280,10 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                return -1;
+            }
             return _service == null ? -1 : await _service.RefreshCurrentModeAsync(_service.CurrentMode).ConfigureAwait(false);
         }
         catch
@@ -265,6 +317,13 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                bool ok = NucBatteryMode.TrySet(mode, out string detail);
+                Logger.WriteLine("[nuc-battery] " + detail);
+                if (ok) _nucBatteryMode = mode;
+                return ok;
+            }
             return _hw != null && await _hw.SetBatteryProtection(mode).ConfigureAwait(false);
         }
         catch
@@ -320,6 +379,12 @@ internal sealed class BackendProbe : IDisposable
             if (L_Mechrevo.WpfP0.Services.VirtualDisplayBlankService.TryHandleQuickSwitch(key, on, out bool blankConfirmed))
             {
                 return blankConfirmed;
+            }
+            if (string.Equals(key, "winupdate", StringComparison.OrdinalIgnoreCase))
+            {
+                WindowsUpdateGuard.Result result = WindowsUpdateGuard.SetDisabled(on);
+                Logger.WriteLine("[winupdate] " + (on ? "禁用" : "恢复") + " · " + result.UserDetail());
+                return result.Ok;
             }
             if (_service == null)
             {
@@ -383,6 +448,12 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                return on
+                    ? SoftwareColorEnhancement.Apply(MechrevoLite.AppConfig.GetString("display_effect_mode"))
+                    : SoftwareColorEnhancement.Reset();
+            }
             return _service != null && await _service.SetDisplayEffectSwitch(on).ConfigureAwait(false);
         }
         catch
@@ -738,9 +809,13 @@ internal sealed class BackendProbe : IDisposable
 
     internal bool QuickState(string key)
     {
-        if (_hw == null)
+        if (_hw == null && !string.Equals(key, "winupdate", StringComparison.OrdinalIgnoreCase))
         {
             return false;
+        }
+        if (string.Equals(key, "winupdate", StringComparison.OrdinalIgnoreCase))
+        {
+            return WindowsUpdateGuard.IsDisabled() == true;
         }
         bool? system = ReadSystemQuick(key);
         if (system.HasValue)

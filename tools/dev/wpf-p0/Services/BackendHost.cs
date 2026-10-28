@@ -42,12 +42,24 @@ internal sealed class BackendHost : IDisposable
             {
                 TimedOut = true;
                 LastError = "连接超时（" + (int)timeout.TotalSeconds + " 秒）";
+                if (probe.TryEnableNucUmiLocalReady())
+                {
+                    WpfBackend.Attach(probe.Hw, probe.Service);
+                    LastError = "";
+                    return true;
+                }
                 DisposeProbe();
                 return false;
             }
             bool ok = await connect.ConfigureAwait(false);
             if (!ok)
             {
+                if (probe.TryEnableNucUmiLocalReady())
+                {
+                    WpfBackend.Attach(probe.Hw, probe.Service);
+                    LastError = "";
+                    return true;
+                }
                 LastError = probe.LastError;
                 DisposeProbe();
                 return false;

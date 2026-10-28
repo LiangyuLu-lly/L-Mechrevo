@@ -1,0 +1,232 @@
+﻿布局修正（2026-10-11 第三轮）几何核对 —— 数据由独立 UI 审计宿主导出，不经提权 LM
+宿主命令：dotnet EGroupShot.dll <outDir> <suffix> Settings-Telemetry <viewport>
+夹具喂合成传感器值：CPU 62°C / 1234rpm / 45%，GPU 55°C / 1100rpm / 40%（只读路径）
+
+====================================================================================================
+【窄卡片 · 最小窗宽 436 设备px】视口 1920x1080-100pct / 1920x1080-200pct / 1366x768-100pct
+====================================================================================================
+--- Settings-Telemetry @ 1920x1080-100pct (dpi=96, work=1920x1032) ---
+  [layout] ===== 标题行 / 按钮行几何核对 =====
+  [layout] panelCPUTitle BufferedPanel#panelCPUTitle 348x60@16,2 client=348x60 dock=Top vis=True rows=[-]
+  [layout] perfHeaderRow BufferedTableLayoutPanel#perfHeaderRow 348x26@0,0 client=348x26 dock=Top vis=True rows=[26]
+  [layout] perfModeRow BufferedTableLayoutPanel#perfModeRow 348x34@0,26 client=348x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 perfHeaderRowLeft {X=0,Y=0,Width=197,Height=26} 列宽=[26,61,108,2]
+  [layout]     PictureBox#picturePerf {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelPerf {X=26,Y=3,Width=61,Height=19} vis=True 文本='性能模式'
+  [layout]     FlowLayoutPanel#perfShortcuts {X=91,Y=4,Width=102,Height=17} vis=True 文本=''
+  [layout]   [读数] 'CPU' {X=197,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '62°C' {X=225,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1234rpm 45%' {X=260,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 perfModeRow 子控件=BufferedTableLayoutPanel#tablePerf:{X=0,Y=0,Width=348,Height=34}:vis=True
+  [layout]   [按钮] tablePerf {X=0,Y=0,Width=348,Height=34} 列宽=[69,69,69,69,72] 子=buttonSilent:{X=0,Y=0,Width=66,Height=34}:vis=True:txt='静音';buttonBalanced:{X=72,Y=0,Width=63,Height=34}:vis=True:txt='平衡';:{X=141,Y=0,Width=63,Height=34}:vis=True:txt='静音狂暴';buttonTurbo:{X=210,Y=0,Width=63,Height=34}:vis=True:txt='高能狂暴';:{X=279,Y=0,Width=69,Height=34}:vis=True:txt='自定义'
+  [layout] panelGPUTitle Panel#panelGPUTitle 348x60@16,2 client=348x60 dock=Top vis=True rows=[-]
+  [layout] gpuHeaderRow BufferedTableLayoutPanel#gpuHeaderRow 348x26@0,0 client=348x26 dock=Top vis=True rows=[26]
+  [layout] gpuModeRow BufferedTableLayoutPanel#gpuModeRow 348x34@0,26 client=348x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 gpuHeaderRowLeft {X=0,Y=0,Width=197,Height=26} 列宽=[26,61,6,104]
+  [layout]     PictureBox#pictureGPU {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelGPU {X=26,Y=3,Width=61,Height=19} vis=True 文本='显卡模式'
+  [layout]     Label#labelGPUFan {X=93,Y=4,Width=0,Height=17} vis=True 文本=''
+  [layout]   [读数] 'GPU' {X=197,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '55°C' {X=225,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1100rpm 40%' {X=260,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 gpuModeRow 子控件=BufferedTableLayoutPanel#tableGPU:{X=0,Y=0,Width=348,Height=34}:vis=True
+  [layout]   [按钮] tableGPU {X=0,Y=0,Width=348,Height=34} 列宽=[116,116,116] 子=buttonEco:{X=0,Y=0,Width=113,Height=34}:vis=True:txt='核显模式';buttonStandard:{X=119,Y=0,Width=110,Height=34}:vis=True:txt='混合';buttonUltimate:{X=235,Y=0,Width=113,Height=34}:vis=True:txt='直连'
+  [text-clipping] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfModeRow/tablePerf/RButton: Text '静音狂暴' needs {Width=56, Height=17}, available 55x30.
+  [text-clipping] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfModeRow/tablePerf/buttonTurbo: Text '高能狂暴' needs {Width=56, Height=17}, available 55x30.
+  [parent-overflow] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelBattery/tableBatteryLimit/chargeLimitHead/badgeChargeLimit: Bounds {X=97,Y=0,Width=47,Height=28} outside parent client {X=0,Y=0,Width=144,Height=26}.
+  issues=4
+  shot=D:\openLM\tmp_layoutshot\shots-fix2\shot-Settings-Telemetry-1920x1080-100pct.png
+  elapsed=1.5s
+--- Settings-Telemetry @ 1920x1080-200pct (dpi=192, work=1920x984) ---
+  [layout] ===== 标题行 / 按钮行几何核对 =====
+  [layout] panelCPUTitle BufferedPanel#panelCPUTitle 640x120@64,8 client=640x120 dock=Top vis=True rows=[-]
+  [layout] perfHeaderRow BufferedTableLayoutPanel#perfHeaderRow 640x52@0,0 client=640x52 dock=Top vis=True rows=[52]
+  [layout] perfModeRow BufferedTableLayoutPanel#perfModeRow 640x68@0,52 client=640x68 dock=Top vis=True rows=[68]
+  [layout] [row-order] 标题行 y=0..52 / 按钮行 y=52..120 / 宿主高=120 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 perfHeaderRowLeft {X=0,Y=0,Width=361,Height=52} 列宽=[52,119,214,-24]
+  [layout]     PictureBox#picturePerf {X=0,Y=0,Width=52,Height=52} vis=True 文本=''
+  [layout]     Label#labelPerf {X=52,Y=9,Width=119,Height=34} vis=True 文本='性能模式'
+  [layout]     FlowLayoutPanel#perfShortcuts {X=179,Y=10,Width=202,Height=32} vis=True 文本=''
+  [layout]   [读数] 'CPU' {X=361,Y=12,Width=51,Height=27} 实测文本=39x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '62°C' {X=412,Y=12,Width=64,Height=27} 实测文本=52x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1234rpm 45%' {X=476,Y=0,Width=164,Height=52} 实测文本=143x27 字体=Consolas 17pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 perfModeRow 子控件=BufferedTableLayoutPanel#tablePerf:{X=0,Y=0,Width=640,Height=68}:vis=True
+  [layout]   [按钮] tablePerf {X=0,Y=0,Width=640,Height=68} 列宽=[128,128,128,128,128] 子=buttonSilent:{X=0,Y=0,Width=122,Height=68}:vis=True:txt='静音';buttonBalanced:{X=134,Y=0,Width=116,Height=68}:vis=True:txt='平衡';:{X=262,Y=0,Width=116,Height=68}:vis=True:txt='静音狂暴';buttonTurbo:{X=390,Y=0,Width=116,Height=68}:vis=True:txt='高能狂暴';:{X=518,Y=0,Width=122,Height=68}:vis=True:txt='自定义'
+  [layout] panelGPUTitle Panel#panelGPUTitle 640x120@64,8 client=640x120 dock=Top vis=True rows=[-]
+  [layout] gpuHeaderRow BufferedTableLayoutPanel#gpuHeaderRow 640x52@0,0 client=640x52 dock=Top vis=True rows=[52]
+  [layout] gpuModeRow BufferedTableLayoutPanel#gpuModeRow 640x68@0,52 client=640x68 dock=Top vis=True rows=[68]
+  [layout] [row-order] 标题行 y=0..52 / 按钮行 y=52..120 / 宿主高=120 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 gpuHeaderRowLeft {X=0,Y=0,Width=361,Height=52} 列宽=[52,119,12,178]
+  [layout]     PictureBox#pictureGPU {X=0,Y=0,Width=52,Height=52} vis=True 文本=''
+  [layout]     Label#labelGPU {X=52,Y=9,Width=119,Height=34} vis=True 文本='显卡模式'
+  [layout]     Label#labelGPUFan {X=183,Y=11,Width=0,Height=30} vis=True 文本=''
+  [layout]   [读数] 'GPU' {X=361,Y=12,Width=51,Height=27} 实测文本=39x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '55°C' {X=412,Y=12,Width=64,Height=27} 实测文本=52x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1100rpm 40%' {X=476,Y=0,Width=164,Height=52} 实测文本=143x27 字体=Consolas 17pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 gpuModeRow 子控件=BufferedTableLayoutPanel#tableGPU:{X=0,Y=0,Width=640,Height=68}:vis=True
+  [layout]   [按钮] tableGPU {X=0,Y=0,Width=640,Height=68} 列宽=[213,213,214] 子=buttonEco:{X=0,Y=0,Width=207,Height=68}:vis=True:txt='核显模式';buttonStandard:{X=219,Y=0,Width=201,Height=68}:vis=True:txt='混合';buttonUltimate:{X=432,Y=0,Width=208,Height=68}:vis=True:txt='直连'
+  [text-clipping] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfModeRow/tablePerf/RButton: Text '静音狂暴' needs {Width=110, Height=31}, available 108x64.
+  [text-clipping] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfModeRow/tablePerf/buttonTurbo: Text '高能狂暴' needs {Width=110, Height=31}, available 108x64.
+  [parent-overflow] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfHeaderRow/perfHeaderRowLeft/perfShortcuts: Bounds {X=179,Y=10,Width=202,Height=32} outside parent client {X=0,Y=0,Width=361,Height=52}.
+  issues=4
+  shot=D:\openLM\tmp_layoutshot\shots-fix2\shot-Settings-Telemetry-1920x1080-200pct.png
+  elapsed=2.4s
+--- Settings-Telemetry @ 1366x768-100pct (dpi=96, work=1366x720) ---
+  [layout] ===== 标题行 / 按钮行几何核对 =====
+  [layout] panelCPUTitle BufferedPanel#panelCPUTitle 348x60@16,2 client=348x60 dock=Top vis=True rows=[-]
+  [layout] perfHeaderRow BufferedTableLayoutPanel#perfHeaderRow 348x26@0,0 client=348x26 dock=Top vis=True rows=[26]
+  [layout] perfModeRow BufferedTableLayoutPanel#perfModeRow 348x34@0,26 client=348x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 perfHeaderRowLeft {X=0,Y=0,Width=197,Height=26} 列宽=[26,61,108,2]
+  [layout]     PictureBox#picturePerf {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelPerf {X=26,Y=3,Width=61,Height=19} vis=True 文本='性能模式'
+  [layout]     FlowLayoutPanel#perfShortcuts {X=91,Y=4,Width=102,Height=17} vis=True 文本=''
+  [layout]   [读数] 'CPU' {X=197,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '62°C' {X=225,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1234rpm 45%' {X=260,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 perfModeRow 子控件=BufferedTableLayoutPanel#tablePerf:{X=0,Y=0,Width=348,Height=34}:vis=True
+  [layout]   [按钮] tablePerf {X=0,Y=0,Width=348,Height=34} 列宽=[69,69,69,69,72] 子=buttonSilent:{X=0,Y=0,Width=66,Height=34}:vis=True:txt='静音';buttonBalanced:{X=72,Y=0,Width=63,Height=34}:vis=True:txt='平衡';:{X=141,Y=0,Width=63,Height=34}:vis=True:txt='静音狂暴';buttonTurbo:{X=210,Y=0,Width=63,Height=34}:vis=True:txt='高能狂暴';:{X=279,Y=0,Width=69,Height=34}:vis=True:txt='自定义'
+  [layout] panelGPUTitle Panel#panelGPUTitle 348x60@16,2 client=348x60 dock=Top vis=True rows=[-]
+  [layout] gpuHeaderRow BufferedTableLayoutPanel#gpuHeaderRow 348x26@0,0 client=348x26 dock=Top vis=True rows=[26]
+  [layout] gpuModeRow BufferedTableLayoutPanel#gpuModeRow 348x34@0,26 client=348x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 gpuHeaderRowLeft {X=0,Y=0,Width=197,Height=26} 列宽=[26,61,6,104]
+  [layout]     PictureBox#pictureGPU {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelGPU {X=26,Y=3,Width=61,Height=19} vis=True 文本='显卡模式'
+  [layout]     Label#labelGPUFan {X=93,Y=4,Width=0,Height=17} vis=True 文本=''
+  [layout]   [读数] 'GPU' {X=197,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '55°C' {X=225,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1100rpm 40%' {X=260,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 gpuModeRow 子控件=BufferedTableLayoutPanel#tableGPU:{X=0,Y=0,Width=348,Height=34}:vis=True
+  [layout]   [按钮] tableGPU {X=0,Y=0,Width=348,Height=34} 列宽=[116,116,116] 子=buttonEco:{X=0,Y=0,Width=113,Height=34}:vis=True:txt='核显模式';buttonStandard:{X=119,Y=0,Width=110,Height=34}:vis=True:txt='混合';buttonUltimate:{X=235,Y=0,Width=113,Height=34}:vis=True:txt='直连'
+  [text-clipping] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfModeRow/tablePerf/RButton: Text '静音狂暴' needs {Width=56, Height=17}, available 55x30.
+  [text-clipping] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfModeRow/tablePerf/buttonTurbo: Text '高能狂暴' needs {Width=56, Height=17}, available 55x30.
+  [parent-overflow] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelBattery/tableBatteryLimit/chargeLimitHead/badgeChargeLimit: Bounds {X=97,Y=0,Width=47,Height=28} outside parent client {X=0,Y=0,Width=144,Height=26}.
+  issues=4
+  shot=D:\openLM\tmp_layoutshot\shots-fix2\shot-Settings-Telemetry-1366x768-100pct.png
+  elapsed=1.4s
+  row-order-pass = 6
+  text-clipping = 6
+  parent-overflow = 3
+  Settings-Telemetry | parent-overflow = 3
+  Settings-Telemetry | text-clipping = 6
+
+====================================================================================================
+【窄卡片 + 30 系 UI（LMECHREVO_FORCE_30UI=1：配置编辑按钮 + 配置行可见）】
+====================================================================================================
+--- Settings-Telemetry @ 1920x1080-100pct (dpi=96, work=1920x1032) ---
+  [layout] ===== 标题行 / 按钮行几何核对 =====
+  [layout] panelCPUTitle BufferedPanel#panelCPUTitle 348x60@16,2 client=348x60 dock=Top vis=True rows=[-]
+  [layout] perfHeaderRow BufferedTableLayoutPanel#perfHeaderRow 348x26@0,0 client=348x26 dock=Top vis=True rows=[26]
+  [layout] perfModeRow BufferedTableLayoutPanel#perfModeRow 348x34@0,26 client=348x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 perfHeaderRowLeft {X=0,Y=0,Width=197,Height=26} 列宽=[26,61,186,-76]
+  [layout]     PictureBox#picturePerf {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelPerf {X=26,Y=3,Width=61,Height=19} vis=True 文本='性能模式'
+  [layout]     FlowLayoutPanel#perfShortcuts {X=91,Y=1,Width=180,Height=24} vis=True 文本=''
+  [layout]   [读数] 'CPU' {X=197,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '62°C' {X=225,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1234rpm 45%' {X=260,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 perfModeRow 子控件=BufferedTableLayoutPanel#tablePerf:{X=0,Y=0,Width=348,Height=34}:vis=True
+  [layout]   [按钮] tablePerf {X=0,Y=0,Width=348,Height=34} 列宽=[87,87,87,87] 子=buttonSilent:{X=0,Y=0,Width=84,Height=34}:vis=True:txt='静音';buttonBalanced:{X=90,Y=0,Width=81,Height=34}:vis=True:txt='平衡';:{X=177,Y=0,Width=81,Height=34}:vis=True:txt='静音狂暴';buttonTurbo:{X=264,Y=0,Width=84,Height=34}:vis=True:txt='高能狂暴'
+  [layout] panelGPUTitle Panel#panelGPUTitle 348x60@16,2 client=348x60 dock=Top vis=True rows=[-]
+  [layout] gpuHeaderRow BufferedTableLayoutPanel#gpuHeaderRow 348x26@0,0 client=348x26 dock=Top vis=True rows=[26]
+  [layout] gpuModeRow BufferedTableLayoutPanel#gpuModeRow 348x34@0,26 client=348x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 gpuHeaderRowLeft {X=0,Y=0,Width=197,Height=26} 列宽=[26,61,6,104]
+  [layout]     PictureBox#pictureGPU {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelGPU {X=26,Y=3,Width=61,Height=19} vis=True 文本='显卡模式'
+  [layout]     Label#labelGPUFan {X=93,Y=4,Width=0,Height=17} vis=True 文本=''
+  [layout]   [读数] 'GPU' {X=197,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '55°C' {X=225,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1100rpm 40%' {X=260,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 gpuModeRow 子控件=BufferedTableLayoutPanel#tableGPU:{X=0,Y=0,Width=348,Height=34}:vis=True
+  [layout]   [按钮] tableGPU {X=0,Y=0,Width=348,Height=34} 列宽=[116,116,116] 子=buttonEco:{X=0,Y=0,Width=113,Height=34}:vis=True:txt='核显模式';buttonStandard:{X=119,Y=0,Width=110,Height=34}:vis=True:txt='混合';buttonUltimate:{X=235,Y=0,Width=113,Height=34}:vis=True:txt='直连'
+  [parent-overflow] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelPerformance/panelCPUTitle/perfHeaderRow/perfHeaderRowLeft/perfShortcuts: Bounds {X=91,Y=1,Width=180,Height=24} outside parent client {X=0,Y=0,Width=197,Height=26}.
+  [parent-overflow] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelBattery/tableBatteryLimit/chargeLimitHead/badgeChargeLimit: Bounds {X=97,Y=0,Width=47,Height=28} outside parent client {X=0,Y=0,Width=144,Height=26}.
+  issues=3
+  shot=D:\openLM\tmp_layoutshot\shots-fix30\shot-Settings-Telemetry-1920x1080-100pct.png
+  elapsed=1.6s
+  row-order-pass = 2
+  parent-overflow = 2
+  Settings-Telemetry | parent-overflow = 2
+
+====================================================================================================
+【真实窗宽 1000 设备px + 30 系 UI】1920x1080-100pct
+====================================================================================================
+--- Settings-Telemetry @ 1920x1080-100pct (dpi=96, work=1920x1032) ---
+  form-width-override=1000 -> actual 1000
+  [layout] ===== 标题行 / 按钮行几何核对 =====
+  [layout] panelCPUTitle BufferedPanel#panelCPUTitle 912x60@16,2 client=912x60 dock=Top vis=True rows=[-]
+  [layout] perfHeaderRow BufferedTableLayoutPanel#perfHeaderRow 912x26@0,0 client=912x26 dock=Top vis=True rows=[26]
+  [layout] perfModeRow BufferedTableLayoutPanel#perfModeRow 912x34@0,26 client=912x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 perfHeaderRowLeft {X=0,Y=0,Width=761,Height=26} 列宽=[26,61,186,488]
+  [layout]     PictureBox#picturePerf {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelPerf {X=26,Y=3,Width=61,Height=19} vis=True 文本='性能模式'
+  [layout]     FlowLayoutPanel#perfShortcuts {X=91,Y=1,Width=180,Height=24} vis=True 文本=''
+  [layout]   [读数] 'CPU' {X=761,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '62°C' {X=789,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1234rpm 45%' {X=824,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 perfModeRow 子控件=BufferedTableLayoutPanel#tablePerf:{X=0,Y=0,Width=912,Height=34}:vis=True
+  [layout]   [按钮] tablePerf {X=0,Y=0,Width=912,Height=34} 列宽=[228,228,228,228] 子=buttonSilent:{X=0,Y=0,Width=225,Height=34}:vis=True:txt='静音';buttonBalanced:{X=231,Y=0,Width=222,Height=34}:vis=True:txt='平衡';:{X=459,Y=0,Width=222,Height=34}:vis=True:txt='静音狂暴';buttonTurbo:{X=687,Y=0,Width=225,Height=34}:vis=True:txt='高能狂暴'
+  [layout] panelGPUTitle Panel#panelGPUTitle 912x60@16,2 client=912x60 dock=Top vis=True rows=[-]
+  [layout] gpuHeaderRow BufferedTableLayoutPanel#gpuHeaderRow 912x26@0,0 client=912x26 dock=Top vis=True rows=[26]
+  [layout] gpuModeRow BufferedTableLayoutPanel#gpuModeRow 912x34@0,26 client=912x34 dock=Top vis=True rows=[34]
+  [layout] [row-order] 标题行 y=0..26 / 按钮行 y=26..60 / 宿主高=60 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 gpuHeaderRowLeft {X=0,Y=0,Width=761,Height=26} 列宽=[26,61,6,668]
+  [layout]     PictureBox#pictureGPU {X=0,Y=0,Width=26,Height=26} vis=True 文本=''
+  [layout]     Label#labelGPU {X=26,Y=3,Width=61,Height=19} vis=True 文本='显卡模式'
+  [layout]     Label#labelGPUFan {X=93,Y=4,Width=0,Height=17} vis=True 文本=''
+  [layout]   [读数] 'GPU' {X=761,Y=6,Width=28,Height=14} 实测文本=21x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '55°C' {X=789,Y=6,Width=35,Height=14} 实测文本=28x14 字体=Consolas 8.5pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1100rpm 40%' {X=824,Y=0,Width=88,Height=26} 实测文本=77x14 字体=Consolas 8.5pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 gpuModeRow 子控件=BufferedTableLayoutPanel#tableGPU:{X=0,Y=0,Width=912,Height=34}:vis=True
+  [layout]   [按钮] tableGPU {X=0,Y=0,Width=912,Height=34} 列宽=[303,303,306] 子=buttonEco:{X=0,Y=0,Width=300,Height=34}:vis=True:txt='核显模式';buttonStandard:{X=306,Y=0,Width=297,Height=34}:vis=True:txt='混合';buttonUltimate:{X=609,Y=0,Width=303,Height=34}:vis=True:txt='直连'
+  [parent-overflow] Settings-Telemetry/dashboardLayout/dashboardPageHost/dashboardStack/panelBattery/tableBatteryLimit/chargeLimitHead/badgeChargeLimit: Bounds {X=97,Y=0,Width=47,Height=28} outside parent client {X=0,Y=0,Width=144,Height=26}.
+  issues=2
+  shot=D:\openLM\tmp_layoutshot\shots-wide100\shot-Settings-Telemetry-1920x1080-100pct.png
+  elapsed=1.8s
+  row-order-pass = 2
+  parent-overflow = 1
+  Settings-Telemetry | parent-overflow = 1
+
+====================================================================================================
+【真实窗宽 1483 设备px（受屏幕宽度限制）+ 30 系 UI】1920x1080-200pct
+====================================================================================================
+--- Settings-Telemetry @ 1920x1080-200pct (dpi=192, work=1920x984) ---
+  form-width-override=2000 -> actual 1483
+  [layout] ===== 标题行 / 按钮行几何核对 =====
+  [layout] panelCPUTitle BufferedPanel#panelCPUTitle 1267x120@64,8 client=1267x120 dock=Top vis=True rows=[-]
+  [layout] perfHeaderRow BufferedTableLayoutPanel#perfHeaderRow 1267x52@0,0 client=1267x52 dock=Top vis=True rows=[52]
+  [layout] perfModeRow BufferedTableLayoutPanel#perfModeRow 1267x68@0,52 client=1267x68 dock=Top vis=True rows=[68]
+  [layout] [row-order] 标题行 y=0..52 / 按钮行 y=52..120 / 宿主高=120 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 perfHeaderRowLeft {X=0,Y=0,Width=988,Height=52} 列宽=[52,119,370,447]
+  [layout]     PictureBox#picturePerf {X=0,Y=0,Width=52,Height=52} vis=True 文本=''
+  [layout]     Label#labelPerf {X=52,Y=9,Width=119,Height=34} vis=True 文本='性能模式'
+  [layout]     FlowLayoutPanel#perfShortcuts {X=179,Y=2,Width=358,Height=48} vis=True 文本=''
+  [layout]   [读数] 'CPU' {X=988,Y=12,Width=51,Height=27} 实测文本=39x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '62°C' {X=1039,Y=12,Width=64,Height=27} 实测文本=52x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1234rpm 45%' {X=1103,Y=0,Width=164,Height=52} 实测文本=143x27 字体=Consolas 17pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 perfModeRow 子控件=BufferedTableLayoutPanel#tablePerf:{X=0,Y=0,Width=1267,Height=68}:vis=True
+  [layout]   [按钮] tablePerf {X=0,Y=0,Width=1267,Height=68} 列宽=[316,316,316,319] 子=buttonSilent:{X=0,Y=0,Width=310,Height=68}:vis=True:txt='静音';buttonBalanced:{X=322,Y=0,Width=304,Height=68}:vis=True:txt='平衡';:{X=638,Y=0,Width=304,Height=68}:vis=True:txt='静音狂暴';buttonTurbo:{X=954,Y=0,Width=313,Height=68}:vis=True:txt='高能狂暴'
+  [layout] panelGPUTitle Panel#panelGPUTitle 1267x120@64,8 client=1267x120 dock=Top vis=True rows=[-]
+  [layout] gpuHeaderRow BufferedTableLayoutPanel#gpuHeaderRow 1267x52@0,0 client=1267x52 dock=Top vis=True rows=[52]
+  [layout] gpuModeRow BufferedTableLayoutPanel#gpuModeRow 1267x68@0,52 client=1267x68 dock=Top vis=True rows=[68]
+  [layout] [row-order] 标题行 y=0..52 / 按钮行 y=52..120 / 宿主高=120 ⇒ 标题在按钮行上方=PASS
+  [layout]   标题左组 gpuHeaderRowLeft {X=0,Y=0,Width=988,Height=52} 列宽=[52,119,12,805]
+  [layout]     PictureBox#pictureGPU {X=0,Y=0,Width=52,Height=52} vis=True 文本=''
+  [layout]     Label#labelGPU {X=52,Y=9,Width=119,Height=34} vis=True 文本='显卡模式'
+  [layout]     Label#labelGPUFan {X=183,Y=11,Width=0,Height=30} vis=True 文本=''
+  [layout]   [读数] 'GPU' {X=988,Y=12,Width=51,Height=27} 实测文本=39x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '55°C' {X=1039,Y=12,Width=64,Height=27} 实测文本=52x27 字体=Consolas 17pt AutoSize=True 对齐=MiddleLeft 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   [读数] '1100rpm 40%' {X=1103,Y=0,Width=164,Height=52} 实测文本=143x27 字体=Consolas 17pt AutoSize=False 对齐=MiddleRight 文本放得下=PASS 整片在标题行内=PASS
+  [layout]   按钮行 gpuModeRow 子控件=BufferedTableLayoutPanel#tableGPU:{X=0,Y=0,Width=1267,Height=68}:vis=True
+  [layout]   [按钮] tableGPU {X=0,Y=0,Width=1267,Height=68} 列宽=[422,422,423] 子=buttonEco:{X=0,Y=0,Width=416,Height=68}:vis=True:txt='核显模式';buttonStandard:{X=428,Y=0,Width=410,Height=68}:vis=True:txt='混合';buttonUltimate:{X=850,Y=0,Width=417,Height=68}:vis=True:txt='直连'
+  issues=1
+  shot=D:\openLM\tmp_layoutshot\shots-wide200\shot-Settings-Telemetry-1920x1080-200pct.png
+  elapsed=2.8s
+  row-order-pass = 2
+

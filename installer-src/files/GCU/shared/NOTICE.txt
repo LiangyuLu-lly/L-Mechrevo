@@ -1,0 +1,10 @@
+GCU-only redistribution notice
+==============================
+
+This bundle contains proprietary AISTONE/Mechrevo service binaries and a
+Microsoft-signed UWACPI driver. They are not licensed under L-Mechrevo's GPL
+license. Redistribute this directory only when you have permission from the
+applicable rights holders, and do not remove their digital signatures.
+
+The installer rejects missing or invalid signatures before installing the
+service or driver.

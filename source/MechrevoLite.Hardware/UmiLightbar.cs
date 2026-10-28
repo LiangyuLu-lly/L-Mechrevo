@@ -64,10 +64,9 @@ internal static class UmiLightbar
         }
         try
         {
-            byte ac = (byte)Math.Max(0, Read(handle, AcCtrl));
-            byte dc = (byte)Math.Max(0, Read(handle, DcCtrl));
-            ac = (byte)((ac & 0xFA) | (on ? 1 : 0));
-            dc = (byte)((dc & 0xFA) | (on ? 1 : 0));
+            // 原厂：1864=0 单色常亮，=8 关闭，=128 彩色/循环。
+            byte ac = (byte)(on ? 0 : 8);
+            byte dc = (byte)(on ? 0 : 8);
             bool okAc = Write(handle, AcCtrl, ac);
             bool okDc = Write(handle, DcCtrl, dc);
             Logger.WriteLine("[umi-lightbar] 电源=" + (on ? "开" : "关") + " · AC=" + okAc + " DC=" + okDc);
@@ -91,9 +90,12 @@ internal static class UmiLightbar
             bool on = true;
             byte ac = (byte)Math.Max(0, Read(handle, AcCtrl));
             byte dc = (byte)Math.Max(0, Read(handle, DcCtrl));
-            byte effectBits = effect == "Single" ? (byte)0 : (byte)4;
-            ac = (byte)((ac & 0x89) | effectBits | 1);
-            dc = (byte)((dc & 0x89) | effectBits | 1);
+            bool colorful = effect is "Colorful" or "Rainbow" or "ColorMarquee" or "Welcome" or "ColorfulMode";
+            bool off = string.Equals(effect, "Off", StringComparison.OrdinalIgnoreCase);
+            // 原厂 Intel 灯带只有：单色(0)、关闭(8)、彩色/循环(128)。
+            byte ctrl = (byte)(off ? 8 : colorful ? 128 : 0);
+            ac = ctrl;
+            dc = ctrl;
             Write(handle, AcCtrl, ac);
             Write(handle, DcCtrl, dc);
 
@@ -101,9 +103,16 @@ internal static class UmiLightbar
             {
                 // 控制台的 R/G/B_level 是 0..100，固件再 *2；UI 的 ARGB 是 0..255。
                 // 旧写法把 0..255 再乘亮度，实际写入严重偏色/偏亮，导致“设置和显示不一致”。
-                int r = Math.Clamp(color.Value.R * 100 / 255 * 2, 0, 255);
-                int g = Math.Clamp(color.Value.G * 100 / 255 * 2, 0, 255);
-                int b = Math.Clamp(color.Value.B * 100 / 255 * 2, 0, 255);
+                float factor = lightLevel switch
+                {
+                    <= 0 => 0f,
+                    <= 4 => lightLevel / 4f,
+                    <= 100 => lightLevel / 100f,
+                    _ => 1f
+                };
+                int r = Math.Clamp((int)Math.Round(color.Value.R * 100 / 255.0 * 2 * factor), 0, 255);
+                int g = Math.Clamp((int)Math.Round(color.Value.G * 100 / 255.0 * 2 * factor), 0, 255);
+                int b = Math.Clamp((int)Math.Round(color.Value.B * 100 / 255.0 * 2 * factor), 0, 255);
                 Write(handle, AcR, (byte)r);
                 Write(handle, AcG, (byte)g);
                 Write(handle, AcB, (byte)b);

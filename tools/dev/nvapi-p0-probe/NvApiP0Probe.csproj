@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>nvapi-p0-probe</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace />
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- ⭐ 链接主工程**当前源码**里的 NvapiPStates（不是副本）：这样 interop 模式测的就是
+         LM 实际会执行的那份 Initialize/Unload + 手写结构体，换机型复测同样有效。 -->
+    <Compile Include="..\..\..\source\MechrevoLite.Gpu\NvapiPStates.cs" Link="NvapiPStates.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 与主工程同一个 NvAPIWrapper（0.8.1.100），保证探针和 LM 的封送行为一致 -->
+    <Reference Include="NvAPIWrapper">
+      <HintPath>..\..\..\lm_pkg_files\{app}\NvAPIWrapper.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

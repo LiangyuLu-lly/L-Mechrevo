@@ -1,0 +1,15 @@
+{
+  "fan": true,
+  "temp": false,
+  "boost": false,
+  "usage": false,
+  "mem": false,
+  "net": false,
+  "power": false,
+  "memtemp": false,
+  "alpha": 61,
+  "pos": [
+    976,
+    22
+  ]
+}
