@@ -159,7 +159,11 @@ internal static class NucQuickSwitches
         {
             hw.QuickSwitches["fnkey"] = (fn & FnLockBit) != 0;
         }
-        if (TryRead(CameraCutoffAddress, out int cam))
+        if (CameraPnpControl.TryGetEnabled(out bool cameraEnabled, out _))
+        {
+            hw.QuickSwitches["webcam"] = cameraEnabled;
+        }
+        else if (TryRead(CameraCutoffAddress, out int cam))
         {
             hw.QuickSwitches["webcam"] = (cam & CameraCutoffBit) == 0;
         }

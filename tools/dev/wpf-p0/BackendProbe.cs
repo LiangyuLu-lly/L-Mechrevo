@@ -256,6 +256,14 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    internal void SyncNucQuickSwitches()
+    {
+        if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+        {
+            NucQuickSwitches.Sync(_hw);
+        }
+    }
+
     internal void MarkUserModeSwitch()
     {
         try

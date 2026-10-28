@@ -4420,6 +4420,7 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
+        probe.SyncNucQuickSwitches();
         BackendLine.Text = probe.Snapshot();
         UpdateTraySensorTooltip(probe);
         HookHardwareState(probe.Hw);
