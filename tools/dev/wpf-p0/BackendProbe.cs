@@ -265,6 +265,10 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                return -1;
+            }
             return _service == null ? -1 : await _service.RefreshCurrentModeAsync(_service.CurrentMode).ConfigureAwait(false);
         }
         catch

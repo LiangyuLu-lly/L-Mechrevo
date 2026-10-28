@@ -276,6 +276,14 @@ public partial class CustomModeWindow : Window
         }
         try
         {
+            MechrevoLite.Hardware.MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
+            if (hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true)
+            {
+                // 本地 ACPI/EC 自定义档：不走 GCU 固件槽，直接标记 ActiveModeId。
+                MechrevoLite.Mode.PerfModeStore.ActiveModeId = id;
+                perf.NotifyExternalSwitch(id);
+                return true;
+            }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.ActivateAsync(id, "wpf-editor", forceParameters: true);
             return outcome?.ModeSwitched == true;
         }

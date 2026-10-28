@@ -2932,11 +2932,11 @@ public partial class OriginalStyleWindow : Window
                 return;
             }
             bool ok = result == MechrevoService.ModeSwitchResult.Ok;
-            if (ok && mode == 1 && silentTurbo == true && !turboSubModeSupported)
+            if (!nucDirect && ok && mode == 1 && silentTurbo == true && !turboSubModeSupported)
             {
                 ok = false;
             }
-            else if (ok && mode == 1 && silentTurbo.HasValue && turboSubModeSupported)
+            else if (!nucDirect && ok && mode == 1 && silentTurbo.HasValue && turboSubModeSupported)
             {
                 ok = _backendProbe?.Service != null
                     && await _backendProbe.Service.SwitchTurboSubMode(silentTurbo.Value);
@@ -2945,10 +2945,13 @@ public partial class OriginalStyleWindow : Window
             if (!ok)
             {
                 // 旧版失败后会 RefreshCurrentModeAsync 再回填；不能拿缓存的 CurrentMode 直接回弹。
-                int actualMode = await _backendProbe!.RefreshCurrentModeAsync();
-                if (actualMode >= 0)
+                if (!nucDirect)
                 {
-                    Logger.WriteLine("[perfmode] 切档失败，回读实际档=" + actualMode);
+                    int actualMode = await _backendProbe!.RefreshCurrentModeAsync();
+                    if (actualMode >= 0)
+                    {
+                        Logger.WriteLine("[perfmode] 切档失败，回读实际档=" + actualMode);
+                    }
                 }
                 _pendingMode = -1;
             }
@@ -3034,6 +3037,15 @@ public partial class OriginalStyleWindow : Window
                 || (MechrevoLite.Mode.PerfModeStore.ActiveModeId?.StartsWith("custom", StringComparison.OrdinalIgnoreCase) ?? false))
             {
                 return 3;
+            }
+        }
+        if (hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true)
+        {
+            int local = VisualModeForId(MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId
+                ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId);
+            if (local >= 0)
+            {
+                return local;
             }
         }
         int mode = probe.CurrentMode;

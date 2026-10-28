@@ -62,17 +62,15 @@ public static class NucPerformanceMode
         int minPl4 = Math.Min(250, pl2 + 20);
         pl4 = Math.Clamp(pl4, minPl4, 250);
         bool write3 = TryWrite(Pl4WriteAddress, pl4);
-        bool fan = TryApplyFanMode(visualMode, out string fanDetail);
-        bool fanBoost = TryApplyFanBoost(visualMode, out string fanBoostDetail);
-        bool dstate = TryApplyDState(visualMode, out string dstateDetail);
+        // 模式切换只写功耗墙；风扇模式/强冷/DState 不在这里自动写，
+        // 避免不同 NUC/UMI EC 语义下把风扇推到全速。
         // 非自定义档：清除 Custom Mode 标志，交还 EC 原生模式。
         TryWrite(1798, 64);
-        detail += " " + fanDetail + " " + fanBoostDetail + " " + dstateDetail;
         bool read1 = TryRead(Pl1WriteAddress, out int rb1);
         bool read2 = TryRead(Pl2WriteAddress, out int rb2);
         bool read3 = TryRead(Pl4WriteAddress, out int rb3);
         detail += $"PL1={pl1} PL2={pl2} PL4={pl4} 写入={write1 && write2 && write3} 回读={rb1}/{rb2}/{rb3}";
-        return write1 && write2 && write3 && read1 && read2 && read3 && fan && fanBoost && dstate && rb1 == pl1 && rb2 == pl2 && rb3 == pl4;
+        return write1 && write2 && write3 && read1 && read2 && read3 && rb1 == pl1 && rb2 == pl2 && rb3 == pl4;
     }
 
     /// <summary>自定义档：PL1/PL2/PL4 直接写自定义 EC 槽（1923/1924/1925）。</summary>
