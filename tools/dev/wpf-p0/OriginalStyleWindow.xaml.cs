@@ -3754,21 +3754,23 @@ public partial class OriginalStyleWindow : Window
         HighlightSegment(button);
         int mode = int.Parse(text);
         int percentForMode = mode switch { 0 => 100, 1 => 80, 2 => 60, _ => 80 };
-        // NUC/UMI 本地模式：三档直接作为充电上限（OR 口径），滑块不开放。
-        bool nucCharge = _backendProbe.Hw?.IsIntelNucMachine == true || _backendProbe.Hw?.IsUmiMachine == true;
-        if (nucCharge)
+        // OR 三档：仅非 10/16/20/30 系启用；30 系继续走屏蔽/原路径。
+        bool legacyGeneration = _backendProbe.Hw?.IsIntelNucMachine == true
+            || _backendProbe.Hw?.IsUmiMachine == true
+            || MechrevoLite.Hardware.EcChargeLimit.IsLegacyGenerationBlocked();
+        if (!legacyGeneration)
         {
-            bool nucOk = MechrevoLite.Hardware.NucChargeLimit.TrySet(percentForMode, out string nucDetail);
-            if (nucOk)
+            bool orOk = MechrevoLite.Hardware.EcChargeLimitOverride.TrySet(percentForMode, out string orDetail);
+            if (orOk)
             {
                 MechrevoLite.Battery.BatteryControl.SetSelectedModePercent(percentForMode);
                 MechrevoLite.Battery.BatteryControl.chargeFull = percentForMode >= 100;
                 AppConfig.Set("charge_limit", percentForMode);
                 AppConfig.Flush();
             }
-            Logger.WriteLine($"[nuc-charge] 三档 mode={mode} {percentForMode}% ⇒ {nucOk} · {nucDetail}");
+            Logger.WriteLine($"[or-charge] 三档 mode={mode} {percentForMode}% ⇒ {orOk} · {orDetail}");
             ApplyBatteryModeHighlight(mode);
-            StatusText.Text = nucOk ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
+            StatusText.Text = orOk ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
             return;
         }
         // 无极限充 / EC 限充生效时，三档只作为 EC 上限值来源，写 EC 0x7B9，不发 GCU 档位。

@@ -2,8 +2,8 @@
 
 namespace MechrevoLite.Hardware;
 
-/// <summary>NUC/UMI 三档充电上限，沿用 OR/同方 EC 写法：0x7B9 上限、0x7D0 复充下限、0x770 平台覆盖复位。</summary>
-internal static class NucChargeLimit
+/// <summary>非 10/16/20/30 系的 EC 三档充电上限，按 OR 平台门控顺序写入。</summary>
+internal static class EcChargeLimitOverride
 {
     private const int UpperRegister = 1977;   // 0x7B9
     private const int LowerRegister = 2000;   // 0x7D0
@@ -22,7 +22,6 @@ internal static class NucChargeLimit
         }
         try
         {
-            // OR 顺序：平台 ID 0x7C3=0x04 开门，0x770 复位覆盖，0x7B9/0x7D0 写阈值，0x7A6 写档位。
             int mode = percent >= 95 ? 0x01 : percent <= 65 ? 0x21 : 0x11;
             bool platform = AcpiDriverEc.TryWriteByte(PlatformIdRegister,
                 percent < 95 ? (byte)0x04 : (byte)0x07);
