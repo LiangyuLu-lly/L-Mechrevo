@@ -15,6 +15,13 @@ internal static class NucGpuPower
     internal static bool TryApply(int ctgp, bool dbOn, int dbWatts, int? coreOffset, int? memoryOffset, out string detail)
     {
         detail = "";
+        string probe = Probe();
+        Logger.WriteLine("[nuc-gpu-probe] " + probe);
+        if (MechrevoLite.AppConfig.Get("nuc_gpu_apply", 0) != 1)
+        {
+            detail = "GPU参数已保存；硬件下发未启用（当前只有单版本假设，待探针确认）：" + probe;
+            return true;
+        }
         if (ctgp <= 0 && !dbOn && !coreOffset.HasValue && !memoryOffset.HasValue)
         {
             detail = "无 GPU 参数";
@@ -84,6 +91,28 @@ internal static class NucGpuPower
             }
         }
         return ok;
+    }
+
+    internal static string Probe()
+    {
+        static string Hex(int address)
+        {
+            return AcpiDriverEc.TryReadByte(address, out byte value) ? $"0x{address:X3}=0x{value:X2}" : $"0x{address:X3}=读取失败";
+        }
+        string nvml = "NVML不可用";
+        try
+        {
+            if (NvmlHelper.TryGetPowerLimitBounds(out int minimum, out int maximum, out int current))
+            {
+                nvml = $"NVML min={minimum} max={maximum} current={current}";
+            }
+        }
+        catch { }
+        return "cTGP/DB " + string.Join(" ", new[]
+        {
+            Hex(1859), Hex(1860), Hex(1861), Hex(1862),
+            Hex(1988), Hex(2004), Hex(2005)
+        }) + " · " + nvml;
     }
 
     private static bool SetControlBit(int bit, bool on, out string detail)
