@@ -220,6 +220,9 @@ public partial class FanCurveWindow : Window
                 }
                 bool ok = MechrevoLite.Hardware.NucFanTable.TryApply(
                     CpuCurve.Temperatures, cpu, GpuCurve.Temperatures, gpu, out string detail);
+                bool isolatedOk = MechrevoLite.Hardware.NucFanTable.TrySetFanIsolated(true, out string isolatedDetail);
+                ok = ok && isolatedOk;
+                detail += " " + isolatedDetail;
                 PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
                 PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
                 _dirty = false;

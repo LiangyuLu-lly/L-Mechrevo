@@ -20,6 +20,43 @@ internal static class NucFanTable
     private const int FanBoostClamp = 1873;
     private const int LatchBit = 0x04;
 
+    /// <summary>风扇 Ramp Rate：1927，0x80|步长 或 0x81（关闭）。</summary>
+    internal static bool TrySetFanRamp(bool enabled, int speedMs, out string detail)
+    {
+        detail = "";
+        int value = enabled
+            ? 0x80 | (Math.Clamp(speedMs, 100, 12700) / 100)
+            : 0x81;
+        if (!TryWrite(1927, value))
+        {
+            detail = "FanRamp 写入失败";
+            return false;
+        }
+        bool ok = TryRead(1927, out int after) && after == value;
+        detail = $"FanRamp=0x{value:X2} 回读=0x{after:X2}";
+        return ok;
+    }
+
+    /// <summary>Fan Isolated：1989 bit7，读改写保留其它位。</summary>
+    internal static bool TrySetFanIsolated(bool enabled, out string detail)
+    {
+        detail = "";
+        if (!TryRead(1989, out int current))
+        {
+            detail = "FanIsolated 读取失败";
+            return false;
+        }
+        int value = enabled ? (current | 0x80) : (current & ~0x80);
+        if (!TryWrite(1989, value))
+        {
+            detail = "FanIsolated 写入失败";
+            return false;
+        }
+        bool ok = TryRead(1989, out int after) && after == value;
+        detail = $"FanIsolated=0x{value:X2} 回读=0x{after:X2}";
+        return ok;
+    }
+
     internal static bool TryApply(byte[] cpuTemps, int[] cpuDuties, byte[] gpuTemps, int[] gpuDuties, out string detail)
     {
         detail = "";

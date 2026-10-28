@@ -886,6 +886,13 @@ public partial class CustomModeWindow : Window
                 MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
                 bool ok = MechrevoLite.Hardware.NucPerformanceMode.TryApplyCustom(
                     edited.Pl1, edited.Pl2, edited.Pl4, edited.TccTarget, out string detail);
+                bool rampOk = MechrevoLite.Hardware.NucFanTable.TrySetFanRamp(
+                    edited.FanSwitchSpeedOn == true, edited.FanSwitchSpeedMs ?? 300, out string rampDetail);
+                bool curveOn = edited.FanCurveOn != false
+                    && (edited.CpuFanDuty != null || edited.GpuFanDuty != null);
+                bool isolatedOk = MechrevoLite.Hardware.NucFanTable.TrySetFanIsolated(curveOn, out string isolatedDetail);
+                ok = ok && rampOk && isolatedOk;
+                detail += " " + rampDetail + " " + isolatedDetail;
                 _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
                 StatusText.Text = ok
                     ? "自定义功耗墙已应用：" + detail
