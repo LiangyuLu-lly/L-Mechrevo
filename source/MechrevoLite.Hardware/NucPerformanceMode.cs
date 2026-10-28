@@ -115,23 +115,32 @@ public static class NucPerformanceMode
     private static bool TryApplyModeLed(int visualMode, out string detail)
     {
         detail = "";
-        if (!TryRead(FanModeAddress, out int current) || current < 0 || current > 255)
+        // 原厂 Power LED 状态在 1957 低 2 位，不是 1963。
+        const int LedAddress = 1957;
+        if (!TryRead(LedAddress, out int current) || current < 0 || current > 255)
         {
             detail = "ModeLED 读取失败";
             return false;
         }
-        int ledCount = visualMode switch
+        int mode = visualMode switch
         {
-            2 => 0, // 静音
-            0 => 1, // 平衡
-            1 => 2, // 狂暴
+            0 => 2, // 平衡
+            1 => 1, // 狂暴
+            2 => 3, // 静音
             _ => 0
         };
-        int value = (current & 0xF0) | ledCount;
-        bool write = TryWrite(FanModeAddress, value);
-        bool read = TryRead(FanModeAddress, out int after);
-        detail = $"ModeLED={ledCount} 写入={write} 回读=0x{after:X2}";
-        return write && read && (after & 0x0F) == ledCount;
+        int ledBits = mode switch
+        {
+            1 => 1,
+            2 => 0,
+            3 => 2,
+            _ => 0
+        };
+        int value = (current & 0xFC) | ledBits;
+        bool write = TryWrite(LedAddress, value);
+        bool read = TryRead(LedAddress, out int after);
+        detail = $"ModeLED mode={mode} bits={ledBits} 写入={write} 回读=0x{after:X2}";
+        return write && read && (after & 0x03) == ledBits;
     }
 
     private static bool TryApplyFanMode(int visualMode, out string detail)
