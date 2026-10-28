@@ -131,7 +131,9 @@ internal sealed class BackendProbe : IDisposable
 
     internal int CurrentMode => _service?.CurrentMode ?? -1;
 
-    internal int BatteryMode => _hw?.BatteryProtection ?? -1;
+    private int _nucBatteryMode = -1;
+
+    internal int BatteryMode => _nucBatteryMode >= 0 ? _nucBatteryMode : (_hw?.BatteryProtection ?? -1);
 
     internal int GpuMode => _hw?.GpuMode ?? -1;
 
@@ -306,6 +308,13 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                bool ok = NucBatteryMode.TrySet(mode, out string detail);
+                Logger.WriteLine("[nuc-battery] " + detail);
+                if (ok) _nucBatteryMode = mode;
+                return ok;
+            }
             return _hw != null && await _hw.SetBatteryProtection(mode).ConfigureAwait(false);
         }
         catch
