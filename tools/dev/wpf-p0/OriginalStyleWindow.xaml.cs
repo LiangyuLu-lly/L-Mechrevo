@@ -4887,9 +4887,13 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            GpuSection.Visibility = (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap) ? Visibility.Visible : Visibility.Collapsed;
-            ScreenSection.Visibility = (caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming) ? Visibility.Visible : Visibility.Collapsed;
             MechrevoHw? hw = _backendProbe?.Hw;
+            bool umiGpuMode = hw?.IsUmiMachine == true && hw.IsGcuConnected;
+            bool nucNoGpuSwitch = hw?.IsIntelNucMachine == true;
+            GpuSection.Visibility = (!nucNoGpuSwitch && (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap || umiGpuMode))
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ScreenSection.Visibility = (caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming) ? Visibility.Visible : Visibility.Collapsed;
             bool hasKeyboard = caps.Keyboard || (hw?.SupportsKeyboard ?? false);
             bool hasLightbar = caps.Lightbar || (hw?.SupportsLightbar ?? false);
             bool hasLogo = caps.LogoLight || (hw?.SupportsLogoLight ?? false);
@@ -4954,7 +4958,7 @@ public partial class OriginalStyleWindow : Window
         GpuEcoColumn.Width = GpuEcoButton.Visibility == Visibility.Visible
             ? new GridLength(1, GridUnitType.Star)
             : new GridLength(0);
-        if (GpuEcoButton.Visibility == Visibility.Visible)
+        if (GpuEcoButton.Visibility == Visibility.Visible && hw?.IsIntelNucMachine != true)
         {
             GpuSection.Visibility = Visibility.Visible;
         }

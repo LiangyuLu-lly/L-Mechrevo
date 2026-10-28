@@ -2447,6 +2447,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	public bool CanSwitchGpuMode(int mode)
 	{
+		// UMI 30 系有显卡模式切换硬件，但能力位可能不上报；只放两档（混合/直连）。
+		if (IsUmiMachine && IsGcuConnected && (mode == 1 || mode == 2))
+		{
+			return true;
+		}
 		return mode switch
 		{
 			0 => SupportsDgpuDirect || SupportsIgpuOnly, 
@@ -10479,8 +10484,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// 回退（2026-10-03）：热切换执行停用（与核显省电重叠），统一走重启后应用
 		// 2026-10-03：热切换执行已删除（与核显省电功能重叠）
-		bool useMuxTarget = mode == 0 && SupportsDgpuDirect && !SupportsIgpuOnly;
-		GpuRouteCommand gpuRouteCommand = GpuRouteCommandLayer.BuildSwitchCommand(mode, SupportsDgpuDirect, SupportsIgpuOnly, DgpuGeneration);
+		bool umiGpuSwitch = IsUmiMachine && IsGcuConnected;
+		bool supportsDgpuDirect = SupportsDgpuDirect || umiGpuSwitch;
+		bool useMuxTarget = mode == 0 && supportsDgpuDirect && !SupportsIgpuOnly;
+		GpuRouteCommand gpuRouteCommand = GpuRouteCommandLayer.BuildSwitchCommand(mode, supportsDgpuDirect, SupportsIgpuOnly, DgpuGeneration);
 		if ((object)gpuRouteCommand == null)
 		{
 			Logger.WriteLine($"SetGpuMode({mode}) rejected: action not in dGPU generation {DgpuGeneration} vocabulary");
