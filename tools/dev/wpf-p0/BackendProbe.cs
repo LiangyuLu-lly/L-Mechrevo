@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using MechrevoLite;
 using MechrevoLite.Hardware;
+using MechrevoLite.Helpers;
 
 namespace L_Mechrevo.WpfP0;
 
@@ -378,6 +379,12 @@ internal sealed class BackendProbe : IDisposable
             if (L_Mechrevo.WpfP0.Services.VirtualDisplayBlankService.TryHandleQuickSwitch(key, on, out bool blankConfirmed))
             {
                 return blankConfirmed;
+            }
+            if (string.Equals(key, "winupdate", StringComparison.OrdinalIgnoreCase))
+            {
+                WindowsUpdateGuard.Result result = WindowsUpdateGuard.SetDisabled(on);
+                Logger.WriteLine("[winupdate] " + (on ? "禁用" : "恢复") + " · " + result.UserDetail());
+                return result.Ok;
             }
             if (_service == null)
             {
@@ -802,9 +809,13 @@ internal sealed class BackendProbe : IDisposable
 
     internal bool QuickState(string key)
     {
-        if (_hw == null)
+        if (_hw == null && !string.Equals(key, "winupdate", StringComparison.OrdinalIgnoreCase))
         {
             return false;
+        }
+        if (string.Equals(key, "winupdate", StringComparison.OrdinalIgnoreCase))
+        {
+            return WindowsUpdateGuard.IsDisabled() == true;
         }
         bool? system = ReadSystemQuick(key);
         if (system.HasValue)
