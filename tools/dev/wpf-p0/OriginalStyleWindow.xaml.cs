@@ -2909,7 +2909,18 @@ public partial class OriginalStyleWindow : Window
         _backendProbe?.MarkUserModeSwitch();
         try
         {
-            MechrevoService.ModeSwitchResult result = await DashboardCommands.SetPerformanceModeResultAsync(mode);
+            bool nucDirect = (_backendProbe?.Hw?.IsIntelNucMachine ?? false) || (_backendProbe?.Hw?.IsUmiMachine ?? false);
+            MechrevoService.ModeSwitchResult result;
+            if (nucDirect)
+            {
+                bool applied = MechrevoLite.Hardware.NucPerformanceMode.TryApply(mode, out string detail);
+                Logger.WriteLine("[nuc-mode] 直写 EC " + (applied ? "OK" : "FAIL") + "：" + detail);
+                result = applied ? MechrevoService.ModeSwitchResult.Ok : MechrevoService.ModeSwitchResult.Failed;
+            }
+            else
+            {
+                result = await DashboardCommands.SetPerformanceModeResultAsync(mode);
+            }
             if (request != _modeRequestId)
             {
                 return;
@@ -2960,7 +2971,10 @@ public partial class OriginalStyleWindow : Window
                     // 自定义配置里的 WindowsPowerMode 会覆盖高性能电源的默认映射。
                     MechrevoLite.Mode.PerfModeService.Instance?.ApplyWindowsPowerOverlayForActiveMode();
                 }
-                SyncGpuDbForMode(mode, "WPF 切档");
+                if (!nucDirect)
+                {
+                    SyncGpuDbForMode(mode, "WPF 切档");
+                }
                 SyncCustomWindowMode(mode);
                 RefreshWideCustomEditor();
             }
