@@ -32,7 +32,10 @@ internal static class VirtualDisplayBlank
 	internal const int PollIntervalMs = 100;
 
 	/// <summary>鼠标位移超过该值（像素）视为用户动作，恢复显示。</summary>
-	internal const int MouseMoveThresholdPx = 5;
+	internal const int MouseMoveThresholdPx = 20;
+
+	/// <summary>切换拓扑后的输入稳定期：忽略显示器切换本身造成的鼠标坐标抖动。</summary>
+	internal const int InputGraceMs = 1500;
 
 	internal const int TopologySwitchDelayMs = 300;
 
@@ -454,17 +457,32 @@ internal static class VirtualDisplayBlank
 	/// </summary>
 	private static void WaitForExitCondition()
 	{
+		// displayswitch 切换拓扑时鼠标坐标会跳变；先等输入稳定，再取基准点。
+		Thread.Sleep(InputGraceMs);
 		POINT initial;
 		GetCursorPos(out initial);
+		int stableSamples = 0;
 		while (true)
 		{
 			Thread.Sleep(PollIntervalMs);
 			POINT current;
 			GetCursorPos(out current);
-			if (Math.Abs(current.X - initial.X) > MouseMoveThresholdPx || Math.Abs(current.Y - initial.Y) > MouseMoveThresholdPx)
+			bool moved = Math.Abs(current.X - initial.X) > MouseMoveThresholdPx
+				|| Math.Abs(current.Y - initial.Y) > MouseMoveThresholdPx;
+			if (moved)
 			{
-				return;
+				stableSamples++;
+				if (stableSamples >= 2)
+				{
+					Logger.WriteLine("Screen blank: mouse movement detected, restoring display.");
+					return;
+				}
 			}
+			else
+			{
+				stableSamples = 0;
+			}
+			initial = current;
 			if ((DateTime.UtcNow - _blankStartedUtc) > MaxBlankDuration)
 			{
 				Logger.WriteLine("Screen blank: watchdog reached (" + MaxBlankDuration.TotalMinutes + "min), forcing restore.");
