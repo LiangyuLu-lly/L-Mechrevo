@@ -38,6 +38,48 @@ public static class IccHelper
 		{
 			Directory.CreateDirectory(CustomIccDir);
 			MigrateLegacyCustomIccOnce();
+			ImportBundledIccFromProgramDir();
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>程序目录或程序目录\ICC 下自带的 ICC，首次发现时复制到用户 customICC。</summary>
+	private static void ImportBundledIccFromProgramDir()
+	{
+		try
+		{
+			string[] dirs =
+			{
+				AppContext.BaseDirectory,
+				Path.Combine(AppContext.BaseDirectory, "ICC"),
+				Path.Combine(AppContext.BaseDirectory, "customICC")
+			};
+			foreach (string dir in dirs)
+			{
+				if (!Directory.Exists(dir))
+				{
+					continue;
+				}
+				foreach (string file in Directory.EnumerateFiles(dir, "*.icm").Concat(Directory.EnumerateFiles(dir, "*.icc")))
+				{
+					string name = Path.GetFileName(file);
+					string dest = Path.Combine(CustomIccDir, name);
+					if (File.Exists(dest))
+					{
+						continue;
+					}
+					try
+					{
+						File.Copy(file, dest, overwrite: false);
+						Logger.WriteLine("已导入程序目录 ICC: " + name);
+					}
+					catch
+					{
+					}
+				}
+			}
 		}
 		catch
 		{
