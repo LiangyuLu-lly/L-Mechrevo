@@ -1,3 +1,4 @@
+using System.Diagnostics;
 ﻿using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -3562,6 +3563,11 @@ public partial class OriginalStyleWindow : Window
             RefreshFromBackend();
             return;
         }
+        if (_backendProbe.Hw?.IsUmiMachine == true)
+        {
+            await SwitchUmiGpuColdAsync(mode, button);
+            return;
+        }
         if (_backendProbe.IsBaolongda)
         {
             if (mode == 0)
@@ -3655,6 +3661,66 @@ public partial class OriginalStyleWindow : Window
             if (_services != null) { _services.Gpu.ClearRestartPending(); } else { _backendProbe.ClearGpuRestartPending(); }
         }
         StatusText.Text = ok ? WpfStrings.GpuModeSentRestart : WpfStrings.GpuModeFailed;
+        RefreshFromBackend();
+    }
+
+    private async Task SwitchUmiGpuColdAsync(int mode, ToggleButton button)
+    {
+        if (_backendProbe == null || (mode != 1 && mode != 2))
+        {
+            return;
+        }
+        string modeName = button.Content?.ToString() ?? (WpfStrings.ModeNamePrefix + mode);
+        _gpuPromptOpen = true;
+        foreach (ToggleButton item in new[] { GpuEcoButton, GpuHybridButton, GpuDirectButton })
+        {
+            item.IsChecked = ReferenceEquals(item, button);
+        }
+        HighlightSegment(button);
+        GpuRestartPromptWindow prompt = new GpuRestartPromptWindow(modeName) { Owner = this };
+        try
+        {
+            prompt.ShowDialog();
+        }
+        finally
+        {
+            _gpuPromptOpen = false;
+        }
+        if (prompt.Result == GpuPromptResult.Cancel)
+        {
+            RefreshFromBackend();
+            return;
+        }
+        bool ok = MechrevoLite.Hardware.UefiGpuMux.TryWriteColdMode(mode, out string detail);
+        Logger.WriteLine("[gpu-mux] UMI cold switch " + (ok ? "OK" : "FAIL") + "：" + detail);
+        if (!ok)
+        {
+            StatusText.Text = "UEFI 显卡模式写入失败：" + detail;
+            RefreshFromBackend();
+            return;
+        }
+        if (_services != null) { _services.Gpu.MarkRestartPending(mode); } else { _backendProbe.MarkGpuRestartPending(mode); }
+        UpdateGpuButtons(mode, pending: true);
+        if (prompt.Result == GpuPromptResult.SwitchAndRestart)
+        {
+            StatusText.Text = "已写入 NVRAM，即将重启切换显卡模式";
+            try
+            {
+                Process.Start(new ProcessStartInfo("shutdown.exe", "/r /f /t 5")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "NVRAM 已写入，但重启失败：" + ex.Message;
+            }
+        }
+        else
+        {
+            StatusText.Text = "已写入 NVRAM，重启后切换显卡模式：" + detail;
+        }
         RefreshFromBackend();
     }
 
