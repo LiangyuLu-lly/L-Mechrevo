@@ -2595,7 +2595,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		get
 		{
 			bool oldPredicate = SupportsFanBoost || UsesBaolongda;
-			bool visible = oldPredicate || WujieSmuApu;
+			// NUC/UMI 的强冷走本地 EC 0x751 bit6，不依赖 GCU 能力位。
+			bool visible = oldPredicate || WujieSmuApu || IsIntelNucMachine || IsUmiMachine;
 			string message = "[fan] 强冷可见性：backend=" + ActiveBackend + " · caps.FanBoost=" + Capabilities.FanBoost
 				+ " · 旧判据=" + oldPredicate + " ⇒ visible=" + visible;
 			if (Logger.TryMarkChanged("fan-boost-visible", message))

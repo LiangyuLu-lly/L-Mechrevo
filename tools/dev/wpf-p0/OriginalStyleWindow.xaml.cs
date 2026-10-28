@@ -2916,7 +2916,13 @@ public partial class OriginalStyleWindow : Window
             MechrevoService.ModeSwitchResult result;
             if (nucDirect)
             {
+                int previousMode = ResolveDisplayMode(_backendProbe);
                 bool applied = MechrevoLite.Hardware.NucPerformanceMode.TryApply(mode, out string detail);
+                if (previousMode == 3 && mode != 3)
+                {
+                    bool fanRestored = MechrevoLite.Hardware.NucFanTable.TryRestoreDefault(out string fanDetail);
+                    detail += " 退出自定义风扇恢复=" + fanRestored + " " + fanDetail;
+                }
                 Logger.WriteLine("[nuc-mode] 直写 EC " + (applied ? "OK" : "FAIL") + "：" + detail);
                 result = applied ? MechrevoService.ModeSwitchResult.Ok : MechrevoService.ModeSwitchResult.Failed;
             }
@@ -2992,6 +2998,7 @@ public partial class OriginalStyleWindow : Window
                 _modeSwitchInFlight = false;
                 RefreshPerfConfigSelections();
                 RefreshFromBackend();
+                _wideWindow?.RefreshFromOwner();
             }
         }
     }
@@ -3043,8 +3050,14 @@ public partial class OriginalStyleWindow : Window
         }
         if (hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true)
         {
-            int local = VisualModeForId(MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId
-                ?? MechrevoLite.Mode.PerfModeStore.ActiveModeId);
+            // NUC/UMI 的直写模式以 ActiveModeId 为权威；
+            // DisplayedModeId 可能仍停在 PerfModeService 的旧档，导致性能键永远从同一档开始。
+            string? localId = MechrevoLite.Mode.PerfModeStore.ActiveModeId;
+            if (string.IsNullOrWhiteSpace(localId))
+            {
+                localId = MechrevoLite.Mode.PerfModeService.Instance?.DisplayedModeId;
+            }
+            int local = VisualModeForId(localId);
             if (local >= 0)
             {
                 return local;

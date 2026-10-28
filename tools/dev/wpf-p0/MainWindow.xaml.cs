@@ -1234,6 +1234,28 @@ public partial class MainWindow : Window
         DisplayInfoRow.Children.Add(_autoRefresh);
         _autoRefresh.Click += (_, _) => _owner?.WideSetAutoRefresh(_autoRefresh.IsChecked == true);
         DisplayDetailsPanel.Children.Add(brightnessRow);
+        if (_owner.SupportsMiniled)
+        {
+            StackPanel miniledRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+            miniledRow.Children.Add(new TextBlock
+            {
+                Text = "MiniLED 分区控光",
+                Style = (Style)FindResource("MutedText"),
+                Width = 110,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            CheckBox miniled = new()
+            {
+                Content = "开启",
+                Style = (Style)FindResource("HeaderSwitch"),
+                IsChecked = _owner.MiniledOn,
+                Margin = new Thickness(0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            miniled.Click += (_, _) => _owner.ToggleMiniled();
+            miniledRow.Children.Add(miniled);
+            DisplayDetailsPanel.Children.Add(miniledRow);
+        }
     }
 
     private void BuildRefreshRateButtons(int[] rates, int currentHz)
@@ -1880,10 +1902,13 @@ public partial class MainWindow : Window
         {
             return;
         }
-        bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings)
-            && !(_probe?.Hw?.SupportsModeProfileConfig ?? false);
+        bool nucUmi = _probe?.Hw?.IsIntelNucMachine == true || _probe?.Hw?.IsUmiMachine == true;
+        bool nucNoGpu = _probe?.Hw?.IsIntelNucMachine == true;
+        bool customAllowed = nucUmi
+            || ((caps.CpuPerformanceTuning || caps.FanSettings)
+                && !(_probe?.Hw?.SupportsModeProfileConfig ?? false));
         HomePerf自定义.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
-        bool gpuSupported = caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap;
+        bool gpuSupported = !nucNoGpu && (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap);
         HomeGpuCard.Visibility = gpuSupported ? Visibility.Visible : Visibility.Collapsed;
         HomeGpuColumn.Width = gpuSupported ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         HomeMidColumn.Width = gpuSupported ? new GridLength(12) : new GridLength(0);
@@ -2107,6 +2132,11 @@ public partial class MainWindow : Window
         {
             _liquidLightColorButton.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(color.A, color.R, color.G, color.B));
         }
+    }
+
+    internal void RefreshFromOwner()
+    {
+        RefreshHomeExtras();
     }
 
     internal void RefreshLiquidCooling()

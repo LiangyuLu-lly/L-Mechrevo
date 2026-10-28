@@ -133,14 +133,18 @@ internal static class NucQuickSwitches
     internal static bool TrySetFanBoost(bool on, out bool confirmed)
     {
         confirmed = false;
-        // NUC/UMI 30 系是 legacy dual-mode：0x50=强冷开，0x10=强冷关；
-        // 40/50 系才是 bit6 (0x40) 置位。不能用同一套位操作。
-        int target = on ? 0x50 : 0x10;
+        // NUC/UMI 30 官方 SetEcFanBoost：开写 0x40，关写 0x00；
+        // 保留同字节其它位，避免踩到 Q-Key/其它 clamp 状态。
+        if (!TryRead(FanBoostAddress, out int current))
+        {
+            return false;
+        }
+        int target = on ? (current | 0x40) : (current & ~0x40);
         if (!TryWrite(FanBoostAddress, target))
         {
             return false;
         }
-        confirmed = TryRead(FanBoostAddress, out int after) && after == target;
+        confirmed = TryRead(FanBoostAddress, out int after) && ((after & 0x40) != 0) == on;
         return confirmed;
     }
 
