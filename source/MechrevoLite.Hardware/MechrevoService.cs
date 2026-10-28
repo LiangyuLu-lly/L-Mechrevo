@@ -2979,6 +2979,50 @@ public class MechrevoService
 			{
 				return false;
 			}
+			// NUC/UMI 的 Fn 锁 / 摄像头 / Win 键锁走 ACPI EC，不经过 GCU 能力位。
+			if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+			{
+				if (string.Equals(key, "fnkey", StringComparison.Ordinal))
+				{
+					bool nucOk = NucQuickSwitches.TrySetFnLock(on, out bool nucConfirmed);
+					_hw.QuickSwitches["fnkey"] = nucConfirmed ? on : _hw.QuickSwitches.TryGetValue("fnkey", out bool oldFn) && oldFn;
+					Logger.WriteLine($"SwitchQuick(fnkey,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={nucConfirmed}");
+					return nucConfirmed;
+				}
+				if (string.Equals(key, "webcam", StringComparison.Ordinal))
+				{
+					bool nucOk = NucQuickSwitches.TrySetCamera(on, out bool nucConfirmed);
+					if (nucOk)
+					{
+						_hw.QuickSwitches["webcam"] = on;
+						Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={nucConfirmed}");
+						return nucConfirmed;
+					}
+					// EC 断电位不可用时退回 Windows PnP，不落回 GCU MQTT。
+					if (CameraPnpControl.HasCamera)
+					{
+						(bool camOk, string camDetail) = await Task.Run(() =>
+						{
+							bool ok = CameraPnpControl.TrySetEnabled(on, out bool _, out string detail);
+							return (ok, detail);
+						}).ConfigureAwait(continueOnCapturedContext: false);
+						if (camOk) _hw.QuickSwitches["webcam"] = on;
+						Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI Windows PnP ⇒ 确认={camOk}（{camDetail}）");
+						return camOk;
+					}
+					return false;
+				}
+				if (string.Equals(key, "winkey", StringComparison.Ordinal))
+				{
+					bool nucOk = NucQuickSwitches.TrySetWinKeyLock(on, out bool nucConfirmed);
+					if (nucOk)
+					{
+						_hw.QuickSwitches["winkey"] = on;
+					}
+					Logger.WriteLine($"SwitchQuick(winkey,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={nucConfirmed}");
+					return nucConfirmed;
+				}
+			}
 			// ⭐⭐ 2026-10-16（宝龙达 · 窄范围）：⭐ **Fn 键锁 / 触摸板 走 WMI**（⭐ 它没有 GCU ✅）
 			//   ⭐ 依据：⭐ 真机诊断包已回读到 ⭐ `Fn锁=0` ✅ / ⭐ `触摸板=1` ✅ ⇒ ⭐ **硬件支持** ✅
 			//   ⭐ 模板：⭐ 与档位/LOGO/键盘灯/功耗墙/显卡模式**同一套**（⭐ 非宝龙达恒 false ⇒ 下面原路 ✅）

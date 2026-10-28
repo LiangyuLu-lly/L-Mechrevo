@@ -4409,6 +4409,10 @@ public partial class OriginalStyleWindow : Window
         BackendLine.Text = probe.Snapshot();
         UpdateTraySensorTooltip(probe);
         HookHardwareState(probe.Hw);
+        if (probe.Hw.IsIntelNucMachine || probe.Hw.IsUmiMachine)
+        {
+            MechrevoLite.Hardware.NucQuickSwitches.Sync(probe.Hw);
+        }
         EnsurePerformanceKeyService();
         try
         {
