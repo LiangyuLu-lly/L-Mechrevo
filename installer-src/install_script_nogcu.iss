@@ -1,22 +1,22 @@
-; Created by "innounp" version 2.67.11
+﻿; Created by "innounp" version 2.67.11
 ; Setup file: pkg-20260919-195709-a076c697.exe
 ; Inno Setup Version: 6.7.0 (Unicode)
 
 [Setup]
 AppName=L-Mechrevo
-AppVerName=L-Mechrevo 0.291.5 beta22.5 (NoGCU)
+AppVerName=L-Mechrevo 0.293.6.1 beta23.6.1 (NoGCU)
 AppId={{8F4E2C71-9B3A-4D6E-A1C2-7E5B9D0F3A64}
-AppVersion=0.291.5
+AppVersion=0.293.6.1
 AppPublisher=L-Mechrevo contributors
 AppCopyright=Copyright (C) 2026 L-Mechrevo contributors. GPL-3.0-only.
 DefaultDirName={autopf}\L-Mechrevo
 DefaultGroupName=L-Mechrevo
-OutputBaseFilename=LM-0.291.5-beta22.5-NoGCU-setup
+OutputBaseFilename=LM-0.293.6.1-beta23.6.1-NoGCU-setup
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
-VersionInfoVersion=0.291.5
-VersionInfoProductVersion=0.291.5
-UninstallDisplayName=L-Mechrevo 0.291.5 beta22.5 (NoGCU)
+VersionInfoVersion=0.293.6.1
+VersionInfoProductVersion=0.293.6.1
+UninstallDisplayName=L-Mechrevo 0.293.6.1 beta23.6.1 (NoGCU)
 Compression=lzma2
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -34,6 +34,18 @@ Source: "files\BlackSharp.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "files\DiskInfoToolkit.dll"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\HidSharp.dll"; DestDir: "{app}"; Flags: ignoreversion 
+Source: "files\MechrevoLite.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "files\MechrevoLite.Core.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "files\PawnIO\*"; DestDir: "{app}\PawnIO"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "files\UWACPIDriver\*"; DestDir: "{app}\UWACPIDriver"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "files\Install-PawnIO.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "files\GCU\Install-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion
+Source: "files\GCU\Select-GcuPayload.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion
+Source: "files\GCU\Uninstall-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversion
+Source: "files\GCU\7za.exe"; DestDir: "{app}\GCU"; Flags: ignoreversion
+Source: "files\GCU\logo\Language\*.json"; DestDir: "{app}\GCU\logo\Language"; Flags: ignoreversion
+Source: "files\GCU\shared\README.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion
+Source: "files\GCU\shared\NOTICE.txt"; DestDir: "{app}\GCU"; Flags: ignoreversion
 Source: "files\L-Mechrevo.deps.json"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\L-Mechrevo.dll"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "files\L-Mechrevo.dll.config"; DestDir: "{app}"; Flags: ignoreversion 
@@ -247,6 +259,62 @@ begin
   end;
 end;
 
+procedure InstallExternalGcuIfPresent();
+var
+  SourceArchive, SourceFolder, Staging, SevenZip, Script, Params: String;
+  ResultCode: Integer;
+begin
+  SourceArchive := ExpandConstant('{src}\GCU.7z');
+  SourceFolder := ExpandConstant('{src}\GCU');
+  if not FileExists(SourceArchive) and not DirExists(SourceFolder) then
+    Exit;
+
+  Staging := ExpandConstant('{tmp}\lm-external-gcu');
+  ForceDirectories(Staging);
+  SevenZip := ExpandConstant('{app}\GCU\7za.exe');
+  if FileExists(SourceArchive) then
+  begin
+    if not FileExists(SevenZip) then
+    begin
+      Log('LM-GCU: 7za.exe 缺失，跳过外置 GCU 包');
+      Exit;
+    end;
+    if not Exec(SevenZip, 'x -y -o"' + Staging + '" "' + SourceArchive + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+    begin
+      Log('LM-GCU: 外置 GCU.7z 解压失败，跳过');
+      Exit;
+    end;
+  end
+  else
+    Staging := SourceFolder;
+
+  // Install-Gcu.ps1 需要 StagingRoot 下有 payload 和 7za.exe。
+  if not DirExists(Staging + '\payload') then
+  begin
+    Log('LM-GCU: 外置目录没有 payload，跳过');
+    Exit;
+  end;
+  if FileExists(SevenZip) then
+    CopyFile(SevenZip, Staging + '\7za.exe', False);
+
+  Script := ExpandConstant('{app}\GCU\Install-Gcu.ps1');
+  if not FileExists(Script) then
+  begin
+    Log('LM-GCU: Install-Gcu.ps1 缺失，跳过');
+    Exit;
+  end;
+  Params := '-NoProfile -ExecutionPolicy Bypass -File "' + Script + '"' +
+    ' -StagingRoot "' + Staging + '"' +
+    ' -TargetDir "' + ExpandConstant('{app}\GCU') + '"' +
+    ' -Variant Auto -InstallerVersion "18.3"' +
+    ' -LogDir "' + ExpandConstant('{commonappdata}\L-Mechrevo\logs') + '"' +
+    ' -AppExe "' + ExpandConstant('{app}\L-Mechrevo.exe') + '"';
+  if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Log('LM-GCU: 外置 GCU 安装退出码=' + IntToStr(ResultCode))
+  else
+    Log('LM-GCU: 外置 GCU 安装启动失败');
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
@@ -256,6 +324,7 @@ begin
       Log('LM-UPDATE: 安装日志已保存到 {app}\install.log')
     else
       Log('LM-UPDATE: 安装日志复制失败');
+    InstallExternalGcuIfPresent();
   end;
 end;
 
