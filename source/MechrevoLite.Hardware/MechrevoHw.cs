@@ -156,6 +156,7 @@ public class MechrevoHw : IDisposable
 	// 后端选择：唯一真源是 MechrevoBackendOrder.Candidates（有序候选表），本处只存**结果**。
 	// ⭐ 加新后端（例如宝龙达）只需在候选表里加一项，本文件不用改任何 else/if。
 	private MechrevoBackendKind _activeBackend;
+	private bool _nucLocalReady;
 
 	// 老机型 WMI 后端（root\WMI:MICommonInterface）。⚠️ 字段与职责对照《差异与合并计划》A-22。
 	private bool _allowLegacyProbe;
@@ -1921,7 +1922,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⚠️ 判据是**后端在不在**，不是"有没有跟 GCU 说过话"：老接口在而 GCU 从未连上时本属性为 true
 	/// ⇒ 依赖 GCU 上报的功能仍必须各自用 <see cref="IsGcuConnected" /> / 能力位把关（已逐点分类，见本轮报告 ②）。
 	/// </summary>
-	public bool IsConnected => UsesBuiltInModes || IsGcuConnected;
+	public bool IsConnected => UsesBuiltInModes || IsGcuConnected || _nucLocalReady;
+
+	internal void MarkNucLocalReady()
+	{
+		_nucLocalReady = true;
+	}
 
 	/// <summary>
 	/// 2026-10-15（C-1 第 2 步）：本会话是否在用**老机型 WMI 后端**（<c>root\WMI:MICommonInterface</c>）。
@@ -7637,6 +7643,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				// 区分"被误判成老机型"与"确实走的是 GCU 通路、连不上另有原因"。
 				// 注：级别过滤下（默认 error）本行不进日志，用户可见的信号是顶部状态：非 GCU 后端显示「● 已就绪」。
 				Logger.WriteLine($"Hardware backend: GCU (MQTT). IsGcuServiceInstalled={IsGcuServiceInstalled}, legacyProbe={kind}");
+			}
+			// NUC/UMI 直接走本地 ACPI/EC：不再尝试连接 GCU/MQTT。
+			if (IsIntelNucMachine || IsUmiMachine)
+			{
+				Logger.WriteLine("[backend] NUC/UMI 本地 ACPI 模式：跳过 GCU/MQTT");
+				MarkNucLocalReady();
+				return true;
 			}
 			if (UsesBuiltInModes)
 			{

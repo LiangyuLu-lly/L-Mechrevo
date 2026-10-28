@@ -65,6 +65,7 @@ internal sealed class BackendProbe : IDisposable
                 return false;
             }
             _service ??= new MechrevoService(_hw);
+            _hw.MarkNucLocalReady();
             Connected = true;
             LastError = "";
             Logger.WriteLine("[backend] NUC/UMI 本地 ACPI/EC 就绪（GCU 未连接）");
