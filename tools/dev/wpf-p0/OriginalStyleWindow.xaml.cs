@@ -4902,7 +4902,10 @@ public partial class OriginalStyleWindow : Window
   _services?.Lighting.ApplyHardwareLightIdleTimer();
   L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.ApplyKeyboardAutoOffSetting();
   SyncLightSwitchesFromHardware();
-  bool customAllowed = (caps.CpuPerformanceTuning || caps.FanSettings) && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false);
+  bool nucUmiModeUi = _backendProbe?.Hw?.IsIntelNucMachine == true || _backendProbe?.Hw?.IsUmiMachine == true;
+            bool customAllowed = nucUmiModeUi
+                || ((caps.CpuPerformanceTuning || caps.FanSettings)
+                    && !(_backendProbe?.Hw?.SupportsModeProfileConfig ?? false));
             CustomModeButton.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
             // 原版只保证静音/平衡；部分 30 系机型没有狂暴档 ⇒ 隐藏狂暴按钮，30 系配置行随之隐藏。
             // 仅 Intel NUC/UMI 的原厂控制台在 TurboModeSupport=0 时仍提供三档；
@@ -4914,7 +4917,8 @@ public partial class OriginalStyleWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
             bool silentTurboAllowed = caps.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported
-                || UiQaShowAll.Enabled;
+                || UiQaShowAll.Enabled
+                || nucUmiModeUi;
             EnsureSilentTurboButton(silentTurboAllowed);
             if (TurboModeButton.Content is TextBlock turboLabel)
             {
@@ -5437,7 +5441,8 @@ public partial class OriginalStyleWindow : Window
     private void RefreshPerfConfigVisibility(int currentMode)
     {
         MechrevoHw? hw = _backendProbe?.Hw;
-        bool profileConfig = hw?.SupportsModeProfileConfig == true;
+        bool profileConfig = hw?.SupportsModeProfileConfig == true
+                && !(hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true);
         bool show = profileConfig && currentMode >= 0 && currentMode <= 2;
         // 30 系配置下拉必须和对应性能模式按钮一起显隐；部分 30 系只有静音/平衡两档。
         PerfConfigSilentGroup.Visibility = SilentModeButton.Visibility;
