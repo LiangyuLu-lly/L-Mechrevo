@@ -4893,6 +4893,13 @@ public partial class OriginalStyleWindow : Window
         {
             return;
         }
+        // NUC/UMI 的多数功能走本地 ACPI/EC，不依赖 GCU；GCU 未连接也按“已就绪”显示。
+        if (!probe.IsGcuConnected
+            && (probe.Hw?.IsIntelNucMachine == true || probe.Hw?.IsUmiMachine == true))
+        {
+            SetBackendStatus(WpfStrings.BackendNonGcuReady, "#4ADE80", "NUC/UMI 直接 ACPI/EC 模式已就绪（无需 GCU）");
+            return;
+        }
         if (_services?.BackendStatus.IsNonGcuBackend ?? probe.IsNonGcuBackend)
         {
             bool ready = _services?.BackendStatus.Connected ?? probe.Connected;
