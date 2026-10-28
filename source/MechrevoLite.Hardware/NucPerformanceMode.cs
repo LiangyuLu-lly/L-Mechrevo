@@ -64,13 +64,15 @@ public static class NucPerformanceMode
         bool write3 = TryWrite(Pl4WriteAddress, pl4);
         // 模式切换只写功耗墙；风扇模式/强冷/DState 不在这里自动写，
         // 避免不同 NUC/UMI EC 语义下把风扇推到全速。
+        // 性能键/电源灯：1963 低 4 位对应 静音=0、平衡=1、狂暴=2 个灯。
+        bool led = TryApplyModeLed(visualMode, out string ledDetail);
         // 非自定义档：清除 Custom Mode 标志，交还 EC 原生模式。
         TryWrite(1798, 64);
         bool read1 = TryRead(Pl1WriteAddress, out int rb1);
         bool read2 = TryRead(Pl2WriteAddress, out int rb2);
         bool read3 = TryRead(Pl4WriteAddress, out int rb3);
-        detail += $"PL1={pl1} PL2={pl2} PL4={pl4} 写入={write1 && write2 && write3} 回读={rb1}/{rb2}/{rb3}";
-        return write1 && write2 && write3 && read1 && read2 && read3 && rb1 == pl1 && rb2 == pl2 && rb3 == pl4;
+        detail += $"PL1={pl1} PL2={pl2} PL4={pl4} 写入={write1 && write2 && write3} 回读={rb1}/{rb2}/{rb3} " + ledDetail;
+        return write1 && write2 && write3 && read1 && read2 && read3 && led && rb1 == pl1 && rb2 == pl2 && rb3 == pl4;
     }
 
     /// <summary>自定义档：PL1/PL2/PL4 直接写自定义 EC 槽（1923/1924/1925）。</summary>
@@ -108,6 +110,28 @@ public static class NucPerformanceMode
         }
         detail = $"自定义 PL1={p1} PL2={p2} PL4={p4} 写入={w1 && w2 && w3} 回读={rb1}/{rb2}/{rb3}";
         return w1 && w2 && w3 && r1 && r2 && r3 && rb1 == p1 && rb2 == p2 && rb3 == p4;
+    }
+
+    private static bool TryApplyModeLed(int visualMode, out string detail)
+    {
+        detail = "";
+        if (!TryRead(FanModeAddress, out int current) || current < 0 || current > 255)
+        {
+            detail = "ModeLED 读取失败";
+            return false;
+        }
+        int ledCount = visualMode switch
+        {
+            2 => 0, // 静音
+            0 => 1, // 平衡
+            1 => 2, // 狂暴
+            _ => 0
+        };
+        int value = (current & 0xF0) | ledCount;
+        bool write = TryWrite(FanModeAddress, value);
+        bool read = TryRead(FanModeAddress, out int after);
+        detail = $"ModeLED={ledCount} 写入={write} 回读=0x{after:X2}";
+        return write && read && (after & 0x0F) == ledCount;
     }
 
     private static bool TryApplyFanMode(int visualMode, out string detail)
