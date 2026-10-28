@@ -138,6 +138,18 @@ public partial class CustomModeWindow : Window
         }
 }
 
+    private void ContentScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Handled || ContentScroll == null)
+        {
+            return;
+        }
+        // 鼠标在 Slider / ComboBox 上时，子控件会把滚轮吃掉；这里统一转发给外层页面，
+        // 保证自定义界面任意位置滚轮都能上下滚动。
+        ContentScroll.ScrollToVerticalOffset(ContentScroll.VerticalOffset - e.Delta);
+        e.Handled = true;
+    }
+
     private void MarkDirty()
     {
         if (_loadingUi || _firmwareMode || _current == null)
