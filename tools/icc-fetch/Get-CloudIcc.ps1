@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$OutDir = (Join-Path $PSScriptRoot 'downloads')
+    [string]$OutDir = $PSScriptRoot
 )
 $ErrorActionPreference = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
