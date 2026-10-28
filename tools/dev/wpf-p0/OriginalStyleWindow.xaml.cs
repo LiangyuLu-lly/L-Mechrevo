@@ -4983,7 +4983,8 @@ public partial class OriginalStyleWindow : Window
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             ScreenSection.Visibility = (caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming) ? Visibility.Visible : Visibility.Collapsed;
-            bool hasKeyboard = caps.Keyboard || (hw?.SupportsKeyboard ?? false);
+            bool hasKeyboard = caps.Keyboard || (hw?.SupportsKeyboard ?? false)
+                || hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true;
             bool hasLightbar = caps.Lightbar || (hw?.SupportsLightbar ?? false);
             bool hasLogo = caps.LogoLight || (hw?.SupportsLogoLight ?? false);
             LightingSection.Visibility = (hasKeyboard || hasLightbar || hasLogo) ? Visibility.Visible : Visibility.Collapsed;
@@ -5009,9 +5010,9 @@ public partial class OriginalStyleWindow : Window
         TurboModeButton.Visibility = (caps.TurboMode || UiQaShowAll.Enabled || vendorNucModes)
             ? Visibility.Visible
             : Visibility.Collapsed;
+            // NUC/UMI 没有实现“静音狂暴”子模式，不显示该按钮。
             bool silentTurboAllowed = caps.SilentTurboAvailability == MechrevoLite.Hardware.FeatureAvailability.Supported
-                || UiQaShowAll.Enabled
-                || nucUmiModeUi;
+                || UiQaShowAll.Enabled;
             EnsureSilentTurboButton(silentTurboAllowed);
             if (TurboModeButton.Content is TextBlock turboLabel)
             {
@@ -5051,7 +5052,8 @@ public partial class OriginalStyleWindow : Window
         {
             GpuSection.Visibility = Visibility.Visible;
         }
-        bool keyboard = (caps?.Keyboard ?? false) || (hw?.SupportsKeyboard ?? false);
+        bool keyboard = (caps?.Keyboard ?? false) || (hw?.SupportsKeyboard ?? false)
+            || hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true;
         bool hasStrip = (caps?.Lightbar ?? false) || (hw?.SupportsLightbar ?? false);
         bool hasLogo = (caps?.LogoLight ?? false) || (hw?.SupportsLogoLight ?? false);
         bool hasHinge = _backendProbe?.SupportsHingeLight == true;
