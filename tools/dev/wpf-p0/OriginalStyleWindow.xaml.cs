@@ -6401,10 +6401,12 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         BackendProbe? probe = _backendProbe;
-        if (probe?.Connected != true)
+        if (probe == null)
         {
             return;
         }
+        // 不要求 GCU/后端已连接：同方机器 GCU 断开时仍走本地空闲计时，
+        // 关灯优先使用 HID/legacy 路径；完全没有后端时后续写入会失败，但计时器仍保留。
         int timeoutSeconds = AppConfig.Get("lighting_idle_seconds", 0);
         // 亚分钟选项由 LM 软件计时；1s tick 保证“20秒”实际落在 20~21s，而不是 2s tick 拖到 22s+。
         TimeSpan desiredTick = timeoutSeconds > 0 && timeoutSeconds < 60
