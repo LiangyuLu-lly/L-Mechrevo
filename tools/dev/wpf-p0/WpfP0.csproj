@@ -39,4 +39,9 @@
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Management">
+      <HintPath>..\..\..\lm_pkg_files\{app}\System.Management.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>

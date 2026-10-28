@@ -132,6 +132,7 @@ public partial class OriginalStyleWindow : Window
     private bool? _chargeLimitChannelProbe;
     private long _chargeLimitChannelProbeTick;
     private BackendProbe? _backendProbe;
+    private PerformanceKeyService? _performanceKey;
     // 托盘/后台默认 2s；悬浮窗打开时临时提到 1s。
     private readonly DispatcherTimer _backendTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _backendRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
@@ -3062,6 +3063,46 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private void EnsurePerformanceKeyService()
+    {
+        if (_performanceKey != null || _backendProbe?.Hw == null)
+        {
+            return;
+        }
+        if (!_backendProbe.Hw.IsIntelNucMachine && !_backendProbe.Hw.IsUmiMachine)
+        {
+            return;
+        }
+        _performanceKey = new PerformanceKeyService();
+        _performanceKey.Pressed += () => Dispatcher.BeginInvoke(new Action(OnPerformanceKeyPressed));
+        _performanceKey.Start();
+    }
+
+    private void OnPerformanceKeyPressed()
+    {
+        try
+        {
+            if (_modeSwitchInFlight || _backendProbe == null)
+            {
+                return;
+            }
+            int current = ResolveDisplayMode(_backendProbe);
+            // 原厂 NUC 的顺序：Performance -> BatterySaver -> Balanced -> Performance
+            int next = current switch
+            {
+                1 => 2, // 狂暴 -> 静音
+                2 => 0, // 静音 -> 平衡
+                _ => 1  // 平衡/自定义 -> 狂暴
+            };
+            Logger.WriteLine("[perfkey] 当前=" + current + " -> 目标=" + next);
+            _ = SwitchModeAsync(next);
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLine("[perfkey] 切档失败：" + ex.Message);
+        }
+    }
+
     private async Task RestorePerfModeOnStartupAsync()
     {
         if (_perfRestoreStarted)
@@ -4288,6 +4329,7 @@ public partial class OriginalStyleWindow : Window
         BackendLine.Text = probe.Snapshot();
         UpdateTraySensorTooltip(probe);
         HookHardwareState(probe.Hw);
+        EnsurePerformanceKeyService();
         try
         {
             MechrevoHw? liveHw = probe.Hw;
