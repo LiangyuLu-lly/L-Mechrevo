@@ -2631,11 +2631,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			"usb" => !UsesBaolongda, 
 			"deepsleep" => DeepSleepSeen, 
 			"copilot" => CopilotSeen, 
-			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen, 
+			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen || IsIntelNucMachine || IsUmiMachine, 
 			// ⇒ 界面显示"下发被拒、已回滚"（机主日志 [QS-apply] 键=highperf 下发结果=False）
 			"highperf" => true, 
 			// （风扇强冷 · 无 GCU）：宝龙达用本机通道（EC 目标档/掩码 + 13 回读）
-		"fanboost" => SupportsFanBoostQuickSwitch,
+		"fanboost" => SupportsFanBoostQuickSwitch || IsIntelNucMachine || IsUmiMachine,
 		// （APU 防缩缸）： 纯 Windows 电源策略 ⇒ 所有机型可用
 		"apuboost" => true, 
 			"lightbar" => SupportsLightbar, 

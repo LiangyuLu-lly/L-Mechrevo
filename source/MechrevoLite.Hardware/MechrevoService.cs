@@ -2982,6 +2982,34 @@ public class MechrevoService
 			// NUC/UMI 的 Fn 锁 / 摄像头 / Win 键锁走 ACPI EC，不经过 GCU 能力位。
 			if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
 			{
+				if (string.Equals(key, "touchpad", StringComparison.Ordinal))
+				{
+					bool tpOk = NucQuickSwitches.TrySetTouchpad(on, out bool tpConfirmed);
+					_hw.QuickSwitches["touchpad"] = tpConfirmed ? on : _hw.QuickSwitches.TryGetValue("touchpad", out bool oldTp) && oldTp;
+					Logger.WriteLine($"SwitchQuick(touchpad,{on}) ⭐ NUC/UMI ACPI EC + PTP ⇒ 确认={tpConfirmed}");
+					return tpConfirmed;
+				}
+				if (string.Equals(key, "usb", StringComparison.Ordinal))
+				{
+					bool usbOk = NucQuickSwitches.TryPulseUsbCharging();
+					_hw.QuickSwitches["usb"] = on;
+					Logger.WriteLine($"SwitchQuick(usb,{on}) ⭐ NUC/UMI EC trigger bit4 ⇒ 写入={usbOk}");
+					return usbOk;
+				}
+				if (string.Equals(key, "acrecovery", StringComparison.Ordinal))
+				{
+					bool acOk = NucQuickSwitches.TrySetAcRecovery(on, out bool acConfirmed);
+					_hw.QuickSwitches["acrecovery"] = acConfirmed ? on : _hw.QuickSwitches.TryGetValue("acrecovery", out bool oldAc) && oldAc;
+					Logger.WriteLine($"SwitchQuick(acrecovery,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={acConfirmed}");
+					return acConfirmed;
+				}
+				if (string.Equals(key, "fanboost", StringComparison.Ordinal))
+				{
+					bool fbOk = NucQuickSwitches.TrySetFanBoost(on, out bool fbConfirmed);
+					_hw.QuickSwitches["fanboost"] = fbConfirmed ? on : _hw.QuickSwitches.TryGetValue("fanboost", out bool oldFb) && oldFb;
+					Logger.WriteLine($"SwitchQuick(fanboost,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={fbConfirmed}");
+					return fbConfirmed;
+				}
 				if (string.Equals(key, "fnkey", StringComparison.Ordinal))
 				{
 					bool nucOk = NucQuickSwitches.TrySetFnLock(on, out bool nucConfirmed);

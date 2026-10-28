@@ -13,6 +13,13 @@ internal static class NucQuickSwitches
     private const int FnLockBit = 0x10;
     private const int CameraCutoffBit = 0x08;
     private const int WinKeyBit = 0x01;
+    private const int TouchpadAddress = 1958;   // 0x7A6 bit3
+    private const int TouchpadBit = 0x08;
+    private const int UsbChargeTriggerBit = 0x10;
+    private const int AcRecoveryAddress = 1830; // 0x726 bit3
+    private const int AcRecoveryBit = 0x08;
+    private const int FanBoostAddress = 1873; // 0x751
+    private const int FanBoostBit = 0x40;
 
     internal static bool TrySetFnLock(bool on, out bool confirmed)
     {
@@ -75,6 +82,77 @@ internal static class NucQuickSwitches
         return false;
     }
 
+    internal static bool TrySetTouchpad(bool on, out bool confirmed)
+    {
+        confirmed = false;
+        if (!TryRead(TouchpadAddress, out int current))
+        {
+            return false;
+        }
+        int target = on ? (current | TouchpadBit) : (current & ~TouchpadBit);
+        if (!TryWrite(TouchpadAddress, target))
+        {
+            return false;
+        }
+        confirmed = TryRead(TouchpadAddress, out int after) && ((after & TouchpadBit) != 0) == on;
+        WritePtpRegistry(on);
+        return confirmed;
+    }
+
+    internal static bool TryPulseUsbCharging()
+    {
+        if (!TryRead(TriggerAddress, out int trigger))
+        {
+            return false;
+        }
+        return TryWrite(TriggerAddress, trigger | UsbChargeTriggerBit);
+    }
+
+    internal static bool TrySetAcRecovery(bool on, out bool confirmed)
+    {
+        confirmed = false;
+        if (!TryRead(AcRecoveryAddress, out int current))
+        {
+            return false;
+        }
+        int target = on ? (current | AcRecoveryBit) : (current & ~AcRecoveryBit);
+        if (!TryWrite(AcRecoveryAddress, target))
+        {
+            return false;
+        }
+        confirmed = TryRead(AcRecoveryAddress, out int after) && ((after & AcRecoveryBit) != 0) == on;
+        return confirmed;
+    }
+
+    internal static bool TrySetFanBoost(bool on, out bool confirmed)
+    {
+        confirmed = false;
+        if (!TryRead(FanBoostAddress, out int current))
+        {
+            return false;
+        }
+        int target = on ? (current | FanBoostBit) : (current & ~FanBoostBit);
+        if (!TryWrite(FanBoostAddress, target))
+        {
+            return false;
+        }
+        confirmed = TryRead(FanBoostAddress, out int after) && ((after & FanBoostBit) != 0) == on;
+        return confirmed;
+    }
+
+    private static void WritePtpRegistry(bool on)
+    {
+        try
+        {
+            using Microsoft.Win32.RegistryKey? key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad\Status", writable: true);
+            key?.SetValue("Enabled", on ? 1 : 0, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch
+        {
+        }
+    }
+
     internal static void Sync(MechrevoHw hw)
     {
         if (TryRead(FnLockAddress, out int fn))
@@ -88,6 +166,18 @@ internal static class NucQuickSwitches
         if (TryRead(WinKeyStatusAddress, out int win))
         {
             hw.QuickSwitches["winkey"] = (win & WinKeyBit) != 0;
+        }
+        if (TryRead(TouchpadAddress, out int tp))
+        {
+            hw.QuickSwitches["touchpad"] = (tp & TouchpadBit) != 0;
+        }
+        if (TryRead(AcRecoveryAddress, out int ac))
+        {
+            hw.QuickSwitches["acrecovery"] = (ac & AcRecoveryBit) != 0;
+        }
+        if (TryRead(FanBoostAddress, out int fb))
+        {
+            hw.QuickSwitches["fanboost"] = (fb & FanBoostBit) != 0;
         }
     }
 
