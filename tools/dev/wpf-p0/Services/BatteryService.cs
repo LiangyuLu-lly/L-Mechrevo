@@ -51,16 +51,14 @@ internal sealed class BatteryService : IBatteryService
         catch
         {
         }
-        int percent = hw.BatteryPercent;
-        if (percent <= 0)
+        int percent = WindowsBattery.ReadPercent();
+        if (percent < 0)
         {
-            try
-            {
-                percent = (int)Math.Round(System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent * 100);
-            }
-            catch
-            {
-            }
+            percent = hw.BatteryPercent;
+        }
+        if (percent < 0)
+        {
+            percent = 0;
         }
         return new BatterySnapshot(
             HardwareAvailable: true,

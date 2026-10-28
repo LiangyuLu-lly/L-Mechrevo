@@ -4391,6 +4391,15 @@ public partial class OriginalStyleWindow : Window
         }
         string health = SettingsText.BatteryHealthText(hw);
         string abnormal = hw.BatteryAbnormal ? " · " + WpfStrings.BatteryAbnormal : "";
+        int batteryPercent = WindowsBattery.ReadPercent();
+        if (batteryPercent < 0)
+        {
+            batteryPercent = hw.BatteryPercent;
+        }
+        if (batteryPercent < 0)
+        {
+            batteryPercent = 0;
+        }
         string powerState = "";
         try
         {
@@ -4400,27 +4409,12 @@ public partial class OriginalStyleWindow : Window
             string state = charging
                 ? WpfStrings.BatteryCharging
                 : (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online
-                    ? (hw.BatteryPercent >= 99 ? WpfStrings.BatteryFull : WpfStrings.BatteryNotCharging)
+                    ? (batteryPercent >= 99 ? WpfStrings.BatteryFull : WpfStrings.BatteryNotCharging)
                     : WpfStrings.BatteryDischarging);
             powerState = " · " + source + " · " + state;
         }
         catch
         {
-        }
-        int batteryPercent = hw.BatteryPercent;
-        if (batteryPercent < 0)
-        {
-            try
-            {
-                float life = System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent;
-                if (life >= 0f && life <= 1f)
-                {
-                    batteryPercent = (int)Math.Round(life * 100f);
-                }
-            }
-            catch
-            {
-            }
         }
         BatteryInfo.Text = WpfStrings.OriginalStyleWindow_xaml_Text_46 + batteryPercent + "%" + powerState + (string.IsNullOrWhiteSpace(health) ? "" : " · " + health) + abnormal;
         BatteryInfo.ToolTip = health;
