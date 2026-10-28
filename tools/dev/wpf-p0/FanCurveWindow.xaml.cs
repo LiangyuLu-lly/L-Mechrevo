@@ -37,7 +37,8 @@ public partial class FanCurveWindow : Window
         CpuSection.Visibility = showCpu ? Visibility.Visible : Visibility.Collapsed;
         GpuSection.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
         _hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
-        bool supported = _hw != null && (_hw.IsGcuConnected || _hw.UsesBaolongda || _hw.WujieSmuApu);
+        bool supported = _hw != null && (_hw.IsGcuConnected || _hw.UsesBaolongda || _hw.WujieSmuApu
+            || _hw.IsIntelNucMachine || _hw.IsUmiMachine);
         if (!supported)
         {
             HintText.Text = WpfStrings.FanCurveWindow_xaml_Text;
@@ -198,7 +199,39 @@ public partial class FanCurveWindow : Window
 
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
-        if (_hw == null || !_hw.IsGcuConnected)
+        if (_hw == null)
+        {
+            StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_3;
+            return;
+        }
+        if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+        {
+            try
+            {
+                int[] cpu = CpuCurve.Duties;
+                int[] gpu = GpuCurve.Duties;
+                if (PushFanCurveCheck?.IsChecked == false)
+                {
+                    PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
+                    PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, false);
+                    _dirty = false;
+                    StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_4;
+                    return;
+                }
+                bool ok = MechrevoLite.Hardware.NucFanTable.TryApply(
+                    CpuCurve.Temperatures, cpu, GpuCurve.Temperatures, gpu, out string detail);
+                PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
+                PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
+                _dirty = false;
+                StatusText.Text = ok ? "NUC/UMI 风扇曲线已写入：" + detail : "NUC/UMI 风扇曲线写入失败：" + detail;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
+            }
+            return;
+        }
+        if (!_hw.IsGcuConnected)
         {
             StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_3;
             return;
