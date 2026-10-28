@@ -10,6 +10,7 @@ public static class NucPerformanceMode
 {
     private const int Pl1WriteAddress = 1923; // 0x783
     private const int Pl2WriteAddress = 1924; // 0x784
+    private const int Pl4WriteAddress = 1925; // 0x785
     private const int FanModeAddress = 1963;  // 0x7AB · 低 4 位风扇模式
     private const int FanBoostAddress = 1873; // 0x751 · 风扇增强
     private const int DStateAddress = 1931;   // 0x78B · GPU D-State 低 3 位
@@ -20,6 +21,13 @@ public static class NucPerformanceMode
         1 => (1959, 1960), // Performance
         2 => (1844, 1845), // BatterySaver
         _ => (1840, 1841)  // Balanced
+    };
+
+    private static int Pl4DefaultRegister(int visualMode) => visualMode switch
+    {
+        1 => 1961, // Performance
+        2 => 1846, // BatterySaver
+        _ => 1842  // Balanced
     };
 
     private static (byte Pl1, byte Pl2) Fallback(int visualMode) => visualMode switch
@@ -46,22 +54,29 @@ public static class NucPerformanceMode
             return false;
         }
 
-        bool write1 = EcPortIo.TryWriteByte(Pl1WriteAddress, pl1);
-        bool write2 = EcPortIo.TryWriteByte(Pl2WriteAddress, pl2);
+        bool write1 = TryWrite(Pl1WriteAddress, pl1);
+        bool write2 = TryWrite(Pl2WriteAddress, pl2);
+        int pl4 = TryRead(Pl4DefaultRegister(visualMode), out int pl4Default) && pl4Default > 0
+            ? pl4Default
+            : 125;
+        int minPl4 = Math.Min(250, pl2 + 20);
+        pl4 = Math.Clamp(pl4, minPl4, 250);
+        bool write3 = TryWrite(Pl4WriteAddress, pl4);
         bool fan = TryApplyFanMode(visualMode, out string fanDetail);
         bool fanBoost = TryApplyFanBoost(visualMode, out string fanBoostDetail);
         bool dstate = TryApplyDState(visualMode, out string dstateDetail);
         detail += " " + fanDetail + " " + fanBoostDetail + " " + dstateDetail;
-        bool read1 = EcPortIo.TryReadByteStable(Pl1WriteAddress, out int rb1, out _);
-        bool read2 = EcPortIo.TryReadByteStable(Pl2WriteAddress, out int rb2, out _);
-        detail += $"PL1={pl1} PL2={pl2} 写入={write1 && write2} 回读={rb1}/{rb2}";
-        return write1 && write2 && read1 && read2 && fan && fanBoost && dstate && rb1 == pl1 && rb2 == pl2;
+        bool read1 = TryRead(Pl1WriteAddress, out int rb1);
+        bool read2 = TryRead(Pl2WriteAddress, out int rb2);
+        bool read3 = TryRead(Pl4WriteAddress, out int rb3);
+        detail += $"PL1={pl1} PL2={pl2} PL4={pl4} 写入={write1 && write2 && write3} 回读={rb1}/{rb2}/{rb3}";
+        return write1 && write2 && write3 && read1 && read2 && read3 && fan && fanBoost && dstate && rb1 == pl1 && rb2 == pl2 && rb3 == pl4;
     }
 
     private static bool TryApplyFanMode(int visualMode, out string detail)
     {
         detail = "";
-        if (!EcPortIo.TryReadByteStable(FanModeAddress, out int current, out _) || current < 0 || current > 255)
+        if (!TryRead(FanModeAddress, out int current) || current < 0 || current > 255)
         {
             detail = "风扇模式读取失败";
             return false;
@@ -73,8 +88,8 @@ public static class NucPerformanceMode
             _ => 2  // Standard
         };
         int value = (current & 0xF0) | wanted;
-        bool write = EcPortIo.TryWriteByte(FanModeAddress, value);
-        bool read = EcPortIo.TryReadByteStable(FanModeAddress, out int back, out _);
+        bool write = TryWrite(FanModeAddress, value);
+        bool read = TryRead(FanModeAddress, out int back);
         detail += $"FanMode=0x{value:X2} 写入={write} 回读=0x{back:X2}";
         return write && read && back == value;
     }
@@ -82,8 +97,8 @@ public static class NucPerformanceMode
     private static bool TryApplyFanBoost(int visualMode, out string detail)
     {
         int value = visualMode == 1 ? 64 : 0;
-        bool write = EcPortIo.TryWriteByte(FanBoostAddress, value);
-        bool read = EcPortIo.TryReadByteStable(FanBoostAddress, out int back, out _);
+        bool write = TryWrite(FanBoostAddress, value);
+        bool read = TryRead(FanBoostAddress, out int back);
         detail = $"FanBoost={value} 写入={write} 回读={back}";
         return write && read && back == value;
     }
@@ -92,27 +107,52 @@ public static class NucPerformanceMode
     {
         detail = "";
         int defaultAddress = visualMode switch { 1 => 1962, 2 => 1847, _ => 1843 };
-        if (!EcPortIo.TryReadByteStable(defaultAddress, out int defaultDState, out _) || defaultDState < 0 || defaultDState > 7)
+        if (!TryRead(defaultAddress, out int defaultDState) || defaultDState < 0 || defaultDState > 7)
         {
             detail = "DState 默认值读取失败";
             return false;
         }
-        if (!EcPortIo.TryReadByteStable(DStateAddress, out int current, out _) || current < 0 || current > 255)
+        if (!TryRead(DStateAddress, out int current) || current < 0 || current > 255)
         {
             detail = "DState 当前值读取失败";
             return false;
         }
         int value = (current & 0xF8) | defaultDState;
-        bool write = EcPortIo.TryWriteByte(DStateAddress, value);
-        bool read = EcPortIo.TryReadByteStable(DStateAddress, out int back, out _);
+        bool write = TryWrite(DStateAddress, value);
+        bool read = TryRead(DStateAddress, out int back);
         detail = $"DState 0x{value:X2} 写入={write} 回读=0x{back:X2}";
         return write && read && back == value;
+    }
+
+    private static bool TryRead(int address, out int value)
+    {
+        if (AcpiDriverEc.TryReadByte(address, out byte byteValue))
+        {
+            value = byteValue;
+            return true;
+        }
+        if (EcPortIo.TryReadByteStable(address, out int legacy, out _))
+        {
+            value = legacy;
+            return true;
+        }
+        value = -1;
+        return false;
+    }
+
+    private static bool TryWrite(int address, int value)
+    {
+        if (AcpiDriverEc.TryWriteByte(address, value))
+        {
+            return true;
+        }
+        return EcPortIo.TryWriteByte(address, value);
     }
 
     private static bool TryReadPower(int address, out byte value)
     {
         value = 0;
-        if (!EcPortIo.TryReadByteStable(address, out int raw, out _) || raw < 0 || raw > 255)
+        if (!TryRead(address, out int raw) || raw < 0 || raw > 255)
         {
             return false;
         }
