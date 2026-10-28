@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Threading;
+using System.Diagnostics;
+using System.IO;
 
 namespace MechrevoLite.Hardware;
 
@@ -96,6 +98,10 @@ internal static class NucQuickSwitches
         }
         confirmed = TryRead(TouchpadAddress, out int after) && ((after & TouchpadBit) != 0) == on;
         WritePtpRegistry(on);
+        // Windows 输入子系统还需要 EnableTouchpad 开关；只写 EC/PTP 注册表不足以真正启用/禁用触摸板。
+        bool systemOk = TrySystemTouchpad(on, out string systemDetail);
+        Logger.WriteLine($"[touchpad] EC={confirmed} System={systemOk}（{systemDetail}）");
+        confirmed = confirmed && (systemOk || !File.Exists(SystemTouchpadTool));
         return confirmed;
     }
 
@@ -127,17 +133,67 @@ internal static class NucQuickSwitches
     internal static bool TrySetFanBoost(bool on, out bool confirmed)
     {
         confirmed = false;
-        if (!TryRead(FanBoostAddress, out int current))
-        {
-            return false;
-        }
-        int target = on ? (current | FanBoostBit) : (current & ~FanBoostBit);
+        // NUC/UMI 30 系是 legacy dual-mode：0x50=强冷开，0x10=强冷关；
+        // 40/50 系才是 bit6 (0x40) 置位。不能用同一套位操作。
+        int target = on ? 0x50 : 0x10;
         if (!TryWrite(FanBoostAddress, target))
         {
             return false;
         }
-        confirmed = TryRead(FanBoostAddress, out int after) && ((after & FanBoostBit) != 0) == on;
+        confirmed = TryRead(FanBoostAddress, out int after) && after == target;
         return confirmed;
+    }
+
+    private const string SystemTouchpadTool = @"C:\Windows\System32\SystemSettingsAdminFlows.exe";
+
+    private static bool TrySystemTouchpad(bool on, out string detail)
+    {
+        detail = "";
+        try
+        {
+            if (!File.Exists(SystemTouchpadTool))
+            {
+                detail = "SystemSettingsAdminFlows 不存在";
+                return false;
+            }
+            ProcessStartInfo psi = new(SystemTouchpadTool, "EnableTouchpad " + (on ? "1" : "0"))
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            using (Process? process = Process.Start(psi))
+            {
+                if (process == null)
+                {
+                    detail = "启动失败";
+                    return false;
+                }
+                process.WaitForExit(2000);
+            }
+            if (on)
+            {
+                // 从设备管理器 PnP 禁用状态恢复；只做 enable，不做 disable（禁用由 Windows 输入子系统负责）。
+                foreach (string deviceId in new[] { @"HID\UNIW0001&Col01", @"HID\UNIW0001&Col02" })
+                {
+                    ProcessStartInfo pnputil = new("pnputil", "/enable-device /deviceid \"" + deviceId + "\"")
+                    {
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    };
+                    using Process? p = Process.Start(pnputil);
+                    p?.WaitForExit(1500);
+                }
+            }
+            detail = "已调用 Windows EnableTouchpad";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            detail = ex.GetType().Name;
+            return false;
+        }
     }
 
     private static void WritePtpRegistry(bool on)

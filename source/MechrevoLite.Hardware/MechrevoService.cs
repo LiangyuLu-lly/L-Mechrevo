@@ -3028,14 +3028,8 @@ public class MechrevoService
 				}
 				if (string.Equals(key, "webcam", StringComparison.Ordinal))
 				{
-					bool nucOk = NucQuickSwitches.TrySetCamera(on, out bool nucConfirmed);
-					if (nucOk)
-					{
-						_hw.QuickSwitches["webcam"] = on;
-						Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI ACPI EC ⇒ 确认={nucConfirmed}");
-						return nucConfirmed;
-					}
-					// EC 断电位不可用时退回 Windows PnP，不落回 GCU MQTT。
+					// 优先做 Windows PnP 设备禁用/启用；EC 断电位只是辅助，
+					// 单写 EC 位并不能保证相机设备从系统中消失。
 					if (CameraPnpControl.HasCamera)
 					{
 						(bool camOk, string camDetail) = await Task.Run(() =>
@@ -3043,9 +3037,22 @@ public class MechrevoService
 							bool ok = CameraPnpControl.TrySetEnabled(on, out bool _, out string detail);
 							return (ok, detail);
 						}).ConfigureAwait(continueOnCapturedContext: false);
-						if (camOk) _hw.QuickSwitches["webcam"] = on;
-						Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI Windows PnP ⇒ 确认={camOk}（{camDetail}）");
-						return camOk;
+						if (camOk)
+						{
+							_hw.QuickSwitches["webcam"] = on;
+							// 同时同步 EC 断电位，保持硬件/系统状态一致。
+							NucQuickSwitches.TrySetCamera(on, out bool ecConfirmed);
+							Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI Windows PnP ⇒ 确认={camOk}（{camDetail}）EC={ecConfirmed}");
+							return true;
+						}
+						Logger.WriteLine($"SwitchQuick(webcam,{on}) PnP 失败（{camDetail}）⇒ 尝试 EC 断电位");
+					}
+					bool nucOk = NucQuickSwitches.TrySetCamera(on, out bool nucConfirmed);
+					if (nucOk)
+					{
+						_hw.QuickSwitches["webcam"] = on;
+						Logger.WriteLine($"SwitchQuick(webcam,{on}) ⭐ NUC/UMI ACPI EC（PnP 不可用）⇒ 确认={nucConfirmed}");
+						return nucConfirmed;
 					}
 					return false;
 				}
