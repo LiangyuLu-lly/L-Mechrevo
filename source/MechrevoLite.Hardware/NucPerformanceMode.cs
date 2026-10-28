@@ -73,6 +73,38 @@ public static class NucPerformanceMode
         return write1 && write2 && write3 && read1 && read2 && read3 && fan && fanBoost && dstate && rb1 == pl1 && rb2 == pl2 && rb3 == pl4;
     }
 
+    /// <summary>自定义档：PL1/PL2/PL4 直接写自定义 EC 槽（1923/1924/1925）。</summary>
+    public static bool TryApplyCustom(int? pl1, int? pl2, int? pl4, int? tcc, out string detail)
+    {
+        detail = "";
+        if (!pl1.HasValue || !pl2.HasValue || !pl4.HasValue)
+        {
+            detail = "自定义功耗墙不完整";
+            return false;
+        }
+        int p1 = Math.Clamp(pl1.Value, 5, 200);
+        int p2 = Math.Clamp(pl2.Value, 5, 250);
+        if (p1 > p2)
+        {
+            (p1, p2) = (p2, p1);
+        }
+        int p4 = Math.Clamp(pl4.Value, Math.Min(250, p2 + 20), 250);
+        bool w1 = TryWrite(Pl1WriteAddress, p1);
+        bool w2 = TryWrite(Pl2WriteAddress, p2);
+        bool w3 = TryWrite(Pl4WriteAddress, p4);
+        bool r1 = TryRead(Pl1WriteAddress, out int rb1);
+        bool r2 = TryRead(Pl2WriteAddress, out int rb2);
+        bool r3 = TryRead(Pl4WriteAddress, out int rb3);
+        // 原厂自定义模式标志：1798=65
+        TryWrite(1798, 65);
+        if (tcc.HasValue)
+        {
+            TryWrite(1926, Math.Clamp(tcc.Value, 0, 255));
+        }
+        detail = $"自定义 PL1={p1} PL2={p2} PL4={p4} 写入={w1 && w2 && w3} 回读={rb1}/{rb2}/{rb3}";
+        return w1 && w2 && w3 && r1 && r2 && r3 && rb1 == p1 && rb2 == p2 && rb3 == p4;
+    }
+
     private static bool TryApplyFanMode(int visualMode, out string detail)
     {
         detail = "";

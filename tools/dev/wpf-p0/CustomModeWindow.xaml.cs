@@ -880,6 +880,24 @@ public partial class CustomModeWindow : Window
                 StatusText.Text = "配置已保存：模式 " + _firmwareVisualMode + " · 配置 " + (_firmwareProfileIndex + 1) + "（切到该模式后生效）";
                 return;
             }
+            bool nucDirect = WpfBackend.Hw?.IsIntelNucMachine == true || WpfBackend.Hw?.IsUmiMachine == true;
+            if (nucDirect && _current.IsCustom)
+            {
+                MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
+                bool ok = MechrevoLite.Hardware.NucPerformanceMode.TryApplyCustom(
+                    edited.Pl1, edited.Pl2, edited.Pl4, edited.TccTarget, out string detail);
+                _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
+                StatusText.Text = ok
+                    ? "自定义功耗墙已应用：" + detail
+                    : "自定义功耗墙应用失败：" + detail;
+                ToolTip = detail;
+                if (ok)
+                {
+                    _dirty = false;
+                    ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
+                }
+                return;
+            }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");
             if (outcome == null)
             {
