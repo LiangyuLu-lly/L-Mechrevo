@@ -906,6 +906,14 @@ public partial class CustomModeWindow : Window
             if (nucDirect)
             {
                 if (_current?.Id != null) MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
+                string gpuDetail = "";
+                bool gpuOk = MechrevoLite.Hardware.NucGpuPower.TryApply(
+                    edited.GpuTgp ?? 0,
+                    edited.GpuDynamicBoostOn == true,
+                    edited.GpuDynamicBoost ?? 0,
+                    edited.GpuOverclockOn == true ? edited.GpuCoreOffset : null,
+                    edited.GpuOverclockOn == true ? edited.GpuMemoryOffset : null,
+                    out gpuDetail);
                 bool ok = MechrevoLite.Hardware.NucPerformanceMode.TryApplyCustom(
                     edited.Pl1, edited.Pl2, edited.Pl4, edited.TccTarget, out string detail);
                 bool rampOk = MechrevoLite.Hardware.NucFanTable.TrySetFanRamp(
@@ -913,8 +921,8 @@ public partial class CustomModeWindow : Window
                 bool curveOn = edited.FanCurveOn != false
                     && (edited.CpuFanDuty != null || edited.GpuFanDuty != null);
                 bool isolatedOk = MechrevoLite.Hardware.NucFanTable.TrySetFanIsolated(curveOn, out string isolatedDetail);
-                ok = ok && rampOk && isolatedOk;
-                detail += " " + rampDetail + " " + isolatedDetail;
+                ok = ok && rampOk && isolatedOk && gpuOk;
+                detail += " " + rampDetail + " " + isolatedDetail + " " + gpuDetail;
                 _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
                 StatusText.Text = ok
                     ? "自定义功耗墙已应用：" + detail
