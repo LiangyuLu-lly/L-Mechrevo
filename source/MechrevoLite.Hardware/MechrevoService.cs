@@ -1877,6 +1877,11 @@ public class MechrevoService
 
 	public async Task<bool> ApplyDisplayEffectProfile(DisplayEffectProfile profile)
 	{
+		if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+		{
+			return SoftwareColorEnhancement.ApplyProfile(profile.Name, profile.Brightness, profile.ColorTemp,
+				profile.ColorR, profile.ColorG, profile.ColorB, profile.VibrantValue, profile.Constrast, profile.Gamma);
+		}
 		if (profile == null || string.IsNullOrWhiteSpace(profile.Name))
 		{
 			return false;
@@ -1907,6 +1912,10 @@ public class MechrevoService
 
 	public async Task<bool> ResetDisplayEffectProfile(string mode)
 	{
+		if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+		{
+			return SoftwareColorEnhancement.Reset();
+		}
 		if (string.IsNullOrWhiteSpace(mode))
 		{
 			return false;

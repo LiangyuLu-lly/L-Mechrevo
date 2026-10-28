@@ -224,6 +224,10 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                return SoftwareColorEnhancement.Apply(mode);
+            }
             if (_service == null || _hw == null || !_hw.DisplayEffectProfiles.TryGetValue(mode, out DisplayEffectProfile? profile))
             {
                 return false;
@@ -420,6 +424,12 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                return on
+                    ? SoftwareColorEnhancement.Apply(MechrevoLite.AppConfig.GetString("display_effect_mode"))
+                    : SoftwareColorEnhancement.Reset();
+            }
             return _service != null && await _service.SetDisplayEffectSwitch(on).ConfigureAwait(false);
         }
         catch

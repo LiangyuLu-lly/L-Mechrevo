@@ -1023,7 +1023,9 @@ public partial class OriginalStyleWindow : Window
         {
             try
             {
-                return _backendProbe?.Hw?.DisplayEffectProfiles.Count > 0
+                return _backendProbe?.Hw?.IsIntelNucMachine == true
+                    || _backendProbe?.Hw?.IsUmiMachine == true
+                    || _backendProbe?.Hw?.DisplayEffectProfiles.Count > 0
                     || _backendProbe?.Capabilities?.ColorCalibration == true;
             }
             catch
