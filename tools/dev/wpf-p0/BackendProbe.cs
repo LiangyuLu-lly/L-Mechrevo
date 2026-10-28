@@ -55,6 +55,27 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    /// <summary>NUC/UMI 不依赖 GCU 时把探针标成本地就绪（仅当 Hw 已识别出机型）。</summary>
+    internal bool TryEnableNucUmiLocalReady()
+    {
+        try
+        {
+            if (_hw == null || !(_hw.IsIntelNucMachine || _hw.IsUmiMachine))
+            {
+                return false;
+            }
+            _service ??= new MechrevoService(_hw);
+            Connected = true;
+            LastError = "";
+            Logger.WriteLine("[backend] NUC/UMI 本地 ACPI/EC 就绪（GCU 未连接）");
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal MechrevoHw? Hw => _hw;
 
     internal MechrevoService? Service => _service;
