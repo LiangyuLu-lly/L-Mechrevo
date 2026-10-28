@@ -444,10 +444,13 @@ public partial class CustomModeWindow : Window
             SmuSlowTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
             SmuFastTimeRow.Visibility = smuPower ? Visibility.Visible : Visibility.Collapsed;
         }
+        bool nucDirectRows = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsIntelNucMachine == true
+            || L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsUmiMachine == true;
         bool locked = L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
             && PerfModeCapabilities.IsGen40Plus(lockHw)
-            && _current?.IsCustom != true;
+            && _current?.IsCustom != true
+            && !nucDirectRows;
         CpuPowerCard.IsEnabled = !locked;
         TempGpuCard.IsEnabled = !locked;
         FanCard.IsEnabled = !locked;
@@ -664,20 +667,31 @@ public partial class CustomModeWindow : Window
         SetSliderRange(GpuTgpSlider, hw.GpuTgpMinimum, hw.GpuTgpMaximum);
         SetSliderRange(DbSlider, hw.GpuDbMinimum, hw.GpuDbMaximum);
         SetSliderRange(FanDelaySlider, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum);
+        bool nucDirectUi = hw.IsIntelNucMachine || hw.IsUmiMachine;
+        if (nucDirectUi)
+        {
+            SetSliderRange(Pl1Slider, 5, 200);
+            SetSliderRange(Pl2Slider, 5, 250);
+            SetSliderRange(Pl4Slider, 5, 250);
+            SetSliderRange(TccSlider, 75, 100);
+            SetSliderRange(GpuTgpSlider, 60, 175);
+            SetSliderRange(DbSlider, 0, 30);
+            SetSliderRange(FanDelaySlider, 100, 10000);
+        }
         // 30 系固件配置编辑器是完整参数页；能力位滞后时不能把整页做成只读。
         bool vendorProfile = _firmwareMode;
-        TccSwitch.IsEnabled = hw.TccAdjustable || vendorProfile;
-        DbSwitch.IsEnabled = hw.GpuDynamicBoostAdjustable || vendorProfile;
-        GpuTgpSlider.IsEnabled = hw.GpuTgpAdjustable || vendorProfile;
-        FanSensitivitySwitch.IsEnabled = hw.SupportsFanSwitchSpeed || vendorProfile;
-        GpuOcSwitch.IsEnabled = (hw.SupportsGpuOverclock
+        TccSwitch.IsEnabled = nucDirectUi || hw.TccAdjustable || vendorProfile;
+        DbSwitch.IsEnabled = nucDirectUi || hw.GpuDynamicBoostAdjustable || vendorProfile;
+        GpuTgpSlider.IsEnabled = nucDirectUi || hw.GpuTgpAdjustable || vendorProfile;
+        FanSensitivitySwitch.IsEnabled = nucDirectUi || hw.SupportsFanSwitchSpeed || vendorProfile;
+        GpuOcSwitch.IsEnabled = nucDirectUi || (hw.SupportsGpuOverclock
                 && string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
                 || vendorProfile;
-        if (!hw.GpuTgpAdjustable)
+        if (!hw.GpuTgpAdjustable && !nucDirectUi)
         {
             GpuTgpSlider.Opacity = 0.45;
         }
-        if (!hw.GpuDynamicBoostAdjustable)
+        if (!hw.GpuDynamicBoostAdjustable && !nucDirectUi)
         {
             DbSwitch.Opacity = 0.45;
             DbSlider.Opacity = 0.45;
@@ -889,9 +903,9 @@ public partial class CustomModeWindow : Window
                 return;
             }
             bool nucDirect = WpfBackend.Hw?.IsIntelNucMachine == true || WpfBackend.Hw?.IsUmiMachine == true;
-            if (nucDirect && _current.IsCustom)
+            if (nucDirect)
             {
-                MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
+                if (_current?.Id != null) MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
                 bool ok = MechrevoLite.Hardware.NucPerformanceMode.TryApplyCustom(
                     edited.Pl1, edited.Pl2, edited.Pl4, edited.TccTarget, out string detail);
                 bool rampOk = MechrevoLite.Hardware.NucFanTable.TrySetFanRamp(
