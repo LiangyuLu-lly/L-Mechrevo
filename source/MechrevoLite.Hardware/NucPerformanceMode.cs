@@ -11,6 +11,8 @@ public static class NucPerformanceMode
     private const int Pl1WriteAddress = 1923; // 0x783
     private const int Pl2WriteAddress = 1924; // 0x784
     private const int FanModeAddress = 1963;  // 0x7AB · 低 4 位风扇模式
+    private const int FanBoostAddress = 1873; // 0x751 · 风扇增强
+    private const int DStateAddress = 1931;   // 0x78B · GPU D-State 低 3 位
 
     // 各档在 EC 中的默认 PL1/PL2 来源地址
     private static (int Pl1, int Pl2) DefaultRegisters(int visualMode) => visualMode switch
@@ -47,11 +49,13 @@ public static class NucPerformanceMode
         bool write1 = EcPortIo.TryWriteByte(Pl1WriteAddress, pl1);
         bool write2 = EcPortIo.TryWriteByte(Pl2WriteAddress, pl2);
         bool fan = TryApplyFanMode(visualMode, out string fanDetail);
-        detail += " " + fanDetail;
+        bool fanBoost = TryApplyFanBoost(visualMode, out string fanBoostDetail);
+        bool dstate = TryApplyDState(visualMode, out string dstateDetail);
+        detail += " " + fanDetail + " " + fanBoostDetail + " " + dstateDetail;
         bool read1 = EcPortIo.TryReadByteStable(Pl1WriteAddress, out int rb1, out _);
         bool read2 = EcPortIo.TryReadByteStable(Pl2WriteAddress, out int rb2, out _);
         detail += $"PL1={pl1} PL2={pl2} 写入={write1 && write2} 回读={rb1}/{rb2}";
-        return write1 && write2 && read1 && read2 && fan && rb1 == pl1 && rb2 == pl2;
+        return write1 && write2 && read1 && read2 && fan && fanBoost && dstate && rb1 == pl1 && rb2 == pl2;
     }
 
     private static bool TryApplyFanMode(int visualMode, out string detail)
@@ -72,6 +76,36 @@ public static class NucPerformanceMode
         bool write = EcPortIo.TryWriteByte(FanModeAddress, value);
         bool read = EcPortIo.TryReadByteStable(FanModeAddress, out int back, out _);
         detail += $"FanMode=0x{value:X2} 写入={write} 回读=0x{back:X2}";
+        return write && read && back == value;
+    }
+
+    private static bool TryApplyFanBoost(int visualMode, out string detail)
+    {
+        int value = visualMode == 1 ? 64 : 0;
+        bool write = EcPortIo.TryWriteByte(FanBoostAddress, value);
+        bool read = EcPortIo.TryReadByteStable(FanBoostAddress, out int back, out _);
+        detail = $"FanBoost={value} 写入={write} 回读={back}";
+        return write && read && back == value;
+    }
+
+    private static bool TryApplyDState(int visualMode, out string detail)
+    {
+        detail = "";
+        int defaultAddress = visualMode switch { 1 => 1962, 2 => 1847, _ => 1843 };
+        if (!EcPortIo.TryReadByteStable(defaultAddress, out int defaultDState, out _) || defaultDState < 0 || defaultDState > 7)
+        {
+            detail = "DState 默认值读取失败";
+            return false;
+        }
+        if (!EcPortIo.TryReadByteStable(DStateAddress, out int current, out _) || current < 0 || current > 255)
+        {
+            detail = "DState 当前值读取失败";
+            return false;
+        }
+        int value = (current & 0xF8) | defaultDState;
+        bool write = EcPortIo.TryWriteByte(DStateAddress, value);
+        bool read = EcPortIo.TryReadByteStable(DStateAddress, out int back, out _);
+        detail = $"DState 0x{value:X2} 写入={write} 回读=0x{back:X2}";
         return write && read && back == value;
     }
 
