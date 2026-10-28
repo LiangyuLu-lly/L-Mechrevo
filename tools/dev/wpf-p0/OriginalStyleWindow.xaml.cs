@@ -4977,7 +4977,7 @@ public partial class OriginalStyleWindow : Window
         try
         {
             MechrevoHw? hw = _backendProbe?.Hw;
-            bool umiGpuMode = hw?.IsUmiMachine == true && hw.IsGcuConnected;
+            bool umiGpuMode = hw?.IsUmiMachine == true;
             bool nucNoGpuSwitch = hw?.IsIntelNucMachine == true;
             GpuSection.Visibility = (!nucNoGpuSwitch && (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap || umiGpuMode))
                 ? Visibility.Visible
@@ -4985,7 +4985,8 @@ public partial class OriginalStyleWindow : Window
             ScreenSection.Visibility = (caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming) ? Visibility.Visible : Visibility.Collapsed;
             bool hasKeyboard = caps.Keyboard || (hw?.SupportsKeyboard ?? false)
                 || hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true;
-            bool hasLightbar = caps.Lightbar || (hw?.SupportsLightbar ?? false);
+            bool hasLightbar = caps.Lightbar || (hw?.SupportsLightbar ?? false)
+                || hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true;
             bool hasLogo = caps.LogoLight || (hw?.SupportsLogoLight ?? false);
             LightingSection.Visibility = (hasKeyboard || hasLightbar || hasLogo) ? Visibility.Visible : Visibility.Collapsed;
             KeyboardLightRow.Visibility = hasKeyboard ? Visibility.Visible : Visibility.Collapsed;
