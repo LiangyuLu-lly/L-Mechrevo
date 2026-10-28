@@ -65,6 +65,8 @@ public static class NucPerformanceMode
         bool fan = TryApplyFanMode(visualMode, out string fanDetail);
         bool fanBoost = TryApplyFanBoost(visualMode, out string fanBoostDetail);
         bool dstate = TryApplyDState(visualMode, out string dstateDetail);
+        // 非自定义档：清除 Custom Mode 标志，交还 EC 原生模式。
+        TryWrite(1798, 64);
         detail += " " + fanDetail + " " + fanBoostDetail + " " + dstateDetail;
         bool read1 = TryRead(Pl1WriteAddress, out int rb1);
         bool read2 = TryRead(Pl2WriteAddress, out int rb2);
@@ -100,6 +102,11 @@ public static class NucPerformanceMode
         if (tcc.HasValue)
         {
             TryWrite(1926, Math.Clamp(tcc.Value, 0, 255));
+        }
+        // 触发字节 bit5=0x20 让 EC 重新锁存自定义功耗配置；保留 USB 充电 bit4。
+        if (TryRead(1895, out int trigger))
+        {
+            TryWrite(1895, (trigger & 0x10) | 0x20);
         }
         detail = $"自定义 PL1={p1} PL2={p2} PL4={p4} 写入={w1 && w2 && w3} 回读={rb1}/{rb2}/{rb3}";
         return w1 && w2 && w3 && r1 && r2 && r3 && rb1 == p1 && rb2 == p2 && rb3 == p4;
