@@ -2131,7 +2131,7 @@ public partial class OriginalStyleWindow : Window
     /// 旧 <c>SettingsForm.cs:12273</c> LIDSWITCH 处理的 WPF 等价：
     /// 合盖 = <c>BatteryControl.AutoBattery()</c> + 关键盘背光（旧 <c>Aura.ApplyBrightness(0,"Lid")</c>）；
     /// 开盖 = 恢复键盘背光（旧 <c>InputDispatcher.GetBacklight()</c>）+ 旧 <c>InputDispatcher.InitFNLock()</c>
-    /// （后者在可得反编译源里是空 stub，Core 无同源 API ⇒ 安全跳过并记录，⛔ 不伪造）。
+    /// （Core 无同源 API ⇒ 安全跳过并记录，⛔ 不伪造）。
     /// <para>⚠️ 旧合盖分支**不**改性能模式/刷新率/电源计划；电源来源变化的模式重放已由 task-25
     /// <c>OnPowerSettledAsync → PerfModeService.ReplayAsync</c> 覆盖 ⇒ 本路径不重复做。</para>
     /// </summary>
@@ -3854,6 +3854,7 @@ public partial class OriginalStyleWindow : Window
         Logger.WriteError("[kbd-osd] ACPI 亮度 → " + clamped + "/4");
     }
 
+    // OSD 交互参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
     private void PollTouchpadOsd(MechrevoHw hw)
     {
         try

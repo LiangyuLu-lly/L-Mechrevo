@@ -9,6 +9,8 @@ using L_Mechrevo.WpfP0.Resources;
 
 namespace L_Mechrevo.WpfP0;
 
+// OSD 交互参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>
 /// 轻量 OSD：性能模式、灯光、屏幕亮度、快捷键锁状态的即时提示。
 /// 窗口不激活、不抢焦点，短时自动消失；新提示覆盖旧提示。

@@ -2,6 +2,8 @@
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>
 /// NUC/UMI 电池保护档：官方控制台通过 EC 0x07B9 写充电上限。
 /// 三档映射：长效=100%、平衡=80%、工作站=60%；无极限充也走同一寄存器。

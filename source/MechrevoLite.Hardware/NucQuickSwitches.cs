@@ -5,6 +5,8 @@ using System.IO;
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>NUC/UMI 高频快捷开关：Fn 锁、摄像头、Win 键锁，直接走 ACPI EC。</summary>
 internal static class NucQuickSwitches
 {

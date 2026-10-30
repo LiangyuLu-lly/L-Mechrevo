@@ -4,6 +4,8 @@ using MechrevoLite.Gpu.NVidia;
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>NUC/UMI 显卡 cTGP / Dynamic Boost / 驱动超频。</summary>
 internal static class NucGpuPower
 {

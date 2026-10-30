@@ -4,6 +4,8 @@ using System.Linq;
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>NUC/UMI 风扇表：16 段温度/占空比 + 模式默认表 + 自定义曲线。</summary>
 internal static class NucFanTable
 {

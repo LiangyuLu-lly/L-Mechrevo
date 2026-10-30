@@ -2,6 +2,8 @@
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>
 /// NUC / UMI 原生性能档：直接写 EC 的 PL1/PL2，不再经过 GCU 的模式切换。
 /// 只使用已经确认的 EC 地址；风扇/GPU 仍由 EC 现有策略处理。

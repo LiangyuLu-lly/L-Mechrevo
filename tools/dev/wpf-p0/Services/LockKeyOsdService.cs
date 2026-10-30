@@ -4,6 +4,8 @@ using L_Mechrevo.WpfP0.Services;
 
 namespace L_Mechrevo.WpfP0;
 
+// OSD 交互参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>
 /// 系统大小写/小键盘锁定状态监听：轮询 GetKeyState，变化时弹 OSD。
 /// 同时让 QuickState 读取真实系统状态，快捷开关会跟随。

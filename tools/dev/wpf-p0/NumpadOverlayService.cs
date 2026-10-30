@@ -5,6 +5,8 @@ using MechrevoLite.Helpers;
 
 namespace L_Mechrevo.WpfP0;
 
+// OSD 交互参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>
 /// NUC 没有独立数字小键盘：Fn+SCRLK 打开 ScrollLock 后，
 /// 用主键盘 m/j/k/l/u/i/o/7/8/9 模拟小键盘 0..9。

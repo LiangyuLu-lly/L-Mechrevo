@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>
 /// UMI / Intel NUC X15 灯带：走 \\.\ACPIDriver 的 ACPI H2RAM 地址。
 /// 地址与控制位沿用 30 系 NUC 控制台的灯带实现。
