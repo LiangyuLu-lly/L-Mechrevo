@@ -3618,6 +3618,15 @@ public partial class OriginalStyleWindow : Window
         }
         HighlightSegment(button);
         int mode = int.Parse(text);
+        // 星耀平台通过统一服务入口设置电池档位。
+        if (XingyaoPmc2.IsXingyaoPlatform())
+        {
+            bool xingyaoOk = _services != null
+                ? (await DashboardCommands.SetBatteryModeAsync(mode)).Ok
+                : await _backendProbe.SetBatteryModeAsync(mode);
+            StatusText.Text = xingyaoOk ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
+            return;
+        }
         int percentForMode = mode switch { 0 => 100, 1 => 80, 2 => 60, _ => 80 };
         // 无极限充 / EC 限充生效时，三档只作为 EC 上限值来源，写 EC 0x7B9，不发 GCU 档位。
         if (ChargeSliderToggle.IsChecked == true)

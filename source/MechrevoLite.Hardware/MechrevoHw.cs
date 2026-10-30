@@ -9224,6 +9224,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	private void OnSystemBatteryProtection(JObject o)
 	{
+		if (XingyaoPmc2.IsXingyaoPlatform())
+		{
+			return;
+		}
 		int num = Int(o, "HealthProtectionStatus");
 		if (num >= 0 && num != BatteryProtection)
 		{
@@ -10436,10 +10440,29 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			2 => "HEALTHYMODE", 
 			_ => throw new ArgumentOutOfRangeException("mode"), 
 		};
-		Logger.WriteLine($"SetBatteryProtection({mode}) -> {action}");
 		await _controlLock.WaitAsync();
 		try
 		{
+			if (XingyaoPmc2.IsXingyaoPlatform())
+			{
+				int target = mode switch
+				{
+					0 => 100,
+					1 => 80,
+					2 => 60,
+					_ => throw new ArgumentOutOfRangeException(nameof(mode)),
+				};
+				// 两个阈值相同：低于目标充电，高于目标主动放电。
+				var state = await Task.Run(() => XingyaoPmc2.Restore(target, target));
+				Logger.WriteLine($"PMC2 电池档位已验证：Enabled={state.Enabled}, T1={state.T1}, T2={state.T2}");
+				if (BatteryProtection != mode)
+				{
+					BatteryProtection = mode;
+					BatteryProtectionChanged?.Invoke();
+				}
+				return true;
+			}
+			Logger.WriteLine($"SetBatteryProtection({mode}) -> {action}");
 			if (BatteryProtection == mode)
 			{
 				return true;
