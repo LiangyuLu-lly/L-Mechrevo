@@ -46,6 +46,8 @@
                 <TextBlock Text="{x:Static loc:WpfStrings.LicensesWindow_Text_3}" TextWrapping="Wrap" />
                 <TextBlock Text="{x:Static loc:WpfStrings.WujieFanTableLicense}" TextWrapping="Wrap" />
                 <TextBlock Text="https://github.com/Qxingyue/-14XA-Uniwill-EC-" TextWrapping="Wrap" />
+                <TextBlock Text="faintonce/open-revo — GPL-3.0" />
+                <TextBlock Text="https://github.com/faintonce/open-revo" TextWrapping="Wrap" />
                 <TextBlock Text="GaoXanSheng/JiaolongControl — MIT" />
                 <TextBlock Text="KanzakiK/DOUZHANZHE-Control — GPL-3.0" />
 

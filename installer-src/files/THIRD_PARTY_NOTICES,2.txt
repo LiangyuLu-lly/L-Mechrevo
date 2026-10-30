@@ -81,6 +81,7 @@ AMD SMU 命令参考：https://github.com/FlyGoat/RyzenAdj (LGPL-3.0)
                    https://github.com/irusanov/SMUDebugTool (GPL-3.0)
                    https://github.com/leogx9r/ryzen_smu (GPL-2.0)
 其它 SMU 通路参考：https://github.com/JamesCJ60/Universal-x86-Tuning-Utility (GPL-3.0)
+OpenRevo 项目参考：https://github.com/faintonce/open-revo (GPL-3.0)
 蓝牙水冷协议参考：https://github.com/tomups/watercooler-manager (GPL-3.0)
 ---------------------------------------------------------------------------
 InpOut32/64（Highresolution Enterprises）
