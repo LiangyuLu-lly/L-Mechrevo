@@ -56,7 +56,7 @@
    安装脚本自动识别 WJ/WJXY 两种名称。
 7. NUC/UMI 云母背景适配：默认开启 Mica，Win11 22H2+ 生效；不支持时回退纯色，
    设置页可开关云母并调强度（NUC/UMI 与其它机型共用同一套窗口背景逻辑）。
-8. 鸣谢与引用增加 faintonce/open-revo（GPL-3.0）；云母/背景模糊使用 Windows DWM 系统材质，不是 OpenRevo 提供。
+8. 鸣谢与引用增加 faintonce/open-revo（GPL-3.0）。
 9. 构建验证：0 errors；NVIDIA 子进程与按需采样需真机回归。
 
 四十二、0.293.5.1 beta23.5.1 稳定性补丁（2026-10-23 · 旧UI）

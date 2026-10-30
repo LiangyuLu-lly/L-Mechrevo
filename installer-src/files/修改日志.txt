@@ -44,8 +44,7 @@ r84（2026-10-31 · 0.293.6.3 beta23.6.3 · NVIDIA 遥测子进程化 + NUC Fn/�
   设置页增加云母开关与强度滑块，NUC/UMI 与其它机型共用同一套窗口背景逻辑。
 - 鸣谢与引用增加 `faintonce/open-revo`（GPL-3.0）：README、LicensesWindow、
   THIRD_PARTY_NOTICES 英文/中文三处同步。
-- 云母/背景模糊使用 Windows DWM 系统材质（DwmSetWindowAttribute），不是 OpenRevo 的代码/方案；
-  OpenRevo 仅作为项目架构参考。
+- 云母/背景模糊使用 Windows DWM 系统材质（DwmSetWindowAttribute）。
 - 构建 0 errors；真机待验证项：nvidia-smi 字段支持度、功耗上限写入、水冷 BLE 曲线/绑定、外接 HDMI 黑屏回归。
 
 r83（2026-10-27 · 0.293.6 beta23.6 · WPF 主界面打包）

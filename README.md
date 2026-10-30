@@ -262,7 +262,6 @@ GCU 硬件服务尚未连接时，涉及硬件的命令会提示「GCU 硬件服
 
 - **[G-Helper](https://github.com/seerge/g-helper)**：应用框架与部分硬件控制思路（GPL-3.0-only）。
 - **[OpenRevo](https://github.com/faintonce/open-revo)**：机械革命机型识别、后端匹配与控制中心架构参考（GPL-3.0）。
-- **云母 / 背景模糊**：直接使用 Windows DWM 系统材质（`DwmSetWindowAttribute`），不是 OpenRevo 的代码或方案。
 - **[PawnIO](https://github.com/namazso/PawnIO) / [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules)**：底层驱动与 SMU/MSR/EC 模块（驱动 GPL-2.0，模块 LGPL-2.1-or-later）。
 - **[irusanov/SMUDebugTool](https://github.com/irusanov/SMUDebugTool) / [ZenStates-Core](https://github.com/irusanov/ZenStates-Core)**：AMD SMU 协议参考（GPL-3.0）。
 - **[FlyGoat/RyzenAdj](https://github.com/FlyGoat/RyzenAdj)**：AMD SMU 命令与功耗参数参考（LGPL-3.0）。
