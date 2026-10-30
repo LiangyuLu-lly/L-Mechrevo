@@ -235,11 +235,32 @@
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_BackgroundBlur}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="BackgroundBlurSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="40" Value="12"
+                                        VerticalAlignment="Center" ValueChanged="BackgroundBlur_Changed" />
+                                <TextBlock x:Name="BackgroundBlurText" Text="12" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
                             <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_31}" VerticalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Slider x:Name="BackgroundScrimSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="50"
                                         VerticalAlignment="Center" ValueChanged="BackgroundScrim_Changed" />
                                 <TextBlock x:Name="BackgroundScrimText" Text="50%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <CheckBox x:Name="MicaBackdropCheck" Content="{x:Static loc:WpfStrings.SettingsWindow_MicaBackdrop}"
+                                      VerticalAlignment="Center" Click="MicaBackdrop_Click" />
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_MicaTint}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="MicaTintSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="100"
+                                        VerticalAlignment="Center" ValueChanged="MicaTint_Changed"
+                                        ToolTip="云母强度：100 = 云母最强，0 = 完全不透明" />
+                                <TextBlock x:Name="MicaTintText" Text="100%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
                             </StackPanel>
                         </Grid>
                         <Grid Margin="0,8,0,0">
@@ -434,11 +455,11 @@
                 <Border x:Name="PeripheralBatteryCard" Style="{StaticResource Card}" Visibility="Collapsed">
                     <StackPanel>
                         <Grid>
-                            <TextBlock Text="外设电量" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.ExternalBatteryCard_Title}" Style="{StaticResource CardTitle}" />
                             <TextBlock x:Name="PeripheralBatteryStatus" Text="" Style="{StaticResource Hint}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0" />
                         </Grid>
                         <StackPanel x:Name="PeripheralBatteryPanel" Margin="0,8,0,0" />
-                        <TextBlock Text="读取已连接蓝牙/HID 键鼠的剩余电量；不支持或读取失败时不显示本卡片。"
+                        <TextBlock Text="{x:Static loc:WpfStrings.ExternalBatteryCard_Description}"
                                    Style="{StaticResource Hint}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
@@ -480,6 +501,12 @@
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_8}" Tag="2000" />
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_7}" Tag="5000" />
                             </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="锁定悬浮窗（鼠标穿透）" VerticalAlignment="Center" />
+                            <CheckBox x:Name="OverlayLockCheck" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Click="OverlayLock_Click" />
                         </Grid>
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_6}" Style="{StaticResource FlatButton}" Click="OverlayToggle_Click" />

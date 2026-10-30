@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(OriginalStyleWindow owner)
     {
         InitializeComponent();
+        L_Mechrevo.WpfP0.Services.WindowWorkAreaPolicy.ClampOnLoaded(this);
         FontFamily = (System.Windows.Media.FontFamily)Application.Current.Resources["AppFontFamily"];
         _owner = owner;
         Owner = owner;
@@ -173,6 +174,7 @@ public partial class SettingsWindow : Window
             }
             OverlayOpacitySlider.Value = opacity;
             OverlayOpacityText.Text = opacity + "%";
+            OverlayLockCheck.IsChecked = _owner?.WideOverlayLocked == true;
             foreach (ComboBoxItem item in OverlayIntervalCombo.Items)
             {
                 if (item.Tag as string == interval.ToString())
@@ -251,6 +253,13 @@ public partial class SettingsWindow : Window
         Status(WpfStrings.OverlayStateToggled);
     }
 
+    private void OverlayLock_Click(object sender, RoutedEventArgs e)
+    {
+        bool locked = OverlayLockCheck.IsChecked == true;
+        _owner?.SetOverlayLockedFromSettings(locked);
+        Status(locked ? "悬浮窗已锁定，可在托盘菜单或设置中解锁" : "悬浮窗已解锁");
+    }
+
     private void OverlayReset_Click(object sender, RoutedEventArgs e)
     {
         ApplyOverlayValues(resetPosition: true);
@@ -308,8 +317,10 @@ public partial class SettingsWindow : Window
         RefreshPawnIO();
         BackgroundOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_bg_opacity", 65), 0, 100);
         BackgroundScrimSlider.Value = Math.Clamp(AppConfig.Get("ui_bg_scrim", 50), 0, 100);
+        BackgroundBlurSlider.Value = Math.Clamp(AppConfig.Get("ui_bg_blur", 12), 0, 40);
         BackgroundOpacityText.Text = (int)BackgroundOpacitySlider.Value + "%";
         BackgroundScrimText.Text = (int)BackgroundScrimSlider.Value + "%";
+        BackgroundBlurText.Text = ((int)BackgroundBlurSlider.Value).ToString();
         WideBackgroundOpacitySlider.Value = Math.Clamp(AppConfig.Get("wide_bg_opacity", 78), 0, 100);
         WideBackgroundOpacityText.Text = (int)WideBackgroundOpacitySlider.Value + "%";
         RefreshBackgroundPathText();
@@ -481,6 +492,8 @@ public partial class SettingsWindow : Window
         }
         AppConfig.Set("language", item.Tag as string ?? "zh-CN");
         AppConfig.Flush();
+        // 立即同步 GCU 悬浮窗语言；LM 自身界面仍按提示重启生效。
+        _owner.SyncGcuLanguage(item.Tag as string ?? "zh-CN");
         MessageBoxResult restart = MessageBox.Show(
             this,
             WpfStrings.LanguageRestartPrompt,
@@ -646,6 +659,20 @@ public partial class SettingsWindow : Window
         AppConfig.Set("ui_bg_opacity", value);
         AppConfig.Flush();
         _owner.ApplyBackgroundAppearance();
+    }
+
+    private void BackgroundBlur_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncing || BackgroundBlurText == null)
+        {
+            return;
+        }
+        int value = (int)Math.Round(e.NewValue);
+        BackgroundBlurText.Text = value.ToString();
+        AppConfig.Set("ui_bg_blur", value);
+        AppConfig.Flush();
+        _owner.ApplyBackgroundAppearance();
+        _owner.RefreshWideBackground();
     }
 
     private void BackgroundScrim_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -917,7 +944,7 @@ public partial class SettingsWindow : Window
         }
         try
         {
-            MechrevoLite.Update.UpdateInfo? info = await MechrevoLite.Update.UpdateChecker.CheckAsync(force: true);
+            MechrevoLite.Update.UpdateInfo? info = await MechrevoLite.Update.UpdateChecker.CheckGitHubAsync(force: true);
             if (info == null)
             {
                 Status(WpfStrings.UpdateCheckNoResult);

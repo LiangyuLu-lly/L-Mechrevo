@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using MechrevoLite;
 using MechrevoLite.Hardware;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -21,18 +22,18 @@ internal static class LiquidCoolingLightService
 
     private static readonly LiquidLightOption[] HeadOptions =
     {
-        new("cyan_static", "青色常亮"),
-        new("cyan_breath", "青色呼吸"),
-        new("colorful", "七彩"),
-        new("colorful_breath", "七彩呼吸"),
-        new("custom_static", "自定义常亮", IsCustom: true),
-        new("custom_breath", "自定义呼吸", IsCustom: true)
+        new("cyan_static", WpfStrings.L("青色常亮", "Cyan solid")),
+        new("cyan_breath", WpfStrings.L("青色呼吸", "Cyan breathing")),
+        new("colorful", WpfStrings.L("七彩", "Colorful")),
+        new("colorful_breath", WpfStrings.L("七彩呼吸", "Colorful breathing")),
+        new("custom_static", WpfStrings.L("自定义常亮", "Custom solid"), IsCustom: true),
+        new("custom_breath", WpfStrings.L("自定义呼吸", "Custom breathing"), IsCustom: true)
     };
 
     private static readonly LiquidLightOption[] FanOptions =
     {
-        new("fan_rotate", "风扇旋转"),
-        new("fan_rainbow", "风扇彩虹")
+        new("fan_rotate", WpfStrings.L("风扇旋转", "Fan spin")),
+        new("fan_rainbow", WpfStrings.L("风扇彩虹", "Fan rainbow"))
     };
 
     internal static IReadOnlyList<LiquidLightOption> Options(MechrevoHw? hw)
@@ -42,7 +43,7 @@ internal static class LiquidCoolingLightService
         {
             options.AddRange(FanOptions);
         }
-        options.Add(new LiquidLightOption("off", "关闭"));
+        options.Add(new LiquidLightOption("off", WpfStrings.L("关闭", "Off")));
         return options;
     }
 

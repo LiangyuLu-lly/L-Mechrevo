@@ -76,6 +76,8 @@ internal static class EcPortIo
 
 	private static bool _loadAttempted;
 
+	private static bool _inpoutFallback;
+
 	private static string _loadFailure = "";
 
 	private static bool _poisoned;
@@ -1127,15 +1129,25 @@ internal static class EcPortIo
 		}
 		try
 		{
-			ulong[] output = new ulong[1];
-			if (!_pawn.Execute("ioctl_pio_read", new ulong[1] { port }, output))
+			if (_pawn != null && _pawn.IsModuleLoaded)
 			{
-				ReportSoftFailure(kind, "端口读 0x" + port.ToString("X2") + " 失败（Execute 返回 false）");
-				return false;
+				ulong[] output = new ulong[1];
+				if (!_pawn.Execute("ioctl_pio_read", new ulong[1] { port }, output))
+				{
+					ReportSoftFailure(kind, "端口读 0x" + port.ToString("X2") + " 失败（Execute 返回 false）");
+					return false;
+				}
+				_ioCount++;
+				value = (byte)(output[0] & 0xFF);
+				return true;
 			}
-			_ioCount++;
-			value = (byte)(output[0] & 0xFF);
-			return true;
+			if (I2ecInpOut.TryReadPort((short)port, out value))
+			{
+				_ioCount++;
+				return true;
+			}
+			ReportSoftFailure(kind, "端口读 0x" + port.ToString("X2") + " 失败（PawnIO/inpoutx64 都不可用）");
+			return false;
 		}
 		catch (Exception ex)
 		{
@@ -1155,17 +1167,27 @@ internal static class EcPortIo
 		}
 		try
 		{
-			if (!_pawn.Execute("ioctl_pio_write", new ulong[2]
+			if (_pawn != null && _pawn.IsModuleLoaded)
 			{
-				port,
-				value
-			}, null))
-			{
-				ReportSoftFailure(kind, "端口写 0x" + port.ToString("X2") + " 失败（Execute 返回 false）");
-				return false;
+				if (!_pawn.Execute("ioctl_pio_write", new ulong[2]
+				{
+					port,
+					value
+				}, null))
+				{
+					ReportSoftFailure(kind, "端口写 0x" + port.ToString("X2") + " 失败（Execute 返回 false）");
+					return false;
+				}
+				_ioCount++;
+				return true;
 			}
-			_ioCount++;
-			return true;
+			if (I2ecInpOut.TryWritePort((short)port, value))
+			{
+				_ioCount++;
+				return true;
+			}
+			ReportSoftFailure(kind, "端口写 0x" + port.ToString("X2") + " 失败（PawnIO/inpoutx64 都不可用）");
+			return false;
 		}
 		catch (Exception ex)
 		{
@@ -1181,6 +1203,18 @@ internal static class EcPortIo
 
 	// ── 模块惰性装载 ──
 
+	private static bool TryUseInpoutFallback(string reason)
+	{
+		if (!I2ecInpOut.CanUsePortIo(out string detail))
+		{
+			return false;
+		}
+		_inpoutFallback = true;
+		_loadFailure = "PawnIO 不可用（" + reason + "）⇒ 已回退 inpoutx64 端口 I/O";
+		Logger.WriteError("[ec] " + _loadFailure + " · " + detail);
+		return true;
+	}
+
 	private static bool EnsureModule()
 	{
 		if (_pawn != null && _pawn.IsModuleLoaded)
@@ -1189,7 +1223,7 @@ internal static class EcPortIo
 		}
 		if (_loadAttempted)
 		{
-			return false;
+			return _inpoutFallback;
 		}
 		_loadAttempted = true;
 		PawnIOWrapper pawn = null;
@@ -1206,6 +1240,10 @@ internal static class EcPortIo
 					_ => "PawnIO 连接失败：" + connect,
 				};
 				pawn.Dispose();
+				if (TryUseInpoutFallback(_loadFailure))
+				{
+					return true;
+				}
 				return false;
 			}
 			byte[] moduleData = LoadModuleResource();
@@ -1213,12 +1251,20 @@ internal static class EcPortIo
 			{
 				_loadFailure = "内嵌资源 " + ModuleResourceName + " 缺失或为空";
 				pawn.Dispose();
+				if (TryUseInpoutFallback(_loadFailure))
+				{
+					return true;
+				}
 				return false;
 			}
 			if (!pawn.LoadModule(moduleData))
 			{
 				_loadFailure = "模块装载被拒（LoadModule 返回 false）";
 				pawn.Dispose();
+				if (TryUseInpoutFallback(_loadFailure))
+				{
+					return true;
+				}
 				return false;
 			}
 			_pawn = pawn;
@@ -1228,6 +1274,10 @@ internal static class EcPortIo
 		{
 			_loadFailure = "装载抛异常：" + ex.GetType().Name + "：" + ex.Message;
 			pawn?.Dispose();
+			if (TryUseInpoutFallback(_loadFailure))
+			{
+				return true;
+			}
 			return false;
 		}
 	}

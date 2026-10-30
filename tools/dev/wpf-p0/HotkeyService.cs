@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Interop;
 using MechrevoLite;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 /// <summary>全局热键：绑定保存在 config，支持设置页修改。</summary>
@@ -21,13 +22,13 @@ internal sealed class HotkeyService : IDisposable
 
     internal static readonly HotkeyAction[] Actions =
     {
-        new(1, "mode_silent", "切换到静音模式", ModControl | ModAlt, 0x31),
-        new(2, "mode_balanced", "切换到平衡模式", ModControl | ModAlt, 0x32),
-        new(3, "mode_turbo", "切换到狂暴模式", ModControl | ModAlt, 0x33),
-        new(4, "mode_custom", "切换到自定义模式", ModControl | ModAlt, 0x34),
-        new(5, "overlay", "悬浮窗", ModControl | ModAlt, 0x4F),
-        new(6, "settings", "设置", ModControl | ModAlt, 0x53),
-        new(7, "show_main", "显示主界面", ModControl | ModAlt, 0x4D)
+        new(1, "mode_silent", WpfStrings.L("切换到静音模式", "Switch to Silent mode"), ModControl | ModAlt, 0x31),
+        new(2, "mode_balanced", WpfStrings.L("切换到平衡模式", "Switch to Balanced mode"), ModControl | ModAlt, 0x32),
+        new(3, "mode_turbo", WpfStrings.L("切换到狂暴模式", "Switch to Turbo mode"), ModControl | ModAlt, 0x33),
+        new(4, "mode_custom", WpfStrings.L("切换到自定义模式", "Switch to Custom mode"), ModControl | ModAlt, 0x34),
+        new(5, "overlay", WpfStrings.L("悬浮窗", "Overlay"), ModControl | ModAlt, 0x4F),
+        new(6, "settings", WpfStrings.L("设置", "Settings"), ModControl | ModAlt, 0x53),
+        new(7, "show_main", WpfStrings.L("显示主界面", "Show main window"), ModControl | ModAlt, 0x4D)
     };
 
     private readonly HwndSource _source;
@@ -47,7 +48,7 @@ internal sealed class HotkeyService : IDisposable
     internal HotkeyService(Window window)
     {
         IntPtr handle = new WindowInteropHelper(window).Handle;
-        _source = HwndSource.FromHwnd(handle) ?? throw new InvalidOperationException("HWND 未就绪");
+        _source = HwndSource.FromHwnd(handle) ?? throw new InvalidOperationException(WpfStrings.L("HWND 未就绪", "HWND not ready"));
         _hook = WndProc;
         _source.AddHook(_hook);
         Current = this;

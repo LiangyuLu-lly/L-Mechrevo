@@ -816,6 +816,21 @@
   <data name="SettingsWindow_Text_32" xml:space="preserve">
     <value>背景不透明度</value>
   </data>
+  <data name="SettingsWindow_MicaBackdrop" xml:space="preserve">
+    <value>云母材质背景</value>
+  </data>
+  <data name="SettingsWindow_MicaTint" xml:space="preserve">
+    <value>云母强度</value>
+  </data>
+  <data name="TrayOverlayLock" xml:space="preserve">
+    <value>悬浮窗：锁定/解锁</value>
+  </data>
+  <data name="OverlayLockHint" xml:space="preserve">
+    <value>锁定悬浮窗（鼠标穿透）</value>
+  </data>
+  <data name="SettingsWindow_BackgroundBlur" xml:space="preserve">
+    <value>背景模糊</value>
+  </data>
   <data name="SettingsWindow_Text_33" xml:space="preserve">
     <value>主题色</value>
   </data>
@@ -2696,6 +2711,9 @@
   <data name="OnlineUpdateDisabled" xml:space="preserve">
     <value>当前版本已按原版策略关闭在线更新</value>
   </data>
+  <data name="UpdateChecking" xml:space="preserve">
+    <value>正在检查更新…</value>
+  </data>
   <data name="UpdateCheckNoResult" xml:space="preserve">
     <value>检查更新失败：没有返回结果</value>
   </data>
@@ -2959,5 +2977,17 @@ GCU：{0} · 宝龙达：{1} · 无界：{2}</value>
   </data>
   <data name="TurboHighEnergy" xml:space="preserve">
     <value>高能狂暴</value>
+  </data>
+  <data name="NucExtremeTurbo" xml:space="preserve">
+    <value>极致狂暴</value>
+  </data>
+  <data name="FanCurveBaolongdaEnable_Content" xml:space="preserve">
+    <value>启用软件闭环</value>
+  </data>
+  <data name="FanSyncSharedHeatPipe_Content" xml:space="preserve">
+    <value>双扇联动</value>
+  </data>
+  <data name="FanCurveRestoreDefault_Content" xml:space="preserve">
+    <value>恢复默认曲线</value>
   </data>
 </root>

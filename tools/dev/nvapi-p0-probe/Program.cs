@@ -21,7 +21,8 @@ namespace NvApiP0Probe;
 /// <para>⭐ <c>--interop</c> / <c>--interop-write</c>：链接主工程的 <c>NvapiPStates.cs</c> 原文件，
 /// 实测「手写 NVAPI 类 + NvAPIWrapper 同一进程」的互操作（本机曾复现 Unload 导致 wrapper
 /// <c>EnumPhysicalGPUs</c> 0xC0000005；修正后 10/10 一致）。</para>
-/// <para>⭐ <c>--reset</c> 只归零；<c>--log PATH</c> 指定输出文件（提权时无法重定向 stdout，必须靠它）。</para>
+/// <para>⭐ <c>--reset</c> 只归零；<c>--apply N</c> 应用 +N/+N 并**故意不归零**（人工验证用，验证后手动 --reset）；
+/// <c>--log PATH</c> 指定输出文件（提权时无法重定向 stdout，必须靠它）。</para>
 /// <para>⚠️ 普通读/写模式用 NvAPIWrapper（与主工程同一 DLL）；interop 模式才用主工程手写结构体类。</para>
 /// </summary>
 internal static class Program
@@ -46,10 +47,25 @@ internal static class Program
 			delta = Math.Abs(parsed);
 		}
 		delta = Math.Clamp(delta, 1, HardLimitMhz / 2);
+		int apply = -1;
+		string applyText = ArgValue(args, "--apply");
+		if (applyText != null && int.TryParse(applyText, out int applyParsed) && applyParsed != 0)
+		{
+			apply = Math.Clamp(Math.Abs(applyParsed), 1, HardLimitMhz);
+		}
 		try
 		{
 			Log($"=== nvapi-p0-probe ===  PID={Environment.ProcessId} · admin={IsElevated()} · {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 			Log($"args = {(args.Length == 0 ? "(none)" : string.Join(" ", args))}");
+			if (apply > 0)
+			{
+				if (write || reset || interop || interopWrite)
+				{
+					Log("[args] --apply 不能与其他模式同时用");
+					return 3;
+				}
+				return RunApply(apply);
+			}
 			if (interop || interopWrite)
 			{
 				return RunInterop(interopWrite);
@@ -372,7 +388,66 @@ internal static class Program
 		return 0;
 	}
 
+	/// <summary>
+	/// ⭐ 人工验证模式：写入 core/mem = +N / +N MHz 并回读确认，**故意不自动归零**
+	/// （保持偏移供机主用外部工具/体感验证）。验证完请运行 <c>--reset</c>。
+	/// <para>⚠️ 若写入未被回读确认，仍会立即归零兜底：不把未知状态留给机主。</para>
+	/// <para>退出码：0=已应用并回读一致；9=未确认（已归零兜底）；6=需要管理员；5=读不到 P0。</para>
+	/// </summary>
+	private static int RunApply(int mhz)
+	{
+		Log($"mode = APPLY core/mem = +{mhz} MHz（**不自动归零**，供人工验证；验证后请运行 --reset）");
+		PhysicalGPU[] gpus = PhysicalGPU.GetPhysicalGPUs();
+		if (gpus == null || gpus.Length == 0)
+		{
+			Log("[gpu] 枚举不到物理 GPU ⇒ 停止");
+			return 4;
+		}
+		PhysicalGPU gpu = gpus.FirstOrDefault((PhysicalGPU g) => g.SystemType == SystemType.Laptop) ?? gpus[0];
+		Log("[gpu] 选用：" + gpu.FullName);
+		if (!TryReadP0(gpu.Handle, out int coreNow, out int memNow, out string err))
+		{
+			Log("[P0] 读不到：" + err);
+			return 5;
+		}
+		Log($"[P0] 写前 core={coreNow} mem={memNow} MHz");
+		if (!IsElevated())
+		{
+			Log("[apply] ⚠️ 当前进程不是管理员 ⇒ 不写（NVAPI 写会被拒绝）。");
+			return 6;
+		}
+		if (coreNow != 0 || memNow != 0)
+		{
+			Log($"⚠️ 进入时偏移非 0（{coreNow}/{memNow}）⇒ 先归零再做本用例");
+			if (!ResetCoreMem(gpu.Handle))
+			{
+				Log("[apply] ⚠️ 前置归零未确认 ⇒ 不写");
+				return 7;
+			}
+		}
+		Log("");
+		Log($"--- apply：core=+{mhz} mem=+{mhz} MHz（单次 SetPstates20，两域一起）---");
+		bool ok = TryWriteAndVerify(gpu.Handle, mhz, "apply(+" + mhz + ")", out int readCore, out int readMem);
+		if (!ok)
+		{
+			Log("⚠️ 写入未被回读确认 ⇒ 立即归零兜底（不把未知状态留给机主）");
+			bool zero = ResetCoreMem(gpu.Handle);
+			Log(zero ? "[apply] 已归零 0/0 ✅（本次 apply 失败）" : "[apply] ⛔ 归零也未确认，请人工复核！");
+			return 9;
+		}
+		Log($"[apply] ✅ 已应用并回读确认 core={readCore} mem={readMem} MHz");
+		Log("⚠️ 本模式故意不归零：偏移保持到驱动复位/重启；人工验证完请运行 --reset 归零。");
+		Log("EXIT=0");
+		return 0;
+	}
+
 	private static bool TryWriteCase(PhysicalGPUHandle handle, int targetMhz, out int readCore, out int readMem)
+	{
+		return TryWriteAndVerify(handle, targetMhz, "case +" + targetMhz, out readCore, out readMem);
+	}
+
+	/// <summary>写入 core=mem=targetMhz 并多次回读，只有完全一致才返回 true（回读值通过 out 返回）。</summary>
+	private static bool TryWriteAndVerify(PhysicalGPUHandle handle, int targetMhz, string tag, out int readCore, out int readMem)
 	{
 		readCore = 0;
 		readMem = 0;
@@ -384,11 +459,11 @@ internal static class Program
 		try
 		{
 			WriteP0(handle, targetMhz, targetMhz);
-			Log($"  [case +{targetMhz}] SetPstates20(core={targetMhz}, mem={targetMhz}) 调用成功（驱动已接受，无异常）");
+			Log($"  [{tag}] SetPstates20(core={targetMhz}, mem={targetMhz}) 调用成功（驱动已接受，无异常）");
 		}
 		catch (Exception ex)
 		{
-			Log($"  [case +{targetMhz}] SetPstates20 抛异常 ⇒ 写入未被接受：{ex.Message}");
+			Log($"  [{tag}] SetPstates20 抛异常 ⇒ 写入未被接受：{ex.Message}");
 			return false;
 		}
 		int[] delays = new int[6] { 100, 150, 250, 500, 1000, 2000 };
@@ -397,11 +472,11 @@ internal static class Program
 			Thread.Sleep(delays[i]);
 			if (!TryReadP0(handle, out readCore, out readMem, out string err))
 			{
-				Log($"  [case +{targetMhz}] 第 {i + 1} 次回读失败：{err}");
+				Log($"  [{tag}] 第 {i + 1} 次回读失败：{err}");
 				continue;
 			}
 			bool match = readCore == targetMhz && readMem == targetMhz;
-			Log($"  [case +{targetMhz}] 第 {i + 1} 次回读 core={readCore} mem={readMem}（期望 {targetMhz}/{targetMhz}）⇒ {(match ? "匹配 ✅" : "未匹配")}");
+			Log($"  [{tag}] 第 {i + 1} 次回读 core={readCore} mem={readMem}（期望 {targetMhz}/{targetMhz}）⇒ {(match ? "匹配 ✅" : "未匹配")}");
 			if (match)
 			{
 				return true;

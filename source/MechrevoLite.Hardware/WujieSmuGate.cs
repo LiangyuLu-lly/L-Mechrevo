@@ -50,7 +50,7 @@ internal sealed record WujieSmuVerdict(
 internal static class WujieSmuGate
 {
 	/// <summary>机型名关键字（⛔ 不含模具号；大小写不敏感）。</summary>
-	private static readonly string[] WujieModelKeywords = new string[3] { "无界", "WUJIE", "WJXY" };
+	private static readonly string[] WujieModelKeywords = new string[3] { "无界", "WUJIE", "WJ" };
 	// 范围常量（UI/写入**同一口径**）：PL1/PL2 = [15, 90]W；温度墙沿用 60–105℃。
 	internal const int PlMinWatts = 15;
 
@@ -61,7 +61,7 @@ internal static class WujieSmuGate
 	internal const int TccMaxCelsius = 105;
 
 	/// <summary>
-	/// ⭐ **无界 APU 判据**（不含 SMU 可用性）：机型名含无界/WUJIE/WJXY && CpuVendor.IsAmd && 无 NVIDIA 独显 ✅。
+	/// ⭐ **无界 APU 判据**（不含 SMU 可用性）：机型名含无界/WUJIE/WJ && CpuVendor.IsAmd && 无 NVIDIA 独显 ✅。
 	/// <para>⚠️ 只读；SMU 是否可用由调用方另加 `SmuAvailability.IsReady`（与 `<see cref="PerfModeCapabilities.UsesSmuForCustomPower" />` 同源）。</para>
 	/// </summary>
 	internal static bool IsWujieApu()
@@ -90,7 +90,7 @@ internal static class WujieSmuGate
 				return false;
 			}
 			WujieSmuVerdict verdict = Evaluate();
-			// 无界机型保持原判据（避免 WJXY 载荷同时命中时把无界当星耀）
+			// 无界机型保持原判据（避免 WJ 载荷同时命中时把无界当星耀）
 			return !verdict.IsWujie && verdict.IsAmd && !verdict.HasNvidia;
 		}
 		catch

@@ -1043,7 +1043,17 @@ public static class HardwareControl
 		//   ⛔ 整个选择过程**不修改任何数值**（不做偏移/补偿）✅
 		int celsius = 0;
 		string source = "";
-		if (vendorCelsius > 0)
+		// NUC/UMI 的 GCU 厂商温度可能长期停在一个值（风扇却按真实温度转），
+		// 这两类机型改为 LHM 优先；其它机型仍保持厂商优先。
+		bool preferLhmCpu = (hw.IsIntelNucMachine || hw.IsUmiMachine) && !lhmSuspect && lhmCelsius > 0;
+		if (preferLhmCpu)
+		{
+			celsius = lhmCelsius;
+			source = (lhmTier == LhmMonitor.CpuTemperatureTier.TctlTdie)
+				? "LHM/TctlTdie"
+				: (lhmTier == LhmMonitor.CpuTemperatureTier.Package ? "LHM/Package" : "LHM/Other");
+		}
+		else if (vendorCelsius > 0)
 		{
 			celsius = vendorCelsius;
 			source = (hw.UsesBaolongda ? "func22" : "vendor");
@@ -1333,7 +1343,18 @@ public static class HardwareControl
 		try
 		{
 			int cpuFromVendor = (hw.BaolongdaCpuTemp > 0) ? hw.BaolongdaCpuTemp : hw.CpuTemp;
-			if (cpuFromVendor > 0)
+			// 无界/星耀 AMD：厂商通道给的是热区/封装口径，和 HWiNFO 的 CPU Package 差很多，
+			// 这两类机型改为 LHM 优先，LHM 无值才回退厂商/ACPI。
+			// 无界/星耀 AMD APU 的厂商通道是 ACPI/热区口径（用户截图 67℃），
+			// HWiNFO 的 Tctl/Tdie 才是 CPU 真实温度（38℃）；这两种 APU 都优先 LHM。
+			bool preferLhm = hw.SmuCustomApu || hw.WujieSmuApu;
+			float? fromLhm = lhmMonitor.CpuTemperature;
+			if (preferLhm && fromLhm.HasValue && fromLhm.Value > 0f)
+			{
+				cpuTemp = (int)Math.Round(fromLhm.Value);
+				hw.MarkCpuInfoReceived();
+			}
+			else if (cpuFromVendor > 0)
 			{
 				// ⭐ 厂商（⭐ GCU 推送 / ⭐ 宝龙达功能号 22 ✅）给了有效值 ⇒ ⭐ 照原样用 ✅
 				cpuTemp = cpuFromVendor;
@@ -1341,7 +1362,6 @@ public static class HardwareControl
 			else
 			{
 				// ⭐ 厂商没给 ⇒ ⭐ 才用 LM 自带的 LHM 兜底 ✅（⭐ 非 GCU 后端主要靠这一支 ✅）
-				float? fromLhm = lhmMonitor.CpuTemperature;
 				if (fromLhm.HasValue && fromLhm.Value > 0f)
 				{
 					cpuTemp = (int)Math.Round(fromLhm.Value);
@@ -1554,6 +1574,18 @@ public static class HardwareControl
 			}
 			// 2026-10-22（机主：LM 显示的 CPU 转速其实是副扇、GPU 读不到）：
 			// 无界机型**以 EC 为准**覆盖 GCU FanInfo：主扇 0x0464 = CPU、副扇 0x046C = GPU。
+			// GCU FanInfo 未上报时（例如 GCU 服务预热/尚未 ready），按官方 EC 寄存器只读兜底。
+			// 与 OpenRevo 的 EC 轮询同理：Fan RPM 直接走 EC，不依赖 GCU 是否已 ready。
+			if (!hw.WujieSmuApu && !hw.UsesBaolongda
+				&& (cpuFanRPM <= 0 || gpuFanRPM <= 0)
+				&& hw.TryReadGcuEcFanSpeeds(out int gcuCpuFanRpm, out int gcuGpuFanRpm))
+			{
+				if (gcuCpuFanRpm > 0) cpuFanRPM = gcuCpuFanRpm;
+				if (gcuGpuFanRpm > 0) gpuFanRPM = gcuGpuFanRpm;
+				hw.ApplyGcuEcFanSpeeds(gcuCpuFanRpm, gcuGpuFanRpm);
+				Logger.WriteLineIfChanged("gcu-ec-fan",
+					"[fan] GCU FanInfo 缺失 ⇒ EC 只读兜底：CPU=" + gcuCpuFanRpm + "rpm · GPU=" + gcuGpuFanRpm + "rpm");
+			}
 			if (hw.WujieSmuApu)
 			{
 				if (hw.TryReadWujieEcFanSpeeds(out int mainFanRpm, out int secondaryFanRpm))
@@ -1996,10 +2028,16 @@ public static class HardwareControl
 					break;
 				}
 			}
-			// ⭐ 理据：⭐ 0℃ 以下 / ⭐ 150℃ 以上都不是"⭐ 真实 GPU 温度"⭐ ⇒ ⭐ 当取不到 ✅（⛔ 不猜 ⚠️）
-			if (firstLine != null && int.TryParse(firstLine, out int celsius) && celsius > 0 && celsius < 150)
+			// 理据：0℃ 以下 / 150℃ 以上都不是真实 GPU 温度 ⇒ 当取不到（不猜）。
+			// 注意：部分 nvidia-smi（如 621.01）的 temperature.gpu 输出是带两位小数的
+			// 浮点（46.78 / 50.47），不能用 int.TryParse；否则会像 OpenRevo 那样
+			// 解析失败后一直退回到旧值/空值。
+			if (firstLine != null
+				&& double.TryParse(firstLine, System.Globalization.NumberStyles.Float,
+					System.Globalization.CultureInfo.InvariantCulture, out double rawCelsius)
+				&& rawCelsius > 0 && rawCelsius < 150)
 			{
-				return celsius;
+				return (int)Math.Round(rawCelsius);
 			}
 			return null;
 		}
@@ -2521,6 +2559,41 @@ public static class HardwareControl
 		}
 		cpuPower = ResolveCpuPower(num, fallbackCpuPower);
 		gpuPower = ResolveGpuPower(num2, IsUsablePower(num2) ? ((float?)null) : gpuPowerViaNvml);
+		// Intel iGPU（尤其星耀 PTL）：LHM 多数只给 D3D 负载；频率/功耗/温度缺失时
+		// 尝试 Level Zero Sysman（只读），读到才覆盖，读不到保持「—」。
+		if (CpuVendor.IsIntel)
+		{
+			try
+			{
+				if (IntelLevelZeroTelemetry.TryRead(out double? l0Freq, out double? l0Power, out double? l0Temp, out string l0Detail))
+				{
+					bool changed = false;
+					if (l0Freq.HasValue && gpuCoreFreq <= 0)
+					{
+						gpuCoreFreq = (int)Math.Round(l0Freq.Value);
+						changed = true;
+					}
+					if (l0Temp.HasValue && gpuTemp <= 0)
+					{
+						gpuTemp = (int)Math.Round(l0Temp.Value);
+						changed = true;
+					}
+					if (l0Power.HasValue && !gpuPower.HasValue)
+					{
+						gpuPower = (float)l0Power.Value;
+						changed = true;
+					}
+					if (Logger.TryMarkChanged("intel-l0-values", l0Detail))
+					{
+						Logger.WriteError("[intel-l0] " + l0Detail);
+					}
+					_ = changed;
+				}
+			}
+			catch
+			{
+			}
+		}
 		// AMD 核显（无 NVIDIA 独显）⇒ **ADL PMLog 优先于 LHM**（只读；NVIDIA 机型一律不进）
 		bool amdIgpu = CpuVendor.IsAmd && Program.hw != null && Program.hw.DgpuGeneration == DgpuGenerationKind.NoDgpu;
 		// （机主更正：LHM 在 APU 上能读到核显功耗）：ADL 改为**仅当 LHM 没给值时的兜底**
@@ -2567,9 +2640,25 @@ public static class HardwareControl
 		//   ⚠️ 必须放在这里（写值之后），⛔ 不能放方法入口 —— 入口到这儿之间有好几道早退，
 		//      "来采过"≠"值刷新过" ⚠️（⭐ 见 `_lastPowerRefreshTick` 的注释 ✅）。
 		Interlocked.Exchange(ref _lastPowerRefreshTick, Environment.TickCount64);
-		(long, long)? tuple = ((num6 > 0 && num7 > 0) ? ((long, long)?)null : memoryViaNvml);
-		long num3 = ((num6 > 0) ? num6 : (tuple?.Item1 ?? 0));
-		long num4 = ((num7 > 0) ? num7 : (tuple?.Item2 ?? 0));
+		// 核显（NoDgpu）：LHM 的 dedicated 字段通常只有一小段，真正用的是 D3D Shared Memory；
+		// 有共享显存读数时优先它，避免无界/星耀核显显存占用一直是「—」。
+		int lhmUsed = num6;
+		int lhmTotal = num7;
+		if (Program.hw != null && Program.hw.DgpuGeneration == DgpuGenerationKind.NoDgpu && lhmMonitor != null)
+		{
+			int sharedUsed = lhmMonitor.GpuSharedMemoryUsedMb;
+			int sharedTotal = lhmMonitor.GpuSharedMemoryTotalMb;
+			if (sharedUsed > 0 && sharedTotal > 0)
+			{
+				lhmUsed = sharedUsed;
+				lhmTotal = sharedTotal;
+				Logger.WriteLineIfChanged("gpu-vram-shared",
+					"[gpu-vram] 核显共享显存 used=" + sharedUsed + "MB / total=" + sharedTotal + "MB");
+			}
+		}
+		(long, long)? tuple = ((lhmUsed > 0 && lhmTotal > 0) ? ((long, long)?)null : memoryViaNvml);
+		long num3 = ((lhmUsed > 0) ? lhmUsed : (tuple?.Item1 ?? 0));
+		long num4 = ((lhmTotal > 0) ? lhmTotal : (tuple?.Item2 ?? 0));
 		vramUsedMb = ((num3 > 0) ? new int?((int)Math.Min(num3, 2147483647L)) : ((int?)null));
 		vramUsage = ((num3 > 0 && num4 > 0) ? new int?((int)Math.Clamp(num3 * 100 / num4, 0L, 100L)) : ((int?)null));
 	}

@@ -76,9 +76,38 @@ internal static class SoftwareColorEnhancement
                 }
             }
             preset ??= Presets[0];
-            ApplyGamma(preset);
-            return ApplyMatrix(preset);
+            bool gammaOk = ApplyGamma(preset);
+            bool matrixOk = ApplyMatrix(preset);
+            return gammaOk || matrixOk;
         }
+    }
+
+    /// <summary>当前色彩档位的默认编辑参数（用于编辑器“恢复默认”，不是统一回多彩）。</summary>
+    internal static DisplayEffectProfile DefaultProfile(string? mode)
+    {
+        SoftwareColorPreset preset = FindPreset(mode) ?? Presets[0];
+        return new DisplayEffectProfile
+        {
+            Name = preset.Id,
+            Brightness = 50,
+            ColorTemp = preset.ColorTempK,
+            ColorR = (float)Math.Round(preset.GainR * 128f),
+            ColorG = (float)Math.Round(preset.GainG * 128f),
+            ColorB = (float)Math.Round(preset.GainB * 128f),
+            VibrantValue = preset.Saturation,
+            Constrast = preset.Contrast,
+            Gamma = preset.Gamma
+        };
+    }
+
+    private static SoftwareColorPreset? FindPreset(string? mode)
+    {
+        if (string.IsNullOrWhiteSpace(mode)) return null;
+        foreach (SoftwareColorPreset item in Presets)
+        {
+            if (string.Equals(item.Id, mode, StringComparison.OrdinalIgnoreCase)) return item;
+        }
+        return null;
     }
 
     internal static bool ApplyProfile(string name, int brightness, int colorTemp, float r, float g, float b, float vibrant, float contrast, float gamma)
@@ -88,14 +117,15 @@ internal static class SoftwareColorEnhancement
             SoftwareColorPreset preset = new(
                 name,
                 colorTemp <= 0 ? 6500 : colorTemp,
-                r <= 0 ? 1f : r,
-                g <= 0 ? 1f : g,
-                b <= 0 ? 1f : b,
+                NormalizeGain(r),
+                NormalizeGain(g),
+                NormalizeGain(b),
                 vibrant <= 0 ? 1f : vibrant,
                 contrast <= 0 ? 1f : contrast,
                 gamma <= 0 ? 1f : gamma);
-            ApplyGamma(preset);
-            return ApplyMatrix(preset);
+            bool gammaOk = ApplyGamma(preset);
+            bool matrixOk = ApplyMatrix(preset);
+            return gammaOk || matrixOk;
         }
     }
 
@@ -122,7 +152,7 @@ internal static class SoftwareColorEnhancement
         }
     }
 
-    private static void ApplyGamma(SoftwareColorPreset preset)
+    private static bool ApplyGamma(SoftwareColorPreset preset)
     {
         (float tr, float tg, float tb) = KelvinToRgb(preset.ColorTempK);
         float fr = Math.Clamp(preset.GainR, 0f, 2f) * tr;
@@ -145,7 +175,7 @@ internal static class SoftwareColorEnhancement
             ramp.Green[i] = Calc(fg);
             ramp.Blue[i] = Calc(fb);
         }
-        ApplyGammaRamp(ramp);
+        return ApplyGammaRamp(ramp);
     }
 
     private static bool ApplyGammaRamp(GammaRamp ramp)
@@ -167,6 +197,13 @@ internal static class SoftwareColorEnhancement
             Marshal.FreeHGlobal(ptr);
             ReleaseDC(IntPtr.Zero, hdc);
         }
+    }
+
+    private static float NormalizeGain(float value)
+    {
+        // 编辑器/GCU 的 RGB 可能是 0..255；软件矩阵内部是 0..2。
+        if (value > 2.5f) return Math.Clamp(value / 128f, 0f, 2f);
+        return Math.Clamp(value, 0f, 2f);
     }
 
     private static bool ApplyMatrix(SoftwareColorPreset preset, bool identity = false)

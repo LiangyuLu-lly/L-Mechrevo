@@ -37,6 +37,11 @@ public partial class FanCurveWindow : Window
         CpuSection.Visibility = showCpu ? Visibility.Visible : Visibility.Collapsed;
         GpuSection.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
         _hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
+        if (_hw?.UsesBaolongda == true)
+        {
+            BaolongdaLoopCheck.Visibility = Visibility.Visible;
+            BaolongdaSyncCheck.Visibility = Visibility.Visible;
+        }
         bool supported = _hw != null && (_hw.IsGcuConnected || _hw.UsesBaolongda || _hw.WujieSmuApu
             || _hw.IsIntelNucMachine || _hw.IsUmiMachine);
         if (!supported)
@@ -147,9 +152,16 @@ public partial class FanCurveWindow : Window
         {
             return;
         }
+        // 宽屏内联时模式事件可能在拖动过程中到达；拖动期间不重载，避免点位回弹。
+        if (CpuCurve.IsDragging || GpuCurve.IsDragging)
+        {
+            return;
+        }
         if (_hw.UsesBaolongda)
         {
             BaolongdaFanCurveSettings curve = _hw.LoadBaolongdaFanCurve(_modeId);
+            BaolongdaLoopCheck.IsChecked = curve.Enabled;
+            BaolongdaSyncCheck.IsChecked = curve.SyncEnabled;
             CpuCurve.Load(TempsToBytes(curve.Channel1Temperatures),
                 RpmsToPercent(curve.Channel1Rpms, curve.MaxRpm));
             GpuCurve.Load(TempsToBytes(curve.Channel0Temperatures),
@@ -176,7 +188,11 @@ public partial class FanCurveWindow : Window
         {
             CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
             GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
-            PersistHardwareCurveIfMissing(cpuSaved, gpuSaved);
+            // LegacyMifs 等无 GCU 机型不把默认曲线落盘，避免污染存档。
+            if (_hw.IsGcuConnected)
+            {
+                PersistHardwareCurveIfMissing(cpuSaved, gpuSaved);
+            }
         }
         else if (_hw.CpuCurveDuty.Length >= 16 && _hw.GpuCurveDuty.Length >= 16
             && _hw.CpuCurveUpT.Length >= 16 && _hw.GpuCurveUpT.Length >= 16)
@@ -220,23 +236,20 @@ public partial class FanCurveWindow : Window
                 }
                 bool ok = MechrevoLite.Hardware.NucFanTable.TryApply(
                     CpuCurve.Temperatures, cpu, GpuCurve.Temperatures, gpu, out string detail);
+                bool rampOk = MechrevoLite.Hardware.NucFanTable.TrySetFanRamp(true, 300, out string rampDetail);
                 bool isolatedOk = MechrevoLite.Hardware.NucFanTable.TrySetFanIsolated(true, out string isolatedDetail);
-                ok = ok && isolatedOk;
-                detail += " " + isolatedDetail;
+                ok = ok && rampOk && isolatedOk;
+                detail += " " + rampDetail + " " + isolatedDetail;
+                Logger.WriteLine("[nuc-fan] 自定义风扇应用 ok=" + ok + " detail=" + detail);
                 PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
                 PerfModeService.Instance?.RecordFanCurveEnabled(_modeId, true);
                 _dirty = false;
-                StatusText.Text = ok ? "NUC/UMI 风扇曲线已写入：" + detail : "NUC/UMI 风扇曲线写入失败：" + detail;
+                StatusText.Text = ok ? WpfStrings.L("NUC/UMI 风扇曲线已写入：", "NUC/UMI fan curve written: ") + detail : WpfStrings.L("NUC/UMI 风扇曲线写入失败：", "Failed to write NUC/UMI fan curve: ") + detail;
             }
             catch (Exception ex)
             {
                 StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
             }
-            return;
-        }
-        if (!_hw.IsGcuConnected)
-        {
-            StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_3;
             return;
         }
         if (_hw.UsesBaolongda)
@@ -248,9 +261,9 @@ public partial class FanCurveWindow : Window
                 int maxRpm = Math.Max(1, _hw.FanRpmMaxForPercent);
                 BaolongdaFanCurveSettings curve = new()
                 {
-                    Enabled = true,
+                    Enabled = BaolongdaLoopCheck.IsChecked == true,
                     FormatVersion = BaolongdaFanCurveSettings.CurrentFormatVersion,
-                    SyncEnabled = true,
+                    SyncEnabled = BaolongdaSyncCheck.IsChecked == true,
                     HysteresisC = FanCurveEngine.DefaultHysteresisC,
                     IntervalMs = BaolongdaFanCurveSettings.DefaultIntervalMs,
                     MinRpm = BaolongdaFanCurveSettings.DefaultMinRpm,
@@ -262,7 +275,7 @@ public partial class FanCurveWindow : Window
                 };
                 bool ok = _hw.SaveBaolongdaFanCurve(_modeId, curve);
                 _dirty = false;
-                StatusText.Text = ok ? "宝龙达风扇曲线已保存并应用" : "宝龙达风扇曲线保存失败";
+                StatusText.Text = ok ? WpfStrings.L("宝龙达风扇曲线已保存并应用", "Baolongda fan curve saved and applied") : WpfStrings.L("宝龙达风扇曲线保存失败", "Failed to save Baolongda fan curve");
             }
             catch (Exception ex)
             {
@@ -291,12 +304,17 @@ public partial class FanCurveWindow : Window
                 PerfModeService.Instance?.RecordFanCurves(_modeId, cpu, gpu);
                 SaveWujieTemps(cpuTemps, gpuTemps);
                 _dirty = false;
-                StatusText.Text = ok ? "无界 EC 曲线已启动：" + detail : "无界 EC 曲线启动失败：" + detail;
+                StatusText.Text = ok ? WpfStrings.L("无界 EC 曲线已启动：", "Wujie EC curve started: ") + detail : WpfStrings.L("无界 EC 曲线启动失败：", "Failed to start Wujie EC curve: ") + detail;
             }
             catch (Exception ex)
             {
                 StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_6 + ex.Message;
             }
+            return;
+        }
+        if (!_hw.IsGcuConnected)
+        {
+            StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_3;
             return;
         }
         try
@@ -386,41 +404,74 @@ public partial class FanCurveWindow : Window
         return true;
     }
 
-    private void Restore_Click(object sender, RoutedEventArgs e)
+    private async void RestoreDefault_Click(object sender, RoutedEventArgs e)
     {
-        if (_hw != null && _hw.UsesBaolongda)
+        if (_hw == null) return;
+        MessageBoxResult confirm = MessageBox.Show(this,
+            WpfStrings.L("将停止自定义风扇曲线、交还固件/EC 自动控制，并清除该档已保存的曲线点位。继续？", "This stops the custom fan curve, returns control to firmware/EC, and clears saved curve points for this mode. Continue?"),
+            WpfStrings.L("恢复默认风扇曲线", "Restore default fan curve"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes) return;
+        try
         {
-            BaolongdaFanCurveSettings curve = _hw.LoadBaolongdaFanCurve(_modeId);
-            CpuCurve.Load(TempsToBytes(BaolongdaFanCurveSettings.DefaultTemperatures()),
-                RpmsToPercent(BaolongdaFanCurveSettings.DefaultRpms(_hw.FanRpmMaxForPercent), _hw.FanRpmMaxForPercent));
-            GpuCurve.Load(TempsToBytes(BaolongdaFanCurveSettings.DefaultTemperatures()),
-                RpmsToPercent(BaolongdaFanCurveSettings.DefaultRpms(_hw.FanRpmMaxForPercent), _hw.FanRpmMaxForPercent));
+            if (_hw.UsesBaolongda)
+            {
+                PerfModeService.Instance?.ResetBaolongdaFanToFirmwareDefault();
+                ClearSavedFanCurve();
+                LoadFromHardware();
+                _dirty = false;
+                StatusText.Text = WpfStrings.L("已恢复默认：宝龙达软件闭环已关闭，曲线回到固件默认", "Restored: Baolongda software loop disabled; curve returned to firmware default");
+            }
+            else if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+            {
+                bool restored = MechrevoLite.Hardware.NucFanTable.TryRestoreDefault(out string nucDetail);
+                bool isolatedRestore = MechrevoLite.Hardware.NucFanTable.TrySetFanIsolated(false, out string isolatedDetail);
+                restored &= isolatedRestore;
+                nucDetail += " " + isolatedDetail;
+                LoadFromHardware();
+                _dirty = false;
+                StatusText.Text = restored
+                    ? WpfStrings.L("已恢复默认：NUC/UMI 风扇表已还原", "Restored: NUC/UMI fan table restored")
+                    : WpfStrings.L("恢复默认失败：", "Restore default failed: ") + nucDetail;
+            }
+            else if (_hw.IsGcuConnected)
+            {
+                if (!_hw.TryGetBuiltInDefaultFanCurve(out byte[] cpuTemps, out byte[] cpuDuties,
+                        out byte[] gpuTemps, out byte[] gpuDuties))
+                {
+                    throw new InvalidOperationException(WpfStrings.L("找不到内置默认曲线资源", "Built-in default curve resource not found"));
+                }
+                await _hw.SetFanCurve(0, cpuDuties.Select(v => (int)v).ToArray());
+                await _hw.SetFanCurve(1, gpuDuties.Select(v => (int)v).ToArray());
+                ClearSavedFanCurve();
+                CpuCurve.Load(cpuTemps, cpuDuties);
+                GpuCurve.Load(gpuTemps, gpuDuties);
+                _dirty = false;
+                StatusText.Text = WpfStrings.L("已恢复默认：已写回内置默认风扇曲线", "Restored: built-in default fan curve written");
+            }
+            else
+            {
+                StatusText.Text = WpfStrings.L("本机不支持恢复默认曲线", "Restoring the default curve is not supported on this machine");
+            }
         }
-        else if (_hw != null && _hw.WujieSmuApu)
+        catch (Exception ex)
         {
-            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
-            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
+            StatusText.Text = WpfStrings.L("恢复默认失败：", "Restore default failed: ") + ex.Message;
+            Logger.WriteLine("[fan] 恢复默认曲线失败：" + ex.GetType().Name + " " + ex.Message);
         }
-        else if (_hw != null && _hw.TryGetBuiltInDefaultFanCurve(out byte[] cpuTemps, out byte[] cpuDuties,
-                     out byte[] gpuTemps, out byte[] gpuDuties))
-        {
-            CpuCurve.Load(cpuTemps, cpuDuties);
-            GpuCurve.Load(gpuTemps, gpuDuties);
-        }
-        else if (_modeId.StartsWith("custom", StringComparison.Ordinal)
-            || _modeId.StartsWith("fw", StringComparison.Ordinal))
-        {
-            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
-            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
-        }
-        else
-        {
-            CpuCurve.Load(FanCurveDefaults.CpuTemperatures, FanCurveDefaults.CpuDutyBytes);
-            GpuCurve.Load(FanCurveDefaults.GpuTemperatures, FanCurveDefaults.GpuDutyBytes);
-        }
-        _dirty = true;
-        StatusText.Text = WpfStrings.FanCurveWindow_xaml_Text_7;
     }
+
+    private void ClearSavedFanCurve()
+    {
+        try
+        {
+            PerfModeSettings settings = PerfModeStore.LoadSettings(_modeId);
+            PerfModeStore.SaveSettings(_modeId, settings with { CpuFanDuty = null, GpuFanDuty = null });
+        }
+        catch
+        {
+        }
+    }
+
 
     private void SaveWujieTemps(byte[] cpuTemps, byte[] gpuTemps)
     {

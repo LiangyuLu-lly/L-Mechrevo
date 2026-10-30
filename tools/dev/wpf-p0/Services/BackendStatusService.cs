@@ -1,5 +1,6 @@
 using MechrevoLite.Hardware;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -73,7 +74,7 @@ internal sealed class BackendStatusService : IBackendStatusService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return "未连接";
+            return WpfStrings.L("未连接", "Not connected");
         }
         try
         {
@@ -81,7 +82,7 @@ internal sealed class BackendStatusService : IBackendStatusService
         }
         catch
         {
-            return "后端状态读取异常";
+            return WpfStrings.L("后端状态读取异常", "Failed to read backend status");
         }
     }
 }

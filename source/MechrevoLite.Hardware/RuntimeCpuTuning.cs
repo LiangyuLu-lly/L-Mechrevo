@@ -60,6 +60,12 @@ internal sealed class RuntimeCpuTuning : IDisposable
 	// ---------------------------------------------------------------------------------------
 	internal const string ForceEntryEnvironmentVariable = "LMECHREVO_FORCE_CPU_TUNING";
 
+	/// <summary>
+	/// 英特尔 CPU 调节总开关（临时屏蔽）：不加载 PawnIO IntelMSR、不读/写 OC 邮箱，
+	/// 让 Intel XTU 独占 MSR 0x150。AMD CO/FMax 路径不受影响。
+	/// </summary>
+	internal const bool IntelCpuTuningDisabled = true;
+
 	private static bool? _forceEntry;
 
 	internal static bool ForceEntry
@@ -154,6 +160,12 @@ internal sealed class RuntimeCpuTuning : IDisposable
 		{
 			List<CpuTuningOption> optionList = new List<CpuTuningOption>();
 			List<string> detailList = new List<string>();
+			if (IntelCpuTuningDisabled && CpuVendor.IsIntel)
+			{
+				return Store("CpuTuneDisabled",
+					"Intel CPU tuning is temporarily disabled: LM does not load IntelMSR or send any Intel MSR/OC command, so Intel XTU can own MSR 0x150.",
+					optionList);
+			}
 			// 2026-10-10 fmax: 每次探针都从"没有 FMax 结论"重新开始 —— 上次的结论不能跨探针存活
 			// （否则"驱动被卸载后重探"会继续显示上一次的回读值）。
 			_fmax = null;
@@ -637,6 +649,10 @@ internal sealed class RuntimeCpuTuning : IDisposable
 	{
 		lock (SyncRoot)
 		{
+			if (IntelCpuTuningDisabled && CpuVendor.IsIntel)
+			{
+				return new CpuTuningResult(Success: false, Verified: false, "Intel CPU tuning is disabled (XTU owns MSR 0x150); no command sent.");
+			}
 			CpuFMaxProbe? fmax = _fmax;
 			if (fmax == null)
 			{
@@ -722,6 +738,10 @@ internal sealed class RuntimeCpuTuning : IDisposable
 	{
 		lock (SyncRoot)
 		{
+			if (IntelCpuTuningDisabled && CpuVendor.IsIntel)
+			{
+				return new CpuTuningResult(Success: false, Verified: false, "Intel CPU tuning is disabled (XTU owns MSR 0x150); no command sent.");
+			}
 			CpuTuningOption? cpuTuningOption = _probe?.Options.FirstOrDefault((CpuTuningOption o) => o.Id == id);
 			if (cpuTuningOption == null || !cpuTuningOption.CanWrite || value < cpuTuningOption.Minimum || value > cpuTuningOption.Maximum || value != decimal.Truncate(value))
 			{
@@ -787,6 +807,10 @@ internal sealed class RuntimeCpuTuning : IDisposable
 	{
 		lock (SyncRoot)
 		{
+			if (IntelCpuTuningDisabled && CpuVendor.IsIntel)
+			{
+				return new CpuTuningResult(Success: false, Verified: false, "Intel CPU tuning is disabled (XTU owns MSR 0x150); no command sent.");
+			}
 			List<string> list = new List<string>();
 			// 2026-10-10 intel（⑦B）：Intel 的两个 domain 各只恢复一次（intel-core / intel-ratio 同属
 			// domain 0，重复调 Restore 只是多发一遍同样的写回，没必要）。
@@ -1056,6 +1080,10 @@ internal sealed class RuntimeCpuTuning : IDisposable
 	{
 		lock (SyncRoot)
 		{
+			if (IntelCpuTuningDisabled && CpuVendor.IsIntel)
+			{
+				return new CpuTuningResult(Success: false, Verified: false, "Intel CPU tuning is disabled (XTU owns MSR 0x150); no command sent.");
+			}
 			if (!EnsurePerCoreWrite(out CpuTuningOption option, out string reason))
 			{
 				return new CpuTuningResult(Success: false, Verified: false, "per-core CO write refused: " + reason);
@@ -1482,10 +1510,13 @@ internal sealed class RuntimeCpuTuning : IDisposable
 					return new CpuTuningResult(Success: false, Verified: false, "auto-apply is off.");
 				}
 				SkippedByGuard = true;
-				LastAutoApplyDetail = "auto-apply skipped by the shutdown guard: the clean-exit marker was missing (last shutdown was not clean)";
-				Logger.WriteLine("[cpu-co] startup auto-apply SKIPPED: previous shutdown was not clean (crash / power loss / forced kill);"
-					+ " the saved per-core CO values and the saved FMax were NOT written this boot, so a possibly unstable setting is not re-applied."
-					+ " Switch location: custom mode -> CPU tuning -> startup auto-apply (cpu_co_auto_apply).");
+				// 上次非正常关机 ⇒ 本次跳过，并自动关掉开关，避免“不稳定值→重启→再自动应用”的循环。
+				AppConfig.Set(PerCoreAutoApplyKey, 0);
+				AppConfig.Flush();
+				LastAutoApplyDetail = "auto-apply skipped by the shutdown guard and the switch was disabled: the clean-exit marker was missing (last shutdown was not clean)";
+				Logger.WriteError("[cpu-co] startup auto-apply SKIPPED: previous shutdown was not clean (crash / power loss / forced kill);"
+					+ " the saved per-core CO values and the saved FMax were NOT written this boot, so a possibly unstable setting is not re-applied;"
+					+ " cpu_co_auto_apply was turned OFF to prevent a reboot loop.");
 				NotifyGuardSkip();
 				return new CpuTuningResult(Success: false, Verified: false,
 					"auto-apply skipped: previous shutdown was not clean (no write command sent).");
@@ -1495,6 +1526,15 @@ internal sealed class RuntimeCpuTuning : IDisposable
 				LastAutoApplyDetail = "auto-apply is off (cpu_co_auto_apply)";
 				Logger.WriteLine("[cpu-co] startup auto-apply: OFF (cpu_co_auto_apply); nothing written");
 				return new CpuTuningResult(Success: false, Verified: false, "auto-apply is off.");
+			}
+			// Intel 的开机自动应用只有 AMD 的每核 CO / FMax 两类，Intel 没有对应项。
+			// 这里提前返回，避免开机就加载 PawnIO IntelMSR 模块、占用 MSR 0x150 OC 邮箱，
+			// 否则 Intel XTU 启动时会被 LM 抢先占用而打不开。
+			if (CpuVendor.IsIntel)
+			{
+				LastAutoApplyDetail = "Intel CPU: per-core CO/FMax auto-apply is AMD-only; skipped before opening PawnIO/IntelMSR.";
+				Logger.WriteLine("[cpu-co] startup auto-apply: Intel CPU ⇒ 跳过（不加载 PawnIO IntelMSR，避免与 Intel XTU 冲突）");
+				return new CpuTuningResult(Success: false, Verified: false, "Intel CPU: auto-apply not applicable; PawnIO/IntelMSR not opened.");
 			}
 			Stopwatch stopwatch = Stopwatch.StartNew();
 			Logger.WriteLine($"[cpu-co] startup auto-apply: ON{(simulate ? " (SIMULATE, --yes not given)" : "")}; checking capability before touching the SMU");

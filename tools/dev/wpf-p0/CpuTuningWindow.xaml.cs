@@ -15,8 +15,10 @@ namespace L_Mechrevo.WpfP0;
 public partial class CpuTuningWindow : Window
 {
     private readonly List<(CpuTuningOption Option, Slider Slider, TextBlock Value)> _rows = new();
-    private Slider? _fmaxSlider;
-    private readonly List<Slider> _perCoreSliders = new();
+    private TextBox? _fmaxBox;
+    private Slider? _allCoreCoSlider;
+    private bool _syncingPerCore;
+    private readonly List<TextBox> _perCoreInputs = new();
 
     public CpuTuningWindow()
     {
@@ -37,20 +39,32 @@ public partial class CpuTuningWindow : Window
         }
     }
 
+    private static string ShortStatus(string key)
+    {
+        return key switch
+        {
+            "CpuTuneSmuReady" => "可调",
+            "CpuTuneSmuPartial" => "部分选项被 SKU 锁定",
+            "CpuTuneUnsupported" => "本机暂不支持",
+            "CpuTuneDriverMissing" => "缺少 PawnIO 驱动",
+            "CpuTuneDisabled" => "Intel 调节已屏蔽（XTU 独占 MSR）",
+            _ => "检测完成"
+        };
+    }
+
     private void LoadProbe()
     {
         try
         {
             CpuTuningProbe probe = RuntimeCpuTuning.Instance.Probe();
-            CpuText.Text = probe.Cpu + " · " + Localized(probe.StatusKey);
-            if (!string.IsNullOrWhiteSpace(probe.Detail))
-            {
-                StatusText.Text = probe.Detail;
-            }
+            // 只显示一句摘要；完整探针细节放进 ToolTip，不再铺满窗口。
+            CpuText.Text = probe.Cpu + " · " + ShortStatus(probe.StatusKey);
+            CpuText.ToolTip = string.IsNullOrWhiteSpace(probe.Detail) ? null : probe.Detail;
+            StatusText.Text = "";
             OptionsPanel.Children.Clear();
             _rows.Clear();
-            _perCoreSliders.Clear();
-            _fmaxSlider = null;
+            _perCoreInputs.Clear();
+            _fmaxBox = null;
             if (probe.Options.Count == 0)
             {
                 OptionsPanel.Children.Add(new TextBlock
@@ -62,6 +76,11 @@ public partial class CpuTuningWindow : Window
             }
             foreach (CpuTuningOption option in probe.Options)
             {
+                // 机主口径：CPU 调节不再提供「固定全核频率」（amd-clock）。
+                if (string.Equals(option.Id, "amd-clock", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
                 AddOptionRow(option);
             }
             if (probe.FMax is { Capability: FMaxCapability.ReadOnly or FMaxCapability.ReadWrite or FMaxCapability.WriteNoReadback } fmax)
@@ -107,6 +126,10 @@ public partial class CpuTuningWindow : Window
         };
         Grid.SetColumn(slider, 1);
         row.Children.Add(slider);
+        if (string.Equals(option.Id, "amd-co", StringComparison.OrdinalIgnoreCase))
+        {
+            _allCoreCoSlider = slider;
+        }
 
         TextBlock valueText = new()
         {
@@ -135,16 +158,21 @@ public partial class CpuTuningWindow : Window
 
     private void AddPerCoreSection(CpuTuningProbe probe)
     {
-        CpuTuningOption? option = probe.Options.FirstOrDefault(o => o.PerCoreWrite);
+        // 即使本机 SKU 锁了 CO 写入，也把每核输入框铺出来（置灰但可见）；
+        // 不再用 PerCoreWrite 作为“是否显示”的唯一条件。
+        CpuTuningOption? option = probe.Options.FirstOrDefault(o => o.Id == "amd-co")
+            ?? probe.Options.FirstOrDefault(o => o.PerCoreWrite);
         if (option == null)
         {
             return;
         }
-        int coreCount = RuntimeCpuTuning.PerCoreCapacity;
+        int coreCount = Math.Max(RuntimeCpuTuning.PerCoreCapacity,
+            option.CoreReadback?.Count ?? 0);
         if (coreCount <= 0)
         {
             return;
         }
+        bool editable = option.CanWrite && option.PerCoreWrite;
         OptionsPanel.Children.Add(new TextBlock
         {
             Text = WpfStrings.CpuTuningWindow_xaml_Text_3,
@@ -152,50 +180,95 @@ public partial class CpuTuningWindow : Window
             Margin = new Thickness(0, 12, 0, 6)
         });
         IReadOnlyList<int?> saved = RuntimeCpuTuning.LoadSavedPerCore(coreCount);
-        List<Slider> sliders = _perCoreSliders;
-        for (int core = 0; core < coreCount; core++)
+        List<TextBox> boxes = _perCoreInputs;
+        Grid grid = new();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+        int rows = Math.Max(1, (coreCount + 1) / 2);
+        for (int rowIndex = 0; rowIndex < rows; rowIndex++)
         {
-            Grid row = new() { Margin = new Thickness(0, 0, 0, 4) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
-            row.Children.Add(new TextBlock { Text = "Core " + core, VerticalAlignment = VerticalAlignment.Center });
-            decimal start = saved.Count > core && saved[core].HasValue
-                ? saved[core]!.Value
-                : (option.CoreReadback != null && option.CoreReadback.Count > core ? option.CoreReadback[core] : 0);
-            Slider slider = new()
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (int side = 0; side < 2; side++)
             {
-                Minimum = (double)option.Minimum,
-                Maximum = (double)option.Maximum,
-                Value = Math.Clamp((double)start, (double)option.Minimum, (double)option.Maximum),
-                Margin = new Thickness(8, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Style = (Style)FindResource("RoundSlider")
-            };
-            Grid.SetColumn(slider, 1);
-            row.Children.Add(slider);
-            TextBlock valueText = new()
+                int core = rowIndex + side * rows;
+                if (core >= coreCount)
+                {
+                    continue;
+                }
+                decimal start = saved.Count > core && saved[core].HasValue
+                    ? saved[core]!.Value
+                    : (option.CoreReadback != null && option.CoreReadback.Count > core ? option.CoreReadback[core] : 0);
+                TextBlock label = new()
+                {
+                    Text = "Core " + core,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(side == 0 ? 0 : 12, 2, 6, 2)
+                };
+                TextBox box = CreateValueBox(start.ToString("0"), editable);
+                box.TextChanged += (_, _) =>
+                {
+                    if (_syncingPerCore || _allCoreCoSlider == null)
+                    {
+                        return;
+                    }
+                    int[] parsed = boxes.Select(b => int.TryParse(b.Text, out int v) ? v : int.MinValue).ToArray();
+                    if (parsed.Length > 0 && parsed.All(v => v == parsed[0]) && parsed[0] != int.MinValue)
+                    {
+                        _syncingPerCore = true;
+                        try { _allCoreCoSlider.Value = Math.Clamp(parsed[0], (int)_allCoreCoSlider.Minimum, (int)_allCoreCoSlider.Maximum); }
+                        finally { _syncingPerCore = false; }
+                    }
+                };
+                boxes.Add(box);
+                Grid.SetRow(label, rowIndex);
+                Grid.SetColumn(label, side == 0 ? 0 : 3);
+                Grid.SetRow(box, rowIndex);
+                Grid.SetColumn(box, side == 0 ? 1 : 4);
+                grid.Children.Add(label);
+                grid.Children.Add(box);
+            }
+        }
+        OptionsPanel.Children.Add(grid);
+        if (_allCoreCoSlider != null)
+        {
+            _allCoreCoSlider.ValueChanged += (_, e) =>
             {
-                Text = ((int)slider.Value).ToString(),
-                VerticalAlignment = VerticalAlignment.Center,
-                TextAlignment = TextAlignment.Right
+                if (_syncingPerCore) return;
+                _syncingPerCore = true;
+                try
+                {
+                    string value = ((int)Math.Round(e.NewValue)).ToString();
+                    foreach (TextBox box in boxes) box.Text = value;
+                }
+                finally
+                {
+                    _syncingPerCore = false;
+                }
             };
-            Grid.SetColumn(valueText, 2);
-            row.Children.Add(valueText);
-            slider.ValueChanged += (_, e) => valueText.Text = ((int)e.NewValue).ToString();
-            sliders.Add(slider);
-            OptionsPanel.Children.Add(row);
+        }
+        if (!editable)
+        {
+            OptionsPanel.Children.Add(new TextBlock
+            {
+                Text = WpfStrings.L("每核 CO 当前被 SKU 锁定，仅显示回读值。", "Per-core CO is locked by the current SKU; readback only."),
+                Style = (Style)FindResource("MutedText"),
+                Margin = new Thickness(0, 4, 0, 4)
+            });
         }
         Button apply = new()
         {
             Content = WpfStrings.CpuTuningWindow_xaml_Content_2,
+            IsEnabled = editable,
             Style = (Style)FindResource("FlatButton"),
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 6, 0, 10)
         };
         apply.Click += async (_, _) =>
         {
-            int[] values = sliders.Select(s => (int)Math.Round(s.Value)).ToArray();
+            int[] values = boxes.Select(b => int.TryParse(b.Text, out int v) ? v : 0).ToArray();
             try
             {
                 CpuTuningResult result = await Task.Run(() => RuntimeCpuTuning.Instance.ApplyPerCore(values));
@@ -214,6 +287,33 @@ public partial class CpuTuningWindow : Window
         OptionsPanel.Children.Add(apply);
     }
 
+    private TextBox CreateValueBox(string text, bool enabled)
+    {
+        TextBox box = new()
+        {
+            Text = text,
+            Width = 74,
+            Height = 26,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 2, 0, 2),
+            TextAlignment = TextAlignment.Right,
+            IsEnabled = enabled,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(4, 0, 4, 0)
+        };
+        try
+        {
+            box.Background = (Brush)FindResource("ControlBrush");
+            box.Foreground = (Brush)FindResource("TextBrush");
+            box.BorderBrush = (Brush)FindResource("CardBorderBrush");
+            box.BorderThickness = new Thickness(1);
+        }
+        catch
+        {
+        }
+        return box;
+    }
+
     private void AddFMaxRow(CpuFMaxProbe fmax)
     {
         Grid row = new() { Margin = new Thickness(0, 8, 0, 8) };
@@ -227,30 +327,12 @@ public partial class CpuTuningWindow : Window
             VerticalAlignment = VerticalAlignment.Center
         });
         decimal start = fmax.Current ?? RuntimeCpuTuning.LoadSavedFMax() ?? 0m;
-        double minimum = (double)RuntimeCpuTuning.FMaxMinimum;
-        double maximum = (double)RuntimeCpuTuning.FMaxMaximum;
-        Slider slider = new()
-        {
-            Minimum = minimum,
-            Maximum = maximum,
-            Value = Math.Clamp((double)start, minimum, maximum),
-            IsEnabled = RuntimeCpuTuning.Instance.FMaxWritableCapability,
-            Margin = new Thickness(8, 0, 8, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Style = (Style)FindResource("RoundSlider")
-        };
-        Grid.SetColumn(slider, 1);
-        row.Children.Add(slider);
-        _fmaxSlider = slider;
-        TextBlock valueText = new()
-        {
-            Text = ((int)slider.Value).ToString(),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextAlignment = TextAlignment.Right
-        };
-        Grid.SetColumn(valueText, 2);
-        row.Children.Add(valueText);
-        slider.ValueChanged += (_, e) => valueText.Text = ((int)e.NewValue).ToString();
+        TextBox box = CreateValueBox(((int)start).ToString(), RuntimeCpuTuning.Instance.FMaxWritableCapability);
+        box.Width = 110;
+        box.Margin = new Thickness(8, 0, 8, 0);
+        Grid.SetColumn(box, 1);
+        row.Children.Add(box);
+        _fmaxBox = box;
         Button apply = new()
         {
             Content = WpfStrings.CpuTuningWindow_xaml_Content,
@@ -261,9 +343,15 @@ public partial class CpuTuningWindow : Window
         Grid.SetColumn(apply, 3);
         apply.Click += async (_, _) =>
         {
+            if (!int.TryParse(box.Text, out int mhz))
+            {
+                StatusText.Text = WpfStrings.L("FMax 必须是整数 MHz", "FMax must be an integer MHz");
+                return;
+            }
+            mhz = Math.Clamp(mhz, (int)RuntimeCpuTuning.FMaxMinimum, (int)RuntimeCpuTuning.FMaxMaximum);
+            box.Text = mhz.ToString();
             try
             {
-                decimal mhz = (decimal)slider.Value;
                 CpuTuningResult result = await Task.Run(() => RuntimeCpuTuning.Instance.ApplyFMax(mhz));
                 StatusText.Text = result.Detail;
             }
@@ -316,15 +404,16 @@ public partial class CpuTuningWindow : Window
     {
         try
         {
-            if (_perCoreSliders.Count > 0)
+            if (_perCoreInputs.Count > 0)
             {
-                int[] values = _perCoreSliders.Select(s => (int)Math.Round(s.Value)).ToArray();
+                int[] values = _perCoreInputs.Select(b => int.TryParse(b.Text, out int v) ? v : 0).ToArray();
                 int allCore = RuntimeCpuTuning.LoadSavedAllCore() ?? values.FirstOrDefault();
                 RuntimeCpuTuning.SaveSettings(values, allCore);
             }
-            if (_fmaxSlider != null && RuntimeCpuTuning.Instance.FMaxWritableCapability)
+            if (_fmaxBox != null && RuntimeCpuTuning.Instance.FMaxWritableCapability
+                && int.TryParse(_fmaxBox.Text, out int fmaxValue))
             {
-                RuntimeCpuTuning.SaveFMax((int)_fmaxSlider.Value);
+                RuntimeCpuTuning.SaveFMax(fmaxValue);
             }
             StatusText.Text = WpfStrings.CpuTuningWindow_xaml_Text_8;
         }

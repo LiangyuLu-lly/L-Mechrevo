@@ -17,6 +17,8 @@ public sealed class FanCurveCanvas : FrameworkElement
 
     internal event Action? Changed;
 
+    internal bool IsDragging => _dragIndex >= 0;
+
     internal int[] Duties => _duties;
     internal byte[] Temperatures => _temps;
 
@@ -26,6 +28,7 @@ public sealed class FanCurveCanvas : FrameworkElement
         MinHeight = 150;
         Cursor = Cursors.Hand;
         ClipToBounds = true;
+        Focusable = true;
     }
 
     internal void Load(byte[] temps, byte[] duties)
@@ -131,9 +134,9 @@ public sealed class FanCurveCanvas : FrameworkElement
         }
     }
 
-    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+    protected override void OnPreviewMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        base.OnMouseLeftButtonDown(e);
+        base.OnPreviewMouseLeftButtonDown(e);
         var plot = Plot();
         Point pos = e.GetPosition(this);
         int best = -1;
@@ -153,14 +156,16 @@ public sealed class FanCurveCanvas : FrameworkElement
         if (best >= 0)
         {
             _dragIndex = best;
+            Focus();
             CaptureMouse();
+            e.Handled = true;
             InvalidateVisual();
         }
     }
 
-    protected override void OnMouseMove(MouseEventArgs e)
+    protected override void OnPreviewMouseMove(MouseEventArgs e)
     {
-        base.OnMouseMove(e);
+        base.OnPreviewMouseMove(e);
         if (_dragIndex < 0 || e.LeftButton != MouseButtonState.Pressed)
         {
             return;
@@ -171,6 +176,7 @@ public sealed class FanCurveCanvas : FrameworkElement
         duty = Math.Clamp(duty, 0, 100);
         if (duty == _duties[_dragIndex])
         {
+            e.Handled = true;
             return;
         }
         _duties[_dragIndex] = duty;
@@ -189,16 +195,18 @@ public sealed class FanCurveCanvas : FrameworkElement
                 _duties[i] = _duties[i + 1];
             }
         }
+        e.Handled = true;
         Changed?.Invoke();
         InvalidateVisual();
     }
 
-    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    protected override void OnPreviewMouseLeftButtonUp(MouseButtonEventArgs e)
     {
-        base.OnMouseLeftButtonUp(e);
+        base.OnPreviewMouseLeftButtonUp(e);
         if (_dragIndex >= 0)
         {
             _dragIndex = -1;
+            e.Handled = true;
             ReleaseMouseCapture();
             Changed?.Invoke();
             InvalidateVisual();

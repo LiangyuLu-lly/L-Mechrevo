@@ -41,9 +41,13 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <CheckBox x:Name="WujieIndependentCheck" Content="{x:Static loc:WpfStrings.WujieIndependentCheck_Content}" IsChecked="False"
                           VerticalAlignment="Center" Margin="0,0,14,0" Visibility="Collapsed" />
+                <CheckBox x:Name="BaolongdaLoopCheck" Content="{x:Static loc:WpfStrings.FanCurveBaolongdaEnable_Content}" IsChecked="False"
+                          VerticalAlignment="Center" Margin="0,0,14,0" Visibility="Collapsed" />
+                <CheckBox x:Name="BaolongdaSyncCheck" Content="{x:Static loc:WpfStrings.FanSyncSharedHeatPipe_Content}" IsChecked="True"
+                          VerticalAlignment="Center" Margin="0,0,14,0" Visibility="Collapsed" />
                 <CheckBox x:Name="PushFanCurveCheck" Content="{x:Static loc:WpfStrings.PushFanCurveCheck_Content}" IsChecked="True"
                           VerticalAlignment="Center" Margin="0,0,14,0" />
-                <Button Content="{x:Static loc:WpfStrings.DisplayEffectEditorWindow_Content}" Style="{StaticResource FlatButton}" Click="Restore_Click" Margin="0,0,8,0" />
+                <Button Content="{x:Static loc:WpfStrings.FanCurveRestoreDefault_Content}" Style="{StaticResource FlatButton}" Click="RestoreDefault_Click" Margin="0,0,8,0" />
                 <Button Content="{x:Static loc:WpfStrings.ApplyButton_Content}" Style="{StaticResource FlatButton}" Click="Apply_Click" Margin="0,0,8,0" />
                 <Button Content="{x:Static loc:WpfStrings.CpuTuningWindow_Content}" Style="{StaticResource FlatButton}" Click="Close_Click" />
             </StackPanel>

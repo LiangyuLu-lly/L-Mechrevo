@@ -65,12 +65,37 @@ internal sealed class SensorService : ISensorService
             {
                 gpuPower = NvidiaSmiSensor.GetPowerWatts();
             }
+            bool preferLocalTemp = hw?.SmuCustomApu == true || hw?.WujieSmuApu == true
+                || hw?.IsIntelNucMachine == true || hw?.IsUmiMachine == true;
+            int cpuTemp = preferLocalTemp && HardwareControl.cpuTemp > 0
+                ? HardwareControl.cpuTemp
+                : Prefer(connected ? hw!.CpuTemp : -1, HardwareControl.cpuTemp);
+            int gpuTemp = preferLocalTemp && HardwareControl.gpuTemp > 0
+                ? HardwareControl.gpuTemp
+                : Prefer(connected ? hw!.GpuTemp : -1, HardwareControl.gpuTemp);
+            int cpuFanRpm = umiFan && umiMain >= 0 ? umiMain : Prefer(connected ? hw!.CpuFanRpm : -1, HardwareControl.cpuFanRPM);
+            int gpuFanRpm = umiFan && umiSecond >= 0 ? umiSecond : Prefer(connected ? hw!.GpuFanRpm : -1, HardwareControl.gpuFanRPM);
+            if (cpuFanRpm <= 0 || gpuFanRpm <= 0)
+            {
+                try
+                {
+                    if (MechrevoLite.Hardware.XingyaoFanReader.TryReadFanRpm(out int xyMain, out int xySecond))
+                    {
+                        if (cpuFanRpm <= 0 && xyMain > 0) cpuFanRpm = xyMain;
+                        if (gpuFanRpm <= 0 && xySecond > 0) gpuFanRpm = xySecond;
+                        hw?.ApplyXingyaoFanSpeeds(xyMain, xySecond);
+                    }
+                }
+                catch
+                {
+                }
+            }
             return new SensorSnapshot(
                 HardwareAvailable: true,
-                CpuTempC: Prefer(connected ? hw!.CpuTemp : -1, HardwareControl.cpuTemp),
-                GpuTempC: Prefer(connected ? hw!.GpuTemp : -1, HardwareControl.gpuTemp),
-                CpuFanRpm: umiFan && umiMain >= 0 ? umiMain : Prefer(connected ? hw!.CpuFanRpm : -1, HardwareControl.cpuFanRPM),
-                GpuFanRpm: umiFan && umiSecond >= 0 ? umiSecond : Prefer(connected ? hw!.GpuFanRpm : -1, HardwareControl.gpuFanRPM),
+                CpuTempC: cpuTemp,
+                GpuTempC: gpuTemp,
+                CpuFanRpm: cpuFanRpm,
+                GpuFanRpm: gpuFanRpm,
                 CpuUsagePercent: Prefer(connected ? hw!.CpuUsage : -1, HardwareControl.cpuUsage ?? 0),
                 GpuUsagePercent: Prefer(connected ? hw!.GpuUsage : -1, HardwareControl.gpuUsage ?? 0),
                 CpuFanDutyPercent: umiDuty && umiMainDuty >= 0 ? umiMainDuty : Prefer(connected ? hw!.CpuFanDuty : -1, HardwareControl.cpuFan ?? 0),

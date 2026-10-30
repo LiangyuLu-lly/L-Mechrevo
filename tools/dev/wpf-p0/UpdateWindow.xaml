@@ -31,6 +31,7 @@
         <Grid Grid.Row="3" Margin="0,12,0,0">
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{DynamicResource MutedText}" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="DownloadUpdateButton" Content="{x:Static loc:WpfStrings.UpdateDownloadInstall}" Style="{StaticResource FlatButton}" Click="DownloadUpdate_Click" />
                 <Button Content="{x:Static loc:WpfStrings.UpdateWindow_Content_2}" Style="{StaticResource FlatButton}" Click="CopyLink_Click" />
                 <Button Content="{x:Static loc:WpfStrings.UpdateWindow_Content}" Style="{StaticResource FlatButton}" Click="OpenLink_Click" />
                 <Button Content="{x:Static loc:WpfStrings.CpuTuningWindow_Content}" Style="{StaticResource FlatButton}" Click="Close_Click" Margin="0" />

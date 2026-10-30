@@ -11,7 +11,7 @@
         "landingPath": "{app}\\GCU\\AiStoneService\\... for EVERY variant, including 1020 and 30. There is NO {app}\\GCU\\payload\\<Variant>\\ level and no per-variant directory in the install tree: only the SELECTED archive is unpacked, and nothing of the payload template is kept.",
         "temporaryStaging": "the package ships the five *.7z plus 7za.exe with [Files] Flags: dontcopy; the setup extracts them into {tmp} in PrepareToInstall (ExtractGcuStagingTemporaries) and Install-Gcu.ps1 deletes the archive and 7za.exe once the unpack succeeded (Remove-GcuStagingTemporaries). After the install {app}\\GCU holds only AiStoneService\\, logo\\Language\\, README.txt, NOTICE.txt and the three .ps1 files.",
         "normalisation": "the 7z internal top folder is NOT always the variant key: 1020.7z holds '20', 30.7z holds '30'. It is asserted against the catalog during the unpack and is NOT reproduced on disk (the landing path is fixed).",
-        "serviceDirNote": "1020.7z and 30.7z ship UniwillService (legacy naming, MyControlCenter inside); 40/50/WJXY.7z ship AiStoneService. ServiceDir here is the name INSIDE the archive; on disk every variant becomes AiStoneService - see Install-Gcu.ps1 Get-GcuServiceLeafName.",
+        "serviceDirNote": "1020.7z and 30.7z ship UniwillService (legacy naming, MyControlCenter inside); 40/50/WJ.7z ship AiStoneService. ServiceDir here is the name INSIDE the archive; on disk every variant becomes AiStoneService - see Install-Gcu.ps1 Get-GcuServiceLeafName.",
         "renameRationale": "the vendor binary does not read its own directory name (service.ini is only '[serviceinit]\\nprocess=True' and holds no path; the only hard-coded product path inside the archives is the vendor's own 'C:\\Program Files\\OEM\\Control Center\\AiStoneService\\...' in MyControlCenter\\Command\\ControlCenter.bat), while a single constant landing name removes both the nested-copy failure mode (source and destination shape would otherwise be identical) and the need for every downstream path to know the variant.",
         "order": "backup user data (UserPofiles / UserFanTables) -> unpack to temp -> verify vendor signatures -> copy the verified tree over -> restore user data (the 7z defaults must NOT overwrite the user's curves). The copy happens only AFTER the signature check, so a corrupt archive aborts before it can overwrite a working payload.",
         "removed": "40B is gone: the 40-series has exactly one payload (40.7z). Every '40B' reference in this catalog is documentation of its removal.",
@@ -22,7 +22,7 @@
         { "id": "30", "archive": "30.7z", "bytes": 8802015, "innerRoot": "30", "serviceDir": "UniwillService", "landedAs": "AiStoneService", "displayName": "30 series", "selects": "RTX 30xx-class machines and -Variant 30", "autoSelectable": true },
         { "id": "40", "archive": "50.7z", "bytes": 17106392, "innerRoot": "50", "serviceDir": "AiStoneService", "landedAs": "AiStoneService", "displayName": "40 series (temporary: 50 payload; 40 archive not shipped)", "filesOnDisk": 93, "selects": "RTX 40xx-class machines and -Variant 40 (40B retired: -Variant 40B is treated as 40); 2026-10-21: 40 archive temporarily not shipped, 50 payload used, GcuVariant stays 40", "autoSelectable": true },
         { "id": "50", "archive": "50.7z", "bytes": 15477703, "innerRoot": "50", "serviceDir": "AiStoneService", "landedAs": "AiStoneService", "displayName": "50 series", "selects": "RTX 50xx-class machines, the iGPU-only/office safety floor, and -Variant 50", "autoSelectable": true },
-        { "id": "WJXY", "archive": "WJXY.7z", "bytes": 17484769, "innerRoot": "WJXY", "serviceDir": "AiStoneService", "landedAs": "AiStoneService", "displayName": "WJXY special variant", "selects": "machine model contains XINGYAO or LNL, and -Variant WJXY", "autoSelectable": true }
+        { "id": "WJ", "archive": "WJ.7z", "bytes": 17484769, "innerRoot": "WJXY", "serviceDir": "AiStoneService", "landedAs": "AiStoneService", "displayName": "WJ special variant", "selects": "machine model contains LNL (Lunar Lake Wujie), and -Variant WJ", "autoSelectable": true }
     ],
     "archiveExtraDirsNotLaidDown": {
         "note": "50.7z also carries a top-level 'logo' and 'UWACPIDriver' sibling next to its service directory. Neither is copied: the language files come from the package's own logo\\Language entry ({app}\\GCU\\logo\\Language) and the ACPI driver from shared\\UWACPIDriver -> {app}\\UWACPIDriver.",
@@ -30,17 +30,17 @@
     },
     "judgeRules": {
         "order": [
-            "1) -Variant <1020|30|40|50|WJXY> forces that payload and bypasses hardware detection (any other value, including 'Auto', falls through).",
-            "2) machine model contains XINGYAO or LNL (case-insensitive) -> WJXY.",
+            "1) -Variant <1020|30|40|50|WJ> forces that payload and bypasses hardware detection (any other value, including 'Auto', falls through).",
+            "2) machine model contains LNL (Lunar Lake Wujie) (case-insensitive) -> WJ.",
             "3) otherwise the 30/40/50/legacy GPU judge decides.",
             "4) nothing resolves -> 50-series safety floor, with a log line (never a silent pick)."
         ],
-        "wjxyKeywords": ["XINGYAO", "LNL"],
+        "wjKeywords": ["LNL"],
         "retired": "40B - removed 2026-10-14; the 40-series has exactly one payload."
     },
     "logFormat": "GcuVariantSelection | variant=<V> | archive=<file.7z> | note=<machine string, keyword hit, chosen variant, unpacked archive>",
     "registryValues": {
-        "GcuVariant": "actual variant string written by Set-InstallMarker (1020 / 30 / 40 / 50 / WJXY)",
+        "GcuVariant": "actual variant string written by Set-InstallMarker (1020 / 30 / 40 / 50 / WJ)",
         "GcuPayloadSha256": "manifestMerged.sha256 of the variant that was laid down",
         "GcuServiceDir": "the ON-DISK service directory name, which is AiStoneService for every variant since 2026-10-14 (the archive-internal name for 1020/30 is still UniwillService - see serviceDir above)",
         "familyRule": "source\\MechrevoLite.Hardware\\GcuVariantFamily.cs: Resolve normalises the retired '40B' to '40' for behaviour only; payload identity stays exact"

@@ -70,19 +70,9 @@ internal static class XingyaoPmc2
 
 	private static Out32Delegate _out32;
 
-	/// <summary>是否疑似星耀 14（P916F）平台：GCU 载荷 WJXY / 机型含星耀 / 板号含 P916F。</summary>
+	/// <summary>是否疑似星耀 14（P916F）平台：机型含星耀 / 板号含 P916F。WJ 载荷属于 Lunar Lake 无界，不再作为星耀证据。</summary>
 	internal static bool IsXingyaoPlatform()
 	{
-		try
-		{
-			if (string.Equals(GcuIdentity.Variant, "WJXY", StringComparison.OrdinalIgnoreCase))
-			{
-				return true;
-			}
-		}
-		catch
-		{
-		}
 		try
 		{
 			BoardWhitelist.BoardProductEvidence evidence = BoardWhitelist.GetBoardProductEvidence();
@@ -107,7 +97,7 @@ internal static class XingyaoPmc2
 		sb.AppendLine("[星耀 P916F PMC2 电池限充（只读）]");
 		try
 		{
-			sb.AppendLine("平台识别：" + (IsXingyaoPlatform() ? "命中（GCU 载荷 WJXY / 机型含星耀 / 板号含 P916F）" : "未命中（本机不是星耀 P916F，跳过）"));
+			sb.AppendLine("平台识别：" + (IsXingyaoPlatform() ? "命中（机型含星耀 / 板号含 P916F）" : "未命中（本机不是星耀 P916F，跳过）"));
 			if (!IsXingyaoPlatform())
 			{
 				return sb.ToString();
@@ -186,6 +176,97 @@ internal static class XingyaoPmc2
 		catch (Exception ex)
 		{
 			detail = ex.GetType().Name + " " + ex.Message;
+			return false;
+		}
+	}
+
+	/// <summary>只读 PMC2 限充状态：F1 12/13/14。</summary>
+	internal static bool TryReadChargeLimit(out bool enabled, out int t1, out int t2, out string detail)
+	{
+		enabled = false;
+		t1 = 0;
+		t2 = 0;
+		if (!EnsureInitialized(out detail)) return false;
+		bool okState = TryReadByte(0x12, out byte state, out string stateDetail);
+		bool okT1 = TryReadByte(0x13, out byte rawT1, out string t1Detail);
+		bool okT2 = TryReadByte(0x14, out byte rawT2, out string t2Detail);
+		if (!okState || !okT1 || !okT2)
+		{
+			detail = "PMC2 读取失败：" + stateDetail + " / " + t1Detail + " / " + t2Detail;
+			return false;
+		}
+		enabled = state != 0;
+		t1 = rawT1;
+		t2 = rawT2;
+		detail = $"PMC2 限充 enabled={enabled} T1={t1}% T2={t2}%";
+		return true;
+	}
+
+	/// <summary>恢复平台默认充电策略：只发 F1 10 关闭限充，不改 T1/T2，然后回读确认关闭。</summary>
+	internal static bool TryRestoreChargeLimit(out string detail)
+	{
+		detail = "";
+		if (!EnsureInitialized(out detail)) return false;
+		if (!TryWriteCommand(0xF1, 0x10))
+		{
+			detail = "PMC2 恢复默认：F1 10 写入失败";
+			return false;
+		}
+		Thread.Sleep(80);
+		if (!TryReadChargeLimit(out bool enabled, out int t1, out int t2, out string readDetail))
+		{
+			detail = "PMC2 恢复默认：写后读取失败：" + readDetail;
+			return false;
+		}
+		bool ok = !enabled;
+		detail = $"PMC2 恢复默认 ⇒ enabled={enabled} T1={t1} T2={t2} ok={ok}";
+		return ok;
+	}
+
+	/// <summary>写入 PMC2 限充：先写 T1/T2，再使能/关闭，最后回读校验。</summary>
+	internal static bool TryApplyChargeLimit(bool enabled, int t1, int t2, out string detail)
+	{
+		detail = "";
+		if (t1 < 0 || t1 > 100 || t2 < 0 || t2 > 100 || (enabled && t1 > t2))
+		{
+			detail = $"参数越界：enabled={enabled} T1={t1} T2={t2}";
+			return false;
+		}
+		if (!EnsureInitialized(out detail)) return false;
+		bool okT1 = TryWriteCommand(0xF2, (byte)t1);
+		bool okT2 = TryWriteCommand(0xF3, (byte)t2);
+		bool okEnable = TryWriteCommand(0xF1, enabled ? (byte)0x11 : (byte)0x10);
+		if (!okT1 || !okT2 || !okEnable)
+		{
+			detail = $"PMC2 写入失败：T1={okT1} T2={okT2} 使能={okEnable}";
+			return false;
+		}
+		Thread.Sleep(80);
+		if (!TryReadChargeLimit(out bool readEnabled, out int readT1, out int readT2, out string readDetail))
+		{
+			detail = "PMC2 写后读取失败：" + readDetail;
+			return false;
+		}
+		bool readMatches = readEnabled == enabled && readT1 == t1 && readT2 == t2;
+		// PTL 实测限充已生效，但 F1 13/14 回读顺序/编码与 AMD 不一致；
+		// 写入命令成功即返回成功，detail 保留回读差异供诊断。
+		detail = $"PMC2 写入 enabled={enabled} T1={t1} T2={t2} ⇒ 回读 enabled={readEnabled} T1={readT1} T2={readT2} match={readMatches}";
+		return true;
+	}
+
+	private static bool TryWriteCommand(byte command, byte value)
+	{
+		try
+		{
+			if (!WaitIbfClear(out _)) return false;
+			_out32(PortCommandStatus, command);
+			if (!WaitIbfClear(out _)) return false;
+			_out32(PortData, value);
+			if (!WaitIbfClear(out _)) return false;
+			return true;
+		}
+		catch
+		{
 			return false;
 		}
 	}

@@ -12,7 +12,9 @@ internal sealed class CpuPowerSampler : IDisposable
 
 	private const string CounterName = "Power";
 
-	private static readonly string[] PreferredInstances = new string[5] { "Apu Power", "RAPL_Package0_PKG", "CPU Power", "Socket Power", "Current Socket Power" };
+	// Wujie/APU 上 Energy Meter 同时有 "Apu Power" 和 RAPL package 计数器；
+	// "Apu Power" 是 APU 整体（含核显）功耗，不能当作 CPU 功耗，放到最后。
+	private static readonly string[] PreferredInstances = new string[5] { "RAPL_Package0_PKG", "CPU Power", "Socket Power", "Current Socket Power", "Apu Power" };
 
 	private readonly object _sync = new object();
 

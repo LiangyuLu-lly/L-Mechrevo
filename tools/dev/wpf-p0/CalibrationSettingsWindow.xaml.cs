@@ -110,7 +110,7 @@ public partial class CalibrationSettingsWindow : Window
             MechrevoLite.Display.CloudIccFetcher.Result result = await MechrevoLite.Display.CloudIccFetcher.FetchAsync();
             if (!result.Ok || string.IsNullOrWhiteSpace(result.FileName))
             {
-                MessageBox.Show(this, result.Detail, "云端获取 ICC", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, result.Detail, WpfStrings.L("云端获取 ICC", "Get ICC from cloud"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             AppConfig.Set("calib_custom_icc", result.FileName);
@@ -122,12 +122,15 @@ public partial class CalibrationSettingsWindow : Window
             RefreshIccList();
             int index = IccCombo.Items.IndexOf(result.FileName);
             if (index >= 0) IccCombo.SelectedIndex = index;
-            MessageBox.Show(this, result.Detail + Environment.NewLine + Environment.NewLine + result.FileName,
-                "云端获取 ICC", MessageBoxButton.OK, MessageBoxImage.Information);
+            string importedList = result.FileNames is { Count: > 0 } names
+                ? string.Join(Environment.NewLine, names)
+                : result.FileName;
+            MessageBox.Show(this, result.Detail + Environment.NewLine + Environment.NewLine + importedList,
+                WpfStrings.L("云端获取 ICC", "Get ICC from cloud"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "云端获取 ICC 失败：" + ex.Message, "云端获取 ICC", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, WpfStrings.L("云端获取 ICC 失败：", "Failed to get ICC from cloud: ") + ex.Message, WpfStrings.L("云端获取 ICC", "Get ICC from cloud"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -139,7 +142,7 @@ public partial class CalibrationSettingsWindow : Window
     {
         OpenFileDialog dialog = new OpenFileDialog
         {
-            Filter = "ICC 配置文件|*.icc;*.icm|所有文件|*.*",
+            Filter = WpfStrings.L("ICC 配置文件|*.icc;*.icm|所有文件|*.*", "ICC profiles|*.icc;*.icm|All files|*.*"),
             CheckFileExists = true
         };
         if (dialog.ShowDialog(this) != true)
@@ -149,7 +152,7 @@ public partial class CalibrationSettingsWindow : Window
         string? imported = IccHelper.ImportIcc(dialog.FileName);
         if (string.IsNullOrWhiteSpace(imported))
         {
-            MessageBox.Show(this, WpfStrings.CalibrationSettingsWindow_xaml_MessageBoxShowthis, "屏幕校色", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, WpfStrings.CalibrationSettingsWindow_xaml_MessageBoxShowthis, WpfStrings.L("屏幕校色", "Display calibration"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         AppConfig.Set("calib_custom_icc", imported);

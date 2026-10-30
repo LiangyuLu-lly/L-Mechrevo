@@ -1,7 +1,7 @@
 <#
   Invoke-GpuHotSwitch.ps1  --  hot-switch the discrete GPU with NO vendor software
 
-  What it does (ACPI-WMI, the same interface GCUService uses):
+  What it does (documented ACPI-WMI interface):
       cmd=3 addr=1  ->  write 0x3_0000_0000_01   iGPU-only ON  (switch the dGPU away)
       cmd=3 addr=1  ->  write 0x3_0000_0000_00   iGPU-only OFF (bring it back)
       cmd=3 addr=3  ->  read  support   85 = this machine has the runtime switch, 170 = it does not
@@ -58,7 +58,7 @@ function Save-Report {
 # the packing/extraction (the probe has been validated on four different laptops).
 # ---------------------------------------------------------------------------------------
 $probe = $StateEngine
-if (-not $probe) { $probe = Join-Path $PSScriptRoot 'Get-GcuNvramState.ps1' }
+if (-not $probe) { $probe = Join-Path $PSScriptRoot 'Get-NvramState.ps1' }
 if (-not (Test-Path -LiteralPath $probe)) {
     Write-Report -Level ERROR -Message ("helper engine not found: {0}" -f $probe)
     Save-Report

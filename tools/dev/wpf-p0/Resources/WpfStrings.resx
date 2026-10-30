@@ -816,6 +816,21 @@
   <data name="SettingsWindow_Text_32" xml:space="preserve">
     <value>Background opacity</value>
   </data>
+  <data name="SettingsWindow_MicaBackdrop" xml:space="preserve">
+    <value>Mica backdrop</value>
+  </data>
+  <data name="SettingsWindow_MicaTint" xml:space="preserve">
+    <value>Mica tint</value>
+  </data>
+  <data name="TrayOverlayLock" xml:space="preserve">
+    <value>Overlay: lock/unlock</value>
+  </data>
+  <data name="OverlayLockHint" xml:space="preserve">
+    <value>Lock overlay (click-through)</value>
+  </data>
+  <data name="SettingsWindow_BackgroundBlur" xml:space="preserve">
+    <value>Background blur</value>
+  </data>
   <data name="SettingsWindow_Text_33" xml:space="preserve">
     <value>Accent color</value>
   </data>
@@ -2696,6 +2711,9 @@ If the screen stays black, you will have to force shutdown and restart.</value>
   <data name="OnlineUpdateDisabled" xml:space="preserve">
     <value>Online update is disabled in this build by the original policy</value>
   </data>
+  <data name="UpdateChecking" xml:space="preserve">
+    <value>Checking for updates...</value>
+  </data>
   <data name="UpdateCheckNoResult" xml:space="preserve">
     <value>Update check failed: no result returned</value>
   </data>
@@ -2959,5 +2977,17 @@ Cancel: do not switch</value>
   </data>
   <data name="TurboHighEnergy" xml:space="preserve">
     <value>High Energy Turbo</value>
+  </data>
+  <data name="NucExtremeTurbo" xml:space="preserve">
+    <value>Extreme Turbo</value>
+  </data>
+  <data name="FanCurveBaolongdaEnable_Content" xml:space="preserve">
+    <value>Enable software closed loop</value>
+  </data>
+  <data name="FanSyncSharedHeatPipe_Content" xml:space="preserve">
+    <value>Link both fans</value>
+  </data>
+  <data name="FanCurveRestoreDefault_Content" xml:space="preserve">
+    <value>Restore default curve</value>
   </data>
 </root>

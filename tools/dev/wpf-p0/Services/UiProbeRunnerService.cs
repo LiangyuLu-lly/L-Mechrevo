@@ -49,7 +49,7 @@ internal static class UiProbeRunnerService
     /// <summary>无 CLI 参数时的等价环境变量（与旧版一致）。</summary>
     internal const string EnvironmentVariable = "LMECHREVO_UI_PROBE";
 
-    private static readonly string[] KnownProfiles = { "all", "wujie", "baolongda", "gen50", "minimal" };
+    private static readonly string[] KnownProfiles = { "all", "nuc", "wujie", "baolongda", "gen50", "minimal" };
 
     private static readonly string[] KnownForms = { "settings", "custommode", "fancurve", "主界面", "自定义模式", "风扇曲线" };
 
@@ -110,6 +110,14 @@ internal static class UiProbeRunnerService
         try
         {
             MechrevoDeviceCapabilities caps = BuildCapabilities(profile);
+            if (string.Equals(profile, "nuc", StringComparison.OrdinalIgnoreCase))
+            {
+                MechrevoLite.Hardware.MachineIdentity identity = new(
+                    "LAPKC71E", "ui-probe", false, "Gen30", false,
+                    "NUC X15 (probe)", "ui-probe", "", false, false,
+                    "LAPKC71E", "ui-probe", "", "", false, "", "NUC X15 (probe)");
+                MechrevoLite.Hardware.BackendRouter.SetPreviewDecision(identity);
+            }
             MechrevoHw hw = new MechrevoHw(publishOverride: null, capabilities: caps);
             WpfBackend.Attach(hw, null);
             // 等价旧版 Program.UiAuditUseReportedCapabilities = true：
@@ -225,28 +233,29 @@ internal static class UiProbeRunnerService
         bool wujie = string.Equals(name, "wujie", StringComparison.OrdinalIgnoreCase);
         bool baolongda = string.Equals(name, "baolongda", StringComparison.OrdinalIgnoreCase);
         bool gen50 = string.Equals(name, "gen50", StringComparison.OrdinalIgnoreCase);
+        bool nuc = string.Equals(name, "nuc", StringComparison.OrdinalIgnoreCase);
         bool minimal = string.Equals(name, "minimal", StringComparison.OrdinalIgnoreCase);
-        bool full = all || gen50;
+        bool full = all || gen50 || nuc;
         return new MechrevoDeviceCapabilities
         {
-            ProjectId = all ? "UI-PROBE" : (wujie ? "WUJIE" : (baolongda ? "BAOLONGDA" : (gen50 ? "GEN50" : "MINIMAL"))),
+            ProjectId = all ? "UI-PROBE" : (nuc ? "LAPKC71E" : (wujie ? "WUJIE" : (baolongda ? "BAOLONGDA" : (gen50 ? "GEN50" : "MINIMAL")))),
             Manufacturer = "MECHREVO",
-            Model = all ? "UI 探针（全开）" : (wujie ? "无界（探针）" : (baolongda ? "宝龙达（探针）" : (gen50 ? "50 系 GCU（探针）" : "极简（探针）"))),
-            BaseboardProduct = all ? "UI-PROBE" : (wujie ? "WUJIE14XA" : (baolongda ? "MRID6" : (gen50 ? "JIAOLONG" : "MINIMAL"))),
+            Model = all ? "UI 探针（全开）" : (nuc ? "NUC X15（探针）" : (wujie ? "无界（探针）" : (baolongda ? "宝龙达（探针）" : (gen50 ? "50 系 GCU（探针）" : "极简（探针）")))),
+            BaseboardProduct = all ? "UI-PROBE" : (nuc ? "LAPKC71E" : (wujie ? "WUJIE14XA" : (baolongda ? "MRID6" : (gen50 ? "JIAOLONG" : "MINIMAL")))),
             BiosVersion = "UI-PROBE",
             IsMechrevo = true,
             ProfileAvailable = !minimal,
-            Keyboard = all || wujie || baolongda,
-            Lightbar = all || baolongda,
-            RgbLightbar = all || baolongda,
-            LogoLight = all || baolongda,
-            DisplayRefresh = all || gen50 || baolongda,
-            ColorCalibration = all || gen50 || baolongda,
+            Keyboard = all || nuc || wujie || baolongda,
+            Lightbar = all || nuc || baolongda,
+            RgbLightbar = all || nuc || baolongda,
+            LogoLight = all || nuc || baolongda,
+            DisplayRefresh = all || nuc || gen50 || baolongda,
+            ColorCalibration = all || nuc || gen50 || baolongda,
             ColorCalibrationLevel = full ? 4 : (baolongda ? 2 : 0),
             DgpuDirect = all || baolongda || gen50,
             IgpuOnly = full,
-            FanBoost = all || wujie || baolongda || gen50,
-            FanSettings = all || wujie || baolongda,
+            FanBoost = all || nuc || wujie || baolongda || gen50,
+            FanSettings = all || nuc || wujie || baolongda,
             OverclockSettings = all || baolongda || gen50,
             CpuPerformanceTuning = all || gen50 || baolongda,
             LiquidCooling = all || gen50,
@@ -256,8 +265,8 @@ internal static class UiProbeRunnerService
             AcRecoveryOn = (all || gen50) ? true : (baolongda ? (bool?)false : null),
             LcdOverdrive = all || gen50,
             LocalDimming = all || gen50,
-            TurboMode = all || gen50,
-            TurboSubMode = all || gen50,
+            TurboMode = all || nuc || gen50,
+            TurboSubMode = all || nuc || gen50,
             SmartBalance = all || gen50,
             RamFan15 = all || gen50,
             NvidiaGpu = all || baolongda || gen50,

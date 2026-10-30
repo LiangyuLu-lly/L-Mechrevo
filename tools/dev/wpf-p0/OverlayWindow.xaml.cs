@@ -1,5 +1,7 @@
 using System;
 using System.Windows;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Media;
 using L_Mechrevo.WpfP0.Resources;
@@ -38,11 +40,13 @@ public partial class OverlayWindow : Window
     private bool _pressed;
     private bool _dragging;
     private bool _acOnline;
+    private bool _locked;
 
     public OverlayWindow(Func<OverlaySnapshot> provider)
     {
         InitializeComponent();
         _provider = provider;
+        _locked = ReadSavedLocked();
         try
         {
             _displayMode = Math.Clamp(MechrevoLite.AppConfig.Get("overlay_wpf_mode", 1), 0, 2);
@@ -54,6 +58,7 @@ public partial class OverlayWindow : Window
             _displayMode = 1;
         }
         ApplyDisplayMode();
+        SourceInitialized += (_, _) => ApplyLockState();
         Loaded += (_, _) =>
         {
             RestorePosition();
@@ -61,6 +66,7 @@ public partial class OverlayWindow : Window
             {
                 ResetPosition();
             }
+            ApplyLockState();
             Refresh();
             _timer.Tick += (_, _) => Refresh();
             if (IsVisible)
@@ -72,6 +78,7 @@ public partial class OverlayWindow : Window
         {
             if (IsVisible)
             {
+                ApplyLockState();
                 Refresh();
                 _timer.Start();
             }
@@ -89,6 +96,8 @@ public partial class OverlayWindow : Window
         {
             OverlaySnapshot s = _provider();
             _acOnline = s.AcOnline;
+            bool showGpu = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu;
+            GpuRow.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
             GpuTempText.Text = FormatTemp(s.GpuTemp);
             GpuFreqText.Text = FormatFreq(s.GpuCoreFreq);
             GpuFanText.Text = FormatFan(s.GpuFanRpm, s.GpuFanDuty);
@@ -306,7 +315,7 @@ public partial class OverlayWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState != MouseButtonState.Pressed)
+        if (_locked || LockButton.IsMouseOver || e.ButtonState != MouseButtonState.Pressed)
         {
             return;
         }
@@ -318,7 +327,7 @@ public partial class OverlayWindow : Window
 
     private void Window_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_pressed || e.LeftButton != MouseButtonState.Pressed)
+        if (_locked || !_pressed || e.LeftButton != MouseButtonState.Pressed)
         {
             return;
         }
@@ -341,7 +350,7 @@ public partial class OverlayWindow : Window
 
     private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_pressed)
+        if (_locked || !_pressed)
         {
             return;
         }
@@ -356,6 +365,117 @@ public partial class OverlayWindow : Window
 
     private void Window_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (_locked || LockButton.IsMouseOver)
+        {
+            return;
+        }
         Hide();
+    }
+
+    // ── 锁定 + 鼠标穿透 ──────────────────────────────────────────────
+    private const int GwlExStyle = -20;
+    private const int WsExTransparent = 0x00000020;
+    private const int WsExLayered = 0x00080000;
+    private const int WsExNoActivate = 0x08000000;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern nint GetWindowLongPtr(nint hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    internal static bool ReadSavedLocked()
+    {
+        try
+        {
+            return MechrevoLite.AppConfig.Is("overlay_locked");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal bool IsLocked => _locked;
+
+    internal void SetLocked(bool locked)
+    {
+        bool wasLocked = _locked;
+        _locked = locked;
+        try
+        {
+            MechrevoLite.AppConfig.Set("overlay_locked", locked ? 1 : 0);
+            MechrevoLite.AppConfig.Flush();
+        }
+        catch
+        {
+        }
+        ApplyLockState();
+        if (locked && !wasLocked)
+        {
+            try
+            {
+                OsdService.Show("\uE72E", "悬浮窗已锁定", "可在托盘菜单或设置中解锁");
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private void ApplyLockState()
+    {
+        try
+        {
+            OverlayRoot.IsHitTestVisible = !_locked;
+            LockButton.Visibility = _locked ? Visibility.Collapsed : (IsMouseOver ? Visibility.Visible : Visibility.Collapsed);
+            nint handle = new WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
+            long current = GetWindowLongPtr(handle, GwlExStyle).ToInt64();
+            long target = _locked
+                ? (current | WsExTransparent | WsExLayered | WsExNoActivate)
+                : (current & ~(WsExTransparent | WsExNoActivate));
+            if (target != current)
+            {
+                SetWindowLongPtr(handle, GwlExStyle, (nint)target);
+                SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0,
+                    SwpNoSize | SwpNoMove | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private void OverlayRoot_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (!_locked)
+        {
+            LockButton.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void OverlayRoot_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (!_locked && !LockButton.IsMouseOver)
+        {
+            LockButton.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void LockButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetLocked(true);
     }
 }

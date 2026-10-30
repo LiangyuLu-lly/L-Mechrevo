@@ -12,6 +12,7 @@ using PawnIO;
 
 [assembly: InternalsVisibleTo("L-Mechrevo.WpfP0")]
 [assembly: InternalsVisibleTo("L-Mechrevo")]
+[assembly: InternalsVisibleTo("mro_monitor")]
 
 namespace MechrevoLite
 {
@@ -207,8 +208,17 @@ namespace MechrevoLite
         /// <summary>旧 Toast 的 Core shim：只做通知，不创建任何窗体。</summary>
         internal class ToastForm
         {
-            internal static void ShowFailure(string message) => Logger.WriteLine("[toast][failure] " + message);
-            internal static void ShowNotice(string message) => Logger.WriteLine("[toast][notice] " + message);
+            internal static void ShowFailure(string message)
+            {
+                Logger.WriteLine("[toast][failure] " + message);
+                MechrevoLite.Helpers.ToastBridge.ShowFailure(message);
+            }
+
+            internal static void ShowNotice(string message)
+            {
+                Logger.WriteLine("[toast][notice] " + message);
+                MechrevoLite.Helpers.ToastBridge.ShowNotice(message);
+            }
         }
     }
 
@@ -274,3 +284,4 @@ namespace MechrevoLite
         }
     }
 }
+

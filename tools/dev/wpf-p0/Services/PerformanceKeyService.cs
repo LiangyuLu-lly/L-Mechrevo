@@ -17,6 +17,9 @@ internal sealed class PerformanceKeyService : IDisposable
 
     internal event Action? Pressed;
 
+    /// <summary>所有 ACPI ULong 事件（176 性能键、177/178/185 键盘亮度、59-63 直接亮度档）。</summary>
+    internal event Action<int>? AcpiCode;
+
     internal void Start()
     {
         if (_started)
@@ -30,11 +33,11 @@ internal sealed class PerformanceKeyService : IDisposable
             _watcher.EventArrived += OnEventArrived;
             _watcher.Start();
             _started = true;
-            Logger.WriteLine("[perfkey] 已订阅 ACPI 性能键事件 ULong=" + PerformanceKeyCode);
+            Logger.WriteError("[perfkey] 已订阅 ACPI 性能键事件 ULong=" + PerformanceKeyCode);
         }
         catch (Exception ex)
         {
-            Logger.WriteLine("[perfkey] 订阅失败：" + ex.Message);
+            Logger.WriteError("[perfkey] 订阅失败：" + ex.Message);
             Dispose();
         }
     }
@@ -44,7 +47,19 @@ internal sealed class PerformanceKeyService : IDisposable
         try
         {
             object? value = e.NewEvent?.Properties["ULong"]?.Value;
-            if (value == null || Convert.ToInt32(value) != PerformanceKeyCode)
+            if (value == null)
+            {
+                return;
+            }
+            int code = Convert.ToInt32(value);
+            try
+            {
+                AcpiCode?.Invoke(code);
+            }
+            catch
+            {
+            }
+            if (code != PerformanceKeyCode)
             {
                 return;
             }
@@ -54,7 +69,7 @@ internal sealed class PerformanceKeyService : IDisposable
             {
                 return;
             }
-            Logger.WriteLine("[perfkey] ACPI ULong=" + PerformanceKeyCode + " -> 切换性能模式");
+            Logger.WriteError("[perfkey] ACPI ULong=" + PerformanceKeyCode + " -> 切换性能模式");
             Pressed?.Invoke();
         }
         catch (Exception ex)

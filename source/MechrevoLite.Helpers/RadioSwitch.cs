@@ -57,10 +57,18 @@ internal static class RadioSwitch
 
 	private static int _started;
 
+	// 缓存 Radio 对象：600ms 轮询时不再每次 FindAll/FromId（那两次 WinRT 枚举才是主要开销），
+	// 只读缓存的 Radio.State；15s 或读失败时才重新枚举。
+	private static readonly Dictionary<RadioSwitchKind, Radio> CachedRadios = new();
+	private static long _lastRadioEnumerationTick;
+
 	private static RadioAccessStatus? _access;
 
 	/// <summary>⭐ 可用性变化回调（⭐ 由 MechrevoHw 挂上 ⇒ 让界面重新评估这两个开关是否显示）。</summary>
 	internal static Action AvailabilityChanged;
+
+	/// <summary>系统/硬件 Radio 状态变化（key=WiFi/蓝牙，on=当前状态）。</summary>
+	internal static event Action<RadioSwitchKind, bool>? StateChanged;
 
 	/// <summary>⭐ 启动后台轮询（⭐ 幂等；只在宝龙达后端启动时调一次）。</summary>
 	internal static void Start()
@@ -69,14 +77,16 @@ internal static class RadioSwitch
 		{
 			return;
 		}
-		// ⭐ 500 ms 首扫（别和启动抢资源），之后 3 s 一次（与宝龙达其它状态刷新同节拍）
+		// 首扫稍等启动，之后 600ms 一次。
+		// 这个节拍和 OpenRevo 的 slow track 一致（50ms 主循环 × 12 tick）：
+		// WinRT Radio 读取约 0.5ms，不会造成 CPU 负担；3s 一次会让系统开关看起来“没反应”。
 		_ = Task.Run(async delegate
 		{
-			await Task.Delay(50).ConfigureAwait(continueOnCapturedContext: false);
+			await Task.Delay(200).ConfigureAwait(continueOnCapturedContext: false);
 			while (true)
 			{
 				await PollOnceAsync().ConfigureAwait(continueOnCapturedContext: false);
-				await Task.Delay(3000).ConfigureAwait(continueOnCapturedContext: false);
+				await Task.Delay(600).ConfigureAwait(continueOnCapturedContext: false);
 			}
 		});
 	}
@@ -172,32 +182,43 @@ internal static class RadioSwitch
 				SetUnavailableAll($"无 Radio 访问权限（{access}）");
 				return;
 			}
-			DeviceInformationCollection devices = await DeviceInformation.FindAllAsync(Radio.GetDeviceSelector())
-				.AsTask().ConfigureAwait(continueOnCapturedContext: false);
 			bool wasWifi = Available(RadioSwitchKind.Wifi);
 			bool wasBt = Available(RadioSwitchKind.Bluetooth);
+			long now = Environment.TickCount64;
+			if (CachedRadios.Count == 0 || now - _lastRadioEnumerationTick > 15000)
+			{
+				CachedRadios.Clear();
+				DeviceInformationCollection devices = await DeviceInformation.FindAllAsync(Radio.GetDeviceSelector())
+					.AsTask().ConfigureAwait(continueOnCapturedContext: false);
+				foreach (DeviceInformation device in devices)
+				{
+					Radio radio = await Radio.FromIdAsync(device.Id).AsTask().ConfigureAwait(continueOnCapturedContext: false);
+					if (radio == null)
+					{
+						continue;
+					}
+					RadioSwitchKind? kind = MapKind(radio.Kind);
+					if (kind.HasValue)
+					{
+						CachedRadios[kind.Value] = radio;
+					}
+				}
+				_lastRadioEnumerationTick = now;
+			}
 			bool sawWifi = false;
 			bool sawBt = false;
-			foreach (DeviceInformation device in devices)
+			foreach (KeyValuePair<RadioSwitchKind, Radio> pair in CachedRadios)
 			{
-				Radio radio = await Radio.FromIdAsync(device.Id).AsTask().ConfigureAwait(continueOnCapturedContext: false);
-				if (radio == null)
+				try
 				{
-					continue;
+					UpdateCache(pair.Key, pair.Value.State);
+					if (pair.Key == RadioSwitchKind.Wifi) sawWifi = true;
+					else sawBt = true;
 				}
-				RadioSwitchKind? kind = MapKind(radio.Kind);
-				if (!kind.HasValue)
+				catch
 				{
-					continue;
-				}
-				UpdateCache(kind.Value, radio.State);
-				if (kind.Value == RadioSwitchKind.Wifi)
-				{
-					sawWifi = true;
-				}
-				else
-				{
-					sawBt = true;
+					CachedRadios.Remove(pair.Key);
+					break;
 				}
 			}
 			if (!sawWifi)
@@ -208,7 +229,6 @@ internal static class RadioSwitch
 			{
 				SetUnavailable(RadioSwitchKind.Bluetooth, "本机没有蓝牙无线电（或已禁用）");
 			}
-			// ⭐ 可用性**变了**才通知界面（⛔ 不每 3 s 触发一次重排）
 			if (wasWifi != Available(RadioSwitchKind.Wifi) || wasBt != Available(RadioSwitchKind.Bluetooth))
 			{
 				try
@@ -222,6 +242,7 @@ internal static class RadioSwitch
 		}
 		catch (Exception ex)
 		{
+			CachedRadios.Clear();
 			SetUnavailableAll(ex.GetType().Name + " " + ex.Message);
 		}
 	}
@@ -258,13 +279,29 @@ internal static class RadioSwitch
 
 	private static void UpdateCache(RadioSwitchKind kind, RadioState state)
 	{
+		bool changed;
+		bool on;
 		lock (Gate)
 		{
 			Entry entry = Cache[kind];
+			bool wasAvailable = entry.Available;
+			bool wasOn = entry.On;
 			entry.Available = true;
 			entry.On = state == RadioState.On;
 			entry.StateText = state.ToString();
 			entry.Note = string.Empty;
+			on = entry.On;
+			changed = !wasAvailable || wasOn != on;
+		}
+		if (changed)
+		{
+			try
+			{
+				StateChanged?.Invoke(kind, on);
+			}
+			catch
+			{
+			}
 		}
 	}
 

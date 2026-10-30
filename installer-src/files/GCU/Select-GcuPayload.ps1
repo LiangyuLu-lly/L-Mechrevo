@@ -110,7 +110,7 @@ function Get-XingyaoEvidence {
         }
     }
     return [pscustomobject]@{
-        Variant = $(if ($Wjxy) { "WJXY" } else { "" })
+        Variant = $(if ($Wjxy) { "WJ" } else { "" })
         Model   = $Model
         Key     = $key
         Reason  = $(if ($Wjxy) { "machine string contains '$key' -> WJXY special variant" } else { "machine string has no WJXY keyword -> legacy judge" })
@@ -158,14 +158,16 @@ function Resolve-GcuVariant {
     $wjxy = Test-WjxyMachine -Models @($model)
 
     if ($forced -eq "WJXY") {
-        $notes.Add("variant forced to WJXY (hardware detection bypassed)") | Out-Null
+        # WJXY compatibility alias: same LNL payload as WJ.
+        $forced = "WJ"
+        $notes.Add("variant forced to WJXY (alias of WJ)") | Out-Null
     }
     elseif ($forced) {
         $notes.Add("variant forced to $forced (hardware detection bypassed)") | Out-Null
     }
     elseif ($wjxy) {
-        $forced = "WJXY"
-        $notes.Add("machine string '$model' contains a WJXY keyword -> WJXY special variant") | Out-Null
+        $forced = "WJ"
+        $notes.Add("machine string '$model' contains a WJ keyword -> WJ special variant") | Out-Null
     }
     else {
         $gpuGen = Get-GpuGeneration -GpuName $GpuName -GpuDeviceId $GpuDeviceId -Offline:$Offline
@@ -203,7 +205,7 @@ function Resolve-GcuVariant {
 # directly as
 #   {app}\GCU\AiStoneService\...        (EVERY variant, incl. 1020/30)
 # ===========================================================================
-$script:VariantKeys = @("1020", "30", "40", "50", "WJXY")
+$script:VariantKeys = @("1020", "30", "40", "50", "WJ", "WJXY")
 $script:Archives = [ordered]@{
     # inner root -> variant name mapping (the 7z internal top folder differs from the
     # variant key for two entries and must be normalised during the unpack):
@@ -217,7 +219,8 @@ $script:Archives = [ordered]@{
     # 40 系当前实际安装的是 50 系 GCU 载荷；注册表必须记录实际载荷版本 50，而不是机器代际 40。
     "40"   = [pscustomobject]@{ Variant = "40";   PayloadVariant = "50";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "40 series (temporary: 50 payload; 40 archive not shipped)" }
     "50"   = [pscustomobject]@{ Variant = "50";   PayloadVariant = "50";   FileName = "50.7z";   RelPath = "payload\50.7z";   InnerRoot = "50";    ServiceDir = "AiStoneService"; DisplayName = "50 series" }
-    "WJXY" = [pscustomobject]@{ Variant = "WJXY"; PayloadVariant = "WJXY"; FileName = "WJXY.7z"; RelPath = "payload\WJXY.7z"; InnerRoot = "WJXY"; ServiceDir = "AiStoneService"; DisplayName = "WJXY special variant (XINGYAO / LNL machines)" }
+    "WJ"   = [pscustomobject]@{ Variant = "WJ";   PayloadVariant = "WJ";   FileName = "WJ.7z";   RelPath = "payload\WJ.7z";   InnerRoot = "WJXY"; ServiceDir = "AiStoneService"; DisplayName = "WJ special variant (LNL Wujie; default)" }
+    "WJXY" = [pscustomobject]@{ Variant = "WJXY"; PayloadVariant = "WJ";   FileName = "WJ.7z";   RelPath = "payload\WJ.7z";   InnerRoot = "WJXY"; ServiceDir = "AiStoneService"; DisplayName = "WJXY alias (compatibility)" }
 }
 
 # The archives are staged flat, one per variant, under the -StagingRoot the setup passes ({tmp}).

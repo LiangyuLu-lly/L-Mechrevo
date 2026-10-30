@@ -426,6 +426,12 @@ public class LhmMonitor : IDisposable
 
 	public int GpuMemoryUsedMb { get; private set; }
 
+	/// <summary>核显/共享显存（D3D Shared Memory）已用 MB；独显通常为 0。</summary>
+	public int GpuSharedMemoryUsedMb { get; private set; }
+
+	/// <summary>核显/共享显存总量 MB。</summary>
+	public int GpuSharedMemoryTotalMb { get; private set; }
+
 	/// <summary>(b) 连续失败次数：调用方据此决定重建监控对象。</summary>
 	internal int ConsecutiveFailures => Volatile.Read(in _consecutiveFailures);
 
@@ -535,6 +541,8 @@ public class LhmMonitor : IDisposable
 				GpuPower = null;
 				GpuMemoryTotalMb = 0;
 				GpuMemoryUsedMb = 0;
+				GpuSharedMemoryTotalMb = 0;
+				GpuSharedMemoryUsedMb = 0;
 				// ⭐⭐ 2026-10-18（机主：30 系 CPU 温度 80℃ 不动 · 诊断包 lm-…-161007）：
 				//   ⚠️⚠️ **根因**：⭐ 这里原来**没有**把 CPU 温度清成 null，而采集分支又带
 				//   `!CpuTemperature.HasValue` 闸门 ⚠️ ⇒ ⭐ 一个 <see cref="LhmMonitor" /> 实例
@@ -662,6 +670,14 @@ public class LhmMonitor : IDisposable
 						else if (sensor.SensorType == SensorType.SmallData && IsGpuMemoryUsedSensorName(sensor.Name))
 						{
 							GpuMemoryUsedMb = (int)sensor.Value.Value;
+						}
+						else if (sensor.SensorType == SensorType.SmallData && IsGpuSharedMemoryTotalSensorName(sensor.Name))
+						{
+							GpuSharedMemoryTotalMb = (int)sensor.Value.Value;
+						}
+						else if (sensor.SensorType == SensorType.SmallData && IsGpuSharedMemoryUsedSensorName(sensor.Name))
+						{
+							GpuSharedMemoryUsedMb = (int)sensor.Value.Value;
 						}
 						// ⭐⭐ 2026-10-18（机主：GPU 占用率显示不对）：⭐ GPU 核心负载（⭐ 只在**非 NVIDIA** 机型命中 ✅）
 						//   ⚠️ 关键：⭐ 与本轮温度一样**每轮都收集** ⇒ ⛔ 不会重蹈"只写一次就冻结"的覆辙 ✅
@@ -1257,6 +1273,20 @@ public class LhmMonitor : IDisposable
 			return true;
 		}
 		return false;
+	}
+
+	private static bool IsGpuSharedMemoryTotalSensorName(string? name)
+	{
+		return name != null
+			&& (name.Equals("D3D Shared Memory Total", StringComparison.OrdinalIgnoreCase)
+				|| name.Equals("Shared Memory Total", StringComparison.OrdinalIgnoreCase));
+	}
+
+	private static bool IsGpuSharedMemoryUsedSensorName(string? name)
+	{
+		return name != null
+			&& (name.Equals("D3D Shared Memory Used", StringComparison.OrdinalIgnoreCase)
+				|| name.Equals("Shared Memory Used", StringComparison.OrdinalIgnoreCase));
 	}
 
 	private static bool IsGpuMemoryUsedSensorName(string? name)

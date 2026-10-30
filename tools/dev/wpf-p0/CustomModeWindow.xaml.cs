@@ -34,6 +34,7 @@ public partial class CustomModeWindow : Window
     public CustomModeWindow(string? initialModeId = null)
     {
         InitializeComponent();
+        L_Mechrevo.WpfP0.Services.WindowWorkAreaPolicy.ClampOnLoaded(this);
         AddHandler(Slider.ValueChangedEvent,
             new RoutedPropertyChangedEventHandler<double>((_, _) => MarkDirty()), true);
         AddHandler(CheckBox.CheckedEvent,
@@ -446,11 +447,16 @@ public partial class CustomModeWindow : Window
         }
         bool nucDirectRows = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsIntelNucMachine == true
             || L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.IsUmiMachine == true;
+        bool intelMsrRows = L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw intelHw
+            && MechrevoLite.Hardware.CpuVendor.IsIntel
+            && !intelHw.IsIntelNucMachine
+            && !intelHw.IsUmiMachine;
         bool locked = L_Mechrevo.WpfP0.Services.WpfBackend.Hw is MechrevoHw lockHw
             && lockHw.IsGcuConnected
             && PerfModeCapabilities.IsGen40Plus(lockHw)
             && _current?.IsCustom != true
-            && !nucDirectRows;
+            && !nucDirectRows
+            && !intelMsrRows;
         CpuPowerCard.IsEnabled = !locked;
         TempGpuCard.IsEnabled = !locked;
         FanCard.IsEnabled = !locked;
@@ -469,6 +475,12 @@ public partial class CustomModeWindow : Window
             smuCustomApu);
         bool pl4Supported = hwForRows != null && hwForRows.Pl4Minimum >= 0 && hwForRows.Pl4Maximum > hwForRows.Pl4Minimum;
         Pl4Row.Visibility = !apuOrNoDgpu && pl4Supported ? Visibility.Visible : Visibility.Collapsed;
+        DbRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
+        // 30 系 NUC/UMI 是固定基础 TGP，只能调 Dynamic Boost；基础 TGP 行直接隐藏。
+        bool fixedBaseTgp = hwForRows != null
+            && (hwForRows.IsIntelNucMachine || hwForRows.IsUmiMachine)
+            && hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
+        GpuTgpRow.Visibility = (apuOrNoDgpu || fixedBaseTgp) ? Visibility.Collapsed : Visibility.Visible;
         FanBoostRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
         FanCard.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
         StapmTimeRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
@@ -661,6 +673,12 @@ public partial class CustomModeWindow : Window
         {
             SetSliderRange(Pl1Slider, hw.Pl1Minimum, hw.Pl1Maximum);
             SetSliderRange(Pl2Slider, hw.Pl2Minimum, hw.Pl2Maximum);
+            if (MechrevoLite.Hardware.CpuVendor.IsIntel && !hw.IsIntelNucMachine && !hw.IsUmiMachine)
+            {
+                // Intel MSR 后端（非 NUC/UMI）：UI 范围与 MSR 写入范围对齐。
+                SetSliderRange(Pl1Slider, 5, 120);
+                SetSliderRange(Pl2Slider, 5, 150);
+            }
         }
         SetSliderRange(Pl4Slider, hw.Pl4Minimum, hw.Pl4Maximum);
         SetSliderRange(TccSlider, hw.TccMinimum, hw.TccMaximum);
@@ -684,9 +702,7 @@ public partial class CustomModeWindow : Window
         DbSwitch.IsEnabled = nucDirectUi || hw.GpuDynamicBoostAdjustable || vendorProfile;
         GpuTgpSlider.IsEnabled = nucDirectUi || hw.GpuTgpAdjustable || vendorProfile;
         FanSensitivitySwitch.IsEnabled = nucDirectUi || hw.SupportsFanSwitchSpeed || vendorProfile;
-        GpuOcSwitch.IsEnabled = nucDirectUi || (hw.SupportsGpuOverclock
-                && string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
-                || vendorProfile;
+        GpuOcSwitch.IsEnabled = nucDirectUi || hw.SupportsGpuOverclock || vendorProfile;
         if (!hw.GpuTgpAdjustable && !nucDirectUi)
         {
             GpuTgpSlider.Opacity = 0.45;
@@ -897,9 +913,8 @@ public partial class CustomModeWindow : Window
                 // 否则内置档会被改成 NeedsFirmwareSlot，后续切档走固件槽重放并失败。
                 _settings = edited;
                 _dirty = false;
-                ToolTip = null;
                 ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
-                StatusText.Text = "配置已保存：模式 " + _firmwareVisualMode + " · 配置 " + (_firmwareProfileIndex + 1) + "（切到该模式后生效）";
+                StatusText.Text = WpfStrings.L("配置已保存：模式 ", "Configuration saved: mode ") + _firmwareVisualMode + WpfStrings.L(" · 配置 ", " · profile ") + (_firmwareProfileIndex + 1) + WpfStrings.L("（切到该模式后生效）", " (applies after switching to this mode)");
                 return;
             }
             bool nucDirect = WpfBackend.Hw?.IsIntelNucMachine == true || WpfBackend.Hw?.IsUmiMachine == true;
@@ -907,15 +922,20 @@ public partial class CustomModeWindow : Window
             {
                 if (_current?.Id != null) MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
                 string gpuDetail = "";
+                // NUC 自定义：cTGP / Dynamic Boost / GPU 超频统一走 NucGpuPower；
+                // 旧版这里只做 NVAPI 偏移，导致“GPU 动态加速/功耗上限”保存了但没下发。
                 bool gpuOk = MechrevoLite.Hardware.NucGpuPower.TryApply(
                     edited.GpuTgp ?? 0,
                     edited.GpuDynamicBoostOn == true,
                     edited.GpuDynamicBoost ?? 0,
                     edited.GpuOverclockOn == true ? edited.GpuCoreOffset : null,
                     edited.GpuOverclockOn == true ? edited.GpuMemoryOffset : null,
-                    out gpuDetail);
+                    out gpuDetail,
+                    force: true);
                 bool ok = MechrevoLite.Hardware.NucPerformanceMode.TryApplyCustom(
-                    edited.Pl1, edited.Pl2, edited.Pl4, edited.TccTarget, out string detail);
+                    edited.Pl1, edited.Pl2, edited.Pl4,
+                    edited.TccOn == true ? edited.TccTarget : null,
+                    out string detail);
                 bool rampOk = MechrevoLite.Hardware.NucFanTable.TrySetFanRamp(
                     edited.FanSwitchSpeedOn == true, edited.FanSwitchSpeedMs ?? 300, out string rampDetail);
                 bool curveOn = edited.FanCurveOn != false
@@ -925,14 +945,40 @@ public partial class CustomModeWindow : Window
                 detail += " " + rampDetail + " " + isolatedDetail + " " + gpuDetail;
                 _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
                 StatusText.Text = ok
-                    ? "自定义功耗墙已应用：" + detail
-                    : "自定义功耗墙应用失败：" + detail;
-                ToolTip = detail;
+                    ? WpfStrings.L("自定义功耗墙已应用：", "Custom power limits applied: ") + detail
+                    : WpfStrings.L("自定义功耗墙应用失败：", "Failed to apply custom power limits: ") + detail;
                 if (ok)
                 {
                     _dirty = false;
                     ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
                 }
+                return;
+            }
+            // 星耀 Intel PTL 没有 GCU 固件槽；自定义按本机 MSR 直接下发，避免
+            // PerfModeService 走 FirmwareSlot 时返回空结果（界面显示“没有返回下发结果”）。
+            bool xingyaoIntelMsr = WpfBackend.Hw is MechrevoHw xyHw
+                && MechrevoLite.Hardware.CpuVendor.IsIntel
+                && !xyHw.IsIntelNucMachine
+                && !xyHw.IsUmiMachine
+                && MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform();
+            if (xingyaoIntelMsr && _current?.IsCustom == true && WpfBackend.Service != null)
+            {
+                Dictionary<string, string> fields = new();
+                if (edited.Pl1.HasValue) fields["PL1"] = edited.Pl1.Value.ToString();
+                if (edited.Pl2.HasValue) fields["PL2"] = edited.Pl2.Value.ToString();
+                if (edited.TccTarget.HasValue) fields["CpuTccOffset"] = edited.TccTarget.Value.ToString();
+                MechrevoLite.Mode.PerfModeStore.SaveSettings(_current.Id, edited);
+                bool xyOk = fields.Count == 0 || await WpfBackend.Service.SetCustomDetail(fields);
+                _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(_current.Id);
+                StatusText.Text = xyOk
+                    ? WpfStrings.L("自定义功耗墙已应用：", "Custom power limits applied: ") + string.Join(" ", fields.Select(kv => kv.Key + "=" + kv.Value))
+                    : WpfStrings.L("自定义功耗墙应用失败：", "Failed to apply custom power limits: ") + string.Join(" ", fields.Select(kv => kv.Key + "=" + kv.Value));
+                if (xyOk)
+                {
+                    _dirty = false;
+                    ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
+                }
+                Logger.WriteError("[xingyao-msr] 自定义应用 " + (xyOk ? "成功" : "失败") + "：" + string.Join(",", fields.Select(kv => kv.Key + "=" + kv.Value)));
                 return;
             }
             MechrevoLite.Mode.PerfApplyOutcome? outcome = await perf.UpdateAsync(_current.Id, _ => edited, "wpf-editor");
@@ -949,7 +995,6 @@ public partial class CustomModeWindow : Window
                 : "";
             string stale = MechrevoLite.Mode.PerfModeText.StaleNote(outcome);
             StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_14 + ModeName(_current) + " · " + summary + failure + stale;
-            ToolTip = MechrevoLite.Mode.PerfModeText.Details(outcome, amd);
             if (!outcome.AnyFailed)
             {
                 _dirty = false;

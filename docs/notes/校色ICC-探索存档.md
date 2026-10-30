@@ -1,4 +1,4 @@
-﻿# 校色 ICC 联网拉取 —— 探索存档
+# 校色 ICC 联网拉取 —— 探索存档
 
 > **性质：这是一份研究存档，不是待办、不是待决定项。** 写下来只是为了"以后想查的时候有据可查"。
 > **时间**：探索与实测 2026-10-06（19:30 前后）；存档整理 2026-10-06 20:10。
@@ -124,3 +124,72 @@
   这属于**预期的受限拒绝**，**不代表**该文件权限或内容损坏。
 - **硬约束（本次全程遵守）**：没有改任何代码、没有改版本号、没有打包；没有动 `_upstream\`、`installer-src\`（含 `files\GCU\`）；
   **没有写入任何硬件设置**；**没有安装任何 ICC**；`D:\Downloads` 只读未动。
+
+---
+
+## 八、2026-10-30 实测更新（已确认，替换上面"未验证"部分）
+
+> 本节为**实机确认**结果，前述"没取到 / 待验证"的结论已被本节覆盖。
+
+### 8.1 两套命名规则（都已实测命中）
+
+| 代际 | 服务器 | 命名 | 实测样本 | 返回 |
+|---|---|---|---|---|
+| **40 系** | `iccprofile.uniwill.com.tw` | `<pnp>_<MAC>` | `BOE0CBE_B025AA781188` | 单文件 `.icm`，20,340 B，`acsp` |
+| **50 系** | `iccprofile.aistoneglobal.com:8001` | `<pnp>_<BIOS序列号>` + `.zip` | `BOE0D55_425052C32559370299.zip` | ZIP，42,504 B |
+
+- `pnp` = `WmiMonitorID.ManufacturerName` + `ProductCodeID`（如 `BOE` + `0CBE` = `BOE0CBE`，`BOE` + `0D55` = `BOE0D55`）
+- `sn` = `Win32_BIOS.SerialNumber`（面板 `SerialNumberID` 实测常返回 `"0"`，不可用）
+- `MAC` 来自 `Get-NetAdapter -Physical`（去掉 `-`/`:` 后大写）
+- 每套命名都试三种后缀：`''` → `.zip` → `.icm`（50 系实际是 `.zip` 命中）
+- 40 系机器访问 aistone 服务器全部 404（服务器按代际分家）；50 系反之亦然
+
+### 8.2 50 系 ZIP 内部结构（BOE0D55，2025-05-24 文件日期）
+
+```
+BOE0D55_425052C32559370299.zip   42,504 B   SHA256 5E468769FBB8D90F26C205602CA54B0205CE310210B6B33CCDA835EF08950AFF
+├─ sRGB.icm           35,884 B   acsp / dataSpace=RGB / pcs=XYZ
+├─ Default.icm         9,628 B   acsp / dataSpace=RGB / pcs=XYZ
+└─ PanelInfo.xml         211 B
+```
+
+`PanelInfo.xml` 内容：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE PanelInfo>
+<PanelInfo version="2">
+    <HDR>true</HDR>
+    <ColorSpace>sRGB</ColorSpace>
+    <Gamma>2.2</Gamma>
+    <Profiles>sRGB,Default</Profiles>
+</PanelInfo>
+```
+
+**结论：ZIP 必须原样保留，不能解包只取一个。** 广色域机型一个包里会有多个 ICM（`sRGB` / `Default`，未来可能还有 `P3` 等），
+`PanelInfo.xml` 还给出了 HDR/色域/Gamma 元数据，是选择安装哪一个的依据。
+
+### 8.3 脚本行为（`D:\openLM\tools\icc-fetch\Get-CloudIcc.ps1`）
+
+- 服务器返回 ZIP → **原样保存 `<候选名>.zip`**，不解包；只读取中央目录列出包内 `.icm/.icc` 清单
+- 服务器返回 ICC → 保存 `<候选名>.icm`
+- 落盘名统一取候选名本体，不再出现 `xxx.zip.icm` 双后缀（2026-10-30 修）
+- 支持 `-Method 1|2|3|auto`：1=序列号（50 系）/ 2=MAC（40 系）/ 3=两个都试 / auto=1 失败再 2，仍失败兜底
+- 自提权（UAC）+ `-KeepOpen` 双击入口 `双击运行-获取云端ICC.cmd`
+
+### 8.4 对 ICC 插件（openrevo-plugin-icc）的设计含义
+
+1. 用宿主 `fetch_url_bytes` 拉 ZIP（0.9.5 已具备该命令）
+2. 前端解析 ZIP 中央目录，列出所有 `.icm`（不必依赖第三方库，ZIP 中央目录格式简单）
+3. 解析 `PanelInfo.xml` → 显示 HDR / ColorSpace / Gamma / Profiles
+4. 让用户选择要安装的 ICM（或按 `PanelInfo.Profiles` 顺序推荐第一个）
+5. 调宿主 `import_custom_color_profile` 安装，必要时 `apply_color_profile` 激活
+
+### 8.5 已知样本文件（本机就地留存）
+
+| 路径 | 说明 |
+|---|---|
+| `D:\Downloads\BOE0D55_425052C32559370299.zip` | 50 系样本（含 sRGB + Default + PanelInfo.xml） |
+| 桌面 `BOE0D55_425052C32559370299.icm` | 旧版脚本解包得到的 sRGB 单文件（35,884 B） |
+| `D:\openLM\tools\icc-fetch\BOE0CBE_B025AA781188.icm` | 40 系本机实测命中（20,340 B） |
+
