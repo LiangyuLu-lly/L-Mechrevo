@@ -124,6 +124,8 @@ public partial class OriginalStyleWindow : Window
     private long _lastPerfKeyOsdTick;
     private long _lastSwitchModeOsdTick;
     private int _lastKeyboardBrightnessOsd = -2;
+    private bool? _lastKeyboardPowerForOsd;
+    private long _keyboardOsdSilentUntil = Environment.TickCount64 + 8000;
     private int _lastTouchpadOsd = -2;
     private int _lastFnLockOsd = -2;
     private int _lastMicOsd = -2;
@@ -822,6 +824,13 @@ public partial class OriginalStyleWindow : Window
         try
         {
             // 开关只报通道名+开/关；亮度/颜色/速度才报档位，避免开关也弹“亮度 1/4”。
+            if (channelPowerOsd && string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal))
+            {
+                // 开关已经弹过“开/关”，轮询不要再把亮度 0→上次档位补一条亮度 OSD。
+                _lastKeyboardBrightnessOsd = -2;
+                _lastKeyboardPowerForOsd = null;
+                _keyboardOsdSilentUntil = Environment.TickCount64 + 2000;
+            }
             if (channelPowerOsd)
             {
                 OsdService.Show(LightChannelGlyph(topic), LightChannelTitle(topic),
@@ -3967,6 +3976,27 @@ public partial class OriginalStyleWindow : Window
     private void PollKeyboardBrightnessOsd(MechrevoHw hw)
     {
         int brightness = hw.KeyboardBrightness;
+        bool powerOn = hw.KeyboardPower;
+
+        // 电源开关本身已经有“开/关”OSD；开关导致亮度从 0 跳到上次档位时，
+        // 不要再叠加一条“亮度 x/4”。开机恢复灯光同理，静默期只同步基线。
+        if (!_lastKeyboardPowerForOsd.HasValue)
+        {
+            _lastKeyboardPowerForOsd = powerOn;
+            _lastKeyboardBrightnessOsd = brightness;
+            return;
+        }
+        if (_lastKeyboardPowerForOsd.Value != powerOn)
+        {
+            _lastKeyboardPowerForOsd = powerOn;
+            _lastKeyboardBrightnessOsd = brightness;
+            return;
+        }
+        if (Environment.TickCount64 < _keyboardOsdSilentUntil)
+        {
+            _lastKeyboardBrightnessOsd = brightness;
+            return;
+        }
         if (_lastKeyboardBrightnessOsd == -2)
         {
             _lastKeyboardBrightnessOsd = brightness;
@@ -8660,6 +8690,10 @@ public partial class OriginalStyleWindow : Window
             await RestoreSavedChannelAsync("HidLightbar_Hinge/Ctrl", LightHingeSwitch);
             await RestoreSavedChannelAsync("HidLightbar_Sync/Ctrl", LightSyncSwitch);
             TryResumeBaolongdaRainbow("启动/恢复");
+            // 开机恢复灯光期间不同步亮度 OSD；完成后重置基线并静默几秒。
+            _lastKeyboardPowerForOsd = _backendProbe?.Hw?.KeyboardPower;
+            _lastKeyboardBrightnessOsd = _backendProbe?.Hw?.KeyboardBrightness ?? -2;
+            _keyboardOsdSilentUntil = Environment.TickCount64 + 5000;
         }
         catch
         {
@@ -9161,6 +9195,10 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         bool requested = KeyboardLightSwitch.IsChecked == true;
+        // 开关自身会弹“开/关”；清掉亮度基线，避免轮询再把 0→上次档位报成亮度 OSD。
+        _lastKeyboardBrightnessOsd = -2;
+        _lastKeyboardPowerForOsd = null;
+        _keyboardOsdSilentUntil = Environment.TickCount64 + 2000;
         _pendingKeyboardPower = requested;
         _pendingKeyboardPowerTick = Environment.TickCount64;
         // 与 0.293.5.1 同口径：不管最终走 HID 还是 GCU 固件键盘，先落下用户意图位。
