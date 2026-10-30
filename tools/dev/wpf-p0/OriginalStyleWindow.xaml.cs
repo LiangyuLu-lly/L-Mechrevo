@@ -3766,6 +3766,15 @@ public partial class OriginalStyleWindow : Window
         }
         HighlightSegment(button);
         int mode = int.Parse(text);
+        // 星耀平台通过统一服务入口设置电池档位。
+        if (XingyaoPmc2.IsXingyaoPlatform())
+        {
+            bool xingyaoOk = _services != null
+                ? (await DashboardCommands.SetBatteryModeAsync(mode)).Ok
+                : await _backendProbe.SetBatteryModeAsync(mode);
+            StatusText.Text = xingyaoOk ? WpfStrings.BatteryModeSent : WpfStrings.BatteryModeFailed;
+            return;
+        }
         int percentForMode = mode switch { 0 => 100, 1 => 80, 2 => 60, _ => 80 };
         // OR 三档：仅非 10/16/20/30 系启用；30 系继续走屏蔽/原路径。
         bool legacyGeneration = _backendProbe.Hw?.IsIntelNucMachine == true
