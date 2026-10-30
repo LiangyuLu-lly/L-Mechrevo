@@ -167,16 +167,25 @@ internal class PowerNative
 		}
 		if (overlays.Contains(scheme))
 		{
+			// 对齐 OpenRevo：直接调用 PowerSetActiveOverlayScheme，不先回读、
+			// 不因回读不一致而跳过，也不回退/改切 High Performance 电源计划。
 			Guid guid = new Guid(scheme);
-			uint num = PowerGetEffectiveOverlayScheme(out var EffectiveOverlayGuid);
-			if (GetBatterySaverStatus())
+			try
 			{
-				Logger.WriteLine("Battery Saver detected");
+				uint num = PowerSetActiveOverlayScheme(guid);
+				if (num == 0)
+				{
+					Logger.WriteLine("Power Mode -> " + scheme + ":OK");
+				}
+				else
+				{
+					Logger.WriteError("[power] PowerSetActiveOverlayScheme failed: scheme=" + scheme + " hr=" + num);
+				}
 			}
-			else if (num != 0 || EffectiveOverlayGuid != guid)
+			catch (Exception ex)
 			{
-				num = PowerSetActiveOverlayScheme(guid);
-				Logger.WriteLine("Power Mode " + EffectiveOverlayGuid.ToString() + " -> " + scheme + ":" + ((num == 0) ? "OK" : ((object)num)));
+				// 极老系统没有 PowerSetActiveOverlayScheme：只记日志，不影响切档。
+				Logger.WriteError("[power] PowerSetActiveOverlayScheme unavailable: " + ex.GetType().Name);
 			}
 		}
 	}

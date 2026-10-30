@@ -5,6 +5,8 @@ using System.IO;
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>NUC/UMI 高频快捷开关：Fn 锁、摄像头、Win 键锁，直接走 ACPI EC。</summary>
 internal static class NucQuickSwitches
 {
@@ -22,6 +24,17 @@ internal static class NucQuickSwitches
     private const int AcRecoveryBit = 0x08;
     private const int FanBoostAddress = 1873; // 0x751
     private const int FanBoostBit = 0x40;
+
+    internal static bool TryReadFnLock(out bool on)
+    {
+        on = false;
+        if (!TryRead(FnLockAddress, out int current))
+        {
+            return false;
+        }
+        on = (current & FnLockBit) != 0;
+        return true;
+    }
 
     internal static bool TrySetFnLock(bool on, out bool confirmed)
     {
@@ -105,13 +118,40 @@ internal static class NucQuickSwitches
         return confirmed;
     }
 
-    internal static bool TryPulseUsbCharging()
+    /// <summary>
+    /// NUC/UMI 的关机 USB 供电是 trigger bit4 的“翻转脉冲”，不是常驻位。
+    /// 旧实现只置位、不清零，会把 USB 触发位一直挂住，并可能让固件顺带清掉
+    /// 来电自启（1830 bit3）；这里改成“置位→30ms→清零”，并恢复来电自启位。
+    /// </summary>
+    internal static bool TryPulseUsbCharging(bool requestedOn, bool currentOn, out bool confirmed)
     {
+        confirmed = false;
+        // 已处于目标状态：不重复翻转（翻转位每写一次会切一次）。
+        if (requestedOn == currentOn)
+        {
+            confirmed = true;
+            return true;
+        }
         if (!TryRead(TriggerAddress, out int trigger))
         {
             return false;
         }
-        return TryWrite(TriggerAddress, trigger | UsbChargeTriggerBit);
+        bool acBefore = TryRead(AcRecoveryAddress, out int acOld) && (acOld & AcRecoveryBit) != 0;
+        if (!TryWrite(TriggerAddress, trigger | UsbChargeTriggerBit))
+        {
+            return false;
+        }
+        Thread.Sleep(30);
+        // 清掉 trigger，别让它一直挂着。
+        TryWrite(TriggerAddress, trigger & ~UsbChargeTriggerBit);
+        bool pulseOk = TryRead(TriggerAddress, out int after) && (after & UsbChargeTriggerBit) == 0;
+        // USB 触发可能顺带清掉来电自启；按切换前的值恢复。
+        if (TryRead(AcRecoveryAddress, out int acAfter) && (acAfter & AcRecoveryBit) == 0 && acBefore)
+        {
+            TryWrite(AcRecoveryAddress, acAfter | AcRecoveryBit);
+        }
+        confirmed = pulseOk;
+        return pulseOk;
     }
 
     internal static bool TrySetAcRecovery(bool on, out bool confirmed)

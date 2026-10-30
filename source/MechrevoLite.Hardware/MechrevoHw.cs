@@ -157,6 +157,7 @@ public class MechrevoHw : IDisposable
 	// ⭐ 加新后端（例如宝龙达）只需在候选表里加一项，本文件不用改任何 else/if。
 	private MechrevoBackendKind _activeBackend;
 	private bool _nucLocalReady;
+	private bool _xingyaoLocalReady;
 
 	// 老机型 WMI 后端（root\WMI:MICommonInterface）。⚠️ 字段与职责对照《差异与合并计划》A-22。
 	private bool _allowLegacyProbe;
@@ -1040,7 +1041,8 @@ public class MechrevoHw : IDisposable
 {
     get
     {
-        return Capabilities.LogoLight || LogoLightStatusSeen;
+        return Capabilities.LogoLight || LogoLightStatusSeen
+;
     }
 }
 
@@ -1922,11 +1924,16 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// ⚠️ 判据是**后端在不在**，不是"有没有跟 GCU 说过话"：老接口在而 GCU 从未连上时本属性为 true
 	/// ⇒ 依赖 GCU 上报的功能仍必须各自用 <see cref="IsGcuConnected" /> / 能力位把关（已逐点分类，见本轮报告 ②）。
 	/// </summary>
-	public bool IsConnected => UsesBuiltInModes || IsGcuConnected || _nucLocalReady;
+	public bool IsConnected => UsesBuiltInModes || IsGcuConnected || _nucLocalReady || _xingyaoLocalReady;
 
 	internal void MarkNucLocalReady()
 	{
 		_nucLocalReady = true;
+	}
+
+	internal void MarkXingyaoLocalReady()
+	{
+		_xingyaoLocalReady = true;
 	}
 
 	/// <summary>
@@ -1961,6 +1968,14 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		if (secondFanRpm >= 0) GpuFanRpm = secondFanRpm;
 		// 与 GCU Fan/Status 同口径：读到风扇就刷新“新鲜度”，否则迷你窗的
 		// FanDutyText 会因 IsFanInfoFresh=false 把百分比整段省略。
+		System.Threading.Interlocked.Exchange(ref _fanInfoReceivedAt, Environment.TickCount64);
+	}
+
+	/// <summary>把星耀 WMAA 读到的风扇转速回写到门面属性，供迷你窗/托盘/宽屏共用。</summary>
+	internal void ApplyXingyaoFanSpeeds(int mainFanRpm, int secondFanRpm)
+	{
+		if (mainFanRpm >= 0) CpuFanRpm = mainFanRpm;
+		if (secondFanRpm >= 0) GpuFanRpm = secondFanRpm;
 		System.Threading.Interlocked.Exchange(ref _fanInfoReceivedAt, Environment.TickCount64);
 	}
 
@@ -2637,7 +2652,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⚠️ **非宝龙达逐位不变**：⭐ 老接口/GCU 机型仍恒 `true`（⭐ 与改动前逐字一致 ✅）。
 			"usb" => !UsesBaolongda, 
 			"deepsleep" => DeepSleepSeen, 
-			"copilot" => CopilotSeen, 
+			"copilot" => CopilotSeen || XingyaoQuickSwitch.IsApplicable(this), 
 			"acrecovery" => Capabilities.AcRecovery || AcRecoverySeen || IsIntelNucMachine || IsUmiMachine, 
 			// ⇒ 界面显示"下发被拒、已回滚"（机主日志 [QS-apply] 键=highperf 下发结果=False）
 			"highperf" => true, 
@@ -5027,10 +5042,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			}
 			// （机主：开灯后过一会自己变关）：最近 5s 有过**用户灯效动作** ⇒ 不触发自动关
 			long lastUserAction = Interlocked.Read(ref _kbdLastUserActionTick);
-			if (lastUserAction != 0 && Environment.TickCount64 - lastUserAction < KeyboardAutoOffUserActionGuardMs)
+			// 自动关灯按「开灯后经过的时间」算，不能拿系统空闲时间直接套：
+			// 用户手动开灯时系统可能已经空闲很久，5s 保护期一过就会被立刻关掉。
+			long actionGuard = Math.Max(KeyboardAutoOffUserActionGuardMs, thresholdMilliseconds);
+			if (lastUserAction != 0 && Environment.TickCount64 - lastUserAction < actionGuard)
 			{
 				Logger.WriteLineIfChanged("kbd-autooff-recent-action",
-					"[light] 自动关灯：最近 5s 有用户灯效动作 ⇒ 本轮不触发");
+					"[light] 自动关灯：本次开灯后未满 " + (actionGuard / 1000) + "s ⇒ 本轮不触发");
 				return;
 			}
 			if (Volatile.Read(ref _kbdAutoOffSuppressUntilInput) != 0)
@@ -5280,6 +5298,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	{
 		confirmed = false;
 		BaolongdaWmi wmi = _baolongda?.Wmi;
+		if (wmi == null && !_disposed && CpuVendor.IsIntel && !IsIntelNucMachine && !IsUmiMachine)
+		{
+			return TryApplyIntelMsrPowerLimit(enable, pl1Watts, pl2Watts, tempWallC, out confirmed);
+		}
 		if (wmi == null || _disposed)
 		{
 			return false;
@@ -5572,6 +5594,28 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	internal static bool FanBoostActive => _fanBoostActive;
 	// ③ 读功能号 13 **回读确认转速真的上去了**（ 给风扇起转时间，多次采样）④ 关闭时恢复强冷前的曲线并重启闭环
+	private bool TryApplyIntelMsrPowerLimit(bool enable, int pl1Watts, int pl2Watts, int tempWallC, out bool confirmed)
+	{
+		confirmed = false;
+		if (!enable)
+		{
+			return true;
+		}
+		if (tempWallC > 0)
+		{
+			Logger.WriteError("[intel-msr] 温度墙暂不通过 MSR 写入，本次跳过");
+		}
+		bool ok = PawnIO.IntelMsrPowerLimit.TryApply(pl1Watts, pl2Watts, out bool locked, out string detail);
+		confirmed = ok;
+		if (ok)
+		{
+			if (pl1Watts > 0) Pl1 = Math.Clamp(pl1Watts, 5, 200);
+			if (pl2Watts > 0) Pl2 = Math.Clamp(pl2Watts, 5, 200);
+		}
+		Logger.WriteError("[intel-msr] 自定义功耗 PL1=" + pl1Watts + "W PL2=" + pl2Watts + "W lock=" + locked + " ⇒ " + detail);
+		return true;
+	}
+
 	internal bool TrySetFanBoostViaBackend(bool on, out bool confirmed)
 	{
 		confirmed = false;
@@ -5591,7 +5635,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			//   ⇒ 这里先探一次，缺失时如实提示用户去装，而不是只报"EC 写入失败"。
 			if (!PawnIO.RyzenSmuService.IsPawnInstalled())
 			{
-				Logger.WriteError("[fan] ⛔ 强冷失败：PawnIO 驱动未安装 ⇒ EC 写入不可用（WMI 转速仍可读）。请到「CPU 调节」页点一次「安装 PawnIO 驱动」后重试。");
+				// 2026-10-29：不再直接放弃。EC 通道现在会在 PawnIO 缺失时回退 inpoutx64（0x62/0x66）；
+				// 是否真的成功由后面的 FanWriter 写入/回读决定，失败再回滚。
+				Logger.WriteError("[fan] PawnIO 驱动未安装 ⇒ 尝试 inpoutx64 EC 回退（0x62/0x66）");
 			}
 			// ⭐⭐ 2026-10-18（机主：30/40 系均已实测可用 ⇒ 删除闸门）：⭐ 强冷直接走 `FanWriter`（无需 cfg 验证）✅
 			//   ⚠️ 仍保留：EC 写失败回滚、单次写、13 轮询确认、交回固件安全顺序 ✅
@@ -5618,22 +5664,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			{
 				maskOk = FanWriter.TrySetManualMask(true, true, out maskDetail);
 			}
-			// 40 系宝龙达在部分机型 ACPI/LPC EC 写不进去（诊断：通道=None / 0xB20 写失败），
-			// 但 WMI 功能号 20/21 本身可用；强冷走 WMI 手动风扇兜底。
-			if ((!targetsOk || !maskOk) && _baolongda?.Wmi is BaolongdaWmi fanWmi)
+			// 0.293.5.1 基线：EC 目标/掩码失败即回滚交回固件，不把 0x751（NUC 寄存器）写到宝龙达。
+			if (!targetsOk || !maskOk)
 			{
-				bool speed0 = fanWmi.TrySetMaxFanSpeed(0, (byte)units);
-				bool speed1 = fanWmi.TrySetMaxFanSpeed(1, (byte)units);
-				bool switch0 = fanWmi.TrySetFanManualSwitch(0, true);
-				bool switch1 = fanWmi.TrySetFanManualSwitch(1, true);
-				if (speed0 && speed1 && switch0 && switch1)
-				{
-					targetsOk = true;
-					maskOk = true;
-					targetDetail = "WMI 功能号 21=" + units + " · 20=1/1";
-					maskDetail = "WMI 功能号 20 开启";
-					Logger.WriteLine("[fan] 强冷：EC 写入失败 ⇒ 已切换 WMI 功能号 20/21 手动风扇兜底");
-				}
+				Logger.WriteError("[fan] 强冷：EC 目标/掩码写入失败 ⇒ 按基线回滚 · "
+					+ targetDetail + " · " + maskDetail);
 			}
 			// ⭐⭐ 2026-10-18（机主诊断包 · 强冷已写入但确认太急）：⭐ 3900→6000 RPM 需要更久 ⇒
 			//   改为**最多 10 s 轮询**（每 500 ms 读一次功能号 13，取**最大值**），满足任一条件即确认：
@@ -5681,13 +5716,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// 关闭：恢复快照（含 Enabled 状态）
 		FanWriter.TryReleaseToFirmware(out string releaseOnOff);
-		if (_baolongda?.Wmi is BaolongdaWmi offWmi)
-		{
-			offWmi.TrySetFanManualSwitch(0, false);
-			offWmi.TrySetFanManualSwitch(1, false);
-			offWmi.TrySetMaxFanSpeed(0, 0);
-			offWmi.TrySetMaxFanSpeed(1, 0);
-		}
+		// 0.293.5.1 关闭路径只交回固件，不再写 WMI 20/21；
+		// 这两条 WMI 写在部分宝龙达机型会卡住，导致“强冷关不掉”。
 		_fanBoostActive = false;
 		// ⭐ 强冷结束 ⇒ 平滑状态清零（⭐ 让恢复后的闭环从真实温度重新收敛，⛔ 不沿用强冷前的旧平滑值）
 		ResetBaolongdaFanCurveSmoothing();
@@ -5887,8 +5917,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	internal int BaolongdaStapmTimeSeconds { get; private set; }
 	/// <summary>当前 SMU slow 时间窗（秒，0 = 读不到）；30 系与无界共用，只读采样。</summary>
 	internal int SmuSlowTimeSeconds { get; private set; }
-	/// <summary>2026-10-21：本机 GCU 载荷是否为 WJXY（星耀 / 无界 LNL 等特殊的 1.0.2.70 分支）。只读。</summary>
-	internal bool UsesWjxyGcuPayload => string.Equals(GcuIdentity.Variant, "WJXY", StringComparison.OrdinalIgnoreCase);
+	/// <summary>本机 GCU 载荷是否为 WJ（Lunar Lake 无界专用的 1.0.2.70 分支）。只读。</summary>
+	internal bool UsesWjGcuPayload => string.Equals(GcuIdentity.Variant, "WJ", StringComparison.OrdinalIgnoreCase);
 
 	/// <summary>无界：最近一次从 PM 表读到的 STAPM / fPPT 实况值（只用于日志/对比，⛔ 不回写）。</summary>
 	internal int WujieLiveStapmWatts { get; private set; }
@@ -5977,6 +6007,60 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			return true;
 		}
 		return false;
+	}
+
+	/// <summary>GCU FanInfo 缺失时的只读 EC 兜底：CPU 0x0464/0x0465，GPU 0x046C/0x046B（大端）。</summary>
+	internal bool TryReadGcuEcFanSpeeds(out int cpuRpm, out int gpuRpm)
+	{
+		cpuRpm = -1;
+		gpuRpm = -1;
+		if (!IsGcuServiceInstalled || UsesBaolongda || WujieSmuApu || IsIntelNucMachine || IsUmiMachine)
+		{
+			return false;
+		}
+		bool cpuOk = TryReadEcFanWord(0x0464, out cpuRpm, lowOffset: 1);
+		bool gpuOk = TryReadEcFanWord(0x046C, out gpuRpm, lowOffset: -1);
+		return cpuOk || gpuOk;
+	}
+
+	private static bool TryReadEcFanWord(int highAddress, out int rpm, int lowOffset)
+	{
+		rpm = -1;
+		try
+		{
+			int high = -1;
+			int low = -1;
+			if (I2ecInpOut.IsAvailable
+				&& I2ecInpOut.TryReadEcByte(highAddress, out high, out _)
+				&& I2ecInpOut.TryReadEcByte(highAddress + lowOffset, out low, out _))
+			{
+				rpm = ((high & 0xFF) << 8) | (low & 0xFF);
+				return rpm > 0 && rpm < 8000;
+			}
+			if (AcpiDriverEc.TryReadByte(highAddress, out byte highByte)
+				&& AcpiDriverEc.TryReadByte(highAddress + lowOffset, out byte lowByte))
+			{
+				rpm = (highByte << 8) | lowByte;
+				return rpm > 0 && rpm < 8000;
+			}
+			if (EcPortIo.TryReadByte(highAddress, out int highValue)
+				&& EcPortIo.TryReadByte(highAddress + lowOffset, out int lowValue))
+			{
+				rpm = ((highValue & 0xFF) << 8) | (lowValue & 0xFF);
+				return rpm > 0 && rpm < 8000;
+			}
+		}
+		catch
+		{
+		}
+		return false;
+	}
+
+	internal void ApplyGcuEcFanSpeeds(int cpuRpm, int gpuRpm)
+	{
+		if (cpuRpm >= 0) CpuFanRpm = cpuRpm;
+		if (gpuRpm >= 0) GpuFanRpm = gpuRpm;
+		MarkFanInfoReceived();
 	}
 
 	/// <summary>2026-10-21（无界双风扇）：从 EC 读两路风扇转速（0xC834/0xC835 × 100 RPM）。
@@ -9243,10 +9327,6 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	private void OnSystemBatteryProtection(JObject o)
 	{
-		if (XingyaoPmc2.IsXingyaoPlatform())
-		{
-			return;
-		}
 		int num = Int(o, "HealthProtectionStatus");
 		if (num >= 0 && num != BatteryProtection)
 		{
@@ -9912,7 +9992,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		//   ⚠️ 只记“变化”，默认级别可见；不写任何东西。
 		try
 		{
-			if ((UsesWjxyGcuPayload || WujieSmuApu) && num3 > 0 && num4 > 0
+			if ((UsesWjGcuPayload || WujieSmuApu) && num3 > 0 && num4 > 0
 				&& (num3 != _gcuReportedPl1 || num4 != _gcuReportedPl2))
 			{
 				Logger.WriteError("[gcu] 上报功耗变化：CPU_PL1 " + (_gcuReportedPl1 > 0 ? _gcuReportedPl1 + "W" : "(首见)")
@@ -10013,8 +10093,8 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					Logger.WriteLine("[gcu] TjMax 取 MSR 0x1A2 = " + msrTjMax + "℃");
 				}
 			}
-		// 2026-10-21（星耀 / 无界 LNL · WJXY 载荷）：Intel 控制字段探测日志（只读，每个不同组合只记一次）
-		if (UsesWjxyGcuPayload || WujieSmuApu)
+		// WJ 载荷（Lunar Lake 无界）：Intel 控制字段探测日志（只读，每个不同组合只记一次）
+		if (UsesWjGcuPayload || WujieSmuApu)
 		{
 			try
 			{
@@ -10032,12 +10112,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 					+ " TccRaw=" + TccRawMinimum + ".." + TccRawMaximum;
 				if (Logger.TryMarkChanged("wjxy-intel-fields", wjxyFields))
 				{
-					Logger.WriteError("[gcu] WJXY/LNL Intel 控制字段：" + wjxyFields);
+					Logger.WriteError("[gcu] WJ/LNL Intel 控制字段：" + wjxyFields);
 				}
 			}
 			catch (Exception exWjxy)
 			{
-				Logger.WriteLine("[gcu] WJXY Intel 字段日志失败（已吞掉）：" + exWjxy.Message);
+				Logger.WriteLine("[gcu] WJ Intel 字段日志失败（已吞掉）：" + exWjxy.Message);
 			}
 		}
 
@@ -10459,29 +10539,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 			2 => "HEALTHYMODE", 
 			_ => throw new ArgumentOutOfRangeException("mode"), 
 		};
+		Logger.WriteLine($"SetBatteryProtection({mode}) -> {action}");
 		await _controlLock.WaitAsync();
 		try
 		{
-			if (XingyaoPmc2.IsXingyaoPlatform())
-			{
-				int target = mode switch
-				{
-					0 => 100,
-					1 => 80,
-					2 => 60,
-					_ => throw new ArgumentOutOfRangeException(nameof(mode)),
-				};
-				// 两个阈值相同：低于目标充电，高于目标主动放电。
-				var state = await Task.Run(() => XingyaoPmc2.Restore(target, target));
-				Logger.WriteLine($"PMC2 电池档位已验证：Enabled={state.Enabled}, T1={state.T1}, T2={state.T2}");
-				if (BatteryProtection != mode)
-				{
-					BatteryProtection = mode;
-					BatteryProtectionChanged?.Invoke();
-				}
-				return true;
-			}
-			Logger.WriteLine($"SetBatteryProtection({mode}) -> {action}");
 			if (BatteryProtection == mode)
 			{
 				return true;

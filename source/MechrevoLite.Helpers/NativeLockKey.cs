@@ -19,6 +19,9 @@ internal static class NativeLockKey
 	/// <summary>数字小键盘锁定键的虚拟键码。</summary>
 	internal const int NumLockVirtualKey = 0x90;
 
+	/// <summary>ScrollLock 虚拟键码（NUC 的 Fn+SCRLK 实际产生这个键）。</summary>
+	internal const int ScrollLockVirtualKey = 0x91;
+
 	/// <summary>上述两个键通用的扫描码（模拟按键时随虚拟键码一起给出）。</summary>
 	private const byte CommonScanCode = 0x45;
 
@@ -116,6 +119,11 @@ internal static class NativeLockKey
 		return IsOn(NumLockVirtualKey);
 	}
 
+	internal static bool IsScrollLockOn()
+	{
+		return IsOn(ScrollLockVirtualKey);
+	}
+
 	/// <summary>
 	/// 把某个锁定键设成目标态；**已经到位就不发**（幂等）。
 	/// <para>⭐ 为什么要幂等：锁定键是"按一次翻转一次"的语义，
@@ -171,6 +179,11 @@ internal static class NativeLockKey
 	internal static bool TrySetNumLock(bool target, out string note)
 	{
 		return TrySet(NumLockVirtualKey, target, out note);
+	}
+
+	internal static bool TrySetScrollLock(bool target, out string note)
+	{
+		return TrySet(ScrollLockVirtualKey, target, out note);
 	}
 
 	/// <summary>供日志使用的可读状态描述（⛔ 不用 true/false，避免与"成功/失败"混淆）。</summary>

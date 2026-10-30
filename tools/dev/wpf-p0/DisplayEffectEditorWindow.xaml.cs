@@ -109,18 +109,7 @@ public partial class DisplayEffectEditorWindow : Window
         {
             profile = found;
         }
-        profile ??= new DisplayEffectProfile
-        {
-            Name = _mode,
-            Brightness = 50,
-            ColorTemp = 6500,
-            ColorR = 128,
-            ColorG = 128,
-            ColorB = 128,
-            VibrantValue = 1.5f,
-            Constrast = 1.0f,
-            Gamma = 1.0f
-        };
+        profile ??= MechrevoLite.Hardware.SoftwareColorEnhancement.DefaultProfile(_mode);
         _syncing = true;
         try
         {
@@ -165,7 +154,18 @@ public partial class DisplayEffectEditorWindow : Window
             Constrast = Get("contrast") * 0.1f,
             Gamma = Get("gamma") * 0.01f
         };
-        await L_Mechrevo.WpfP0.Services.WpfBackend.Service.ApplyDisplayEffectProfile(profile);
+        MechrevoLite.Hardware.MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
+        bool hasGcuProfile = hw != null && hw.DisplayEffectProfiles.ContainsKey(_mode);
+        if (hasGcuProfile)
+        {
+            await L_Mechrevo.WpfP0.Services.WpfBackend.Service.ApplyDisplayEffectProfile(profile);
+        }
+        else
+        {
+            MechrevoLite.Hardware.SoftwareColorEnhancement.ApplyProfile(profile.Name, profile.Brightness,
+                profile.ColorTemp, profile.ColorR, profile.ColorG, profile.ColorB,
+                profile.VibrantValue, profile.Constrast, profile.Gamma);
+        }
     }
 
     private int Get(string key)
@@ -175,16 +175,23 @@ public partial class DisplayEffectEditorWindow : Window
 
     private async void ResetButton_Click(object sender, RoutedEventArgs e)
     {
-        if (L_Mechrevo.WpfP0.Services.WpfBackend.Service == null || string.IsNullOrWhiteSpace(_mode))
+        if (string.IsNullOrWhiteSpace(_mode)) return;
+        MechrevoLite.Hardware.MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
+        bool hasGcuProfile = hw != null && hw.DisplayEffectProfiles.ContainsKey(_mode);
+        if (hasGcuProfile && L_Mechrevo.WpfP0.Services.WpfBackend.Service != null)
         {
-            return;
+            if (await L_Mechrevo.WpfP0.Services.WpfBackend.Service.ResetDisplayEffectProfile(_mode))
+            {
+                await L_Mechrevo.WpfP0.Services.WpfBackend.Service.RequestDisplayEffectStatus();
+                await Task.Delay(500);
+            }
         }
-        if (await L_Mechrevo.WpfP0.Services.WpfBackend.Service.ResetDisplayEffectProfile(_mode))
+        else
         {
-            await L_Mechrevo.WpfP0.Services.WpfBackend.Service.RequestDisplayEffectStatus();
-            await Task.Delay(500);
-            LoadProfile();
+            // 没有 GCU 档位表 / NUC 本机软件路径：恢复当前档位的软件默认，而不是回多彩。
+            MechrevoLite.Hardware.SoftwareColorEnhancement.Apply(_mode);
         }
+        LoadProfile();
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)

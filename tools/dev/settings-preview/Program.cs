@@ -47,7 +47,7 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine("create failed: " + ex.GetType().Name + ": " + ex.Message);
+            Console.WriteLine("create failed: " + ex.GetType().Name + ": " + ex.Message + " INNER=" + ex.InnerException?.GetType().Name + ": " + ex.InnerException?.Message + " STACK=" + ex.InnerException?.StackTrace);
             return;
         }
         Console.WriteLine("ctorMs=" + ctorWatch.ElapsedMilliseconds);

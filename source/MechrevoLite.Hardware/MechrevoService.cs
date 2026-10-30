@@ -889,7 +889,9 @@ public class MechrevoService
 			return false;
 		}
 		// （机主：PL1/PL2 不可调 · 日志 WriteFirmwareField:PL1=120 -> Failed）
-		if (_hw != null && (_hw.UsesBaolongda || _hw.SmuCustomApu) && fields != null && fields.Count > 0)
+		bool intelMsrPower = _hw != null && MechrevoLite.Hardware.CpuVendor.IsIntel
+			&& !_hw.IsIntelNucMachine && !_hw.IsUmiMachine;
+		if (_hw != null && (_hw.UsesBaolongda || _hw.SmuCustomApu || intelMsrPower) && fields != null && fields.Count > 0)
 		{
 			List<string> consumedKeys = new List<string>();
 			foreach (KeyValuePair<string, string> kv in fields)
@@ -1507,12 +1509,6 @@ public class MechrevoService
 		{
 			return false;
 		}
-		// 40 系 40 GCU 不认 LCHWOC/OverClockingSwitch；只有实际 50 GCU 才执行。
-		if (!string.Equals(GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
-		{
-			Logger.WriteLine("[gpu-oc] 跳过：实际 GCU 变体=" + GcuIdentity.Variant + "（仅 50 GCU 支持）");
-			return false;
-		}
 		if (!_hw.SupportsGpuOverclock && !_hw.Capabilities.OverclockSettings)
 		{
 			return false;
@@ -1557,11 +1553,6 @@ public class MechrevoService
 		// 2026-10-15（C-1 第 2 步分类 ①）：MQTT 下发入口 ⇒ 真正需要 GCU。
 		if (hw == null || !hw.IsGcuConnected)
 		{
-			return false;
-		}
-		if (!string.Equals(GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase))
-		{
-			Logger.WriteLine("[gpu-oc] 跳过恢复：实际 GCU 变体=" + GcuIdentity.Variant + "（仅 50 GCU 支持）");
 			return false;
 		}
 		try
@@ -3000,9 +2991,10 @@ public class MechrevoService
 				}
 				if (string.Equals(key, "usb", StringComparison.Ordinal))
 				{
-					bool usbOk = NucQuickSwitches.TryPulseUsbCharging();
-					_hw.QuickSwitches["usb"] = on;
-					Logger.WriteLine($"SwitchQuick(usb,{on}) ⭐ NUC/UMI EC trigger bit4 ⇒ 写入={usbOk}");
+					bool usbCurrent = _hw.QuickSwitches.TryGetValue("usb", out bool usbOld) && usbOld;
+					bool usbOk = NucQuickSwitches.TryPulseUsbCharging(on, usbCurrent, out bool usbConfirmed);
+					_hw.QuickSwitches["usb"] = usbConfirmed ? on : usbCurrent;
+					Logger.WriteLine($"SwitchQuick(usb,{on}) ⭐ NUC/UMI EC trigger bit4 脉冲 ⇒ 确认={usbConfirmed}");
 					return usbOk;
 				}
 				if (string.Equals(key, "acrecovery", StringComparison.Ordinal))
@@ -3102,18 +3094,45 @@ public class MechrevoService
 				return false;
 			}
 			// 2026-10-17（「高性能电源」解耦 GCU）： 无 GCU 时不再发注定失败的 MQTT
+			bool preferGcuHighPerf = false;
 			if (string.Equals(key, "highperf", StringComparison.Ordinal))
 			{
-				MechrevoLite.Mode.PerfModeService perf = MechrevoLite.Mode.PerfModeService.Instance;
-				if (perf == null)
+				// 50 系 GCU 机型优先走 GCU 的 HIGHPERFORMANCEPOWERMODE_ON/OFF；
+				// 非 50 系仍走纯 Windows 电源 Overlay。
+				bool preferGcu = _hw.IsGcuConnected
+					&& !_hw.UsesBaolongda
+					&& !_hw.IsIntelNucMachine
+					&& !_hw.IsUmiMachine
+					&& _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen50;
+				preferGcuHighPerf = preferGcu;
+				if (!preferGcu)
 				{
-					Logger.WriteLine("SwitchQuick(highperf)：⚠️ PerfModeService 不可用 ⇒ 不下发");
-					return false;
+					MechrevoLite.Mode.PerfModeService perf = MechrevoLite.Mode.PerfModeService.Instance;
+					if (perf == null)
+					{
+						Logger.WriteLine("SwitchQuick(highperf)：⚠️ PerfModeService 不可用 ⇒ 不下发");
+						return false;
+					}
+					perf.WindowsPowerOverlayEnabled = on;
+					if (on)
+					{
+						perf.ApplyWindowsPowerOverlayForActiveMode();
+						Logger.WriteError("SwitchQuick(highperf,True) ⭐ 已启用，并立即按当前模式应用 Windows 电源模式");
+					}
+					else
+					{
+						MechrevoLite.Mode.PowerNative.SetPowerMode(0);
+						Logger.WriteError("SwitchQuick(highperf,False) ⭐ 已关闭联动，Windows 电源模式回到平衡");
+					}
+					_hw.QuickSwitches["highperf"] = on;
+					return true;
 				}
-				perf.WindowsPowerOverlayEnabled = on;
-				_hw.QuickSwitches["highperf"] = on;
-				Logger.WriteLine($"SwitchQuick(highperf,{on}) ⭐ 走**Windows 电源模式联动**（不依赖 GCU）");
-				return true;
+				// 50 系 GCU 自己控制高性能电源；LM 的 Windows Overlay 必须先关掉，
+				// 避免后续切档/LM 自动化再次干预。
+				MechrevoLite.AppConfig.Set("bd_power_overlay", 0);
+				MechrevoLite.AppConfig.Flush();
+				Logger.WriteError($"SwitchQuick(highperf,{on}) ⭐ 50 系 GCU 优先走 GCU；LM Windows 电源 Overlay 已禁用");
+				// 继续走下面的 action/MQTT，确认后不再调用 GLM 的 SyncHighPerformancePowerMode。
 			}
 			// （APU 防缩缸）： 纯 Windows 电源策略（处理器性能提升模式 → 5）
 			if (string.Equals(key, "apuboost", StringComparison.Ordinal))
@@ -3304,7 +3323,15 @@ public class MechrevoService
 				confirmed = true;
 				Logger.WriteLine($"[quick] acrecovery 无状态回读 ⇒ 已按下发成功处理({on})");
 			}
-			if (confirmed && key == "highperf")
+			if (!confirmed && key == "osd" && !_hw.OsdSeen)
+			{
+				// 部分 GCU 的 Setting/Status 不回 OSD 字段；命令已下发就按成功处理，
+				// 否则 GCU-OSD 磁贴会被 UI 弹回，看起来“关不掉”。
+				_hw.QuickSwitches[key] = on;
+				confirmed = true;
+				Logger.WriteLine($"[quick] osd 无 OSD 状态回读 ⇒ 已按下发成功处理({on})");
+			}
+			if (confirmed && key == "highperf" && !preferGcuHighPerf)
 			{
 				confirmed = await Task.Run(() => _syncHighPerformancePowerMode(on, _hw.OperatingMode)).ConfigureAwait(continueOnCapturedContext: false);
 			}
@@ -4113,9 +4140,11 @@ public class MechrevoService
 	private bool TryApplyPowerLimitViaBackend(string key, string rawValue)
 	{
 		MechrevoHw hw = _hw;
-		if (hw == null || (!hw.UsesBaolongda && !hw.SmuCustomApu))
+		bool intelMsrPower = hw != null && MechrevoLite.Hardware.CpuVendor.IsIntel
+			&& !hw.IsIntelNucMachine && !hw.IsUmiMachine;
+		if (hw == null || (!hw.UsesBaolongda && !hw.SmuCustomApu && !intelMsrPower))
 		{
-			return false; // ⭐ 不是宝龙达/无界 APU 在管事 ⇒ ⭐ 原样交给 GCU ✅
+			return false; // ⭐ 不是宝龙达/无界 APU/Intel MSR 在管事 ⇒ ⭐ 原样交给 GCU ✅
 		}
 		bool isPl1 = string.Equals(key, "PL1", StringComparison.Ordinal);
 		bool isPl2 = string.Equals(key, "PL2", StringComparison.Ordinal);
@@ -4969,6 +4998,24 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 		return effect is "Rainbow" or "Aurora" or "Gaming";
 	}
 
+	/// <summary>2026-10-29：灯带/Logo 的厂商七色板 ColorBuffer（7 段，Rainbow 专用）。</summary>
+	private static object[] BuildLightbarVendorRainbowBuffer()
+	{
+		int[] palette = LightbarColorPolicy.VendorRainbowPalette;
+		object[] buffer = new object[palette.Length];
+		for (int i = 0; i < palette.Length; i++)
+		{
+			int argb = palette[i];
+			buffer[i] = new Dictionary<string, object>
+			{
+				["R"] = (argb >> 16) & 0xFF,
+				["G"] = (argb >> 8) & 0xFF,
+				["B"] = argb & 0xFF
+			};
+		}
+		return buffer;
+	}
+
 	public async Task<bool> SetLightEffect(string topic, string effect, int light = 4, int speed = 1, string direction = "None", Color? singleColor = null, bool save = true)
 	{
 		try
@@ -5003,7 +5050,19 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			// 呼吸=多段循环；混色=多段彩色（需 7 段调色板），两者都按循环下发
 			bool isBreathingEffect = string.Equals(effect, "Breathing", StringComparison.OrdinalIgnoreCase);
 			bool isMixEffect = string.Equals(effect, "Mix", StringComparison.OrdinalIgnoreCase);
-			dictionary["isCircular"] = isKeyboardTopic || isBreathingEffect || isMixEffect;
+			bool isRainbowEffect = LightbarColorPolicy.UsesVendorRainbowPalette(effect);
+			if (isKeyboardTopic)
+			{
+				dictionary["isCircular"] = true;
+			}
+			else if (LightCompatibilitySwitches.LightbarMixFixEnabled)
+			{
+				dictionary["isCircular"] = LightbarColorPolicy.IsCircular(topic, effect);
+			}
+			else
+			{
+				dictionary["isCircular"] = isKeyboardTopic || isBreathingEffect || isMixEffect;
+			}
 			if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal) && string.Equals(effect, "Manual", StringComparison.Ordinal))
 			{
 				int[] manualIndexes = LightChannelSettings.DefaultManualIndexes;
@@ -5064,9 +5123,15 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 						}
 					});
 				}
-				else if (isMixEffect)
+				else if (isRainbowEffect && LightCompatibilitySwitches.LightbarMixFixEnabled)
 				{
-					// 混色：固件按多段调色板轮转，不发单色
+					// 七彩兜底只给 Rainbow：厂商七色板 + isCircular（灯带通道）⇒ b2=8 逐段下发。
+					dictionary["ColorBlocks"] = 7;
+					dictionary["ColorBuffer"] = BuildLightbarVendorRainbowBuffer();
+				}
+				else if (isMixEffect && !LightCompatibilitySwitches.LightbarMixFixEnabled)
+				{
+					// 回退态：逐字回到旧实现（品红收尾的 7 段七彩）。
 					dictionary["ColorBlocks"] = 7;
 					dictionary["ColorBuffer"] = new object[7]
 					{
@@ -5106,7 +5171,9 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 			if (applyOfficialLogo)
 			{
 				// Logo 通道按效果分流：单色=1 段，呼吸/彩虹=7 段循环，其余效果由固件配色
-				int logoColorMode = LightForm.LightEffectColorMode(effect);
+				int logoColorMode = LightCompatibilitySwitches.LightbarMixFixEnabled
+					? LightbarColorPolicy.ResolveLogoColorMode(effect)
+					: LightForm.LightEffectColorMode(effect);
 				if (logoColorMode == 7)
 				{
 					dictionary["isCircular"] = true;
@@ -5142,7 +5209,9 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 				}
 				else
 				{
-					dictionary["isCircular"] = true;
+					dictionary["isCircular"] = LightCompatibilitySwitches.LightbarMixFixEnabled
+						? LightbarColorPolicy.IsCircular(topic, effect)
+						: true;
 					dictionary["ColorBlocks"] = 0;
 					dictionary["ColorBuffer"] = Array.Empty<object>();
 				}
@@ -5907,6 +5976,24 @@ public Task<bool> SetKeyboardEffect(string effect, int light = 4, int speed = 1,
 	{
 		try
 		{
+			// 宝龙达没有 GCU 强冷能力位，走本机 EC 目标/掩码路径。
+			if (_hw.UsesBaolongda)
+			{
+				(bool handled, bool confirmed) = await Task.Run(() =>
+				{
+					bool ok = _hw.TrySetFanBoostViaBackend(enable, out bool confirmedLocal);
+					return (ok, confirmedLocal);
+				}).ConfigureAwait(continueOnCapturedContext: false);
+				Logger.WriteLine($"SwitchFanBoost({enable}) 宝龙达本机通道 ⇒ handled={handled} confirmed={confirmed}");
+				return handled && confirmed;
+			}
+			// NUC/UMI 的强冷是本地 EC 0x751 bit6，不走 GCU。
+			if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+			{
+				bool ok = NucQuickSwitches.TrySetFanBoost(enable, out bool confirmed);
+				Logger.WriteLine($"SwitchFanBoost({enable}) NUC/UMI EC ⇒ ok={ok} confirmed={confirmed}");
+				return ok && confirmed;
+			}
 			// ⭐⭐ 无界（GCU 后端）恢复强冷入口：能力位刷新前也允许走 GCU 话题；GCU 未连接则如实失败 ✅
 			if (!_hw.SupportsFanBoost && !_hw.WujieSmuApu)
 			{

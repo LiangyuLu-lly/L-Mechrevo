@@ -3,7 +3,7 @@
 
   Why this exists: the vendor console refuses the "iGPU power-saving" switch while the discrete
   GPU is in use ("GPU in use, switching not supported right now"). Its own usage number comes from
-  the Windows GPU performance counters (GCUService: GPUTypeClass.GetGpuUsageFromPerfCounterOptimized
+  the Windows GPU performance counters (GPUTypeClass)
   / GetGpuUsage_PerfCounter), so the occupants are exactly the processes that hold GPU engine time
   or GPU memory. This script lists them and, only with -Kill, ends them.
 
@@ -53,7 +53,7 @@ $script:ProtectedNames = @(
     'searchhost', 'startmenuexperiencehost', 'shellexperiencehost', 'textinputhost',
     'applicationframehost', 'runtimebroker', 'wmiPrvSE', 'audiodg', 'spoolsv',
     'msmpeng', 'nissrv', 'securityhealthservice', 'securityhealthsystray',
-    'mycontrolcenter', 'gcuservice', 'aistoneservice',
+    
     'nvdisplay.container', 'nvcontainer', 'nvsphelper64', 'nvsmartmaxcontainer'
 )
 
@@ -226,7 +226,7 @@ Write-Report '========================================================='
 Write-Report ' clear dGPU occupants (read-only unless -Kill is given)'
 Write-Report '========================================================='
 Write-Report ("host={0}  user={1}  elevated={2}" -f $env:COMPUTERNAME, $identity.Name, $isAdmin)
-Write-Report 'source: Win32_PerfFormattedData_GPUPerformanceCounters_* (the same counters GCUService reads)'
+Write-Report 'source: Win32_PerfFormattedData_GPUPerformanceCounters_* (the same Windows counters reads)'
 if ($LogPath) { Write-Report ("log file     : {0}" -f $LogPath) }
 Write-Report ''
 

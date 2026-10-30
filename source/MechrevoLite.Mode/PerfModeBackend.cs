@@ -65,7 +65,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			SupportsGpuOverclock = hw.SupportsGpuOverclock,
 			// 无界 APU：强冷走 GCU 同通道 ⇒ 先按支持处理（曲线窗口再用 IsGcuConnected 兜底）
 			SupportsFanCurve = hw.FanCurveSeen || hw.WujieSmuApu,
-			SupportsFanBoost = hw.SupportsFanBoost,
+			SupportsFanBoost = hw.SupportsFanBoost || hw.UsesBaolongda,
 			SupportsFanSwitchSpeed = hw.SupportsFanSwitchSpeed,
 			// 2026-10-15（用户拍板：刷新率这条**整个改走 Windows API**，不再依赖 GCU）：
 			// 原来判的是 GCU 能力位 + 固件的「自动刷新率」字段（`hw.SupportsDisplayRefresh && !hw.DcHz`）
@@ -97,7 +97,7 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 	/// <summary>2026-10-21（机主）：无界目标功耗 &gt; 60W 时，先切狂暴模式再下发 SMU；已在狂暴/刚切过则不重复发。</summary>
 	public async Task<bool> EnsureWujieHighPowerModeAsync(CancellationToken ct)
 	{
-		if (_hw == null || !_hw.WujieSmuApu)
+		if (_hw == null || (!_hw.WujieSmuApu && !_hw.XingyaoAmdSmuApu))
 		{
 			return true;
 		}
@@ -383,7 +383,8 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 
 	public Task<bool> SetFanBoostAsync(bool on, CancellationToken ct)
 	{
-		if (_hw.FanBoost != on)
+		// 宝龙达没有 GCU FanBoost 状态位，不能拿 _hw.FanBoost 判断是否已应用。
+		if (_hw.UsesBaolongda || _hw.FanBoost != on)
 		{
 			return _service.SwitchFanBoost(on);
 		}

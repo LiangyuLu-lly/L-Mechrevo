@@ -2,11 +2,14 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using L_Mechrevo.WpfP0.Services;
 using L_Mechrevo.WpfP0.Resources;
 
 namespace L_Mechrevo.WpfP0;
+
+// OSD 交互参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
 
 /// <summary>
 /// 轻量 OSD：性能模式、灯光、屏幕亮度、快捷键锁状态的即时提示。
@@ -16,11 +19,39 @@ internal static class OsdService
 {
     private static Window? _window;
     private static DispatcherTimer? _timer;
+    // 被总开关挡掉的次数（带上序号是为了不被日志去重，诊断包里能看出“到底挡了几条”）。
+    private static int _suppressed;
 
     internal static void Show(string glyph, string title, string value)
     {
+        ShowCoreDispatch(glyph, null, title, value);
+    }
+
+    internal static void ShowImage(ImageSource image, string title, string value)
+    {
+        ShowCoreDispatch(null, image, title, value);
+    }
+
+    /// <summary>触摸板 OSD 使用专门的触摸板图标（不再借用通用按键字形）。</summary>
+    internal static void ShowTouchpad(string title, string value)
+    {
+        try
+        {
+            BitmapImage image = new(new Uri("pack://application:,,,/Assets/Icons/icons8_touchpad_96.png", UriKind.Absolute));
+            ShowImage(image, title, value);
+        }
+        catch
+        {
+            Show("\uE7C9", title, value);
+        }
+    }
+
+    private static void ShowCoreDispatch(string? glyph, ImageSource? image, string title, string value)
+    {
         if (MechrevoLite.AppConfig.Get("lm_osd_enabled", 1) == 0)
         {
+            Logger.WriteError("[osd] disabled by lm_osd_enabled=0（累计 " + (++_suppressed)
+                + " 条：" + title + " " + value + "）");
             return;
         }
         Application? app = Application.Current;
@@ -28,10 +59,10 @@ internal static class OsdService
         {
             return;
         }
-        app.Dispatcher.BeginInvoke(new Action(() => ShowCore(glyph, title, value)));
+        app.Dispatcher.BeginInvoke(new Action(() => ShowCore(glyph, image, title, value)));
     }
 
-    private static void ShowCore(string glyph, string title, string value)
+    private static void ShowCore(string? glyph, ImageSource? image, string title, string value)
     {
         try
         {
@@ -64,7 +95,19 @@ internal static class OsdService
                 VerticalAlignment = VerticalAlignment.Center
             };
             StackPanel row = new() { Orientation = Orientation.Horizontal };
-            if (!string.IsNullOrEmpty(glyph))
+            if (image != null)
+            {
+                row.Children.Add(new Image
+                {
+                    Source = image,
+                    Width = 30,
+                    Height = 30,
+                    Stretch = Stretch.Uniform,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 16, 0)
+                });
+            }
+            else if (!string.IsNullOrEmpty(glyph))
             {
                 row.Children.Add(glyphText);
             }
@@ -114,14 +157,22 @@ internal static class OsdService
             };
             _timer.Start();
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.WriteError("[osd] show failed: " + ex.GetType().Name + " " + ex.Message);
         }
     }
 
     internal static void ShowQuickSwitch(string key, bool on)
     {
-        string glyph = OriginalStyleWindow.QuickGlyph(key);
-        Show(glyph, QuickSwitchService.DisplayLabel(key), on ? WpfStrings.StateOn : WpfStrings.StateOff);
+        string label = QuickSwitchService.DisplayLabel(key);
+        string value = on ? WpfStrings.StateOn : WpfStrings.StateOff;
+        if (string.Equals(key, "touchpad", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "touchpadtoggle", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowTouchpad(label, value);
+            return;
+        }
+        Show(OriginalStyleWindow.QuickGlyph(key), label, value);
     }
 }

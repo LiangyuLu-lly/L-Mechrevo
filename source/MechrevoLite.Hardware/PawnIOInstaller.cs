@@ -43,6 +43,17 @@ internal static class PawnIOInstaller
 		{
 			version = "";
 		}
+		// 注册表键存在≠驱动真的能连上（卸载残留/服务未启动/指纹不符都会这样）。
+		// 以实际 Connect 结果作为“已安装”判据，避免 UI 显示“已安装”但 EC 写入全失败。
+		try
+		{
+			using PawnIO.PawnIOWrapper probe = new();
+			installed = probe.Connect() == PawnIO.PawnIOWrapper.ConnectResult.OK;
+		}
+		catch
+		{
+			installed = false;
+		}
 		return new Status(installed, version);
 	}
 

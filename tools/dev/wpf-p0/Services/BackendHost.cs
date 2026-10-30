@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using L_Mechrevo.WpfP0;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -26,7 +27,7 @@ internal sealed class BackendHost : IDisposable
     {
         if (_disposed)
         {
-            LastError = "BackendHost 已释放";
+            LastError = WpfStrings.L("BackendHost 已释放", "BackendHost disposed");
             return false;
         }
         DisposeProbe();
@@ -41,7 +42,7 @@ internal sealed class BackendHost : IDisposable
             if (completed != connect)
             {
                 TimedOut = true;
-                LastError = "连接超时（" + (int)timeout.TotalSeconds + " 秒）";
+                LastError = WpfStrings.L("连接超时（", "Connection timed out (") + (int)timeout.TotalSeconds + WpfStrings.L(" 秒）", " s)");
                 if (probe.TryEnableNucUmiLocalReady())
                 {
                     WpfBackend.Attach(probe.Hw, probe.Service);

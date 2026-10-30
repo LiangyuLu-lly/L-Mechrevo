@@ -58,7 +58,9 @@ internal sealed class ChargeLimitService : IChargeLimitService
     }
 
     public bool Supported => _backend.Hw is { } hw
-        && (BatteryLimitPanel.IsSupportedBoard(hw) || MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine());
+        && (BatteryLimitPanel.IsSupportedBoard(hw)
+            || hw.IsIntelNucMachine || hw.IsUmiMachine
+            || MechrevoLite.Hardware.EcChargeLimit.IsEcDirectWriteAllowed());
 
     public ChargeLimitState Read()
     {
@@ -78,6 +80,27 @@ internal sealed class ChargeLimitService : IChargeLimitService
                 mode = ecMode;
                 enabled = ecMode == BatteryLimitWriter.ModeActive;
             }
+            else if (_backend.Hw is { IsIntelNucMachine: true } or { IsUmiMachine: true })
+            {
+                if (MechrevoLite.Hardware.NucBatteryMode.TryReadPercent(out int nucPercent))
+                {
+                    high = nucPercent;
+                    low = Math.Max(1, nucPercent - 5);
+                    mode = nucPercent < 100 ? BatteryLimitWriter.ModeActive : 0;
+                    enabled = nucPercent < 100;
+                }
+            }
+            else if (MechrevoLite.Hardware.EcChargeLimit.IsEcDirectWriteAllowed())
+            {
+                int currentLimit = MechrevoLite.Hardware.EcChargeLimit.ReadPercent();
+                if (currentLimit >= 40 && currentLimit < 100)
+                {
+                    high = currentLimit;
+                    low = Math.Max(1, currentLimit - 5);
+                    mode = BatteryLimitWriter.ModeActive;
+                    enabled = true;
+                }
+            }
         }
         catch
         {
@@ -87,11 +110,9 @@ internal sealed class ChargeLimitService : IChargeLimitService
             if (BatteryLimitRestore.TryLoad(out bool configEnabled, out int configLow, out int configHigh))
             {
                 enabled |= configEnabled;
-                if (!ecRead)
-                {
-                    low = configLow;
-                    high = configHigh;
-                }
+                low = configLow;
+                high = configHigh;
+                if (configEnabled) mode = BatteryLimitWriter.ModeActive;
             }
         }
         catch
@@ -113,8 +134,27 @@ internal sealed class ChargeLimitService : IChargeLimitService
     {
         try
         {
-            bool ok = BatteryLimitWriter.TryEnable(lowPercent, highPercent, allowInitialDischarge: true, out string detail);
-            return ok ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+            if (_backend.Hw is { IsIntelNucMachine: true } or { IsUmiMachine: true })
+            {
+                bool nucOk = MechrevoLite.Hardware.NucBatteryMode.TrySetPercent(highPercent, out string nucDetail);
+                return nucOk ? ServiceResult.Success(nucDetail) : ServiceResult.Fail(nucDetail);
+            }
+            // 宝龙达：按 beta23.5.1 基准的 BatteryLimitPanel 路径走 BatteryLimitWriter
+            // （EC 0x83A1/0x83A2/0x83C0 阈值语义），不混用 0x7B9 的 EcChargeLimit。
+            if (_backend.Hw?.UsesBaolongda == true)
+            {
+                bool bdOk = BatteryLimitWriter.TryEnable(lowPercent, highPercent, allowInitialDischarge: true, out string bdDetail);
+                return bdOk ? ServiceResult.Success(bdDetail) : ServiceResult.Fail(bdDetail);
+            }
+            if (MechrevoLite.Hardware.EcChargeLimit.IsEcDirectWriteAllowed())
+            {
+                bool ecOk = MechrevoLite.Hardware.EcChargeLimit.TrySet(highPercent, out int applied);
+                string detail = "EC 限充 high=" + highPercent + "%"
+                    + (applied > 0 ? " 回读=" + applied + "%" : "");
+                return ecOk ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+            }
+            bool ok = BatteryLimitWriter.TryEnable(lowPercent, highPercent, allowInitialDischarge: true, out string detail2);
+            return ok ? ServiceResult.Success(detail2) : ServiceResult.Fail(detail2);
         }
         catch (Exception ex)
         {
@@ -126,8 +166,24 @@ internal sealed class ChargeLimitService : IChargeLimitService
     {
         try
         {
-            bool ok = BatteryLimitWriter.TryDisable(out string detail);
-            return ok ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+            if (_backend.Hw is { IsIntelNucMachine: true } or { IsUmiMachine: true })
+            {
+                bool nucOk = MechrevoLite.Hardware.NucBatteryMode.TrySetPercent(100, out string nucDetail);
+                return nucOk ? ServiceResult.Success(nucDetail) : ServiceResult.Fail(nucDetail);
+            }
+            if (_backend.Hw?.UsesBaolongda == true)
+            {
+                bool bdOk = BatteryLimitWriter.TryDisable(out string bdDetail);
+                return bdOk ? ServiceResult.Success(bdDetail) : ServiceResult.Fail(bdDetail);
+            }
+            if (MechrevoLite.Hardware.EcChargeLimit.IsEcDirectWriteAllowed())
+            {
+                bool ecOk = MechrevoLite.Hardware.EcChargeLimit.TrySet(100, out int applied);
+                string detail = "EC 限充恢复 100%" + (applied > 0 ? " 回读=" + applied + "%" : "");
+                return ecOk ? ServiceResult.Success(detail) : ServiceResult.Fail(detail);
+            }
+            bool ok = BatteryLimitWriter.TryDisable(out string detail2);
+            return ok ? ServiceResult.Success(detail2) : ServiceResult.Fail(detail2);
         }
         catch (Exception ex)
         {
@@ -151,10 +207,10 @@ internal sealed class ChargeLimitService : IChargeLimitService
         }
         try
         {
-            bool ok = BatteryLimitWriter.TryEnable(lowPercent, highPercent, allowInitialDischarge: true, out string detail);
-            if (!ok)
+            ServiceResult enabled = EnableThresholdRaw(lowPercent, highPercent);
+            if (!enabled.Ok)
             {
-                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_19 + detail);
+                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_19 + enabled.Detail);
             }
             BatteryLimitRestore.SaveConfig(true, lowPercent, highPercent);
             return ServiceResult.Success(WpfStrings.OriginalStyleWindow_xaml_Text_23 + highPercent + WpfStrings.ChargeStartSeparator + lowPercent + "%" + WpfStrings.ClosingParen);
@@ -175,10 +231,10 @@ internal sealed class ChargeLimitService : IChargeLimitService
         }
         try
         {
-            bool ok = BatteryLimitWriter.TryDisable(out string detail);
-            if (!ok)
+            ServiceResult disabled = DisableThresholdRaw();
+            if (!disabled.Ok)
             {
-                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_21 + detail);
+                return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_21 + disabled.Detail);
             }
             BatteryLimitRestore.SaveConfig(false, 0, 0);
             return ServiceResult.Success(WpfStrings.OriginalStyleWindow_xaml_Text_20);

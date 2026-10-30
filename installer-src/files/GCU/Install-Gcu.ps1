@@ -80,7 +80,7 @@ param(
     # 2026-10-14 (7z payload switch): Auto / 1020 / 30 / 40 / 50 / WJXY.
     # 40B is GONE: the 40-series has exactly one payload (40.7z); -Variant 40B is accepted and
     # treated as '40' for compatibility, and the selector never hands it back either.
-    [ValidateSet('Auto','1020','50','40','30','40B','WJXY')][string]$Variant = 'Auto',
+    [ValidateSet('Auto','1020','50','40','30','40B','WJ','WJXY')][string]$Variant = 'Auto',
     [string]$LogDir,
     [string]$InstallerVersion,
     [string]$StatusDir,
@@ -603,7 +603,8 @@ $script:PayloadArchiveFactory = @{
     '30'   = @{ Size = 8802015;  Sha256 = '199A5124B1B700856BB77BBDD6133713DBBA47307E0B90454387011BE3BD54DE'; Name = '30.7z' }
     '40'   = @{ Size = 17106392; Sha256 = '17826E53405C7B7C02FBB3DDF5828EA5B15292BA507956D885D337741F7BB3B0'; Name = '50.7z' }   # 2026-10-21: 40 系暂用 50 载荷
     '50'   = @{ Size = 17106392; Sha256 = '17826E53405C7B7C02FBB3DDF5828EA5B15292BA507956D885D337741F7BB3B0'; Name = '50.7z' }
-    'WJXY' = @{ Size = 17484769; Sha256 = 'D71D3D975E8DB3A95F051E86CB6CB380011B16DD375AEB42EE66AF6001725638'; Name = 'WJXY.7z' }
+    'WJ'   = @{ Size = 17484769; Sha256 = 'D71D3D975E8DB3A95F051E86CB6CB380011B16DD375AEB42EE66AF6001725638'; Name = 'WJ.7z' }
+    'WJXY' = @{ Size = 17484769; Sha256 = 'D71D3D975E8DB3A95F051E86CB6CB380011B16DD375AEB42EE66AF6001725638'; Name = 'WJ.7z' }
 }
 # 落地后的期望值：AiStoneService 下的**文件数 + 总字节**（本机 5 变体实测，2026-10-15）
 $script:PayloadLandedExpect = @{
@@ -611,6 +612,7 @@ $script:PayloadLandedExpect = @{
     '30'   = @{ Files = 173; Bytes = 46012624 }
     '40'   = @{ Files = 93;  Bytes = 55608072 }   # 2026-10-21: 40 系暂用 50 载荷 ⇒ 落地期望值同 50
     '50'   = @{ Files = 93;  Bytes = 55608072 }
+    'WJ'   = @{ Files = 98;  Bytes = 57468032 }
     'WJXY' = @{ Files = 98;  Bytes = 57468032 }
 }
 
@@ -1120,9 +1122,10 @@ function Get-GcuPayloadArchiveFor {
         '30'   = @{ FileName = '30.7z';   InnerRoot = '30';    ServiceDir = 'UniwillService' }
         '40'   = @{ FileName = '50.7z';   InnerRoot = '50';    ServiceDir = 'AiStoneService' }   # 2026-10-21: 40 系暂用 50 载荷
         '50'   = @{ FileName = '50.7z';   InnerRoot = '50';    ServiceDir = 'AiStoneService' }
-        'WJXY' = @{ FileName = 'WJXY.7z'; InnerRoot = 'WJXY'; ServiceDir = 'AiStoneService' }
+        'WJ' = @{ FileName = 'WJ.7z'; InnerRoot = 'WJXY'; ServiceDir = 'AiStoneService' }
+        'WJXY' = @{ FileName = 'WJ.7z'; InnerRoot = 'WJXY'; ServiceDir = 'AiStoneService' }
     }
-    if (-not $table.ContainsKey($v)) { throw ("unknown GCU variant '$Variant' (known: 1020, 30, 40, 50, WJXY)") }
+    if (-not $table.ContainsKey($v)) { throw ("unknown GCU variant '$Variant' (known: 1020, 30, 40, 50, WJ, WJXY)") }
     $e = $table[$v]
     return [pscustomobject]@{
         Variant   = $v

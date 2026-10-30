@@ -158,6 +158,21 @@ public class WaterCoolerBle : IDisposable
 		}
 	}
 
+	public bool HasBoundDevice => TryGetBoundDevice(out _, out _);
+
+	public string BoundDeviceName => TryGetBoundDevice(out _, out string name) ? name : "";
+
+	public ulong BoundAddress => TryGetBoundDevice(out ulong address, out _) ? address : 0uL;
+
+	/// <summary>解除专属绑定；之后才会重新扫描/连接其它水冷。</summary>
+	public void UnbindDevice()
+	{
+		AppConfig.Remove("lc_bound_address");
+		AppConfig.Remove("lc_bound_name");
+		AppConfig.Flush();
+		Logger.WriteLine("BLE 水冷：已解除专属绑定");
+	}
+
 	public event Action<bool>? ConnectionChanged;
 
 	internal static bool IsFanLedModel(string? deviceName, string? firmwareVersion)
@@ -250,6 +265,14 @@ public class WaterCoolerBle : IDisposable
 		return text.ToUpperInvariant();
 	}
 
+	public void ClearDevices()
+	{
+		lock (_lock)
+		{
+			Devices.Clear();
+		}
+	}
+
 	public void StartScan()
 	{
 		if ((object)_watcher != null)
@@ -319,10 +342,32 @@ public class WaterCoolerBle : IDisposable
 		}
 	}
 
+	public async Task<bool> BindDeviceAsync(ulong address, string name)
+	{
+		if (address == 0)
+		{
+			return false;
+		}
+		TryGetBoundDevice(out ulong oldAddress, out string oldName);
+		UnbindDevice();
+		bool ok = await ConnectAsync(address, name);
+		if (!ok && oldAddress != 0)
+		{
+			AppConfig.Set("lc_bound_address", oldAddress.ToString("X12", CultureInfo.InvariantCulture));
+			AppConfig.Set("lc_bound_name", oldName);
+		}
+		return ok;
+	}
+
 	public async Task<bool> AutoConnectAsync()
 	{
 		ulong savedAddress = 0uL;
 		string savedName = "";
+		if (TryGetBoundDevice(out ulong boundAddress, out string boundName))
+		{
+			Logger.WriteLine($"BLE 自动连接：专属绑定 {boundName} ({boundAddress:X12})，不扫描其它水冷");
+			return await ConnectAsync(boundAddress, boundName);
+		}
 		if (TryGetSavedDevice(out savedAddress, out savedName))
 		{
 			Logger.WriteLine($"BLE 自动连接：先尝试上次设备 {savedName} ({savedAddress:X12})");
@@ -385,6 +430,11 @@ public class WaterCoolerBle : IDisposable
 		_ = 7;
 		try
 		{
+			if (TryGetBoundDevice(out ulong bound, out string boundName) && bound != 0 && bound != address)
+			{
+				Logger.WriteLine($"BLE 水冷：拒绝连接非绑定设备 {name} ({address:X12})，当前绑定 {boundName} ({bound:X12})");
+				return false;
+			}
 			Disconnect();
 			BluetoothLEDevice device = await BluetoothLEDevice.FromBluetoothAddressAsync(address);
 			if ((object)device == null)
@@ -508,6 +558,12 @@ public class WaterCoolerBle : IDisposable
 			_firmwareReply = null;
 			AppConfig.Set("lc_last_address", address.ToString("X12", CultureInfo.InvariantCulture));
 			AppConfig.Set("lc_last_name", name);
+			if (!TryGetBoundDevice(out _, out _))
+			{
+				AppConfig.Set("lc_bound_address", address.ToString("X12", CultureInfo.InvariantCulture));
+				AppConfig.Set("lc_bound_name", name);
+				Logger.WriteLine($"BLE 水冷：首次连接自动绑定 {name} ({address:X12})");
+			}
 			_lastAutomaticPump = (_lastAutomaticFan = -1);
 			Logger.WriteLine($"BLE connected: {name} ({address:X12}) fw={FirmwareVersion} fanLed={SupportsFanLed}");
 			ConnectionChanged?.Invoke(obj: true);
@@ -901,6 +957,16 @@ public class WaterCoolerBle : IDisposable
 		if (connected && meterNormal == false && consecutiveFaults >= 2)
 		{
 			return connectedFor >= TimeSpan.FromSeconds(8L);
+		}
+		return false;
+	}
+
+	private static bool TryGetBoundDevice(out ulong address, out string name)
+	{
+		name = AppConfig.GetString("lc_bound_name", Strings.WaterCoolerBox) ?? Strings.WaterCoolerBox;
+		if (ulong.TryParse(AppConfig.GetString("lc_bound_address", ""), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out address))
+		{
+			return address != 0;
 		}
 		return false;
 	}

@@ -32,6 +32,9 @@ public partial class LightEditorWindow : Window
     private bool _logoGrade;
     /// <summary>⭐ 2026-10-26（task-17 · 宽屏白色背光入口）：白色背光键盘只有 电源 + 2 档亮度，没有灯效/颜色/速度 ✅。</summary>
     private readonly bool _whiteBacklightOnly;
+
+    /// <summary>NUC/UMI 原厂灯带没有速度寄存器，编辑器隐藏速度行；其它机型不受影响。</summary>
+    private readonly bool _hideSpeedForNucLightbar;
     private int _lightMax = 4;
     private readonly DispatcherTimer _applyTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
     private bool _suppressAutoApply;
@@ -46,6 +49,9 @@ public partial class LightEditorWindow : Window
         _effects = effects;
         _whiteBacklightOnly = whiteBacklightOnly && string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
         _keyboard = string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
+        _hideSpeedForNucLightbar = string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+            && L_Mechrevo.WpfP0.Services.WpfBackend.Hw is { } lightbarHw
+            && (lightbarHw.IsIntelNucMachine || lightbarHw.IsUmiMachine);
         Title = title;
         TitleText.Text = title;
         MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
@@ -138,6 +144,11 @@ public partial class LightEditorWindow : Window
             MixRow.Visibility = Visibility.Collapsed;
             SpeedRow.Visibility = Visibility.Collapsed;
             KeyboardExtraRow.Visibility = Visibility.Collapsed;
+        }
+        if (_hideSpeedForNucLightbar)
+        {
+            // NUC/UMI 原厂只有单色/彩色，没有速度通道。
+            SpeedRow.Visibility = Visibility.Collapsed;
         }
         _suppressAutoApply = false;
         PowerCheck.Checked += (_, _) =>
@@ -656,19 +667,42 @@ public partial class LightEditorWindow : Window
             }
             else if (power)
             {
-                await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightPower(_topic, true);
-                if (!powerWasOn)
+                bool nucLightbar = string.Equals(_topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+                    && L_Mechrevo.WpfP0.Services.WpfBackend.Hw is { } lbHw
+                    && (lbHw.IsIntelNucMachine || lbHw.IsUmiMachine);
+                if (nucLightbar)
                 {
-                    await Task.Delay(600);
+                    // NUC/UMI 灯带走本地 ACPI 通道；XAML 编辑器原来走 GCU service，
+                    // 彩虹/混色的亮度和颜色根本没下发。
+                    MechrevoLite.Hardware.UmiLightbar.SetPower(true);
+                    if (!powerWasOn)
+                    {
+                        await Task.Delay(600);
+                    }
+                    System.Drawing.Color nucColor = System.Drawing.Color.FromArgb(_colorArgb);
+                    ok = MechrevoLite.Hardware.UmiLightbar.SetEffect(effect, nucColor, _light);
                 }
-                System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
-                    ? System.Drawing.Color.FromArgb(_colorArgb)
-                    : null;
-                ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightEffect(_topic, effect, _light, _speed, "None", color);
+                else
+                {
+                    await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightPower(_topic, true);
+                    if (!powerWasOn)
+                    {
+                        await Task.Delay(600);
+                    }
+                    System.Drawing.Color? color = KeyboardFirmwareEffects.IsSingleColorEffect(effect)
+                        ? System.Drawing.Color.FromArgb(_colorArgb)
+                        : null;
+                    ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightEffect(_topic, effect, _light, _speed, "None", color);
+                }
             }
             else
             {
-                ok = await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightPower(_topic, false);
+                bool nucLightbarOff = string.Equals(_topic, "HidLightbar/Ctrl", StringComparison.Ordinal)
+                    && L_Mechrevo.WpfP0.Services.WpfBackend.Hw is { } lbHwOff
+                    && (lbHwOff.IsIntelNucMachine || lbHwOff.IsUmiMachine);
+                ok = nucLightbarOff
+                    ? MechrevoLite.Hardware.UmiLightbar.SetPower(false)
+                    : await L_Mechrevo.WpfP0.Services.WpfBackend.Service.SetLightPower(_topic, false);
             }
             if (ok)
             {

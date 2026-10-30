@@ -9,7 +9,7 @@
             <Setter Property="Padding" Value="4,0" />
             <Setter Property="Margin" Value="0,0,4,0" />
             <Setter Property="Height" Value="34" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="13" />
         </Style>
     </UserControl.Resources>
 <ScrollViewer x:Name="HomePage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" CanContentScroll="False">
@@ -34,7 +34,17 @@
                                             </Canvas>
                                         </Viewbox>
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Title}" Style="{StaticResource CardTitle}" />
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Title}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                                <CheckBox x:Name="HomeGpuOcToggle" Grid.Column="1"
+                                                          Content="{x:Static loc:WpfStrings.CustomModeWindow_Text_3}"
+                                                          Style="{StaticResource HeaderSwitch}" Margin="8,0,0,0"
+                                                          VerticalAlignment="Center" Visibility="Collapsed" />
+                                            </Grid>
                                             <TextBlock x:Name="PerfCurrentText" Text="{x:Static loc:WpfStrings.PerfCurrentText_Text}" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
                                             <WrapPanel x:Name="HomePerfButtonsPanel" Orientation="Horizontal" ItemWidth="64" ItemHeight="34">
                                                 <ToggleButton x:Name="HomePerf静音" Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_23}" Tag="2" Style="{StaticResource HomePerfSegment}" />

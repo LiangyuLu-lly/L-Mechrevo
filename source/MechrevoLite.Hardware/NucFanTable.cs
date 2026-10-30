@@ -4,7 +4,9 @@ using System.Linq;
 
 namespace MechrevoLite.Hardware;
 
-/// <summary>NUC/UMI 自定义风扇曲线：写入 EC RAM 的 16 段温度/占空比表。</summary>
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
+/// <summary>NUC/UMI 风扇表：16 段温度/占空比 + 模式默认表 + 自定义曲线。</summary>
 internal static class NucFanTable
 {
     private const int CpuUptBase = 3840;
@@ -21,169 +23,142 @@ internal static class NucFanTable
     private const int FanBoostClamp = 1873;
     private const int FanRamp = 1927;
     private const int FanIsolated = 1989;
+    private const int TriggerByte = 1895;
     private const int LatchBit = 0x04;
 
-    private sealed class Snapshot
+    private sealed class ModeTable
     {
-        public byte[] CpuUp = Array.Empty<byte>();
-        public byte[] CpuDown = Array.Empty<byte>();
-        public byte[] CpuDuty = Array.Empty<byte>();
-        public byte[] GpuUp = Array.Empty<byte>();
-        public byte[] GpuDown = Array.Empty<byte>();
-        public byte[] GpuDuty = Array.Empty<byte>();
-        public int Max1, Max2, Ctrl, Latch, Ap, Ramp, Isolated;
+        public required string Name;
+        public required byte[] CpuUp;
+        public required byte[] CpuDown;
+        public required byte[] CpuDuty;
+        public required byte[] GpuUp;
+        public required byte[] GpuDown;
+        public required byte[] GpuDuty;
+        public byte MaxDuty => GpuDuty[15];
     }
 
-    private static Snapshot? _defaultTable;
+    // 官方 30 系 NUC/UMI 三档默认表；性能档/平衡档/静音档必须有不同占空比上限。
+    private static readonly ModeTable Office = new()
+    {
+        Name = "Office",
+        CpuUp = new byte[] { 0, 55, 57, 59, 61, 63, 65, 67, 69, 255, 255, 255, 255, 255, 255, 255 },
+        CpuDown = new byte[] { 48, 58, 60, 62, 64, 66, 68, 70, 255, 255, 255, 255, 255, 255, 255, 255 },
+        CpuDuty = new byte[] { 0, 60, 60, 60, 60, 70, 70, 90, 110, 110, 110, 110, 110, 110, 110, 110 },
+        GpuUp = new byte[] { 0, 55, 55, 57, 57, 59, 62, 64, 66, 255, 255, 255, 255, 255, 255, 255 },
+        GpuDown = new byte[] { 48, 56, 58, 58, 60, 63, 65, 67, 255, 255, 255, 255, 255, 255, 255, 255 },
+        GpuDuty = new byte[] { 0, 60, 60, 60, 60, 70, 70, 90, 110, 110, 110, 110, 110, 110, 110, 110 }
+    };
 
-    private static string BackupPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "MechrevoLite", "nuc-fan-default.txt");
+    private static readonly ModeTable Gaming = new()
+    {
+        Name = "Gaming",
+        CpuUp = new byte[] { 0, 55, 58, 61, 65, 69, 72, 75, 78, 81, 255, 255, 255, 255, 255, 255 },
+        CpuDown = new byte[] { 48, 58, 61, 65, 69, 73, 76, 79, 82, 255, 255, 255, 255, 255, 255, 255 },
+        CpuDuty = new byte[] { 0, 60, 70, 80, 100, 110, 120, 130, 150, 160, 160, 160, 160, 160, 160, 160 },
+        GpuUp = new byte[] { 0, 55, 58, 61, 65, 69, 72, 75, 78, 81, 255, 255, 255, 255, 255, 255 },
+        GpuDown = new byte[] { 48, 58, 61, 65, 69, 73, 76, 79, 82, 255, 255, 255, 255, 255, 255, 255 },
+        GpuDuty = new byte[] { 0, 60, 70, 80, 100, 110, 120, 130, 150, 160, 160, 160, 160, 160, 160, 160 }
+    };
+
+    private static readonly ModeTable Turbo = new()
+    {
+        Name = "Turbo",
+        CpuUp = new byte[] { 0, 55, 58, 61, 65, 69, 72, 75, 78, 81, 84, 255, 255, 255, 255, 255 },
+        CpuDown = new byte[] { 48, 58, 61, 65, 69, 73, 76, 79, 82, 85, 255, 255, 255, 255, 255, 255 },
+        CpuDuty = new byte[] { 0, 60, 70, 80, 100, 110, 120, 130, 150, 160, 180, 180, 180, 180, 180, 180 },
+        GpuUp = new byte[] { 0, 55, 58, 61, 65, 69, 72, 75, 78, 81, 84, 255, 255, 255, 255, 255 },
+        GpuDown = new byte[] { 48, 58, 61, 65, 69, 73, 76, 79, 82, 85, 255, 255, 255, 255, 255, 255 },
+        GpuDuty = new byte[] { 0, 60, 70, 80, 100, 110, 120, 130, 150, 160, 180, 180, 180, 180, 180, 180 }
+    };
+
+    private static ModeTable _lastDefault = Gaming;
 
     internal static bool CaptureDefaultOnce()
     {
-        if (_defaultTable != null) return true;
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(BackupPath)!);
-            if (File.Exists(BackupPath))
-            {
-                Snapshot? loaded = Load(BackupPath);
-                if (loaded != null) { _defaultTable = loaded; return true; }
-            }
-            Snapshot snapshot = ReadSnapshot();
-            _defaultTable = snapshot;
-            Save(BackupPath, snapshot);
-            return true;
-        }
-        catch { return false; }
+        _lastDefault ??= Gaming;
+        return true;
     }
 
+    /// <summary>自定义曲线退出/恢复默认时，恢复最近一次应用的模式默认表（不是全 0 快照）。</summary>
     internal static bool TryRestoreDefault(out string detail)
     {
+        bool ok = ApplyTable(_lastDefault ?? Gaming, out detail);
+        bool isolated = TrySetFanIsolated(false, out string isolatedDetail);
+        detail += " · " + isolatedDetail;
+        return ok && isolated;
+    }
+
+    /// <summary>按模式应用官方默认表：静音=Office、平衡=Gaming、狂暴/极致=Turbo。</summary>
+    internal static bool TryApplyDefaultMode(int visualMode, out string detail)
+    {
         detail = "";
-        if (!CaptureDefaultOnce() || _defaultTable == null)
+        ModeTable? table = visualMode switch
         {
-            detail = "没有可恢复的默认风扇表";
-            return false;
+            2 => Office,
+            0 => Gaming,
+            1 or 5 => Turbo,
+            _ => null
+        };
+        if (table == null)
+        {
+            detail = "自定义档不应用默认风扇表";
+            return true;
         }
-        Snapshot d = _defaultTable;
+        _lastDefault = table;
+        bool ok = ApplyTable(table, out detail);
+        // 切回官方默认表时同时交还 FanIsolated，避免上一次自定义曲线留下独立输出位。
+        bool isolated = TrySetFanIsolated(false, out string isolatedDetail);
+        detail += " · " + isolatedDetail;
+        return ok && isolated;
+    }
+
+    private static bool ApplyTable(ModeTable table, out string detail)
+    {
+        detail = "";
+        // 强冷开启时不要覆盖风扇表，避免抢固件强冷控制。
+        if (TryRead(FanBoostClamp, out int clamp) && (clamp & 0x40) != 0)
+        {
+            detail = "强冷开启，跳过风扇表写入（保持强冷全速）";
+            return true;
+        }
+
+        // 官方顺序：APExist → latch 预脉冲 → AP Active → 写表 → 写 max/ctrl → latch 提交。
+        if (TryRead(ApOemByte, out int ap))
+        {
+            TryWrite(ApOemByte, ap | 0x01);
+        }
+        TryWrite(TableLatch, LatchBit);
+        TryWrite(TableLatch, 0x00);
+        if (TryRead(ApOemByte, out ap))
+        {
+            TryWrite(ApOemByte, ap | 0x81);
+        }
+
         bool ok = true;
-        // 先清 latch，再恢复表，最后恢复原始 latch 状态提交。
-        ok &= TryWrite(TableLatch, 0);
-        for (int i = 0; i < 16; i++) ok &= TryWrite(CpuUptBase + i, d.CpuUp[i]);
-        for (int i = 0; i < 16; i++) ok &= TryWrite(CpuDowntBase + i, d.CpuDown[i]);
-        for (int i = 0; i < 16; i++) ok &= TryWrite(CpuDutyBase + i, d.CpuDuty[i]);
-        for (int i = 0; i < 16; i++) ok &= TryWrite(GpuUptBase + i, d.GpuUp[i]);
-        for (int i = 0; i < 16; i++) ok &= TryWrite(GpuDowntBase + i, d.GpuDown[i]);
-        for (int i = 0; i < 16; i++) ok &= TryWrite(GpuDutyBase + i, d.GpuDuty[i]);
-        ok &= TryWrite(ApOemByte, d.Ap);
-        ok &= TryWrite(TableLatch, d.Latch);
-        TryWrite(FanRamp, d.Ramp);
-        TryWrite(FanIsolated, d.Isolated);
-        detail = "默认风扇表已恢复"
-            + (TryRead(TableLatch, out int latch) ? " 回读Latch=0x" + latch.ToString("X2") : "");
-        return ok;
-    }
+        for (int i = 0; i < 16; i++) ok &= TryWrite(CpuUptBase + i, table.CpuUp[i]);
+        for (int i = 0; i < 16; i++) ok &= TryWrite(CpuDowntBase + i, table.CpuDown[i]);
+        for (int i = 0; i < 16; i++) ok &= TryWrite(CpuDutyBase + i, i == 0 ? 0 : table.CpuDuty[i]);
+        for (int i = 0; i < 16; i++) ok &= TryWrite(GpuUptBase + i, table.GpuUp[i]);
+        for (int i = 0; i < 16; i++) ok &= TryWrite(GpuDowntBase + i, table.GpuDown[i]);
+        // GPU 占空比只写 13 段（3920..3932）；3933–3935 是 Max1/Max2/TableCtrl，不能混写。
+        for (int i = 0; i < 13; i++) ok &= TryWrite(GpuDutyBase + i, i == 0 ? 0 : table.GpuDuty[i]);
 
-    private static Snapshot ReadSnapshot()
-    {
-        Snapshot s = new()
+        int maxDuty = table.MaxDuty;
+        int ctrl = Math.Max(maxDuty, 160); // 官方活动控制字节至少 0xA0，绝不能写 0/1/2/3。
+        ok &= TryWrite(GpuMax1, maxDuty);
+        ok &= TryWrite(GpuMax2, maxDuty);
+        ok &= TryWrite(TableCtrl, ctrl);
+        TryWrite(TableLatch, LatchBit);
+        if (TryRead(TriggerByte, out int trigger))
         {
-            CpuUp = ReadBlock(CpuUptBase),
-            CpuDown = ReadBlock(CpuDowntBase),
-            CpuDuty = ReadBlock(CpuDutyBase),
-            GpuUp = ReadBlock(GpuUptBase),
-            GpuDown = ReadBlock(GpuDowntBase),
-            GpuDuty = ReadBlock(GpuDutyBase)
-        };
-        TryRead(GpuMax1, out s.Max1);
-        TryRead(GpuMax2, out s.Max2);
-        TryRead(TableCtrl, out s.Ctrl);
-        TryRead(TableLatch, out s.Latch);
-        TryRead(ApOemByte, out s.Ap);
-        TryRead(FanRamp, out s.Ramp);
-        TryRead(FanIsolated, out s.Isolated);
-        return s;
-    }
-
-    private static byte[] ReadBlock(int address)
-    {
-        byte[] result = new byte[16];
-        for (int i = 0; i < 16; i++)
-        {
-            if (!TryRead(address + i, out int value)) value = 0;
-            result[i] = (byte)Math.Clamp(value, 0, 255);
+            TryWrite(TriggerByte, (trigger & 0x10) | 0x20);
         }
-        return result;
-    }
 
-    private static void Save(string path, Snapshot s)
-    {
-        string[] lines =
-        {
-            "c0=" + string.Join(',', s.CpuUp),
-            "c1=" + string.Join(',', s.CpuDown),
-            "c2=" + string.Join(',', s.CpuDuty),
-            "g0=" + string.Join(',', s.GpuUp),
-            "g1=" + string.Join(',', s.GpuDown),
-            "g2=" + string.Join(',', s.GpuDuty),
-            $"max1={s.Max1} max2={s.Max2} ctrl={s.Ctrl} latch={s.Latch} ap={s.Ap} ramp={s.Ramp} iso={s.Isolated}"
-        };
-        File.WriteAllLines(path, lines);
-    }
-
-    private static Snapshot? Load(string path)
-    {
-        try
-        {
-            string[] lines = File.ReadAllLines(path);
-            Snapshot s = new();
-            foreach (string line in lines)
-            {
-                int eq = line.IndexOf('=');
-                if (eq < 0) continue;
-                string key = line[..eq];
-                string val = line[(eq + 1)..];
-                if (key is "c0" or "c1" or "c2" or "g0" or "g1" or "g2")
-                {
-                    byte[] arr = val.Split(',').Select(x => byte.TryParse(x, out byte b) ? b : (byte)0).ToArray();
-                    if (arr.Length != 16) return null;
-                    switch (key)
-                    {
-                        case "c0": s.CpuUp = arr; break;
-                        case "c1": s.CpuDown = arr; break;
-                        case "c2": s.CpuDuty = arr; break;
-                        case "g0": s.GpuUp = arr; break;
-                        case "g1": s.GpuDown = arr; break;
-                        case "g2": s.GpuDuty = arr; break;
-                    }
-                }
-                else
-                {
-                    foreach (string part in val.Split(' '))
-                    {
-                        int e = part.IndexOf('=');
-                        if (e < 0) continue;
-                        if (int.TryParse(part[(e + 1)..], out int n))
-                        {
-                            switch (part[..e])
-                            {
-                                case "max1": s.Max1 = n; break;
-                                case "max2": s.Max2 = n; break;
-                                case "ctrl": s.Ctrl = n; break;
-                                case "latch": s.Latch = n; break;
-                                case "ap": s.Ap = n; break;
-                                case "ramp": s.Ramp = n; break;
-                                case "iso": s.Isolated = n; break;
-                            }
-                        }
-                    }
-                }
-            }
-            return s.CpuUp.Length == 16 && s.GpuDuty.Length == 16 ? s : null;
-        }
-        catch { return null; }
+        bool readMax1 = TryRead(GpuMax1, out int read1);
+        bool ctrlReadOk = TryRead(TableCtrl, out int ctrlReadback);
+        detail = $"{table.Name} 默认表已应用 · maxDuty={maxDuty} ctrl={ctrl}（回读 {ctrlReadback}）";
+        return ok && readMax1 && read1 == maxDuty && ctrlReadOk && ctrlReadback == ctrl;
     }
 
     /// <summary>风扇 Ramp Rate：1927，0x80|步长 或 0x81（关闭）。</summary>
@@ -236,7 +211,7 @@ internal static class NucFanTable
             detail = "强冷开启，跳过风扇曲线写入";
             return false;
         }
-        CaptureDefaultOnce();
+
         byte[] cpuDuty = NormalizeDuty(cpuDuties);
         byte[] gpuDuty = NormalizeDuty(gpuDuties);
         byte gpuTail = Math.Max(gpuDuty[12], gpuDuty[15]);
@@ -245,6 +220,7 @@ internal static class NucFanTable
         gpuDuty[15] = gpuTail;
         byte[] cpuDown = BuildDown(cpuTemps);
         byte[] gpuDown = BuildDown(gpuTemps);
+
         if (TryRead(ApOemByte, out int ap)) TryWrite(ApOemByte, ap | 0x81);
         TryWrite(TableLatch, 0x00);
         for (int i = 0; i < 16; i++) if (!TryWrite(CpuUptBase + i, cpuTemps[i])) { detail = "CPU UpT 写入失败@" + i; return false; }
@@ -252,12 +228,14 @@ internal static class NucFanTable
         for (int i = 0; i < 16; i++) if (!TryWrite(CpuDutyBase + i, i == 0 ? 0 : cpuDuty[i])) { detail = "CPU Duty 写入失败@" + i; return false; }
         for (int i = 0; i < 16; i++) if (!TryWrite(GpuUptBase + i, gpuTemps[i])) { detail = "GPU UpT 写入失败@" + i; return false; }
         for (int i = 0; i < 16; i++) if (!TryWrite(GpuDowntBase + i, gpuDown[i])) { detail = "GPU DownT 写入失败@" + i; return false; }
-        // 官方 NUC 30 的 GPU 表就是 3920..3935 共 16 段；3933–3935 是表内最后三段，
-        // 不能当 Max/Ctrl 单独覆盖，否则 GPU 表不完整，第二风扇可能直接掉到 0。
-        for (int i = 0; i < 16; i++) if (!TryWrite(GpuDutyBase + i, i == 0 ? 0 : gpuDuty[i])) { detail = "GPU Duty 写入失败@" + i; return false; }
-        if (TryRead(TableLatch, out int latch)) TryWrite(TableLatch, latch | LatchBit);
-        else TryWrite(TableLatch, LatchBit);
-        detail = $"CPU={string.Join(',', cpuDuty)} GPU={string.Join(',', gpuDuty)}";
+        for (int i = 0; i < 13; i++) if (!TryWrite(GpuDutyBase + i, i == 0 ? 0 : gpuDuty[i])) { detail = "GPU Duty 写入失败@" + i; return false; }
+        int maxDuty = Math.Max(cpuDuty[15], gpuDuty[15]);
+        int ctrl = Math.Max(maxDuty, 160);
+        TryWrite(GpuMax1, maxDuty);
+        TryWrite(GpuMax2, maxDuty);
+        TryWrite(TableCtrl, ctrl);
+        TryWrite(TableLatch, LatchBit);
+        detail = $"CPU={string.Join(',', cpuDuty)} GPU={string.Join(',', gpuDuty)} max={maxDuty} ctrl={ctrl}";
         return true;
     }
 

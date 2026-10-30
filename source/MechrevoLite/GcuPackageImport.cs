@@ -15,7 +15,7 @@ namespace MechrevoLite;
 /// <para>只对 GCU 机型开放：非 GCU 后端（宝龙达 / 老接口）点状态条不弹导入。</para>
 /// <para>识别方式（不只看文件名）：</para>
 /// <list type="bullet">
-/// <item>标准名：1020/30/40/50/WJXY.7z；</item>
+/// <item>标准名：1020/30/40/50/WJ.7z；</item>
 /// <item>改名字的 .7z/.zip：解开看内容，按 GCUService.exe 版本/体积判变体后重打包；</item>
 /// <item>已解压的树（含 AiStoneService\MyControlCenter\GCUService.exe）：直接重打包成变体 7z。</item>
 /// </list>
@@ -23,7 +23,7 @@ namespace MechrevoLite;
 internal static class GcuPackageImport
 {
 
-	private static readonly string[] VariantArchives = { "1020.7z", "30.7z", "40.7z", "50.7z", "WJXY.7z" };
+	private static readonly string[] VariantArchives = { "1020.7z", "30.7z", "40.7z", "50.7z", "WJ.7z" };
 
 	/// <summary>当前是否应该提供「导入 GCU 包」入口（GCU 后端但未连接/未安装）。</summary>
 	internal static bool ShouldOffer()
@@ -577,12 +577,12 @@ internal static class GcuPackageImport
 		}
 		// Install-Gcu.ps1 按变体表认归档布局：
 		//   1020 -> 20\UniwillService   30 -> 30\UniwillService
-		//   40   -> 40\AiStoneService   50 -> 50\AiStoneService   WJXY -> WJXY\AiStoneService
+		//   40   -> 40\AiStoneService   50 -> 50\AiStoneService   WJ -> WJXY\AiStoneService
 		(string innerRoot, string serviceLeaf) = variant switch
 		{
 			"1020" => ("20", "UniwillService"),
 			"30" => ("30", "UniwillService"),
-			"WJXY" => ("WJXY", "AiStoneService"),
+			"WJ" => ("WJXY", "AiStoneService"),
 			_ => (variant, "AiStoneService")
 		};
 		string packageRoot = Path.Combine(staging, "_pkg_" + Guid.NewGuid().ToString("N"));

@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using MechrevoLite.Hardware;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -78,16 +79,16 @@ internal sealed class BatteryService : IBatteryService
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
-            return ServiceResult.Fail("后端未连接");
+            return ServiceResult.Fail(WpfStrings.L("后端未连接", "Backend not connected"));
         }
         try
         {
             bool ok = await probe.SetBatteryModeAsync(mode).ConfigureAwait(false);
-            return ok ? ServiceResult.Success("电池档位已下发") : ServiceResult.Fail("电池档位下发失败");
+            return ok ? ServiceResult.Success(WpfStrings.L("电池档位已下发", "Battery profile sent")) : ServiceResult.Fail(WpfStrings.L("电池档位下发失败", "Failed to send battery profile"));
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("电池档位下发异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.L("电池档位下发异常：", "Battery profile error: ") + ex.GetType().Name);
         }
     }
 }

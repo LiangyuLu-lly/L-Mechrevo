@@ -1,19 +1,19 @@
 <#
 .SYNOPSIS
     Standalone NVIDIA dGPU "silence" script: disable / enable the discrete GPU device.
-    Does NOT use GCU, MQTT or any L-Mechrevo service.
+    Does NOT use any vendor control-center service or background agent.
 
 .DESCRIPTION
-    Talks to the PnP device directly (the same API as the vendor disableDGpu.ps1 /
-    enableDGpu.ps1), but adds everything those two one-liners lack: elevation check,
+    Talks to the PnP device directly (the standard Windows PnP command set /
+    laptop dGPU disable), but adds everything a one-liner lacks: elevation check,
     idempotency, display-topology gate, occupancy detection and cleanup, fallback
     paths, result verification, automatic rollback on a broken display path, logging,
     exit codes and a recovery entry point.
 
     Three different things are often confused; this script only does the first:
       1. Disable the device      - PnP level, the device disappears.  <- this script
-      2. Silence the dGPU        - hybrid mode, let the dGPU sleep (vendor GCU
-                                   GPUPowerSaving / iGPU-only-save, executed by the EC).
+      2. Silence the dGPU        - hybrid mode, let the dGPU sleep (vendor power-saving
+                                   mode, executed by the embedded controller).
       3. Change the display route- MUX / firmware level, usually needs a reboot.
                                    This script neither does it nor can do it.
 
@@ -25,7 +25,7 @@
     zh-CN system). Non-ASCII characters then decode as mojibake, which at best makes
     messages unreadable and at worst breaks parsing outright. Verified: this same
     script with Chinese text and no BOM yielded 42 parse errors under PS 5.1.
-    The vendor payload scripts are ASCII-only for the same reason.
+    The original one-line scripts are ASCII-only for the same reason.
 
 .PARAMETER Action
     Status (read-only) | Disable | Enable.
@@ -148,12 +148,12 @@ $script:ProtectedProcessNames = @(
     'applicationframehost', 'systemsettings', 'dllhost', 'conhost', 'openconsole', 'audiodg', 'spoolsv',
     'wlanext', 'msdtc', 'ctfloader', 'igfxem', 'igfxhk', 'igfxext', 'nvcontainer', 'nvdisplay.container',
     'nvsettings', 'nvspcaps64', 'nvsphelper64', 'nvwmi64', 'nvcplui', 'nvidia-smi', 'nvidia-smi.exe',
-    'atieclxx', 'atiesrxx', 'l-mechrevo', 'gcuservice', 'gcubridge', 'aistoneservice',
+    'atieclxx', 'atiesrxx',
     'powershell', 'pwsh', 'windowsterminal', 'cmd', 'taskkill', 'reg', 'wmiprvse', 'msmpeng',
     'lockapp', 'shellhost', 'shellexperiencehost', 'startmenuexperiencehost', 'searchhost',
     'textinputhost', 'applicationframehost', 'explorer', 'dwm', 'winlogon', 'logonui', 'userinit'
 )
-$script:ProtectedNamePrefixes = @('controlcenter')
+$script:ProtectedNamePrefixes = @()   # service-owned processes are protected dynamically
 
 # NVIDIA user-mode driver modules: a process that loaded one of these has the dGPU open.
 $script:NvidiaUmdPattern = '^(nvwgf2umx?|nvd3dumx?|nvcuda|nvml|nvapi64|nvoglv64|nvopencl64|nvfbc|nvencodeapi64)\.dll$'
@@ -250,7 +250,7 @@ function Test-ProtectedProcess {
       "explorer.exe" while the list holds "explorer" - that mismatch is exactly how a
       -Force run could have killed the user's shell (found on a real machine).
     #>
-    param([string]$Name, [string]$Path = '')
+    param([string]$Name, [string]$Path = '', [int]$ProcessId = 0)
 
     if ([string]::IsNullOrWhiteSpace($Name)) { return $true }
 
@@ -264,6 +264,13 @@ function Test-ProtectedProcess {
     if ($script:ProtectedProcessNames -contains $lower) { return $true }
     foreach ($prefix in $script:ProtectedNamePrefixes) {
         if ($lower.StartsWith($prefix)) { return $true }
+    }
+    # Vendor-neutral: any process owned by a registered Windows service is left alone.
+    if ($ProcessId -gt 0) {
+        try {
+            $svc = Get-CimInstance Win32_Service -Filter ('ProcessId=' + $ProcessId) -ErrorAction Stop
+            if ($svc) { return $true }
+        } catch { }
     }
     return $false
 }
@@ -340,7 +347,7 @@ function Test-AnyNonNvidiaDisplayAdapter {
 }
 
 # =====================================================================================
-# Display topology (EnumDisplayDevices; no GCU, no WMI)
+# Display topology (EnumDisplayDevices; no WMI)
 # =====================================================================================
 if (-not ('DgpuSilenceDisplayApi' -as [type])) {
     Add-Type -TypeDefinition @'
@@ -385,8 +392,8 @@ function Get-DisplayTopology {
     <#
       Per display adapter: AttachedToDesktop / Primary / Mirrored / IsNvidia / Monitors[].
       Monitors are enumerated with EDD_GET_DEVICE_INTERFACE_NAME, so it is visible which
-      adapter each monitor hangs off. This is the GCU-free equivalent of the vendor's
-      NumberOfScreen / HDMI_MonitorsNumber / GetMonitorSignalfromEC guard.
+      adapter each monitor hangs off. Vendor-neutral equivalent of the firmware's
+      screen-count / HDMI-monitor-count / signal-source guard.
     #>
     $adapters = New-Object System.Collections.ArrayList
     $index = 0
@@ -555,7 +562,7 @@ function Get-DgpuOccupant {
         if (-not $IncludeOtherSessions) {
             if ($null -ne $ownSession -and $p.SessionId -ne $ownSession) { continue }
         }
-        $isProtected = Test-ProtectedProcess -Name $p.ProcessName
+        $isProtected = Test-ProtectedProcess -Name $p.ProcessName -ProcessId $p.Id
         $modules = $null
         try { $modules = $p.Modules } catch { $modules = $null }
         if ($null -eq $modules) {
@@ -864,7 +871,7 @@ function Invoke-DisableAction {
         Write-Log -Message ("  {0}`n      InstanceId = {1}`n      Status = {2}  ProblemCode = {3}" -f $t.FriendlyName, $t.InstanceId, $t.Status, $problemText)
     }
     if ($targets.Count -gt 1) {
-        Write-Log -Level WARN -Message 'Note: more than one NVIDIA display device matched; all of them will be disabled (the vendor script disables all as well).'
+        Write-Log -Level WARN -Message 'Note: more than one NVIDIA display device matched; all of them will be disabled (a one-liner would disable all as well).'
     }
 
     # ---- gate 1: fallback display adapter ----

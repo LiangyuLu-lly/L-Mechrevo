@@ -46,6 +46,8 @@ internal static class LightingCatalog
     internal static readonly (string Effect, string Name)[] SyncEffects =
     {
         ("Single", Strings.EffectSingle),
+        ("Breathing", Strings.EffectBreathing),
+        ("Wave", Strings.EffectWave),
         ("Dawn", Strings.LightEffectDawn)
     };
 
@@ -74,6 +76,14 @@ internal static class LightingCatalog
         if (effect == "Single" || effect == "Raindrop")
         {
             return 1;
+        }
+        if (effect == "Mix")
+        {
+            return 1;
+        }
+        if (effect == "Rainbow")
+        {
+            return 7;
         }
         if (effect == "Breathing" || effect == "Impact" || effect == "ColorMarquee")
         {

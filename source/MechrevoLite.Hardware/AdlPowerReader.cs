@@ -198,6 +198,76 @@ internal static class AdlPowerReader
 		return false;
 	}
 
+	/// <summary>只读 PMLog：GPU 核心负载 / 核心频率 / 显存频率 / 显存占用（AMD 核显）。</summary>
+	internal static bool TryReadTelemetry(out int loadPercent, out int coreMhz, out int memoryMhz, out int memoryUsedMb, out int temperatureC)
+	{
+		loadPercent = -1;
+		coreMhz = -1;
+		memoryMhz = -1;
+		memoryUsedMb = -1;
+		temperatureC = -1;
+		if (!EnsureInitialized())
+		{
+			return false;
+		}
+		PmLogOutput output = new PmLogOutput
+		{
+			Size = Marshal.SizeOf<PmLogOutput>(),
+			Sensors = new PmLogSensor[MaxPmLogSensors]
+		};
+		int adapterCount = Math.Max(1, _adapterCount);
+		bool any = false;
+		for (int adapterIndex = 0; adapterIndex < adapterCount; adapterIndex++)
+		{
+			if (ADL2_New_QueryPMLogData_Get(_context, adapterIndex, ref output) != 0)
+			{
+				continue;
+			}
+			for (int i = 0; i < MaxPmLogSensors; i++)
+			{
+				PmLogSensor sensor = output.Sensors[i];
+				if (sensor.Supported == 0 || sensor.Value <= 0)
+				{
+					continue;
+				}
+				switch (i)
+				{
+					case 4:
+						if (temperatureC < 0 && sensor.Value > 0 && sensor.Value < 150) { temperatureC = sensor.Value; any = true; }
+						break;
+					case 6:
+					case 7:
+						if (loadPercent < 0)
+						{
+							int normalized = sensor.Value > 100 ? (int)Math.Round(sensor.Value / 100.0) : sensor.Value;
+							if (normalized >= 0 && normalized <= 100) { loadPercent = normalized; any = true; }
+						}
+						break;
+					case 1:
+					case 14:
+						if (coreMhz < 0) { coreMhz = sensor.Value; any = true; }
+						break;
+					case 2:
+					case 15:
+						if (memoryMhz < 0) { memoryMhz = sensor.Value; any = true; }
+						break;
+					case 10:
+						if (memoryUsedMb < 0)
+						{
+							memoryUsedMb = sensor.Value > 1000000 ? (int)Math.Round(sensor.Value / 1024.0 / 1024.0) : sensor.Value;
+							any = true;
+						}
+						break;
+				}
+			}
+			if (any)
+			{
+				break;
+			}
+		}
+		return any;
+	}
+
 	private static bool EnsureInitialized()
 	{
 		lock (Gate)

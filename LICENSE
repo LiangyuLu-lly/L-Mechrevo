@@ -2,7 +2,7 @@ L-Mechrevo is distributed under the GNU General Public License version 3 only (G
 Copyright (C) 2026 L-Mechrevo contributors
 It contains code derived from G-Helper (https://github.com/seerge/g-helper), also GPL-3.0-only.
 See THIRD-PARTY-NOTICES.md for the complete third-party inventory, the LICENSES folder for the upstream
-licence texts, and ATTRIBUTION-PATCH-PLAN.md for the in-code / in-UI marking work.
+licence texts, and docs/archive/attribution-20261010/ATTRIBUTION-PATCH-PLAN.md for the in-code / in-UI marking work.
 
 The canonical GPL-3.0 text follows verbatim (byte-identical to
 https://github.com/seerge/g-helper/blob/main/LICENSE, git blob f288702d2fa16d3cdf0035b15a9fcbc552cd88e7).

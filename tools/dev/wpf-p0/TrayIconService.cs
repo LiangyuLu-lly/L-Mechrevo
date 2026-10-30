@@ -21,7 +21,10 @@ internal sealed record TrayMenuState(
     bool OverlayOn,
     bool SilentTurboVisible,
     bool SilentTurboOn,
-    bool TurboVisible);
+    bool TurboVisible,
+    bool GpuDirectVisible = true,
+    bool GpuEcoVisible = true,
+    bool OverlayLocked = false);
 
 internal static class TrayMenuConfig
 {
@@ -75,6 +78,7 @@ internal sealed class TrayIconService : IDisposable
     private readonly NotifyIcon _icon;
     private readonly ContextMenuStrip _menu = new();
     private bool _rebuilding;
+    private long _lastTrayActionTick;
     private bool _disposed;
 
     internal Func<TrayMenuState>? StateProvider { get; set; }
@@ -82,6 +86,7 @@ internal sealed class TrayIconService : IDisposable
     internal event Action? ShowRequested;
     internal event Action? SettingsRequested;
     internal event Action? OverlayRequested;
+    internal event Action? OverlayLockRequested;
     internal event Action? ExitRequested;
     internal event Action? KeyboardLightingRequested;
     internal event Action? DiagnosticsRequested;
@@ -227,9 +232,15 @@ internal sealed class TrayIconService : IDisposable
             {
                 _menu.Items.Add(new ToolStripSeparator());
                 ToolStripMenuItem gpu = new(WpfStrings.TrayGpu);
-                gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuIntegrated, state.GpuMode == 0, () => GpuModeRequested?.Invoke(0)));
+                if (state.GpuEcoVisible)
+                {
+                    gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuIntegrated, state.GpuMode == 0, () => GpuModeRequested?.Invoke(0)));
+                }
                 gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuHybrid, state.GpuMode == 1, () => GpuModeRequested?.Invoke(1)));
-                gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuDirect, state.GpuMode == 2, () => GpuModeRequested?.Invoke(2)));
+                if (state.GpuDirectVisible)
+                {
+                    gpu.DropDownItems.Add(MenuItem(WpfStrings.TrayGpuDirect, state.GpuMode == 2, () => GpuModeRequested?.Invoke(2)));
+                }
                 _menu.Items.Add(gpu);
             }
             if (TrayMenuConfig.IsEnabled("keyboard") && state?.KeyboardLightVisible == true)
@@ -239,6 +250,7 @@ internal sealed class TrayIconService : IDisposable
             if (TrayMenuConfig.IsEnabled("overlay"))
             {
                 _menu.Items.Add(MenuItem(WpfStrings.TrayOverlay, state?.OverlayOn == true, () => OverlayRequested?.Invoke()));
+                _menu.Items.Add(MenuItem(WpfStrings.TrayOverlayLock, state?.OverlayLocked == true, () => OverlayLockRequested?.Invoke()));
             }
             if (TrayMenuConfig.IsEnabled("main"))
             {
@@ -260,10 +272,19 @@ internal sealed class TrayIconService : IDisposable
         }
     }
 
-    private static ToolStripMenuItem MenuItem(string text, bool isChecked, Action action)
+    private ToolStripMenuItem MenuItem(string text, bool isChecked, Action action)
     {
         ToolStripMenuItem item = new(text) { Checked = isChecked };
-        item.Click += (_, _) => action();
+        item.Click += (_, _) =>
+        {
+            // 托盘动作可能是 async void（切档/开关），同步锁会在 await 前就释放；
+            // 用时间窗兜住异步动作，避免连点重复下发。
+            long now = Environment.TickCount64;
+            if (now - _lastTrayActionTick < 1200) return;
+            _lastTrayActionTick = now;
+            try { action(); }
+            catch (Exception ex) { global::Logger.WriteLine("[tray] 动作失败：" + ex.Message); }
+        };
         return item;
     }
 

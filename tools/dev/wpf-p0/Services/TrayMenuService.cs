@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0.Services;
 
 /// <summary>
@@ -60,11 +61,11 @@ internal sealed class TrayMenuService : ITrayMenuService
         try
         {
             TrayMenuConfig.Save(keys);
-            return ServiceResult.Success("托盘菜单已保存");
+            return ServiceResult.Success(WpfStrings.L("托盘菜单已保存", "Tray menu saved"));
         }
         catch (Exception ex)
         {
-            return ServiceResult.Fail("托盘菜单保存异常：" + ex.GetType().Name);
+            return ServiceResult.Fail(WpfStrings.L("托盘菜单保存异常：", "Failed to save tray menu: ") + ex.GetType().Name);
         }
     }
 }

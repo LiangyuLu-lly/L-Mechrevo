@@ -50,7 +50,7 @@ internal static class UpdatePolicy
 
 	internal const long MaxPackageBytes = 419430400L;
 
-	internal static readonly string[] AllowedDownloadHosts = new string[2] { "stats.l-mechrevo.cn", "l-mechrevo.cn" };
+	internal static readonly string[] AllowedDownloadHosts = new string[5] { "stats.l-mechrevo.cn", "l-mechrevo.cn", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com" };
 
 	private static readonly Regex SaneVersionToken = new Regex("^[vV]?[0-9A-Za-z][0-9A-Za-z._+\\-]*$", RegexOptions.Compiled);
 

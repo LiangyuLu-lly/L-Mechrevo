@@ -204,19 +204,20 @@ internal sealed class DisplayService : IDisplayService
     public IReadOnlyList<CalibrationOption> CalibrationOptions()
     {
         int level = _backend.Probe?.ColorCalibrationLevel ?? 1;
+        bool nuc = _backend.Hw?.IsIntelNucMachine == true || _backend.Hw?.IsUmiMachine == true;
         List<CalibrationOption> options = new()
         {
             new(1, WpfStrings.OriginalStyleWindow_Content_9, false)
         };
-        if (level >= 2)
+        if (!nuc && level >= 2)
         {
             options.Add(new(2, "sRGB", false));
         }
-        if (level >= 3)
+        if (!nuc && level >= 3)
         {
             options.Add(new(3, "P3", false));
         }
-        if (level >= 4)
+        if (!nuc && level >= 4)
         {
             options.Add(new(4, "AdobeRGB", false));
         }
@@ -241,12 +242,19 @@ internal sealed class DisplayService : IDisplayService
         try
         {
             bool ok;
+            bool nuc = _backend.Hw?.IsIntelNucMachine == true || _backend.Hw?.IsUmiMachine == true;
             if (on && mode == 999)
             {
                 ok = await ApplyCustomIccAsync().ConfigureAwait(false);
             }
-            else if (!on && AppConfig.Get("calib_mode") == 999)
+            else if (!on && (AppConfig.Get("calib_mode") == 999 || nuc))
             {
+                await Task.Run(IccHelper.ClearAllIcc).ConfigureAwait(false);
+                ok = true;
+            }
+            else if (nuc && on && mode == 1)
+            {
+                // NUC 原生档 = 清除 ICC，不做 GCU 下发。
                 await Task.Run(IccHelper.ClearAllIcc).ConfigureAwait(false);
                 ok = true;
             }
@@ -284,22 +292,18 @@ internal sealed class DisplayService : IDisplayService
         }
         try
         {
-            bool ok = await probe.SetDisplayEffectSwitchAsync(on).ConfigureAwait(false);
+            string target = string.IsNullOrWhiteSpace(mode) ? CurrentDisplayEffectMode : mode;
+            bool ok = await probe.ApplyDisplayEffectAsync(on, target).ConfigureAwait(false);
             if (!ok)
             {
                 return ServiceResult.Fail(WpfStrings.OriginalStyleWindow_xaml_Text_61);
             }
             AppConfig.Set("display_effect", on ? 1 : 0);
-            AppConfig.Flush();
-            if (on)
+            if (!string.IsNullOrWhiteSpace(target))
             {
-                string target = string.IsNullOrWhiteSpace(mode) ? CurrentDisplayEffectMode : mode;
-                if (!string.IsNullOrWhiteSpace(target))
-                {
-                    await probe.ApplyDisplayEffectProfileAsync(target).ConfigureAwait(false);
-                }
+                AppConfig.Set("display_effect_mode", target);
             }
-            await probe.RequestDisplayEffectStatusAsync().ConfigureAwait(false);
+            AppConfig.Flush();
             return ServiceResult.Success(on ? WpfStrings.DisplayColorEnhancementOn : WpfStrings.DisplayColorEnhancementOff);
         }
         catch (Exception ex)

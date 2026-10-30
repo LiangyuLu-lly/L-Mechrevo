@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class MainWindow
@@ -18,6 +19,8 @@ public partial class MainWindow
     private ToggleButton HomePerf静音 = null!;
     private ToggleButton HomePerf平衡 = null!;
     private ToggleButton? HomePerf静音狂暴;
+    private ToggleButton? HomePerf极致;
+    private CheckBox HomeGpuOcToggle = null!;
     private ToggleButton HomePerf狂暴 = null!;
     private ToggleButton HomePerf自定义 = null!;
     private Border HomeGpuCard = null!;
@@ -89,6 +92,7 @@ public partial class MainWindow
         HomeGpu混合 = _homeView.HomeGpu混合;
         HomeGpu独显 = _homeView.HomeGpu独显;
         HomeGpu集显 = _homeView.HomeGpu集显;
+        HomeGpuOcToggle = _homeView.HomeGpuOcToggle;
         HomeIgpuSavingPanel = _homeView.HomeIgpuSavingPanel;
         HomeDisplayColumn = _homeView.HomeDisplayColumn;
         HomeDisplayGap = _homeView.HomeDisplayGap;
@@ -166,6 +170,7 @@ public partial class MainWindow
         HomeGpu混合.Click += Gpu_Click;
         HomeGpu独显.Click += Gpu_Click;
         HomeGpu集显.Click += Gpu_Click;
+        HomeGpuOcToggle.Click += HomeGpuOcToggle_Click;
     }
 
     private void WireScreenEvents()
@@ -223,7 +228,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            StatusText.Text = "自定义编辑器加载失败：" + ex.Message;
+            StatusText.Text = WpfStrings.L("自定义编辑器加载失败：", "Failed to load custom editor: ") + ex.Message;
         }
     }
 
