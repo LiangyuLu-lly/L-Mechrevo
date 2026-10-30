@@ -45,6 +45,9 @@ r84（2026-10-31 · 0.293.6.3 beta23.6.3 · NVIDIA 遥测子进程化 + NUC Fn/�
 - 鸣谢与引用增加 `faintonce/open-revo`（GPL-3.0）：README、LicensesWindow、
   THIRD_PARTY_NOTICES 英文/中文三处同步。
 - 云母/背景模糊使用 Windows DWM 系统材质（DwmSetWindowAttribute）。
+- 键盘灯 OSD：开机恢复期间不再弹亮度 0；开关只弹开/关，轮询不再补亮度；
+  Fn+F8 手动亮度 OSD 保留。修复点：`PollKeyboardBrightnessOsd` 增加电源变化/启动静默抑制，
+  `KeyboardLightSwitch_Click` 与宽屏灯光卡开关清空亮度基线。
 - 构建 0 errors；真机待验证项：nvidia-smi 字段支持度、功耗上限写入、水冷 BLE 曲线/绑定、外接 HDMI 黑屏回归。
 
 r82（2026-10-23 · 0.293.5.1 beta23.5.1 稳定性补丁 · 旧UI）
