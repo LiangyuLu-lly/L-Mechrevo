@@ -95,6 +95,12 @@
             <!-- 顶栏 -->
             <Grid Grid.Row="1" Margin="24,10,24,0">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock x:Name="WideBackendStatus" Text="● 未连接" FontSize="11" Foreground="#9BA6B5"
+                               Margin="0,0,14,0" VerticalAlignment="Center" Cursor="Hand" ToolTip="后端连接状态" />
+                    <CheckBox x:Name="WideBackgroundToggle" Content="{x:Static loc:WpfStrings.BackgroundToggle_Content}"
+                              Style="{StaticResource HeaderSwitch}" Margin="0,0,14,0" VerticalAlignment="Center"
+                              Checked="WideBackgroundToggle_Changed" Unchecked="WideBackgroundToggle_Changed"
+                              ToolTip="显示/隐藏大窗口自定义背景图" />
                     <Button Content="{x:Static loc:WpfStrings.MainWindow_Content_2}" x:Name="ThemeButton" Style="{StaticResource GhostButton}" Click="ThemeButton_Click" Margin="0,0,10,0" />
                     <Button Content="{x:Static loc:WpfStrings.MainWindow_Content}" Style="{StaticResource GhostButton}" Click="CompactButton_Click" Margin="0,0,10,0" />
                     <Border Background="#22000000" CornerRadius="10" Padding="10,7">
@@ -132,6 +138,9 @@
                         <Border Height="1" Background="{DynamicResource CardBorderBrush}" Margin="6,12,6,10" />
                         <Button x:Name="NavDockOverlay" Tag="悬浮窗" Style="{StaticResource NavButton}" Click="WideDock_Click">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_4}" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                        <Button x:Name="NavDockUpdate" Tag="检查更新" Style="{StaticResource NavButton}" Click="WideDock_Click">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.CheckUpdateButton_Content}" VerticalAlignment="Center" /></StackPanel>
                         </Button>
                         <Button x:Name="NavDockSettings" Tag="设置" Style="{StaticResource NavButton}" Click="WideDock_Click">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0" /><TextBlock Text="{x:Static loc:WpfStrings.InlineOverlayTitle_Text}" VerticalAlignment="Center" /></StackPanel>

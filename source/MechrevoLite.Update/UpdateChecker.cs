@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,6 +48,192 @@ internal static class UpdateChecker
 	{
 		string value = NormalizeBaseUrl(baseUrl);
 		return $"{value}/api/update_check.php?version={Uri.EscapeDataString(version)}&channel={Uri.EscapeDataString(channel)}";
+	}
+
+	internal const string GitHubOwner = "xmsjx";
+	internal const string GitHubRepo = "L-Mechrevo-Next";
+	internal const string GitHubReleasesApi = "https://api.github.com/repos/" + GitHubOwner + "/" + GitHubRepo + "/releases?per_page=30";
+
+	/// <summary>从 GitHub Releases 读取最新应用包（排除 GCU 服务包等非应用发布）。</summary>
+	internal static async Task<UpdateInfo?> CheckGitHubAsync(bool force = false, string? versionOverride = null)
+	{
+		await Gate.WaitAsync().ConfigureAwait(continueOnCapturedContext: false);
+		try
+		{
+			if (!force && cached != null)
+			{
+				return cached;
+			}
+			if (!force && !ShouldAutoCheckNow(DateTime.UtcNow))
+			{
+				return cached;
+			}
+			string version = versionOverride ?? Program.ReleaseVersion;
+			string json;
+			try
+			{
+				using HttpRequestMessage request = new(HttpMethod.Get, GitHubReleasesApi);
+				request.Headers.UserAgent.ParseAdd("L-Mechrevo/" + Program.ReleaseLabel);
+				request.Headers.Accept.ParseAdd("application/vnd.github+json");
+				using HttpResponseMessage response = await UpdateHttp.Check.SendAsync(request).ConfigureAwait(continueOnCapturedContext: false);
+				response.EnsureSuccessStatusCode();
+				json = await response.Content.ReadAsStringAsync().ConfigureAwait(continueOnCapturedContext: false);
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("GitHub 更新检测失败（静默跳过）：" + ex.GetType().Name + " " + ex.Message);
+				return null;
+			}
+			UpdateInfo? info = ParseGitHubReleases(json, version);
+			if (info == null)
+			{
+				Logger.WriteLine("GitHub 更新检测失败：没有可用的应用 Release");
+				return null;
+			}
+			cached = info;
+			AppConfig.Set("update_last_check", (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+			Logger.WriteLine($"GitHub 更新检测：本机={info.CurrentVersion} 最新={info.LatestVersion ?? "(无)"} 有更新={info.UpdateAvailable} 资产={info.FileName ?? "(无)"}");
+			return info;
+		}
+		finally
+		{
+			Gate.Release();
+		}
+	}
+
+	/// <summary>版本号里的 -betaN.M 是发布标签，不是补丁号；比较主版本时先剥掉。</summary>
+	private static string BaseVersion(string? version)
+	{
+		if (string.IsNullOrWhiteSpace(version)) return "";
+		string text = version.Trim().TrimStart('v', 'V');
+		int idx = text.IndexOf("-beta", StringComparison.OrdinalIgnoreCase);
+		return idx > 0 ? text[..idx] : text;
+	}
+
+	private static bool IsNewerGitHub(string? candidate, string? current)
+	{
+		int baseCmp = UpdateVersion.Compare(BaseVersion(candidate), BaseVersion(current));
+		if (baseCmp != 0) return baseCmp > 0;
+		return UpdateVersion.Compare(candidate, current) > 0;
+	}
+
+	private static JObject? FindExternalGcuAsset(JArray releases)
+	{
+		foreach (JToken token in releases)
+		{
+			if (token is not JObject release) continue;
+			if (release.Value<bool?>("draft") == true) continue;
+			JArray? assets = release["assets"] as JArray;
+			if (assets == null) continue;
+			foreach (JToken assetToken in assets)
+			{
+				if (assetToken is not JObject asset) continue;
+				string? name = Clean(asset.Value<string>("name"));
+				if (name == null) continue;
+				if (name.EndsWith(".7z", StringComparison.OrdinalIgnoreCase)
+					&& name.Contains("gcu", StringComparison.OrdinalIgnoreCase))
+				{
+					return asset;
+				}
+			}
+		}
+		return null;
+	}
+
+	private static UpdateInfo? ParseGitHubReleases(string? json, string currentVersion)
+	{
+		if (string.IsNullOrWhiteSpace(json)) return null;
+		JArray releases;
+		try { releases = JArray.Parse(json); }
+		catch { return null; }
+		JObject? best = null;
+		string bestVersion = "";
+		foreach (JToken token in releases)
+		{
+			if (token is not JObject release) continue;
+			if (release.Value<bool?>("draft") == true) continue;
+			string? tag = Clean(release.Value<string>("tag_name"));
+			if (string.IsNullOrWhiteSpace(tag)) continue;
+			string normalized = tag!.TrimStart('v', 'V');
+			if (!UpdatePolicy.IsSaneVersion(normalized)) continue;
+			JArray? assets = release["assets"] as JArray;
+			// 更新包发布不一定附带 setup（只有 DLL 更新时也应可检测）；只要资产里
+			// 有可用的 update.zip/7z 或 setup.exe 就纳入候选。
+			bool hasUsableAsset = assets?.OfType<JObject>().Any(a =>
+			{
+				string? name = Clean(a.Value<string>("name"));
+				if (name == null) return false;
+				bool isUpdate = name.Contains("update", StringComparison.OrdinalIgnoreCase)
+					&& (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+						|| name.EndsWith(".7z", StringComparison.OrdinalIgnoreCase));
+				bool isSetup = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+					&& name.Contains("setup", StringComparison.OrdinalIgnoreCase);
+				return isUpdate || isSetup;
+			}) == true;
+			if (!hasUsableAsset) continue;
+			if (best == null || IsNewerGitHub(normalized, bestVersion))
+			{
+				best = release;
+				bestVersion = normalized;
+			}
+		}
+		if (best == null) return null;
+		string? chosenTag = Clean(best.Value<string>("tag_name"));
+		string latest = chosenTag?.TrimStart('v', 'V') ?? bestVersion;
+		JArray? allAssets = best["assets"] as JArray;
+		JObject? updateAsset = allAssets?.OfType<JObject>().FirstOrDefault(a =>
+		{
+			string? name = Clean(a.Value<string>("name"));
+			return name != null
+				&& name.Contains("update", StringComparison.OrdinalIgnoreCase)
+				&& (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+					|| name.EndsWith(".7z", StringComparison.OrdinalIgnoreCase));
+		});
+		JObject? setupAsset = allAssets?.OfType<JObject>().FirstOrDefault(a =>
+		{
+			string? name = Clean(a.Value<string>("name"));
+			return name != null && name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+				&& name.Contains("setup", StringComparison.OrdinalIgnoreCase);
+		});
+		// 优先更新包；没有更新包才回退安装包。
+		JObject? chosenAsset = updateAsset ?? setupAsset;
+		string? downloadUrl = Clean(chosenAsset?.Value<string>("browser_download_url"));
+		string? digest = Clean(chosenAsset?.Value<string>("digest"));
+		string? sha256 = null;
+		if (digest != null && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+		{
+			sha256 = digest.Substring(7);
+		}
+		long? size = chosenAsset?.Value<long?>("size");
+		string? chosenName = Clean(chosenAsset?.Value<string>("name"));
+		// NoGCU setup 发布时，GCU 厂商组件单独挂在 GitHub 的 gcu-service-unmodified
+		// Release（GCU.7z）；只在本次资产是 setup.exe 时把它带下去，由安装器解压安装。
+		string? externalGcuName = null;
+		string? externalGcuUrl = null;
+		long? externalGcuSize = null;
+		string? externalGcuSha256 = null;
+		if (chosenName != null && chosenName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+		{
+			JObject? gcuAsset = FindExternalGcuAsset(releases);
+			if (gcuAsset != null)
+			{
+				externalGcuName = Clean(gcuAsset.Value<string>("name"));
+				externalGcuUrl = Clean(gcuAsset.Value<string>("browser_download_url"));
+				externalGcuSize = gcuAsset.Value<long?>("size");
+				string? gcuDigest = Clean(gcuAsset.Value<string>("digest"));
+				if (gcuDigest != null && gcuDigest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+				{
+					externalGcuSha256 = gcuDigest.Substring(7);
+				}
+			}
+		}
+		string? page = Clean(best.Value<string>("html_url"));
+		string? notes = Clean(best.Value<string>("body"));
+		string? date = Clean(best.Value<string>("published_at"));
+		bool available = IsNewerGitHub(latest, currentVersion);
+		return new UpdateInfo(currentVersion, latest, "github", false, available, date, notes,
+			chosenName, size, sha256, downloadUrl, page, null,
+			externalGcuName, externalGcuUrl, externalGcuSize, externalGcuSha256);
 	}
 
 	internal static async Task<UpdateInfo?> CheckAsync(bool force = false, string? versionOverride = null)

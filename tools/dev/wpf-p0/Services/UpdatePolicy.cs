@@ -4,5 +4,5 @@ namespace L_Mechrevo.WpfP0.Services;
 internal static class UpdatePolicy
 {
     /// <summary>与旧 UI 保持一致的暂时隐藏更新入口策略；后续由设置页/远端开关接管。</summary>
-    internal const bool TemporarilyHidden = true;
+    internal const bool TemporarilyHidden = false;
 }

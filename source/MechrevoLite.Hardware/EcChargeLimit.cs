@@ -252,7 +252,7 @@ internal static class EcChargeLimit
 		{
 			return false;
 		}
-		// 2026-10-21（机主要求）：无界 Intel（LNL）与星耀（WJXY 载荷）暂未验证 EC 限充位置 ⇒ 暂时隐藏。
+		// 2026-10-21（机主要求）：无界 Intel（LNL）与星耀（WJ 载荷）暂未验证 EC 限充位置 ⇒ 暂时隐藏。
 		// ⚠️ 只影响这两类机型的 EC 限充 UI 判定；其它同方/GCU 机型逐位不变；ec_charge_limit=1/0 强覆盖仍在上面优先生效。
 		if (IsTemporarilyHiddenModel(out string hiddenReason))
 		{
@@ -353,10 +353,10 @@ internal static class EcChargeLimit
 		reason = string.Empty;
 		try
 		{
-			// 星耀：GCU 载荷为 WJXY（安装器登记 / 包特征识别）
-			if (string.Equals(GcuIdentity.Variant, "WJXY", StringComparison.OrdinalIgnoreCase))
+			// 星耀：GCU 载荷为 WJ（安装器登记 / 包特征识别）
+			if (string.Equals(GcuIdentity.Variant, "WJ", StringComparison.OrdinalIgnoreCase))
 			{
-				reason = "星耀机型（GCU 载荷 WJXY）暂未验证 EC 限充地址";
+				reason = "星耀机型（GCU 载荷 WJ）暂未验证 EC 限充地址";
 				return true;
 			}
 			try
@@ -580,6 +580,23 @@ internal static class EcChargeLimit
 						return false;
 					}
 					upperWritten = true;
+					// 参考 OpenRevo 的 EC 限充：上限成功后 best-effort 补齐复充下限 0x07D0。
+					// ⚠️ 不参与成败判定（部分固件会自己推导，写失败/被覆盖都不影响上限）。
+					if (percent < 100)
+					{
+						int wantLower = LowerValueFor(percent);
+						int nowLower = Read(num, LowerRegister);
+						if (nowLower != wantLower)
+						{
+							bool lowerWrite = Write(num, LowerRegister, (byte)wantLower);
+							int lowerRead = Read(num, LowerRegister);
+							Logger.WriteLine("[charge-limit] 复充下限 0x" + LowerRegister.ToString("X3")
+								+ " 原=" + (nowLower < 0 ? "不可读" : nowLower.ToString())
+								+ " → " + wantLower + " 写=" + lowerWrite
+								+ " 回读=" + (lowerRead < 0 ? "不可读" : lowerRead.ToString())
+								+ "（best-effort，不影响上限成败）");
+						}
+					}
 					// 2026-10-10（对齐上游 Leo-stro/mechrevo-charge-limit · 停写复充下限 0x7D0）：
 					// 上游**只写 0x07B9**，复充下限 0x07D0 由固件 store_limit() 在门控保持窗口内自己推导。
 					// 我们以前把 0x07D0 的写入成败与 0x07B9 绑成"全或无"（0x7D0 写失败或回读不符就回滚

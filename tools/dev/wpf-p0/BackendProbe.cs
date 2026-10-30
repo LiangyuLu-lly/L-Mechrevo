@@ -6,6 +6,7 @@ using MechrevoLite;
 using MechrevoLite.Hardware;
 using MechrevoLite.Helpers;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 /// <summary>P1 试接：只读创建 MechrevoHw 并读取公开传感器字段，不下发任何硬件命令。</summary>
@@ -16,6 +17,18 @@ internal sealed class BackendProbe : IDisposable
     private static readonly Type? ShellType = typeof(MechrevoHw).Assembly.GetType("MechrevoLite.Helpers.ShellPersonalization");
     private static readonly Type? SleepType = typeof(MechrevoHw).Assembly.GetType("MechrevoLite.Helpers.PowerSleepGuard");
     private bool _disposed;
+
+    internal BackendProbe()
+    {
+    }
+
+    /// <summary>UI 探针预览：直接挂合成硬件，不连接真实后端。</summary>
+    internal BackendProbe(MechrevoHw hw, MechrevoService? service = null)
+    {
+        _hw = hw;
+        _service = service;
+        Connected = true;
+    }
 
     internal bool Connected { get; private set; }
 
@@ -36,6 +49,15 @@ internal sealed class BackendProbe : IDisposable
                 LastError = "";
                 Logger.WriteLine("[backend] NUC/UMI GCU 未连接，使用本地 ACPI/EC 模式");
             }
+            if (!ok && MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform())
+            {
+                // 星耀不再安装 GCU：性能档/风扇/快捷开关走 WMAA；窗口仍要进入已就绪。
+                _hw.MarkXingyaoLocalReady();
+                _service ??= new MechrevoService(_hw);
+                ok = true;
+                LastError = "";
+                Logger.WriteLine("[backend] 星耀 P916F GCU 未连接，使用 WMAA 本地模式");
+            }
             if (ok)
             {
                 L_Mechrevo.WpfP0.Services.WpfBackend.acpi ??= new AsusACPI();
@@ -44,7 +66,7 @@ internal sealed class BackendProbe : IDisposable
             Connected = ok;
             if (!ok)
             {
-                LastError = "ConnectAsync 返回 false";
+                LastError = WpfStrings.L("ConnectAsync 返回 false", "ConnectAsync returned false");
             }
             return ok;
         }
@@ -103,7 +125,6 @@ internal sealed class BackendProbe : IDisposable
                 case "capslock":
                 case "highperf":
                 case "monitoroff":
-                case "taskbarautohide":
                 case "transparency":
                 case "darktheme":
                 case "sleepnetoff":
@@ -119,7 +140,8 @@ internal sealed class BackendProbe : IDisposable
                 case "acrecovery":
                     return _hw.Capabilities.AcRecovery;
                 case "fanboost":
-                    return _hw.Capabilities.FanBoost;
+                    return _hw.Capabilities.FanBoost || _hw.UsesBaolongda
+                        || _hw.IsIntelNucMachine || _hw.IsUmiMachine;
                 default:
                     return false;
             }
@@ -134,7 +156,22 @@ internal sealed class BackendProbe : IDisposable
 
     private int _nucBatteryMode = -1;
 
-    internal int BatteryMode => _nucBatteryMode >= 0 ? _nucBatteryMode : (_hw?.BatteryProtection ?? -1);
+    internal int BatteryMode
+    {
+        get
+        {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                if (NucBatteryMode.TryReadMode(out int mode))
+                {
+                    _nucBatteryMode = mode;
+                    return mode;
+                }
+                return _nucBatteryMode;
+            }
+            return _hw?.BatteryProtection ?? -1;
+        }
+    }
 
     internal int GpuMode => _hw?.GpuMode ?? -1;
 
@@ -223,6 +260,22 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    /// <summary>当前后端是否提供了 GCU 色彩档位表；没有时改用本地软件色彩增强。</summary>
+    private bool HasGcuDisplayProfiles
+    {
+        get
+        {
+            try
+            {
+                return _hw?.DisplayEffectProfiles.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
     internal async Task<bool> ApplyDisplayEffectProfileAsync(string mode)
     {
         try
@@ -233,7 +286,10 @@ internal sealed class BackendProbe : IDisposable
             }
             if (_service == null || _hw == null || !_hw.DisplayEffectProfiles.TryGetValue(mode, out DisplayEffectProfile? profile))
             {
-                return false;
+                // 40 系等部分 GCU 不上报 ProfileNameList；此时用本地 gamma/矩阵色彩增强，
+                // 保证档位按钮实际有可见效果，而不是返回失败。
+                Logger.WriteLine("[display-effect] GCU 无档位表，改用本地软件色彩增强 mode=" + mode);
+                return SoftwareColorEnhancement.Apply(mode);
             }
             return await _service.ApplyDisplayEffectProfile(profile).ConfigureAwait(false);
         }
@@ -247,6 +303,7 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true) return;
             if (_service != null)
             {
                 await _service.RequestDisplayEffectStatus().ConfigureAwait(false);
@@ -282,7 +339,12 @@ internal sealed class BackendProbe : IDisposable
         {
             if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
             {
-                return -1;
+                return MechrevoLite.Hardware.NucPerformanceMode.TryReadVisualMode(out int nucMode) ? nucMode : -1;
+            }
+            if (MechrevoLite.Hardware.XingyaoPerformanceMode.IsApplicable(_hw)
+                && MechrevoLite.Hardware.XingyaoPerformanceMode.TryReadVisualMode(out int xyMode, out _))
+            {
+                return xyMode;
             }
             return _service == null ? -1 : await _service.RefreshCurrentModeAsync(_service.CurrentMode).ConfigureAwait(false);
         }
@@ -386,14 +448,38 @@ internal sealed class BackendProbe : IDisposable
                 Logger.WriteLine("[winupdate] " + (on ? "禁用" : "恢复") + " · " + result.UserDetail());
                 return result.Ok;
             }
-            if (_service == null)
-            {
-                return false;
-            }
             bool? systemResult = SetSystemQuick(key, on);
             if (systemResult.HasValue)
             {
                 return systemResult.Value;
+            }
+            if (string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase))
+            {
+                // GCU 自己的 OSD：走 MechrevoService.SwitchQuick("osd")，
+                // 不改 lm_osd_enabled（那是 LM 自身 OSD）。
+                bool gcuOsdOk = _service != null && await _service.SwitchQuick("osd", on).ConfigureAwait(false);
+                Logger.WriteError("[gcuosd] " + (on ? "显示" : "隐藏") + " ⇒ " + gcuOsdOk);
+                return gcuOsdOk;
+            }
+            if (string.Equals(key, "osd", StringComparison.OrdinalIgnoreCase))
+            {
+                MechrevoLite.AppConfig.Set("lm_osd_enabled", on ? 1 : 0);
+                MechrevoLite.AppConfig.Flush();
+                if (on) OsdService.Show("", WpfStrings.QuickOsd, WpfStrings.StateOn);
+                Logger.WriteError("[osd] 本地 OSD 开关=" + on);
+                return true;
+            }
+            // 星耀 WMAA 快捷开关不依赖 GCU service。
+            if (MechrevoLite.Hardware.XingyaoQuickSwitch.IsApplicable(_hw)
+                && (key is "winkey" or "fnkey" or "copilot" or "touchpad")
+                && MechrevoLite.Hardware.XingyaoQuickSwitch.TrySet(key, on, out string xingyaoDetail))
+            {
+                Logger.WriteLine("[xingyao-quick] " + xingyaoDetail);
+                return true;
+            }
+            if (_service == null)
+            {
+                return false;
             }
             if (string.Equals(key, "fanboost", StringComparison.OrdinalIgnoreCase))
             {
@@ -411,6 +497,16 @@ internal sealed class BackendProbe : IDisposable
     {
         try
         {
+            if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                // NUC/UMI 没有 GCU 校色通道：原生/关闭只清本地 ICC，不做任何 MQTT。
+                if (mode <= 1)
+                {
+                    await Task.Run(MechrevoLite.Display.IccHelper.ClearAllIcc).ConfigureAwait(false);
+                    return true;
+                }
+                return false;
+            }
             return _service != null && await _service.SetColorCalibration(mode).ConfigureAwait(false);
         }
         catch
@@ -424,10 +520,8 @@ internal sealed class BackendProbe : IDisposable
         get
         {
             MechrevoHw? hw = _hw;
-            // GPU 超频走 GCU 的 LCHWOC/OverClockingSwitch；40 系 40 GCU 不认这些字段，
-            // 只有实际 50 GCU 才显示/执行（40 系装 50 GCU 时 GcuIdentity 也会是 50）。
-            bool gcu50 = string.Equals(MechrevoLite.Hardware.GcuIdentity.Variant, "50", StringComparison.OrdinalIgnoreCase);
-            return hw != null && hw.IsGcuConnected && gcu50
+            // 0.293.5.1 基线：只要 GCU 能力位承认超频就显示，不按载荷变体号硬屏蔽。
+            return hw != null && hw.IsGcuConnected
                 && (hw.SupportsGpuOverclock || hw.Capabilities?.OverclockSettings == true || hw.GcuGpuOverclockAvailable);
         }
     }
@@ -444,11 +538,72 @@ internal sealed class BackendProbe : IDisposable
         }
     }
 
+    /// <summary>色彩增强开关 + 档位下发：GCU 侧切换是异步的，先等一拍再下发档位，最后再补一次，避免首次开启被状态包盖掉。</summary>
+    /// <summary>色彩增强开关 + 档位下发：GCU 档位表可能在启动后异步到达，失败时请求状态并重试。</summary>
+    internal async Task<bool> ApplyDisplayEffectAsync(bool on, string? mode)
+    {
+        // NUC/UMI 没有 GCU Display/Control；色彩增强是本地软件 gamma/matrix，不能走 GCU 状态请求。
+        if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+        {
+            string target = string.IsNullOrWhiteSpace(mode)
+                ? (MechrevoLite.AppConfig.GetString("display_effect_mode") ?? "")
+                : mode;
+            if (on)
+            {
+                if (string.IsNullOrWhiteSpace(target)) target = "VibrantMode";
+                bool applied = MechrevoLite.Hardware.SoftwareColorEnhancement.Apply(target);
+                Logger.WriteLine("[nuc-color] software color effect mode=" + target + " ok=" + applied);
+                return applied;
+            }
+            bool reset = MechrevoLite.Hardware.SoftwareColorEnhancement.Reset();
+            Logger.WriteLine("[nuc-color] software color reset ok=" + reset);
+            return reset;
+        }
+        bool ok = await SetDisplayEffectSwitchAsync(on).ConfigureAwait(false);
+        if (!ok)
+        {
+            return false;
+        }
+        if (!on)
+        {
+            await RequestDisplayEffectStatusAsync().ConfigureAwait(false);
+            return true;
+        }
+        if (string.IsNullOrWhiteSpace(mode))
+        {
+            mode = _hw?.DisplayEffectMode;
+        }
+        if (string.IsNullOrWhiteSpace(mode))
+        {
+            return false;
+        }
+        for (int attempt = 0; attempt < 6; attempt++)
+        {
+            await Task.Delay(160).ConfigureAwait(false);
+            bool applied = await ApplyDisplayEffectProfileAsync(mode).ConfigureAwait(false);
+            await RequestDisplayEffectStatusAsync().ConfigureAwait(false);
+            if (applied)
+            {
+                // 状态包可能稍后覆盖，最后一次档位在状态请求之后补发。
+                await Task.Delay(120).ConfigureAwait(false);
+                await ApplyDisplayEffectProfileAsync(mode).ConfigureAwait(false);
+                return true;
+            }
+        }
+        return false;
+    }
+
     internal async Task<bool> SetDisplayEffectSwitchAsync(bool on)
     {
         try
         {
             if (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true)
+            {
+                return on
+                    ? SoftwareColorEnhancement.Apply(MechrevoLite.AppConfig.GetString("display_effect_mode"))
+                    : SoftwareColorEnhancement.Reset();
+            }
+            if (!HasGcuDisplayProfiles)
             {
                 return on
                     ? SoftwareColorEnhancement.Apply(MechrevoLite.AppConfig.GetString("display_effect_mode"))
@@ -480,7 +635,16 @@ internal sealed class BackendProbe : IDisposable
         {
             if (_hw?.IsIntelNucMachine == true && string.Equals(topic, "HidLightbar/Ctrl", StringComparison.Ordinal))
             {
-                return UmiLightbar.SetPower(on);
+                bool local = UmiLightbar.SetPower(on);
+                bool? state = UmiLightbar.TryReadStatus(out bool readOn, out _, out _, out _) ? readOn : (bool?)null;
+                if (state == on)
+                {
+                    return true;
+                }
+                // EC 写返回成功但回读没变：再走一次 GCU/服务通道，避免「点了关不掉」。
+                bool remote = _service != null && await _service.SetLightPower(topic, on).ConfigureAwait(false);
+                Logger.WriteError("[umi-lightbar] 电源回读不匹配 requested=" + on + " read=" + state?.ToString() + " local=" + local + " remote=" + remote);
+                return local || remote;
             }
             return _service != null && await _service.SetLightPower(topic, on).ConfigureAwait(false);
         }
@@ -591,6 +755,19 @@ internal sealed class BackendProbe : IDisposable
             (int light, int speed, Color? color) = ReadLightArgs("HidLightbar/Ctrl", effect, keyboard: false);
             if (_hw?.IsIntelNucMachine == true)
             {
+                // 原厂灯带 Monocolor / Rainbow 都会写 RGB；不是单色效果也要带颜色，
+                // 否则彩虹模式的亮度和混色不会变。
+                if (color == null)
+                {
+                    try
+                    {
+                        color = System.Drawing.Color.FromArgb(
+                            MechrevoLite.Hardware.LightingSettingsStore.Load("HidLightbar/Ctrl", effect).ColorArgb);
+                    }
+                    catch
+                    {
+                    }
+                }
                 return UmiLightbar.SetEffect(effect, color, light);
             }
             return _service != null && await _service.SetLightEffect("HidLightbar/Ctrl", effect, light, speed, "None", color, true).ConfigureAwait(false);
@@ -817,18 +994,87 @@ internal sealed class BackendProbe : IDisposable
         {
             return WindowsUpdateGuard.IsDisabled() == true;
         }
+        if (string.Equals(key, "touchpad", StringComparison.OrdinalIgnoreCase)
+            && (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true))
+        {
+            object? ptp = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad\Status",
+                "Enabled", null);
+            if (ptp != null)
+            {
+                return Convert.ToInt32(ptp) != 0;
+            }
+        }
+        if (string.Equals(key, "touchpad", StringComparison.OrdinalIgnoreCase)
+            && (_hw?.IsIntelNucMachine == true || _hw?.IsUmiMachine == true))
+        {
+            object? ptp = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad\Status",
+                "Enabled", null);
+            if (ptp != null)
+            {
+                return Convert.ToInt32(ptp) != 0;
+            }
+        }
+        if (string.Equals(key, "wifi", StringComparison.OrdinalIgnoreCase)
+            && MechrevoLite.Helpers.RadioSwitch.Available(MechrevoLite.Helpers.RadioSwitchKind.Wifi)
+            && MechrevoLite.Helpers.RadioSwitch.TryGet(MechrevoLite.Helpers.RadioSwitchKind.Wifi, out bool radioWifi, out _))
+        {
+            return radioWifi;
+        }
+        if (string.Equals(key, "bt", StringComparison.OrdinalIgnoreCase)
+            && MechrevoLite.Helpers.RadioSwitch.Available(MechrevoLite.Helpers.RadioSwitchKind.Bluetooth)
+            && MechrevoLite.Helpers.RadioSwitch.TryGet(MechrevoLite.Helpers.RadioSwitchKind.Bluetooth, out bool radioBt, out _))
+        {
+            return radioBt;
+        }
         bool? system = ReadSystemQuick(key);
         if (system.HasValue)
         {
             return system.Value;
         }
+        if (MechrevoLite.Hardware.XingyaoQuickSwitch.IsApplicable(_hw)
+            && MechrevoLite.Hardware.XingyaoQuickSwitch.TryGet(key, out bool xingyaoQuick, out _))
+        {
+            return xingyaoQuick;
+        }
+        if (string.Equals(key, "logolight", StringComparison.OrdinalIgnoreCase)
+            && _hw.UsesBaolongda && _hw.TryReadLogoLightViaBackend(out bool logoOn))
+        {
+            // 0.293.5.1：宝龙达 Logo 灯状态以硬件功能号 15 直读为准，不读 3 秒镜像。
+            return logoOn;
+        }
         if (string.Equals(key, "fanboost", StringComparison.OrdinalIgnoreCase))
         {
+            if (_hw.UsesBaolongda) return MechrevoHw.FanBoostActive;
+            if (_hw.IsIntelNucMachine || _hw.IsUmiMachine)
+            {
+                // NUC/UMI 强冷状态来自 EC 0x751，由 NucQuickSwitches.Sync 回填。
+                return _hw.QuickSwitches.TryGetValue("fanboost", out bool quickOn) && quickOn;
+            }
             return _hw.FanBoost;
         }
         if (string.Equals(key, "highperf", StringComparison.OrdinalIgnoreCase))
         {
+            // 50 系 GCU：状态来自 GCU 的 HighPerformancePowerModeSwitch 回包。
+            if (_hw?.IsGcuConnected == true
+                && !_hw.UsesBaolongda
+                && !_hw.IsIntelNucMachine
+                && !_hw.IsUmiMachine
+                && _hw.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen50
+                && _hw.QuickSwitches.TryGetValue("highperf", out bool gcuHighPerf))
+            {
+                return gcuHighPerf;
+            }
             return MechrevoLite.Mode.PerfModeService.Instance?.WindowsPowerOverlayEnabled == true;
+        }
+        if (string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase))
+        {
+            return _hw != null && _hw.QuickSwitches.TryGetValue("osd", out bool gcuOsd) && gcuOsd;
+        }
+        if (string.Equals(key, "osd", StringComparison.OrdinalIgnoreCase))
+        {
+            return MechrevoLite.AppConfig.Get("lm_osd_enabled", 1) != 0;
         }
         if (string.Equals(key, "apuboost", StringComparison.OrdinalIgnoreCase))
         {
@@ -843,8 +1089,10 @@ internal sealed class BackendProbe : IDisposable
         {
             switch (key)
             {
-                case "taskbarautohide":
-                    return InvokeBool(ShellType, "IsTaskbarAutoHide");
+                case "capslock":
+                    return MechrevoLite.Helpers.NativeLockKey.IsCapsLockOn();
+                case "numpad":
+                    return MechrevoLite.Helpers.NativeLockKey.IsNumLockOn();
                 case "transparency":
                     return InvokeBool(ShellType, "IsTransparencyEnabled");
                 case "darktheme":
@@ -867,8 +1115,6 @@ internal sealed class BackendProbe : IDisposable
         {
             switch (key)
             {
-                case "taskbarautohide":
-                    return InvokeBool(ShellType, "SetTaskbarAutoHide", on);
                 case "transparency":
                     return InvokeBool(ShellType, "SetTransparencyEnabled", on);
                 case "darktheme":
@@ -911,19 +1157,19 @@ internal sealed class BackendProbe : IDisposable
         MechrevoHw? hw = _hw;
         if (hw == null)
         {
-            return LastError.Length == 0 ? "未连接" : LastError;
+            return LastError.Length == 0 ? WpfStrings.L("未连接", "Not connected") : LastError;
         }
         try
         {
             return "CPU " + hw.CpuTemp + "℃ · GPU " + hw.GpuTemp
-                + "℃ · 风扇 " + hw.CpuFanRpm + "/" + hw.GpuFanRpm
-                + " rpm · 电池 " + hw.BatteryPercent + "%"
-                + " · " + (hw.IsConnected ? "已连接" : "未连接")
-                + (Connected ? "" : " · 连接未确认");
+                + WpfStrings.L("℃ · 风扇 ", "°C · fans ") + hw.CpuFanRpm + "/" + hw.GpuFanRpm
+                + WpfStrings.L(" rpm · 电池 ", " rpm · battery ") + hw.BatteryPercent + "%"
+                + " · " + (hw.IsConnected ? WpfStrings.L("已连接", "Connected") : WpfStrings.L("未连接", "Not connected"))
+                + (Connected ? "" : WpfStrings.L(" · 连接未确认", " · connection unconfirmed"));
         }
         catch (Exception ex)
         {
-            return "读取异常：" + ex.GetType().Name;
+            return WpfStrings.L("读取异常：", "Read error: ") + ex.GetType().Name;
         }
     }
 

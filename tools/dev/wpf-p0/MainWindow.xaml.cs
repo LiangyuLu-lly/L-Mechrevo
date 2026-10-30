@@ -45,6 +45,12 @@ public partial class MainWindow : Window
     private Button? _liquidStatusButton;
     private ComboBox? _liquidPumpCombo;
     private ComboBox? _liquidFanCombo;
+    private WaterCoolerCurveCanvas? _liquidCurveCanvas;
+    private Slider? _liquidPumpStartSlider;
+    private Slider? _liquidPumpTurboSlider;
+    private TextBlock? _liquidPumpStartValue;
+    private TextBlock? _liquidPumpTurboValue;
+    private Button? _liquidCurveApplyButton;
     private bool _liquidSyncing;
     private Grid? _liquidLightRow;
     private ComboBox? _liquidLightCombo;
@@ -60,6 +66,7 @@ public partial class MainWindow : Window
     private readonly List<(ToggleButton Button, Func<bool> Get, Action<bool> Set)> _screenFeatures = new();
     private Window? _inlineWindow;
     private bool _wideMaximized;
+    private bool _syncingWideBackgroundToggle;
     private bool _switchingToMini;
     private string _activePage = "home";
     private readonly Dictionary<string, long> _pageLastAccess = new() { ["home"] = Environment.TickCount64 };
@@ -95,10 +102,16 @@ public partial class MainWindow : Window
     internal MainWindow(OriginalStyleWindow? owner = null, BackendProbe? probe = null)
     {
         InitializeComponent();
+        L_Mechrevo.WpfP0.Services.WindowWorkAreaPolicy.ClampOnLoaded(this);
         EnsureHomeView();
         _owner = owner;
         _probe = probe;
-        SourceInitialized += (_, _) => ApplyRoundedWindowChrome();
+        SourceInitialized += (_, _) =>
+        {
+            ApplyRoundedWindowChrome();
+            WindowBackdrop.Apply(this);
+            ReloadWideBackground();
+        };
         RootContent.Opacity = 1;
         AppTheme.Apply(true);
         ReloadWideBackground();
@@ -138,6 +151,7 @@ public partial class MainWindow : Window
         };
         ApplyHomeCapabilities();
         RefreshSensors();
+        UpdateWideBackendStatus();
         StatusText.Text = WpfStrings.MainWindow_xaml_Text;
     }
 
@@ -145,6 +159,49 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         ApplyDarkTitleBar(_dark);
+    }
+
+    private void UpdateWideBackendStatus()
+    {
+        if (WideBackendStatus == null)
+        {
+            return;
+        }
+        BackendProbe? probe = _probe ?? _owner?.CurrentBackend;
+        bool gcu = probe?.IsGcuConnected == true;
+        bool connected = probe?.Connected == true;
+        bool reconnecting = probe?.IsReconnecting == true;
+        bool nonGcu = probe?.IsNonGcuBackend == true;
+        string text;
+        string color;
+        string tip;
+        if (gcu)
+        {
+            text = WpfStrings.BackendGcuConnected;
+            color = "#4ADE80";
+            tip = WpfStrings.BackendGcuConnectedTip;
+        }
+        else if (reconnecting)
+        {
+            text = WpfStrings.BackendGcuConnecting;
+            color = "#F59E0B";
+            tip = WpfStrings.BackendGcuConnectingTip;
+        }
+        else if (connected || nonGcu)
+        {
+            text = WpfStrings.BackendNonGcuReady;
+            color = "#4ADE80";
+            tip = WpfStrings.L("本机后端已就绪（GCU 未连接）", "Local backend ready (GCU not connected)");
+        }
+        else
+        {
+            text = WpfStrings.BackendGcuDisconnected;
+            color = "#EF4444";
+            tip = WpfStrings.BackendGcuDisconnectedTip;
+        }
+        WideBackendStatus.Text = text;
+        WideBackendStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+        WideBackendStatus.ToolTip = tip;
     }
 
     private void RefreshSensors()
@@ -161,11 +218,11 @@ public partial class MainWindow : Window
         if (fanMax <= 1) fanMax = 5000;
         SetMetric(_cpuMetrics, 0, snapshot.CpuTempC, "℃");
         SetMetric(_cpuMetrics, 1, snapshot.CpuUsagePercent, "%");
-        SetMetric(_cpuMetrics, 2, snapshot.CpuPowerWatts ?? 0, "W");
+        SetMetric(_cpuMetrics, 2, snapshot.CpuPowerWatts ?? double.NaN, "W");
         SetMetric(_cpuMetrics, 3, snapshot.CpuFrequencyMhz, "MHz");
         SetMetric(_gpuMetrics, 0, snapshot.GpuTempC, "℃");
         SetMetric(_gpuMetrics, 1, snapshot.GpuUsagePercent, "%");
-        SetMetric(_gpuMetrics, 2, snapshot.GpuPowerWatts ?? 0, "W");
+        SetMetric(_gpuMetrics, 2, snapshot.GpuPowerWatts ?? double.NaN, "W");
         SetMetric(_gpuMetrics, 3, snapshot.GpuCoreFrequencyMhz, "MHz");
         SetMetric(_gpuMetrics, 4, snapshot.GpuMemoryClockMhz ?? 0, "MHz");
         _cpuFanRing?.SetValue(snapshot.CpuFanRpm, fanMax, "rpm");
@@ -174,6 +231,7 @@ public partial class MainWindow : Window
         if (_gpuDutyText != null) _gpuDutyText.Text = WpfStrings.MainWindow_xaml_Text_2 + snapshot.GpuFanDutyPercent + "%";
         // ⭐ task-26：连接状态可能后变（GCU 服务重连/掉线）⇒ 每次传感器 tick 顺带校正一次屏幕页门控（有缓存，只在变化时改 UI）
         UpdateScreenBackendGating();
+        UpdateWideBackendStatus();
         RefreshHomeExtras();
     }
 
@@ -181,6 +239,12 @@ public partial class MainWindow : Window
     {
         if (index < 0 || index >= metrics.Count) return;
         (RoundedBar bar, TextBlock text, string _) = metrics[index];
+        if (double.IsNaN(value))
+        {
+            bar.SetValue(0, bar.Maximum);
+            text.Text = "--";
+            return;
+        }
         bar.SetValue(value, bar.Maximum);
         text.Text = unit switch
         {
@@ -196,6 +260,69 @@ public partial class MainWindow : Window
         return match.Success && double.TryParse(match.Value, out double value) ? value : 0;
     }
 
+    private static string ResolveCpuModel()
+    {
+        try
+        {
+            string name = PawnIO.CpuInfo.Name?.Trim() ?? "";
+            return name.Length == 0 ? "CPU" : name;
+        }
+        catch
+        {
+            return "CPU";
+        }
+    }
+
+    private static string ResolveGpuModel()
+    {
+        try
+        {
+            MechrevoLite.Gpu.DgpuIdentity identity = MechrevoLite.Gpu.GpuGenerationProvider.Current();
+            string name = identity.MarketingName?.Trim() ?? "";
+            if (name.Length > 0)
+            {
+                return name;
+            }
+            // 核显/无独显机型：DgpuIdentity 没有 MarketingName，从显示适配器注册表补。
+            IReadOnlyList<MechrevoLite.Gpu.GpuAdapter> adapters = MechrevoLite.Gpu.GpuAdapterReader.ReadFromRegistry(out _);
+            bool Physical(MechrevoLite.Gpu.GpuAdapter a)
+                => !string.IsNullOrWhiteSpace(a.Name)
+                    && !IsVirtualDisplayName(a.Name)
+                    && !a.Name.Contains("Microsoft Basic", StringComparison.OrdinalIgnoreCase);
+            MechrevoLite.Gpu.GpuAdapter? adapter = adapters.FirstOrDefault(a => a.IsNvidia && Physical(a))
+                ?? adapters.FirstOrDefault(a => Physical(a) && a.Name.Contains("Radeon", StringComparison.OrdinalIgnoreCase))
+                ?? adapters.FirstOrDefault(a => Physical(a) && a.Name.Contains("Intel", StringComparison.OrdinalIgnoreCase))
+                // 最后只接受有 PCI VendorId 的物理适配器，⛔ 不把虚拟屏/串流屏当 GPU。
+                ?? adapters.FirstOrDefault(a => Physical(a) && !string.IsNullOrWhiteSpace(a.VendorId));
+            string adapterName = adapter?.Name?.Trim() ?? "";
+            return adapterName.Length == 0 ? "GPU" : adapterName;
+        }
+        catch
+        {
+            return "GPU";
+        }
+    }
+
+    private static bool IsVirtualDisplayName(string name)
+    {
+        string value = name.ToLowerInvariant();
+        string[] markers =
+        {
+            "virtual", "usbmmidd", "indirect", "displaylink", "idd",
+            "parsec", "sunshine", "spacedesk", "duet", "twomon",
+            "air display", "remote", "rdp", "vmware", "virtualbox",
+            "hyper-v", "citrix", "splashtop", "basic display"
+        };
+        foreach (string marker in markers)
+        {
+            if (value.Contains(marker, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void BuildSensorBlocks()
     {
         if (SensorBlocksGrid == null) return;
@@ -205,15 +332,45 @@ public partial class MainWindow : Window
 
     private Border BuildCpuGpuCard(string title, bool cpu)
     {
-        StackPanel left = new() { Width = 140 };
-        left.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("CardTitle") });
-        RingGauge ring = new() { Width = 116, Height = 116, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0) };
+        string model = cpu ? ResolveCpuModel() : ResolveGpuModel();
+        TextBlock titleText = new()
+        {
+            Text = title,
+            Style = (Style)FindResource("CardTitle"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        TextBlock modelText = new()
+        {
+            Text = model,
+            Style = (Style)FindResource("MutedText"),
+            FontSize = 11,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            ToolTip = model
+        };
+        Grid header = new() { Margin = new Thickness(0, 0, 0, 10) };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(titleText, 0);
+        Grid.SetColumn(modelText, 1);
+        header.Children.Add(titleText);
+        header.Children.Add(modelText);
+
+        StackPanel left = new() { Width = 140, VerticalAlignment = VerticalAlignment.Center };
+        RingGauge ring = new()
+        {
+            Width = 116,
+            Height = 116,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
         TextBlock duty = new()
         {
             Text = WpfStrings.MainWindow_xaml_Text_3,
             Style = (Style)FindResource("MutedText"),
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 2, 0, 0)
+            Margin = new Thickness(0, 4, 0, 0)
         };
         left.Children.Add(ring);
         left.Children.Add(duty);
@@ -230,7 +387,7 @@ public partial class MainWindow : Window
             _gpuMetrics.Clear();
         }
 
-        StackPanel metrics = new() { Margin = new Thickness(14, 2, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        StackPanel metrics = new() { Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Top };
         (string Label, double Maximum)[] rows = cpu
             ? new[] { (WpfStrings.SensorTemp, 100.0), (WpfStrings.SensorUsage, 100.0), (WpfStrings.SensorPower, 100.0), (WpfStrings.SensorFrequency, 6000.0) }
             : new[] { (WpfStrings.SensorTemp, 100.0), (WpfStrings.SensorUsage, 100.0), (WpfStrings.SensorPower, 200.0), (WpfStrings.SensorCoreFrequency, 3000.0), (WpfStrings.SensorVramFrequency, 12000.0) };
@@ -238,9 +395,9 @@ public partial class MainWindow : Window
         foreach ((string label, double maximum) in rows)
         {
             StackPanel metric = new() { Margin = new Thickness(0, 0, 0, 8) };
-            Grid header = new();
-            header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid rowHeader = new();
+            rowHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            rowHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             TextBlock name = new() { Text = label, Style = (Style)FindResource("MutedText") };
             TextBlock value = new()
             {
@@ -250,33 +407,41 @@ public partial class MainWindow : Window
             };
             Grid.SetColumn(name, 0);
             Grid.SetColumn(value, 1);
-            header.Children.Add(name);
-            header.Children.Add(value);
+            rowHeader.Children.Add(name);
+            rowHeader.Children.Add(value);
             RoundedBar bar = new()
             {
                 Maximum = maximum,
                 Height = 9,
                 Margin = new Thickness(0, 5, 0, 0)
             };
-            metric.Children.Add(header);
+            metric.Children.Add(rowHeader);
             metric.Children.Add(bar);
             metrics.Children.Add(metric);
             target.Add((bar, value, ""));
         }
 
-        Grid grid = new();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid body = new();
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         Grid.SetColumn(left, 0);
         Grid.SetColumn(metrics, 1);
-        grid.Children.Add(left);
-        grid.Children.Add(metrics);
+        body.Children.Add(left);
+        body.Children.Add(metrics);
+
+        Grid root = new();
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        Grid.SetRow(header, 0);
+        Grid.SetRow(body, 1);
+        root.Children.Add(header);
+        root.Children.Add(body);
         return new Border
         {
             Style = (Style)FindResource("Card"),
             Margin = new Thickness(5, 0, 5, 14),
-            MinHeight = 220,
-            Child = grid
+            MinHeight = 260,
+            Child = root
         };
     }
 
@@ -289,7 +454,7 @@ public partial class MainWindow : Window
         NavCollapseButton.Content = _navCollapsed ? "»" : "«";
         FontFamily glyphFont = new("Segoe MDL2 Assets");
         FontFamily textFont = (FontFamily)Application.Current.Resources["AppFontFamily"];
-        SetNavContent(NavHome, _navCollapsed, "\uE80F", "首页", glyphFont, textFont);
+        SetNavContent(NavHome, _navCollapsed, "\uE80F", WpfStrings.NavHome_Content, glyphFont, textFont);
         SetNavContent(NavScreen, _navCollapsed, "\uE7F4", WpfStrings.NavScreen_Content, glyphFont, textFont);
         SetNavContent(NavLighting, _navCollapsed, "\uE706", WpfStrings.TitleText_Text_2, glyphFont, textFont);
         SetNavContent(NavCustom, _navCollapsed, "\uE70F", WpfStrings.NavCustom_Content, glyphFont, textFont);
@@ -435,13 +600,20 @@ public partial class MainWindow : Window
     {
         try
         {
+            SyncWideBackgroundToggle();
             string path = AppConfig.GetString("wide_bg_image") ?? "";
-            if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            bool enabled = AppConfig.Get("wide_bg_enabled", 0) != 0;
+            bool hasImage = !string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path);
+            if (!enabled || !hasImage)
             {
                 BackgroundImage.Visibility = Visibility.Collapsed;
                 BackgroundScrim.Visibility = Visibility.Collapsed;
+                // 背景关闭：恢复云母（默认开；用户显式选 solid 时 Apply 内部会尊重配置）。
+                WindowBackdrop.Apply(this);
                 return;
             }
+            // 背景图优先：先撤掉本窗口的云母，再显示背景图和遮罩。
+            WindowBackdrop.Disable(this);
             BitmapImage bitmap = new();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
@@ -449,6 +621,7 @@ public partial class MainWindow : Window
             bitmap.EndInit();
             BackgroundImage.Source = bitmap;
             BackgroundImage.Opacity = Math.Clamp(AppConfig.Get("wide_bg_opacity", 78), 0, 100) / 100.0;
+            OriginalStyleWindow.ApplyBackgroundBlur(BackgroundImage);
             BackgroundImage.Visibility = Visibility.Visible;
             BackgroundScrim.Fill = new SolidColorBrush(Colors.Black);
             BackgroundScrim.Opacity = Math.Clamp(AppConfig.Get("wide_bg_scrim", 35), 0, 100) / 100.0;
@@ -457,6 +630,35 @@ public partial class MainWindow : Window
         catch
         {
         }
+    }
+
+    private void SyncWideBackgroundToggle()
+    {
+        if (WideBackgroundToggle == null)
+        {
+            return;
+        }
+        string path = AppConfig.GetString("wide_bg_image") ?? "";
+        bool hasImage = !string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path);
+        bool enabled = AppConfig.Get("wide_bg_enabled", 0) != 0;
+        _syncingWideBackgroundToggle = true;
+        WideBackgroundToggle.IsEnabled = hasImage;
+        WideBackgroundToggle.IsChecked = hasImage && enabled;
+        WideBackgroundToggle.ToolTip = hasImage
+            ? "显示/隐藏大窗口自定义背景图"
+            : "先在设置 → 宽屏背景图里选择图片";
+        _syncingWideBackgroundToggle = false;
+    }
+
+    private void WideBackgroundToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncingWideBackgroundToggle || WideBackgroundToggle == null)
+        {
+            return;
+        }
+        AppConfig.Set("wide_bg_enabled", WideBackgroundToggle.IsChecked == true ? 1 : 0);
+        AppConfig.Flush();
+        ReloadWideBackground();
     }
 
     private void OnBackendReady()
@@ -479,6 +681,7 @@ public partial class MainWindow : Window
             {
                 BuildHomeExtras();
             }
+            UpdateWideBackendStatus();
             RefreshHomeExtras();
         }));
     }
@@ -674,6 +877,28 @@ public partial class MainWindow : Window
         }
     }
 
+    private void EnsureWideExtremeButton(bool visible)
+    {
+        if (visible && HomePerf极致 == null && HomePerf狂暴.Parent is Panel panel)
+        {
+            ToggleButton button = new()
+            {
+                Content = WpfStrings.NucExtremeTurbo,
+                Tag = "5",
+                Style = (_homeView?.TryFindResource("HomePerfSegment") as Style) ?? (Style)FindResource("SegmentButton")
+            };
+            button.Click += Mode_Click;
+            int index = panel.Children.IndexOf(HomePerf狂暴);
+            panel.Children.Insert(index < 0 ? panel.Children.Count : index + 1, button);
+            HomePerf极致 = button;
+        }
+        else if (!visible && HomePerf极致 != null)
+        {
+            if (HomePerf极致.Parent is Panel parent) parent.Children.Remove(HomePerf极致);
+            HomePerf极致 = null;
+        }
+    }
+
     private void Mode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not ToggleButton button)
@@ -682,6 +907,7 @@ public partial class MainWindow : Window
         }
         List<ToggleButton> perfButtons = new() { HomePerf静音, HomePerf平衡, HomePerf狂暴, HomePerf自定义 };
         if (HomePerf静音狂暴 != null) perfButtons.Add(HomePerf静音狂暴);
+        if (HomePerf极致 != null) perfButtons.Add(HomePerf极致);
         foreach (ToggleButton perfButton in perfButtons)
         {
             perfButton.IsChecked = ReferenceEquals(perfButton, button);
@@ -689,6 +915,12 @@ public partial class MainWindow : Window
         if (HomePerf静音狂暴 != null && ReferenceEquals(button, HomePerf静音狂暴))
         {
             _owner?.WideSetSilentTurbo();
+            StatusText.Text = WpfStrings.MainWindow_xaml_Text_6 + button.Content;
+            return;
+        }
+        if (HomePerf极致 != null && ReferenceEquals(button, HomePerf极致))
+        {
+            _owner?.WideSetMode(MechrevoLite.Hardware.NucPerformanceMode.ExtremeVisualMode);
             StatusText.Text = WpfStrings.MainWindow_xaml_Text_6 + button.Content;
             return;
         }
@@ -709,12 +941,8 @@ public partial class MainWindow : Window
     {
         if (sender is ToggleButton button && button.Tag is string text && int.TryParse(text, out int mode))
         {
-            foreach (ToggleButton gpuButton in new[] { HomeGpu混合, HomeGpu独显, HomeGpu集显 })
-            {
-                gpuButton.IsChecked = ReferenceEquals(gpuButton, button);
-            }
+            // 和小窗走同一个 GpuMode_Click：能力判断、宝龙达/SMU/重启确认由同一后端路径处理。
             _owner?.WideSetGpuMode(mode);
-            StatusText.Text = WpfStrings.MainWindow_xaml_Text_7 + button.Content;
         }
     }
 
@@ -1239,14 +1467,14 @@ public partial class MainWindow : Window
             StackPanel miniledRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
             miniledRow.Children.Add(new TextBlock
             {
-                Text = "MiniLED 分区控光",
+                Text = WpfStrings.L("MiniLED 分区控光", "MiniLED local dimming"),
                 Style = (Style)FindResource("MutedText"),
                 Width = 110,
                 VerticalAlignment = VerticalAlignment.Center
             });
             CheckBox miniled = new()
             {
-                Content = "开启",
+                Content = WpfStrings.L("开启", "On"),
                 Style = (Style)FindResource("HeaderSwitch"),
                 IsChecked = _owner.MiniledOn,
                 Margin = new Thickness(0),
@@ -1425,9 +1653,9 @@ public partial class MainWindow : Window
         ScreenFeaturesPanel.Children.Clear();
         _screenFeatures.Clear();
         ScreenFeaturesCard.Visibility = Visibility.Collapsed;
-        AddScreenFeature("显示响应加速", () => _owner.SupportsLcdOverdrive, () => _owner.LcdOverdrive,
+        AddScreenFeature(WpfStrings.L("显示响应加速", "Display overdrive"), () => _owner.SupportsLcdOverdrive, () => _owner.LcdOverdrive,
             on => _ = _owner.SetLcdOverdriveAsync(on));
-        AddScreenFeature("MiniLED 分区控光", () => _owner.SupportsMiniled, () => _owner.MiniledOn,
+        AddScreenFeature(WpfStrings.L("MiniLED 分区控光", "MiniLED local dimming"), () => _owner.SupportsMiniled, () => _owner.MiniledOn,
             on => { if (_owner.MiniledOn != on) _owner.ToggleMiniled(); });
         AddScreenFeature("HDR Color Control", () => _owner.SupportsHdrControl, () => _owner.HdrControlOn,
             on => { if (_owner.HdrControlOn != on) _owner.ToggleHdrControl(); });
@@ -1568,7 +1796,7 @@ public partial class MainWindow : Window
     {
         OpenFileDialog dialog = new()
         {
-            Filter = "ICC 配置文件|*.icc;*.icm|所有文件|*.*",
+            Filter = WpfStrings.L("ICC 配置文件|*.icc;*.icm|所有文件|*.*", "ICC profiles|*.icc;*.icm|All files|*.*"),
             CheckFileExists = true
         };
         if (dialog.ShowDialog(this) != true) return;
@@ -1618,26 +1846,15 @@ public partial class MainWindow : Window
         {
             profile = found;
         }
-        profile ??= new DisplayEffectProfile
-        {
-            Name = _currentEffectMode,
-            Brightness = 50,
-            ColorTemp = 6500,
-            ColorR = 128,
-            ColorG = 128,
-            ColorB = 128,
-            VibrantValue = 1.5f,
-            Constrast = 1.0f,
-            Gamma = 1.0f
-        };
-        AddEffectRow("brightness", "亮度", 0, 100, profile.Brightness, v => v + "%");
-        AddEffectRow("colortemp", "色温", 30, 100, profile.ColorTemp / 100, v => (v * 100) + "K");
-        AddEffectRow("saturation", "饱和度", 5, 25, (int)Math.Round(profile.VibrantValue * 10), v => (v * 0.1).ToString("0.0"));
-        AddEffectRow("gamma", "伽玛", 50, 200, (int)Math.Round(profile.Gamma * 100), v => (v * 0.01).ToString("0.00"));
-        AddEffectRow("r", "红", 0, 255, (int)profile.ColorR, v => v.ToString());
-        AddEffectRow("g", "绿", 0, 255, (int)profile.ColorG, v => v.ToString());
-        AddEffectRow("b", "蓝", 0, 255, (int)profile.ColorB, v => v.ToString());
-        AddEffectRow("contrast", "对比度", 5, 20, (int)Math.Round(profile.Constrast * 10), v => (v * 0.1).ToString("0.0"));
+        profile ??= MechrevoLite.Hardware.SoftwareColorEnhancement.DefaultProfile(_currentEffectMode);
+        AddEffectRow("brightness", WpfStrings.L("亮度", "Brightness"), 0, 100, profile.Brightness, v => v + "%");
+        AddEffectRow("colortemp", WpfStrings.L("色温", "Color temp"), 30, 100, profile.ColorTemp / 100, v => (v * 100) + "K");
+        AddEffectRow("saturation", WpfStrings.L("饱和度", "Saturation"), 5, 25, (int)Math.Round(profile.VibrantValue * 10), v => (v * 0.1).ToString("0.0"));
+        AddEffectRow("gamma", WpfStrings.L("伽玛", "Gamma"), 50, 200, (int)Math.Round(profile.Gamma * 100), v => (v * 0.01).ToString("0.00"));
+        AddEffectRow("r", WpfStrings.L("红", "Red"), 0, 255, (int)profile.ColorR, v => v.ToString());
+        AddEffectRow("g", WpfStrings.L("绿", "Green"), 0, 255, (int)profile.ColorG, v => v.ToString());
+        AddEffectRow("b", WpfStrings.L("蓝", "Blue"), 0, 255, (int)profile.ColorB, v => v.ToString());
+        AddEffectRow("contrast", WpfStrings.L("对比度", "Contrast"), 5, 20, (int)Math.Round(profile.Constrast * 10), v => (v * 0.1).ToString("0.0"));
     }
 
     private void AddEffectRow(string key, string label, int min, int max, int value, Func<int, string> format)
@@ -1698,7 +1915,17 @@ public partial class MainWindow : Window
             Constrast = EffectValue("contrast") * 0.1f,
             Gamma = EffectValue("gamma") * 0.01f
         };
-        await _probe.Service.ApplyDisplayEffectProfile(profile);
+        bool hasGcuProfile = _probe.Hw != null && _probe.Hw.DisplayEffectProfiles.ContainsKey(_currentEffectMode);
+        if (hasGcuProfile)
+        {
+            await _probe.Service.ApplyDisplayEffectProfile(profile);
+        }
+        else
+        {
+            MechrevoLite.Hardware.SoftwareColorEnhancement.ApplyProfile(profile.Name, profile.Brightness,
+                profile.ColorTemp, profile.ColorR, profile.ColorG, profile.ColorB,
+                profile.VibrantValue, profile.Constrast, profile.Gamma);
+        }
     }
 
     private async void ScreenEffectReset_Click(object sender, RoutedEventArgs e)
@@ -1708,13 +1935,21 @@ public partial class MainWindow : Window
             StatusText.Text = WpfStrings.StatusEffectResetNeedsBackend;
             return;
         }
-        if (_probe?.Service == null || string.IsNullOrWhiteSpace(_currentEffectMode)) return;
-        if (await _probe.Service.ResetDisplayEffectProfile(_currentEffectMode))
+        if (string.IsNullOrWhiteSpace(_currentEffectMode)) return;
+        bool hasGcuProfile = _probe?.Hw != null && _probe.Hw.DisplayEffectProfiles.ContainsKey(_currentEffectMode);
+        if (hasGcuProfile && _probe?.Service != null)
         {
-            await _probe.Service.RequestDisplayEffectStatus();
-            await Task.Delay(500);
-            BuildEffectEditor();
+            if (await _probe.Service.ResetDisplayEffectProfile(_currentEffectMode))
+            {
+                await _probe.Service.RequestDisplayEffectStatus();
+                await Task.Delay(500);
+            }
         }
+        else
+        {
+            MechrevoLite.Hardware.SoftwareColorEnhancement.Apply(_currentEffectMode);
+        }
+        BuildEffectEditor();
     }
 
     private void RefreshScreenControls()
@@ -1759,7 +1994,7 @@ public partial class MainWindow : Window
         _screenBackendConnected = connected;
         try
         {
-            string? tip = connected ? null : "后端未连接：需要 GCU/厂商服务在线后才可编辑";
+            string? tip = connected ? null : WpfStrings.L("后端未连接：需要 GCU/厂商服务在线后才可编辑", "Backend not connected: GCU/vendor service must be online to edit");
             ScreenEffectEditButton.IsEnabled = connected;
             ScreenEffectEditButton.ToolTip = tip;
             ScreenEffectToggle.IsEnabled = connected;
@@ -1773,7 +2008,7 @@ public partial class MainWindow : Window
             {
                 ScreenCalibrationSettingsButton.ToolTip = connected
                     ? null
-                    : "后端未连接：校色开关/档位需连接后生效；本地 ICC 设置仍可用";
+                    : WpfStrings.L("后端未连接：校色开关/档位需连接后生效；本地 ICC 设置仍可用", "Backend not connected: calibration switch/profile need a connection; local ICC settings still work");
             }
             if (!connected && ScreenEffectEditorPanel is not null)
             {
@@ -1798,6 +2033,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void HomeGpuOcToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (_owner == null) return;
+        bool requested = HomeGpuOcToggle.IsChecked == true;
+        HomeGpuOcToggle.IsEnabled = false;
+        try
+        {
+            bool ok = await _owner.WideSetGpuOverclockAsync(requested);
+            if (!ok)
+            {
+                HomeGpuOcToggle.IsChecked = !requested;
+                StatusText.Text = WpfStrings.GpuOverclockFailed;
+            }
+            else
+            {
+                StatusText.Text = WpfStrings.GpuOverclockPrefix + (requested ? WpfStrings.IgpuSavingOnPreview_Content : WpfStrings.OriginalStyleWindow_Content_5);
+            }
+        }
+        finally
+        {
+            HomeGpuOcToggle.IsEnabled = true;
+        }
+    }
+
     private void RefreshHomeExtras()
     {
         if (_owner == null)
@@ -1812,9 +2071,12 @@ public partial class MainWindow : Window
         if (MoreSwitchGrid != null && MoreSwitchGrid.Children.Count == 0) BuildMoreSwitchTiles();
         PerfCurrentText.Text = _owner.WidePerformanceText;
         GpuCurrentText.Text = _owner.WideGpuModeText;
+        HomeGpuOcToggle.Visibility = _owner.WideGpuOverclockVisible ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpuOcToggle.IsChecked = _owner.WideGpuOverclockEnabled;
         bool silentTurboVisible = _owner.WideSilentTurboVisible;
         HomePerf狂暴.Visibility = _owner.WideTurboModeVisible ? Visibility.Visible : Visibility.Collapsed;
         EnsureWideSilentTurboButton(silentTurboVisible);
+        EnsureWideExtremeButton(_owner.WideExtremeModeVisible);
         HomePerf狂暴.Content = silentTurboVisible ? WpfStrings.TurboHighEnergy : WpfStrings.ModeTurbo;
         if (!_owner.WideModeSwitchPending)
         {
@@ -1824,12 +2086,29 @@ public partial class MainWindow : Window
             HomePerf平衡.IsChecked = currentMode == 0;
             if (HomePerf静音狂暴 != null) HomePerf静音狂暴.IsChecked = currentMode == 1 && silentTurboActive;
             HomePerf狂暴.IsChecked = currentMode == 1 && !silentTurboActive;
+            if (HomePerf极致 != null) HomePerf极致.IsChecked = currentMode == MechrevoLite.Hardware.NucPerformanceMode.ExtremeVisualMode;
             HomePerf自定义.IsChecked = currentMode is 3 or 4;
         }
-        string gpu = _owner.WideGpuModeText;
-        HomeGpu混合.IsChecked = gpu.Contains(WpfStrings.GpuModeHybrid) || gpu.Contains(WpfStrings.GpuHybrid);
-        HomeGpu独显.IsChecked = gpu.Contains(WpfStrings.GpuModeDedicated) || gpu.Contains(WpfStrings.GpuDedicated);
-        HomeGpu集显.IsChecked = gpu.Contains(WpfStrings.GpuModeIntegrated) || gpu.Contains(WpfStrings.GpuIntegrated);
+        // 按实际 GPU 模式枚举高亮，不再依赖本地化文案匹配（语言/文案变化不会失配）。
+        int gpuMode = _probe?.CurrentGpuMode ?? -1;
+        int pendingGpu = _probe?.PendingGpuTarget ?? -1;
+        if (_probe?.HasPendingGpuRestart == true && pendingGpu >= 0)
+        {
+            gpuMode = pendingGpu;
+        }
+        if (gpuMode >= 0)
+        {
+            HomeGpu混合.IsChecked = gpuMode == 1;
+            HomeGpu独显.IsChecked = gpuMode == 2;
+            HomeGpu集显.IsChecked = gpuMode == 0;
+        }
+        else
+        {
+            string gpu = _owner.WideGpuModeText;
+            HomeGpu混合.IsChecked = gpu.Contains(WpfStrings.GpuModeHybrid) || gpu.Contains(WpfStrings.GpuHybrid);
+            HomeGpu独显.IsChecked = gpu.Contains(WpfStrings.GpuModeDedicated) || gpu.Contains(WpfStrings.GpuDedicated);
+            HomeGpu集显.IsChecked = gpu.Contains(WpfStrings.GpuModeIntegrated) || gpu.Contains(WpfStrings.GpuIntegrated);
+        }
         RefreshQuickTiles();
         (string batteryInfo, int batteryMode, string batteryCharge) = _owner.WideBattery();
         if (_batteryInfoText != null) _batteryInfoText.Text = batteryInfo;
@@ -1895,6 +2174,13 @@ public partial class MainWindow : Window
         }
     }
 
+    private static bool HasAnyCustomRange(MechrevoHw? hw, MechrevoDeviceCapabilities caps)
+    {
+        return (hw?.Pl1Adjustable ?? false) || (hw?.Pl2Adjustable ?? false) || (hw?.Pl4Adjustable ?? false)
+            || (hw?.TccAdjustable ?? false) || (hw?.GpuTgpAdjustable ?? false) || (hw?.GpuDynamicBoostAdjustable ?? false)
+            || caps.CpuPerformanceTuning || caps.FanSettings;
+    }
+
     private void ApplyHomeCapabilities()
     {
         MechrevoDeviceCapabilities? caps = _probe?.Capabilities;
@@ -1904,25 +2190,39 @@ public partial class MainWindow : Window
         }
         bool nucUmi = _probe?.Hw?.IsIntelNucMachine == true || _probe?.Hw?.IsUmiMachine == true;
         bool nucNoGpu = _probe?.Hw?.IsIntelNucMachine == true;
-        bool customAllowed = nucUmi
-            || ((caps.CpuPerformanceTuning || caps.FanSettings)
-                && !(_probe?.Hw?.SupportsModeProfileConfig ?? false));
+        // Intel 星耀暂时屏蔽自定义；AMD 星耀/无界走本机 SMU 自定义。
+        bool smuCustom = _probe?.Hw?.SmuCustomApu == true;
+        bool customAllowed = nucUmi || smuCustom
+            || ((caps.CpuPerformanceTuning || caps.FanSettings || HasAnyCustomRange(_probe?.Hw, caps))
+                && !(_probe?.Hw?.SupportsModeProfileConfig ?? false))
+            || _probe?.Hw?.UsesBaolongda == true;
         HomePerf自定义.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
-        bool gpuSupported = !nucNoGpu && (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap);
+        bool gpuRowHidden = _probe?.Hw?.GpuRowHiddenByGcuReports == true;
+        bool directSupported = _probe?.Hw?.SupportsDgpuDirect ?? caps.DgpuDirect;
+        bool gpuSwitchSupported = _probe?.Hw?.CanOfferGpuModeSwitch ?? (caps.DgpuDirect || caps.IgpuOnly || caps.GpuHotSwap);
+        bool gpuSupported = !nucNoGpu && !gpuRowHidden
+            && (gpuSwitchSupported || directSupported || caps.GpuHotSwap);
         HomeGpuCard.Visibility = gpuSupported ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpu独显.Visibility = directSupported ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpu集显.Visibility = (_probe?.Hw?.CanOfferIgpuOnly ?? caps.IgpuOnly)
+            ? Visibility.Visible : Visibility.Collapsed;
+        HomeGpuOcToggle.Visibility = _owner?.WideGpuOverclockVisible == true
+            ? Visibility.Visible : Visibility.Collapsed;
         HomeGpuColumn.Width = gpuSupported ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         HomeMidColumn.Width = gpuSupported ? new GridLength(12) : new GridLength(0);
         Grid.SetColumn(HomePerfCard, 0);
         Grid.SetColumnSpan(HomePerfCard, gpuSupported ? 1 : 3);
-        HomeGpu集显.Visibility = ResolveWideLightVisible("igpu_only_ui", caps.IgpuOnly)
-            ? Visibility.Visible : Visibility.Collapsed;
-        HomeGpu独显.Visibility = caps.DgpuDirect ? Visibility.Visible : Visibility.Collapsed;
         bool displaySupported = caps.DisplayRefresh || caps.ColorCalibration || caps.LcdOverdrive || caps.LocalDimming;
         HomeDisplayCard.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
         HomeDisplayColumn.Width = displaySupported ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         HomeDisplayGap.Width = displaySupported ? new GridLength(10) : new GridLength(0);
         Grid.SetColumn(BatteryCardHost, displaySupported ? 2 : 0);
         Grid.SetColumnSpan(BatteryCardHost, displaySupported ? 1 : 3);
+        bool hasLighting = caps.Keyboard || caps.Lightbar || caps.LogoLight
+            || _probe?.Hw?.SupportsKeyboard == true || _probe?.Hw?.SupportsLightbar == true
+            || _probe?.Hw?.SupportsLogoLight == true;
+        NavLighting.Visibility = hasLighting ? Visibility.Visible : Visibility.Collapsed;
+        NavCustom.Visibility = customAllowed ? Visibility.Visible : Visibility.Collapsed;
         NavScreen.Visibility = displaySupported ? Visibility.Visible : Visibility.Collapsed;
         if (ScreenCalibrationCard != null)
         {
@@ -1960,6 +2260,7 @@ public partial class MainWindow : Window
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Viewbox icon = new()
         {
             Width = 18,
@@ -1985,9 +2286,20 @@ public partial class MainWindow : Window
             {
                 _liquidStatusButton.Content = _owner.WideLiquidConnected ? WpfStrings.LiquidConnected : WpfStrings.LiquidDisconnected;
             }
-            StatusText.Text = ok ? "水冷状态已更新" : "刷新水冷状态失败";
+            StatusText.Text = ok ? WpfStrings.L("水冷状态已更新", "Liquid cooling status updated") : WpfStrings.L("刷新水冷状态失败", "Failed to refresh liquid cooling status");
         };
-        Grid.SetColumn(_liquidStatusButton, 2);
+        Button pairButton = new()
+        {
+            Content = "配对",
+            Style = (Style)FindResource("FlatButton"),
+            Padding = new Thickness(10, 4, 10, 4),
+            Margin = new Thickness(0, 0, 8, 0),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        pairButton.Click += (_, _) => _owner?.WideOpenLiquidPairing();
+        Grid.SetColumn(pairButton, 2);
+        header.Children.Add(pairButton);
+        Grid.SetColumn(_liquidStatusButton, 3);
         header.Children.Add(_liquidStatusButton);
         panel.Children.Add(header);
         Grid combos = new() { Margin = new Thickness(0, 8, 0, 0) };
@@ -2004,11 +2316,79 @@ public partial class MainWindow : Window
         TextBlock fanLabel = new() { Text = WpfStrings.Fan, Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
         Grid.SetColumn(fanLabel, 2);
         combos.Children.Add(fanLabel);
-        _liquidFanCombo = CreateLiquidCombo(new[] { (WpfStrings.AutoOption, "-1"), ("40%", "0"), ("50%", "1"), ("60%", "2"), ("90%", "3") });
+        _liquidFanCombo = CreateLiquidCombo(new[] { (WpfStrings.AutoOption, "-1"), ("40%", "0"), ("50%", "1"), ("60%", "2"), ("90%", "3"), ("自定义曲线", "curve") });
         _liquidFanCombo.SelectionChanged += async (_, _) => await SetLiquidComboAsync(pump: false);
         Grid.SetColumn(_liquidFanCombo, 3);
         combos.Children.Add(_liquidFanCombo);
         panel.Children.Add(combos);
+        _liquidCurveCanvas = new WaterCoolerCurveCanvas
+        {
+            Height = 190,
+            Margin = new Thickness(0, 8, 0, 0),
+            Visibility = Visibility.Collapsed
+        };
+        panel.Children.Add(_liquidCurveCanvas);
+        Grid pumpThresholds = new() { Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
+        pumpThresholds.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        pumpThresholds.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        pumpThresholds.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        pumpThresholds.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        pumpThresholds.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        pumpThresholds.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        TextBlock startLabel = new() { Text = "启泵", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        pumpThresholds.Children.Add(startLabel);
+        _liquidPumpStartSlider = new Slider { Style = (Style)FindResource("RoundSlider"), Minimum = 30, Maximum = 90, Value = 55, IsSnapToTickEnabled = true, TickFrequency = 1, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(_liquidPumpStartSlider, 1);
+        pumpThresholds.Children.Add(_liquidPumpStartSlider);
+        _liquidPumpStartValue = new TextBlock { Text = "55°C", Width = 46, Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        Grid.SetColumn(_liquidPumpStartValue, 2);
+        pumpThresholds.Children.Add(_liquidPumpStartValue);
+        TextBlock turboLabel = new() { Text = "狂暴", Style = (Style)FindResource("MutedText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 8, 0) };
+        Grid.SetColumn(turboLabel, 3);
+        pumpThresholds.Children.Add(turboLabel);
+        _liquidPumpTurboSlider = new Slider { Style = (Style)FindResource("RoundSlider"), Minimum = 35, Maximum = 100, Value = 90, IsSnapToTickEnabled = true, TickFrequency = 1, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(_liquidPumpTurboSlider, 4);
+        pumpThresholds.Children.Add(_liquidPumpTurboSlider);
+        _liquidPumpTurboValue = new TextBlock { Text = "90°C", Width = 46, Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        Grid.SetColumn(_liquidPumpTurboValue, 5);
+        pumpThresholds.Children.Add(_liquidPumpTurboValue);
+        _liquidPumpStartSlider.ValueChanged += (_, _) =>
+        {
+            if (_liquidPumpStartValue != null) _liquidPumpStartValue.Text = (int)Math.Round(_liquidPumpStartSlider.Value) + "°C";
+            if (_liquidPumpTurboSlider != null && _liquidPumpTurboSlider.Value < _liquidPumpStartSlider.Value + 5)
+            {
+                _liquidPumpTurboSlider.Value = _liquidPumpStartSlider.Value + 5;
+            }
+        };
+        _liquidPumpTurboSlider.ValueChanged += (_, _) =>
+        {
+            if (_liquidPumpTurboValue != null) _liquidPumpTurboValue.Text = (int)Math.Round(_liquidPumpTurboSlider.Value) + "°C";
+            if (_liquidPumpStartSlider != null && _liquidPumpStartSlider.Value > _liquidPumpTurboSlider.Value - 5)
+            {
+                _liquidPumpStartSlider.Value = Math.Max(30, _liquidPumpTurboSlider.Value - 5);
+            }
+        };
+        panel.Children.Add(pumpThresholds);
+        Grid curveActions = new() { Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+        curveActions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        curveActions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        curveActions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _liquidCurveApplyButton = new Button { Content = "应用曲线", Style = (Style)FindResource("FlatButton"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(0, 0, 8, 0) };
+        _liquidCurveApplyButton.Click += async (_, _) => await ApplyWideLiquidCurveAsync();
+        Grid.SetColumn(_liquidCurveApplyButton, 1);
+        curveActions.Children.Add(_liquidCurveApplyButton);
+        Button restore = new() { Content = "恢复默认", Style = (Style)FindResource("FlatButton"), Padding = new Thickness(12, 4, 12, 4) };
+        restore.Click += (_, _) =>
+        {
+            _liquidCurveCanvas?.Load(WaterCoolerCurve.DefaultPoints);
+            if (_liquidPumpStartSlider != null) _liquidPumpStartSlider.Value = 55;
+            if (_liquidPumpTurboSlider != null) _liquidPumpTurboSlider.Value = 90;
+        };
+        Grid.SetColumn(restore, 2);
+        curveActions.Children.Add(restore);
+        panel.Children.Add(curveActions);
+        _liquidCurveCanvas.Tag = curveActions;
+        _liquidPumpStartSlider.Tag = pumpThresholds;
         Grid lightRow = new() { Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
         lightRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         lightRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -2016,7 +2396,7 @@ public partial class MainWindow : Window
         lightRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         lightRow.Children.Add(new TextBlock
         {
-            Text = "灯光",
+            Text = WpfStrings.L("灯光", "Lighting"),
             Style = (Style)FindResource("MutedText"),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
@@ -2031,7 +2411,7 @@ public partial class MainWindow : Window
         lightRow.Children.Add(_liquidLightCombo);
         _liquidLightColorButton = new Button
         {
-            Content = "颜色",
+            Content = WpfStrings.L("颜色", "Color"),
             // ⚠️ task-26 收口：宽屏根资源里没有 "MiniButton"（各子窗口有自己的局部同名样式）⇒
             //   原来直接 FindResource 会在宽窗构造时抛 ResourceReferenceKeyNotFoundException（启动崩溃）。
             //   ⭐ 有就用，没有回退到既有 FlatButton（⛔ 不新增/不伪造样式资源；等 MainWindow.xaml 补定义后自动恢复）。
@@ -2079,11 +2459,17 @@ public partial class MainWindow : Window
         {
             return;
         }
-        int profile = int.TryParse(item.Tag as string, out int parsed) ? parsed : -1;
+        string tag = item.Tag as string ?? "";
+        if (!pump && string.Equals(tag, "curve", StringComparison.OrdinalIgnoreCase))
+        {
+            _owner?.WideOpenLiquidCurve();
+            return;
+        }
+        int profile = int.TryParse(tag, out int parsed) ? parsed : -1;
         bool ok = pump
             ? await _owner.WideSetLiquidPumpAsync(profile)
             : await _owner.WideSetLiquidFanAsync(profile);
-        StatusText.Text = ok ? (pump ? "水泵档位已下发" : "风扇档位已下发") : "水冷档位下发失败";
+        StatusText.Text = ok ? (pump ? WpfStrings.L("水泵档位已下发", "Pump profile sent") : WpfStrings.L("风扇档位已下发", "Fan profile sent")) : WpfStrings.L("水冷档位下发失败", "Failed to send liquid cooling profile");
     }
 
     private async Task SetLiquidLightComboAsync()
@@ -2100,9 +2486,9 @@ public partial class MainWindow : Window
         bool ok = await _owner.WideApplyLiquidLightAsync(profile, _owner.WideLiquidLightColor);
         if (_liquidLightStatus != null)
         {
-            _liquidLightStatus.Text = ok ? "灯光已下发" : "灯光下发失败";
+            _liquidLightStatus.Text = ok ? WpfStrings.L("灯光已下发", "Lighting sent") : WpfStrings.L("灯光下发失败", "Failed to send lighting");
         }
-        StatusText.Text = ok ? "水冷灯光已下发" : "水冷灯光下发失败";
+        StatusText.Text = ok ? WpfStrings.L("水冷灯光已下发", "Liquid cooling lighting sent") : WpfStrings.L("水冷灯光下发失败", "Failed to send liquid cooling lighting");
     }
 
     private async Task PickLiquidLightColorAsync()
@@ -2125,9 +2511,9 @@ public partial class MainWindow : Window
         bool ok = await _owner.WideApplyLiquidLightAsync(profile, color);
         if (_liquidLightStatus != null)
         {
-            _liquidLightStatus.Text = ok ? "颜色已下发" : "颜色下发失败";
+            _liquidLightStatus.Text = ok ? WpfStrings.L("颜色已下发", "Color sent") : WpfStrings.L("颜色下发失败", "Failed to send color");
         }
-        StatusText.Text = ok ? "水冷颜色已下发" : "水冷颜色下发失败";
+        StatusText.Text = ok ? WpfStrings.L("水冷颜色已下发", "Liquid cooling color sent") : WpfStrings.L("水冷颜色下发失败", "Failed to send liquid cooling color");
         if (_liquidLightColorButton != null)
         {
             _liquidLightColorButton.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(color.A, color.R, color.G, color.B));
@@ -2164,10 +2550,68 @@ public partial class MainWindow : Window
         SelectLiquidCombo(_liquidPumpCombo, _owner.WideLiquidPump);
         SelectLiquidCombo(_liquidFanCombo, _owner.WideLiquidFan);
         _liquidSyncing = false;
+        if (_liquidCurveCanvas != null)
+        {
+            bool curveSupported = _owner.WideLiquidCurveSupported;
+            _liquidCurveCanvas.Visibility = Visibility.Visible;
+            _liquidCurveCanvas.Load(_owner.WideLiquidCurvePoints);
+            if (_liquidCurveCanvas.Tag is Grid actions)
+            {
+                actions.Visibility = Visibility.Visible;
+            }
+            if (_liquidCurveApplyButton != null)
+            {
+                _liquidCurveApplyButton.IsEnabled = curveSupported;
+            }
+            if (_liquidPumpStartSlider != null && _liquidPumpStartSlider.Tag is Grid thresholds)
+            {
+                thresholds.Visibility = Visibility.Visible;
+                _liquidPumpStartSlider.IsEnabled = curveSupported;
+            }
+            if (_liquidPumpTurboSlider != null)
+            {
+                _liquidPumpTurboSlider.IsEnabled = curveSupported;
+            }
+            if (_liquidPumpStartSlider != null)
+            {
+                _liquidPumpStartSlider.Value = WaterCoolerCurve.PumpStartTemp;
+            }
+            if (_liquidPumpTurboSlider != null)
+            {
+                _liquidPumpTurboSlider.Value = WaterCoolerCurve.PumpTurboTemp;
+            }
+        }
         bool lightSupported = _owner.WideLiquidLightSupported;
         if (_liquidLightRow != null)
         {
-            _liquidLightRow.Visibility = lightSupported ? Visibility.Visible : Visibility.Collapsed;
+            // 宽屏水冷卡可见时，灯光行始终可见；未连接时置灰。
+            _liquidLightRow.Visibility = Visibility.Visible;
+        }
+        if (!lightSupported)
+        {
+            _liquidLightSyncing = true;
+            try
+            {
+                if (_liquidLightCombo != null)
+                {
+                    _liquidLightCombo.Items.Clear();
+                    _liquidLightCombo.Items.Add(new ComboBoxItem { Content = "未连接/不支持", Tag = "" });
+                    _liquidLightCombo.SelectedIndex = 0;
+                    _liquidLightCombo.IsEnabled = false;
+                }
+                if (_liquidLightColorButton != null)
+                {
+                    _liquidLightColorButton.IsEnabled = false;
+                }
+                if (_liquidLightStatus != null)
+                {
+                    _liquidLightStatus.Text = "水冷未连接";
+                }
+            }
+            finally
+            {
+                _liquidLightSyncing = false;
+            }
         }
         if (lightSupported)
         {
@@ -2200,7 +2644,7 @@ public partial class MainWindow : Window
                 }
                 if (_liquidLightStatus != null)
                 {
-                    _liquidLightStatus.Text = string.IsNullOrWhiteSpace(saved) ? "" : "已保存：" + saved;
+                    _liquidLightStatus.Text = string.IsNullOrWhiteSpace(saved) ? "" : WpfStrings.L("已保存：", "Saved: ") + saved;
                 }
             }
             finally
@@ -2208,6 +2652,18 @@ public partial class MainWindow : Window
                 _liquidLightSyncing = false;
             }
         }
+    }
+
+    private async System.Threading.Tasks.Task ApplyWideLiquidCurveAsync()
+    {
+        if (_owner == null || _liquidCurveCanvas == null)
+        {
+            return;
+        }
+        int start = (int)Math.Round(_liquidPumpStartSlider?.Value ?? 55);
+        int turbo = (int)Math.Round(_liquidPumpTurboSlider?.Value ?? 90);
+        bool ok = await _owner.WideSetLiquidCurveAsync(_liquidCurveCanvas.Points, start, turbo);
+        StatusText.Text = ok ? "水冷曲线已应用" : "水冷曲线应用失败：请确认 BLE 水冷已连接";
     }
 
     private static void SelectLiquidCombo(ComboBox? combo, int value)
@@ -2222,6 +2678,11 @@ public partial class MainWindow : Window
                 combo.SelectedIndex = i;
                 return;
             }
+        }
+        // -2/未知档位时回退到第一个“自动”，不要留下空下拉
+        if (combo.Items.Count > 0)
+        {
+            combo.SelectedIndex = 0;
         }
     }
 
@@ -2753,7 +3214,7 @@ public partial class MainWindow : Window
             manualButtons.Add(manualSwatch);
             manualPanel.Children.Add(manualSwatch);
         }
-        manualSection.Children.Add(new TextBlock { Text = "手动分区颜色", Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 0, 0, 4) });
+        manualSection.Children.Add(new TextBlock { Text = WpfStrings.L("手动分区颜色", "Manual zone colors"), Style = (Style)FindResource("MutedText"), Margin = new Thickness(0, 0, 0, 4) });
         manualSection.Children.Add(manualPanel);
         right.Children.Add(colorSection);
         right.Children.Add(mixSection);
@@ -3070,7 +3531,7 @@ public partial class MainWindow : Window
         }
         Button button = new()
         {
-            Content = hidKeyboard ? "HID 编辑" : WpfStrings.LightSyncEditButton_Content,
+            Content = hidKeyboard ? WpfStrings.L("HID 编辑", "HID editor") : WpfStrings.LightSyncEditButton_Content,
             Style = (Style)FindResource("GhostButton"),
             Padding = new Thickness(8, 4, 8, 4),
             FontSize = 11,
@@ -3217,7 +3678,7 @@ public partial class MainWindow : Window
         if (string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal)
             && string.Equals(effect, "Manual", StringComparison.Ordinal))
         {
-            return (2, 10, "色彩间隔");
+            return (2, 10, WpfStrings.L("色彩间隔", "Color interval"));
         }
         return (0, 4, WpfStrings.Speed);
     }
@@ -3258,7 +3719,7 @@ public partial class MainWindow : Window
                 if (_owner != null)
                 {
                     bool whiteOk = await _owner.WideApplyWhiteBacklightAsync(light, powerOn);
-                    StatusText.Text = whiteOk ? "白色背光已下发" : "白色背光下发失败";
+                    StatusText.Text = whiteOk ? WpfStrings.L("白色背光已下发", "White backlight sent") : WpfStrings.L("白色背光下发失败", "Failed to send white backlight");
                 }
                 return;
             }
@@ -3282,8 +3743,8 @@ public partial class MainWindow : Window
             }
             bool ok = await _owner.WideApplyLightAsync(topic, effect, light, speedValue, colorArgb, powerOn, channelPowerOsd);
             StatusText.Text = ok
-                ? "灯光已下发：" + topic + " / " + effect
-                : "灯光下发失败：" + topic + " / " + effect;
+                ? WpfStrings.L("灯光已下发：", "Lighting sent: ") + topic + " / " + effect
+                : WpfStrings.L("灯光下发失败：", "Failed to send lighting: ") + topic + " / " + effect;
         }
         catch (Exception ex)
         {
@@ -3291,7 +3752,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void WideDock_Click(object sender, RoutedEventArgs e)
+    private async void WideDock_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || button.Tag is not string name) return;
         switch (name)
@@ -3314,6 +3775,18 @@ public partial class MainWindow : Window
             case "诊断":
                 _ = RunDockActionAsync(name);
                 return;
+            case "检查更新":
+                if (_owner != null)
+                {
+                    StatusText.Text = WpfStrings.UpdateChecking;
+                    string message = await _owner.WideCheckForUpdatesAsync();
+                    StatusText.Text = message;
+                    if (!string.IsNullOrWhiteSpace(message))
+                    {
+                        ToastService.Show(message);
+                    }
+                }
+                return;
         }
     }
 
@@ -3321,7 +3794,7 @@ public partial class MainWindow : Window
     {
         if (_owner == null) return;
         await _owner.WideDockActionAsync(name);
-        StatusText.Text = name + " 已执行";
+        StatusText.Text = name + WpfStrings.L(" 已执行", " executed");
     }
 
     private void ShowInlineWindow(Window window, string title)

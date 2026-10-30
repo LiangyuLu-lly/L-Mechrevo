@@ -352,7 +352,7 @@ internal sealed record MachineIdentity(
 	}
 
 	/// <summary>
-	/// 只读判定「无界 APU」：型号/板号关键字（无界/WUJIE/WJXY）+ AMD CPU + 无 NVIDIA 独显。
+	/// 只读判定「无界 APU」：型号/板号关键字（无界/WUJIE/WJ）+ AMD CPU + 无 NVIDIA 独显。
 	/// <para>⚠️ 与 <c>WujieSmuGate.Evaluate()</c> 的 <c>ApuOk</c> 同口径，但**不触发 SMU 可用性探测**
 	/// （那需要 PawnIO / SMU 往返，属后端能力，不属于机型识别）；family/SKU 字段不参与判定
 	/// —— 事实来源里如实注明这一点。</para>

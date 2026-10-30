@@ -158,6 +158,49 @@ internal static class I2ecInpOut
 
 	internal static string InitDetail => _initDetail;
 
+	/// <summary>给 ACPI EC 通道（0x62/0x66）做后备：只检查 inpoutx64 是否可用。</summary>
+	internal static bool CanUsePortIo(out string detail)
+	{
+		return EnsureInitialized(out detail);
+	}
+
+	/// <summary>通用端口读（仅限 ACPI EC 白名单 0x62/0x66 的调用方使用）。</summary>
+	internal static bool TryReadPort(short port, out byte value)
+	{
+		value = 0;
+		try
+		{
+			if (!EnsureInitialized(out _))
+			{
+				return false;
+			}
+			value = (byte)(_inp32(port) & 0xFF);
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	/// <summary>通用端口写（仅限 ACPI EC 白名单 0x62/0x66 的调用方使用）。</summary>
+	internal static bool TryWritePort(short port, byte value)
+	{
+		try
+		{
+			if (!EnsureInitialized(out _))
+			{
+				return false;
+			}
+			_out32(port, value);
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	/// <summary>2026-10-22：驱动刚安装/服务刚启动后允许重新初始化（不清已加载的 DLL）。</summary>
 	internal static void ResetInitialization()
 	{

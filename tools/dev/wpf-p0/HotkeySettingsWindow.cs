@@ -47,7 +47,7 @@ internal sealed class HotkeySettingsWindow : Window
             AppConfig.Set("hotkey_enabled", _enabled.IsChecked == true ? 1 : 0);
             AppConfig.Flush();
             HotkeyService.Current?.Reload();
-            _status.Text = _enabled.IsChecked == true ? "全局热键已启用" : "全局热键已停用";
+            _status.Text = _enabled.IsChecked == true ? WpfStrings.L("全局热键已启用", "Global hotkeys enabled") : WpfStrings.L("全局热键已停用", "Global hotkeys disabled");
         };
         header.Children.Add(_enabled);
         _status = new TextBlock
@@ -160,7 +160,7 @@ internal sealed class HotkeySettingsWindow : Window
             (uint otherMods, uint otherKey) = HotkeyService.GetGesture(other);
             if (otherMods == modifiers && otherKey == vk)
             {
-                _status.Text = WpfStrings.HotkeySettingsWindow_Text_6 + other.Label + "」占用";
+                _status.Text = WpfStrings.HotkeySettingsWindow_Text_6 + other.Label + WpfStrings.L("」占用", " is already in use");
                 e.Handled = true;
                 return;
             }

@@ -175,14 +175,14 @@
                             <Slider x:Name="TccSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="75" Maximum="100" Value="95" ValueChanged="Tcc_Changed" />
                             <TextBlock x:Name="TccText" Grid.Column="3" Text="95" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
-                        <Grid Margin="0,4,0,0">
+                        <Grid x:Name="DbRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_8}" VerticalAlignment="Center" />
                             <CheckBox x:Name="DbSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="DbSwitch_Changed" Unchecked="DbSwitch_Changed" />
                             <Slider x:Name="DbSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="30" Value="25" ValueChanged="Db_Changed" />
                             <TextBlock x:Name="DbText" Grid.Column="3" Text="25" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
-                        <Grid Margin="0,4,0,0">
+                        <Grid x:Name="GpuTgpRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_7}" VerticalAlignment="Center" />
                             <Slider x:Name="GpuTgpSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="GpuTgp_Changed" />

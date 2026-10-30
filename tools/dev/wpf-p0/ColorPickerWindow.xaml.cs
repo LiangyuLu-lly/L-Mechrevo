@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MechrevoLite.Hardware;
 
+using L_Mechrevo.WpfP0.Resources;
 namespace L_Mechrevo.WpfP0;
 
 public partial class ColorPickerWindow : Window
@@ -37,7 +38,7 @@ public partial class ColorPickerWindow : Window
             };
             PresetGrid.Children.Add(button);
         }
-        StatusText.Text = $"当前 #{initial.R:X2}{initial.G:X2}{initial.B:X2}";
+        StatusText.Text = WpfStrings.L("当前 ", "Current ") + $"#{initial.R:X2}{initial.G:X2}{initial.B:X2}";
     }
 
     private void Custom_Click(object sender, RoutedEventArgs e)

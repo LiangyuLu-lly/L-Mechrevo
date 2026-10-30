@@ -24,6 +24,8 @@
         <SolidColorBrush x:Key="MutedBrush" Color="#C3CAD4" />
         <SolidColorBrush x:Key="CardBorderBrush" Color="#33FFFFFF" />
     </Window.Resources>
+    <Grid x:Name="OverlayRoot" Background="Transparent"
+          MouseEnter="OverlayRoot_MouseEnter" MouseLeave="OverlayRoot_MouseLeave">
     <Border x:Name="OverlayCard" Background="#E60B0D10" BorderBrush="{DynamicResource CardBorderBrush}"
             BorderThickness="1" CornerRadius="10" Padding="10,5">
         <StackPanel Grid.IsSharedSizeScope="True">
@@ -69,4 +71,10 @@
             </StackPanel>
         </StackPanel>
     </Border>
+    <Button x:Name="LockButton" Content="🔒" Width="22" Height="22"
+            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
+            Visibility="Collapsed" Focusable="False" Click="LockButton_Click"
+            ToolTip="{x:Static loc:WpfStrings.OverlayLockHint}"
+            Background="#CC1F2937" Foreground="#F3F5F8" BorderThickness="0" />
+    </Grid>
 </Window>

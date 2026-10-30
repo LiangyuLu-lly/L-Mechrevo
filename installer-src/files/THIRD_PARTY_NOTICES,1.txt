@@ -83,6 +83,7 @@ AMD SMU command reference: https://github.com/FlyGoat/RyzenAdj (LGPL-3.0)
                            https://github.com/irusanov/SMUDebugTool (GPL-3.0)
                            https://github.com/leogx9r/ryzen_smu (GPL-2.0)
 Additional SMU route reference: https://github.com/JamesCJ60/Universal-x86-Tuning-Utility (GPL-3.0)
+OpenRevo project reference: https://github.com/faintonce/open-revo (GPL-3.0)
 The Bluetooth LE liquid-cooler protocol reference is watercooler-manager
 (https://github.com/tomups/watercooler-manager, GPL-3.0).
 ---------------------------------------------------------------------------

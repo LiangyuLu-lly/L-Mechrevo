@@ -68,16 +68,8 @@ internal static class ModeProfileConfig
 		{
 			return 0;
 		}
-		// 原厂 30 系控制台默认：Office=3 / Gaming=2 / Turbo=2（UserPofiles MainOption.json）。
-		// 旧默认 0 在部分 NUC 上会写到空配置槽，表现就是“狂暴写不进去”。
-		int fallback = visualMode switch
-		{
-			2 => 3,
-			0 => 2,
-			1 => 2,
-			_ => 0
-		};
-		return Math.Clamp(AppConfig.Get(text, fallback), 0, Count - 1);
+		// 0.293.5.1 基线：未设置时下发 ProfileIndex=0。
+		return Math.Clamp(AppConfig.Get(text, 0), 0, Count - 1);
 	}
 
 	/// <summary>设置该模式绑定的配置号。下次切到该模式时随 Action 一起下发。</summary>

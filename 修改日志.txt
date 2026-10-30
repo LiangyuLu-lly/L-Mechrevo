@@ -1,3 +1,52 @@
+r84（2026-10-31 · 0.293.6.3 beta23.6.3 · NVIDIA 遥测子进程化 + NUC Fn/水冷/星耀）
+
+一、NVIDIA 遥测/黑屏
+- 重写 `source/NvmlHelper.cs`：不再 P/Invoke nvml.dll，改用 nvidia-smi 子进程查询
+  temperature.gpu/power.draw/memory.used/total/clocks.gr/clocks.mem/utilization.gpu/
+  power.limit/min/max/default；2s 超时、1.5s 快照缓存；失败只清空本次快照。
+- 无 NVIDIA 独显（适配器 VendorId 非 10DE）时不启动 nvidia-smi；枚举不可用保持原行为。
+- 功耗上限读写改 nvidia-smi -pl；不支持/无权限返回 false。
+- `NvmlSafetyPolicy` 不再按 JIGUANG/外接单屏停遥测；删除临时“外接单屏禁用 NVML”策略。
+- 传感器按需：无主窗/宽屏/悬浮窗/其它可见窗口且托盘传感器关闭时
+  `HardwareControl.DisableLocalMonitoring()`，有消费者再 `EnableLocalMonitoring()`。
+- 托盘传感器默认 `tray_sensor_tooltip=0`。
+- 诊断包已证实历史 7 个 NVML 0xc0000005 转储；本次改造目标是彻底移除进程内 NVML。
+
+二、NUC/UMI（LAPKC71F）
+- Fn 锁读 EC 1870 bit4；触摸板读 PTP 注册表；OSD 触摸板图标。
+- Fn+F5（ACPI 183）CoreAudio 静音切换；Fn+F12（164）WiFi/蓝牙飞行模式；
+  Fn+F8（177/178/185/59-63）实际下发亮度并重启 HID 效果帧，修正关灯后无法再亮和 0/4 卡死；
+  Fn+SCRLK（VK_SCROLL）只弹小键盘 OSD，不映射九键；CapsLock 不再连带 NumLock OSD。
+- 外接显示器时“息屏（不睡眠）”提示不可用。
+
+三、Intel/星耀
+- Intel 星耀屏蔽自定义模式（入口隐藏 + PerfModeService 拦截）。
+- AMD 星耀接入 SMU 自定义（PL1/PL2/TCC/STAPM，与无界同链路；不打开无界专属风扇/限充/键盘）。
+- NUC GPU 控制字节补 cTGP bit2，修正自定义 TGP 被忽略。
+
+四、水冷
+- 新增 BLE 水冷风扇曲线（6 点温度→duty）与水泵启泵/狂暴双阈值；2s 主机侧插值下发。
+- 新增专属 MAC 绑定/防串连、配对扫描页、解除绑定；首次连接自动绑定。
+- 修复迷你窗水冷泵/扇下拉叠住、标题挤压、灯光行悬空；宽屏水冷卡补内联曲线/阈值/应用/恢复默认，
+  修复泵/扇下拉空显示，灯光行常显（未连接置灰）。
+- 水冷曲线窗口改用 RoundSlider 圆点滑块，数值与滑块间距 14px。
+
+五、其它
+- 水冷标题/状态拆列，LiquidBody 与灯光行动态行归位。
+- 宽屏“检查更新”改由 `WideCheckForUpdatesAsync` 返回结果，宽屏状态栏 + Toast 显示；
+  避免只写迷你窗 StatusText 导致宽屏看起来没反应。
+- 悬浮窗锁定：`OverlayWindow.SetLocked(true)` 弹 OSD
+  “悬浮窗已锁定 / 可在托盘菜单或设置中解锁”；设置页新增“锁定悬浮窗（鼠标穿透）”开关，
+  与托盘菜单共用 `overlay_locked`，可在设置直接解锁。
+- GCU 变体命名：默认恢复为 WJ（WJ.7z），同时兼容 WJXY 作为别名；
+  Select-GcuPayload/Install-Gcu/ISS 均接受 WJ 与 WJXY，LNL 无界仍按 WJ 载荷安装。
+- NUC/UMI 云母背景：`WindowBackdrop` 默认 Mica，Win11 22H2+ 生效，失败回退纯色；
+  设置页增加云母开关与强度滑块，NUC/UMI 与其它机型共用同一套窗口背景逻辑。
+- 鸣谢与引用增加 `faintonce/open-revo`（GPL-3.0）：README、LicensesWindow、
+  THIRD_PARTY_NOTICES 英文/中文三处同步。
+- 云母/背景模糊使用 Windows DWM 系统材质（DwmSetWindowAttribute）。
+- 构建 0 errors；真机待验证项：nvidia-smi 字段支持度、功耗上限写入、水冷 BLE 曲线/绑定、外接 HDMI 黑屏回归。
+
 r82（2026-10-23 · 0.293.5.1 beta23.5.1 稳定性补丁 · 旧UI）
 
 一、稳定性

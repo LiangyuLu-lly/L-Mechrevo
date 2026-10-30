@@ -21,6 +21,13 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // 独立更新器必须先于单实例/UI/硬件初始化处理，避免更新器加载安装目录里的旧 DLL。
+        if (L_Mechrevo.WpfP0.Services.DllUpdateHelper.TryHandle(e.Args, out int updateExitCode))
+        {
+            Environment.ExitCode = updateExitCode;
+            Shutdown();
+            return;
+        }
         // ⭐ task-24：`--ui-probe` 优先无界面处理（等价旧 Program.cs:340-343：必须在单实例互斥体之前，
         //   预览/帮助不建主窗、不连硬件。list=退出 0；未知能力档/窗体=退出 2；正常启动不受影响）。
         if (L_Mechrevo.WpfP0.Services.UiProbeRunnerService.TryHandleHeadless(e.Args, out int uiProbeExitCode))
@@ -127,6 +134,12 @@ public partial class App : Application
         _ = System.Threading.Tasks.Task.Run(() => global::Startup.StartupCheck());
         _ = Task.Run(() => MechrevoLite.HardwareControl.EnableLocalMonitoring());
         base.OnStartup(e);
+        // 系统 CapsLock / NumLock 变化时弹 LM OSD，并让快捷开关跟随真实状态。
+        LockKeyOsdService.Start();
+        // 暂不补充九键映射：Fn+SCRLK 只显示 ScrollLock OSD，不改键码。
+        // Wi-Fi / 蓝牙：和 OpenRevo 一样用 Windows Radio 状态轮询，
+        // 系统里切换也能同步 OSD / 开关状态；只读探测，不改变硬件策略。
+        MechrevoLite.Helpers.RadioSwitch.Start();
         OriginalStyleWindow window = new();
         MainWindow = window;
         if (string.Equals(MechrevoLite.AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))

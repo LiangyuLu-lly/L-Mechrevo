@@ -13,7 +13,7 @@ namespace MechrevoLite.Hardware;
 /// 诊断按变体选落地基线、展示变体名，都必须仍用注册表原值区分 —— 40B 与 40 曾是**不同的字节集**
 /// （payload\40 = 4 文件、payload\40B = 8 文件，2026-10-10 世代）。故意不走本类的那一处见
 /// <c>DiagnosticGcuEvidenceInfo.BaselineForVariant</c>（那里按变体精确取表）。</para>
-/// <para>2026-10-14：随包载荷整体换成「5 个独立 7z」（1020 / 30 / 40 / 50 / WJXY），
+/// <para>2026-10-14：随包载荷整体换成「5 个独立 7z」（1020 / 30 / 40 / 50 / WJ），
 /// 40B 覆盖层**整体不再存在**。本类保留 40B→40 归一，只是为了让**老机器上遗留的注册表值**
 /// （上一版装过 40B 的机器写的就是 <c>GcuVariant=40B</c>）继续按 40 家族判断；新安装不会再产生它。</para>
 /// <para>✅ 纯字符串运算：不读注册表、不碰硬件、不写任何状态；离线可跑自测见 <see cref="RunSelfTest"/>。
@@ -34,7 +34,7 @@ internal static class GcuVariantFamily
 
 	/// <summary>
 	/// 变体 → 家族键：去首尾空白 + 转大写后，<c>"40B"</c> 归一到 <c>"40"</c>，其余原样返回
-	/// （<c>"30"</c> / <c>"50"</c> / <c>"1020"</c> / <c>"WJXY"</c> / <c>"GCU"</c> / 未知值各自成族）；
+	/// （<c>"30"</c> / <c>"50"</c> / <c>"1020"</c> / <c>"WJ"</c> / <c>"GCU"</c> / 未知值各自成族）；
 	/// <c>null</c> / 空 / 全空白 → <c>""</c>（＝注册表没有 GcuVariant，与任何家族都不相等）。
 	/// </summary>
 	internal static string Resolve(string variant)
@@ -83,23 +83,23 @@ internal static class GcuVariantFamily
 		Check(Resolve("40") == Resolve("40B"), "Resolve(\"40\") == Resolve(\"40B\")（同一家族键）", pass, fail);
 		Check(IsFamily("40B", Forty) && IsFamily("40", Forty) && IsFamily("40b", " 40 "), "IsFamily：40 / 40B / 40b 对家族 \"40\" 全判真", pass, fail);
 
-		// ---- ② 别的变体一律不落进 40 家族（不误判；2026-10-14 新增 1020 / WJXY）----
+		// ---- ② 别的变体一律不落进 40 家族（不误判；2026-10-14 新增 1020 / WJ）----
 		Check(!Is40("30"), "Is40(\"30\") = false", pass, fail);
 		Check(!Is40("50"), "Is40(\"50\") = false", pass, fail);
 		Check(!Is40("1020"), "Is40(\"1020\") = false（1020 不是 40 家族）", pass, fail);
-		Check(!Is40("WJXY"), "Is40(\"WJXY\") = false（WJXY 特别变体不是 40 家族）", pass, fail);
+		Check(!Is40("WJ"), "Is40(\"WJ\") = false（WJ 特别变体不是 40 家族）", pass, fail);
 		Check(!Is40("GCU"), "Is40(\"GCU\") = false（base 底座不是 40 家族）", pass, fail);
 		Check(!Is40("70"), "Is40(\"70\") = false（未知变体不落进 40）", pass, fail);
 		Check(!Is40(null), "Is40(null) = false（注册表没有 GcuVariant）", pass, fail);
 		Check(!Is40(""), "Is40(\"\") = false", pass, fail);
 		Check(!Is40("   "), "Is40(\"   \") = false", pass, fail);
 		Check(!IsFamily("40B", "50") && !IsFamily("50", Forty), "IsFamily：跨家族一律假（不把 40B 当 50）", pass, fail);
-		Check(!IsFamily("40B", "WJXY") && !IsFamily("WJXY", Forty), "IsFamily：40B 与 WJXY 跨家族，一律假", pass, fail);
+		Check(!IsFamily("40B", "WJ") && !IsFamily("WJ", Forty), "IsFamily：40B 与 WJ 跨家族，一律假", pass, fail);
 		Check(!IsFamily(null, Forty) && !IsFamily("40B", null) && !IsFamily("40B", ""), "IsFamily：任一侧为空判假", pass, fail);
 
-		// ---- ③ 非 40 变体的家族键原样保留（30 / 50 / 1020 / WJXY 不被吞）----
+		// ---- ③ 非 40 变体的家族键原样保留（30 / 50 / 1020 / WJ 不被吞）----
 		Check(Resolve("30") == "30" && Resolve("50") == "50" && Resolve("gcu") == "GCU", "Resolve：30 / 50 / gcu 原样成族", pass, fail);
-		Check(Resolve("1020") == "1020" && Resolve("wjxy") == "WJXY", "Resolve：1020 / wjxy 原样成族", pass, fail);
+		Check(Resolve("1020") == "1020" && Resolve("wj") == "WJ", "Resolve：1020 / wj 原样成族", pass, fail);
 
 		// ---- ④ 载荷身份**不**被本类合并（40 ≠ 40B，供诊断按变体精确取表）----
 		Check(!string.Equals("40", FortyB, StringComparison.OrdinalIgnoreCase), "载荷身份仍分开：\"40\" != \"40B\"（OrdinalIgnoreCase）—— 等价的是行为判断，不是载荷身份", pass, fail);
@@ -108,7 +108,7 @@ internal static class GcuVariantFamily
 		// ---- ⑤ 接线核对：MechrevoService 的公开判据与 40 家族助手同源 ----
 		Check(MechrevoService.IsGcu40Family("40") && MechrevoService.IsGcu40Family("40B") && MechrevoService.IsGcu40Family("40b"), "MechrevoService.IsGcu40Family：40 / 40B / 40b 全判真（键盘灯 40 系协议分支的判据）", pass, fail);
 		Check(!MechrevoService.IsGcu40Family("30") && !MechrevoService.IsGcu40Family("50") && !MechrevoService.IsGcu40Family(null), "MechrevoService.IsGcu40Family：30 / 50 / null 判假", pass, fail);
-		Check(!MechrevoService.IsGcu40Family("1020") && !MechrevoService.IsGcu40Family("WJXY"), "MechrevoService.IsGcu40Family：1020 / WJXY 判假", pass, fail);
+		Check(!MechrevoService.IsGcu40Family("1020") && !MechrevoService.IsGcu40Family("WJ"), "MechrevoService.IsGcu40Family：1020 / WJ 判假", pass, fail);
 
 		StringBuilder sb = new StringBuilder();
 		sb.AppendLine($"GCU 变体家族自测（离线，不读注册表、不发帧）：OK={pass.Count} FAIL={fail.Count}");

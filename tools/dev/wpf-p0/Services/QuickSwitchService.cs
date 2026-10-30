@@ -72,7 +72,6 @@ internal sealed class QuickSwitchService : IQuickSwitchService
             new("deepsleep", WpfStrings.QuickDeepSleep),
             new("gamewhitelist", WpfStrings.QuickGameWhitelist),
             new("cpuadvperf", WpfStrings.QuickCpuAdvPerf),
-            new("taskbarautohide", WpfStrings.QuickTaskbarAutoHide),
             new("transparency", WpfStrings.QuickTransparency),
             new("darktheme", WpfStrings.QuickDarkTheme),
             new("monitoroff", WpfStrings.QuickMonitorOff),
@@ -158,7 +157,6 @@ internal sealed class QuickSwitchService : IQuickSwitchService
             "deepsleep" => WpfStrings.QuickDeepSleep,
             "gamewhitelist" => WpfStrings.QuickGameWhitelist,
             "cpuadvperf" => WpfStrings.QuickCpuAdvPerf,
-            "taskbarautohide" => WpfStrings.QuickTaskbarAutoHide,
             "transparency" => WpfStrings.QuickTransparency,
             "darktheme" => WpfStrings.QuickDarkTheme,
             "monitoroff" => WpfStrings.QuickMonitorOff,
@@ -228,7 +226,11 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         {
             return false;
         }
-        key = string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase) ? "osd" : key;
+        if (string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase))
+        {
+            // GCU-OSD 是 GCU 自己的 OSD，不是 LM OSD。
+            return probe.QuickState("gcuosd");
+        }
         // 宝龙达强冷状态在 MechrevoHw.FanBoostActive（本机通道），probe.QuickState 读的是 GCU 字段。
         if (IsBaolongdaFanBoost(key))
         {
@@ -267,17 +269,26 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         {
             AppConfig.Set("lm_osd_enabled", on ? 1 : 0);
             AppConfig.Flush();
+            // 关掉这条路过去没有任何日志：诊断包里只看到“OSD 不弹”，查不到是谁关的。
+            Logger.WriteError("[osd] 本地 OSD 总开关=" + (on ? "开" : "关")
+                + "（lm_osd_enabled=" + AppConfig.Get("lm_osd_enabled", 1) + "）");
             if (on)
             {
                 L_Mechrevo.WpfP0.OsdService.Show("\uE7F4", WpfStrings.QuickOsd, WpfStrings.StateOn);
             }
             return ServiceResult.Success(on ? WpfStrings.QuickResultOn : WpfStrings.QuickResultOff);
         }
-        string backendKey = string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase) ? "osd" : key;
+        string backendKey = key;
         BackendProbe? probe = _backend.Probe;
         if (probe == null)
         {
             return ServiceResult.Fail(WpfStrings.QuickBackendOffline);
+        }
+        if (string.Equals(key, "monitoroff", StringComparison.OrdinalIgnoreCase) && on
+            && !L_Mechrevo.WpfP0.Services.VirtualDisplayBlankService.IsSingleInternalDisplay(out string monitorReason))
+        {
+            L_Mechrevo.WpfP0.ToastService.Show(monitorReason, failure: true);
+            return ServiceResult.Fail(monitorReason);
         }
         if (!Supports(key))
         {
@@ -303,7 +314,13 @@ internal sealed class QuickSwitchService : IQuickSwitchService
                     : ServiceResult.Fail(on ? WpfStrings.QuickFanBoostOnUnconfirmed : WpfStrings.QuickFanBoostOffUnconfirmed);
             }
             ok = await probe.SwitchQuickAsync(backendKey, on).ConfigureAwait(false);
-            if (ok)
+            // Wi-Fi / 蓝牙在部分后端没有可靠回读（命令发出但 confirmed=false）；
+            // 用户明确点了开关时仍要弹 OSD，否则表现为“点了没反应”。
+            bool forceOsd = string.Equals(key, "wifi", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(key, "bt", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(key, "touchpad", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(key, "touchpadtoggle", StringComparison.OrdinalIgnoreCase);
+            if (ok || forceOsd)
             {
                 L_Mechrevo.WpfP0.OsdService.ShowQuickSwitch(key, on);
             }

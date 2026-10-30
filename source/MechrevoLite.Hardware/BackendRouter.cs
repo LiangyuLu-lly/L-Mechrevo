@@ -144,6 +144,13 @@ internal static class BackendRouter
 			DeclarationPassed: DeclarationFor(Fallback)?.Supports(identity) ?? true);
 	}
 
+	/// <summary>仅 UI 探针/离线预览用：把合成机型事实落到 LastDecision，让 UI 按 NUC 渲染；不触碰真实后端。</summary>
+	internal static void SetPreviewDecision(MachineIdentity identity)
+	{
+		System.Threading.Volatile.Write(ref _lastDecision,
+			new BackendRouteDecision(0, "ui-probe -> Gcu", MechrevoBackendKind.Gcu, identity, DeclarationPassed: true));
+	}
+
 	internal static BackendRouteDecision DecideAndLog()
 	{
 		BackendRouteDecision decision = Decide(MachineIdentity.Collect());

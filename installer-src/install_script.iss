@@ -1,30 +1,30 @@
-; Created by "innounp" version 2.67.11
+﻿; Created by "innounp" version 2.67.11
 ; Setup file: pkg-20260919-195709-a076c697.exe
 ; Inno Setup Version: 6.7.0 (Unicode)
 
 [Setup]
 AppName=L-Mechrevo
-AppVerName=L-Mechrevo 0.293.6.1 beta23.6.1
+AppVerName=L-Mechrevo 0.293.6.3 beta23.6.3
 AppId={{8F4E2C71-9B3A-4D6E-A1C2-7E5B9D0F3A64}
-AppVersion=0.293.6.1
+AppVersion=0.293.6.3
 AppPublisher=L-Mechrevo contributors
 AppCopyright=Copyright (C) 2026 L-Mechrevo contributors. GPL-3.0-only.
 DefaultDirName={autopf}\L-Mechrevo
 DefaultGroupName=L-Mechrevo
 #ifdef NOGCU
-OutputBaseFilename=LM-0.293.6.1-beta23.6.1-baolongda-setup
+OutputBaseFilename=LM-0.293.6.3-beta23.6.3-baolongda-setup
 #else
 #ifdef NOGCU_PAYLOAD
-OutputBaseFilename=LM-0.293.6.1-beta23.6.1-nogcupayload-setup
+OutputBaseFilename=LM-0.293.6.3-beta23.6.3-nogcupayload-setup
 #else
-OutputBaseFilename=LM-0.293.6.1-beta23.6.1-setup
+OutputBaseFilename=LM-0.293.6.3-beta23.6.3-setup
 #endif
 #endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
-VersionInfoVersion=0.293.6.1
-VersionInfoProductVersion=0.293.6.1
-UninstallDisplayName=L-Mechrevo 0.293.6.1 beta23.6.1
+VersionInfoVersion=0.293.6.3
+VersionInfoProductVersion=0.293.6.3
+UninstallDisplayName=L-Mechrevo 0.293.6.3 beta23.6.3
 Compression=lzma2
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -181,7 +181,7 @@ Source: "files\GCU\Uninstall-Gcu.ps1"; DestDir: "{app}\GCU"; Flags: ignoreversio
 ;      shared\UWACPIDriver\ 【逐字节相同】（cat/inf/sys 的 SHA256 全等，DriverVer 同为 10/28/2025,
 ;      10.48.11.331），与 payload-old\GCU\UWACPIDriver\ 也逐字节相同。所以"从 7z 抽会降级"这个理由已作废；
 ;      ⚠️ 但**结论仍然有效**：本段照旧以 shared\UWACPIDriver\ 为唯一来源 —— 因为 50.7z 只有 50 系有，
-;      而 1020/30/40/WJXY 四个 7z 里的驱动并不是本驱动；从 shared\ 取才能保证「不论选中哪个变体，
+;      而 1020/30/40/WJ 四个 7z 里的驱动并不是本驱动；从 shared\ 取才能保证「不论选中哪个变体，
 ;      {app}\UWACPIDriver\ 都拿到同一份」。
 ;   ⚠️ 星耀通用性**未证实**（如实记录，⛔ 不得写成"已确认星耀可用"）：
 ;      · inf 的 [Manufacturer] / [Models] 段里，A（星耀 / 无界）与 B（UX7）逐字节相同；
@@ -263,7 +263,7 @@ Source: "files\GCU\payload\30.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: Sho
 Source: "files\GCU\payload\50.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 #ifndef NOGCU_PAYLOAD
-Source: "files\GCU\payload\WJXY.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
+Source: "files\GCU\payload\WJ.7z"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
 #endif
 Source: "files\GCU\7za.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: ShouldInstallGcu
 Source: "files\GCU\7za.exe"; DestDir: "{tmp}"; Flags: dontcopy; Check: ShouldInstallGcu
@@ -484,7 +484,7 @@ Type: files; Name: "{app}\GCU\1020.7z";
 Type: files; Name: "{app}\GCU\30.7z";
 Type: files; Name: "{app}\GCU\40.7z";
 Type: files; Name: "{app}\GCU\50.7z";
-Type: files; Name: "{app}\GCU\WJXY.7z";
+Type: files; Name: "{app}\GCU\WJ.7z";
 Type: files; Name: "{app}\GCU\安装GCU.cmd";
 Type: files; Name: "{app}\GCU\手动安装说明.txt";
 ; ⭐ 2026-10-15：手工兜底那次运行会把日志写到 {app}\GCU\logs（`安装GCU.cmd` 传的 -LogDir），卸载时一并清掉。
@@ -2087,10 +2087,10 @@ end;
 
 // ==== 2026-10-14（7z 载荷化 + 40B 整体移除）：GCU 变体判定口径 ====
 // ⛔ 40B 逻辑已整个删除（owner 指示「40B 逻辑【整个不要了】」）：40 系一律走 `40`。
-//    随包载荷由「base + 40/30/50 覆盖层」改成 5 个独立 7z（1020 / 30 / 40 / 50 / WJXY），
+//    随包载荷由「base + 40/30/50 覆盖层」改成 5 个独立 7z（1020 / 30 / 40 / 50 / WJ），
 //    其中 40.7z 就是 40 系的唯一载荷；2026-10-21 起 40 载荷暂时不随包（40 系用 50 载荷，GcuVariant 仍写 40）；
 //    不再有 40B 覆盖层、不再有「是否支持核显模式」的询问。
-// 新增机型判据（owner 2026-10-14 定）：机型串含 `XINGYAO` 或 `LNL` => 走 WJXY 特别变体；
+// 新增机型判据（owner 2026-10-14 定）：机型串含 `XINGYAO` 或 `LNL` => 走 WJ 特别变体；
 //    其余照常走 30/40/50 判据；判不出来 => 记日志 + 走现有判据（⛔ 不静默乱选）。
 //    ⭐ 判据实现与日志都在 Select-GcuPayload.ps1（同一份脚本、同一份口径），本段只保留
 //      「把 Auto 结果回读给升级回灌逻辑用」的接线。
@@ -2144,7 +2144,7 @@ begin
   if not GCuVariantAsked then
   begin
     GCuVariantAsked := True;
-    Log('LM-GCU: 变体一律走 Auto 判据（40B 询问已于 2026-10-14 移除；40 系载荷实际为 50，注册表写 50；机型含 XINGYAO/LNL = WJXY）');
+    Log('LM-GCU: 变体一律走 Auto 判据（40B 询问已于 2026-10-14 移除；40 系载荷实际为 50，注册表写 50；机型含 XINGYAO/LNL = WJ）');
   end;
   Result := GetEffectiveGcuVariant();
 end;
@@ -2586,6 +2586,34 @@ begin
   end;
 end;
 
+function IsXingyaoMold(): Boolean;
+var
+  Board: String;
+  Model: String;
+  BoardU: String;
+  ModelU: String;
+begin
+  Result := False;
+  Board := '';
+  Model := '';
+  try
+    RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'BaseBoardProduct', Board);
+    RegQueryStringValue(HKEY_LOCAL_MACHINE, 'HARDWARE\DESCRIPTION\System\BIOS', 'SystemProductName', Model);
+    BoardU := Uppercase(Board);
+    ModelU := Uppercase(Model);
+    if (Pos('XINGYAO', BoardU) > 0) or (Pos('P916F', BoardU) > 0)
+       or (Pos('XINGYAO', ModelU) > 0) or (Pos('P916F', ModelU) > 0) then
+    begin
+      Log('LM-GCU-SKIP: 星耀机型（板号=' + Board + ' · 型号=' + Model + '）=> 本机【不安装 GCU】');
+      Result := True;
+      Exit;
+    end;
+  except
+    Log('LM-GCU-SKIP: 星耀判据读取异常 => 按【非星耀】处理，照旧安装 GCU');
+    Result := False;
+  end;
+end;
+
 // ⭐ [Files] / [Run] 的 `Check:` 参数用这个（⭐ 名字直说"该不该装 GCU" ✅）。
 //   ⭐ 返回 False ⇒ ⭐ Inno 跳过该条目 ✅；⭐ 返回 True ⇒ ⭐ 照旧安装 ✅。
 //   ⚠️ Inno 的 `Check:` 语义 = "返回 True 才处理这一条" ✅ ⇒ 所以这里取反 ✅。
@@ -2595,7 +2623,17 @@ end;
 //      （⭐ 带 `Param: String` 的那种只适用于 `{code:Name}` 常量展开，⛔ 不适用于 Check ✅）
 function ShouldInstallGcu(): Boolean;
 begin
-  Result := not IsBaolongdaMold();
+  if IsBaolongdaMold() then
+  begin
+    Result := False;
+    Exit;
+  end;
+  if IsXingyaoMold() then
+  begin
+    Result := False;
+    Exit;
+  end;
+  Result := True;
 end;
 
 // 精简包（/DNOGCU_PAYLOAD）没有可用 GCU 载荷时跳过 [Run] 的 GCU 安装步骤，但 LM 照常安装
@@ -2620,7 +2658,7 @@ begin
     1: Result := '30.7z';
     2: Result := '40.7z';
     3: Result := '50.7z';
-    4: Result := 'WJXY.7z';
+    4: Result := 'WJ.7z';
   else
     Result := '';
   end;
@@ -2743,11 +2781,17 @@ begin
     Result := '';
     Exit;
   end;
+  if IsXingyaoMold() then
+  begin
+    Log('LM-GCU-SKIP: 星耀机型 => 跳过 GCU 载荷解压（本机不安装 GCU，无载荷需求）');
+    Result := '';
+    Exit;
+  end;
   SetArrayLength(GcuStagingFiles, 5);
   GcuStagingFiles[0] := '1020.7z';
   GcuStagingFiles[1] := '30.7z';
   GcuStagingFiles[2] := '50.7z';
-  GcuStagingFiles[3] := 'WJXY.7z';
+  GcuStagingFiles[3] := 'WJ.7z';
   GcuStagingFiles[4] := '7za.exe';
   // 先解出 7za.exe（外置 GCU.7z 解压需要）
   try

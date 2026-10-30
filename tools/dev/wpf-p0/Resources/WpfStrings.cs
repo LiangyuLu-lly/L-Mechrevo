@@ -10,6 +10,15 @@ public static class WpfStrings
 
     public static string Get(string key) => Manager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
 
+    /// <summary>中文界面直接用调用方中文；非中文界面用第二个参数，避免 UI 文案硬编码。</summary>
+    public static string L(string zh, string en)
+        => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("zh", System.StringComparison.OrdinalIgnoreCase) ? zh : en;
+
+    public static string ExternalBatteryCard_Title => L("外设电量", "Peripheral battery");
+    public static string ExternalBatteryCard_Description => L("读取已连接蓝牙/HID 键鼠的剩余电量；不支持或读取失败时不显示本卡片。", "Shows remaining battery of connected Bluetooth/HID keyboards and mice; hidden when unsupported or unreadable.");
+    public static string CloudIcc_Content => L("云端获取", "Get from cloud");
+    public static string WujieFanTableLicense => L("Qxingyue/-14XA-Uniwill-EC- — 无界风扇 table 控制协议参考（无 LICENSE 文件）", "Qxingyue/-14XA-Uniwill-EC- - reference for the Wujie fan table control protocol (no LICENSE file)");
+
     public static string LightingKeyboard => Get("LightingKeyboard");
     public static string LightingStrip => Get("LightingStrip");
     public static string LightingLogo => Get("LightingLogo");
@@ -90,6 +99,9 @@ public static class WpfStrings
     public static string DisplayEffectEditorWindow_Text => Get("DisplayEffectEditorWindow_Text");
     public static string PushFanCurveCheck_Content => Get("PushFanCurveCheck_Content");
     public static string WujieIndependentCheck_Content => Get("WujieIndependentCheck_Content");
+    public static string FanCurveBaolongdaEnable_Content => MechrevoLite.Properties.Strings.FanCurveBaolongdaEnable;
+    public static string FanSyncSharedHeatPipe_Content => MechrevoLite.Properties.Strings.FanSyncSharedHeatPipe;
+    public static string FanCurveRestoreDefault_Content => Get("FanCurveRestoreDefault_Content");
     public static string FanCurveWindow_Text => Get("FanCurveWindow_Text");
     public static string FanCurveWindow_Text_2 => Get("FanCurveWindow_Text_2");
     public static string HintText_Text => Get("HintText_Text");
@@ -221,6 +233,7 @@ public static class WpfStrings
     public static string SettingsWindow_Content_3 => Get("SettingsWindow_Content_3");
     public static string SettingsWindow_Content_4 => Get("SettingsWindow_Content_4");
     public static string CheckUpdateButton_Content => Get("CheckUpdateButton_Content");
+    public static string UpdateDownloadInstall => MechrevoLite.Properties.Strings.UpdateDownloadInstall;
     public static string SettingsWindow_Text => Get("SettingsWindow_Text");
     public static string SettingsWindow_Text_2 => Get("SettingsWindow_Text_2");
     public static string SettingsWindow_Text_3 => Get("SettingsWindow_Text_3");
@@ -282,6 +295,11 @@ public static class WpfStrings
     public static string SettingsWindow_Text_31 => Get("SettingsWindow_Text_31");
     public static string SettingsWindow_Text_32 => Get("SettingsWindow_Text_32");
     public static string SettingsWindow_Text_33 => Get("SettingsWindow_Text_33");
+    public static string SettingsWindow_BackgroundBlur => Get("SettingsWindow_BackgroundBlur");
+    public static string TrayOverlayLock => Get("TrayOverlayLock");
+    public static string SettingsWindow_MicaBackdrop => Get("SettingsWindow_MicaBackdrop");
+    public static string SettingsWindow_MicaTint => Get("SettingsWindow_MicaTint");
+    public static string OverlayLockHint => Get("OverlayLockHint");
     public static string DarkButton_Content => Get("DarkButton_Content");
     public static string SettingsWindow_Text_34 => Get("SettingsWindow_Text_34");
     public static string FollowSystemCheck_Content => Get("FollowSystemCheck_Content");
@@ -663,6 +681,7 @@ public static class WpfStrings
     public static string TraySilentTurbo => Get("TraySilentTurbo");
     public static string SilentTurbo => Get("SilentTurbo");
     public static string TurboHighEnergy => Get("TurboHighEnergy");
+    public static string NucExtremeTurbo => Get("NucExtremeTurbo");
     public static string TrayTurbo => Get("TrayTurbo");
     public static string TrayFanBoost => Get("TrayFanBoost");
     public static string TrayGpuIntegrated => Get("TrayGpuIntegrated");
@@ -927,6 +946,7 @@ public static class WpfStrings
     public static string DisplayResponseToggleFailed => Get("DisplayResponseToggleFailed");
     public static string DisplayResponseExceptionPrefix => Get("DisplayResponseExceptionPrefix");
     public static string OnlineUpdateDisabled => Get("OnlineUpdateDisabled");
+    public static string UpdateChecking = Get("UpdateChecking");
     public static string UpdateCheckNoResult => Get("UpdateCheckNoResult");
     public static string UpdateLatestPrefix => Get("UpdateLatestPrefix");
     public static string UpdateCheckFailedPrefix => Get("UpdateCheckFailedPrefix");

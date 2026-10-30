@@ -5,8 +5,8 @@
         xmlns:local="clr-namespace:L_Mechrevo.WpfP0"
         Title="{x:Static loc:WpfStrings.OriginalStyleWindow_Title}"
         Icon="Assets/Icons/app.png"
-        Width="420" Height="560"
-        MinWidth="420" MaxWidth="420" MinHeight="300"
+        Width="440" Height="560"
+        MinWidth="440" MaxWidth="440" MinHeight="300"
         ResizeMode="CanResize"
         WindowStyle="None"
         WindowStartupLocation="CenterScreen"
@@ -102,7 +102,7 @@
             <Setter Property="Height" Value="38" />
             <Setter Property="Margin" Value="0,0,5,0" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
@@ -360,6 +360,35 @@
             <Setter Property="FontSize" Value="10" />
         </Style>
 
+        <Style x:Key="OverlayScrollBar" TargetType="ScrollBar">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="6" Margin="1,0" Cursor="Hand">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{DynamicResource MutedBrush}" Opacity="0.55" CornerRadius="3" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -418,9 +447,9 @@
                 </StackPanel>
             </Grid>
 
-            <ScrollViewer x:Name="MainScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+            <ScrollViewer x:Name="MainScroll" Grid.Row="3" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly" CanContentScroll="False" Background="Transparent">
-                <WrapPanel x:Name="ContentPanel" Margin="12,0,5,8" HorizontalAlignment="Left" Orientation="Horizontal">
+                <WrapPanel x:Name="ContentPanel" Margin="12,0,12,8" HorizontalAlignment="Center" Orientation="Horizontal">
 
                     <!-- 性能模式 -->
                     <StackPanel x:Name="PerfSection" Style="{StaticResource Section}">
@@ -445,7 +474,7 @@
                                 <TextBlock x:Name="CpuStat" Text="CPU —" Style="{StaticResource StatText}" />
                             </StackPanel>
                         </Grid>
-                        <local:AdaptivePanel x:Name="ModeGrid" Margin="0,2,0,0">
+                        <local:AdaptivePanel x:Name="ModeGrid" Margin="0,2,0,0" UseContentWidths="True">
                             <ToggleButton x:Name="SilentModeButton" Tag="#22C55E" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
                                 <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_23}" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
@@ -458,6 +487,11 @@
                             </ToggleButton>
                             <ToggleButton x:Name="TurboModeButton" Tag="#EF4444" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" >
                                 <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_22}" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
+                                           FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                           FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+                            </ToggleButton>
+                            <ToggleButton x:Name="ExtremeModeButton" Tag="#F97316" Style="{StaticResource ModeSegment}" Click="ModeButton_Click" Visibility="Collapsed">
+                                <TextBlock Text="{x:Static loc:WpfStrings.NucExtremeTurbo}" Height="18" VerticalAlignment="Center" LineHeight="18" LineStackingStrategy="BlockLineHeight" TextAlignment="Center"
                                            FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                                            FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
                             </ToggleButton>
@@ -606,7 +640,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Static loc:WpfStrings.DisplayEffectEditorWindow_Text}" Style="{StaticResource RowLabel}" Margin="0,0,10,0" />
                             <CheckBox x:Name="DisplayEffectSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" Margin="0,0,10,0" VerticalAlignment="Center" Click="DisplayEffectSwitch_Click" />
-                            <ComboBox x:Name="DisplayEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0">
+                            <ComboBox x:Name="DisplayEffectCombo" Grid.Column="2" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="DisplayEffectCombo_SelectionChanged">
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_5}" />
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_8}" />
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_7}" />
@@ -632,31 +666,23 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_12}" Style="{StaticResource RowLabel}" Margin="0,0,10,0" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_12}" Style="{StaticResource RowLabel}" Margin="0,0,10,0" VerticalAlignment="Center" />
                             <CheckBox x:Name="ChargeLimitSwitch" Grid.Column="1" Style="{StaticResource HeaderSwitch}" VerticalAlignment="Center" Click="ChargeLimitSwitch_Click" />
-                            <Button x:Name="ChargeLimitApplyButton" Grid.Column="3" Content="{x:Static loc:WpfStrings.ChargeLimitApplyButton_Content}" Style="{StaticResource MiniButton}" Click="ChargeLimitApply_Click" />
+                            <Button x:Name="ChargeLimitApplyButton" Grid.Column="3" Content="{x:Static loc:WpfStrings.ChargeLimitApplyButton_Content}" Style="{StaticResource MiniButton}" Click="ChargeLimitApply_Click" Margin="0,0,6,0" />
+                            <Button x:Name="ChargeLimitRestoreButton" Grid.Column="4" Content="恢复默认" Style="{StaticResource MiniButton}" Click="ChargeLimitRestore_Click" />
                         </Grid>
-                        <Grid x:Name="ChargeLimitInputRow" Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_11}" Style="{StaticResource MutedText}" Margin="0,0,0,3" />
-                                <TextBox x:Name="ChargeLimitLowBox" Text="60" Width="72" Height="26" HorizontalAlignment="Left"
-                                         VerticalContentAlignment="Center" Background="{DynamicResource InputBrush}"
-                                         Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
-                                         BorderThickness="1" Padding="6,0" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_10}" Style="{StaticResource MutedText}" Margin="0,0,0,3" />
-                                <TextBox x:Name="ChargeLimitHighBox" Text="80" Width="72" Height="26" HorizontalAlignment="Left"
-                                         VerticalContentAlignment="Center" Background="{DynamicResource InputBrush}"
-                                         Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
-                                         BorderThickness="1" Padding="6,0" />
-                            </StackPanel>
-                        </Grid>
+                        <StackPanel x:Name="ChargeLimitInputRow" Orientation="Horizontal" Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_11}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox x:Name="ChargeLimitLowBox" Text="60" Width="56" Height="26" VerticalContentAlignment="Center" Margin="0,0,10,0"
+                                     Background="{DynamicResource InputBrush}" Foreground="{DynamicResource TextBrush}"
+                                     BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="5,0" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_10}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox x:Name="ChargeLimitHighBox" Text="80" Width="56" Height="26" VerticalContentAlignment="Center"
+                                     Background="{DynamicResource InputBrush}" Foreground="{DynamicResource TextBrush}"
+                                     BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="5,0" />
+                        </StackPanel>
                         <TextBlock x:Name="ChargeLimitStatus" Text="{x:Static loc:WpfStrings.ChargeLimitStatus_Text}" Style="{StaticResource MutedText}" FontSize="10" TextWrapping="Wrap" />
                         <CheckBox x:Name="ChargeSliderToggle" Content="{x:Static loc:WpfStrings.ChargeSliderToggle_Content}" Style="{StaticResource RowSwitch}" Click="ChargeSliderToggle_Click" />
                         <CheckBox x:Name="EcDirectOffToggle" Content="{x:Static loc:WpfStrings.EcDirectOffToggle_Content}" Style="{StaticResource RowSwitch}" Click="EcDirectOffToggle_Click" />
@@ -668,40 +694,70 @@
                                 <Slider x:Name="BatteryLimitSlider" Minimum="40" Maximum="100" Value="100" Style="{StaticResource RoundSlider}" ValueChanged="BatteryLimitSlider_Changed" Visibility="Collapsed" />
                                 <TextBlock x:Name="BatteryLimitSliderText" Grid.Column="1" Text="100%" Style="{StaticResource StatText}" Margin="10,0,0,0" Visibility="Collapsed" />
                             </Grid>
+                        <Grid x:Name="XingyaoChargeRow" Margin="0,8,0,0" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_12}" Style="{StaticResource RowLabel}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <CheckBox x:Name="XingyaoChargeEnable" Content="启用" Style="{StaticResource RowSwitch}" VerticalAlignment="Center" Grid.Column="1" />
+                            <Button Grid.Column="3" Content="{x:Static loc:WpfStrings.ChargeLimitApplyButton_Content}" Style="{StaticResource MiniButton}" Click="XingyaoChargeApply_Click" Margin="0,0,6,0" />
+                            <Button Grid.Column="4" Content="恢复默认" Style="{StaticResource MiniButton}" Click="XingyaoChargeRestore_Click" />
+                        </Grid>
+                        <StackPanel x:Name="XingyaoChargeButtonRow" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_11}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox x:Name="XingyaoChargeLowBox" Width="56" Height="26" VerticalContentAlignment="Center" Text="85" Margin="0,0,10,0" Background="{DynamicResource InputBrush}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="5,0" />
+                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_10}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox x:Name="XingyaoChargeHighBox" Width="56" Height="26" VerticalContentAlignment="Center" Text="100" Background="{DynamicResource InputBrush}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="5,0" />
+                        </StackPanel>
+                        <TextBlock x:Name="XingyaoChargeStatus" Text="" Style="{StaticResource MutedText}" FontSize="10" TextWrapping="Wrap" Visibility="Collapsed" />
                     </StackPanel>
 
                     <!-- 水冷 -->
                     <StackPanel x:Name="LiquidSection" Style="{StaticResource Section}" Visibility="Collapsed">
                         <Grid x:Name="LiquidHeader" Cursor="Hand" MouseLeftButtonUp="LiquidHeader_MouseLeftButtonUp">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock x:Name="LiquidArrow" Text="▾" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
                                 <Viewbox Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"><Path Data="M8,1 C8,1 3,7 3,10.5 A5,5 0 0 0 13,10.5 C13,7 8,1 8,1 Z" Fill="{DynamicResource MutedBrush}" Stretch="Uniform" /></Viewbox>
                                 <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_9}" Style="{StaticResource SectionHeader}" Margin="0" />
                             </StackPanel>
-                            <Button x:Name="LiquidStatusButton" Content="{x:Static loc:WpfStrings.LiquidStatusButton_Content}" Style="{StaticResource MiniButton}" HorizontalAlignment="Right" Click="LiquidStatus_Click" />
+                            <Button x:Name="LiquidCurveButton" Grid.Column="1" Content="曲线" FontSize="11" Style="{StaticResource MiniButton}" MinWidth="44" Padding="8,4" Margin="0,0,6,0" HorizontalAlignment="Right" Visibility="Collapsed" Click="LiquidCurve_Click" ToolTip="水冷曲线控制" />
+                            <Button x:Name="LiquidPairButton" Grid.Column="2" Content="配对" FontSize="11" Style="{StaticResource MiniButton}" MinWidth="44" Padding="8,4" Margin="0,0,6,0" HorizontalAlignment="Right" Visibility="Collapsed" Click="LiquidPair_Click" ToolTip="水冷配对与专属绑定" />
+                            <Button x:Name="LiquidStatusButton" Grid.Column="3" Content="{x:Static loc:WpfStrings.LiquidStatusButton_Content}" Style="{StaticResource MiniButton}" HorizontalAlignment="Right" MinWidth="52" Click="LiquidStatus_Click" />
                         </Grid>
                         <StackPanel x:Name="LiquidBody">
+                        <!-- 迷你窗只有 440 宽：泵/扇保持一行，但给下拉固定窄宽度，避免被压缩重叠 -->
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_8}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <ComboBox x:Name="LiquidPumpCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" SelectedIndex="0" Margin="0,0,12,0" SelectionChanged="LiquidPump_SelectionChanged">
+                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_8}" Style="{StaticResource MutedText}" MinWidth="32" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox x:Name="LiquidPumpCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" Width="140" SelectedIndex="0" Margin="0,0,12,0" SelectionChanged="LiquidPump_SelectionChanged">
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_6}" Tag="-1" />
                                 <ComboBoxItem Content="45%" Tag="0" />
                                 <ComboBoxItem Content="60%" Tag="1" />
                                 <ComboBoxItem Content="90%" Tag="2" />
                             </ComboBox>
-                            <TextBlock Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_7}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <ComboBox x:Name="LiquidFanCombo" Grid.Column="3" Style="{StaticResource RoundCombo}" SelectedIndex="0" SelectionChanged="LiquidFan_SelectionChanged">
+                            <TextBlock Grid.Column="2" Text="{x:Static loc:WpfStrings.OriginalStyleWindow_Text_7}" Style="{StaticResource MutedText}" MinWidth="32" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox x:Name="LiquidFanCombo" Grid.Column="3" Style="{StaticResource RoundCombo}" Width="140" SelectedIndex="0" SelectionChanged="LiquidFan_SelectionChanged">
                                 <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_6}" Tag="-1" />
                                 <ComboBoxItem Content="40%" Tag="0" />
                                 <ComboBoxItem Content="50%" Tag="1" />
                                 <ComboBoxItem Content="60%" Tag="2" />
                                 <ComboBoxItem Content="90%" Tag="3" />
+                                <ComboBoxItem Content="自定义曲线" Tag="curve" />
                             </ComboBox>
                         </Grid>
                         </StackPanel>
@@ -804,6 +860,11 @@
 
                 </WrapPanel>
             </ScrollViewer>
+            <ScrollBar x:Name="MainScrollBar" Grid.Row="3" Orientation="Vertical"
+                       Style="{StaticResource OverlayScrollBar}" Width="8"
+                       HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                       Margin="0,4,2,4" Visibility="Collapsed"
+                       ValueChanged="MainScrollBar_ValueChanged" />
 
             <!-- 底部 dock：模仿原版悬浮底栏 -->
             <Border Grid.Row="4" Margin="12,0,12,8" Background="{DynamicResource DockBrush}" CornerRadius="8" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,6">
@@ -816,13 +877,19 @@
                         <TextBlock x:Name="StatusText" Text="0.293.6" FontSize="12" />
                         <TextBlock Text="beta23.6" Style="{StaticResource MutedText}" FontSize="10" />
                     </StackPanel>
-                    <UniformGrid Grid.Column="1" Columns="5" VerticalAlignment="Center">
+                    <UniformGrid Grid.Column="1" Columns="6" VerticalAlignment="Center">
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
                             <StackPanel>
                                 <Rectangle Width="15" Height="15" HorizontalAlignment="Center" Fill="{DynamicResource MutedBrush}">
                         <Rectangle.OpacityMask><ImageBrush ImageSource="Assets/Icons/ui-overlay.png" /></Rectangle.OpacityMask>
                     </Rectangle>
                                 <TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_4}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="检查更新">
+                            <StackPanel>
+                                <TextBlock Text="&#xE895;" FontFamily="Segoe MDL2 Assets" FontSize="15" HorizontalAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
+                                <TextBlock Text="{x:Static loc:WpfStrings.CheckUpdateButton_Content}" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="设置">

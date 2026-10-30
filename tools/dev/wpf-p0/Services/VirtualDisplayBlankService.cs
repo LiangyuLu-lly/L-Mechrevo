@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using MechrevoLite;
 using MechrevoLite.Display;
 using Microsoft.Win32;
+using System.Windows.Forms;
 
 namespace L_Mechrevo.WpfP0.Services;
 
@@ -115,6 +116,41 @@ internal static class VirtualDisplayBlankService
         }
     }
 
+    /// <summary>最近一次息屏拒绝/失败原因（供 UI/OSD 使用）。</summary>
+    internal static string LastError { get; private set; } = "";
+
+    /// <summary>只有“单个内屏 + 没有外接屏”才允许息屏。</summary>
+    internal static bool IsSingleInternalDisplay(out string reason)
+    {
+        reason = "";
+        try
+        {
+            Screen[] screens = Screen.AllScreens;
+            if (screens.Length != 1)
+            {
+                reason = "外接显示器时“息屏（不睡眠）”不可用（仅内屏可用）";
+                return false;
+            }
+            string? laptop = MechrevoLite.Display.ScreenNative.FindLaptopScreen(false);
+            if (string.IsNullOrWhiteSpace(laptop))
+            {
+                reason = "未识别到内屏，已取消息屏";
+                return false;
+            }
+            if (!string.Equals(screens[0].DeviceName, laptop, StringComparison.OrdinalIgnoreCase))
+            {
+                reason = "当前不是内屏，“息屏（不睡眠）”不可用（仅内屏可用）";
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            reason = "显示拓扑检测失败：" + ex.GetType().Name;
+            return false;
+        }
+    }
+
     /// <summary>
     /// 窗口任务在 <c>BackendProbe.SwitchQuickAsync</c> 里的一行接入点：处理「息屏（monitoroff）」一次性开关。
     /// 返回 true = 本服务已接管（<paramref name="confirmed"/> 为结果）；返回 false = 不是 monitoroff，走原逻辑。
@@ -131,7 +167,31 @@ internal static class VirtualDisplayBlankService
         {
             return true;
         }
+        if (!IsSingleInternalDisplay(out string reason))
+        {
+            LastError = reason;
+            Logger.WriteError("[blank] " + reason);
+            try
+            {
+                L_Mechrevo.WpfP0.ToastService.Show(reason, failure: true);
+            }
+            catch
+            {
+            }
+            return true;
+        }
         string? error = StartBlank();
+        LastError = error ?? "";
+        if (error != null)
+        {
+            try
+            {
+                L_Mechrevo.WpfP0.OsdService.Show("\uE7F4", "息屏", error);
+            }
+            catch
+            {
+            }
+        }
         confirmed = error == null;
         return true;
     }

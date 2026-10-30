@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Newtonsoft.Json.Linq;
 
 namespace MechrevoLite.Update;
 
@@ -170,6 +171,43 @@ internal static class UpdateInstaller
 			Logger.WriteLine("更新包下载失败：" + ex2.GetType().Name + " " + ex2.Message);
 			DeleteFileLogged(filePath);
 			return new DownloadResult(null, "下载失败：" + ex2.Message);
+		}
+	}
+
+	internal static bool VerifyExternalArchive(string filePath, string? sha256, long? size, out string reason)
+	{
+		reason = "";
+		try
+		{
+			if (!File.Exists(filePath))
+			{
+				reason = "外置 GCU 包不存在";
+				return false;
+			}
+			long length = new FileInfo(filePath).Length;
+			if (size.HasValue && length != size.Value)
+			{
+				reason = $"外置 GCU 包大小与服务器声明不符（{length} ≠ {size.Value}）";
+				return false;
+			}
+			if (!UpdatePolicy.IsValidSha256(sha256))
+			{
+				reason = "外置 GCU 包缺少有效 SHA-256";
+				return false;
+			}
+			string actual = ComputeSha256(filePath);
+			if (!string.Equals(actual, sha256!.Trim(), StringComparison.OrdinalIgnoreCase))
+			{
+				reason = "外置 GCU 包 SHA-256 不匹配";
+				return false;
+			}
+			reason = "外置 GCU 包 SHA-256 校验通过";
+			return true;
+		}
+		catch (Exception ex)
+		{
+			reason = "外置 GCU 包校验异常：" + ex.Message;
+			return false;
 		}
 	}
 
@@ -344,6 +382,130 @@ internal static class UpdateInstaller
 		{
 			Logger.WriteLine("安装包启动失败：" + ex.Message);
 			return false;
+		}
+	}
+
+	internal static bool IsDllUpdatePackage(UpdateInfo info)
+	{
+		string name = info.FileName ?? "";
+		string url = info.DownloadUrl ?? "";
+		return name.Contains("update", StringComparison.OrdinalIgnoreCase)
+			&& (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".7z", StringComparison.OrdinalIgnoreCase))
+			|| url.Contains("update", StringComparison.OrdinalIgnoreCase)
+			&& (url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || url.EndsWith(".7z", StringComparison.OrdinalIgnoreCase));
+	}
+
+	internal static bool VerifyDllPackage(string zipPath, out string reason)
+	{
+		reason = "";
+		try
+		{
+			using ZipArchive archive = ZipFile.OpenRead(zipPath);
+			ZipArchiveEntry? manifestEntry = archive.Entries.FirstOrDefault(e => string.Equals(e.Name, "manifest.json", StringComparison.OrdinalIgnoreCase));
+			if (manifestEntry == null)
+			{
+				reason = "更新包缺少 manifest.json";
+				return false;
+			}
+			using StreamReader reader = new(manifestEntry.Open());
+			JObject manifest = JObject.Parse(reader.ReadToEnd());
+			JArray? files = manifest["files"] as JArray;
+			if (files == null || files.Count == 0)
+			{
+				reason = "更新包 manifest 没有文件列表";
+				return false;
+			}
+			string root = Path.GetFullPath(Path.GetDirectoryName(zipPath) ?? "");
+			foreach (JToken token in files)
+			{
+				string? rel = token.Value<string>("path");
+				string? sha = token.Value<string>("sha256");
+				long? size = token.Value<long?>("size");
+				if (string.IsNullOrWhiteSpace(rel) || string.IsNullOrWhiteSpace(sha) || !size.HasValue)
+				{
+					reason = "更新包 manifest 条目不完整";
+					return false;
+				}
+				string normalized = rel.Replace('\\', '/');
+				if (normalized.StartsWith("/") || normalized.Contains(".."))
+				{
+					reason = "更新包包含非法路径";
+					return false;
+				}
+				ZipArchiveEntry? entry = archive.Entries.FirstOrDefault(e => string.Equals(e.FullName.Replace('\\', '/'), normalized, StringComparison.OrdinalIgnoreCase));
+				if (entry == null || entry.Length != size.Value)
+				{
+					reason = "更新包文件缺失或大小不符：" + rel;
+					return false;
+				}
+			}
+			reason = "更新包 manifest 校验通过";
+			return true;
+		}
+		catch (Exception ex)
+		{
+			reason = "更新包校验失败：" + ex.Message;
+			return false;
+		}
+	}
+
+	internal static bool PrepareDllUpdater(string zipPath, string installDir, out string reason)
+	{
+		reason = "";
+		if (!VerifyDllPackage(zipPath, out reason)) return false;
+		try
+		{
+			string root = Path.Combine(TempRoot, "dll-update", Guid.NewGuid().ToString("N"));
+			string extractDir = Path.Combine(root, "package");
+			string helperDir = Path.Combine(root, "helper");
+			Directory.CreateDirectory(extractDir);
+			ZipFile.ExtractToDirectory(zipPath, extractDir);
+			CopyDirectory(installDir, helperDir);
+			string exeName = Path.GetFileName(CurrentExePath);
+			string helperExe = Path.Combine(helperDir, exeName);
+			if (!File.Exists(helperExe))
+			{
+				reason = "更新器复制失败：找不到 " + exeName;
+				return false;
+			}
+			Process process = Process.Start(new ProcessStartInfo
+			{
+				FileName = helperExe,
+				UseShellExecute = false,
+				CreateNoWindow = true,
+				WorkingDirectory = helperDir,
+				ArgumentList =
+				{
+					"--apply-dll-update", extractDir, installDir, Environment.ProcessId.ToString()
+				}
+			});
+			if (process == null)
+			{
+				reason = "更新器启动失败";
+				return false;
+			}
+			reason = "更新器已启动（pid " + process.Id + "）";
+			return true;
+		}
+		catch (Exception ex)
+		{
+			reason = "更新器准备失败：" + ex.Message;
+			return false;
+		}
+	}
+
+	private static void CopyDirectory(string source, string target)
+	{
+		Directory.CreateDirectory(target);
+		foreach (string dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+		{
+			Directory.CreateDirectory(dir.Replace(source, target));
+		}
+		foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+		{
+			string dest = file.Replace(source, target);
+			Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+			File.Copy(file, dest, overwrite: true);
 		}
 	}
 

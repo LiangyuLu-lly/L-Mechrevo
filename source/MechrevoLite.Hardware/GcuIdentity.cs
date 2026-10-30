@@ -46,8 +46,7 @@ internal static class GcuIdentity
 				&& string.Equals(text2, "50", StringComparison.OrdinalIgnoreCase))
 			{
 				Logger.WriteError("[gcu] 变体冲突：注册表 GcuVariant=" + text + " 但实际载荷识别=50 ⇒ 以实际载荷为准（按 50 系处理）");
-				// 2026-10-24（机主：更新载荷为什么不更新注册表）：载荷已经实际换成 50 时，
-				// 把安装标记同步修正，避免每次启动都重复报冲突（下次启动直接读 50）。
+				// 实际载荷已经是 50 时同步安装标记，避免每次启动重复报冲突。
 				PersistCorrectedVariant("50");
 				return "50";
 			}

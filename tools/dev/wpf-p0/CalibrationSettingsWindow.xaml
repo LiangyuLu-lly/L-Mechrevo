@@ -56,7 +56,7 @@
                 <ComboBox x:Name="IccCombo" Style="{DynamicResource RoundCombo}" SelectionChanged="IccCombo_SelectionChanged" />
                 <Button x:Name="ImportButton" Grid.Column="1" Content="{x:Static loc:WpfStrings.ImportButton_Content}" Style="{StaticResource FlatButton}"
                         Margin="8,0,0,0" Click="ImportButton_Click" />
-                <Button x:Name="CloudButton" Grid.Column="2" Content="云端获取" Style="{StaticResource FlatButton}"
+                <Button x:Name="CloudButton" Grid.Column="2" Content="{x:Static loc:WpfStrings.CloudIcc_Content}" Style="{StaticResource FlatButton}"
                         Margin="8,0,0,0" Click="CloudButton_Click" Visibility="Collapsed" />
             </Grid>
             <TextBlock Text="{x:Static loc:WpfStrings.CalibrationSettingsWindow_Text}"

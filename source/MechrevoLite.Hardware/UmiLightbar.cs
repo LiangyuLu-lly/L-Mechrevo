@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 
 namespace MechrevoLite.Hardware;
 
+// 机型适配参考：OpenRevo (https://github.com/faintonce/open-revo, GPL-3.0)。
+
 /// <summary>
 /// UMI / Intel NUC X15 灯带：走 \\.\ACPIDriver 的 ACPI H2RAM 地址。
 /// 地址与控制位沿用 30 系 NUC 控制台的灯带实现。
@@ -46,7 +48,8 @@ internal static class UmiLightbar
             red = Read(handle, AcR) / 2;
             green = Read(handle, AcG) / 2;
             blue = Read(handle, AcB) / 2;
-            on = (ctrl & 1) == 1;
+            // 原厂控制位：bit2=关闭；bit0=灯带使能。
+            on = (ctrl & 0x04) == 0 && (ctrl & 0x01) != 0;
             return ctrl >= 0;
         }
         finally
@@ -64,12 +67,20 @@ internal static class UmiLightbar
         }
         try
         {
-            // 原厂：1864=0 单色常亮，=8 关闭，=128 彩色/循环。
-            byte ac = (byte)(on ? 0 : 8);
-            byte dc = (byte)(on ? 0 : 8);
+            // 原厂灯带电源：读改写 1864/2018，保留其它位，只动 bit0/bit2。
+            // 开 = (ctrl & 0xFA) | 1；关 = (ctrl & 0xFA) | 5。
+            // （旧实现直接写 0/8 会覆盖固件当前模式位，导致“关不掉”。）
+            int acOld = Read(handle, AcCtrl);
+            int dcOld = Read(handle, DcCtrl);
+            byte ac = (byte)(((acOld < 0 ? 0 : acOld) & 0xFA) | (on ? 0x01 : 0x05));
+            byte dc = (byte)(((dcOld < 0 ? 0 : dcOld) & 0xFA) | (on ? 0x01 : 0x05));
             bool okAc = Write(handle, AcCtrl, ac);
             bool okDc = Write(handle, DcCtrl, dc);
-            Logger.WriteLine("[umi-lightbar] 电源=" + (on ? "开" : "关") + " · AC=" + okAc + " DC=" + okDc);
+            int readAc = Read(handle, AcCtrl);
+            int readDc = Read(handle, DcCtrl);
+            Logger.WriteError("[umi-lightbar] 电源=" + (on ? "开" : "关") + " · AC=" + okAc + " DC=" + okDc
+                + " · 回读AC=0x" + (readAc < 0 ? "??" : readAc.ToString("X2"))
+                + " DC=0x" + (readDc < 0 ? "??" : readDc.ToString("X2")));
             return okAc || okDc;
         }
         finally
@@ -87,15 +98,23 @@ internal static class UmiLightbar
         }
         try
         {
-            bool on = true;
-            byte ac = (byte)Math.Max(0, Read(handle, AcCtrl));
-            byte dc = (byte)Math.Max(0, Read(handle, DcCtrl));
-            bool colorful = effect is "Colorful" or "Rainbow" or "ColorMarquee" or "Welcome" or "ColorfulMode";
+            int acOld = Read(handle, AcCtrl);
+            int dcOld = Read(handle, DcCtrl);
+            bool colorful = effect is "Colorful" or "Rainbow" or "ColorMarquee" or "Welcome" or "ColorfulMode" or "Mix";
+            bool breathing = string.Equals(effect, "Breathing", StringComparison.OrdinalIgnoreCase);
             bool off = string.Equals(effect, "Off", StringComparison.OrdinalIgnoreCase);
-            // 原厂 Intel 灯带只有：单色(0)、关闭(8)、彩色/循环(128)。
-            byte ctrl = (byte)(off ? 8 : colorful ? 128 : 0);
-            ac = ctrl;
-            dc = ctrl;
+            // 原厂 ApplySetting/ApplyOnOff 的控制字节语义：
+            //   保留 0x72 的模式位；单色=bit0，呼吸=bit3，彩色/循环=bit7+bit3；
+            //   关闭=bit2+bit0（0x05）。不再整字节覆盖。
+            byte ctrlFor(int old)
+            {
+                if (off) return (byte)((old & 0xFA) | 0x05);
+                if (colorful) return (byte)((old & 0x72) | 0x89);
+                if (breathing) return (byte)((old & 0x72) | 0x09);
+                return (byte)((old & 0x72) | 0x01);
+            }
+            byte ac = ctrlFor(acOld);
+            byte dc = ctrlFor(dcOld);
             Write(handle, AcCtrl, ac);
             Write(handle, DcCtrl, dc);
 
@@ -120,7 +139,7 @@ internal static class UmiLightbar
                 Write(handle, DcG, (byte)g);
                 Write(handle, DcB, (byte)b);
             }
-            Logger.WriteLine("[umi-lightbar] 灯效=" + effect + " · on=" + on + " · 亮度档=" + lightLevel);
+            Logger.WriteLine("[umi-lightbar] 灯效=" + effect + " · AC控制=0x" + ac.ToString("X2") + " · DC控制=0x" + dc.ToString("X2") + " · 亮度档=" + lightLevel);
             return true;
         }
         finally

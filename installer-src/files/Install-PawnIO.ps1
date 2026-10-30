@@ -24,32 +24,7 @@ try {
         New-Item -ItemType Directory -Path $downloadDir | Out-Null
         $InstallerPath = Join-Path $downloadDir 'PawnIO_setup.exe'
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        # 下载源：官方 GitHub 优先，失败后按顺序尝试公共镜像（下载后仍校验 SHA256 + 签名，镜像只做传输）
-        $officialUrl = 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe'
-        $downloadUrls = @(
-            $officialUrl,
-            ('https://gh-proxy.com/' + $officialUrl),
-            ('https://ghfast.top/' + $officialUrl),
-            ('https://hub.gitmirror.com/' + $officialUrl)
-        )
-        $downloaded = $false
-        foreach ($url in $downloadUrls) {
-            try {
-                Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $InstallerPath -TimeoutSec 30
-                if ((Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash -eq $expectedHash) {
-                    Write-Output ('PawnIO downloaded from: ' + (($url -split '/')[2]))
-                    $downloaded = $true
-                    break
-                }
-                Write-Output ('PawnIO mirror hash mismatch, trying next: ' + (($url -split '/')[2]))
-            } catch {
-                Write-Output ('PawnIO download failed, trying next: ' + (($url -split '/')[2]))
-            }
-        }
-        if (-not $downloaded) {
-            Write-Output 'PawnIO download failed/timed out on all sources; skipped (LM installation continues).'
-            exit 0
-        }
+        Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe' -OutFile $InstallerPath -TimeoutSec 120
     }
     $InstallerPath = (Resolve-Path -LiteralPath $InstallerPath).Path
     if ((Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash -ne $expectedHash) {
@@ -60,35 +35,9 @@ try {
     if ($ValidateOnly) { Write-Output 'PawnIO installer hash and signature verified.'; exit 0 }
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Administrator privileges required.' }
-    # 2026-10-18（机主反馈「PawnIO 会重复安装」）：先判是否已装、能否直接启动，避免每次安装包升级都重装一遍驱动。
-    $svcKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\PawnIO'
-    $alreadyInstalled = Test-Path $svcKey
-    $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'" -ErrorAction SilentlyContinue
+    $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'"
     if ($driver -and $driver.State -eq 'Running') { Write-Output 'PawnIO is already running.'; exit 0 }
-    if ($alreadyInstalled) {
-        try { Start-Service -Name 'PawnIO' -ErrorAction Stop; Start-Sleep -Seconds 2 } catch { }
-        $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'" -ErrorAction SilentlyContinue
-        if ($driver -and $driver.State -eq 'Running') { Write-Output 'PawnIO was installed but stopped; service started, no reinstall.'; exit 0 }
-        $ver = $null
-        try {
-            $entry = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
-                Where-Object { $_.DisplayName -like 'PawnIO*' } | Select-Object -First 1
-            if ($entry -and $entry.DisplayVersion) { $ver = [version]$entry.DisplayVersion }
-        } catch { }
-        if ($ver -and $ver -ge [version]'2.2.0') {
-            Write-Output ('PawnIO already installed (v' + $ver.ToString() + ', service not running); skip reinstall.')
-            exit 0
-        }
-    }
-    # 安装阶段超时保护：驱动安装器卡住（下载慢/UAC 等待/服务安装挂起）时不阻塞 LM 安装，直接跳过
-    $process = Start-Process -FilePath $InstallerPath -ArgumentList '-install','-silent' -WindowStyle Hidden -PassThru
-    $installTimeoutMs = 120000
-    if (-not $process.WaitForExit($installTimeoutMs)) {
-        try { if (-not $process.HasExited) { $process.Kill() } } catch { }
-        Write-Output ('PawnIO installer timed out after ' + [int]($installTimeoutMs / 1000) + 's; skipped (LM installation continues).')
-        exit 0
-    }
-    $process.WaitForExit()
+    $process = Start-Process -FilePath $InstallerPath -ArgumentList '-install','-silent' -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -eq 3010) { Write-Output 'PawnIO installed; restart required.'; exit 3010 }
     if ($process.ExitCode -ne 0) { throw ('PawnIO installer exit code: ' + $process.ExitCode) }
     $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'"

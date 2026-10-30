@@ -48,6 +48,14 @@ internal static class LightCompatibilitySwitches
 	/// </summary>
 	internal const bool EnableKeyboardKindModel = true;
 
+	/// <summary>
+	/// 2026-10-29（A5 · Mix 关灯真 bug）：灯带 / Logo / 铰链 / 同步四个通道的 color.isCircular
+	/// 改按「逐通道 × 逐效果」表取值（LightbarColorPolicy），并把"没颜色就发 7 段七彩"的兜底
+	/// 限制到 Rainbow 专用。默认 on。
+	/// 关掉（环境变量 LMECHREVO_LIGHTBAR_MIXFIX=0）⇒ 回到旧口径（isCircular = Breathing || Mix，Mix 发 7 段七彩）。
+	/// </summary>
+	internal const bool EnableLightbarMixFix = true;
+
 	/// <summary>环境变量名：置 0 关闭「补 ID」（恢复 18.6 的通用 7 段无 ID 帧）。</summary>
 	internal const string LightbarIdFixEnvironmentVariable = "LMECHREVO_LIGHTBAR_IDFIX";
 
@@ -60,6 +68,9 @@ internal static class LightCompatibilitySwitches
 	/// <summary>环境变量名：置 0 关闭「ordinal→kind 键盘判据」（回到 0.291.2 的 1/2 都算单分区）。</summary>
 	internal const string KeyboardKindModelEnvironmentVariable = "LMECHREVO_KB_KIND_MODEL";
 
+	/// <summary>环境变量名：置 0 关闭「灯带/Logo 逐效果 isCircular + Rainbow 专用七色板」修复（回到 Mix 关灯那一版）。</summary>
+	internal const string LightbarMixFixEnvironmentVariable = "LMECHREVO_LIGHTBAR_MIXFIX";
+
 	private static (bool Value, string Source)? _lightbarIdFix;
 
 	private static (bool Value, string Source)? _lightbarDedup;
@@ -67,6 +78,8 @@ internal static class LightCompatibilitySwitches
 	private static (bool Value, string Source)? _perKeyIdFix;
 
 	private static (bool Value, string Source)? _keyboardKindModel;
+
+	private static (bool Value, string Source)? _lightbarMixFix;
 
 	private static int _startupLogged;
 
@@ -83,6 +96,12 @@ internal static class LightCompatibilitySwitches
 	internal static bool KeyboardKindModelEnabled => ResolveCached(ref _keyboardKindModel, KeyboardKindModelEnvironmentVariable, EnableKeyboardKindModel).Value;
 
 	/// <summary>
+	/// 最终生效值：true=灯带/Logo/铰链/同步按逐效果 isCircular 表取值且七彩兜底只留给 Rainbow；
+	/// false=旧口径（isCircular = Breathing || Mix，Mix 发 7 段七彩）。
+	/// </summary>
+	internal static bool LightbarMixFixEnabled => ResolveCached(ref _lightbarMixFix, LightbarMixFixEnvironmentVariable, EnableLightbarMixFix).Value;
+
+	/// <summary>
 	/// 启动时打**一条**独立日志（Logger.WriteLine，不走去重），把两个开关的最终生效值与来源写清楚，
 	/// 便于机主导包/替换后一眼确认。只写日志，不改任何状态；本进程只打一次。
 	/// </summary>
@@ -96,10 +115,14 @@ internal static class LightCompatibilitySwitches
 		(bool Value, string Source) dedup = ResolveCached(ref _lightbarDedup, LightbarDedupEnvironmentVariable, EnableLightbarDedup);
 		(bool Value, string Source) perKeyId = ResolveCached(ref _perKeyIdFix, PerKeyIdFixEnvironmentVariable, EnablePerKeyColorBufferIdFix);
 		(bool Value, string Source) kbKind = ResolveCached(ref _keyboardKindModel, KeyboardKindModelEnvironmentVariable, EnableKeyboardKindModel);
+		(bool Value, string Source) lbMix = ResolveCached(ref _lightbarMixFix, LightbarMixFixEnvironmentVariable, EnableLightbarMixFix);
 		Logger.WriteLine("[light] 灯带/键盘修复开关: lightbarIdFix=" + (idFix.Value ? "on" : "off") + " dedup=" + (dedup.Value ? "on" : "off")
 			+ " perKeyIdFix=" + (perKeyId.Value ? "on" : "off") + " kbKindModel=" + (kbKind.Value ? "on" : "off")
-			+ " (来源: idFix=" + idFix.Source + "; dedup=" + dedup.Source + "; perKeyIdFix=" + perKeyId.Source + "; kbKindModel=" + kbKind.Source + ")"
-			+ " | " + LightbarIdFixEnvironmentVariable + " / " + LightbarDedupEnvironmentVariable + " / " + PerKeyIdFixEnvironmentVariable + " / " + KeyboardKindModelEnvironmentVariable + " 取值 1/true/on/yes=开, 0/false/off/no=关; 改完重启 LM 生效; 删掉变量即恢复默认(on)");
+			+ " lightbarMixFix=" + (lbMix.Value ? "on" : "off")
+			+ " (来源: idFix=" + idFix.Source + "; dedup=" + dedup.Source + "; perKeyIdFix=" + perKeyId.Source + "; kbKindModel=" + kbKind.Source
+			+ "; lightbarMixFix=" + lbMix.Source + ")"
+			+ " | " + LightbarIdFixEnvironmentVariable + " / " + LightbarDedupEnvironmentVariable + " / " + PerKeyIdFixEnvironmentVariable + " / " + KeyboardKindModelEnvironmentVariable
+			+ " / " + LightbarMixFixEnvironmentVariable + " 取值 1/true/on/yes=开, 0/false/off/no=关; 改完重启 LM 生效; 删掉变量即恢复默认(on)");
 	}
 
 	private static (bool Value, string Source) ResolveCached(ref (bool Value, string Source)? cache, string variableName, bool defaultValue)

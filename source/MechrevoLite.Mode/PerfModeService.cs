@@ -588,13 +588,12 @@ internal sealed class PerfModeService
 		{
 			return;
 		}
-		// 档位配置里明确设置的 WindowsPowerMode 优先级高于“高性能电源”总开关；
-		// 只有未明确配置时才由总开关 + 档位类型默认映射决定。
-		bool explicitWindowsMode = mode.Settings.WindowsPowerMode.HasValue;
-		if (!explicitWindowsMode && AppConfig.Get("bd_power_overlay", 1) == 0)
+		// 0.293.5.1 基线：“高性能电源”总开关关闭时，任何档位都不下发 Windows 电源模式。
+		if (AppConfig.Get("bd_power_overlay", 1) == 0)
 		{
 			return;
 		}
+		bool explicitWindowsMode = mode.Settings.WindowsPowerMode.HasValue;
 		int overlay;
 		if (explicitWindowsMode)
 		{
@@ -712,6 +711,20 @@ internal sealed class PerfModeService
 		{
 			Logger.WriteLine("PerfModes: activate(" + modeId + ") ignored, mode does not exist");
 			return null;
+		}
+		MechrevoHw? intelXingyaoGuard = _hw;
+		if (mode.IsCustom && intelXingyaoGuard != null
+			&& MechrevoLite.Hardware.CpuVendor.IsIntel
+			&& MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform())
+		{
+			Logger.WriteError("[perfmode] Intel 星耀：自定义模式已暂时屏蔽（不应用、不下发）");
+			PerfApplyOutcome blocked = new PerfApplyOutcome(modeId, new PerfApplyStepOutcome[1]
+			{
+				new PerfApplyStepOutcome(SwitchStepFor(mode, 0), PerfApplyResult.Failed,
+					"Intel 星耀暂不支持自定义模式")
+			});
+			RaiseApplied(blocked);
+			return blocked;
 		}
 		PerfModeSettings expectedSettings = mode.Settings;
 		MechrevoHw hw = _hw;
@@ -1198,7 +1211,8 @@ internal sealed class PerfModeService
 			return;
 		}
 		// 同方 GCU（30/40 系）按 LM 本地保存的自定义档恢复（更新/重装 GCU 后不丢配置）
-		bool gen40Gcu = hw.IsGcuConnected && (hw.DgpuGeneration == DgpuGenerationKind.Gen40 || hw.DgpuGeneration == DgpuGenerationKind.Gen30);
+		bool gen40Gcu = hw.IsGcuConnected && (hw.DgpuGeneration == DgpuGenerationKind.Gen40
+			|| hw.DgpuGeneration == DgpuGenerationKind.Gen30);
 		if (!hw.SmuCustomApu && !hw.UsesBaolongda && !gen40Gcu)
 		{
 			return;
