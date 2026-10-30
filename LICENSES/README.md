@@ -2,7 +2,7 @@
 
 This folder holds **verbatim, unmodified** licence texts of third-party components that L-Mechrevo
 derives from or conveys in binary form. See `THIRD-PARTY-NOTICES.md` (in the source tree: `..\THIRD-PARTY-NOTICES.md`) for the full inventory and
-`..\ATTRIBUTION-PATCH-PLAN.md` for how these files get into the installer.
+`..\..\docs\archive\attribution-20261010\ATTRIBUTION-PATCH-PLAN.md` for how these files get into the installer.
 
 ## Contents
 
