@@ -2578,7 +2578,12 @@ public static class HardwareControl
 		gpuPower = ResolveGpuPower(num2, IsUsablePower(num2) ? ((float?)null) : gpuPowerViaNvml);
 		// Intel iGPU（尤其星耀 PTL）：LHM 多数只给 D3D 负载；频率/功耗/温度缺失时
 		// 尝试 Level Zero Sysman（只读），读到才覆盖，读不到保持「—」。
-		if (CpuVendor.IsIntel)
+		// Level Zero Sysman 只在已验证的星耀平台启用；其它 Intel 平台（如 ARL Ultra 9）
+		// 加载 ze_loader 时可能触发 CFG 间接调用 Fail Fast（0xc0000409 subcode 0xa）。
+		// 需要现场调试时可用 config intel_l0_telemetry=1 显式打开。
+		bool intelL0Allowed = MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform()
+			|| MechrevoLite.AppConfig.Is("intel_l0_telemetry");
+		if (CpuVendor.IsIntel && intelL0Allowed)
 		{
 			try
 			{

@@ -1,3 +1,13 @@
+五十、0.293.6.8 beta23.6.8（2026-10-31）
+────────────────────────────────────────────
+1. 修复部分 Intel 平台启动 0xc0000409：
+   - Intel Level Zero Sysman 只在星耀平台或 intel_l0_telemetry=1 时启用；
+   - 其它 Intel 平台不再加载 ze_loader/zesInit，避免 CFG Fail Fast。
+2. 修复安装包 exe 版本不一致：
+   - 完整包/NoGCU 同步 L-Mechrevo.exe、deps.json、runtimeconfig.json；
+   - 不再出现新 DLL + 旧 6.3 exe 的混合安装。
+3. Release 只发 NoGCU 和更新包。
+
 四十九、0.293.6.7 beta23.6.7（2026-10-31）
 ────────────────────────────────────────────
 1. 部分 Intel GCU 机型 CPU 功耗墙回归修复：
