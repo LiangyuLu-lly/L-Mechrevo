@@ -4,27 +4,27 @@
 
 [Setup]
 AppName=L-Mechrevo
-AppVerName=L-Mechrevo 0.293.6.3 beta23.6.3
+AppVerName=L-Mechrevo 0.293.6.7 beta23.6.7
 AppId={{8F4E2C71-9B3A-4D6E-A1C2-7E5B9D0F3A64}
-AppVersion=0.293.6.3
+AppVersion=0.293.6.7
 AppPublisher=L-Mechrevo contributors
 AppCopyright=Copyright (C) 2026 L-Mechrevo contributors. GPL-3.0-only.
 DefaultDirName={autopf}\L-Mechrevo
 DefaultGroupName=L-Mechrevo
 #ifdef NOGCU
-OutputBaseFilename=LM-0.293.6.3-beta23.6.3-baolongda-setup
+OutputBaseFilename=LM-0.293.6.7-beta23.6.7-baolongda-setup
 #else
 #ifdef NOGCU_PAYLOAD
-OutputBaseFilename=LM-0.293.6.3-beta23.6.3-nogcupayload-setup
+OutputBaseFilename=LM-0.293.6.7-beta23.6.7-nogcupayload-setup
 #else
-OutputBaseFilename=LM-0.293.6.3-beta23.6.3-setup
+OutputBaseFilename=LM-0.293.6.7-beta23.6.7-setup
 #endif
 #endif
 UninstallDisplayIcon={app}\L-Mechrevo.exe
 SetupIconFile=files\favicon.ico
-VersionInfoVersion=0.293.6.3
-VersionInfoProductVersion=0.293.6.3
-UninstallDisplayName=L-Mechrevo 0.293.6.3 beta23.6.3
+VersionInfoVersion=0.293.6.7
+VersionInfoProductVersion=0.293.6.7
+UninstallDisplayName=L-Mechrevo 0.293.6.7 beta23.6.7
 Compression=lzma2
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -365,8 +365,8 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Check: ShouldRunGcuInst
 ; ** 2026-10-17：按「可选任务 pawnio」安装 PawnIO 驱动（读 CPU 温度所需）
 ;   只在该任务被勾选时执行；失败**不阻断安装**（命令末尾 exit 0 兜掉返回码）——
 ;     驱动装不上最坏只是 CPU 温度显示「—」，不该让整个安装失败
-;   runhidden：脚本会下载 + 静默装，不需要黑窗；waituntilterminated 保证装完再启动 LM。
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: runhidden nowait; Tasks: pawnio; Check: ShouldInstallPawnIo
+;   nowait：不再隐藏 PowerShell 窗口；脚本内部下载超时（60s）会跳过 PawnIO，不阻断安装。
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""& '{app}\Install-PawnIO.ps1'; exit 0"""; StatusMsg: "正在安装 PawnIO 驱动（读取 CPU 温度所需）…"; Flags: nowait; Tasks: pawnio; Check: ShouldInstallPawnIo
 ; 2026-10-18（机主：安装完自动在后台拉起 LM，不显示主界面）：
 ;   ⭐ 传 "startup" 参数 ⇒ 程序按「开机自启」路径启动 ⇒ 只驻留托盘、不显示主窗口（IsStartupLaunch）。
 ;   ⛔ 不再是 finish 页的勾选项（postinstall 已去掉）⇒ 静默/普通安装都会自动后台启动。

@@ -1576,8 +1576,11 @@ public static class HardwareControl
 			// 无界机型**以 EC 为准**覆盖 GCU FanInfo：主扇 0x0464 = CPU、副扇 0x046C = GPU。
 			// GCU FanInfo 未上报时（例如 GCU 服务预热/尚未 ready），按官方 EC 寄存器只读兜底。
 			// 与 OpenRevo 的 EC 轮询同理：Fan RPM 直接走 EC，不依赖 GCU 是否已 ready。
+			// 参考 OpenRevo：Fan RPM 直接轮询 EC（CPU 0x0464/0x0465，GPU 0x046C/0x046B），
+			// GCU FanInfo 缺失或超过 5 秒没更新时作为只读备路，避免界面停在旧转速。
+			bool fanInfoStale = !hw.IsFanInfoFresh(TimeSpan.FromSeconds(5));
 			if (!hw.WujieSmuApu && !hw.UsesBaolongda
-				&& (cpuFanRPM <= 0 || gpuFanRPM <= 0)
+				&& (fanInfoStale || cpuFanRPM <= 0 || gpuFanRPM <= 0)
 				&& hw.TryReadGcuEcFanSpeeds(out int gcuCpuFanRpm, out int gcuGpuFanRpm))
 			{
 				if (gcuCpuFanRpm > 0) cpuFanRPM = gcuCpuFanRpm;
@@ -2438,6 +2441,20 @@ public static class HardwareControl
 		if (_localMonitoringEnabled)
 		{
 			TryStep(RefreshCpuTempFromLocalSources, "cpu-temp-local", countsAsHealthFailure: false);
+		}
+		// CPU 功耗也放在 LHM/NVML 闸门之前：Energy Meter 与 LHM/NVML 无关，
+		// JIGUANG/极光这类 NVML 初始化失败的机型也能继续显示 CPU 功耗。
+		if (_localMonitoringEnabled)
+		{
+			TryStep(delegate
+			{
+				float? sampled = cpuPowerSampler?.Sample();
+				if (IsUsablePower(sampled))
+				{
+					cpuPower = ResolveCpuPower(sampled, cpuPower);
+					Interlocked.Exchange(ref _lastPowerRefreshTick, Environment.TickCount64);
+				}
+			}, "cpu-power-perfcounter-early", countsAsHealthFailure: false);
 		}
 		// (d) 未启用/已释放：直接早退。
 		//   ⭐⭐ 2026-10-16（GPU 温度「完全不显示」BUGFIX · p2 实证）：

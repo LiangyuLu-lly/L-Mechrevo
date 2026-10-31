@@ -119,7 +119,7 @@ public partial class OverlayWindow : Window
             CpuMemoryBar.Value = Math.Clamp(s.RamUsage, 0, 100);
 
             string source = FormatPowerSource(s.AcOnline);
-            string state = s.Charging ? WpfStrings.OverlayCharging : (s.AcOnline ? (s.BatteryPercent >= 99 ? WpfStrings.OverlayBatteryFull : WpfStrings.OverlayNotCharging) : WpfStrings.OverlayDischarging);
+            string state = s.Charging ? WpfStrings.OverlayCharging : (s.AcOnline ? (s.BatteryPercent >= 95 ? WpfStrings.OverlayBatteryFull : WpfStrings.OverlayNotCharging) : WpfStrings.OverlayDischarging);
             BatteryText.Text = s.BatteryPercent >= 0 ? WpfStrings.OverlayBatteryLabel + s.BatteryPercent + "%" : WpfStrings.OverlayBatteryDash;
             BatteryDetailText.Text = s.BatteryPercent >= 0 ? source + " · " + state : "";
             UpdateBatteryVisibility();

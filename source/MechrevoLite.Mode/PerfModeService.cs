@@ -1069,9 +1069,9 @@ internal sealed class PerfModeService
 		{
 			reason = "生成";
 		}
-		else if (!caps.SupportsDirectGpuOverclock)
+		else if (!caps.SupportsGpuOverclock)
 		{
-			reason = "后端不支持本机直写（旧 GCU 固件字段路径）";
+			reason = "后端不支持显卡超频";
 		}
 		else if (mode.Route != PerfModeRoute.FirmwareSlot)
 		{

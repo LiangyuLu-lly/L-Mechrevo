@@ -30,7 +30,12 @@ internal sealed class RingGauge : FrameworkElement
         drawingContext.DrawEllipse(null, trackPen, center, radius, radius);
 
         double ratio = Math.Clamp(_value / _maximum, 0, 1);
-        if (ratio > 0.001)
+        if (ratio >= 0.999)
+        {
+            // 100% 时起点和终点重合，单个 ArcTo 不画线；直接画整圆。
+            drawingContext.DrawEllipse(null, accentPen, center, radius, radius);
+        }
+        else if (ratio > 0.001)
         {
             double startAngle = -90;
             double endAngle = -90 + 360 * ratio;

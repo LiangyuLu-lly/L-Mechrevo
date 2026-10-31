@@ -673,12 +673,6 @@ public partial class CustomModeWindow : Window
         {
             SetSliderRange(Pl1Slider, hw.Pl1Minimum, hw.Pl1Maximum);
             SetSliderRange(Pl2Slider, hw.Pl2Minimum, hw.Pl2Maximum);
-            if (MechrevoLite.Hardware.CpuVendor.IsIntel && !hw.IsIntelNucMachine && !hw.IsUmiMachine)
-            {
-                // Intel MSR 后端（非 NUC/UMI）：UI 范围与 MSR 写入范围对齐。
-                SetSliderRange(Pl1Slider, 5, 120);
-                SetSliderRange(Pl2Slider, 5, 150);
-            }
         }
         SetSliderRange(Pl4Slider, hw.Pl4Minimum, hw.Pl4Maximum);
         SetSliderRange(TccSlider, hw.TccMinimum, hw.TccMaximum);

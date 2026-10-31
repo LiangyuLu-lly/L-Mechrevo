@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Win32;
 using MechrevoLite.Properties;using System.Collections.Generic;
 using MechrevoLite.Properties;using System.Drawing;
 using MechrevoLite.Properties;using System.Globalization;
@@ -69,6 +70,8 @@ public class WaterCoolerBle : IDisposable
 	public const string LightFanRotate = "fan_rotate";
 
 	public const string LightFanRainbow = "fan_rainbow";
+
+	public const string LightRotateSpot = "rotate";
 
 	public const string LightOff = "off";
 
@@ -164,6 +167,54 @@ public class WaterCoolerBle : IDisposable
 
 	public ulong BoundAddress => TryGetBoundDevice(out ulong address, out _) ? address : 0uL;
 
+	/// <summary>从 Windows 已配对 BTHLE 设备中找水冷（不依赖扫描/GCU 状态）。</summary>
+	internal static IReadOnlyList<(ulong Address, string Name)> FindPairedWaterCoolers()
+	{
+		List<(ulong Address, string Name)> found = new();
+		try
+		{
+			using RegistryKey? root = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum\BTHLE");
+			if (root == null)
+			{
+				return found;
+			}
+			foreach (string deviceKeyName in root.GetSubKeyNames())
+			{
+				if (!deviceKeyName.StartsWith("Dev_", StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
+				if (!ulong.TryParse(deviceKeyName.Substring(4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong address) || address == 0)
+				{
+					continue;
+				}
+				using RegistryKey? deviceKey = root.OpenSubKey(deviceKeyName);
+				if (deviceKey == null)
+				{
+					continue;
+				}
+				foreach (string instanceName in deviceKey.GetSubKeyNames())
+				{
+					using RegistryKey? instanceKey = deviceKey.OpenSubKey(instanceName);
+					string? friendlyName = instanceKey?.GetValue("FriendlyName") as string;
+					if (!IsLikelyWaterCoolerName(friendlyName))
+					{
+						continue;
+					}
+					if (!found.Any(item => item.Address == address))
+					{
+						found.Add((address, friendlyName ?? ""));
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.WriteLine("BLE 已配对水冷枚举失败：" + ex.GetType().Name + " " + ex.Message);
+		}
+		return found;
+	}
+
 	/// <summary>解除专属绑定；之后才会重新扫描/连接其它水冷。</summary>
 	public void UnbindDevice()
 	{
@@ -177,11 +228,18 @@ public class WaterCoolerBle : IDisposable
 
 	internal static bool IsFanLedModel(string? deviceName, string? firmwareVersion)
 	{
-		if (deviceName == null || !deviceName.Contains("LCT22002", StringComparison.OrdinalIgnoreCase))
+		// 只要水冷已上报固件（例如 "MCU F/W Version: 2.0.0.4"），就认为支持冷排风扇灯；
+		// 设备名可能为空/未命名，不能只靠 LCT22002 字符串判断，否则风扇 0x33 灯效会被静默跳过。
+		if (!string.IsNullOrWhiteSpace(deviceName)
+			&& deviceName.Contains("LCT22002", StringComparison.OrdinalIgnoreCase))
 		{
-			return firmwareVersion?.Contains("LCT22002", StringComparison.OrdinalIgnoreCase) ?? false;
+			return true;
 		}
-		return true;
+		if (!string.IsNullOrWhiteSpace(firmwareVersion))
+		{
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool IsLikelyWaterCoolerName(string? name)
@@ -190,7 +248,12 @@ public class WaterCoolerBle : IDisposable
 		{
 			return false;
 		}
-		if (!name.Contains("LCT", StringComparison.OrdinalIgnoreCase) && !name.Contains("Oasis", StringComparison.OrdinalIgnoreCase) && !name.Contains("水冷", StringComparison.OrdinalIgnoreCase))
+		if (!name.Contains("LCT", StringComparison.OrdinalIgnoreCase)
+			&& !name.Contains("Oasis", StringComparison.OrdinalIgnoreCase)
+			&& !name.Contains("水冷", StringComparison.OrdinalIgnoreCase)
+			&& !name.Contains("COOLING", StringComparison.OrdinalIgnoreCase)
+			&& !name.Contains("COOLER", StringComparison.OrdinalIgnoreCase)
+			&& !name.Contains("CS_", StringComparison.OrdinalIgnoreCase))
 		{
 			return name.Contains("AIO", StringComparison.OrdinalIgnoreCase);
 		}
@@ -279,6 +342,22 @@ public class WaterCoolerBle : IDisposable
 		{
 			return;
 		}
+		// 扫描器启动失败时（部分蓝牙适配器/驱动），仍把 Windows 已配对水冷列出来供手动绑定。
+		foreach ((ulong Address, string Name) paired in FindPairedWaterCoolers())
+		{
+			lock (_lock)
+			{
+				int pairedIndex = Devices.FindIndex(d => d.Address == paired.Address);
+				if (pairedIndex < 0)
+				{
+					Devices.Add((paired.Name, paired.Address, 0));
+				}
+				else if (string.IsNullOrWhiteSpace(Devices[pairedIndex].Name))
+				{
+					Devices[pairedIndex] = (paired.Name, paired.Address, Devices[pairedIndex].Rssi);
+				}
+			}
+		}
 		BluetoothLEAdvertisementWatcher bluetoothLEAdvertisementWatcher = new BluetoothLEAdvertisementWatcher
 		{
 			ScanningMode = BluetoothLEScanningMode.Active,
@@ -296,7 +375,7 @@ public class WaterCoolerBle : IDisposable
 		}
 		catch (Exception ex)
 		{
-			Logger.WriteLine("BLE scan start fail: " + ex.Message);
+			Logger.WriteLine("BLE scan start fail: " + ex.GetType().Name + " hr=0x" + ex.HResult.ToString("X8") + " " + ex.Message);
 			_watcher = null;
 		}
 	}
@@ -365,13 +444,17 @@ public class WaterCoolerBle : IDisposable
 		string savedName = "";
 		if (TryGetBoundDevice(out ulong boundAddress, out string boundName))
 		{
-			Logger.WriteLine($"BLE 自动连接：专属绑定 {boundName} ({boundAddress:X12})，不扫描其它水冷");
-			return await ConnectAsync(boundAddress, boundName);
+			Logger.WriteLine($"BLE 自动连接：先尝试专属绑定 {boundName} ({boundAddress:X12})");
+			if (await ConnectAsync(boundAddress, boundName, allowRebind: true))
+			{
+				return true;
+			}
+			Logger.WriteLine("BLE 自动连接：专属绑定不可达，继续尝试 Windows 已配对/扫描（参考 OpenRevo 自动恢复）");
 		}
 		if (TryGetSavedDevice(out savedAddress, out savedName))
 		{
 			Logger.WriteLine($"BLE 自动连接：先尝试上次设备 {savedName} ({savedAddress:X12})");
-			if (await ConnectAsync(savedAddress, savedName))
+			if (await ConnectAsync(savedAddress, savedName, allowRebind: true))
 			{
 				return true;
 			}
@@ -380,7 +463,15 @@ public class WaterCoolerBle : IDisposable
 		if (systemBluetoothConnectionObservation.IsConnected && ulong.TryParse(NormalizeBluetoothAddress(systemBluetoothConnectionObservation.Address), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result) && result != 0L)
 		{
 			Logger.WriteLine($"BLE 自动连接：Windows 已连接 {systemBluetoothConnectionObservation.Name} ({result:X12})");
-			if (await ConnectAsync(result, string.IsNullOrWhiteSpace(systemBluetoothConnectionObservation.Name) ? savedName : systemBluetoothConnectionObservation.Name))
+			if (await ConnectAsync(result, string.IsNullOrWhiteSpace(systemBluetoothConnectionObservation.Name) ? savedName : systemBluetoothConnectionObservation.Name, allowRebind: true))
+			{
+				return true;
+			}
+		}
+		foreach ((ulong Address, string Name) paired in FindPairedWaterCoolers())
+		{
+			Logger.WriteLine($"BLE 自动连接：Windows 已配对水冷 {paired.Name} ({paired.Address:X12})");
+			if (await ConnectAsync(paired.Address, paired.Name, allowRebind: true))
 			{
 				return true;
 			}
@@ -412,7 +503,7 @@ public class WaterCoolerBle : IDisposable
 			}
 			var (text, num, value) = best.Value;
 			Logger.WriteLine($"BLE 自动连接：发现 {text} ({num:X12}) rssi={value}");
-			return await ConnectAsync(num, text);
+			return await ConnectAsync(num, text, allowRebind: true);
 		}
 		catch (Exception ex)
 		{
@@ -425,38 +516,81 @@ public class WaterCoolerBle : IDisposable
 		}
 	}
 
-	public async Task<bool> ConnectAsync(ulong address, string name)
+	public async Task<bool> ConnectAsync(ulong address, string name, bool allowRebind = false)
 	{
 		_ = 7;
 		try
 		{
 			if (TryGetBoundDevice(out ulong bound, out string boundName) && bound != 0 && bound != address)
 			{
-				Logger.WriteLine($"BLE 水冷：拒绝连接非绑定设备 {name} ({address:X12})，当前绑定 {boundName} ({bound:X12})");
-				return false;
+				if (!allowRebind)
+				{
+					Logger.WriteLine($"BLE 水冷：拒绝连接非绑定设备 {name} ({address:X12})，当前绑定 {boundName} ({bound:X12})");
+					return false;
+				}
+				Logger.WriteLine($"BLE 水冷：绑定设备不可达，允许自动切换到 {name} ({address:X12})，原绑定 {boundName} ({bound:X12})");
 			}
 			Disconnect();
-			BluetoothLEDevice device = await BluetoothLEDevice.FromBluetoothAddressAsync(address);
-			if ((object)device == null)
+			BluetoothLEDevice? device = await BluetoothLEDevice.FromBluetoothAddressAsync(address);
+			if (device == null)
 			{
-				Logger.WriteLine("BLE FromBluetoothAddressAsync: null");
-				return false;
-			}
-			GattDeviceServicesResult gattDeviceServicesResult = await device.GetGattServicesAsync(BluetoothCacheMode.Uncached);
-			if (gattDeviceServicesResult.Status != GattCommunicationStatus.Success)
-			{
-				Logger.WriteLine($"BLE GetGattServicesAsync: {gattDeviceServicesResult.Status}");
+				// FromBluetoothAddressAsync 在设备已配对但当前未连/未广播时会返回 null。
+				// 先按 Windows 蓝牙地址查 DeviceInformation，再用 DeviceId 解析，参考 OpenRevo 的已配对回退。
 				try
 				{
-					device.Dispose();
+					DeviceInformationCollection infos = await DeviceInformation.FindAllAsync(
+						BluetoothLEDevice.GetDeviceSelectorFromBluetoothAddress(address));
+					DeviceInformation? info = infos.FirstOrDefault();
+					if (info != null)
+					{
+						Logger.WriteLine($"BLE FromBluetoothAddressAsync null，改用 DeviceId 解析：{info.Name} / {info.Id}");
+						device = await BluetoothLEDevice.FromIdAsync(info.Id);
+					}
 				}
-				catch
+				catch (Exception ex)
 				{
+					Logger.WriteLine("BLE DeviceInformation fallback fail: " + ex.Message);
 				}
+			}
+			if (device == null)
+			{
+				Logger.WriteLine("BLE FromBluetoothAddressAsync: null（DeviceId 回退也未找到）");
 				return false;
 			}
-			GattDeviceService service = gattDeviceServicesResult.Services.FirstOrDefault((GattDeviceService s) => s.Uuid == ServiceUuid);
-			if ((object)service == null)
+			// 与 OpenRevo 一致：先用服务 UUID 直接取，Uncached 失败再 Cached；
+			// 部分 Windows 蓝牙栈/GCU 占用时，全量服务枚举会失败但按 UUID 能拿到。
+			GattDeviceService? service = null;
+			foreach (BluetoothCacheMode cacheMode in new[] { BluetoothCacheMode.Uncached, BluetoothCacheMode.Cached })
+			{
+				try
+				{
+					GattDeviceServicesResult uuidServices = await device.GetGattServicesForUuidAsync(ServiceUuid, cacheMode);
+					if (uuidServices.Status == GattCommunicationStatus.Success)
+					{
+						service = uuidServices.Services.FirstOrDefault();
+					}
+					Logger.WriteLine($"BLE GetGattServicesForUuid({cacheMode}): {uuidServices.Status} · service={(service != null)}");
+				}
+				catch (Exception ex)
+				{
+					Logger.WriteLine($"BLE GetGattServicesForUuid({cacheMode}) fail: {ex.Message}");
+				}
+				if (service != null)
+				{
+					break;
+				}
+			}
+			if (service == null)
+			{
+				// 兼容旧路径：按 UUID 取不到时再枚举全部服务。
+				GattDeviceServicesResult gattDeviceServicesResult = await device.GetGattServicesAsync(BluetoothCacheMode.Uncached);
+				if (gattDeviceServicesResult.Status == GattCommunicationStatus.Success)
+				{
+					service = gattDeviceServicesResult.Services.FirstOrDefault((GattDeviceService s) => s.Uuid == ServiceUuid);
+				}
+				Logger.WriteLine($"BLE GetGattServicesAsync fallback: {gattDeviceServicesResult.Status} · service={(service != null)}");
+			}
+			if (service == null)
 			{
 				Logger.WriteLine("BLE NUS service not found");
 				try
@@ -467,6 +601,16 @@ public class WaterCoolerBle : IDisposable
 				{
 				}
 				return false;
+			}
+			try
+			{
+				// 共享读写：官方控制台/Windows 已打开服务时，独占打开会 AccessDenied。
+				var openStatus = await service.OpenAsync(GattSharingMode.SharedReadAndWrite);
+				Logger.WriteLine($"BLE GATT service open: {openStatus}");
+			}
+			catch (Exception ex)
+			{
+				Logger.WriteLine("BLE GATT service open fail: " + ex.Message);
 			}
 			GattCharacteristicsResult gattCharacteristicsResult = await service.GetCharacteristicsForUuidAsync(CharTxUuid, BluetoothCacheMode.Uncached);
 			if (gattCharacteristicsResult.Status != GattCommunicationStatus.Success)
@@ -558,11 +702,17 @@ public class WaterCoolerBle : IDisposable
 			_firmwareReply = null;
 			AppConfig.Set("lc_last_address", address.ToString("X12", CultureInfo.InvariantCulture));
 			AppConfig.Set("lc_last_name", name);
-			if (!TryGetBoundDevice(out _, out _))
+			if (!TryGetBoundDevice(out ulong currentBound, out _))
 			{
 				AppConfig.Set("lc_bound_address", address.ToString("X12", CultureInfo.InvariantCulture));
 				AppConfig.Set("lc_bound_name", name);
 				Logger.WriteLine($"BLE 水冷：首次连接自动绑定 {name} ({address:X12})");
+			}
+			else if (allowRebind && currentBound != address)
+			{
+				AppConfig.Set("lc_bound_address", address.ToString("X12", CultureInfo.InvariantCulture));
+				AppConfig.Set("lc_bound_name", name);
+				Logger.WriteLine($"BLE 水冷：自动恢复绑定 {name} ({address:X12})");
 			}
 			_lastAutomaticPump = (_lastAutomaticFan = -1);
 			Logger.WriteLine($"BLE connected: {name} ({address:X12}) fw={FirmwareVersion} fanLed={SupportsFanLed}");
@@ -777,6 +927,14 @@ public class WaterCoolerBle : IDisposable
 		return ApplyLightProfileAsync(profile, SavedLightColor, persist);
 	}
 
+	/// <summary>OpenRevo 旋转光斑：水冷头 +（支持时）冷排风扇同时使用模式 4。</summary>
+	private async Task<bool> ApplyRotateSpotAsync()
+	{
+		bool head = await WriteHeadRgb(4, 0, 0, 0);
+		bool fan = !SupportsFanLed || await WriteFanRgb(4, 0, 0, 0);
+		return head & fan;
+	}
+
 	public async Task<bool> ApplyLightProfileAsync(string profile, Color color, bool persist = true)
 	{
 		Color effectiveColor = (color.IsEmpty ? SavedLightColor : color);
@@ -790,6 +948,7 @@ public class WaterCoolerBle : IDisposable
 			"colorful_breath" => await WriteHeadRgb(3, 0, 0, 0), 
 			"fan_rotate" => await WriteFanRgb(4, 0, 0, 0), 
 			"fan_rainbow" => await WriteFanRgb(5, 0, 0, 0), 
+			"rotate" => await ApplyRotateSpotAsync(), 
 			"off" => await TurnOffLights(), 
 			_ => false, 
 		};

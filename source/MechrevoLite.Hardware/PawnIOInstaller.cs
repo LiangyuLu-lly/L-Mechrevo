@@ -99,7 +99,7 @@ internal static class PawnIOInstaller
 			{
 				UseShellExecute = true,
 				Verb = "runas",
-				WindowStyle = ProcessWindowStyle.Hidden
+				WindowStyle = ProcessWindowStyle.Normal
 			};
 			startInfo.ArgumentList.Add("-NoProfile");
 			startInfo.ArgumentList.Add("-ExecutionPolicy");

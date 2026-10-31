@@ -272,11 +272,21 @@ internal sealed class WaterCoolerRoutingService : IDisposable
             bool gcuControllable = _hw?.LcGcuControllable == true
                 && _hw.IsLcStatusFresh(TimeSpan.FromSeconds(15));
             _ble = new WaterCoolerBle();
-            _ble.ConnectionChanged += _ =>
+            _ble.ConnectionChanged += connected =>
             {
-                if (_ble?.IsConnected == true)
+                if (connected && _ble?.IsConnected == true)
                 {
                     Route = LiquidCoolingControlRoute.DirectBle;
+                }
+                else if (_ble != null && _ble.HasSavedDevice)
+                {
+                    // 断开后必须从 DirectBle 退回“已观察到/未连接”，
+                    // 否则状态按钮仍按 BLE 已连接分支执行，只会再次 Disconnect，无法重连。
+                    Route = LiquidCoolingControlRoute.BluetoothObserved;
+                }
+                else
+                {
+                    Route = LiquidCoolingControlRoute.None;
                 }
                 RouteChanged?.Invoke();
             };
@@ -310,6 +320,14 @@ internal sealed class WaterCoolerRoutingService : IDisposable
             if (gcuControllable)
             {
                 Route = LiquidCoolingControlRoute.Gcu;
+                return;
+            }
+            // GCU 没报水冷、但机型支持水冷：给 BLE 一次自动连接/扫描机会。
+            // 已配对设备会先走 PnP 快速连接；没有配对时才进入广播扫描。
+            if (_hw?.SupportsLiquidCooling == true)
+            {
+                Route = LiquidCoolingControlRoute.BluetoothObserved;
+                _ = ConnectSavedAsync();
                 return;
             }
             Route = LiquidCoolingControlRoute.None;
@@ -348,6 +366,17 @@ internal sealed class WaterCoolerRoutingService : IDisposable
             Interlocked.Exchange(ref _connecting, 0);
             RouteChanged?.Invoke();
         }
+    }
+
+    /// <summary>断开后重新连接 BLE 水冷（使用绑定/已配对/扫描回退）。</summary>
+    internal async Task<bool> ReconnectAsync()
+    {
+        if (_ble == null || Volatile.Read(in _disposed) != 0)
+        {
+            return false;
+        }
+        await ConnectSavedAsync().ConfigureAwait(false);
+        return IsBleRoute && _ble.IsConnected;
     }
 
     internal async Task<bool> RefreshAsync()
@@ -463,6 +492,8 @@ internal sealed class WaterCoolerRoutingService : IDisposable
                 return LiquidCoolingLightService.Options(_hw);
             }
             List<LiquidLightOption> options = LiquidCoolingLightService.Options(null).ToList();
+            // OpenRevo 的旋转光斑：水冷头模式 4，风扇通道支持时同时下发。
+            options.Insert(options.Count - 1, new LiquidLightOption("rotate", WpfStrings.L("旋转光斑", "Rotating spot")));
             if (SupportsFanLed)
             {
                 options.Insert(options.Count - 1, new LiquidLightOption("fan_rotate", WpfStrings.L("风扇旋转", "Fan spin")));

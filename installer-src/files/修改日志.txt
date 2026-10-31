@@ -1,3 +1,56 @@
+r89（2026-10-31 · 0.293.6.7 beta23.6.7 · 水冷/功耗/GPU OC 更新）
+
+- 部分 Intel GCU 机型：PL1 恢复硬件范围，GCU 不再被 Intel MSR 截走 PL1/PL2。
+- GPU OC：FirmwareSlot 自定义档生成 ApplyGpuOverclock，GCU 直写并回读。
+- 水冷：GATT 共享打开、DeviceId 回退、绑定自动恢复、断开后重连。
+- 水冷灯：冷排风扇灯启用；BLE 新增旋转光斑（头 0x1E + 风扇 0x33 模式 4）。
+- 版本 0.293.6.7 beta23.6.7；NoGCU + 更新包发布，本地完整包另存。
+
+r88（2026-10-31 · 0.293.6.6 beta23.6.6 · 更新器路径修复）
+
+- CopyDirectory 使用 Path.GetRelativePath，修复 BaseDirectory 尾部分隔符导致 helper 目录拼错。
+- 安装目录从 CurrentExePath 推导，不写死任何路径。
+- 更新器 exe 缺失时单独从 CurrentExePath 复制兜底。
+- 发布仅更新包，无 NoGCU/完整安装包。
+
+r87（2026-10-31 · 0.293.6.5 beta23.6.5 · JIGUANG 回归修复）
+
+- CPU：删除 Intel PL1 5..120 硬编码；GCU 机型 PL1/PL2 不再走 Intel MSR。
+- GPU OC：FirmwareSlot 自定义档生成 ApplyGpuOverclock；GCU 使用 ApplyGcuGpuOverclock。
+- 宽屏显卡模式：CurrentGpuMode 与 UEFI NVRAM 兜底共用。
+- 发布仅更新包，无 NoGCU/完整安装包。
+
+r86（2026-10-31 · 0.293.6.4 JIGUANG 回归热修）
+
+- CPU 功耗墙：删除自定义页 Intel PL1 5..120 硬编码，恢复 hw.Pl1Maximum（JIGUANG 145）。
+- CPU 功耗墙：GCU 连接时不再被 Intel MSR 后端截走 PL1/PL2，恢复 GCU 字段下发。
+- GPU OC：FirmwareSlot 自定义档补充 ApplyGpuOverclock 步骤（GCU ⇒ ApplyGcuGpuOverclock），
+  旧 WPF 只在 BuiltIn 档生成该步，自定义档保存后确实没有下发。
+- 宽屏显卡模式：确认与迷你窗共用 CurrentGpuMode，UEFI NVRAM 兜底生效。
+- 仅本地测试构建，未上传 GitHub。
+
+r85（2026-10-31 · 0.293.6.4 beta23.6.4 · 五档排版/水冷/圆环/PawnIO）
+
+一、界面
+- 五档性能模式按钮：有静音狂暴/高能狂暴的机型宽屏 ItemWidth=76，长标签 FontSize=12/13；
+  其它 5 键机型保持 64/14，不影响 NUC/UMI。
+- 宽屏「背景图」开关改用与迷你窗同一套 HeaderSwitch（24×14）。
+二、水冷
+- BLE 自动连接增加 Windows 已配对 BTHLE 水冷兜底，不依赖广播扫描成功；
+  扫描/配对页也会列出已配对水冷。
+- 名称过滤补 Cooling/Cooler/CS_；GCU 未连接但支持水冷时仍尝试 BLE。
+三、稳定性/安装
+- 风扇圆环 ratio=1 时 ArcTo 起终点重合不画线，改为 DrawEllipse 整圆。
+- PawnIO 安装去掉 -WindowStyle Hidden / runhidden；下载 60s 超时后 exit 0 跳过。
+- Core 补 AssemblyFileVersion/AssemblyInformationalVersion/Company 元数据。
+四、更新下载
+- 修复更新包下载 HTTP 302：`UpdateHttp.DownloadFollowingRedirectsAsync` 手动跟随最多 5 次，
+  仅允许 `UpdatePolicy` 白名单内 HTTPS 主机；GitHub 资产跳到 objects/release-assets.githubusercontent.com 正常。
+- 旧行为 `AllowAutoRedirect=false` 直接报“拒绝跟随重定向”，导致 Release 资产无法下载。
+
+五、验证
+- 构建 0 errors；未跑安装包（NoGCU 包由 ISSU 构建）。
+
 r84（2026-10-31 · 0.293.6.3 beta23.6.3 · NVIDIA 遥测子进程化 + NUC Fn/水冷/星耀）
 
 一、NVIDIA 遥测/黑屏

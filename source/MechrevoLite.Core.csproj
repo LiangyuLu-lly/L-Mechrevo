@@ -69,6 +69,8 @@
     <Compile Include="NvidiaSmi.cs" />
     <Compile Include="NvmlHelper.cs" />
     <Compile Include="StartupTaskPlan.cs" />
+    <!-- 与主程序共用版本/公司信息，避免 Core 呈现为 0.0.0.0 / 空公司（安全软件信誉会参考它）。 -->
+    <Compile Include="Properties\AssemblyInfo.cs" Link="Properties\AssemblyInfo.cs" />
     <!-- 反编译产物：被业务代码使用的只读集合/内联数组辅助类型（源码里真实存在） -->
     <Compile Include="--y__InlineArray19.cs" />
     <Compile Include="--z__ReadOnlyArray.cs" />

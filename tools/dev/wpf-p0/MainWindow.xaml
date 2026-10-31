@@ -24,6 +24,35 @@
     </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
+        <!-- 与迷你窗 BackgroundToggle 同一套 HeaderSwitch 样式，避免宽屏顶栏的开关尺寸/圆角不一致。 -->
+        <Style x:Key="HeaderSwitch" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="Track" Width="24" Height="14" CornerRadius="7"
+                                    Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
+                                <Grid>
+                                    <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"
+                                             VerticalAlignment="Center" HorizontalAlignment="Left" Margin="1,0,0,0" />
+                                </Grid>
+                            </Border>
+                            <ContentPresenter Margin="5,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,1,0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="PageTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="20" />
             <Setter Property="FontWeight" Value="SemiBold" />

@@ -890,7 +890,7 @@ public class MechrevoService
 		}
 		// （机主：PL1/PL2 不可调 · 日志 WriteFirmwareField:PL1=120 -> Failed）
 		bool intelMsrPower = _hw != null && MechrevoLite.Hardware.CpuVendor.IsIntel
-			&& !_hw.IsIntelNucMachine && !_hw.IsUmiMachine;
+			&& !_hw.IsIntelNucMachine && !_hw.IsUmiMachine && !_hw.IsGcuConnected;
 		if (_hw != null && (_hw.UsesBaolongda || _hw.SmuCustomApu || intelMsrPower) && fields != null && fields.Count > 0)
 		{
 			List<string> consumedKeys = new List<string>();
@@ -4141,7 +4141,7 @@ public class MechrevoService
 	{
 		MechrevoHw hw = _hw;
 		bool intelMsrPower = hw != null && MechrevoLite.Hardware.CpuVendor.IsIntel
-			&& !hw.IsIntelNucMachine && !hw.IsUmiMachine;
+			&& !hw.IsIntelNucMachine && !hw.IsUmiMachine && !hw.IsGcuConnected;
 		if (hw == null || (!hw.UsesBaolongda && !hw.SmuCustomApu && !intelMsrPower))
 		{
 			return false; // ⭐ 不是宝龙达/无界 APU/Intel MSR 在管事 ⇒ ⭐ 原样交给 GCU ✅

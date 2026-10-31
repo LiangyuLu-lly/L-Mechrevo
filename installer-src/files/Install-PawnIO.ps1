@@ -24,7 +24,12 @@ try {
         New-Item -ItemType Directory -Path $downloadDir | Out-Null
         $InstallerPath = Join-Path $downloadDir 'PawnIO_setup.exe'
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe' -OutFile $InstallerPath -TimeoutSec 120
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe' -OutFile $InstallerPath -TimeoutSec 60
+        } catch {
+            Write-Output ('PawnIO 下载超时/失败，已跳过驱动安装：' + $_.Exception.Message)
+            exit 0
+        }
     }
     $InstallerPath = (Resolve-Path -LiteralPath $InstallerPath).Path
     if ((Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash -ne $expectedHash) {
@@ -37,7 +42,7 @@ try {
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Administrator privileges required.' }
     $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'"
     if ($driver -and $driver.State -eq 'Running') { Write-Output 'PawnIO is already running.'; exit 0 }
-    $process = Start-Process -FilePath $InstallerPath -ArgumentList '-install','-silent' -WindowStyle Hidden -Wait -PassThru
+    $process = Start-Process -FilePath $InstallerPath -ArgumentList '-install','-silent' -Wait -PassThru
     if ($process.ExitCode -eq 3010) { Write-Output 'PawnIO installed; restart required.'; exit 3010 }
     if ($process.ExitCode -ne 0) { throw ('PawnIO installer exit code: ' + $process.ExitCode) }
     $driver = Get-CimInstance Win32_SystemDriver -Filter "Name='PawnIO'"

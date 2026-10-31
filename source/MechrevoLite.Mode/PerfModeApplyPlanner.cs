@@ -62,7 +62,11 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("GpuDynamicBoostSwitch", settings.GpuDynamicBoostOn.Value ? 1 : 0));
 			}
-			if (settings.GpuOverclockOn.HasValue)
+			// GCU 自定义档：GPU 超频改走 ApplyGpuOverclock（后端直写并回读确认），
+			// 不再逐字段写 GpuCoreClockOffsetOC/GpuMemoryClockOffsetOC —— 旧字段路径在
+			// GCU 上只发 MQTT，OC 开关/偏移经常不生效。下面仍保留字段路径给非 GCU 后端。
+			bool gcuGpuOverclockStep = !caps.SupportsGpuOverclock;
+			if (settings.GpuOverclockOn.HasValue && gcuGpuOverclockStep)
 			{
 				list.Add(Field("OverClockingSwitch", settings.GpuOverclockOn.Value ? 1 : 0));
 			}
@@ -116,11 +120,11 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("GpuDynamicBoost", settings.GpuDynamicBoost.Value, PerfApplyVerify.GpuPowerLimit));
 			}
-			if (settings.GpuCoreOffset.HasValue)
+			if (settings.GpuCoreOffset.HasValue && gcuGpuOverclockStep)
 			{
 				list.Add(Field("GpuCoreClockOffsetOC", settings.GpuCoreOffset.Value, PerfApplyVerify.GpuClockOffset));
 			}
-			if (settings.GpuMemoryOffset.HasValue)
+			if (settings.GpuMemoryOffset.HasValue && gcuGpuOverclockStep)
 			{
 				list.Add(Field("GpuMemoryClockOffsetOC", settings.GpuMemoryOffset.Value, PerfApplyVerify.GpuClockOffset));
 			}
@@ -223,6 +227,26 @@ public static class PerfModeApplyPlanner
 		}
 		// 规划结果（生成/未生成 + 原因）由 **PerfModeService**（唯一有 route/slotPlan/日志上下文的地方）
 		if (caps.SupportsDirectGpuOverclock && perfModeRoute == PerfModeRoute.FirmwareSlot && slotPlan != null && slotPlan.NeedsParameterWrite
+			&& (settings.GpuOverclockOn.HasValue || settings.GpuCoreOffset.HasValue || settings.GpuMemoryOffset.HasValue))
+		{
+			bool gpuOcOn = settings.GpuOverclockOn ?? true;
+			list.Add(new PerfApplyStep(
+				PerfApplyStepKind.ApplyGpuOverclock,
+				WireKey: null,
+				Value: null,
+				Number: gpuOcOn ? 1 : 0,
+				IsCpuCurve: false,
+				Curve: null,
+				Verify: PerfApplyVerify.GpuClockOffset,
+				GpuOffsets: gpuOcOn
+					? (settings.GpuCoreOffset.GetValueOrDefault(), settings.GpuMemoryOffset.GetValueOrDefault())
+					: (0, 0)));
+		}
+		// GCU 自定义档：走专用 ApplyGpuOverclock 步骤（MechrevoService.ApplyGcuGpuOverclock）。
+		// 原字段路径只在 BuiltIn 分支生成该步，FirmwareSlot 自定义档因此“保存了但不下发”。
+		if (perfModeRoute == PerfModeRoute.FirmwareSlot && canWriteFirmwareSlot
+			&& slotPlan != null && slotPlan.NeedsParameterWrite
+			&& caps.SupportsGpuOverclock
 			&& (settings.GpuOverclockOn.HasValue || settings.GpuCoreOffset.HasValue || settings.GpuMemoryOffset.HasValue))
 		{
 			bool gpuOcOn = settings.GpuOverclockOn ?? true;

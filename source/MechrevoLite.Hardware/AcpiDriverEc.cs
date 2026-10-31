@@ -51,6 +51,52 @@ internal static class AcpiDriverEc
         }
     }
 
+    /// <summary>一次打开 ACPIDriver，批量读 CPU/GPU 两组 16 位风扇转速。</summary>
+    internal static bool TryReadFanWords(int cpuHigh, int cpuLow, int gpuHigh, int gpuLow, out int cpuRpm, out int gpuRpm)
+    {
+        cpuRpm = -1;
+        gpuRpm = -1;
+        lock (Gate)
+        {
+            using SafeFileHandle handle = CreateFileW(DevicePath, GenericRead | GenericWrite, FileShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (handle.IsInvalid)
+            {
+                return false;
+            }
+            byte cpuHi = 0, cpuLo = 0, gpuHi = 0, gpuLo = 0;
+            bool cpuOk = TryReadByteCore(handle, cpuHigh, out cpuHi) && TryReadByteCore(handle, cpuLow, out cpuLo);
+            bool gpuOk = TryReadByteCore(handle, gpuHigh, out gpuHi) && TryReadByteCore(handle, gpuLow, out gpuLo);
+            if (cpuOk)
+            {
+                int rpm = (cpuHi << 8) | cpuLo;
+                if (rpm > 0 && rpm < 8000) cpuRpm = rpm;
+            }
+            if (gpuOk)
+            {
+                int rpm = (gpuHi << 8) | gpuLo;
+                if (rpm > 0 && rpm < 8000) gpuRpm = rpm;
+            }
+            return cpuRpm > 0 || gpuRpm > 0;
+        }
+    }
+
+    private static bool TryReadByteCore(SafeFileHandle handle, int address, out byte value)
+    {
+        value = 0;
+        if (address < 0 || address > ushort.MaxValue)
+        {
+            return false;
+        }
+        byte[] input = BitConverter.GetBytes((uint)address);
+        byte[] output = new byte[4];
+        if (!DeviceIoControl(handle, IoctlEcRead, input, 4, output, 4, out _, IntPtr.Zero))
+        {
+            return false;
+        }
+        value = (byte)BitConverter.ToUInt32(output, 0);
+        return true;
+    }
+
     internal static bool TryWriteByte(int address, int value)
     {
         if (address < 0 || address > ushort.MaxValue || value < 0 || value > 255)

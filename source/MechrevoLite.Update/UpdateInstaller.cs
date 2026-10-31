@@ -94,13 +94,7 @@ internal static class UpdateInstaller
 		{
 			Directory.CreateDirectory(text);
 			CleanStaleTempArtifacts(text);
-			using HttpResponseMessage response = await UpdateHttp.Download.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(continueOnCapturedContext: false);
-			if (UpdateHttp.IsRedirect(response.StatusCode))
-			{
-				string text2 = UpdateHttp.RedirectRefusedReason(response.StatusCode);
-				Logger.WriteLine("更新包下载被拒：" + text2);
-				return new DownloadResult(null, text2);
-			}
+			using HttpResponseMessage response = await UpdateHttp.DownloadFollowingRedirectsAsync(uri, timeout.Token).ConfigureAwait(continueOnCapturedContext: false);
 			response.EnsureSuccessStatusCode();
 			long? contentLength = response.Content.Headers.ContentLength;
 			if (contentLength.HasValue)
@@ -455,14 +449,26 @@ internal static class UpdateInstaller
 		if (!VerifyDllPackage(zipPath, out reason)) return false;
 		try
 		{
+			// 安装目录以当前进程的实际 exe 路径为准，绝不在代码里写死 Program Files 路径。
+			string effectiveInstallDir = Path.GetDirectoryName(CurrentExePath) ?? installDir;
+			if (string.IsNullOrWhiteSpace(effectiveInstallDir))
+			{
+				reason = "更新器复制失败：无法确定安装目录";
+				return false;
+			}
 			string root = Path.Combine(TempRoot, "dll-update", Guid.NewGuid().ToString("N"));
 			string extractDir = Path.Combine(root, "package");
 			string helperDir = Path.Combine(root, "helper");
 			Directory.CreateDirectory(extractDir);
 			ZipFile.ExtractToDirectory(zipPath, extractDir);
-			CopyDirectory(installDir, helperDir);
+			CopyDirectory(effectiveInstallDir, helperDir);
 			string exeName = Path.GetFileName(CurrentExePath);
 			string helperExe = Path.Combine(helperDir, exeName);
+			if (!File.Exists(helperExe) && File.Exists(CurrentExePath))
+			{
+				// 兜底：即使目录复制漏了 exe，也把当前 exe 单独放进 helper。
+				File.Copy(CurrentExePath, helperExe, overwrite: true);
+			}
 			if (!File.Exists(helperExe))
 			{
 				reason = "更新器复制失败：找不到 " + exeName;
@@ -476,7 +482,7 @@ internal static class UpdateInstaller
 				WorkingDirectory = helperDir,
 				ArgumentList =
 				{
-					"--apply-dll-update", extractDir, installDir, Environment.ProcessId.ToString()
+					"--apply-dll-update", extractDir, effectiveInstallDir, Environment.ProcessId.ToString()
 				}
 			});
 			if (process == null)
@@ -496,14 +502,23 @@ internal static class UpdateInstaller
 
 	private static void CopyDirectory(string source, string target)
 	{
-		Directory.CreateDirectory(target);
-		foreach (string dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+		// AppContext.BaseDirectory 末尾通常带分隔符；直接 string.Replace 会把
+		// helper\ + L-Mechrevo.exe 拼成 helperL-Mechrevo.exe，导致更新器找不到 exe。
+		// 这里统一归一化路径并用 GetRelativePath，绝不依赖硬编码目录。
+		string sourceRoot = Path.GetFullPath(source)
+			.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		string targetRoot = Path.GetFullPath(target)
+			.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		Directory.CreateDirectory(targetRoot);
+		foreach (string dir in Directory.GetDirectories(sourceRoot, "*", SearchOption.AllDirectories))
 		{
-			Directory.CreateDirectory(dir.Replace(source, target));
+			string relative = Path.GetRelativePath(sourceRoot, dir);
+			Directory.CreateDirectory(Path.Combine(targetRoot, relative));
 		}
-		foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+		foreach (string file in Directory.GetFiles(sourceRoot, "*", SearchOption.AllDirectories))
 		{
-			string dest = file.Replace(source, target);
+			string relative = Path.GetRelativePath(sourceRoot, file);
+			string dest = Path.Combine(targetRoot, relative);
 			Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
 			File.Copy(file, dest, overwrite: true);
 		}

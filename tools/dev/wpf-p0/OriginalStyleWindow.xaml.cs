@@ -4349,13 +4349,22 @@ public partial class OriginalStyleWindow : Window
             if (child is ToggleButton { Visibility: Visibility.Visible }) visible++;
         }
         bool dense = visible >= 5;
+        bool hasSilentTurbo = SilentTurboModeButton != null
+            && SilentTurboModeButton.Visibility == Visibility.Visible;
         foreach (object child in ModeGrid.Children)
         {
             if (child is not ToggleButton button) continue;
-            button.Padding = dense ? new Thickness(6, 8, 6, 8) : new Thickness(10, 8, 10, 8);
-            button.FontSize = 14;
+            bool longTurboLabel = dense && hasSilentTurbo
+                && (ReferenceEquals(button, SilentTurboModeButton) || ReferenceEquals(button, TurboModeButton));
+            // 只有「静音狂暴 + 高能狂暴」这类 5 键机型才收字号/间距；
+            // NUC 极致狂暴等其它 5 键布局保持原来的 14px / 6px，不受本次改动影响。
+            button.Padding = longTurboLabel
+                ? new Thickness(4, 8, 4, 8)
+                : (dense ? new Thickness(hasSilentTurbo ? 5 : 6, 8, hasSilentTurbo ? 5 : 6, 8)
+                         : new Thickness(10, 8, 10, 8));
+            button.FontSize = longTurboLabel ? 12 : (hasSilentTurbo && dense ? 13 : 14);
         }
-        ModeGrid.Margin = dense ? new Thickness(0, 2, 6, 0) : new Thickness(0, 2, 0, 0);
+        ModeGrid.Margin = dense ? new Thickness(0, 2, 0, 0) : new Thickness(0, 2, 0, 0);
     }
 
     private void RefreshModeHighlights()
@@ -5991,7 +6000,7 @@ public partial class OriginalStyleWindow : Window
             string state = charging
                 ? WpfStrings.BatteryCharging
                 : (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online
-                    ? (batteryPercent >= 99 ? WpfStrings.BatteryFull : WpfStrings.BatteryNotCharging)
+                    ? (batteryPercent >= 95 ? WpfStrings.BatteryFull : WpfStrings.BatteryNotCharging)
                     : WpfStrings.BatteryDischarging);
             powerState = " · " + source + " · " + state;
         }
@@ -6929,7 +6938,9 @@ public partial class OriginalStyleWindow : Window
         || _backendProbe?.Hw?.SupportsLiquidCooling == true
         || _backendProbe?.Capabilities?.LiquidCooling == true;
 
-    internal bool WideLiquidSupported => EnsureWaterCoolerRouting()?.Route is LiquidCoolingControlRoute.Gcu or LiquidCoolingControlRoute.DirectBle;
+    internal bool WideLiquidSupported =>
+        MechrevoLite.AppConfig.Is("force_liquid_cooling_menu")
+        || EnsureWaterCoolerRouting()?.Route is LiquidCoolingControlRoute.Gcu or LiquidCoolingControlRoute.DirectBle;
 
     internal bool WideLiquidConnected
     {
@@ -7006,12 +7017,25 @@ public partial class OriginalStyleWindow : Window
             RefreshLiquidCoolingUi();
             return Task.FromResult(true);
         }
+        if (routing?.IsObservedBle == true)
+        {
+            return ReconnectBleLiquidAsync(routing);
+        }
         return WideRefreshLiquidAsync();
+    }
+
+    private async Task<bool> ReconnectBleLiquidAsync(WaterCoolerRoutingService routing)
+    {
+        bool ok = await routing.ReconnectAsync();
+        RefreshLiquidCoolingUi();
+        return ok;
     }
 
     internal WaterCoolerRoutingService? WideLiquidRouting => EnsureWaterCoolerRouting();
 
-    internal bool WideLiquidCurveSupported => EnsureWaterCoolerRouting()?.IsBleRoute == true;
+    internal bool WideLiquidCurveSupported =>
+        MechrevoLite.AppConfig.Is("force_liquid_cooling_menu")
+        || EnsureWaterCoolerRouting()?.IsBleRoute == true;
 
     internal IReadOnlyList<WaterCoolerCurvePoint> WideLiquidCurvePoints =>
         EnsureWaterCoolerRouting()?.CurvePoints ?? WaterCoolerCurve.DefaultPoints;
@@ -7046,7 +7070,9 @@ public partial class OriginalStyleWindow : Window
         return ok;
     }
 
-    internal bool WideLiquidLightSupported => EnsureWaterCoolerRouting()?.SupportsLight == true;
+    internal bool WideLiquidLightSupported =>
+        MechrevoLite.AppConfig.Is("force_liquid_cooling_menu")
+        || EnsureWaterCoolerRouting()?.SupportsLight == true;
 
     internal System.Drawing.Color WideLiquidLightColor => EnsureWaterCoolerRouting()?.LightColor ?? LiquidCoolingLightService.SavedColor;
 
@@ -7090,7 +7116,8 @@ public partial class OriginalStyleWindow : Window
             bool gcuSupported = routing?.IsGcuRoute == true
                 || (routing == null && _backendProbe?.Hw?.SupportsLiquidCooling == true);
             bool bleSupported = routing?.IsBleRoute == true;
-            if (!gcuSupported && !bleSupported)
+            // 强制水冷菜单同时放开控件，仅供本机查看；未连接时点击下发仍会按路由失败。
+            if (!force && !gcuSupported && !bleSupported)
             {
                 LiquidStatusButton.Content = WpfStrings.OriginalStyleWindow_xaml_Content_3;
                 LiquidPumpCombo.IsEnabled = false;
@@ -7334,6 +7361,21 @@ public partial class OriginalStyleWindow : Window
             routing.Disconnect();
             RefreshLiquidCoolingUi();
             StatusText.Text = WpfStrings.LiquidBleDisconnected;
+            return;
+        }
+        if (routing?.IsObservedBle == true)
+        {
+            LiquidStatusButton.IsEnabled = false;
+            try
+            {
+                bool ok = await routing.ReconnectAsync();
+                RefreshLiquidCoolingUi();
+                StatusText.Text = ok ? WpfStrings.LiquidConnected : WpfStrings.LiquidDisconnected;
+            }
+            finally
+            {
+                LiquidStatusButton.IsEnabled = true;
+            }
             return;
         }
         if (_backendProbe?.Service == null)

@@ -2076,6 +2076,11 @@ public partial class MainWindow : Window
         bool silentTurboVisible = _owner.WideSilentTurboVisible;
         HomePerf狂暴.Visibility = _owner.WideTurboModeVisible ? Visibility.Visible : Visibility.Collapsed;
         EnsureWideSilentTurboButton(silentTurboVisible);
+        // 只有静音狂暴/高能狂暴机型才用 76px 宽按钮；其它机型恢复原 64px，避免影响 NUC/UMI 等布局。
+        if (_homeView != null)
+        {
+            _homeView.HomePerfButtonsPanel.ItemWidth = silentTurboVisible ? 76 : 64;
+        }
         EnsureWideExtremeButton(_owner.WideExtremeModeVisible);
         HomePerf狂暴.Content = silentTurboVisible ? WpfStrings.TurboHighEnergy : WpfStrings.ModeTurbo;
         if (!_owner.WideModeSwitchPending)

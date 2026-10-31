@@ -1,3 +1,64 @@
+四十九、0.293.6.7 beta23.6.7（2026-10-31）
+────────────────────────────────────────────
+1. 部分 Intel GCU 机型 CPU 功耗墙回归修复：
+   - 自定义页 PL1 恢复硬件上报范围，删除 5..120 硬编码；
+   - GCU 连接时 PL1/PL2 不再被 Intel MSR 路径截走。
+2. GPU 超频自定义档修复：
+   - FirmwareSlot 档补充 ApplyGpuOverclock 步骤；
+   - GCU 直写开关+核心/显存偏移并回读确认。
+3. 水冷连接：
+   - NUS 服务 UUID 获取 + Uncached/Cached 回退；
+   - GATT SharedReadAndWrite 共享打开；
+   - FromBluetoothAddressAsync 返回 null 时用 DeviceInformation/DeviceId 再解析；
+   - 绑定设备不可达时自动尝试已配对/扫描并恢复绑定；
+   - 断开后状态降为未连接，点状态按钮可重新连接。
+4. 水冷灯光：
+   - 冷排风扇灯不再只认 LCT22002，水冷上报固件后即启用；
+   - BLE 下拉新增「旋转光斑」，水冷头/风扇同时下发模式 4。
+5. 保留 0.293.6.6 的更新器安装路径修复、五档排版、宽屏开关、PawnIO、圆环 100%、302 下载修复。
+6. 本版 Release 提供 NoGCU 安装包和更新包；另生成本地完整包。
+
+四十八、0.293.6.6 beta23.6.6（2026-10-31）
+────────────────────────────────────────────
+1. 修复更新器“复制失败：找不到 L-Mechrevo.exe”：
+   - AppContext.BaseDirectory 末尾分隔符导致 CopyDirectory 拼成 helperL-Mechrevo.exe；
+   - 改为 Path.GetRelativePath 归一化复制；
+   - 安装目录以 CurrentExePath 实际目录为准，不硬编码 Program Files；
+   - exe 单独复制兜底。
+2. 保留 0.293.6.5 的 JIGUANG 功耗/GPU 超频修复及 0.293.6.4 的更新包修复。
+3. 仅更新包，NoGCU 不打包。
+
+四十七、0.293.6.5 beta23.6.5（2026-10-31）
+────────────────────────────────────────────
+1. JIGUANG CPU 功耗墙回归修复：
+   - 自定义页 PL1 不再硬编码 5..120，恢复 GCU 硬件范围（该机 145W）；
+   - GCU 连接时不再把 PL1/PL2 截走给 Intel MSR 后端。
+2. GPU 超频自定义档修复：
+   - FirmwareSlot 档补充 ApplyGpuOverclock 步骤；
+   - GCU 机型走 ApplyGcuGpuOverclock，开关+核心/显存偏移直写并回读确认；
+   - 不再重复发送旧字段。
+3. 宽屏显卡模式与迷你窗共用 CurrentGpuMode，UEFI NVRAM 兜底同步。
+4. 保留 0.293.6.4 的五档排版、宽屏背景开关、PawnIO、圆环 100%、302 更新下载修复。
+5. 本版只发更新包，NoGCU 不打包。
+
+四十六、0.293.6.4 beta23.6.4（2026-10-31）
+────────────────────────────────────────────
+1. 五档性能模式按钮排版/宽度收口：
+   有静音狂暴/高能狂暴的机型，宽屏按钮 76px，长标签字号缩小；
+   其它 5 键机型保持原 64px/14px，不受影响。
+2. 宽屏顶栏「背景图」开关改为与迷你窗同一套 HeaderSwitch 样式。
+3. PawnIO 安装改为不隐藏执行；下载超时 60s 后跳过，不阻断主程序安装。
+4. MechrevoLite.Core.dll 补全版本/公司元数据（FileVersion/ProductVersion/Company）。
+5. 水冷连接：
+   - 自动连接优先尝试 Windows 已配对 BTHLE 水冷，扫描失败也能按 MAC 连接；
+   - 水冷名称过滤补 Cooling/Cooler/CS_；
+   - 支持水冷但 GCU 未连接时仍尝试 BLE 自动连接。
+6. 修复宽屏风扇圆环在占空比 100% 时归零：
+   100% 时起点/终点重合，改为直接画整圆。
+7. 修复更新包下载 HTTP 302 失败：GitHub Release 资产允许跟随重定向，
+   但只允许跳到允许列表内的 HTTPS 主机。
+8. 构建验证：0 errors。
+
 四十五、0.293.6.3 beta23.6.3（2026-10-31）
 ────────────────────────────────────────────
 一、NVIDIA 遥测与黑屏排查

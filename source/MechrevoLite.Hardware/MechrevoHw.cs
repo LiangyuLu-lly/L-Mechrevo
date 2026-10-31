@@ -1872,6 +1872,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	public int GpuMode { get; private set; } = -1;
 
+	private long _uefiGpuModeCheckedTick;
+	private int _uefiGpuMode = -1;
+
 	public int GpuEcoFlag => (GpuMode == 0) ? 1 : 0;
 
 	public int BatteryProtection { get; private set; } = -1;
@@ -2537,6 +2540,40 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	//   · 删除「自动切换显卡模式」后 mode 3 已无归宿；50 系把核显省电设为 AUTO 时，
 	//     ...RB_AUTO 会让 GpuMode 变成 3，导致三档高亮与切换策略错乱
 	// 因此：认不出就沿用上一次的已知模式。
+	/// <summary>GCU 未上报显示路由时，从 UEFI NVRAM 的 OemDisplayMode 补读（30s 缓存）。</summary>
+	private bool TryReadUefiGpuMode(out int mode)
+	{
+		mode = -1;
+		long now = Environment.TickCount64;
+		if (_uefiGpuModeCheckedTick != 0 && now - _uefiGpuModeCheckedTick < 30000)
+		{
+			mode = _uefiGpuMode;
+			return mode >= 0;
+		}
+		_uefiGpuModeCheckedTick = now;
+		try
+		{
+			if (!MechrevoLite.Hardware.UefiGpuMux.TryRead(out int raw, out _, out _))
+			{
+				_uefiGpuMode = -1;
+				return false;
+			}
+			MechrevoLite.Gpu.GpuRoute? route = MechrevoLite.Gpu.GpuRouteInference.DecodeOemDisplayMode((byte)raw, IsAmdPlatformForLimits);
+			_uefiGpuMode = route.HasValue ? MechrevoLite.Gpu.GpuRouteInference.ToGpuMode(route.Value) : -1;
+			if (_uefiGpuMode >= 0)
+			{
+				Logger.WriteLineIfChanged("gpu-mode-uefi", $"GpuMode 由 UEFI NVRAM 补读：raw=0x{raw:X2} ⇒ mode={_uefiGpuMode}");
+			}
+			mode = _uefiGpuMode;
+			return mode >= 0;
+		}
+		catch
+		{
+			_uefiGpuMode = -1;
+			return false;
+		}
+	}
+
 	internal static int ResolveGpuModeStatus(int currentMode, string? directStatus)
 	{
 		string text = directStatus?.ToUpperInvariant() ?? "";
@@ -5994,6 +6031,17 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	private static bool TryReadWujieFanWord(int address, out int rpm)
 	{
 		rpm = -1;
+		// 优先 ACPI EC；ACPIDriver 不可用再走 I2EC/LPC。
+		if (AcpiDriverEc.TryReadByte(address, out byte highByte)
+			&& AcpiDriverEc.TryReadByte(address + 1, out byte lowByte))
+		{
+			int acpiRpm = (highByte << 8) | lowByte;
+			if (acpiRpm > 0 && acpiRpm < 8000)
+			{
+				rpm = acpiRpm;
+				return true;
+			}
+		}
 		if (I2ecInpOut.IsAvailable
 			&& I2ecInpOut.TryReadEcByte(address, out int high, out _)
 			&& I2ecInpOut.TryReadEcByte(address + 1, out int low, out _))
@@ -6018,16 +6066,29 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		{
 			return false;
 		}
-		bool cpuOk = TryReadEcFanWord(0x0464, out cpuRpm, lowOffset: 1);
-		bool gpuOk = TryReadEcFanWord(0x046C, out gpuRpm, lowOffset: -1);
-		return cpuOk || gpuOk;
+		// 一次打开 ACPIDriver 批量读 4 个寄存器；失败再走单字节 ACPI/I2EC/LPC。
+		bool acpiOk = AcpiDriverEc.TryReadFanWords(0x0464, 0x0465, 0x046C, 0x046B, out int acpiCpu, out int acpiGpu);
+		bool cpuOk = acpiCpu > 0;
+		bool gpuOk = acpiGpu > 0;
+		if (cpuOk) cpuRpm = acpiCpu;
+		if (gpuOk) gpuRpm = acpiGpu;
+		if (!cpuOk) cpuOk = TryReadEcFanWord(0x0464, out cpuRpm, lowOffset: 1, allowAcpi: false);
+		if (!gpuOk) gpuOk = TryReadEcFanWord(0x046C, out gpuRpm, lowOffset: -1, allowAcpi: false);
+		return acpiOk || cpuOk || gpuOk;
 	}
 
-	private static bool TryReadEcFanWord(int highAddress, out int rpm, int lowOffset)
+	private static bool TryReadEcFanWord(int highAddress, out int rpm, int lowOffset, bool allowAcpi = true)
 	{
 		rpm = -1;
 		try
 		{
+			// 优先 ACPI EC（与 OpenRevo 一致）；ACPIDriver 不可用时再退 I2EC/LPC。
+			if (allowAcpi && AcpiDriverEc.TryReadByte(highAddress, out byte highByte)
+				&& AcpiDriverEc.TryReadByte(highAddress + lowOffset, out byte lowByte))
+			{
+				rpm = (highByte << 8) | lowByte;
+				if (rpm > 0 && rpm < 8000) return true;
+			}
 			int high = -1;
 			int low = -1;
 			if (I2ecInpOut.IsAvailable
@@ -6035,12 +6096,6 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 				&& I2ecInpOut.TryReadEcByte(highAddress + lowOffset, out low, out _))
 			{
 				rpm = ((high & 0xFF) << 8) | (low & 0xFF);
-				return rpm > 0 && rpm < 8000;
-			}
-			if (AcpiDriverEc.TryReadByte(highAddress, out byte highByte)
-				&& AcpiDriverEc.TryReadByte(highAddress + lowOffset, out byte lowByte))
-			{
-				rpm = (highByte << 8) | lowByte;
 				return rpm > 0 && rpm < 8000;
 			}
 			if (EcPortIo.TryReadByte(highAddress, out int highValue)
@@ -9874,6 +9929,12 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		}
 		// 2026-10-05：不再传 text25（核显省电字段）—— 显示路由与核显省电无关（§9.6）
 		int num5 = ResolveGpuModeStatus(GpuMode, text24);
+		// GCU 在部分 AMD/Gen50 机型（如 YILONG）不回报 DiscreteGpuDirectConnectionSwitch_Status；
+		// 此时从 UEFI NVRAM OemDisplayMode 补读当前模式，避免显卡模式按钮没有高亮。
+		if (num5 < 0 && TryReadUefiGpuMode(out int uefiMode))
+		{
+			num5 = uefiMode;
+		}
 		string text28 = FirstField(o, "IGpuCannotBeSwitchNowVisibility")?.ToString();
 		if (!string.IsNullOrWhiteSpace(text28))
 		{
