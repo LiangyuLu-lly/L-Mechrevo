@@ -29,7 +29,8 @@ public readonly record struct OverlaySnapshot(
     bool AcOnline,
     bool Charging,
     float CpuPower,
-    float GpuPower);
+    float GpuPower,
+    decimal? BatteryRateWatts);
 
 public partial class OverlayWindow : Window
 {
@@ -58,7 +59,20 @@ public partial class OverlayWindow : Window
             _displayMode = 1;
         }
         ApplyDisplayMode();
-        SourceInitialized += (_, _) => ApplyLockState();
+        SourceInitialized += (_, _) =>
+        {
+            ApplyLockState();
+            try
+            {
+                if (PresentationSource.FromVisual(this) is HwndSource src)
+                {
+                    src.AddHook(OverlayWndProc);
+                }
+            }
+            catch
+            {
+            }
+        };
         Loaded += (_, _) =>
         {
             RestorePosition();
@@ -85,6 +99,15 @@ public partial class OverlayWindow : Window
             else
             {
                 _timer.Stop();
+                _pressed = false;
+                _dragging = false;
+                try
+                {
+                    ReleaseMouseCapture();
+                }
+                catch
+                {
+                }
             }
         };
         Closed += (_, _) => _timer.Stop();
@@ -96,7 +119,10 @@ public partial class OverlayWindow : Window
         {
             OverlaySnapshot s = _provider();
             _acOnline = s.AcOnline;
-            bool showGpu = L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu;
+            MechrevoLite.Hardware.MechrevoHw? hw = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
+            // 无界 APU 没有独显（NoDgpu），但仍有 AMD 核显温度/频率/功耗，GPU 行必须显示。
+            bool showGpu = hw?.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu
+                || hw?.WujieSmuApu == true;
             GpuRow.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
             GpuTempText.Text = FormatTemp(s.GpuTemp);
             GpuFreqText.Text = FormatFreq(s.GpuCoreFreq);
@@ -121,7 +147,16 @@ public partial class OverlayWindow : Window
             string source = FormatPowerSource(s.AcOnline);
             string state = s.Charging ? WpfStrings.OverlayCharging : (s.AcOnline ? (s.BatteryPercent >= 95 ? WpfStrings.OverlayBatteryFull : WpfStrings.OverlayNotCharging) : WpfStrings.OverlayDischarging);
             BatteryText.Text = s.BatteryPercent >= 0 ? WpfStrings.OverlayBatteryLabel + s.BatteryPercent + "%" : WpfStrings.OverlayBatteryDash;
-            BatteryDetailText.Text = s.BatteryPercent >= 0 ? source + " · " + state : "";
+            string detail = s.BatteryPercent >= 0 ? source + " · " + state : "";
+            if (s.BatteryPercent >= 0
+                && hw?.UsesBaolongda != true
+                && s.Charging
+                && s.BatteryRateWatts is decimal chargeWatts
+                && chargeWatts > 0)
+            {
+                detail += " · 充电 " + chargeWatts.ToString("0.#") + "W";
+            }
+            BatteryDetailText.Text = detail;
             UpdateBatteryVisibility();
         }
         catch
@@ -431,6 +466,22 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private const int WmNcHitTest = 0x0084;
+    private const int HtTransparent = -1;
+
+    private IntPtr OverlayWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // 锁定态必须真正鼠标穿透：只靠 WS_EX_TRANSPARENT 在部分 WPF 分层窗上
+        // 双击消息仍会被悬浮窗吃掉。这里直接对 WM_NCHITTEST 返回 HTTRANSPARENT，
+        // 保证单击/右键/双击都落到下面的 Explorer。
+        if (msg == WmNcHitTest && _locked)
+        {
+            handled = true;
+            return new IntPtr(HtTransparent);
+        }
+        return IntPtr.Zero;
+    }
+
     private void ApplyLockState()
     {
         try
@@ -443,9 +494,10 @@ public partial class OverlayWindow : Window
                 return;
             }
             long current = GetWindowLongPtr(handle, GwlExStyle).ToInt64();
+            // 悬浮窗永远不抢前台；未锁定时只去掉鼠标穿透，保留 NOACTIVATE。
             long target = _locked
                 ? (current | WsExTransparent | WsExLayered | WsExNoActivate)
-                : (current & ~(WsExTransparent | WsExNoActivate));
+                : ((current | WsExNoActivate) & ~WsExTransparent);
             if (target != current)
             {
                 SetWindowLongPtr(handle, GwlExStyle, (nint)target);

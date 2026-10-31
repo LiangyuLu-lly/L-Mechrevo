@@ -73,6 +73,7 @@ public partial class OriginalStyleWindow : Window
     internal event Action? BackendReady;
     internal BackendProbe? CurrentBackend => _backendProbe;
     private bool _overlayPreloaded;
+    private bool _appClosing;
     private bool _gpuBootChecksStarted;
     private bool _wideMode;
     private TrayIconService? _trayIcon;
@@ -147,6 +148,7 @@ public partial class OriginalStyleWindow : Window
     private int _cleanExitMarked;
     private string _customWindowModeId = "";
     private bool _perfConfigBuilt;
+    private bool _moreSwitchesHasGcuOsd;
     private bool _gpuPromptOpen;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
@@ -383,6 +385,16 @@ public partial class OriginalStyleWindow : Window
         _trayIcon.CustomModeRequested += id => _ = ActivateTrayCustomAsync(id);
         _trayIcon.SilentTurboRequested += () => _ = TraySilentTurboAsync();
         Loaded += (_, _) => RestoreOverlayVisible();
+        // 最小化/失焦时释放鼠标捕获：否则最小化前拖过悬浮窗/滑块，
+        // 左键会被隐藏窗口一直捕获，桌面程序点不动，直到再次打开 LM。
+        Deactivated += (_, _) => ReleaseAllMouseCapture();
+        StateChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Minimized)
+            {
+                ReleaseAllMouseCapture();
+            }
+        };
         // 悬浮窗改为按需创建：启动期不再预加载，降低常驻内存。
         SourceInitialized += (_, _) =>
         {
@@ -1380,7 +1392,8 @@ public partial class OriginalStyleWindow : Window
             (WpfStrings.QuickGroupKeyboard, new (string, string)[]
             {
                 ("winkey", QuickSwitchService.Label("winkey", "Win键锁")), ("fnkey", QuickSwitchService.Label("fnkey", "Fn键锁")), ("capslock", QuickSwitchService.Label("capslock", "大小写锁定")),
-                ("osd", QuickSwitchService.Label("osd", "OSD提示")), ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"))
+                ("osd", QuickSwitchService.Label("osd", "OSD提示")), ("gcuosd", QuickSwitchService.Label("gcuosd", "GCU-OSD")),
+                ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"))
             }),
             (WpfStrings.QuickGroupPower, new (string, string)[]
             {
@@ -1723,23 +1736,27 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
-    /// <summary>GCU 机型的 EC 限充传输开关（与宝龙达阈值面板是两套）。</summary>
-    internal bool WideEcTransportSupported
+    /// <summary>EC 通道硬件是否存在；⛔ 不读 ec_charge_limit 开关状态。</summary>
+    private bool EcTransportHardwareAvailable()
     {
-        get
+        try
         {
-            try
-            {
-                MechrevoHw? hw = _backendProbe?.Hw;
-                return hw != null && !hw.UsesBaolongda
-                    && MechrevoLite.Hardware.EcChargeLimit.IsAvailableOnThisMachine();
-            }
-            catch
-            {
-                return false;
-            }
+            MechrevoHw? hw = _backendProbe?.Hw;
+            return hw != null && !hw.UsesBaolongda
+                && (hw.IsIntelNucMachine
+                    || hw.IsUmiMachine
+                    || MechrevoLite.Hardware.RuntimeModelSupport.Current().IsSupported
+                    || MechrevoLite.BatteryLimitPanel.IsSupportedBoard(hw)
+                    || MechrevoLite.Hardware.EcChargeLimit.ProbeChannelAvailable());
+        }
+        catch
+        {
+            return false;
         }
     }
+
+    /// <summary>GCU 机型的 EC 限充传输开关（与宝龙达阈值面板是两套）。</summary>
+    internal bool WideEcTransportSupported => EcTransportHardwareAvailable();
 
     internal bool SupportsMiniled => _backendProbe?.Hw?.SupportsLocalDimming == true;
 
@@ -1845,6 +1862,34 @@ public partial class OriginalStyleWindow : Window
         }
     }
 
+    private static void ReleaseAllMouseCapture()
+    {
+        try
+        {
+            Mouse.Capture(null);
+        }
+        catch
+        {
+        }
+    }
+
+    private void UpdateOverlayDockHighlight()
+    {
+        try
+        {
+            if (DockOverlayButton == null)
+            {
+                return;
+            }
+            DockOverlayButton.Background = _overlayWindow?.IsVisible == true
+                ? (System.Windows.Media.Brush)FindResource("ControlBrush")
+                : System.Windows.Media.Brushes.Transparent;
+        }
+        catch
+        {
+        }
+    }
+
     private void EnsureOverlayWindow()
     {
         if (_overlayWindow != null)
@@ -1855,14 +1900,22 @@ public partial class OriginalStyleWindow : Window
         _overlayWindow.Closed += (_, _) =>
         {
             _overlayWindow = null;
-            SaveOverlayVisible(false);
+            // 程序退出时 Close 不是用户主动隐藏，不能把“上次悬浮窗打开”改成 0。
+            if (!_appClosing)
+            {
+                SaveOverlayVisible(false);
+            }
             UpdateBackendTimerInterval();
         };
         _overlayWindow.IsVisibleChanged += (_, _) =>
         {
             UpdateBackendTimerInterval();
-            // 右键隐藏也走这里；必须持久化，否则下次启动会错误地自动显示。
-            SaveOverlayVisible(_overlayWindow?.IsVisible == true);
+            UpdateOverlayDockHighlight();
+            // 右键隐藏也走这里；程序退出触发的隐藏不写盘，否则下次启动会被记成关闭。
+            if (!_appClosing)
+            {
+                SaveOverlayVisible(_overlayWindow?.IsVisible == true);
+            }
         };
     }
 
@@ -1986,14 +2039,12 @@ public partial class OriginalStyleWindow : Window
         {
             _overlayWindow.Hide();
             SaveOverlayVisible(false);
+            UpdateOverlayDockHighlight();
             return;
         }
         _overlayWindow.Show();
-        if (!_overlayWindow.IsLocked)
-        {
-            _overlayWindow.Activate();
-        }
         SaveOverlayVisible(true);
+        UpdateOverlayDockHighlight();
     }
 
     internal bool WideOverlayLocked => _overlayWindow?.IsLocked ?? OverlayWindow.ReadSavedLocked();
@@ -2078,10 +2129,17 @@ public partial class OriginalStyleWindow : Window
             }
             EnsureOverlayWindow();
             _overlayWindow?.Show();
+            UpdateOverlayDockHighlight();
         }
         catch
         {
         }
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        _appClosing = true;
+        base.OnClosing(e);
     }
 
     private IntPtr PowerBroadcastHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -2562,7 +2620,14 @@ public partial class OriginalStyleWindow : Window
         BatteryLimitSlider.Visibility = ChargeSliderToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         if (BatteryLimitSliderText != null) BatteryLimitSliderText.Visibility = ChargeSliderToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         _syncingBatteryLimit = true;
-        BatteryLimitSlider.Value = BatteryControl.ResolveDisplayLimitPercent();
+        int initialLimit = BatteryControl.ResolveDisplayLimitPercent();
+        BatteryLimitSlider.Value = initialLimit;
+        // 初始化时 ValueChanged 被 _syncingBatteryLimit 挡掉，必须手动同步右侧文本，
+        // 否则会出现“滑块在 80、右侧数字仍写 100”。
+        if (BatteryLimitSliderText != null)
+        {
+            BatteryLimitSliderText.Text = initialLimit + "%";
+        }
         _syncingBatteryLimit = false;
         ApplyBatterySliderStage();
     }
@@ -2670,7 +2735,7 @@ public partial class OriginalStyleWindow : Window
             supported = hw != null
                 && (BatteryLimitPanel.IsSupportedBoard(hw)
                     || hw.IsIntelNucMachine || hw.IsUmiMachine
-                    || MechrevoLite.Hardware.EcChargeLimit.IsEcDirectWriteAllowed());
+                    || EcTransportHardwareAvailable());
         }
         catch
         {
@@ -3456,6 +3521,12 @@ public partial class OriginalStyleWindow : Window
             MechrevoLite.Hardware.NucPerformanceMode.ExtremeVisualMode => WpfStrings.NucExtremeTurbo,
             _ => WpfStrings.ModeCustom
         };
+        // 无界自动曲线控制器会在启动后常驻；切到非自定义档必须停掉它，
+        // 否则已经交还 EC 的档位仍会被 25Hz 定时器/EC 写入覆盖。
+        if (mode != 3 && L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.WujieSmuApu == true)
+        {
+            MechrevoLite.Hardware.WujieFanEcController.StopActive("切换到非自定义档");
+        }
         OsdService.Show(string.Empty, WpfStrings.OsdPerformance, osdMode);
         _lastSwitchModeOsdTick = Environment.TickCount64;
         _backendProbe?.MarkUserModeSwitch();
@@ -4351,6 +4422,12 @@ public partial class OriginalStyleWindow : Window
         bool dense = visible >= 5;
         bool hasSilentTurbo = SilentTurboModeButton != null
             && SilentTurboModeButton.Visibility == Visibility.Visible;
+        // 小窗口性能模式按钮始终等宽：三/四/五模式都按可见按钮数均分。
+        if (ModeGrid.UseContentWidths)
+        {
+            ModeGrid.UseContentWidths = false;
+            ModeGrid.InvalidateMeasure();
+        }
         foreach (object child in ModeGrid.Children)
         {
             if (child is not ToggleButton button) continue;
@@ -5504,9 +5581,20 @@ public partial class OriginalStyleWindow : Window
 
     private void BuildMoreSwitches()
     {
-        if (MoreGroupsPanel == null || MoreGroupsPanel.Children.Count > 0 || _backendProbe == null)
+        if (MoreGroupsPanel == null || _backendProbe == null)
         {
             return;
+        }
+        // 迷你窗「更多开关」只在首次构建；GCU 能力若晚到（后端刚连上），
+        // 原来的 Children.Count>0 提前返回会让 GCU-OSD 永久缺失。
+        bool gcuOsdSupported = _services?.QuickSwitches.Supports("gcuosd") == true;
+        if (MoreGroupsPanel.Children.Count > 0 && (!gcuOsdSupported || _moreSwitchesHasGcuOsd))
+        {
+            return;
+        }
+        if (MoreGroupsPanel.Children.Count > 0)
+        {
+            MoreGroupsPanel.Children.Clear();
         }
         (string Title, (string Key, string Label)[] Items)[] groups =
         {
@@ -5518,7 +5606,8 @@ public partial class OriginalStyleWindow : Window
             (WpfStrings.QuickGroupKeyboard, new (string, string)[]
             {
                 ("winkey", QuickSwitchService.Label("winkey", "Win键锁")), ("fnkey", QuickSwitchService.Label("fnkey", "Fn键锁")), ("capslock", QuickSwitchService.Label("capslock", "大小写锁定")),
-                ("osd", QuickSwitchService.Label("osd", "OSD提示")), ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"))
+                ("osd", QuickSwitchService.Label("osd", "OSD提示")), ("gcuosd", QuickSwitchService.Label("gcuosd", "GCU-OSD")),
+                ("copilot", QuickSwitchService.Label("copilot", "Copilot键锁"))
             }),
             (WpfStrings.QuickGroupPower, new (string, string)[]
             {
@@ -5541,9 +5630,16 @@ public partial class OriginalStyleWindow : Window
             List<CheckBox> visible = new List<CheckBox>();
             foreach ((string key, string label) in items)
             {
-                if (!_backendProbe.SupportsQuick(key))
+                bool supported = _services != null
+                    ? _services.QuickSwitches.Supports(key)
+                    : _backendProbe.SupportsQuick(key);
+                if (!supported)
                 {
                     continue;
+                }
+                if (string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase))
+                {
+                    _moreSwitchesHasGcuOsd = true;
                 }
                 visible.Add(new CheckBox
                 {
@@ -6002,7 +6098,17 @@ public partial class OriginalStyleWindow : Window
                 : (power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online
                     ? (batteryPercent >= 95 ? WpfStrings.BatteryFull : WpfStrings.BatteryNotCharging)
                     : WpfStrings.BatteryDischarging);
-            powerState = " · " + source + " · " + state;
+            decimal? chargeWatts = L_Mechrevo.WpfP0.Services.PowerStatusService.Read().BatteryRateWatts;
+            string chargeText = "";
+            // 同方/GCU 机型先显示实际充电功率；宝龙达保持原样。
+            if (hw?.UsesBaolongda != true
+                && charging
+                && chargeWatts is decimal watts
+                && watts > 0)
+            {
+                chargeText = " · 充电 " + watts.ToString("0.#") + "W";
+            }
+            powerState = " · " + source + " · " + state + chargeText;
         }
         catch
         {
@@ -6011,7 +6117,9 @@ public partial class OriginalStyleWindow : Window
         BatteryInfo.ToolTip = health;
         SyncNucExternalMode(probe);
         int mode = ResolveDisplayMode(probe);
-        GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported) ? Visibility.Visible : Visibility.Collapsed;
+        GpuOverclockSwitch.Visibility = (mode == 1 && probe.GpuOcSupported
+    && probe.Hw?.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu)
+    ? Visibility.Visible : Visibility.Collapsed;
         GpuOverclockSwitch.IsChecked = MechrevoService.GpuOverclockEnabled || AppConfig.Is("gpu_oc");
         int currentGpu = probe.CurrentGpuMode;
         int pendingGpu = probe.PendingGpuTarget;
@@ -6091,10 +6199,30 @@ public partial class OriginalStyleWindow : Window
             SyncCustomWindowMode(mode);
         }
         ToggleButton[] batteryButtons = { BatteryLongButton, BatteryBalancedButton, BatteryWorkButton };
-        // 无极限充开启时三档高亮必须跟滑块走；否则 2s 刷新会用后端旧 BatteryMode
-        // 覆盖滑块刚设置的高亮，表现为拖滑块时三个按钮来回跳。
+        // 开机恢复时 UI 可能还停在 XAML 默认的「长效 100%」；以实际限充值为准。
+        // 无极限充开启时仍允许滑块即时反馈，但后台刷新会把显示拉回实际 EC/config 值。
+        int resolvedLimit = MechrevoLite.Battery.BatteryControl.ResolveDisplayLimitPercent();
+        if (ChargeSliderToggle.IsChecked == true && resolvedLimit > 0)
+        {
+            if (!BatteryLimitSlider.IsMouseCaptureWithin
+                && Math.Abs(BatteryLimitSlider.Value - resolvedLimit) >= 0.5)
+            {
+                _syncingBatteryLimit = true;
+                BatteryLimitSlider.Value = resolvedLimit;
+                _syncingBatteryLimit = false;
+            }
+            // 文本与滑块分开同步：Value 已经是 80 时 ValueChanged 不会再触发。
+            if (BatteryLimitSliderText != null)
+            {
+                string limitText = resolvedLimit + "%";
+                if (!string.Equals(BatteryLimitSliderText.Text, limitText, StringComparison.Ordinal))
+                {
+                    BatteryLimitSliderText.Text = limitText;
+                }
+            }
+        }
         int batteryMode = ChargeSliderToggle.IsChecked == true
-            ? ModeForPercent((int)Math.Round(BatteryLimitSlider.Value))
+            ? ModeForPercent(resolvedLimit > 0 ? resolvedLimit : (int)Math.Round(BatteryLimitSlider.Value))
             : probe.BatteryMode;
         for (int i = 0; i < batteryButtons.Length; i++)
         {
@@ -6252,7 +6380,7 @@ public partial class OriginalStyleWindow : Window
     }
 
     /// <summary>背景图高斯模糊：ui_bg_blur 0–40，0 = 不模糊。</summary>
-    internal static void ApplyBackgroundBlur(System.Windows.Controls.Image? image)
+    internal static void ApplyBackgroundBlur(System.Windows.Controls.Image? image, string configKey = "ui_bg_blur")
     {
         if (image == null)
         {
@@ -6260,7 +6388,7 @@ public partial class OriginalStyleWindow : Window
         }
         try
         {
-            int radius = Math.Clamp(AppConfig.Get("ui_bg_blur", 12), 0, 40);
+            int radius = Math.Clamp(AppConfig.Get(configKey, 12), 0, 40);
             // 固定 overscan：开/关模糊时变换不变，只换 Effect，避免背景缩放造成“动一下”。
             // 必须以中心为原点；旧写法 new ScaleTransform(...,0.5,0.5) 是绝对坐标，会向左上/右下偏。
             image.RenderTransformOrigin = new Point(0.5, 0.5);
@@ -6792,9 +6920,28 @@ public partial class OriginalStyleWindow : Window
             // 50 系默认两个狂暴；其它机型默认只显示狂暴。GCU 明确不支持才隐藏。
             bool silentTurboAllowed = ShouldShowSilentTurbo(caps, hw);
             EnsureSilentTurboButton(silentTurboAllowed);
+            // 预览用：强制显示五模式，不改变实际档位能力。
+            bool forceFiveModes = string.Equals(
+                    Environment.GetEnvironmentVariable("LMECHREVO_FORCE_FIVE_MODES"), "1", StringComparison.Ordinal)
+                || MechrevoLite.AppConfig.Get("force_five_modes", 0) == 1;
+            if (forceFiveModes)
+            {
+                CustomModeButton.Visibility = Visibility.Visible;
+                TurboModeButton.Visibility = Visibility.Visible;
+                EnsureSilentTurboButton(true);
+                if (SilentTurboModeButton != null)
+                {
+                    SilentTurboModeButton.Visibility = Visibility.Visible;
+                    SilentTurboModeButton.Content = WpfStrings.SilentTurbo;
+                }
+                if (TurboModeButton.Content is TextBlock turboPreview)
+                {
+                    turboPreview.Text = WpfStrings.TurboHighEnergy;
+                }
+            }
             // 50 系的静音狂暴是在这里动态插入的；插入后必须重新按 5 按钮密度排版。
             ApplyModeSegmentDensity();
-            if (TurboModeButton.Content is TextBlock turboLabel)
+            if (!forceFiveModes && TurboModeButton.Content is TextBlock turboLabel)
             {
                 turboLabel.Text = silentTurboAllowed ? WpfStrings.TurboHighEnergy : WpfStrings.OriginalStyleWindow_Text_22;
             }
@@ -7706,6 +7853,7 @@ public partial class OriginalStyleWindow : Window
                 // 与迷你窗 GpuOverclockSwitch 同一条件：只在狂暴档且后端支持超频时显示；
                 // 不额外按 DgpuGeneration 硬屏蔽（50 系 GCU 支持时即可用）。
                 return hw != null
+                    && hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu
                     && _backendProbe?.GpuOcSupported == true
                     && WideCurrentMode == 1;
             }
@@ -8301,6 +8449,10 @@ public partial class OriginalStyleWindow : Window
 
     private void InitLightingControls()
     {
+        if (string.Equals(Environment.GetEnvironmentVariable("LMECHREVO_DISABLE_KB_LIGHT"), "1", StringComparison.Ordinal))
+        {
+            return;
+        }
         LightOffOnBatteryCheck.IsChecked = AppConfig.Is("lighting_off_on_battery");
         FillKeyboardEffects();
         FillLightChannelEffects();
@@ -9927,6 +10079,22 @@ public partial class OriginalStyleWindow : Window
         catch
         {
         }
+        int ramUsage = hw?.RamUsage ?? -1;
+        double ramUsedGb = hw?.RamUsedGb ?? -1;
+        if (ramUsage <= 0 || ramUsedGb <= 0)
+        {
+            // WUJIE 的 GCU 不上报 SystemMemoryInfo；悬浮窗不能因此显示「—」。
+            if (MechrevoLite.HardwareControl.TryGetLocalRam(out int localRamUsage, out int localRamUsedMb))
+            {
+                ramUsage = localRamUsage;
+                ramUsedGb = localRamUsedMb / 1024.0;
+            }
+        }
+        // NoDgpu 时 hw.VramUsedMb 是 GCU 的 GpuMem（WUJIE 上会变成系统内存占用），
+        // 不能拿来当显存；无独显只认本地 LHM 共享显存。
+        int vramUsedMb = MechrevoLite.HardwareControl.vramUsedMb
+            ?? ((hw != null && hw.DgpuGeneration != MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu && hw.VramUsedMb > 0)
+                ? hw.VramUsedMb : -1);
         return new OverlaySnapshot(
             // 悬浮窗必须和主界面同一口径：快照没有值时回退到本地优先源
             // （Wujie/星耀 APU 的 hw.CpuTemp 是 ACPI 热区，可能比真实 Tctl 高 20℃+）。
@@ -9938,19 +10106,20 @@ public partial class OriginalStyleWindow : Window
                 ? MechrevoLite.HardwareControl.gpuTemp : (hw?.GpuTemp ?? -1)),
             snapshot.GpuUsagePercent,
             snapshot.GpuCoreFrequencyMhz,
-            MechrevoLite.HardwareControl.vramUsedMb ?? (hw != null && hw.VramUsedMb > 0 ? hw.VramUsedMb : -1),
+            vramUsedMb,
             MechrevoLite.HardwareControl.vramUsage ?? -1,
             snapshot.CpuFanRpm > 0 ? snapshot.CpuFanRpm : (hw?.CpuFanRpm ?? -1),
             snapshot.GpuFanRpm > 0 ? snapshot.GpuFanRpm : (hw?.GpuFanRpm ?? -1),
             snapshot.CpuFanDutyPercent,
             snapshot.GpuFanDutyPercent,
-            hw?.RamUsage ?? -1,
-            hw?.RamUsedGb ?? -1,
+            ramUsage,
+            ramUsedGb,
             battery,
             acOnline,
             charging,
             (float)(snapshot.CpuPowerWatts ?? 0),
-            (float)(snapshot.GpuPowerWatts ?? 0));
+            (float)(snapshot.GpuPowerWatts ?? 0),
+            L_Mechrevo.WpfP0.Services.PowerStatusService.Read().BatteryRateWatts);
     }
 
     internal Task ExportDiagnosticPackForFeedbackAsync()

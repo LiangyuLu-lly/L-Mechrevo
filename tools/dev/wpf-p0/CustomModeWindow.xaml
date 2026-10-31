@@ -104,23 +104,21 @@
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_17}" VerticalAlignment="Center" />
                             <ComboBox x:Name="RefreshCombo" Grid.Column="1" Style="{StaticResource RoundCombo}" />
                         </Grid>
-                        <Grid x:Name="FanBoostRow" Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_16}" VerticalAlignment="Center" />
-                            <ComboBox x:Name="FanBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
-                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_4}" Tag="" />
-                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Tag="1" />
-                                <ComboBoxItem Content="{x:Static loc:WpfStrings.StateOff}" Tag="0" />
-                            </ComboBox>
-                        </Grid>
 
                     </StackPanel>
                 </Border>
 
                 <Border x:Name="CpuPowerCard" Style="{StaticResource Card}" Margin="0,0,0,8">
                     <StackPanel>
-                        <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_15}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="CPU" Style="{StaticResource CardTitle}" />
                         <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="TccLabel" Text="{x:Static loc:WpfStrings.TccLabel_Text}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="TccSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="TccSwitch_Changed" Unchecked="TccSwitch_Changed" />
+                            <Slider x:Name="TccSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="75" Maximum="100" Value="95" ValueChanged="Tcc_Changed" />
+                            <TextBlock x:Name="TccText" Grid.Column="3" Text="95" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock x:Name="Pl1Label" Text="{x:Static loc:WpfStrings.Pl1Label_Text}" VerticalAlignment="Center" />
                             <Slider x:Name="Pl1Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="200" Value="65" ValueChanged="Pl1_Changed" />
@@ -137,6 +135,19 @@
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_14}" VerticalAlignment="Center" />
                             <Slider x:Name="Pl4Slider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="5" Maximum="250" Value="100" ValueChanged="Pl4_Changed" />
                             <TextBlock x:Name="Pl4Text" Grid.Column="2" Text="100" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid x:Name="Pl4UnitRow" Margin="0,8,0,0" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="PL4 双倍口径（实验）" VerticalAlignment="Center" />
+                            <CheckBox x:Name="Pl4UnitSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0"
+                                      Checked="Pl4UnitSwitch_Changed" Unchecked="Pl4UnitSwitch_Changed">
+                                <CheckBox.ToolTip>
+                                    <TextBlock MaxWidth="320" TextWrapping="Wrap"
+                                               Text="开：PL4 = 双倍 EC 值（2W/LSB）&#10;关：PL4 = 单倍 EC 值（1W/LSB）&#10;默认按 EC 0x0727 bit7 的实际值显示；切换后立即回读 PL4。" />
+                                </CheckBox.ToolTip>
+                            </CheckBox>
+                            <TextBlock x:Name="Pl4UnitStatus" Grid.Column="2" VerticalAlignment="Center" FontSize="11"
+                                       Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                         <Grid x:Name="StapmTimeRow" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
@@ -167,15 +178,8 @@
 
                 <Border x:Name="TempGpuCard" Style="{StaticResource Card}" Margin="0,0,0,8">
                     <StackPanel>
-                        <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_9}" Style="{StaticResource CardTitle}" />
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
-                            <TextBlock x:Name="TccLabel" Text="{x:Static loc:WpfStrings.TccLabel_Text}" VerticalAlignment="Center" />
-                            <CheckBox x:Name="TccSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="TccSwitch_Changed" Unchecked="TccSwitch_Changed" />
-                            <Slider x:Name="TccSlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="75" Maximum="100" Value="95" ValueChanged="Tcc_Changed" />
-                            <TextBlock x:Name="TccText" Grid.Column="3" Text="95" TextAlignment="Right" VerticalAlignment="Center" />
-                        </Grid>
-                        <Grid x:Name="DbRow" Margin="0,4,0,0">
+                        <TextBlock Text="GPU" Style="{StaticResource CardTitle}" />
+                        <Grid x:Name="DbRow" Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_8}" VerticalAlignment="Center" />
                             <CheckBox x:Name="DbSwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="DbSwitch_Changed" Unchecked="DbSwitch_Changed" />
@@ -194,19 +198,6 @@
                             <Slider x:Name="GpuPowerLimitSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="300" Value="0" ValueChanged="GpuPowerLimit_Changed" />
                             <TextBlock x:Name="GpuPowerLimitText" Grid.Column="2" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Border x:Name="FanCard" Style="{StaticResource Card}" Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_5}" Style="{StaticResource CardTitle}" />
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_4}" VerticalAlignment="Center" />
-                            <CheckBox x:Name="FanSensitivitySwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="FanSensitivitySwitch_Changed" Unchecked="FanSensitivitySwitch_Changed" />
-                            <Slider x:Name="FanDelaySlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="1000" Value="300" ValueChanged="FanDelay_Changed" />
-                            <TextBlock x:Name="FanDelayText" Grid.Column="3" Text="300" TextAlignment="Right" VerticalAlignment="Center" />
-                        </Grid>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_3}" VerticalAlignment="Center" />
@@ -224,6 +215,28 @@
                             <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text}" VerticalAlignment="Center" />
                             <Slider x:Name="MemoryOffsetSlider" Grid.Column="1" Style="{StaticResource RoundSlider}" Minimum="-1000" Maximum="2000" Value="0" ValueChanged="MemoryOffset_Changed" />
                             <TextBlock x:Name="MemoryOffsetText" Grid.Column="2" Text="0" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="FanCard" Style="{StaticResource Card}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="风扇" Style="{StaticResource CardTitle}" />
+                        <Grid x:Name="FanBoostRow" Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_16}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="FanBoostCombo" Grid.Column="1" Style="{StaticResource RoundCombo}">
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_4}" Tag="" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Tag="1" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.StateOff}" Tag="0" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_4}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="FanSensitivitySwitch" Grid.Column="1" Style="{DynamicResource HeaderSwitch}" VerticalAlignment="Center" Margin="0,0,10,0" Checked="FanSensitivitySwitch_Changed" Unchecked="FanSensitivitySwitch_Changed" />
+                            <Slider x:Name="FanDelaySlider" Grid.Column="2" Style="{StaticResource RoundSlider}" Minimum="0" Maximum="1000" Value="300" ValueChanged="FanDelay_Changed" />
+                            <TextBlock x:Name="FanDelayText" Grid.Column="3" Text="300" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                     </StackPanel>
                 </Border>

@@ -712,20 +712,7 @@ internal sealed class PerfModeService
 			Logger.WriteLine("PerfModes: activate(" + modeId + ") ignored, mode does not exist");
 			return null;
 		}
-		MechrevoHw? intelXingyaoGuard = _hw;
-		if (mode.IsCustom && intelXingyaoGuard != null
-			&& MechrevoLite.Hardware.CpuVendor.IsIntel
-			&& MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform())
-		{
-			Logger.WriteError("[perfmode] Intel 星耀：自定义模式已暂时屏蔽（不应用、不下发）");
-			PerfApplyOutcome blocked = new PerfApplyOutcome(modeId, new PerfApplyStepOutcome[1]
-			{
-				new PerfApplyStepOutcome(SwitchStepFor(mode, 0), PerfApplyResult.Failed,
-					"Intel 星耀暂不支持自定义模式")
-			});
-			RaiseApplied(blocked);
-			return blocked;
-		}
+		// Intel 星耀 PTL 的自定义 PL1/PL2 已通过本机 MSR 验证，允许继续走自定义应用。
 		PerfModeSettings expectedSettings = mode.Settings;
 		MechrevoHw hw = _hw;
 		// （无界 APU）：无 GCU 也可走本机 SMU 应用/启动恢复 ⇒ 连接判据放宽（其它机型不变）

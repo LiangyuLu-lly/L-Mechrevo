@@ -128,7 +128,15 @@ public partial class MainWindow : Window
         ApplyPage("home");
         _sensorTimer.Tick += (_, _) => RefreshSensors();
         _sensorTimer.Start();
-        StateChanged += (_, _) => OnWideStateChanged();
+        StateChanged += (_, _) =>
+        {
+            OnWideStateChanged();
+            if (WindowState == WindowState.Minimized)
+            {
+                ReleaseWideMouseCapture();
+            }
+        };
+        Deactivated += (_, _) => ReleaseWideMouseCapture();
         Closed += (_, _) =>
         {
             _sensorTimer.Stop();
@@ -621,7 +629,7 @@ public partial class MainWindow : Window
             bitmap.EndInit();
             BackgroundImage.Source = bitmap;
             BackgroundImage.Opacity = Math.Clamp(AppConfig.Get("wide_bg_opacity", 78), 0, 100) / 100.0;
-            OriginalStyleWindow.ApplyBackgroundBlur(BackgroundImage);
+            OriginalStyleWindow.ApplyBackgroundBlur(BackgroundImage, "wide_bg_blur");
             BackgroundImage.Visibility = Visibility.Visible;
             BackgroundScrim.Fill = new SolidColorBrush(Colors.Black);
             BackgroundScrim.Opacity = Math.Clamp(AppConfig.Get("wide_bg_scrim", 35), 0, 100) / 100.0;
@@ -764,6 +772,17 @@ public partial class MainWindow : Window
         BeginAnimation(TopProperty, top);
         BeginAnimation(WidthProperty, width);
         BeginAnimation(HeightProperty, height);
+    }
+
+    private static void ReleaseWideMouseCapture()
+    {
+        try
+        {
+            Mouse.Capture(null);
+        }
+        catch
+        {
+        }
     }
 
     private void OnWideStateChanged()

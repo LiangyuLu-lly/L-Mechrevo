@@ -28,6 +28,9 @@ internal static class EcKeyboardLight
 	/// <summary>写亮度时固定置 1 的位（固件用它标记“亮度更新”，写完自清）。</summary>
 	private const byte BrightnessWriteFlag = 0x10;
 
+	/// <summary>bit1 = 电源禁用：1=关、0=开。之前只改亮度位，没写这一位，所以“关灯”实际没关。</summary>
+	private const byte PowerDisableBit = 0x02;
+
 	/// <summary>亮度在 bit5~7：0=关、1=暗、2=亮。</summary>
 	private const int BrightnessShift = 5;
 
@@ -95,7 +98,8 @@ internal static class EcKeyboardLight
 			return false;
 		}
 		brightnessLevel = (value >> BrightnessShift) & 0x07;
-		on = brightnessLevel > 0;
+		// bit1=1 表示电源禁用；亮度位不能单独当开关。
+		on = (value & PowerDisableBit) == 0 && brightnessLevel > 0;
 		return true;
 	}
 
@@ -159,12 +163,23 @@ internal static class EcKeyboardLight
 				{
 					targetLevel = MaxBrightnessLevel;
 				}
-				// 与固件写法一致：保留低 5 位、置 bit4、bit5~7 = 亮度档（0=关/1=暗/2=亮）
+				// 与固件写法一致：保留低 5 位、置 bit4、bit5~7 = 亮度档；
+				// bit1 才是电源禁用位（1=关/0=开），必须同步写，否则“关灯”只写亮度 0，灯仍亮。
 				int value = (before & 0x1F) | BrightnessWriteFlag | ((targetLevel & 0x07) << BrightnessShift);
+				if (targetLevel > 0)
+				{
+					value &= ~PowerDisableBit;
+				}
+				else
+				{
+					value |= PowerDisableBit;
+				}
 				bool written = Write(handle, Register, (byte)value);
 				int after = Read(handle, Register);
 				int afterLevel = (after < 0) ? (-1) : ((after >> BrightnessShift) & 0x07);
-				bool ok = written && afterLevel == targetLevel;
+				bool afterPowerOn = after >= 0 && (after & PowerDisableBit) == 0;
+				bool wantPowerOn = targetLevel > 0;
+				bool ok = written && afterLevel == targetLevel && afterPowerOn == wantPowerOn;
 				Logger.WriteError("[kbd-ec] 键盘背光：0x78C 0x" + before.ToString("X2") + " -> 0x" + value.ToString("X2")
 					+ "（" + DescribeLevel(targetLevel) + "）"
 					+ " ⇒ " + (ok ? "回读一致" : ("未确认（写=" + (written ? "成功" : "失败") + " · 回读档=" + (afterLevel < 0 ? "读不到" : afterLevel.ToString()) + "）")));

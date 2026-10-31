@@ -51,13 +51,17 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 		bool wujieApu = hw.WujieSmuApu;
 		bool xingyaoApu = hw.XingyaoAmdSmuApu;
 		bool smuCustomApu = wujieApu || xingyaoApu;
+		// 星耀 Intel PTL：没有 GCU 固件槽，自定义 PL1/PL2 走本机 MSR。
+		bool intelXingyaoMsr = MechrevoLite.Hardware.CpuVendor.IsIntel
+			&& MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform()
+			&& !hw.IsIntelNucMachine && !hw.IsUmiMachine;
 		// 宝龙达 30 系保持原「只读缓存」口径（行为逐位不变）
 		bool smuReady = (hw.IsBaolongda30Series && SmuAvailability.IsReadyCached) || (smuCustomApu && SmuAvailability.IsReady);
 		return new PerfModeCapabilities
 		{
 			UsesAmdPowerFields = hw.UsesAmdPowerFields,
-			SupportsPl1 = hw.Pl1Adjustable,
-			SupportsPl2 = hw.Pl2Adjustable,
+			SupportsPl1 = intelXingyaoMsr || hw.Pl1Adjustable,
+			SupportsPl2 = intelXingyaoMsr || hw.Pl2Adjustable,
 			SupportsPl4 = hw.Pl4Adjustable,
 			SupportsTcc = hw.TccAdjustable,
 			SupportsTgp = hw.GpuTgpAdjustable,
@@ -81,9 +85,9 @@ internal sealed class PerfModeBackend : IPerfModeBackend
 			//   ⇒ ⭐ 所以按后端【如实申报】：⭐ 宝龙达 ⇒ false ⇒ ⭐ 规划器不生成那两步 ✅
 			//      ⇒ ⭐ 不再出现"注定失败"的档位步（⭐ 它会让 Runner 提前 break、把后面所有步骤一起废掉 ❌）✅
 			//   ⚠️ 非宝龙达 ⇒ `UsesBaolongda == false` ⇒ true ⇒ ⭐ 步骤列表【一个字节都不变】✅
-			SupportsFirmwareSlot = !hw.UsesBaolongda && !smuCustomApu,
+			SupportsFirmwareSlot = !hw.UsesBaolongda && !smuCustomApu && !intelXingyaoMsr,
 			// 2026-10-16（宝龙达 · 自定义档 · 功耗墙真下发）： 功耗墙三项（PL1 / PL2 / 温度墙）
-			SupportsWmiPowerFields = hw.UsesBaolongda || smuCustomApu,
+			SupportsWmiPowerFields = hw.UsesBaolongda || smuCustomApu || intelXingyaoMsr,
 			// 本后端自定义档的功耗**到底走不走 SMU** —— 唯一判据 PerfModeCapabilities.UsesSmuForCustomPower
 			SupportsSmuPowerControls = PerfModeCapabilities.UsesSmuForCustomPower(hw.UsesBaolongda, hw.IsBaolongda30Series, smuReady, smuCustomApu),
 			// 非宝龙达 ⇒ false ⇒ 规划器行为**逐位不变** （GCU 机型那条 WriteFirmwareField 路径照旧）。

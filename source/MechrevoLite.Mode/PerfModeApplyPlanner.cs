@@ -112,7 +112,7 @@ public static class PerfModeApplyPlanner
 			{
 				list.Add(Field("CpuTccOffset", settings.TccTarget.Value));
 			}
-			if (settings.GpuTgp.HasValue)
+			if (settings.GpuTgp.HasValue && caps.SupportsTgp)
 			{
 				list.Add(Field("GpuConfigurableTGPTarget", settings.GpuTgp.Value, PerfApplyVerify.GpuPowerLimit));
 			}

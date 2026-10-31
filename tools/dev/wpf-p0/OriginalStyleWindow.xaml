@@ -878,7 +878,7 @@
                         <TextBlock Text="beta23.6" Style="{StaticResource MutedText}" FontSize="10" />
                     </StackPanel>
                     <UniformGrid Grid.Column="1" Columns="6" VerticalAlignment="Center">
-                        <Button Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
+                        <Button x:Name="DockOverlayButton" Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
                             <StackPanel>
                                 <Rectangle Width="15" Height="15" HorizontalAlignment="Center" Fill="{DynamicResource MutedBrush}">
                         <Rectangle.OpacityMask><ImageBrush ImageSource="Assets/Icons/ui-overlay.png" /></Rectangle.OpacityMask>

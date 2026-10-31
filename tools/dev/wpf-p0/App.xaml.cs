@@ -135,11 +135,17 @@ public partial class App : Application
         _ = Task.Run(() => MechrevoLite.HardwareControl.EnableLocalMonitoring());
         base.OnStartup(e);
         // 系统 CapsLock / NumLock 变化时弹 LM OSD，并让快捷开关跟随真实状态。
-        LockKeyOsdService.Start();
+        if (!string.Equals(Environment.GetEnvironmentVariable("LMECHREVO_DISABLE_LOCK_OSD"), "1", StringComparison.Ordinal))
+        {
+            LockKeyOsdService.Start();
+        }
         // 暂不补充九键映射：Fn+SCRLK 只显示 ScrollLock OSD，不改键码。
         // Wi-Fi / 蓝牙：和 OpenRevo 一样用 Windows Radio 状态轮询，
         // 系统里切换也能同步 OSD / 开关状态；只读探测，不改变硬件策略。
-        MechrevoLite.Helpers.RadioSwitch.Start();
+        if (!string.Equals(Environment.GetEnvironmentVariable("LMECHREVO_DISABLE_RADIO"), "1", StringComparison.Ordinal))
+        {
+            MechrevoLite.Helpers.RadioSwitch.Start();
+        }
         OriginalStyleWindow window = new();
         MainWindow = window;
         if (string.Equals(MechrevoLite.AppConfig.GetString("last_window_mode"), "wide", StringComparison.OrdinalIgnoreCase))
@@ -167,6 +173,12 @@ public partial class App : Application
                 {
                     foreach (Window openWindow in Application.Current.Windows)
                     {
+                        // 启动任务静默驻留只隐藏主窗口；悬浮窗如果上次是打开的，
+                        // 必须保留，否则 Hide 会触发 IsVisibleChanged 把状态改成 0。
+                        if (openWindow is L_Mechrevo.WpfP0.OverlayWindow)
+                        {
+                            continue;
+                        }
                         openWindow.ShowInTaskbar = false;
                         openWindow.Hide();
                     }

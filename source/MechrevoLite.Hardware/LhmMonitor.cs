@@ -539,6 +539,8 @@ public class LhmMonitor : IDisposable
 				CpuPower = null;
 				CpuClockMhz = null;
 				GpuPower = null;
+				// GPU 频率每轮重读：否则会冻结在首次读到的 0.8G（r27 已验证有效）。
+				GpuClockMhz = null;
 				GpuMemoryTotalMb = 0;
 				GpuMemoryUsedMb = 0;
 				GpuSharedMemoryTotalMb = 0;

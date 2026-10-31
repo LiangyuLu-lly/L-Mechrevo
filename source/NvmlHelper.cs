@@ -38,6 +38,7 @@ public static class NvmlHelper
     private static string? _smiPath;
     private static bool _smiPathResolved;
     private static bool _disabled;
+    private static bool _notApplicable;
     private static string _disabledReason = "";
     private static bool _unavailable;
     private static long _unavailableUntilTicks;
@@ -78,7 +79,11 @@ public static class NvmlHelper
         }
     }
 
-    internal static bool ModuleGone => _disabled;
+    /// <summary>无 NVIDIA / 无 nvidia-smi 属于“本机不适用”，不是模块丢失；
+    /// 不能触发 LHM 重建/隔离。</summary>
+    internal static bool ModuleGone => _disabled && !_notApplicable;
+
+    internal static bool NotApplicable => _notApplicable;
 
     internal static bool TransitionGuarded => false;
 
@@ -355,6 +360,7 @@ public static class NvmlHelper
             if (!HasNvidiaAdapter())
             {
                 _disabled = true;
+                _notApplicable = true;
                 _disabledReason = "本机没有 NVIDIA 独显：不启动 nvidia-smi";
                 ClearSnapshotLocked();
                 return;
@@ -379,7 +385,12 @@ public static class NvmlHelper
         string? smi = ResolveSmi();
         if (smi == null)
         {
-            NoteFailureLocked("nvidia-smi.exe 未找到", -1);
+            // 没有 nvidia-smi 时不要再累计 NVML 失败，更不要触发 LHM 重建；
+            // 否则无 N 卡机器会被反复重建 LHM，CPU 温度直接冻结。
+            _disabled = true;
+            _notApplicable = true;
+            _disabledReason = "未找到 nvidia-smi.exe：停用 NVIDIA 遥测";
+            ClearSnapshotLocked();
             return;
         }
         const string fields = "index,temperature.gpu,power.draw,memory.used,memory.total,clocks.gr,clocks.mem,utilization.gpu,power.limit,power.min_limit,power.max_limit,power.default_limit";
@@ -502,9 +513,13 @@ public static class NvmlHelper
             IReadOnlyList<GpuAdapter> adapters = MechrevoLite.Gpu.GpuAdapterReader.ReadFromRegistry(out bool enumerationAvailable);
             if (!enumerationAvailable)
             {
-                // 枚举不可用时不强行判定为“无 N 卡”，避免误伤；
-                // nvidia-smi 自己找不到时会自然失败。
-                return true;
+                // 枚举不可用（虚拟显示适配器/驱动限制）时不能无条件当成有 N 卡：
+                // 有 NVIDIA 适配器证据，或系统里确实存在 nvidia-smi，才算有。
+                if (adapters.Any(adapter => adapter.IsNvidia))
+                {
+                    return true;
+                }
+                return ResolveSmi() != null;
             }
             return adapters.Any(adapter => adapter.IsNvidia);
         }

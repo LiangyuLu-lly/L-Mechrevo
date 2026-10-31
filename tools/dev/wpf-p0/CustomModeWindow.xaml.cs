@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -22,6 +22,7 @@ public partial class CustomModeWindow : Window
     private bool _loadingUi;
     private bool _dirty;
     private bool _syncingPowerWalls;
+    private bool _syncingPl4Unit;
     private readonly DispatcherTimer _powerWallTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private bool _powerWallBusy;
     private static string UnsetMark => WpfStrings.CustomUnsetMark;
@@ -466,6 +467,11 @@ public partial class CustomModeWindow : Window
         MechrevoHw? hwForRows = L_Mechrevo.WpfP0.Services.WpfBackend.Hw;
         bool apuOrNoDgpu = hwForRows != null
             && (hwForRows.SmuCustomApu || hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.NoDgpu);
+        // Intel 星耀只开放 PL1/PL2：fPPT、温度/GPU、风扇/超频都不显示。
+        bool intelXingyaoMsr = hwForRows != null
+            && MechrevoLite.Hardware.CpuVendor.IsIntel
+            && MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform()
+            && !hwForRows.IsIntelNucMachine && !hwForRows.IsUmiMachine;
         bool wujieApu = hwForRows?.WujieSmuApu == true;
         bool smuCustomApu = hwForRows?.SmuCustomApu == true;
         bool smuPowerRows = hwForRows != null && MechrevoLite.Mode.PerfModeCapabilities.UsesSmuForCustomPower(
@@ -474,15 +480,50 @@ public partial class CustomModeWindow : Window
             MechrevoLite.Hardware.SmuAvailability.IsReady,
             smuCustomApu);
         bool pl4Supported = hwForRows != null && hwForRows.Pl4Minimum >= 0 && hwForRows.Pl4Maximum > hwForRows.Pl4Minimum;
-        Pl4Row.Visibility = !apuOrNoDgpu && pl4Supported ? Visibility.Visible : Visibility.Collapsed;
-        DbRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
+        bool gcuTongfangMachine = IsGcuTongfangMachine(hwForRows);
+        bool gcuTongfangIntel = IsGcuTongfangIntel(hwForRows);
+        Pl4Row.Visibility = !intelXingyaoMsr && !apuOrNoDgpu && (pl4Supported || gcuTongfangMachine)
+            ? Visibility.Visible : Visibility.Collapsed;
+        DbRow.Visibility = (apuOrNoDgpu || intelXingyaoMsr) ? Visibility.Collapsed : Visibility.Visible;
+        // 没有独显（无界办公本等）不显示 GPU 超频/动态加速卡片。
+        TempGpuCard.Visibility = (apuOrNoDgpu || intelXingyaoMsr)
+            ? Visibility.Collapsed : Visibility.Visible;
+        Pl4UnitRow.Visibility = gcuTongfangIntel ? Visibility.Visible : Visibility.Collapsed;
+        if (gcuTongfangIntel)
+        {
+            _syncingPl4Unit = true;
+            try
+            {
+                if (MechrevoLite.Hardware.EcPl4Unit.TryRead(out bool pl4Double, out byte pl4Raw))
+                {
+                    Pl4UnitSwitch.IsChecked = pl4Double;
+                    // EC 门控为权威：同步到门面层，后续 GCU 回报不覆盖。
+                    L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.SetPl4UnitDouble(pl4Double);
+                    Pl4UnitStatus.Text = "0x0727=0x" + pl4Raw.ToString("X2") + " · " + (pl4Double ? "2W/LSB" : "1W/LSB");
+                    RefreshPl4Readback("");
+                }
+                else
+                {
+                    Pl4UnitSwitch.IsChecked = false;
+                    Pl4UnitSwitch.IsEnabled = false;
+                    Pl4UnitStatus.Text = "0x0727 读取失败";
+                }
+            }
+            finally
+            {
+                _syncingPl4Unit = false;
+            }
+        }
         // 30 系 NUC/UMI 是固定基础 TGP，只能调 Dynamic Boost；基础 TGP 行直接隐藏。
         bool fixedBaseTgp = hwForRows != null
             && (hwForRows.IsIntelNucMachine || hwForRows.IsUmiMachine)
             && hwForRows.DgpuGeneration == MechrevoLite.Gpu.DgpuGenerationKind.Gen30;
-        GpuTgpRow.Visibility = (apuOrNoDgpu || fixedBaseTgp) ? Visibility.Collapsed : Visibility.Visible;
-        FanBoostRow.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
-        FanCard.Visibility = apuOrNoDgpu ? Visibility.Collapsed : Visibility.Visible;
+        bool tgpAdjustable = hwForRows != null
+            && (hwForRows.GpuTgpAdjustable || hwForRows.IsIntelNucMachine || hwForRows.IsUmiMachine);
+        GpuTgpRow.Visibility = (apuOrNoDgpu || fixedBaseTgp || intelXingyaoMsr || !tgpAdjustable)
+            ? Visibility.Collapsed : Visibility.Visible;
+        FanBoostRow.Visibility = (apuOrNoDgpu || intelXingyaoMsr) ? Visibility.Collapsed : Visibility.Visible;
+        FanCard.Visibility = (apuOrNoDgpu || intelXingyaoMsr) ? Visibility.Collapsed : Visibility.Visible;
         StapmTimeRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
         SmuSlowLimitRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
         SmuSlowTimeRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
@@ -658,6 +699,21 @@ public partial class CustomModeWindow : Window
         }
     }
 
+    private static bool IsGcuTongfangMachine(MechrevoHw? hw)
+    {
+        return hw != null
+            && !hw.UsesBaolongda
+            && !hw.IsIntelNucMachine && !hw.IsUmiMachine
+            && MechrevoHw.IsGcuServiceInstalled;
+    }
+
+    private static bool IsGcuTongfangIntel(MechrevoHw? hw)
+    {
+        return IsGcuTongfangMachine(hw)
+            && MechrevoLite.Hardware.CpuVendor.IsIntel
+            && !MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform();
+    }
+
     private void ApplyHardwareControlLimits(MechrevoHw hw)
     {
         if (hw.SmuCustomApu)
@@ -673,19 +729,28 @@ public partial class CustomModeWindow : Window
         {
             SetSliderRange(Pl1Slider, hw.Pl1Minimum, hw.Pl1Maximum);
             SetSliderRange(Pl2Slider, hw.Pl2Minimum, hw.Pl2Maximum);
-            if (MechrevoLite.Hardware.CpuVendor.IsIntel && !hw.IsIntelNucMachine && !hw.IsUmiMachine)
-            {
-                // Intel MSR 后端（非 NUC/UMI）：UI 范围与 MSR 写入范围对齐。
-                SetSliderRange(Pl1Slider, 5, 120);
-                SetSliderRange(Pl2Slider, 5, 150);
-            }
         }
         SetSliderRange(Pl4Slider, hw.Pl4Minimum, hw.Pl4Maximum);
+        // GCU Intel 的 PL4/fPPT 可能只回当前值、不回范围；给可调范围，避免 fPPT 被整行隐藏。
+        if (IsGcuTongfangMachine(hw) && (hw.Pl4Minimum < 0 || hw.Pl4Maximum <= hw.Pl4Minimum))
+        {
+            SetSliderRange(Pl4Slider, 5, 300);
+        }
         SetSliderRange(TccSlider, hw.TccMinimum, hw.TccMaximum);
         SetSliderRange(GpuTgpSlider, hw.GpuTgpMinimum, hw.GpuTgpMaximum);
         SetSliderRange(DbSlider, hw.GpuDbMinimum, hw.GpuDbMaximum);
         SetSliderRange(FanDelaySlider, hw.FanSwitchSpeedMinimum, hw.FanSwitchSpeedMaximum);
         bool nucDirectUi = hw.IsIntelNucMachine || hw.IsUmiMachine;
+        bool intelXingyaoMsr = MechrevoLite.Hardware.CpuVendor.IsIntel
+            && MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform()
+            && !hw.IsIntelNucMachine && !hw.IsUmiMachine
+            && !MechrevoHw.IsGcuServiceInstalled;
+        if (intelXingyaoMsr)
+        {
+            // 358H 实测可接受上限 100W；PL2 也不超过 100W。
+            SetSliderRange(Pl1Slider, 5, 100);
+            SetSliderRange(Pl2Slider, 5, 100);
+        }
         if (nucDirectUi)
         {
             SetSliderRange(Pl1Slider, 5, 200);
@@ -798,6 +863,94 @@ public partial class CustomModeWindow : Window
     {
         if (Pl4Text != null) Pl4Text.Text = ((int)e.NewValue).ToString();
         SyncPowerWalls("fppt");
+    }
+
+    private void RefreshPl4Readback(string prefix)
+    {
+        try
+        {
+            if (Pl4Slider == null || Pl4Text == null)
+            {
+                return;
+            }
+            if (!MechrevoLite.Hardware.EcPl4Unit.TryRead(out bool doubleUnit, out byte gateRaw)
+                || !MechrevoLite.Hardware.EcPl4Unit.TryReadPl4(out int watts, out byte raw, out _))
+            {
+                if (!string.IsNullOrEmpty(prefix))
+                {
+                    Pl4UnitStatus.Text = prefix + "PL4 回读失败";
+                }
+                return;
+            }
+            _syncingPowerWalls = true;
+            try
+            {
+                // EC 门控为权威，防止 GCU 回报把 Pl4Scale 改回去。
+                L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.SetPl4UnitDouble(doubleUnit);
+                Pl4Slider.Value = Math.Clamp(watts, (int)Pl4Slider.Minimum, (int)Pl4Slider.Maximum);
+                Pl4Text.Text = ((int)Pl4Slider.Value).ToString();
+            }
+            finally
+            {
+                _syncingPowerWalls = false;
+            }
+            Pl4UnitStatus.Text = prefix + "0x0727=0x" + gateRaw.ToString("X2")
+                + " · " + (doubleUnit ? "2W/LSB" : "1W/LSB")
+                + " · PL4回读=" + watts + "W（0x0785=" + raw + "）";
+        }
+        catch
+        {
+        }
+    }
+
+    private void Pl4UnitSwitch_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncingPl4Unit || _loadingUi || Pl4UnitSwitch == null)
+        {
+            return;
+        }
+        bool target = Pl4UnitSwitch.IsChecked == true;
+        if (!MechrevoLite.Hardware.EcPl4Unit.IsSupported)
+        {
+            _syncingPl4Unit = true;
+            try
+            {
+                if (MechrevoLite.Hardware.EcPl4Unit.TryRead(out bool actual, out byte raw))
+                {
+                    Pl4UnitSwitch.IsChecked = actual;
+                    Pl4UnitStatus.Text = "0x0727=0x" + raw.ToString("X2") + " · 仅预览（本机不可写）";
+                    RefreshPl4Readback("仅预览 · ");
+                }
+            }
+            finally
+            {
+                _syncingPl4Unit = false;
+            }
+            return;
+        }
+        if (!MechrevoLite.Hardware.EcPl4Unit.TrySetDouble(target, out string detail))
+        {
+            _syncingPl4Unit = true;
+            try
+            {
+                if (MechrevoLite.Hardware.EcPl4Unit.TryRead(out bool actual, out byte raw))
+                {
+                    Pl4UnitSwitch.IsChecked = actual;
+                    Pl4UnitStatus.Text = "0x0727=0x" + raw.ToString("X2");
+                }
+            }
+            finally
+            {
+                _syncingPl4Unit = false;
+            }
+            Pl4UnitStatus.Text = detail;
+            return;
+        }
+        Pl4UnitStatus.Text = detail;
+        L_Mechrevo.WpfP0.Services.WpfBackend.Hw?.SetPl4UnitDouble(target);
+        RefreshPl4Readback(detail + " · ");
+        MechrevoLite.AppConfig.Set("pl4_unit_double", target ? 1 : 0);
+        MechrevoLite.AppConfig.Flush();
     }
 
     /// <summary>FPPT >= PL2 >= PL1；拖动任意一个时把另一端推到合法范围。</summary>

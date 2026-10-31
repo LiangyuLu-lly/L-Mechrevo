@@ -69,38 +69,11 @@ internal static class NativeLockKey
 	/// </summary>
 	internal static bool IsOn(int virtualKey)
 	{
+		// 只读当前键盘状态，不能 AttachThreadInput：
+		// 本方法每 200ms 被 OSD 轮询三次，反复 attach/detach 前台线程会重置
+		// USER32 的鼠标双击计数，导致双击偶尔失效。
 		try
 		{
-			uint foregroundThread = GetWindowThreadProcessId(GetForegroundWindow(), out uint _);
-			uint currentThread = GetCurrentThreadId();
-			if (foregroundThread != 0 && foregroundThread != currentThread)
-			{
-				bool attached = false;
-				try
-				{
-					attached = AttachThreadInput(currentThread, foregroundThread, true);
-					if (attached)
-					{
-						return (GetKeyState(virtualKey) & LockedBitMask) != 0;
-					}
-				}
-				catch (Exception)
-				{
-				}
-				finally
-				{
-					if (attached)
-					{
-						try
-						{
-							AttachThreadInput(currentThread, foregroundThread, false);
-						}
-						catch (Exception)
-						{
-						}
-					}
-				}
-			}
 			return (GetKeyState(virtualKey) & LockedBitMask) != 0;
 		}
 		catch (Exception)

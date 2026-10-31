@@ -8,6 +8,7 @@
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
+        ShowActivated="False"
         WindowStartupLocation="Manual"
         ResizeMode="NoResize"
         FontFamily="{DynamicResource AppFontFamily}"
@@ -65,9 +66,9 @@
                 <ProgressBar x:Name="CpuMemoryBar" Grid.Column="8" Width="30" Height="7" Margin="4,0,0,0" Minimum="0" Maximum="100"
                              Foreground="#22D3EE" Background="#33FFFFFF" BorderThickness="0" VerticalAlignment="Center" />
             </Grid>
-            <StackPanel x:Name="BatteryPanel" Margin="0,4,0,0" HorizontalAlignment="Right">
-                <TextBlock x:Name="BatteryText" Text="{x:Static loc:WpfStrings.BatteryInfo_Text}" Style="{DynamicResource MutedText}" FontSize="10" HorizontalAlignment="Right" />
-                <TextBlock x:Name="BatteryDetailText" Text="" Style="{StaticResource MutedText}" FontSize="10" HorizontalAlignment="Right" Margin="0,1,0,0" />
+            <StackPanel x:Name="BatteryPanel" Margin="0,4,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                <TextBlock x:Name="BatteryText" Text="{x:Static loc:WpfStrings.BatteryInfo_Text}" Style="{DynamicResource MutedText}" FontSize="10" VerticalAlignment="Center" />
+                <TextBlock x:Name="BatteryDetailText" Text="" Style="{StaticResource MutedText}" FontSize="10" VerticalAlignment="Center" Margin="6,0,0,0" />
             </StackPanel>
         </StackPanel>
     </Border>

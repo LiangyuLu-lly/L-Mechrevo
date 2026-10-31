@@ -14,6 +14,47 @@ namespace MechrevoLite;
 
 public static class HardwareControl
 {
+	[StructLayout(LayoutKind.Sequential)]
+	private struct MemoryStatusEx
+	{
+		public uint Length;
+		public uint MemoryLoad;
+		public ulong TotalPhys;
+		public ulong AvailPhys;
+		public ulong TotalPageFile;
+		public ulong AvailPageFile;
+		public ulong TotalVirtual;
+		public ulong AvailVirtual;
+		public ulong AvailExtendedVirtual;
+	}
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
+
+	/// <summary>本地系统内存（WUJIE 这类 GCU 不推内存字段时兜底）。</summary>
+	internal static bool TryGetLocalRam(out int usagePercent, out int usedMb)
+	{
+		usagePercent = -1;
+		usedMb = -1;
+		try
+		{
+			MemoryStatusEx status = new() { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+			if (!GlobalMemoryStatusEx(ref status) || status.TotalPhys == 0)
+			{
+				return false;
+			}
+			ulong used = status.TotalPhys - Math.Min(status.TotalPhys, status.AvailPhys);
+			usagePercent = (int)Math.Clamp((long)(used * 100 / status.TotalPhys), 0, 100);
+			usedMb = (int)Math.Min(used / 1048576UL, int.MaxValue);
+			return true;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	// ⭐⭐ 2026-10-16：⭐ "CPU 温度已切到 LHM" 只记一次（⭐ 免得 3 秒一行刷爆日志 ⚠️）
 	private static int _lhmCpuTempLogged;
 
@@ -1045,7 +1086,9 @@ public static class HardwareControl
 		string source = "";
 		// NUC/UMI 的 GCU 厂商温度可能长期停在一个值（风扇却按真实温度转），
 		// 这两类机型改为 LHM 优先；其它机型仍保持厂商优先。
-		bool preferLhmCpu = (hw.IsIntelNucMachine || hw.IsUmiMachine) && !lhmSuspect && lhmCelsius > 0;
+		// 无界 APU / 耀世的 GCU 厂商温度可能长期停在固定值；优先 LHM。
+		bool preferLhmCpu = (hw.IsIntelNucMachine || hw.IsUmiMachine || hw.WujieSmuApu || hw.IsYaoshiMachine)
+			&& !lhmSuspect && lhmCelsius > 0;
 		if (preferLhmCpu)
 		{
 			celsius = lhmCelsius;
@@ -1605,6 +1648,13 @@ public static class HardwareControl
 						"[fan] 无界 EC 风扇转速：主扇(CPU)=" + (mainFanRpm >= 0 ? mainFanRpm + "rpm" : "读不到")
 						+ " · 副扇(GPU)=" + (secondaryFanRpm >= 0 ? secondaryFanRpm + "rpm" : "读不到")
 						+ "（EC 为准，覆盖 GCU FanInfo）");
+					if (MechrevoLite.Hardware.WujieFanEc.TryReadState(out _, out int wjDuty1, out int wjDuty2,
+						out _, out _, out _, out _))
+					{
+						int wjCpuDuty = wjDuty1 >= 0 ? Math.Clamp(wjDuty1 * 100 / 200, 0, 100) : -1;
+						int wjGpuDuty = wjDuty2 >= 0 ? Math.Clamp(wjDuty2 * 100 / 200, 0, 100) : -1;
+						hw.ApplyWujieFanDuty(wjCpuDuty, wjGpuDuty);
+					}
 				}
 				// 界面 RPM 行要求 FanInfo 新鲜 ⇒ 用 EC 值覆盖时也打一次时间戳（否则有值也不显示）
 				hw.MarkFanInfoReceived();
@@ -1681,8 +1731,14 @@ public static class HardwareControl
 			gpuFan = hw.GpuFanDuty;
 			gpuFanRPM = hw.GpuFanRpm;
 			gpuCoreFreq = hw.GpuCoreFreq;
-			ramUsage = hw.RamUsage;
-			ramUsedMb = (int)(hw.RamUsedGb * 1024.0);
+			if (hw.RamUsage > 0)
+			{
+				ramUsage = hw.RamUsage;
+			}
+			if (hw.RamUsedGb > 0)
+			{
+				ramUsedMb = (int)(hw.RamUsedGb * 1024.0);
+			}
 			// 电池百分比以 Windows 当前值为准（GCU 推送可能滞后，任务栏与本程序要对得上）
 			int winBattery = (int)Math.Round(System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent * 100.0);
 			batteryCapacity = ((winBattery >= 0 && winBattery <= 100) ? winBattery : hw.BatteryPercent);
@@ -2662,22 +2718,10 @@ public static class HardwareControl
 		//   ⚠️ 必须放在这里（写值之后），⛔ 不能放方法入口 —— 入口到这儿之间有好几道早退，
 		//      "来采过"≠"值刷新过" ⚠️（⭐ 见 `_lastPowerRefreshTick` 的注释 ✅）。
 		Interlocked.Exchange(ref _lastPowerRefreshTick, Environment.TickCount64);
-		// 核显（NoDgpu）：LHM 的 dedicated 字段通常只有一小段，真正用的是 D3D Shared Memory；
-		// 有共享显存读数时优先它，避免无界/星耀核显显存占用一直是「—」。
+		// 无界核显按 25.5.1 口径：只认 LHM 的 GPU Memory / Dedicated Memory，
+		// 不使用 D3D Shared Memory（那是系统内存，不是核显专用显存）。
 		int lhmUsed = num6;
 		int lhmTotal = num7;
-		if (Program.hw != null && Program.hw.DgpuGeneration == DgpuGenerationKind.NoDgpu && lhmMonitor != null)
-		{
-			int sharedUsed = lhmMonitor.GpuSharedMemoryUsedMb;
-			int sharedTotal = lhmMonitor.GpuSharedMemoryTotalMb;
-			if (sharedUsed > 0 && sharedTotal > 0)
-			{
-				lhmUsed = sharedUsed;
-				lhmTotal = sharedTotal;
-				Logger.WriteLineIfChanged("gpu-vram-shared",
-					"[gpu-vram] 核显共享显存 used=" + sharedUsed + "MB / total=" + sharedTotal + "MB");
-			}
-		}
 		(long, long)? tuple = ((lhmUsed > 0 && lhmTotal > 0) ? ((long, long)?)null : memoryViaNvml);
 		long num3 = ((lhmUsed > 0) ? lhmUsed : (tuple?.Item1 ?? 0));
 		long num4 = ((lhmTotal > 0) ? lhmTotal : (tuple?.Item2 ?? 0));

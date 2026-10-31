@@ -98,8 +98,9 @@ internal static class IntelMsrPowerLimit
         }
         bool has1 = pl1Watts > 0;
         bool has2 = pl2Watts > 0;
-        int pl1 = has1 ? Math.Clamp(pl1Watts, MinWatts, MaxWatts) : 0;
-        int pl2 = has2 ? Math.Clamp(pl2Watts, MinWatts, MaxWatts) : 0;
+        int maxWatts = MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform() ? 100 : MaxWatts;
+        int pl1 = has1 ? Math.Clamp(pl1Watts, MinWatts, maxWatts) : 0;
+        int pl2 = has2 ? Math.Clamp(pl2Watts, MinWatts, maxWatts) : 0;
         if (!ReadMsr(out ulong raw))
         {
             detail = "MSR 0x610 读取失败（PawnIO/IntelMSR 不可用）";

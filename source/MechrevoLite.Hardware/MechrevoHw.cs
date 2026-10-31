@@ -1826,16 +1826,45 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 
 	public bool Pl4Double { get; private set; }
 
+	private bool? _pl4UnitOverride;
+
 	internal int Pl4Scale
 	{
 		get
 		{
-			if (!Pl4Double)
+			if (!(_pl4UnitOverride ?? Pl4Double))
 			{
 				return 1;
 			}
 			return 2;
 		}
+	}
+
+	/// <summary>实验开关：以 EC 0x0727 bit7 为权威口径；GCU 后续回报不覆盖。</summary>
+	internal void SetPl4UnitDouble(bool doubleUnit)
+	{
+		_pl4UnitOverride = doubleUnit;
+		Pl4Double = doubleUnit;
+		int readScale = Pl4ReadScale();
+		if (_pl4Raw >= 0)
+		{
+			Pl4 = _pl4Raw * readScale;
+		}
+		if (_pl4RawMinimum >= 0)
+		{
+			Pl4Minimum = _pl4RawMinimum * readScale;
+		}
+		if (_pl4RawMaximum >= 0)
+		{
+			Pl4Maximum = _pl4RawMaximum * readScale;
+		}
+	}
+
+	/// <summary>按 GCU 回报的 PL4 上限判断口径：上限 &gt;255 ⇒ GCU 回报实际瓦数，不能再乘单位。</summary>
+	private int Pl4ReadScale()
+	{
+		int basis = _pl4RawMaximum >= 0 ? _pl4RawMaximum : _pl4Raw;
+		return basis > 255 ? 1 : Pl4Scale;
 	}
 
 	internal string Pl4WireKey
@@ -1957,6 +1986,10 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>UMI 机器（型号名含 Umi）。</summary>
 	internal bool IsUmiMachine => BackendRouter.LastDecision?.Identity?.IsUmi == true;
 
+	/// <summary>耀世（同方 GCU，板号 YAOSHI Series-*）。GCU 的 CPU 温度可能长期停在一个值。</summary>
+	internal bool IsYaoshiMachine =>
+		BoardWhitelist.ReadBoardProduct().StartsWith("YAOSHI", StringComparison.OrdinalIgnoreCase);
+
 	/// <summary>Intel NUC X15（型号含 NUC/X15 或板号 LAPKC*）。</summary>
 	internal bool IsIntelNucMachine =>
 		BackendRouter.LastDecision?.Identity?.IsIntelNuc == true
@@ -1983,6 +2016,13 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	}
 
 	internal void ApplyIntelNucFanDuty(int mainDutyPercent, int secondDutyPercent)
+	{
+		if (mainDutyPercent >= 0) CpuFanDuty = mainDutyPercent;
+		if (secondDutyPercent >= 0) GpuFanDuty = secondDutyPercent;
+	}
+
+	/// <summary>无界 EC 主/副扇占空比（0..100%），供悬浮窗/主界面与 RPM 同源显示。</summary>
+	internal void ApplyWujieFanDuty(int mainDutyPercent, int secondDutyPercent)
 	{
 		if (mainDutyPercent >= 0) CpuFanDuty = mainDutyPercent;
 		if (secondDutyPercent >= 0) GpuFanDuty = secondDutyPercent;
@@ -5624,6 +5664,11 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 	/// <summary>⭐ SMU 自定义后端合并判据：无界 APU 或 星耀 AMD（仅 SMU 链路使用）。</summary>
 	internal bool SmuCustomApu => WujieSmuApu || XingyaoAmdSmuApu;
 
+	/// <summary>同方 GCU 体系：无界、星耀，以及已连接 GCU 的同方机型（不含 NUC/UMI/宝龙达）。</summary>
+	internal bool IsTongfangGcuMachine =>
+		!UsesBaolongda
+		&& (WujieSmuApu || XingyaoAmdSmuApu || (IsGcuConnected && !IsIntelNucMachine && !IsUmiMachine));
+
 	/// <summary>无界机型 PawnIO 缺失提示只记一次（避免刷屏）。</summary>
 	private static bool _wujiePawnIoWarned;
 	/// <summary>⭐ 最近一次只读验证结论（⭐ UI 说明行/日志用）✅</summary>
@@ -5646,8 +5691,9 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		confirmed = ok;
 		if (ok)
 		{
-			if (pl1Watts > 0) Pl1 = Math.Clamp(pl1Watts, 5, 200);
-			if (pl2Watts > 0) Pl2 = Math.Clamp(pl2Watts, 5, 200);
+			int maxWatts = MechrevoLite.Hardware.XingyaoPmc2.IsXingyaoPlatform() ? 100 : 200;
+			if (pl1Watts > 0) Pl1 = Math.Clamp(pl1Watts, 5, maxWatts);
+			if (pl2Watts > 0) Pl2 = Math.Clamp(pl2Watts, 5, maxWatts);
 		}
 		Logger.WriteError("[intel-msr] 自定义功耗 PL1=" + pl1Watts + "W PL2=" + pl2Watts + "W lock=" + locked + " ⇒ " + detail);
 		return true;
@@ -10232,7 +10278,7 @@ private bool IsLighbar4Lightbar => !string.IsNullOrWhiteSpace(LightbarStatusType
 		_pl4Raw = OptionalUsablePowerValue(o, "CPU_PL4", _pl4Raw);
 		_pl4RawMinimum = FirstUsablePowerValue(o, _pl4RawMinimum, "CPU_PL4Minimum", "CPU_PL4Min", "CPU_PL4_Minimum", "CPU_PL4_Min");
 		_pl4RawMaximum = FirstUsablePowerValue(o, _pl4RawMaximum, "CPU_PL4Maximum", "CPU_PL4Max", "CPU_PL4_Maximum", "CPU_PL4_Max");
-		int num12 = ((!Pl4Double) ? 1 : 2);
+		int num12 = Pl4ReadScale();
 		int num13 = ((_pl4Raw >= 0) ? (_pl4Raw * num12) : (-1));
 		Pl4 = ((UsesAmdPowerFields && CpuAmdFppt > 0) ? CpuAmdFppt : num13);
 		Pl4Minimum = ((_pl4RawMinimum >= 0) ? (_pl4RawMinimum * num12) : (-1));

@@ -80,9 +80,13 @@ public partial class LightEditorWindow : Window
                 {
                 }
             }
-            _wujieWhite = hw?.WujieSmuApu == true
-                && hw.KeyboardStatusSeen
-                && string.Equals(hw.KeyboardSolution, "UNKNOWN", StringComparison.OrdinalIgnoreCase);
+            // 无界目前只有白色背光键盘；GCU 的 Keyboard/Status 有时晚到/不报，
+            // 不能因为 KeyboardStatusSeen=false 就把它当普通 RGB 键盘（滑块会落到 0..4）。
+            _wujieWhite = hw?.WujieSmuApu == true && _keyboard;
+            Logger.WriteLine("[light-editor] wujieWhite=" + _wujieWhite
+                + " statusSeen=" + (hw?.KeyboardStatusSeen == true)
+                + " solution=" + (hw?.KeyboardSolution ?? "")
+                + " keyboard=" + _keyboard);
             // task-17 白色背光实际只有 2 档（暗/亮），不是 4 档；
             // 旧注释/旧范围写成 0..4 会让 UI 出现第 3/4 档但下发无效。
             if (_whiteBacklightOnly)
@@ -124,6 +128,22 @@ public partial class LightEditorWindow : Window
             _mixColors = (int[])mix.Clone();
         }
         PowerCheck.IsChecked = _settings.PowerOn;
+        if (_keyboard && _wujieWhite)
+        {
+            // 无界白键盘的实际电源状态以 EC 为准；GCU 的 power=False 可能只是状态没回读。
+            // 如果 EC 已经是亮的，编辑器不能停在“电源关、滑块不可拖”。
+            try
+            {
+                if (MechrevoLite.Hardware.EcKeyboardLight.TryGet(out bool ecOn, out int ecLevel)
+                    && (ecOn || ecLevel > 0))
+                {
+                    PowerCheck.IsChecked = true;
+                }
+            }
+            catch
+            {
+            }
+        }
         if (_keyboard)
         {
             HintText.Text = WpfStrings.LightEditorWindow_xaml_Text;
@@ -203,7 +223,9 @@ public partial class LightEditorWindow : Window
     private void UpdateEditorPowerUi()
     {
         bool on = PowerCheck.IsChecked == true;
-        LightSlider.IsEnabled = on;
+        // 白键盘只有开关 + 2 档亮度：即使电源开关暂时是关，也允许拖亮度，
+        // 拖动时自动开灯（与 23.5.1 的可用性一致）。
+        LightSlider.IsEnabled = on || (_keyboard && (_wujieWhite || _whiteBacklightOnly));
         SpeedSlider.IsEnabled = on;
         ColorRow.IsEnabled = on;
         MixRow.IsEnabled = on;
@@ -489,6 +511,11 @@ public partial class LightEditorWindow : Window
         if (_keyboard)
         {
             _light = Math.Clamp((int)Math.Round(e.NewValue), (int)LightSlider.Minimum, _lightMax);
+            if ((_wujieWhite || _whiteBacklightOnly) && PowerCheck.IsChecked != true)
+            {
+                // 拉亮度视为开灯，避免只更新数值但下发时仍按 power=false 处理。
+                PowerCheck.IsChecked = true;
+            }
             if (LightText != null)
             {
                 LightText.Text = (_wujieWhite || _whiteBacklightOnly) ? (_light >= 2 ? WpfStrings.LightLevelBright : WpfStrings.LightLevelDim) : (_light + "/" + _lightMax);

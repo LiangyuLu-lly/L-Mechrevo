@@ -190,12 +190,22 @@ internal static class GcuPackageImport
 				string expectedVariant = ExpectedVariant();
 				if (expectedVariant != null && !File.Exists(Path.Combine(staging, "payload", expectedVariant + ".7z")))
 				{
-					string stagedNames = string.Join("、", stagedVariants.Select(v => v + " 系 GCU"));
-					if (MessageBox.Show(owner, "本机需要 " + expectedVariant + " 系 GCU，实际提供：" + stagedNames + Environment.NewLine + Environment.NewLine +
-						"仍然继续尝试安装吗？", Strings.GcuImportTitle,
-						MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+					// 40 系没有 40.7z 时按既有约定退回 50.7z，不再弹“变体不匹配”警告。
+					if (string.Equals(expectedVariant, "40", StringComparison.OrdinalIgnoreCase)
+						&& File.Exists(Path.Combine(staging, "payload", "50.7z")))
 					{
-						return;
+						installVariant = "50";
+						Logger.WriteError("[gcu-import] 40 系未提供 40 包 ⇒ 自动退回 50 包（DB 由 GpuDbControl 补）");
+					}
+					else
+					{
+						string stagedNames = string.Join("、", stagedVariants.Select(v => v + " 系 GCU"));
+						if (MessageBox.Show(owner, "本机需要 " + expectedVariant + " 系 GCU，实际提供：" + stagedNames + Environment.NewLine + Environment.NewLine +
+							"仍然继续尝试安装吗？", Strings.GcuImportTitle,
+							MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+						{
+							return;
+						}
 					}
 				}
 			}
@@ -491,6 +501,14 @@ internal static class GcuPackageImport
 			{
 				Logger.WriteError($"[gcu-import] 解包失败（不是有效压缩包？）：{file}");
 				return 0;
+			}
+			// 兼容“整包”：GCU.7z 里再放 payload\1020.7z / 30.7z / 50.7z / WJ.7z。
+			// 旧逻辑只找 GCUService.exe，遇到这种多包归档会直接判失败。
+			int nested = StageNestedArchives(extract, staging);
+			if (nested > 0)
+			{
+				Logger.WriteError($"[gcu-import] 识别到整包内的 {nested} 个 GCU 变体：{file}");
+				return nested;
 			}
 			string tree = FindServiceTree(extract);
 			if (tree == null)

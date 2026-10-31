@@ -323,6 +323,8 @@ public partial class SettingsWindow : Window
         BackgroundBlurText.Text = ((int)BackgroundBlurSlider.Value).ToString();
         WideBackgroundOpacitySlider.Value = Math.Clamp(AppConfig.Get("wide_bg_opacity", 78), 0, 100);
         WideBackgroundOpacityText.Text = (int)WideBackgroundOpacitySlider.Value + "%";
+        WideBackgroundBlurSlider.Value = Math.Clamp(AppConfig.Get("wide_bg_blur", 12), 0, 40);
+        WideBackgroundBlurText.Text = ((int)WideBackgroundBlurSlider.Value).ToString();
         RefreshBackgroundPathText();
         RefreshWideBackgroundPathText();
         DockOpacitySlider.Value = Math.Clamp(AppConfig.Get("ui_dock_opacity", 70), 0, 100);
@@ -672,7 +674,6 @@ public partial class SettingsWindow : Window
         AppConfig.Set("ui_bg_blur", value);
         AppConfig.Flush();
         _owner.ApplyBackgroundAppearance();
-        _owner.RefreshWideBackground();
     }
 
     private void BackgroundScrim_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -726,6 +727,16 @@ public partial class SettingsWindow : Window
         int value = (int)Math.Round(e.NewValue);
         WideBackgroundOpacityText.Text = value + "%";
         AppConfig.Set("wide_bg_opacity", value);
+        AppConfig.Flush();
+        _owner.RefreshWideBackground();
+    }
+
+    private void WideBackgroundBlur_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncing || WideBackgroundBlurText == null) return;
+        int value = (int)Math.Round(e.NewValue);
+        WideBackgroundBlurText.Text = value.ToString();
+        AppConfig.Set("wide_bg_blur", value);
         AppConfig.Flush();
         _owner.RefreshWideBackground();
     }

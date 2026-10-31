@@ -101,7 +101,9 @@ internal static class DiagnosticUsageInfo
 				+ "（0 = 成功 · -1 = 还没查过）· 设备句柄存活=" + (NvmlHelper.DeviceHandleAlive ? "是" : "否")
 				+ " · 快照年龄=" + DescribeAge(NvmlHelper.SnapshotAgeMs)
 				+ " · 快照 TTL=" + NvmlHelper.SnapshotTtlMs + "ms"
-				+ " · NVML 已隔离=" + (NvmlHelper.Unavailable ? "是（降级停用）" : "否"));
+				+ " · NVIDIA 遥测=" + (NvmlHelper.NotApplicable
+					? "不适用（本机无 NVIDIA / nvidia-smi，正常停用）"
+					: (NvmlHelper.Unavailable ? "已隔离（降级停用）" : "可用")));
 		}
 		catch (Exception ex)
 		{
