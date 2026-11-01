@@ -209,6 +209,7 @@ public partial class OriginalStyleWindow : Window
     public OriginalStyleWindow()
     {
         InitializeComponent();
+        MainScroll.PreviewMouseWheel += MainScroll_PreviewMouseWheel;
         L_Mechrevo.WpfP0.Services.WindowWorkAreaPolicy.ClampOnLoaded(this);
         RestoreSavedMiniHeight();
         _miniHeightSaveTimer.Tick += (_, _) =>
@@ -6787,6 +6788,42 @@ public partial class OriginalStyleWindow : Window
             ModeGrid.Children.Remove(SilentTurboModeButton);
             SilentTurboModeButton = null;
         }
+    }
+
+    /// <summary>宽屏内容区的滚轮统一转发给 MainScroll；Sliders/ComboBox 不再吃掉页面滚动。</summary>
+    private void MainScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Handled || MainScroll == null)
+        {
+            return;
+        }
+        DependencyObject? node = e.OriginalSource as DependencyObject;
+        ScrollViewer? inner = null;
+        while (node != null && !ReferenceEquals(node, MainScroll))
+        {
+            if (node is ComboBox combo && combo.IsDropDownOpen)
+            {
+                return;
+            }
+            if (node is ScrollViewer viewer && !ReferenceEquals(viewer, MainScroll))
+            {
+                inner = viewer;
+                break;
+            }
+            node = VisualTreeHelper.GetParent(node);
+        }
+        if (inner != null)
+        {
+            bool canScrollInner = e.Delta > 0
+                ? inner.VerticalOffset > 0
+                : inner.VerticalOffset < inner.ScrollableHeight;
+            if (canScrollInner)
+            {
+                return;
+            }
+        }
+        MainScroll.ScrollToVerticalOffset(MainScroll.VerticalOffset - e.Delta);
+        e.Handled = true;
     }
 
     /// <summary>迷你窗高度完全由用户拖动决定；这里只负责记住/恢复，不再按内容自动收放。</summary>
