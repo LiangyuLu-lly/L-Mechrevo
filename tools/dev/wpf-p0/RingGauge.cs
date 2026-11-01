@@ -23,7 +23,8 @@ internal sealed class RingGauge : FrameworkElement
         double size = Math.Max(1, Math.Min(ActualWidth, ActualHeight));
         Point center = new(size / 2, size / 2);
         double radius = Math.Max(1, size / 2 - 9);
-        Brush track = new SolidColorBrush(Color.FromArgb(48, 255, 255, 255));
+        Brush track = (Brush?)Application.Current.Resources["TrackBrush"]
+            ?? new SolidColorBrush(Color.FromArgb(48, 255, 255, 255));
         Brush accent = (Brush?)Application.Current.Resources["AccentBrush"] ?? Brushes.DeepSkyBlue;
         Pen trackPen = new(track, 8);
         Pen accentPen = new(accent, 8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
