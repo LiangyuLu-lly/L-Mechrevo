@@ -356,6 +356,7 @@ public partial class CustomModeWindow : Window
         _modeActivationDebounceCts?.Cancel();
         CancellationTokenSource cts = new();
         _modeActivationDebounceCts = cts;
+        StatusText.Text = WpfStrings.L("正在自动切换配置…", "Auto-switching configuration...");
         try
         {
             // 快速连续切换时只让最后一次进入后端激活，避免中间档位反复切固件槽/超时。
@@ -374,9 +375,10 @@ public partial class CustomModeWindow : Window
 
     private async Task ActivateAndRefreshAsync(string id, long seq)
     {
+        bool switched = false;
         try
         {
-            await SelectModeAsync(id).ConfigureAwait(true);
+            switched = await SelectModeAsync(id).ConfigureAwait(true);
         }
         catch
         {
@@ -392,6 +394,12 @@ public partial class CustomModeWindow : Window
         }
         SyncModeComboToCurrent();
         QueueModeComboSync();
+        if (_current != null)
+        {
+            StatusText.Text = switched
+                ? WpfStrings.L("已自动切换配置：", "Auto-switched configuration: ") + ModeName(_current)
+                : WpfStrings.L("配置已加载，自动切换未完成，请点“应用”重试", "Configuration loaded; auto-switch incomplete. Click Apply to retry");
+        }
     }
 
     private void QueueModeComboSync()
@@ -1136,6 +1144,7 @@ public partial class CustomModeWindow : Window
         {
             // 本次应用以当前编辑内容为准；取消尚未启动的切换防抖，避免它稍后又在应用后切槽。
             _modeActivationDebounceCts?.Cancel();
+            _modeSwitchSeq++;
             // 切换配置后的激活还在进行时，UpdateAsync 会因 PendingModeId 非空直接返回 null
             //（界面显示“没有返回下发结果”）。这里先等激活收尾，再执行本次应用。
             if (!await perf.WaitForActivationIdleAsync(TimeSpan.FromSeconds(8)))
