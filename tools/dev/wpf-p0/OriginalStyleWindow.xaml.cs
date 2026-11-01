@@ -9915,6 +9915,8 @@ public partial class OriginalStyleWindow : Window
         _trayIcon?.SetTheme(_dark);
         ThemeButton.Content = _dark ? WpfStrings.LightTheme : WpfStrings.DarkTheme;
         AppConfig.Set("ui_dark_theme", _dark ? 1 : 0);
+        // 手动点深色/浅色开关即退出“跟随系统”，否则下次启动会被系统主题覆盖。
+        AppConfig.Set("ui_theme_follow_system", 0);
         AppConfig.Flush();
         UpdateBackgroundVisibility();
         RefreshSegmentHighlights();

@@ -405,6 +405,8 @@ public partial class SettingsWindow : Window
     {
         DarkButton.IsChecked = true;
         LightButton.IsChecked = false;
+        FollowSystemCheck.IsChecked = false;
+        AppConfig.Set("ui_theme_follow_system", 0);
         AppConfig.Set("ui_dark_theme", 1);
         AppConfig.Flush();
         _owner.ApplyThemeFromSettings(true);
@@ -415,6 +417,8 @@ public partial class SettingsWindow : Window
     {
         LightButton.IsChecked = true;
         DarkButton.IsChecked = false;
+        FollowSystemCheck.IsChecked = false;
+        AppConfig.Set("ui_theme_follow_system", 0);
         AppConfig.Set("ui_dark_theme", 0);
         AppConfig.Flush();
         _owner.ApplyThemeFromSettings(false);
