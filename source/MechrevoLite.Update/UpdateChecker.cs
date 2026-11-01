@@ -101,20 +101,32 @@ internal static class UpdateChecker
 		}
 	}
 
-	/// <summary>版本号里的 -betaN.M 是发布标签，不是补丁号；比较主版本时先剥掉。</summary>
-	private static string BaseVersion(string? version)
+	/// <summary>取 -beta 后的发布版本号；以后主版本号可移除，不再依赖 0.293.x。</summary>
+	private static string BetaVersion(string? version)
 	{
 		if (string.IsNullOrWhiteSpace(version)) return "";
 		string text = version.Trim().TrimStart('v', 'V');
 		int idx = text.IndexOf("-beta", StringComparison.OrdinalIgnoreCase);
-		return idx > 0 ? text[..idx] : text;
+		return idx >= 0 ? text[(idx + 5)..] : "";
 	}
 
 	private static bool IsNewerGitHub(string? candidate, string? current)
 	{
-		int baseCmp = UpdateVersion.Compare(BaseVersion(candidate), BaseVersion(current));
-		if (baseCmp != 0) return baseCmp > 0;
+		string candidateBeta = BetaVersion(candidate);
+		string currentBeta = BetaVersion(current);
+		// beta 包之间只看 beta 后面的版本，避免被 0.293.6.9 这类主版本号绑死。
+		if (candidateBeta.Length > 0 && currentBeta.Length > 0)
+		{
+			return UpdateVersion.Compare(candidateBeta, currentBeta) > 0;
+		}
 		return UpdateVersion.Compare(candidate, current) > 0;
+	}
+
+	private static DateTime ReleasePublishedAt(JObject release)
+	{
+		string? text = Clean(release.Value<string>("published_at"))
+			?? Clean(release.Value<string>("created_at"));
+		return DateTime.TryParse(text, out DateTime value) ? value : DateTime.MinValue;
 	}
 
 	private static JObject? FindExternalGcuAsset(JArray releases)
@@ -146,8 +158,9 @@ internal static class UpdateChecker
 		JArray releases;
 		try { releases = JArray.Parse(json); }
 		catch { return null; }
-		JObject? best = null;
-		string bestVersion = "";
+		JObject? newest = null;
+		string newestVersion = "";
+		DateTime newestPublished = DateTime.MinValue;
 		foreach (JToken token in releases)
 		{
 			if (token is not JObject release) continue;
@@ -171,16 +184,19 @@ internal static class UpdateChecker
 				return isUpdate || isSetup;
 			}) == true;
 			if (!hasUsableAsset) continue;
-			if (best == null || IsNewerGitHub(normalized, bestVersion))
+			// 按发布时间取最新 Release，不再按版本号挑“最高版本”。
+			DateTime published = ReleasePublishedAt(release);
+			if (newest == null || published > newestPublished)
 			{
-				best = release;
-				bestVersion = normalized;
+				newest = release;
+				newestVersion = normalized;
+				newestPublished = published;
 			}
 		}
-		if (best == null) return null;
-		string? chosenTag = Clean(best.Value<string>("tag_name"));
-		string latest = chosenTag?.TrimStart('v', 'V') ?? bestVersion;
-		JArray? allAssets = best["assets"] as JArray;
+		if (newest == null) return null;
+		string? chosenTag = Clean(newest.Value<string>("tag_name"));
+		string latest = chosenTag?.TrimStart('v', 'V') ?? newestVersion;
+		JArray? allAssets = newest["assets"] as JArray;
 		JObject? updateAsset = allAssets?.OfType<JObject>().FirstOrDefault(a =>
 		{
 			string? name = Clean(a.Value<string>("name"));
@@ -227,9 +243,9 @@ internal static class UpdateChecker
 				}
 			}
 		}
-		string? page = Clean(best.Value<string>("html_url"));
-		string? notes = Clean(best.Value<string>("body"));
-		string? date = Clean(best.Value<string>("published_at"));
+		string? page = Clean(newest.Value<string>("html_url"));
+		string? notes = Clean(newest.Value<string>("body"));
+		string? date = Clean(newest.Value<string>("published_at"));
 		bool available = IsNewerGitHub(latest, currentVersion);
 		return new UpdateInfo(currentVersion, latest, "github", false, available, date, notes,
 			chosenName, size, sha256, downloadUrl, page, null,
