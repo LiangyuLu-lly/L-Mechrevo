@@ -45,6 +45,7 @@ public partial class LightEditorWindow : Window
     public LightEditorWindow(string topic, string title, (string Effect, string Name)[] effects, bool whiteBacklightOnly = false)
     {
         InitializeComponent();
+        ManualResetButton.Content = WpfStrings.L("恢复默认六色", "Restore default six colors");
         _topic = topic;
         _effects = effects;
         _whiteBacklightOnly = whiteBacklightOnly && string.Equals(topic, "Keyboard/Ctrl", StringComparison.Ordinal);
@@ -104,6 +105,15 @@ public partial class LightEditorWindow : Window
         }
         _settings = LightingSettingsStore.Load(topic, effects.Length > 0 ? effects[0].Effect : "Single");
         _light = Math.Clamp(_settings.Light, (int)LightSlider.Minimum, (int)LightSlider.Maximum);
+        if (_keyboard && !_wujieWhite && !_whiteBacklightOnly && hw != null)
+        {
+            // 编辑器以硬件当前亮度为准；否则 Fn 调过亮度后，编辑窗口仍显示旧的保存值。
+            int actual = hw.KeyboardBrightness;
+            if (actual >= 0 && actual <= _lightMax)
+            {
+                _light = actual;
+            }
+        }
         if (_keyboard && _wujieWhite)
         {
             _light = Math.Clamp(MechrevoLite.AppConfig.Get("wujie_kbd_level", 2), 1, 2);
@@ -230,6 +240,22 @@ public partial class LightEditorWindow : Window
         ColorRow.IsEnabled = on;
         MixRow.IsEnabled = on;
         KeyboardExtraRow.IsEnabled = on;
+    }
+
+    private void ManualReset_Click(object sender, RoutedEventArgs e)
+    {
+        _manualIndexes = (int[])LightChannelSettings.DefaultManualIndexes.Clone();
+        try
+        {
+            LightChannelSettings settings = LightingSettingsStore.Load(_topic, SelectedEffect)
+                with { ManualIndexes = (int[])_manualIndexes.Clone() };
+            LightingSettingsStore.Save(_topic, settings);
+        }
+        catch
+        {
+        }
+        RefreshKeyboardUi();
+        ScheduleAutoApply();
     }
 
     private void ResetMix_Click(object sender, RoutedEventArgs e)
@@ -611,6 +637,11 @@ public partial class LightEditorWindow : Window
         _applying = true;
         try
         {
+            // 软件内调节键盘灯时不要再弹亮度 OSD；Fn 键的亮度 OSD 不受影响。
+            if (_keyboard)
+            {
+                OriginalStyleWindow.SuppressKeyboardBrightnessOsd(3000);
+            }
             // 单键 RGB 的 HID/固件写可能较慢；先让出一次 UI 线程，避免拖动时窗口被判无响应。
             await Task.Yield();
             string effect = SelectedEffect;
@@ -737,12 +768,6 @@ public partial class LightEditorWindow : Window
                 {
                     L_Mechrevo.WpfP0.OsdService.Show(OriginalStyleWindow.LightChannelGlyph(_topic),
                         OriginalStyleWindow.LightChannelTitle(_topic), power ? WpfStrings.StateOn : WpfStrings.StateOff);
-                }
-                else
-                {
-                    bool white = _wujieWhite || _whiteBacklightOnly;
-                    L_Mechrevo.WpfP0.OsdService.Show(OriginalStyleWindow.LightChannelGlyph(_topic), WpfStrings.OsdLighting,
-                        OriginalStyleWindow.LightLevelText(_topic, _light, white));
                 }
             }
             if (!fromAuto || !ok)

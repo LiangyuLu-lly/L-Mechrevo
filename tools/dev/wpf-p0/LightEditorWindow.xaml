@@ -125,6 +125,7 @@
                 <StackPanel x:Name="ManualPalettePanel" Margin="0,6,0,0">
                     <TextBlock Text="{x:Static loc:WpfStrings.LightEditorWindow_Text_3}" Style="{DynamicResource MutedText}" Margin="0,0,0,4" />
                     <UniformGrid x:Name="ManualPaletteGrid" Columns="6" Width="240" Height="34" HorizontalAlignment="Left" />
+                    <Button x:Name="ManualResetButton" Content="恢复默认六色" Style="{StaticResource MiniButton}" HorizontalAlignment="Left" Margin="0,6,0,0" Click="ManualReset_Click" />
                 </StackPanel>
                 <StackPanel x:Name="BreathPanel" Margin="0,6,0,0">
                     <TextBlock Text="{x:Static loc:WpfStrings.LightEditorWindow_Text_2}" Style="{DynamicResource MutedText}" Margin="0,0,0,4" />

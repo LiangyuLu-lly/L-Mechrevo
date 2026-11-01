@@ -127,6 +127,15 @@ public partial class OriginalStyleWindow : Window
     private int _lastKeyboardBrightnessOsd = -2;
     private bool? _lastKeyboardPowerForOsd;
     private long _keyboardOsdSilentUntil = Environment.TickCount64 + 8000;
+    private static long _keyboardBrightnessOsdSuppressUntil;
+
+    internal static void SuppressKeyboardBrightnessOsd(int milliseconds)
+    {
+        if (milliseconds > 0)
+        {
+            _keyboardBrightnessOsdSuppressUntil = Environment.TickCount64 + milliseconds;
+        }
+    }
     private int _lastTouchpadOsd = -2;
     private int _lastFnLockOsd = -2;
     private int _lastMicOsd = -2;
@@ -4066,6 +4075,11 @@ public partial class OriginalStyleWindow : Window
             return;
         }
         if (Environment.TickCount64 < _keyboardOsdSilentUntil)
+        {
+            _lastKeyboardBrightnessOsd = brightness;
+            return;
+        }
+        if (Environment.TickCount64 < _keyboardBrightnessOsdSuppressUntil)
         {
             _lastKeyboardBrightnessOsd = brightness;
             return;
