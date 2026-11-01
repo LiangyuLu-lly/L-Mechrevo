@@ -20,6 +20,7 @@ public partial class CustomModeWindow : Window
     private bool _firmwareMode;
     private int _modeComboSyncDepth;
     private long _modeSwitchSeq;
+    private string? _requestedModeId;
     private bool _loadingUi;
     private bool _dirty;
     private bool _syncingPowerWalls;
@@ -266,6 +267,13 @@ public partial class CustomModeWindow : Window
 
     public void BindMode(string id)
     {
+        // 已加载过列表时只切当前配置，不再清空/重建下拉框；重建会让快速切换看起来回弹。
+        if (!_firmwareMode
+            && _modes.Any(m => string.Equals(m.Id, id, StringComparison.Ordinal)))
+        {
+            ApplyMode(id);
+            return;
+        }
         LoadModes(id);
     }
 
@@ -321,11 +329,18 @@ public partial class CustomModeWindow : Window
         }
         _modeComboSyncDepth++;
         long seq = ++_modeSwitchSeq;
+        _requestedModeId = id;
         try
         {
             await SelectModeAsync(id);
             if (seq == _modeSwitchSeq)
             {
+                // 快速连续切换时，旧激活可能晚到并改掉界面；以最后一次请求为准重载一次。
+                string latest = _requestedModeId ?? id;
+                if (_modes.Any(m => string.Equals(m.Id, latest, StringComparison.Ordinal)))
+                {
+                    ApplyMode(latest);
+                }
                 SyncModeComboToCurrent();
             }
         }
