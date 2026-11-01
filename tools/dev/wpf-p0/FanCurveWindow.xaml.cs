@@ -26,12 +26,50 @@ public partial class FanCurveWindow : Window
     {
         foreach (WeakReference<FanCurveWindow> reference in OpenEditors)
         {
-            if (reference.TryGetTarget(out FanCurveWindow? editor) && editor._dirty)
+            if (reference.TryGetTarget(out FanCurveWindow? editor) && editor.HasRealUnsavedChanges())
             {
                 return true;
             }
         }
         return false;
+    }
+
+    internal bool HasRealUnsavedChanges()
+    {
+        if (!_dirty)
+        {
+            return false;
+        }
+        try
+        {
+            MechrevoLite.Mode.PerfModeSettings saved = MechrevoLite.Mode.PerfModeStore.LoadSettings(_modeId);
+            if (SameDuties(CpuCurve.Duties, saved.CpuFanDuty)
+                && SameDuties(GpuCurve.Duties, saved.GpuFanDuty))
+            {
+                _dirty = false;
+                return false;
+            }
+        }
+        catch
+        {
+        }
+        return true;
+    }
+
+    private static bool SameDuties(int[] current, int[]? saved)
+    {
+        if (saved == null || saved.Length != current.Length)
+        {
+            return false;
+        }
+        for (int i = 0; i < current.Length; i++)
+        {
+            if (current[i] != saved[i])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     internal static void DiscardAllUnsavedChanges()

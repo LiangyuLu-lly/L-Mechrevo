@@ -34,6 +34,7 @@ public partial class CustomModeWindow : Window
     private int _firmwareProfileIndex;
     private MechrevoLite.Mode.PerfModeDefinition? _current;
     private MechrevoLite.Mode.PerfModeSettings _settings = MechrevoLite.Mode.PerfModeSettings.Default;
+    private string _cleanUiSignature = "";
 
     public CustomModeWindow(string? initialModeId = null)
     {
@@ -169,6 +170,19 @@ public partial class CustomModeWindow : Window
         }
         ContentScroll.ScrollToVerticalOffset(ContentScroll.VerticalOffset - e.Delta);
         e.Handled = true;
+    }
+
+    private string BuildUiSignature()
+    {
+        static int S(Slider slider) => (int)Math.Round(slider.Value);
+        static string C(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? item.Tag as string ?? "" : "";
+        return string.Join("|",
+            S(Pl1Slider), S(Pl2Slider), S(Pl4Slider), S(TccSlider), S(DbSlider), S(GpuTgpSlider),
+            S(FanDelaySlider), S(CoreOffsetSlider), S(MemoryOffsetSlider), S(StapmTimeSlider),
+            S(SmuSlowLimitSlider), S(SmuSlowTimeSlider), S(SmuFastTimeSlider), S(GpuPowerLimitSlider),
+            TccSwitch.IsChecked == true, DbSwitch.IsChecked == true,
+            FanSensitivitySwitch.IsChecked == true, GpuOcSwitch.IsChecked == true,
+            C(PowerModeCombo), C(PowerPlanCombo), C(CpuBoostCombo), C(FanBoostCombo), C(RefreshCombo));
     }
 
     private void MarkDirty()
@@ -425,6 +439,11 @@ public partial class CustomModeWindow : Window
     private bool ConfirmDiscardUnsavedForModeSwitch()
     {
         bool fanDirty = FanCurveWindow.HasAnyUnsavedChanges();
+        if (_dirty && !string.IsNullOrEmpty(_cleanUiSignature)
+            && string.Equals(BuildUiSignature(), _cleanUiSignature, StringComparison.Ordinal))
+        {
+            _dirty = false;
+        }
         if (!_dirty && !fanDirty)
         {
             return true;
@@ -718,6 +737,7 @@ public partial class CustomModeWindow : Window
         SmuSlowLimitRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
         SmuSlowTimeRow.Visibility = smuPowerRows && !wujieApu ? Visibility.Visible : Visibility.Collapsed;
         SmuFastTimeRow.Visibility = Visibility.Collapsed;
+        _cleanUiSignature = BuildUiSignature();
     
         }
         finally
@@ -1361,6 +1381,10 @@ public partial class CustomModeWindow : Window
         finally
         {
             ApplyButton.IsEnabled = true;
+            if (!_dirty)
+            {
+                _cleanUiSignature = BuildUiSignature();
+            }
         }
     }
 
