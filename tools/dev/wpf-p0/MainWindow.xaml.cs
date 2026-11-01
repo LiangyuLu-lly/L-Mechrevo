@@ -2571,6 +2571,8 @@ public partial class MainWindow : Window
     internal void RefreshFromOwner()
     {
         RefreshHomeExtras();
+        // 迷你窗可能刚新建/删除自定义配置；切回宽屏时同步重建自定义列表。
+        RefreshCustomModeEditor();
     }
 
     internal void RefreshLiquidCooling()

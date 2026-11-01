@@ -10064,6 +10064,7 @@ public partial class OriginalStyleWindow : Window
         }
         _wideWindow.Show();
         _wideWindow.Activate();
+        _wideWindow.RefreshFromOwner();
     }
 
     internal void RefreshWideBackground()
