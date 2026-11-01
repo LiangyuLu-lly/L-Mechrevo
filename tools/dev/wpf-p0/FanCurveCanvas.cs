@@ -13,6 +13,7 @@ public sealed class FanCurveCanvas : FrameworkElement
     private readonly int[] _duties = new int[PointCount];
     private byte[] _temps = new byte[PointCount];
     private int _dragIndex = -1;
+    private bool _dragChanged;
     private int _valid = PointCount;
 
     internal event Action? Changed;
@@ -156,6 +157,7 @@ public sealed class FanCurveCanvas : FrameworkElement
         if (best >= 0)
         {
             _dragIndex = best;
+            _dragChanged = false;
             Focus();
             CaptureMouse();
             e.Handled = true;
@@ -180,6 +182,7 @@ public sealed class FanCurveCanvas : FrameworkElement
             return;
         }
         _duties[_dragIndex] = duty;
+        _dragChanged = true;
         // 与旧曲线一致：后段不允许低于前段。
         for (int i = _dragIndex + 1; i < _valid; i++)
         {
@@ -208,7 +211,11 @@ public sealed class FanCurveCanvas : FrameworkElement
             _dragIndex = -1;
             e.Handled = true;
             ReleaseMouseCapture();
-            Changed?.Invoke();
+            if (_dragChanged)
+            {
+                _dragChanged = false;
+                Changed?.Invoke();
+            }
             InvalidateVisual();
         }
     }
