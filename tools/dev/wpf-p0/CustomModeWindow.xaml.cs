@@ -48,8 +48,9 @@ public partial class CustomModeWindow : Window
         AddHandler(ComboBox.SelectionChangedEvent,
             new SelectionChangedEventHandler((_, e) =>
             {
-                // 配置选择器本身不是参数修改；同步选中项时也不能把配置标脏。
-                if (e.OriginalSource is ComboBox combo && ReferenceEquals(combo, ModeCombo))
+                // ModeCombo 的选择项也属于 ModeCombo.Items；ComboBox 路由事件的
+                // OriginalSource 可能是 ComboBoxItem，不能再只判断 ComboBox。
+                if (e.AddedItems.OfType<object>().Any(item => ModeCombo.Items.Contains(item)))
                 {
                     return;
                 }
@@ -428,6 +429,7 @@ public partial class CustomModeWindow : Window
         {
             return true;
         }
+        Logger.WriteError("[custom-dirty] 切换配置提示未应用：_dirty=" + _dirty + " fanDirty=" + fanDirty);
         MessageBoxResult result = MessageBox.Show(
             this,
             WpfStrings.L(
