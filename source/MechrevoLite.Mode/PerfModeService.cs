@@ -95,6 +95,21 @@ internal sealed class PerfModeService
 
 	public string DisplayedModeId => PendingModeId ?? ActiveModeId;
 
+	/// <summary>等待当前模式激活/编辑结束，避免切换后立刻点应用时 UpdateAsync 直接返回空结果。</summary>
+	internal async Task<bool> WaitForActivationIdleAsync(TimeSpan timeout)
+	{
+		DateTime deadline = DateTime.UtcNow + timeout;
+		while (PendingModeId != null || Volatile.Read(in _activating) > 0)
+		{
+			if (DateTime.UtcNow >= deadline)
+			{
+				return false;
+			}
+			await Task.Delay(40).ConfigureAwait(continueOnCapturedContext: false);
+		}
+		return true;
+	}
+
 	public void NotifyExternalSwitch(string modeId)
 	{
 		if (string.Equals(ActiveModeId, modeId, StringComparison.Ordinal))

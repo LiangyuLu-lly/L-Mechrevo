@@ -1112,6 +1112,13 @@ public partial class CustomModeWindow : Window
         ApplyButton.IsEnabled = false;
         try
         {
+            // 切换配置后的激活还在进行时，UpdateAsync 会因 PendingModeId 非空直接返回 null
+            //（界面显示“没有返回下发结果”）。这里先等激活收尾，再执行本次应用。
+            if (!await perf.WaitForActivationIdleAsync(TimeSpan.FromSeconds(8)))
+            {
+                StatusText.Text = WpfStrings.L("配置仍在切换，请稍后再试", "Mode switch still in progress; please retry");
+                return;
+            }
             int? ReadInt(ComboBox combo)
             {
                 return combo.SelectedItem is ComboBoxItem item && item.Tag is string text && int.TryParse(text, out int value)
