@@ -410,15 +410,16 @@ public partial class CustomModeWindow : Window
         SetSlider(DbSlider, DbText, s.GpuDynamicBoost ?? 25);
         SetSlider(GpuTgpSlider, GpuTgpText, s.GpuTgp ?? 100);
         FanSensitivitySwitch.IsChecked = s.FanSwitchSpeedOn == true;
+        GpuOcSwitch.IsChecked = s.GpuOverclockOn == true;
+        SetSlider(FanDelaySlider, FanDelayText, s.FanSwitchSpeedMs ?? 300);
+        SetSlider(CoreOffsetSlider, CoreOffsetText, s.GpuCoreOffset ?? 0);
+        SetSlider(MemoryOffsetSlider, MemoryOffsetText, s.GpuMemoryOffset ?? 0);
+        // 开关状态先应用，再按新状态刷新滑块可用性；否则切换配置时 GPU OC 滑块会停在旧状态。
         DbSlider.IsEnabled = DbSwitch.IsChecked == true;
         TccSlider.IsEnabled = TccSwitch.IsChecked == true;
         FanDelaySlider.IsEnabled = FanSensitivitySwitch.IsChecked == true;
         CoreOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
         MemoryOffsetSlider.IsEnabled = GpuOcSwitch.IsChecked == true;
-        SetSlider(FanDelaySlider, FanDelayText, s.FanSwitchSpeedMs ?? 300);
-        GpuOcSwitch.IsChecked = s.GpuOverclockOn == true;
-        SetSlider(CoreOffsetSlider, CoreOffsetText, s.GpuCoreOffset ?? 0);
-        SetSlider(MemoryOffsetSlider, MemoryOffsetText, s.GpuMemoryOffset ?? 0);
         SelectComboInt(PowerModeCombo, s.WindowsPowerMode);
         SelectComboInt(CpuBoostCombo, s.CpuBoost);
         SelectComboBool(FanBoostCombo, s.FanBoost);
