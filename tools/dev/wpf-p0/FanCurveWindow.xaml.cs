@@ -20,9 +20,35 @@ public partial class FanCurveWindow : Window
     private WujieFanEcController? _wujieController;
     private readonly DispatcherTimer _activeModeRefreshTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
 
+    private static readonly List<WeakReference<FanCurveWindow>> OpenEditors = new();
+
+    internal static bool HasAnyUnsavedChanges()
+    {
+        foreach (WeakReference<FanCurveWindow> reference in OpenEditors)
+        {
+            if (reference.TryGetTarget(out FanCurveWindow? editor) && editor._dirty)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    internal static void DiscardAllUnsavedChanges()
+    {
+        foreach (WeakReference<FanCurveWindow> reference in OpenEditors)
+        {
+            if (reference.TryGetTarget(out FanCurveWindow? editor))
+            {
+                editor._dirty = false;
+            }
+        }
+    }
+
     public FanCurveWindow(string modeId, bool showCpu = true, bool showGpu = true)
     {
         InitializeComponent();
+        OpenEditors.Add(new WeakReference<FanCurveWindow>(this));
         _modeId = modeId;
         try
         {
@@ -64,6 +90,8 @@ public partial class FanCurveWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        OpenEditors.RemoveAll(reference =>
+            !reference.TryGetTarget(out FanCurveWindow? editor) || ReferenceEquals(editor, this));
         MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
         if (perf != null)
         {

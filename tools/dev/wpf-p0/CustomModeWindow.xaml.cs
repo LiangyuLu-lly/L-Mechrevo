@@ -335,6 +335,11 @@ public partial class CustomModeWindow : Window
         {
             return;
         }
+        if (!ConfirmDiscardUnsavedForModeSwitch())
+        {
+            RevertModeComboSelection();
+            return;
+        }
         long seq = ++_modeSwitchSeq;
         _requestedModeId = id;
         // 先同步加载新配置，完全不等旧的后端激活；旧请求由 PerfModeService 的
@@ -399,6 +404,56 @@ public partial class CustomModeWindow : Window
             StatusText.Text = switched
                 ? WpfStrings.L("已自动切换配置：", "Auto-switched configuration: ") + ModeName(_current)
                 : WpfStrings.L("配置已加载，自动切换未完成，请点“应用”重试", "Configuration loaded; auto-switch incomplete. Click Apply to retry");
+        }
+    }
+
+    private bool ConfirmDiscardUnsavedForModeSwitch()
+    {
+        bool fanDirty = FanCurveWindow.HasAnyUnsavedChanges();
+        if (!_dirty && !fanDirty)
+        {
+            return true;
+        }
+        MessageBoxResult result = MessageBox.Show(
+            this,
+            WpfStrings.L(
+                "当前配置有未应用的修改（含风扇曲线），切换配置会丢弃这些修改。继续？",
+                "The current configuration has unsaved changes (including fan curves). Switching will discard them. Continue?"),
+            "L-Mechrevo",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes)
+        {
+            return false;
+        }
+        FanCurveWindow.DiscardAllUnsavedChanges();
+        _dirty = false;
+        return true;
+    }
+
+    private void RevertModeComboSelection()
+    {
+        if (_current == null)
+        {
+            return;
+        }
+        for (int i = 0; i < ModeCombo.Items.Count; i++)
+        {
+            if (ModeCombo.Items[i] is ComboBoxItem item
+                && item.Tag is string id
+                && string.Equals(id, _current.Id, StringComparison.Ordinal))
+            {
+                _modeComboSyncDepth++;
+                try
+                {
+                    ModeCombo.SelectedIndex = i;
+                }
+                finally
+                {
+                    _modeComboSyncDepth--;
+                }
+                return;
+            }
         }
     }
 
@@ -505,6 +560,8 @@ public partial class CustomModeWindow : Window
         _current = mode;
         _settings = MechrevoLite.Mode.PerfModeStore.LoadSettings(id);
         LoadSettingsToUi(_settings);
+        _dirty = false;
+        ApplyButton.Content = WpfStrings.CpuTuningWindow_xaml_Content;
         Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode);
         StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_5 + ModeName(mode);
         UpdateRouteHint(mode);
