@@ -171,7 +171,7 @@ public partial class OriginalStyleWindow : Window
     private bool _sensorDemandSuspended;
     private int _sensorDemandBusy;
     private readonly DispatcherTimer _statusResetTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-    private readonly string _statusResetText = L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion.Split('-')[0];
+    private readonly string _statusResetText = L_Mechrevo.WpfP0.Services.WpfBackend.ReleaseVersion.Split('-')[^1];
     private bool _connectAttempting;
     private const string QuickTilesConfigKey = "perf_quick_tiles";
     private const string QuickTilesEmptySentinel = "-";
