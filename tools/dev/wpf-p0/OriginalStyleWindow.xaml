@@ -874,7 +874,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center" Margin="2,0,10,0">
-                        <TextBlock x:Name="StatusText" Text="beta23.7.1" FontSize="12" />
+                        <TextBlock x:Name="StatusText" Text="beta23.7.2" FontSize="12" />
                     </StackPanel>
                     <UniformGrid Grid.Column="1" Columns="6" VerticalAlignment="Center">
                         <Button x:Name="DockOverlayButton" Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">
