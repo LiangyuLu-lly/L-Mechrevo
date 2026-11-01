@@ -21,6 +21,7 @@ public partial class CustomModeWindow : Window
     private int _modeComboSyncDepth;
     private long _modeSwitchSeq;
     private string? _requestedModeId;
+    private CancellationTokenSource? _modeActivationDebounceCts;
     private bool _loadingUi;
     private bool _dirty;
     private bool _syncingPowerWalls;
@@ -347,7 +348,28 @@ public partial class CustomModeWindow : Window
         {
             _modeComboSyncDepth--;
         }
-        _ = ActivateAndRefreshAsync(id, seq);
+        _ = DebounceActivateAsync(id, seq);
+    }
+
+    private async Task DebounceActivateAsync(string id, long seq)
+    {
+        _modeActivationDebounceCts?.Cancel();
+        CancellationTokenSource cts = new();
+        _modeActivationDebounceCts = cts;
+        try
+        {
+            // 快速连续切换时只让最后一次进入后端激活，避免中间档位反复切固件槽/超时。
+            await Task.Delay(400, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        if (cts.IsCancellationRequested || seq != _modeSwitchSeq)
+        {
+            return;
+        }
+        await ActivateAndRefreshAsync(id, seq);
     }
 
     private async Task ActivateAndRefreshAsync(string id, long seq)
@@ -1112,6 +1134,8 @@ public partial class CustomModeWindow : Window
         ApplyButton.IsEnabled = false;
         try
         {
+            // 本次应用以当前编辑内容为准；取消尚未启动的切换防抖，避免它稍后又在应用后切槽。
+            _modeActivationDebounceCts?.Cancel();
             // 切换配置后的激活还在进行时，UpdateAsync 会因 PendingModeId 非空直接返回 null
             //（界面显示“没有返回下发结果”）。这里先等激活收尾，再执行本次应用。
             if (!await perf.WaitForActivationIdleAsync(TimeSpan.FromSeconds(8)))
