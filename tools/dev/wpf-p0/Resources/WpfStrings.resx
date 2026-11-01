@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -343,7 +343,7 @@
     <value>Zcodeoooo/JiaoLong16Pro-Battery-threshold — no LICENSE (protocol reference only)</value>
   </data>
   <data name="LicensesWindow_Text_4" xml:space="preserve">
-    <value>Protocol references (no code copied)</value>
+    <value>Protocol references</value>
   </data>
   <data name="LicensesWindow_Text_5" xml:space="preserve">
     <value>usbmmidd_v2 virtual display driver — Amyuni (see the driver's bundled License.txt)</value>

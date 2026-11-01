@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -343,7 +343,7 @@
     <value>Zcodeoooo/JiaoLong16Pro-Battery-threshold — 无 LICENSE（协议事实参考）</value>
   </data>
   <data name="LicensesWindow_Text_4" xml:space="preserve">
-    <value>协议参考（未复制代码）</value>
+    <value>协议参考</value>
   </data>
   <data name="LicensesWindow_Text_5" xml:space="preserve">
     <value>usbmmidd_v2 虚拟显示器驱动 — Amyuni（见驱动自带 License.txt）</value>

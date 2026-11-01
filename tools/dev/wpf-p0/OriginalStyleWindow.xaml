@@ -1,4 +1,4 @@
-<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.OriginalStyleWindow"
+﻿<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.OriginalStyleWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
@@ -874,8 +874,8 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center" Margin="2,0,10,0">
-                        <TextBlock x:Name="StatusText" Text="0.293.6" FontSize="12" />
-                        <TextBlock Text="beta23.6" Style="{StaticResource MutedText}" FontSize="10" />
+                        <TextBlock x:Name="StatusText" Text="0.293.7" FontSize="12" />
+                        <TextBlock Text="beta23.7" Style="{StaticResource MutedText}" FontSize="10" />
                     </StackPanel>
                     <UniformGrid Grid.Column="1" Columns="6" VerticalAlignment="Center">
                         <Button x:Name="DockOverlayButton" Style="{StaticResource DockButton}" Click="DockButton_Click" Tag="悬浮窗">

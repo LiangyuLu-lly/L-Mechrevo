@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
@@ -9,10 +9,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>L-Mechrevo</AssemblyName>
-    <Version>0.293.6.9</Version>
-    <AssemblyVersion>0.293.6.9</AssemblyVersion>
-    <FileVersion>0.293.6.9</FileVersion>
-    <InformationalVersion>0.293.6.9-beta23.6.9</InformationalVersion>
+    <Version>0.293.7</Version>
+    <AssemblyVersion>0.293.7</AssemblyVersion>
+    <FileVersion>0.293.7</FileVersion>
+    <InformationalVersion>0.293.7-beta23.7</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <RootNamespace>L_Mechrevo.WpfP0</RootNamespace>
     <StartupObject>L_Mechrevo.WpfP0.App</StartupObject>
