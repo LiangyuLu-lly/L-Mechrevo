@@ -19,6 +19,7 @@ public partial class CustomModeWindow : Window
     private bool _suppressPlanApply;
     private bool _firmwareMode;
     private int _modeComboSyncDepth;
+    private long _modeSwitchSeq;
     private bool _loadingUi;
     private bool _dirty;
     private bool _syncingPowerWalls;
@@ -310,9 +311,14 @@ public partial class CustomModeWindow : Window
             return;
         }
         _modeComboSyncDepth++;
+        long seq = ++_modeSwitchSeq;
         try
         {
             await SelectModeAsync(id);
+            if (seq == _modeSwitchSeq)
+            {
+                SyncModeComboToCurrent();
+            }
         }
         catch (Exception ex)
         {
@@ -321,6 +327,35 @@ public partial class CustomModeWindow : Window
         finally
         {
             _modeComboSyncDepth--;
+        }
+    }
+
+    private void SyncModeComboToCurrent()
+    {
+        if (_current == null)
+        {
+            return;
+        }
+        for (int i = 0; i < ModeCombo.Items.Count; i++)
+        {
+            if (ModeCombo.Items[i] is ComboBoxItem item
+                && item.Tag is string id
+                && string.Equals(id, _current.Id, StringComparison.Ordinal))
+            {
+                if (ModeCombo.SelectedIndex != i)
+                {
+                    _modeComboSyncDepth++;
+                    try
+                    {
+                        ModeCombo.SelectedIndex = i;
+                    }
+                    finally
+                    {
+                        _modeComboSyncDepth--;
+                    }
+                }
+                return;
+            }
         }
     }
 
@@ -394,6 +429,7 @@ public partial class CustomModeWindow : Window
         Title = WpfStrings.CustomModeWindow_xaml_Title + ModeName(mode);
         StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_5 + ModeName(mode);
         UpdateRouteHint(mode);
+        SyncModeComboToCurrent();
     }
 
     private void LoadSettingsToUi(MechrevoLite.Mode.PerfModeSettings s)
