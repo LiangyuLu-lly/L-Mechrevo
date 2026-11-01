@@ -271,7 +271,16 @@ public partial class CustomModeWindow : Window
 
     public async Task<bool> SelectModeAsync(string id)
     {
-        BindMode(id);
+        // 切换已存在的配置时不要重建 ModeCombo 列表，否则会先清空/重填，
+        // 用户看到的就是“选中后回弹”。直接加载该配置并立即刷新界面。
+        if (_modes.Any(m => string.Equals(m.Id, id, StringComparison.Ordinal)))
+        {
+            ApplyMode(id);
+        }
+        else
+        {
+            BindMode(id);
+        }
         MechrevoLite.Mode.PerfModeService? perf = MechrevoLite.Mode.PerfModeService.Instance;
         if (perf == null)
         {
