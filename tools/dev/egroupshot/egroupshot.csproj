@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWindowsForms>True</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <LangVersion>14.0</LangVersion>
+    <AssemblyName>EGroupShot</AssemblyName>
+    <RootNamespace>EGroupShot</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);WFO1000;CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="L-Mechrevo">
+      <HintPath>..\..\..\source\bin\Release\net10.0-windows10.0.19041.0\L-Mechrevo.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

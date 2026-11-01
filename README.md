@@ -1,14 +1,46 @@
-# L-Mechrevo
-
+# L-Mechrevo-Next
+在原版基础上进行大量优化 适配更多机型 重构UI
 **中文** | [English](README.en.md)
 
 L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的开源控制台，运行在 Windows 托盘。它通过机器上已有的 GCU 硬件服务读取传感器状态并下发控制命令，把性能模式、自定义功耗、键盘灯效、屏幕与电池等常用控制收进一个轻量窗口；机型不支持的入口会自动隐藏。
 
 ## 界面总览
 
-主界面是一块可滚动的仪表盘，从上到下依次是：性能模式、实时遥测、显卡模式、屏幕、电池、液冷系统、灯光、更多开关。底部工具条提供悬浮窗、设置、检查更新、赞助与退出。每个分组标题右侧的箭头可以折叠或展开该分组，折叠状态会被记住。
+主界面同时提供**迷你窗**和**宽屏**两种形态，内容一致，只改变布局与信息密度：
 
-<img src="docs/images/1-dashboard.png" width="420" alt="主界面仪表盘">
+- 迷你窗：紧凑纵向布局，适合日常驻留。
+- 宽屏：横向仪表盘，适合放在桌面侧边查看完整遥测与设置。
+- 两种形态都支持折叠分组、快捷键、悬浮窗和托盘操作。
+
+<p>
+<img src="docs/images/1-dashboard-mini-20261028.png" width="330" alt="迷你窗">
+<img src="docs/images/1-dashboard-wide.png" width="760" alt="宽屏主页">
+</p>
+
+### 外观自定义
+
+界面不只有深色/浅色两套固定主题，还可以按自己的桌面环境调整：
+
+- **浅色 / 深色 / 跟随系统** 三种模式。
+- **强调色**：预设色板或自定义颜色。
+- **背景图**：迷你窗和宽屏分别选择背景图。
+- **透明度**：背景图、背板、底栏、卡片和按钮的不透明度可分别调整。
+- **背景遮罩**：独立调节背景图上的遮罩强度，保证文字可读。
+- **宽屏专用背景**：宽屏可以使用与迷你窗不同的背景图。
+
+<img src="docs/images/settings-appearance.png" width="380" alt="外观与设置">
+
+<img src="docs/images/mini-background.png" width="460" alt="自定义背景示例">
+
+<img src="docs/images/wide-background-20261028.png" width="760" alt="宽屏自定义壁纸示例">
+
+## 源码
+
+当前源码在仓库根目录：
+
+- `source/`：共享硬件与业务代码
+- `tools/dev/wpf-p0/`：WPF 界面
+- `tools/core-shims/`：Core 兼容层
 
 ## 功能特性
 
@@ -21,14 +53,14 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 | 静音 | 限制功耗与风扇转速，噪音最低 | 全部机型 |
 | 平衡 | 默认档，性能与噪音均衡 | 全部机型 |
 | 静音狂暴 | 狂暴性能搭配更安静的风扇策略 | 仅在机型能力确认支持时显示，不支持的机器上自动隐藏 |
-| 狂暴 | 解锁更高功耗墙 | 全部机型 |
+| 高能狂暴/狂暴 | 解锁更高功耗墙 | 全部机型 |
 | 自定义 | 打开自定义性能模式窗口 | 全部机型 |
 
 托盘右键菜单同样可以切换性能模式，菜单项为「静音 (办公)」「平衡 (游戏)」「狂暴 (增强)」，当前档位带勾选标记。
 
-### 自定义性能模式（4 个槽位）
+### 自定义性能模式（多配置）
 
-在主界面点「自定义」打开独立窗口。窗口顶部有四个槽位按钮（自定义 1～4），各自保存一套完整参数，点选即切换整套参数，当前槽位会显示「自定义 N 已激活」。
+在主界面点「自定义」打开独立窗口。窗口顶部可以用下拉框创建和管理多个配置槽位（自定义 1、2、3…），每个槽位保存一套完整参数，点选即切换整套参数，当前槽位会显示「自定义 N 已激活」。
 
 <img src="docs/images/2-custom-mode.png" width="420" alt="自定义性能模式">
 
@@ -67,7 +99,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 灯光分组顶部还有两个全局设置：
 
 - **离电自动关闭全部灯效**：拔掉电源后自动熄灭所有灯，接回电源恢复。
-- **睡眠时间**：关闭 / 10 秒（软件）/ 10 分钟～2 小时。空闲无输入达到设定时间后所有灯自动熄灭，检测到输入立即恢复。
+- **睡眠时间**：关闭 / 10 秒 / 15 秒 / 20 秒 / 30 秒 / 45 秒 / 1 分钟～3 小时。空闲无输入达到设定时间后所有灯自动熄灭，检测到输入立即恢复。
 
 ### 液冷系统（外接水冷机）
 
@@ -126,30 +158,34 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 - **实时遥测**：性能模式下方的遥测行显示 CPU / GPU 温度、功耗、风扇转速与占空比。
 - **悬浮窗**：桌面硬件悬浮窗，四种形态可点击切换，可直接拖动（底部工具条「悬浮窗」开关）。
-- **日间 / 夜间主题**：底部工具条「设置」弹窗内切换。
+- **外观自定义**：浅色 / 深色 / 跟随系统、强调色、背景图、背景透明度、宽屏背景，详见「界面总览 → 外观自定义」。
 - **官方控制台**：检测官方控制台是否在运行，可一键「隔离官方界面与托盘」，只保留 GCU 后台服务，随时可恢复。
 - **程序内更新**：静默检测新版本，有新版时「检查更新」按钮出现角标；下载后自动校验 SHA-256 并拉起更新器。
 - **开机自启动**：以用户级计划任务实现，不依赖管理员权限（「更多开关 → 电源与系统 → 开机自启动」）。
 
 ## 下载
 
-在 [Releases](https://github.com/LiangyuLu-lly/L-Mechrevo/releases) 页面提供两种包：
+在 [Releases](https://github.com/xmsjx/L-Mechrevo-Next/releases) 页面提供 NoGCU 包：
 
-- `L-Mechrevo-<版本>-setup.exe`：全新安装包，自带 .NET 运行时与 GCU 服务载荷，第一次使用下载这个。
-- `L-Mechrevo-<版本>-unsigned.zip`：已有版本的自动更新包。程序内检测到新版会自动提示；也可以手动下载 zip，解压后自行替换程序文件。
+- `LM-<版本>-NoGCU-setup.exe`：全新安装包，不包含 GCU 服务载荷；适用于机器上已经有官方 GCU 服务 / 官方控制台后端的机器。
+- `L-Mechrevo-<版本>-NoGCU-unsigned.zip`：已有版本的自动更新包，不含 GCU 载荷。程序内检测到新版会自动提示；也可以手动下载 zip，解压后自行替换程序文件。
+
+- 可选：把 `GCU.7z` 放在安装包同目录，安装器会自动检测并安装 GCU；不放入则只安装 LM 本体。
+
+当前发布版本：`0.293.6 beta23.6`。
 
 ## 系统要求
 
 - Windows 10 / 11 64 位。
 - 机械革命（Mechrevo / Uniwill 代工）机型。
-- GCU 硬件服务（安装器会自动按显卡代际部署对应载荷）。
+- GCU 硬件服务（NoGCU 包不携带载荷，需要机器已有官方 GCU 服务或官方控制台安装的后端）。
 - 部分功能因机型硬件而异，不支持的入口会自动隐藏。
 
 ## 安装与首次使用
 
-1. 从 Releases 下载 `L-Mechrevo-<版本>-setup.exe`。
+1. 从 Releases 下载 `LM-<版本>-NoGCU-setup.exe`。
 2. 运行安装向导，按提示完成安装。
-3. 安装器会自动检测显卡代际（40 系 / 50 系），部署对应的 GCU 服务载荷与驱动。
+3. 安装器只安装 LM 本体；GCU 服务/驱动需由官方控制台或已有环境提供。
 4. 安装完成后首次启动程序。
 5. 如安装器提示需要重启，请重启一次再使用。
 6. 程序常驻系统托盘，双击托盘图标打开主界面。
@@ -169,7 +205,7 @@ L-Mechrevo 是一个面向机械革命（Mechrevo / Uniwill 代工）机型的�
 
 ### 自定义模式槽位
 
-点「自定义」打开自定义性能模式窗口，顶部选择自定义 1～4 槽位。每个槽位可设置电源计划、睿频模式、CPU 功耗墙（PL1 / PL2，部分机型还有 PL4）、GPU TGP 目标、GPU 动态加速、风扇转换灵敏度、GPU 超频，以及「风扇曲线」按钮。改完即保存到当前选中的槽位；点「恢复当前档默认」可还原当前槽位。
+点「自定义」打开自定义性能模式窗口，顶部可创建和切换多个配置槽位（自定义 1、2、3…）。每个槽位可设置电源计划、睿频模式、CPU 功耗墙（PL1 / PL2，部分机型还有 PL4）、GPU TGP 目标、GPU 动态加速、风扇转换灵敏度、GPU 超频，以及「风扇曲线」按钮。改完即保存到当前选中的槽位；点「恢复当前档默认」可还原当前槽位。
 
 ### 键盘灯效与灯带 Logo
 
@@ -218,7 +254,24 @@ GCU 硬件服务尚未连接时，涉及硬件的命令会提示「GCU 硬件服
 有。功耗墙、超频、风扇曲线等操作可能影响稳定性与硬件寿命，请自行评估，风险自负。
 
 **安装或更新时被驱动 / 杀毒软件拦截？**
-安装器会部署 GCU 服务载荷与驱动，部分杀毒软件或系统策略可能拦截这类操作。请在杀软中放行安装器与程序目录后重试；被拦截的驱动未正确部署时，相关功能会不可用。
+安装器和程序目录可能被部分杀毒软件或系统策略拦截；请在杀软中放行安装器与程序目录后重试。该 NoGCU 包不会部署任何 GCU 服务载荷。
+
+## 鸣谢与引用
+
+本项目的实现离不开这些项目和社区资料：
+
+- **[G-Helper](https://github.com/seerge/g-helper)**：应用框架与部分硬件控制思路（GPL-3.0-only）。
+- **[OpenRevo](https://github.com/faintonce/open-revo)**：机械革命机型识别、后端匹配与控制中心架构参考（GPL-3.0）。
+- **[PawnIO](https://github.com/namazso/PawnIO) / [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules)**：底层驱动与 SMU/MSR/EC 模块（驱动 GPL-2.0，模块 LGPL-2.1-or-later）。
+- **[irusanov/SMUDebugTool](https://github.com/irusanov/SMUDebugTool) / [ZenStates-Core](https://github.com/irusanov/ZenStates-Core)**：AMD SMU 协议参考（GPL-3.0）。
+- **[FlyGoat/RyzenAdj](https://github.com/FlyGoat/RyzenAdj)**：AMD SMU 命令与功耗参数参考（LGPL-3.0）。
+- **[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)**：传感器读取（MPL-2.0）。
+- **[MQTTnet](https://github.com/dotnet/MQTTnet)**、**[HidSharp](https://github.com/IntergatedCircuits/HidSharp)**、**[NvAPIWrapper](https://github.com/falahati/NvAPIWrapper)**、**[Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json)**：通信与硬件访问依赖。
+- **[BetterRGB](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive)**：键盘灯 HID 协议参考。
+- **[IYATT-yx/NullSignal](https://github.com/IYATT-yx/NullSignal)**：虚拟显示息屏方案参考。
+- **[JiaolongControl](https://github.com/GaoXanSheng/JiaolongControl)**：宝龙达接口事实参考（MIT）。
+
+完整版本、许可证文本和“哪些是派生代码、哪些只是协议参考”的说明，以发布包中的 `THIRD_PARTY_NOTICES.txt` 和 `LICENSES\` 为准。
 
 ## 许可与对应源码
 
@@ -227,7 +280,7 @@ GCU 硬件服务尚未连接时，涉及硬件的命令会提示「GCU 硬件服
 
 ## 反馈
 
-欢迎在本仓库 [Issues](https://github.com/LiangyuLu-lly/L-Mechrevo/issues) 反馈问题。请附上：机型、程序版本号（主界面底部可见）、复现步骤。
+欢迎在本仓库 [Issues](https://github.com/xmsjx/L-Mechrevo-Next/issues) 反馈问题。请附上：机型、程序版本号（主界面底部可见）、复现步骤、诊断包文件。
 
 ## 免责声明
 

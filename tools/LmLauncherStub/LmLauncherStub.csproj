@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ================================================================================================
+       LmLauncherStub —— L-Mechrevo 的「.NET 10 缺失」中文提示壳（2026-10-13 新增）
+       ================================================================================================
+       为什么需要它：
+         真正的程序 source\L-Mechrevo.csproj 是 .NET 10 的 apphost（TargetFramework
+         net10.0-windows10.0.19041.0），且 source\app.manifest 是 requireAdministrator。
+         目标机【没有】.NET 10 桌面运行时时，apphost 自己会在加载托管代码【之前】就失败，
+         弹的是焊死在 exe 里的【英文】对话框 —— 我们改不了，程序本身也无法执行任何代码去提示。
+         => 必须有一个【不依赖 .NET 10】的极小程序挡在前面：它在 .NET Framework 4.8.1 上跑
+            （Win10 2004+ / Win11 系统自带），检测到 .NET 10 缺失就用中文说明 + 可复制的完整下载地址；
+            检测到就原样透传命令行参数并拉起真正的 L-Mechrevo.exe。
+
+       ⛔ 本工程不参与 source\L-Mechrevo.csproj 的构建，主程序逻辑一字未动。
+       ⛔ 本工程也【不是】打包的一部分：它只产出 installer-src\files\L-Mechrevo-Launcher.exe，
+          由 install_script.iss 的 [Files] 收进 {app}。
+       ⚠️ 构建方式（本机无 MSVC / Windows SDK，故走 .NET Framework 参考程序集路线）：
+            & 'D:\openLM\dotnet-sdk\dotnet.exe' build 'D:\openLM\tools\LmLauncherStub\LmLauncherStub.csproj' -c Release
+          参考程序集取 C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1
+          （本机实测存在；若换机器没有 v4.8.1 目录，改成 v4.8 即可，代码只用到 4.x 基础 API）。
+       ================================================================================================ -->
+
+  <PropertyGroup>
+    <!-- net481 = .NET Framework 4.8.1：Win10 2004 及以上 / Win11 系统自带，无需随包分发任何运行时。 -->
+    <TargetFramework>net481</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>L-Mechrevo-Launcher</AssemblyName>
+    <RootNamespace>LmLauncherStub</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>..\..\source\app.ico</ApplicationIcon>
+    <!-- requireAdministrator：与真正的 L-Mechrevo.exe（source\app.manifest）一致。 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- 自绘窗体，不需要 DPI/HighDpi 额外的 config 文件（避免多出一个 .exe.config 要一起打包）。 -->
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
+    <GenerateBindingRedirects>false</GenerateBindingRedirects>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CA1416;SYSLIB0011</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- 用 v4.8.1 参考程序集当「SDK 的 mscorlib」，绕开本机没有 .NET Framework Targeting Pack 的问题。
+         FrameworkPathOverride 给的是【参考程序集】目录：这里只编译，不运行，正是所需。 -->
+    <FrameworkPathOverride Condition="Exists('C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1')">C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1</FrameworkPathOverride>
+    <FrameworkPathOverride Condition="'$(FrameworkPathOverride)' == '' and Exists('C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8')">C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8</FrameworkPathOverride>
+    <TargetFrameworkVersion Condition="'$(TargetFrameworkVersion)' == ''">v4.8.1</TargetFrameworkVersion>
+  </PropertyGroup>
+
+  <Target Name="CopyStubIntoInstallerFiles" AfterTargets="Build">
+    <!-- 把壳直接落到 installer-src\files\（install_script.iss 的 [Files] 就从这里取）。
+         ⛔ 只落这一个 exe；不要让它把别的产物带进 payload 目录。 -->
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(MSBuildThisFileDirectory)..\..\installer-src\files\" SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="LmLauncherStub -> installer-src\files\$(TargetFileName)" />
+  </Target>
+
+</Project>

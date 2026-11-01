@@ -1,0 +1,2993 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="LightingKeyboard" xml:space="preserve">
+    <value>Keyboard lighting</value>
+  </data>
+  <data name="LightingStrip" xml:space="preserve">
+    <value>Light strip</value>
+  </data>
+  <data name="LightingLogo" xml:space="preserve">
+    <value>Logo light</value>
+  </data>
+  <data name="LightingHinge" xml:space="preserve">
+    <value>Hinge light</value>
+  </data>
+  <data name="LightingSync" xml:space="preserve">
+    <value>Sync light</value>
+  </data>
+  <data name="PowerOn" xml:space="preserve">
+    <value>Turn on</value>
+  </data>
+  <data name="Brightness" xml:space="preserve">
+    <value>Brightness</value>
+  </data>
+  <data name="Speed" xml:space="preserve">
+    <value>Speed</value>
+  </data>
+  <data name="AdjustHint" xml:space="preserve">
+    <value>Choose an effect; adjust color and brightness on the right.</value>
+  </data>
+  <data name="LiquidSystem" xml:space="preserve">
+    <value>Liquid cooling</value>
+  </data>
+  <data name="Pump" xml:space="preserve">
+    <value>Pump</value>
+  </data>
+  <data name="Fan" xml:space="preserve">
+    <value>Fan</value>
+  </data>
+  <data name="NotConnected" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="Connected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="CalibrationSettingsWindow_Text" xml:space="preserve">
+    <value>When enabled, a "Custom" option appears in the color profile list and the selected ICC profile is applied through Windows Color Management (not via GCU). When disabled, all applied ICC profiles are removed.</value>
+  </data>
+  <data name="ImportButton_Content" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="CustomSwitch_Content" xml:space="preserve">
+    <value>Custom calibration</value>
+  </data>
+  <data name="CalibrationSettingsWindow_Text_2" xml:space="preserve">
+    <value>When enabled, the current color profile is applied once at every boot. Usually unnecessary; use it only if calibration does not survive a restart.</value>
+  </data>
+  <data name="StartupSwitch_Content" xml:space="preserve">
+    <value>Apply calibration on startup</value>
+  </data>
+  <data name="CalibrationSettingsWindow_Text_3" xml:space="preserve">
+    <value>Calibration</value>
+  </data>
+  <data name="ColorPickerWindow_Content" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="ColorPickerWindow_Content_2" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="ColorPickerWindow_Text" xml:space="preserve">
+    <value>Preset color</value>
+  </data>
+  <data name="ColorPickerWindow_Title" xml:space="preserve">
+    <value>Select color</value>
+  </data>
+  <data name="CpuTuningWindow_Content" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="CpuTuningWindow_Content_2" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="CpuTuningWindow_Content_3" xml:space="preserve">
+    <value>Load snapshot</value>
+  </data>
+  <data name="CpuTuningWindow_Content_4" xml:space="preserve">
+    <value>Save snapshot</value>
+  </data>
+  <data name="AutoApplyCheck_Content" xml:space="preserve">
+    <value>Apply automatically at boot</value>
+  </data>
+  <data name="TitleText_Text" xml:space="preserve">
+    <value>CPU tuning</value>
+  </data>
+  <data name="CustomModeWindow_Content" xml:space="preserve">
+    <value>Fan curve</value>
+  </data>
+  <data name="CustomModeWindow_Content_2" xml:space="preserve">
+    <value>Restore defaults</value>
+  </data>
+  <data name="ApplyButton_Content" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="CustomModeWindow_Text" xml:space="preserve">
+    <value>Memory offset (MHz)</value>
+  </data>
+  <data name="CustomModeWindow_Text_2" xml:space="preserve">
+    <value>Core offset (MHz)</value>
+  </data>
+  <data name="CustomModeWindow_Text_3" xml:space="preserve">
+    <value>GPU OC</value>
+  </data>
+  <data name="CustomModeWindow_Text_4" xml:space="preserve">
+    <value>Fan switch sensitivity</value>
+  </data>
+  <data name="CustomModeWindow_Text_5" xml:space="preserve">
+    <value>Fan / OC</value>
+  </data>
+  <data name="CustomModeWindow_Text_6" xml:space="preserve">
+    <value>GPU power limit (W)</value>
+  </data>
+  <data name="CustomModeWindow_Text_7" xml:space="preserve">
+    <value>GPU power limit TGP (W)</value>
+  </data>
+  <data name="CustomModeWindow_Text_8" xml:space="preserve">
+    <value>GPU dynamic boost</value>
+  </data>
+  <data name="TccLabel_Text" xml:space="preserve">
+    <value>CPU temperature wall</value>
+  </data>
+  <data name="CustomModeWindow_Text_9" xml:space="preserve">
+    <value>Temperature / GPU dynamic boost</value>
+  </data>
+  <data name="CustomModeWindow_Text_10" xml:space="preserve">
+    <value>SMU fast time (s)</value>
+  </data>
+  <data name="CustomModeWindow_Text_11" xml:space="preserve">
+    <value>SMU slow time (s)</value>
+  </data>
+  <data name="CustomModeWindow_Text_12" xml:space="preserve">
+    <value>SMU slow limit (W)</value>
+  </data>
+  <data name="CustomModeWindow_Text_13" xml:space="preserve">
+    <value>STAPM time window (s)</value>
+  </data>
+  <data name="CustomModeWindow_Text_14" xml:space="preserve">
+    <value>CPU peak power fPPT (W)</value>
+  </data>
+  <data name="Pl2Label_Text" xml:space="preserve">
+    <value>CPU power wall PL2 (W)</value>
+  </data>
+  <data name="Pl1Label_Text" xml:space="preserve">
+    <value>CPU power wall PL1 (W)</value>
+  </data>
+  <data name="CustomModeWindow_Text_15" xml:space="preserve">
+    <value>CPU power</value>
+  </data>
+  <data name="CustomModeWindow_Content_3" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="CustomModeWindow_Content_4" xml:space="preserve">
+    <value>Unchanged</value>
+  </data>
+  <data name="CustomModeWindow_Text_16" xml:space="preserve">
+    <value>Fan boost</value>
+  </data>
+  <data name="CustomModeWindow_Text_17" xml:space="preserve">
+    <value>Refresh rate</value>
+  </data>
+  <data name="CustomModeWindow_Content_5" xml:space="preserve">
+    <value>Efficient with floor (floor + power saving)</value>
+  </data>
+  <data name="CustomModeWindow_Content_6" xml:space="preserve">
+    <value>Aggressive with floor (base frequency first, then boost)</value>
+  </data>
+  <data name="CustomModeWindow_Content_7" xml:space="preserve">
+    <value>Efficient aggressive (balanced perf &amp; power)</value>
+  </data>
+  <data name="CustomModeWindow_Content_8" xml:space="preserve">
+    <value>Efficient turbo (power saving first, cooler)</value>
+  </data>
+  <data name="CustomModeWindow_Content_9" xml:space="preserve">
+    <value>Aggressive turbo (best performance, hottest)</value>
+  </data>
+  <data name="CustomModeWindow_Content_10" xml:space="preserve">
+    <value>Turbo enabled (default, system automatic)</value>
+  </data>
+  <data name="CustomModeWindow_Content_11" xml:space="preserve">
+    <value>Turbo disabled (CPU stays at base frequency)</value>
+  </data>
+  <data name="CustomModeWindow_Text_18" xml:space="preserve">
+    <value>CPU boost mode</value>
+  </data>
+  <data name="CustomModeWindow_Text_19" xml:space="preserve">
+    <value>Power plan</value>
+  </data>
+  <data name="CustomModeWindow_Content_12" xml:space="preserve">
+    <value>High performance</value>
+  </data>
+  <data name="CustomModeWindow_Content_13" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="CustomModeWindow_Content_14" xml:space="preserve">
+    <value>Efficiency first</value>
+  </data>
+  <data name="CustomModeWindow_Text_20" xml:space="preserve">
+    <value>Windows power mode</value>
+  </data>
+  <data name="CustomModeWindow_Text_21" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="DeleteButton_Content" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="RenameButton_Content" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="NewButton_Content" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="CustomModeWindow_Text_22" xml:space="preserve">
+    <value>Mode</value>
+  </data>
+  <data name="CustomModeWindow_Text_23" xml:space="preserve">
+    <value>Performance mode · Custom</value>
+  </data>
+  <data name="CustomModeWindow_Title" xml:space="preserve">
+    <value>Mode</value>
+  </data>
+  <data name="DisplayEffectEditorWindow_Content" xml:space="preserve">
+    <value>Restore defaults</value>
+  </data>
+  <data name="DisplayEffectEditorWindow_Text" xml:space="preserve">
+    <value>Vibrancy</value>
+  </data>
+  <data name="PushFanCurveCheck_Content" xml:space="preserve">
+    <value>Push fan curve</value>
+  </data>
+  <data name="WujieIndependentCheck_Content" xml:space="preserve">
+    <value>Independent CPU/GPU control</value>
+  </data>
+  <data name="FanCurveWindow_Text" xml:space="preserve">
+    <value>GPU fan</value>
+  </data>
+  <data name="FanCurveWindow_Text_2" xml:space="preserve">
+    <value>CPU fan</value>
+  </data>
+  <data name="HintText_Text" xml:space="preserve">
+    <value>Drag curve points to adjust duty cycle; the temperature axis comes from hardware.</value>
+  </data>
+  <data name="FeedbackWindow_Content" xml:space="preserve">
+    <value>Open Issues</value>
+  </data>
+  <data name="FeedbackWindow_Content_2" xml:space="preserve">
+    <value>Export diagnostics</value>
+  </data>
+  <data name="FeedbackWindow_Content_3" xml:space="preserve">
+    <value>Copy info</value>
+  </data>
+  <data name="FeedbackWindow_Text" xml:space="preserve">
+    <value>Suggested attachments: symptoms, reproduction steps, AC power state, current performance mode, diagnostic pack.</value>
+  </data>
+  <data name="FeedbackWindow_Text_2" xml:space="preserve">
+    <value>Send the version, hardware info and logs together in the GitHub Issue for much faster diagnosis.</value>
+  </data>
+  <data name="FeedbackWindow_Text_3" xml:space="preserve">
+    <value>Feedback &amp; Issues</value>
+  </data>
+  <data name="FeedbackWindow_Title" xml:space="preserve">
+    <value>Feedback</value>
+  </data>
+  <data name="GpuRestartPromptWindow_Content" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="GpuRestartPromptWindow_Content_2" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="GpuRestartPromptWindow_Title" xml:space="preserve">
+    <value>Switch GPU mode</value>
+  </data>
+  <data name="ExtraCheck_Content" xml:space="preserve">
+    <value>Additional options</value>
+  </data>
+  <data name="Extra3Label_Text" xml:space="preserve">
+    <value>Extra</value>
+  </data>
+  <data name="MultiColorLabel_Text" xml:space="preserve">
+    <value>Color</value>
+  </data>
+  <data name="ColorCountLabel_Text" xml:space="preserve">
+    <value>Color count</value>
+  </data>
+  <data name="HidKeyboardWindow_Text" xml:space="preserve">
+    <value>Frame rate</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_2" xml:space="preserve">
+    <value>Angle</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_3" xml:space="preserve">
+    <value>Speed</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_4" xml:space="preserve">
+    <value>Brightness</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_5" xml:space="preserve">
+    <value>Stops HID effects when disabled</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_6" xml:space="preserve">
+    <value>Power</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_7" xml:space="preserve">
+    <value>Effect</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_8" xml:space="preserve">
+    <value>HID keyboard: effects, power and brightness.</value>
+  </data>
+  <data name="HidKeyboardWindow_Text_9" xml:space="preserve">
+    <value>Keyboard lighting</value>
+  </data>
+  <data name="LicensesWindow_Content" xml:space="preserve">
+    <value>Open the LICENSES folder</value>
+  </data>
+  <data name="LicensesWindow_Text" xml:space="preserve">
+    <value>This program is provided under GPL-3.0 without any warranty; see LICENSE in the program directory.</value>
+  </data>
+  <data name="LicensesWindow_Text_2" xml:space="preserve">
+    <value>Copyright (C) 2026 L-Mechrevo contributors; original project: LiangyuLu-lly/L-Mechrevo; maintained by: xiaohan (xmsjx).</value>
+  </data>
+  <data name="LicensesWindow_Text_3" xml:space="preserve">
+    <value>Zcodeoooo/JiaoLong16Pro-Battery-threshold — no LICENSE (protocol reference only)</value>
+  </data>
+  <data name="LicensesWindow_Text_4" xml:space="preserve">
+    <value>Protocol references</value>
+  </data>
+  <data name="LicensesWindow_Text_5" xml:space="preserve">
+    <value>usbmmidd_v2 virtual display driver — Amyuni (see the driver's bundled License.txt)</value>
+  </data>
+  <data name="LicensesWindow_Text_6" xml:space="preserve">
+    <value>Distributed with the program</value>
+  </data>
+  <data name="LicensesWindow_Text_7" xml:space="preserve">
+    <value>G-Helper (including AMD SMU layer) — GPL-3.0</value>
+  </data>
+  <data name="LicensesWindow_Text_8" xml:space="preserve">
+    <value>Derived from</value>
+  </data>
+  <data name="LicensesWindow_Text_9" xml:space="preserve">
+    <value>L-Mechrevo is distributed under GPL-3.0-only. The following third-party projects and license summaries are used by this project. Full texts are in the LICENSES folder.</value>
+  </data>
+  <data name="LicensesWindow_Text_10" xml:space="preserve">
+    <value>Licenses &amp; Credits</value>
+  </data>
+  <data name="LightEditorWindow_Text" xml:space="preserve">
+    <value>Applied automatically after adjustment</value>
+  </data>
+  <data name="LightEditorWindow_Text_2" xml:space="preserve">
+    <value>Breathing color</value>
+  </data>
+  <data name="LightEditorWindow_Text_3" xml:space="preserve">
+    <value>Switch color (6 segments)</value>
+  </data>
+  <data name="LightEditorWindow_Text_4" xml:space="preserve">
+    <value>Per-key display time</value>
+  </data>
+  <data name="LightEditorWindow_Content" xml:space="preserve">
+    <value>Restore default 7 colors</value>
+  </data>
+  <data name="LightEditorWindow_Text_5" xml:space="preserve">
+    <value>Mixed colors (7 colors saved for the current channel)</value>
+  </data>
+  <data name="LightEditorWindow_Text_6" xml:space="preserve">
+    <value>Apply effect when enabled</value>
+  </data>
+  <data name="HintText_Text_2" xml:space="preserve">
+    <value>Effects, brightness, speed and color. Mixed effects reuse the 7 colors saved for the current channel.</value>
+  </data>
+  <data name="TitleText_Text_2" xml:space="preserve">
+    <value>Lighting</value>
+  </data>
+  <data name="InlineOverlayTitle_Text" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="StatusText_Text" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="MainWindow_Text" xml:space="preserve">
+    <value>Quit</value>
+  </data>
+  <data name="MainWindow_Text_2" xml:space="preserve">
+    <value>Diagnostics</value>
+  </data>
+  <data name="MainWindow_Text_3" xml:space="preserve">
+    <value>Donate</value>
+  </data>
+  <data name="MainWindow_Text_4" xml:space="preserve">
+    <value>Overlay</value>
+  </data>
+  <data name="NavSwitches_Content" xml:space="preserve">
+    <value>More switches</value>
+  </data>
+  <data name="NavCustom_Content" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="NavScreen_Content" xml:space="preserve">
+    <value>Screen</value>
+  </data>
+  <data name="NavHome_Content" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="NavTitle_Text" xml:space="preserve">
+    <value>Navigation</value>
+  </data>
+  <data name="MainWindow_Text_5" xml:space="preserve">
+    <value>Accent color</value>
+  </data>
+  <data name="MainWindow_Content" xml:space="preserve">
+    <value>Mini</value>
+  </data>
+  <data name="MainWindow_Content_2" xml:space="preserve">
+    <value>Toggle light</value>
+  </data>
+  <data name="MainWindow_Text_6" xml:space="preserve">
+    <value>L-Mechrevo</value>
+  </data>
+  <data name="LightSyncEditButton_Content" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="OriginalStyleWindow_Text" xml:space="preserve">
+    <value>Sync light</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_2" xml:space="preserve">
+    <value>Hinge</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_3" xml:space="preserve">
+    <value>Logo</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_4" xml:space="preserve">
+    <value>Lightbar</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_5" xml:space="preserve">
+    <value>Keyboard</value>
+  </data>
+  <data name="LightOffOnBatteryCheck_Content" xml:space="preserve">
+    <value>Turn off all lighting automatically on battery</value>
+  </data>
+  <data name="OriginalStyleWindow_Content" xml:space="preserve">
+    <value>30 minutes</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_2" xml:space="preserve">
+    <value>10 minutes</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_3" xml:space="preserve">
+    <value>5 minutes</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_4" xml:space="preserve">
+    <value>1 minute</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_5" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_6" xml:space="preserve">
+    <value>Auto-off time</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_6" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_7" xml:space="preserve">
+    <value>Fan</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_8" xml:space="preserve">
+    <value>Water pump</value>
+  </data>
+  <data name="LiquidStatusButton_Content" xml:space="preserve">
+    <value>Not Connected</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_9" xml:space="preserve">
+    <value>Liquid cooling system</value>
+  </data>
+  <data name="EcDirectOffToggle_Content" xml:space="preserve">
+    <value>Turn off EC direct charging limit (use if writes fail)</value>
+  </data>
+  <data name="ChargeSliderToggle_Content" xml:space="preserve">
+    <value>Enable stepless charge limit (experimental)</value>
+  </data>
+  <data name="ChargeLimitStatus_Text" xml:space="preserve">
+    <value>Reading charge threshold status…</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_10" xml:space="preserve">
+    <value>Stop at %</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_11" xml:space="preserve">
+    <value>Start at %</value>
+  </data>
+  <data name="ChargeLimitApplyButton_Content" xml:space="preserve">
+    <value>Save thresholds</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_12" xml:space="preserve">
+    <value>Charge limit</value>
+  </data>
+  <data name="BatteryWorkButton_Content" xml:space="preserve">
+    <value>Workstation</value>
+  </data>
+  <data name="BatteryBalancedButton_Content" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="BatteryLongButton_Content" xml:space="preserve">
+    <value>Longevity</value>
+  </data>
+  <data name="BatteryInfo_Text" xml:space="preserve">
+    <value>Battery —</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_13" xml:space="preserve">
+    <value>Battery</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_7" xml:space="preserve">
+    <value>Vivid</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_8" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="OriginalStyleWindow_Content_9" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="AutoRefreshSwitch_Content" xml:space="preserve">
+    <value>Auto Refresh</value>
+  </data>
+  <data name="IgpuSavingPreviewStatus_Text" xml:space="preserve">
+    <value>Current: --</value>
+  </data>
+  <data name="IgpuSavingOnPreview_Content" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_14" xml:space="preserve">
+    <value>iGPU Saving</value>
+  </data>
+  <data name="GpuDirectButton_Content" xml:space="preserve">
+    <value>dGPU Mode</value>
+  </data>
+  <data name="GpuHybridButton_Content" xml:space="preserve">
+    <value>Hybrid Mode</value>
+  </data>
+  <data name="GpuEcoButton_Content" xml:space="preserve">
+    <value>iGPU</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_15" xml:space="preserve">
+    <value>GPU Mode</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_16" xml:space="preserve">
+    <value>Screen off</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_17" xml:space="preserve">
+    <value>Win key lock</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_18" xml:space="preserve">
+    <value>Microphone</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_19" xml:space="preserve">
+    <value>Camera</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_20" xml:space="preserve">
+    <value>Strong cooling</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_21" xml:space="preserve">
+    <value>Quick switches</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_22" xml:space="preserve">
+    <value>Turbo</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_23" xml:space="preserve">
+    <value>Silent</value>
+  </data>
+  <data name="CurrentModeText_Text" xml:space="preserve">
+    <value>Current: —</value>
+  </data>
+  <data name="PerfConfigEditButton_Content" xml:space="preserve">
+    <value>Edit config</value>
+  </data>
+  <data name="BackgroundToggle_Content" xml:space="preserve">
+    <value>Background image</value>
+  </data>
+  <data name="ThemeButton_Content" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="WideButton_Content" xml:space="preserve">
+    <value>Wide</value>
+  </data>
+  <data name="BackendStatus_Text" xml:space="preserve">
+    <value>● GCU status unknown</value>
+  </data>
+  <data name="OriginalStyleWindow_Text_24" xml:space="preserve">
+    <value>L-Mechrevo</value>
+  </data>
+  <data name="OriginalStyleWindow_Title" xml:space="preserve">
+    <value>L-Mechrevo</value>
+  </data>
+  <data name="OverlayWindow_Title" xml:space="preserve">
+    <value>L-Mechrevo overlay</value>
+  </data>
+  <data name="QuickTilePickerWindow_Content" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="HintText_Text_3" xml:space="preserve">
+    <value>Up to 5</value>
+  </data>
+  <data name="QuickTilePickerWindow_Text" xml:space="preserve">
+    <value>Select quick switches for the tile row</value>
+  </data>
+  <data name="QuickTilePickerWindow_Title" xml:space="preserve">
+    <value>Select quick buttons</value>
+  </data>
+  <data name="SettingsWindow_Content" xml:space="preserve">
+    <value>Open install folder</value>
+  </data>
+  <data name="SettingsWindow_Content_2" xml:space="preserve">
+    <value>Credits</value>
+  </data>
+  <data name="SettingsWindow_Content_3" xml:space="preserve">
+    <value>Project page / feedback</value>
+  </data>
+  <data name="SettingsWindow_Content_4" xml:space="preserve">
+    <value>In-app feedback</value>
+  </data>
+  <data name="CheckUpdateButton_Content" xml:space="preserve">
+    <value>Check Updates</value>
+  </data>
+  <data name="SettingsWindow_Text" xml:space="preserve">
+    <value>Include a diagnostic bundle when reporting.</value>
+  </data>
+  <data name="SettingsWindow_Text_2" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="SettingsWindow_Text_3" xml:space="preserve">
+    <value>Left-click toggles the display mode; drag to move; position is saved automatically</value>
+  </data>
+  <data name="SettingsWindow_Content_5" xml:space="preserve">
+    <value>Reset position</value>
+  </data>
+  <data name="SettingsWindow_Content_6" xml:space="preserve">
+    <value>Toggle overlay</value>
+  </data>
+  <data name="SettingsWindow_Content_7" xml:space="preserve">
+    <value>5 seconds</value>
+  </data>
+  <data name="SettingsWindow_Content_8" xml:space="preserve">
+    <value>2 seconds</value>
+  </data>
+  <data name="SettingsWindow_Content_9" xml:space="preserve">
+    <value>1 second</value>
+  </data>
+  <data name="SettingsWindow_Content_10" xml:space="preserve">
+    <value>0.5 seconds</value>
+  </data>
+  <data name="SettingsWindow_Text_4" xml:space="preserve">
+    <value>Refresh interval</value>
+  </data>
+  <data name="SettingsWindow_Text_5" xml:space="preserve">
+    <value>When disabled, the overlay also closes and sensor reading pauses while the main window is in the background</value>
+  </data>
+  <data name="TraySensorTooltipCheck_Content" xml:space="preserve">
+    <value>Display</value>
+  </data>
+  <data name="SettingsWindow_Text_6" xml:space="preserve">
+    <value>Tray icon sensor tooltip</value>
+  </data>
+  <data name="SettingsWindow_Text_7" xml:space="preserve">
+    <value>Opacity</value>
+  </data>
+  <data name="SettingsWindow_Content_11" xml:space="preserve">
+    <value>Full</value>
+  </data>
+  <data name="SettingsWindow_Content_12" xml:space="preserve">
+    <value>Minimal</value>
+  </data>
+  <data name="SettingsWindow_Text_8" xml:space="preserve">
+    <value>Display content</value>
+  </data>
+  <data name="SettingsWindow_Text_9" xml:space="preserve">
+    <value>User settings only (no logs); the current settings are backed up before importing, restart L-Mechrevo afterwards.</value>
+  </data>
+  <data name="SettingsWindow_Content_13" xml:space="preserve">
+    <value>Import settings...</value>
+  </data>
+  <data name="SettingsWindow_Content_14" xml:space="preserve">
+    <value>Export settings...</value>
+  </data>
+  <data name="SettingsWindow_Text_10" xml:space="preserve">
+    <value>Settings backup</value>
+  </data>
+  <data name="SettingsWindow_Content_15" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="SettingsWindow_Content_16" xml:space="preserve">
+    <value>Errors only</value>
+  </data>
+  <data name="SettingsWindow_Text_11" xml:space="preserve">
+    <value>Log level</value>
+  </data>
+  <data name="SettingsWindow_Text_12" xml:space="preserve">
+    <value>Pick "Always show" if this row is missing by mistake; pick "Always hide" to drop it even when hardware reports it</value>
+  </data>
+  <data name="LogoHideButton_Content" xml:space="preserve">
+    <value>Always hide</value>
+  </data>
+  <data name="LogoShowButton_Content" xml:space="preserve">
+    <value>Always show</value>
+  </data>
+  <data name="LogoAutoButton_Content" xml:space="preserve">
+    <value>Auto (hardware)</value>
+  </data>
+  <data name="SettingsWindow_Text_13" xml:space="preserve">
+    <value>Logo light row</value>
+  </data>
+  <data name="SettingsWindow_Text_14" xml:space="preserve">
+    <value>Pick "Always show" if this row is missing by mistake; pick "Always hide" to drop it even when hardware reports it</value>
+  </data>
+  <data name="SettingsWindow_Text_15" xml:space="preserve">
+    <value>Lightbar row</value>
+  </data>
+  <data name="SettingsWindow_Text_16" xml:space="preserve">
+    <value>Pick "Always show" if auto detection is wrong</value>
+  </data>
+  <data name="SettingsWindow_Text_17" xml:space="preserve">
+    <value>iGPU-only mode display</value>
+  </data>
+  <data name="PawnStatus_Text" xml:space="preserve">
+    <value>PawnIO driver: checking...</value>
+  </data>
+  <data name="ReinstallPawnButton_Content" xml:space="preserve">
+    <value>Reinstall</value>
+  </data>
+  <data name="SettingsWindow_Text_18" xml:space="preserve">
+    <value>PawnIO driver</value>
+  </data>
+  <data name="OfficialStatus_Text" xml:space="preserve">
+    <value>Not detected</value>
+  </data>
+  <data name="IsolationButton_Content" xml:space="preserve">
+    <value>Isolate official UI &amp; tray</value>
+  </data>
+  <data name="SettingsWindow_Text_19" xml:space="preserve">
+    <value>Official console</value>
+  </data>
+  <data name="SettingsWindow_Text_20" xml:space="preserve">
+    <value>Display resolution mode</value>
+  </data>
+  <data name="SettingsWindow_Text_21" xml:space="preserve">
+    <value>MiniLED local dimming</value>
+  </data>
+  <data name="SettingsWindow_Text_22" xml:space="preserve">
+    <value>Reduces LCD response time when enabled; some panels may show slight overshoot.</value>
+  </data>
+  <data name="OverdriveCheck_Content" xml:space="preserve">
+    <value>Display response acceleration (LCD Overdrive)</value>
+  </data>
+  <data name="WaterCoolingCheck_Content" xml:space="preserve">
+    <value>Force water cooling menu</value>
+  </data>
+  <data name="StartupCheck_Content" xml:space="preserve">
+    <value>Startup</value>
+  </data>
+  <data name="SettingsWindow_Content_17" xml:space="preserve">
+    <value>Hotkeys</value>
+  </data>
+  <data name="SettingsWindow_Content_18" xml:space="preserve">
+    <value>Chinese</value>
+  </data>
+  <data name="SettingsWindow_Text_23" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="SettingsWindow_Text_24" xml:space="preserve">
+    <value>Choose the items to show in the tray right-click menu</value>
+  </data>
+  <data name="SettingsWindow_Text_25" xml:space="preserve">
+    <value>Tray menu</value>
+  </data>
+  <data name="SettingsWindow_Text_26" xml:space="preserve">
+    <value>Button opacity</value>
+  </data>
+  <data name="SettingsWindow_Text_27" xml:space="preserve">
+    <value>Card opacity</value>
+  </data>
+  <data name="SettingsWindow_Text_28" xml:space="preserve">
+    <value>Bottom bar opacity</value>
+  </data>
+  <data name="SettingsWindow_Text_29" xml:space="preserve">
+    <value>Wide background opacity</value>
+  </data>
+  <data name="SettingsWindow_Content_19" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="SettingsWindow_Content_20" xml:space="preserve">
+    <value>Choose...</value>
+  </data>
+  <data name="WideBackgroundPathText_Text" xml:space="preserve">
+    <value>Not selected</value>
+  </data>
+  <data name="SettingsWindow_Text_30" xml:space="preserve">
+    <value>Wide background</value>
+  </data>
+  <data name="SettingsWindow_Text_31" xml:space="preserve">
+    <value>Background mask</value>
+  </data>
+  <data name="SettingsWindow_Text_32" xml:space="preserve">
+    <value>Background opacity</value>
+  </data>
+  <data name="SettingsWindow_MicaBackdrop" xml:space="preserve">
+    <value>Mica backdrop</value>
+  </data>
+  <data name="SettingsWindow_MicaTint" xml:space="preserve">
+    <value>Mica tint</value>
+  </data>
+  <data name="TrayOverlayLock" xml:space="preserve">
+    <value>Overlay: lock/unlock</value>
+  </data>
+  <data name="OverlayLockHint" xml:space="preserve">
+    <value>Lock overlay (click-through)</value>
+  </data>
+  <data name="SettingsWindow_BackgroundBlur" xml:space="preserve">
+    <value>Background blur</value>
+  </data>
+  <data name="SettingsWindow_Text_33" xml:space="preserve">
+    <value>Accent color</value>
+  </data>
+  <data name="DarkButton_Content" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="SettingsWindow_Text_34" xml:space="preserve">
+    <value>UI appearance</value>
+  </data>
+  <data name="FollowSystemCheck_Content" xml:space="preserve">
+    <value>Follow system</value>
+  </data>
+  <data name="SettingsWindow_Text_35" xml:space="preserve">
+    <value>UI</value>
+  </data>
+  <data name="SponsorWindow_Text" xml:space="preserve">
+    <value>The QR codes are for sponsorship only; L-Mechrevo itself is open source and has no paid feature unlocks.</value>
+  </data>
+  <data name="SponsorWindow_Text_2" xml:space="preserve">
+    <value>Current maintainer</value>
+  </data>
+  <data name="SponsorWindow_Text_3" xml:space="preserve">
+    <value>Original project</value>
+  </data>
+  <data name="SponsorWindow_Text_4" xml:space="preserve">
+    <value>Thank you for supporting the maintenance and updates of L-Mechrevo. The QR codes below correspond to the original project and the current maintainer; scan as needed.</value>
+  </data>
+  <data name="SponsorWindow_Text_5" xml:space="preserve">
+    <value>Sponsor L-Mechrevo</value>
+  </data>
+  <data name="PromptText_Text" xml:space="preserve">
+    <value>Input:</value>
+  </data>
+  <data name="TextPromptWindow_Title" xml:space="preserve">
+    <value>Input</value>
+  </data>
+  <data name="UpdateWindow_Content" xml:space="preserve">
+    <value>Open Download Page</value>
+  </data>
+  <data name="UpdateWindow_Content_2" xml:space="preserve">
+    <value>Copy download link</value>
+  </data>
+  <data name="UpdateWindow_Text" xml:space="preserve">
+    <value>New version found</value>
+  </data>
+  <data name="CustomPageView_Content" xml:space="preserve">
+    <value>Open GPU fan curve</value>
+  </data>
+  <data name="CustomPageView_Text" xml:space="preserve">
+    <value>Temperature / RPM curve and smoothing</value>
+  </data>
+  <data name="CustomPageView_Text_2" xml:space="preserve">
+    <value>GPU fan curve</value>
+  </data>
+  <data name="CustomPageView_Content_2" xml:space="preserve">
+    <value>Open CPU fan curve</value>
+  </data>
+  <data name="CustomPageView_Text_3" xml:space="preserve">
+    <value>CPU fan curve</value>
+  </data>
+  <data name="CustomPageView_Content_3" xml:space="preserve">
+    <value>New / Manage custom modes</value>
+  </data>
+  <data name="CustomPageView_Text_4" xml:space="preserve">
+    <value>CPU / GPU power and mode parameters</value>
+  </data>
+  <data name="CustomPageView_Text_5" xml:space="preserve">
+    <value>Custom modes</value>
+  </data>
+  <data name="CustomPageView_Text_6" xml:space="preserve">
+    <value>Custom performance modes and fan curves</value>
+  </data>
+  <data name="HomePageView_Content" xml:space="preserve">
+    <value>Integrated</value>
+  </data>
+  <data name="HomePageView_Content_2" xml:space="preserve">
+    <value>Dedicated</value>
+  </data>
+  <data name="HomePageView_Content_3" xml:space="preserve">
+    <value>Hybrid</value>
+  </data>
+  <data name="GpuCurrentText_Text" xml:space="preserve">
+    <value>Current: Hybrid output</value>
+  </data>
+  <data name="PerfCurrentText_Text" xml:space="preserve">
+    <value>Current: Balanced</value>
+  </data>
+  <data name="LightingPageView_Text" xml:space="preserve">
+    <value>Global lighting</value>
+  </data>
+  <data name="LightingPageView_Text_2" xml:space="preserve">
+    <value>Keyboard, lightbar, Logo, hinge and sync lights</value>
+  </data>
+  <data name="ScreenPageView_Text" xml:space="preserve">
+    <value>Preset parameters</value>
+  </data>
+  <data name="ScreenEffectEditButton_Content" xml:space="preserve">
+    <value>Edit parameters</value>
+  </data>
+  <data name="ScreenPageView_Text_2" xml:space="preserve">
+    <value>Vendor color enhancement presets and parameters</value>
+  </data>
+  <data name="ScreenEffectToggle_Content" xml:space="preserve">
+    <value>Enable color enhancement</value>
+  </data>
+  <data name="ScreenPageView_Text_3" xml:space="preserve">
+    <value>Display features</value>
+  </data>
+  <data name="ScreenPageView_Content" xml:space="preserve">
+    <value>Import ICC</value>
+  </data>
+  <data name="CalibrationCustomSwitch_Content" xml:space="preserve">
+    <value>Custom calibration (ICC)</value>
+  </data>
+  <data name="ScreenCalibrationSettingsButton_Content" xml:space="preserve">
+    <value>Advanced settings</value>
+  </data>
+  <data name="ScreenPageView_Text_4" xml:space="preserve">
+    <value>ICC calibration presets and custom calibration</value>
+  </data>
+  <data name="ScreenCalibrationToggle_Content" xml:space="preserve">
+    <value>Enable calibration</value>
+  </data>
+  <data name="ScreenPageView_Text_5" xml:space="preserve">
+    <value>Refresh rate, brightness, calibration and color enhancement</value>
+  </data>
+  <data name="SwitchesPageView_Text" xml:space="preserve">
+    <value>Quick switches arranged as tiles</value>
+  </data>
+  <data name="CalibrationSettingsWindow_xaml_MessageBoxShowthis" xml:space="preserve">
+    <value>Failed to import ICC.</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text" xml:space="preserve">
+    <value>No adjustable SMU/CO options are available on this platform.</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_2" xml:space="preserve">
+    <value>CPU probe failed: </value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Content" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_3" xml:space="preserve">
+    <value>Per-core CO (Curve Optimizer)</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Content_2" xml:space="preserve">
+    <value>Apply per-core CO</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_4" xml:space="preserve">
+    <value>Failed to apply per-core CO: </value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_5" xml:space="preserve">
+    <value>Failed to apply FMax: </value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_6" xml:space="preserve">
+    <value>Apply failed: </value>
+  </data>
+  <data name="CpuTuningWindow_xaml_MessageBoxShowthis" xml:space="preserve">
+    <value>Reset all CPU tuning items?</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_7" xml:space="preserve">
+    <value>Reset failed: </value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_8" xml:space="preserve">
+    <value>Snapshot saved</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_9" xml:space="preserve">
+    <value>Failed to save snapshot: </value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_10" xml:space="preserve">
+    <value>No readable per-core CO snapshot</value>
+  </data>
+  <data name="CpuTuningWindow_xaml_Text_11" xml:space="preserve">
+    <value>Failed to load snapshot: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Content" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text" xml:space="preserve">
+    <value>There are unapplied changes</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_2" xml:space="preserve">
+    <value>Failed to switch mode: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Title" xml:space="preserve">
+    <value>Performance mode · </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_3" xml:space="preserve">
+    <value>Gen 30 firmware profile (read-only preview)</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_4" xml:space="preserve">
+    <value>Failed to bind firmware profile: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_5" xml:space="preserve">
+    <value>Current mode: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_6" xml:space="preserve">
+    <value>Power plan switched</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_7" xml:space="preserve">
+    <value>Power plan not confirmed; not saved</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_8" xml:space="preserve">
+    <value>Power plan failed: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_9" xml:space="preserve">
+    <value>CPU power wall PL1 (W)</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_10" xml:space="preserve">
+    <value>CPU power wall PL2 (W)</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_11" xml:space="preserve">
+    <value>CPU temperature wall</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_12" xml:space="preserve">
+    <value>PerfModeService is not initialized</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_13" xml:space="preserve">
+    <value>Apply failed: no result returned</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_14" xml:space="preserve">
+    <value>Applied: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_MessageBoxShowthis" xml:space="preserve">
+    <value>Restore factory defaults for this mode?</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_15" xml:space="preserve">
+    <value>Defaults restored: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_16" xml:space="preserve">
+    <value>Failed to create custom mode (limit reached or no available slot)</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_17" xml:space="preserve">
+    <value>Created: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_18" xml:space="preserve">
+    <value>Create failed: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_19" xml:space="preserve">
+    <value>Renamed</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_20" xml:space="preserve">
+    <value>Built-in modes cannot be deleted</value>
+  </data>
+  <data name="CustomModeWindow_xaml_MessageBoxShowthis_2" xml:space="preserve">
+    <value>Delete mode "</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_21" xml:space="preserve">
+    <value>Deleted</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_22" xml:space="preserve">
+    <value>Delete failed</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_23" xml:space="preserve">
+    <value>Backend not connected; cannot open the fan curve</value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_24" xml:space="preserve">
+    <value>Failed to open fan curve: </value>
+  </data>
+  <data name="CustomModeWindow_xaml_Text_25" xml:space="preserve">
+    <value>Failed to open CPU tuning: </value>
+  </data>
+  <data name="FanCurveWindow_xaml_Text" xml:space="preserve">
+    <value>Backend not connected. Cannot read fan curve.</value>
+  </data>
+  <data name="FanCurveWindow_xaml_Text_2" xml:space="preserve">
+    <value>Fan curve changed; push to apply.</value>
+  </data>
+  <data name="FanCurveWindow_xaml_MessageBoxShowthis" xml:space="preserve">
+    <value>The fan curve has unapplied changes. Close anyway?</value>
+  </data>
+  <data name="FanCurveWindow_xaml_Text_3" xml:space="preserve">
+    <value>GCU not connected; cannot apply the fan curve</value>
+  </data>
+  <data name="FanCurveWindow_xaml_Text_4" xml:space="preserve">
+    <value>Fan curve saved; apply switch is off, nothing was sent to hardware</value>
+  </data>
+  <data name="FanCurveWindow_xaml_Text_5" xml:space="preserve">
+    <value>Fan curve applied and read back successfully; written to the current profile</value>
+  </data>
+  <data name="FanCurveWindow_xaml_Text_6" xml:space="preserve">
+    <value>Fan curve readback was not confirmed; not written to the current profile</value>
+  </data>
+  <data name="FanCurveWindow_xaml_Text_7" xml:space="preserve">
+    <value>Default curve restored; click Apply to send it</value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text" xml:space="preserve">
+    <value>Model: </value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_2" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_3" xml:space="preserve">
+    <value>Information copied</value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_4" xml:space="preserve">
+    <value>Copy failed: </value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_5" xml:space="preserve">
+    <value>Exporting diagnostic pack…</value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_6" xml:space="preserve">
+    <value>Diagnostic pack export finished</value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_7" xml:space="preserve">
+    <value>Export failed: </value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_8" xml:space="preserve">
+    <value>Issues opened in the browser</value>
+  </data>
+  <data name="FeedbackWindow_xaml_Text_9" xml:space="preserve">
+    <value>Open failed: </value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Content" xml:space="preserve">
+    <value>Random color</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Content_2" xml:space="preserve">
+    <value>Reverse</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text" xml:space="preserve">
+    <value>Raindrop color count</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_2" xml:space="preserve">
+    <value>Raindrop color</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_3" xml:space="preserve">
+    <value>Matrix color count</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_4" xml:space="preserve">
+    <value>Matrix color</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_5" xml:space="preserve">
+    <value>Static zone count</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_6" xml:space="preserve">
+    <value>Zone colors</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_7" xml:space="preserve">
+    <value>HID not connected; failed to turn off lighting: </value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_8" xml:space="preserve">
+    <value>HID keyboard lighting turned off</value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_9" xml:space="preserve">
+    <value>HID connection failed: </value>
+  </data>
+  <data name="HidKeyboardWindow_xaml_Text_10" xml:space="preserve">
+    <value>HID keyboard effect applied</value>
+  </data>
+  <data name="HotkeySettingsWindow_Title" xml:space="preserve">
+    <value>Global hotkeys</value>
+  </data>
+  <data name="HotkeySettingsWindow_Content" xml:space="preserve">
+    <value>Enable global hotkeys</value>
+  </data>
+  <data name="HotkeySettingsWindow_Text" xml:space="preserve">
+    <value>Click Record, then press the key combination; Esc cancels.</value>
+  </data>
+  <data name="HotkeySettingsWindow_Content_2" xml:space="preserve">
+    <value>Record</value>
+  </data>
+  <data name="HotkeySettingsWindow_Content_3" xml:space="preserve">
+    <value>Restore defaults</value>
+  </data>
+  <data name="HotkeySettingsWindow_Text_2" xml:space="preserve">
+    <value>Default hotkeys restored</value>
+  </data>
+  <data name="HotkeySettingsWindow_Content_4" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="HotkeySettingsWindow_Text_3" xml:space="preserve">
+    <value>Press the new key combination; Esc cancels</value>
+  </data>
+  <data name="HotkeySettingsWindow_Text_4" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="HotkeySettingsWindow_Text_5" xml:space="preserve">
+    <value>A hotkey must include at least one of Ctrl / Alt / Shift / Win</value>
+  </data>
+  <data name="HotkeySettingsWindow_Text_6" xml:space="preserve">
+    <value>This key combination is already used by "</value>
+  </data>
+  <data name="HotkeySettingsWindow_Text_7" xml:space="preserve">
+    <value>Set: </value>
+  </data>
+  <data name="LicensesWindow_xaml_MessageBoxShowthis" xml:space="preserve">
+    <value>The LICENSES folder was not found in the program directory.</value>
+  </data>
+  <data name="LicensesWindow_xaml_MessageBoxShowthis_2" xml:space="preserve">
+    <value>Failed to open the LICENSES folder: </value>
+  </data>
+  <data name="LightEditorWindow_xaml_Text" xml:space="preserve">
+    <value>Single-zone keyboard: breathing uses 4 colors, rainbow cannot be recolored, brightness is x/4, Manual per-key time is 2–10.</value>
+  </data>
+  <data name="LightEditorWindow_xaml_Text_2" xml:space="preserve">
+    <value>Single-zone keyboard mode</value>
+  </data>
+  <data name="LightEditorWindow_xaml_ToolTip" xml:space="preserve">
+    <value>Breathing color</value>
+  </data>
+  <data name="LightEditorWindow_xaml_Text_3" xml:space="preserve">
+    <value>Saved, but the backend is not connected so nothing was sent</value>
+  </data>
+  <data name="MainWindow_xaml_Text" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="MainWindow_xaml_Text_2" xml:space="preserve">
+    <value>Duty</value>
+  </data>
+  <data name="MainWindow_xaml_Text_3" xml:space="preserve">
+    <value>Duty -- </value>
+  </data>
+  <data name="MainWindow_xaml_Text_4" xml:space="preserve">
+    <value>No mini window to restore</value>
+  </data>
+  <data name="MainWindow_xaml_Text_5" xml:space="preserve">
+    <value>Accent color switched: </value>
+  </data>
+  <data name="MainWindow_xaml_Text_6" xml:space="preserve">
+    <value>Performance mode requested: </value>
+  </data>
+  <data name="MainWindow_xaml_Text_7" xml:space="preserve">
+    <value>GPU mode requested: </value>
+  </data>
+  <data name="MainWindow_xaml_Text_8" xml:space="preserve">
+    <value>Refresh rate requested: </value>
+  </data>
+  <data name="MainWindow_xaml_Text_9" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="MainWindow_xaml_Text_10" xml:space="preserve">
+    <value>Battery</value>
+  </data>
+  <data name="MainWindow_xaml_Text_11" xml:space="preserve">
+    <value>Battery mode requested: </value>
+  </data>
+  <data name="MainWindow_xaml_Content" xml:space="preserve">
+    <value>Charge limit</value>
+  </data>
+  <data name="MainWindow_xaml_Content_2" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="MainWindow_xaml_Text_12" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="MainWindow_xaml_Text_13" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="MainWindow_xaml_Content_3" xml:space="preserve">
+    <value>Unlimited charge (experimental)</value>
+  </data>
+  <data name="MainWindow_xaml_Content_4" xml:space="preserve">
+    <value>EC direct write off</value>
+  </data>
+  <data name="MainWindow_xaml_Content_5" xml:space="preserve">
+    <value>Auto Refresh</value>
+  </data>
+  <data name="MainWindow_xaml_Text_14" xml:space="preserve">
+    <value>iGPU Saving</value>
+  </data>
+  <data name="MainWindow_xaml_Content_6" xml:space="preserve">
+    <value>Switch FHD mode</value>
+  </data>
+  <data name="MainWindow_xaml_Text_15" xml:space="preserve">
+    <value>ICC import failed</value>
+  </data>
+  <data name="MainWindow_xaml_Text_16" xml:space="preserve">
+    <value>Lighting settings saved (backend not connected)</value>
+  </data>
+  <data name="MainWindow_xaml_Text_17" xml:space="preserve">
+    <value>Lighting edit failed: </value>
+  </data>
+  <data name="MainWindow_xaml_Text_18" xml:space="preserve">
+    <value>No custom modes yet</value>
+  </data>
+  <data name="MainWindow_xaml_Content_7" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="MainWindow_xaml_Text_19" xml:space="preserve">
+    <value>Custom mode closed</value>
+  </data>
+  <data name="MainWindow_xaml_Text_20" xml:space="preserve">
+    <value>Failed to open custom mode: </value>
+  </data>
+  <data name="MainWindow_xaml_Text_21" xml:space="preserve">
+    <value>CPU fan curve closed</value>
+  </data>
+  <data name="MainWindow_xaml_Text_22" xml:space="preserve">
+    <value>Failed to open CPU fan curve: </value>
+  </data>
+  <data name="MainWindow_xaml_Text_23" xml:space="preserve">
+    <value>GPU fan curve closed</value>
+  </data>
+  <data name="MainWindow_xaml_Text_24" xml:space="preserve">
+    <value>Failed to open GPU fan curve: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text" xml:space="preserve">
+    <value>Failed to register global hotkey: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_2" xml:space="preserve">
+    <value>MiniLED local dimming switched</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_3" xml:space="preserve">
+    <value>MiniLED switch failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_4" xml:space="preserve">
+    <value>HDR Color Control switched</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_5" xml:space="preserve">
+    <value>HDR Color Control switch failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_6" xml:space="preserve">
+    <value>FHD switch failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_7" xml:space="preserve">
+    <value>Failed to open lighting editor: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_8" xml:space="preserve">
+    <value>Mode applied</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_9" xml:space="preserve">
+    <value>Quick tile order saved</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_10" xml:space="preserve">
+    <value>Unlimited charging disabled; charge limit restored to 100%</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_11" xml:space="preserve">
+    <value>Failed to write back 100% after disabling unlimited charging (written=</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_12" xml:space="preserve">
+    <value>Unlimited charging disabled; GCU charge limit restored to 100%</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_13" xml:space="preserve">
+    <value>Failed to write back 100% via GCU after disabling unlimited charging</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_14" xml:space="preserve">
+    <value>Disable unlimited charging: no EC/GCU write-back channel available</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_15" xml:space="preserve">
+    <value>Failed to disable unlimited charging: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_16" xml:space="preserve">
+    <value>Failed to read charge threshold: PawnIO driver required or unsupported model</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_17" xml:space="preserve">
+    <value>Charge threshold read error: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_18" xml:space="preserve">
+    <value>Charge limit enabled (stop at </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_19" xml:space="preserve">
+    <value>Enable failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_20" xml:space="preserve">
+    <value>Charge limit disabled</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_21" xml:space="preserve">
+    <value>Disable failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_22" xml:space="preserve">
+    <value>Operation error: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_23" xml:space="preserve">
+    <value>Threshold saved (stop at </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_24" xml:space="preserve">
+    <value>Save failed</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_25" xml:space="preserve">
+    <value>Save error: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_26" xml:space="preserve">
+    <value>Unlimited charging slider enabled (three-level buttons are temporarily disabled)</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_27" xml:space="preserve">
+    <value>Disabling unlimited charging and restoring full charge…</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_28" xml:space="preserve">
+    <value>Charge limit write was not confirmed</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_29" xml:space="preserve">
+    <value>Charge limit: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Content" xml:space="preserve">
+    <value>Compact</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Content_2" xml:space="preserve">
+    <value>Wide</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_30" xml:space="preserve">
+    <value>Mode</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_31" xml:space="preserve">
+    <value>This model does not support live iGPU-only power saving</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_32" xml:space="preserve">
+    <value>iGPU-only power saving cancelled</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_33" xml:space="preserve">
+    <value>iGPU-only power saving switched: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_34" xml:space="preserve">
+    <value>iGPU-only power saving switched via forced path</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_35" xml:space="preserve">
+    <value>Failed to switch iGPU-only power saving; attempted to restore previous state</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_36" xml:space="preserve">
+    <value>Failed to switch iGPU-only power saving: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_37" xml:space="preserve">
+    <value>The current model does not support this GPU mode</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_38" xml:space="preserve">
+    <value>Baolongda does not support iGPU mode</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_39" xml:space="preserve">
+    <value>Failed to write GPU mode for Baolongda</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_40" xml:space="preserve">
+    <value>Switch requested; takes effect after restart</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_41" xml:space="preserve">
+    <value>Failed to request restart switch</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_42" xml:space="preserve">
+    <value>Three-level buttons are unavailable while unlimited charging is on</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_43" xml:space="preserve">
+    <value>No quick switches available</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_44" xml:space="preserve">
+    <value>Quick tiles updated</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_45" xml:space="preserve">
+    <value>Sleep power-saving scope: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_46" xml:space="preserve">
+    <value>Battery</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_47" xml:space="preserve">
+    <value>Current: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_48" xml:space="preserve">
+    <value>GCU status check failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_49" xml:space="preserve">
+    <value>Failed to show first-run guide: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_50" xml:space="preserve">
+    <value>Creating MechrevoHw and connecting (up to 15 seconds)…</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Content_3" xml:space="preserve">
+    <value>Not Connected</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_51" xml:space="preserve">
+    <value>Backend not connected</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_52" xml:space="preserve">
+    <value>Liquid cooling status refreshed</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_53" xml:space="preserve">
+    <value>Failed to refresh liquid cooling status: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_54" xml:space="preserve">
+    <value>Configuration saved: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_55" xml:space="preserve">
+    <value>Backend not connected; cannot open configuration editor</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_56" xml:space="preserve">
+    <value>Failed to open configuration editor: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_57" xml:space="preserve">
+    <value>Backend not connected; cannot open custom mode</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_58" xml:space="preserve">
+    <value>Applying display calibration…</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_59" xml:space="preserve">
+    <value>Display calibration profile: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_60" xml:space="preserve">
+    <value>Applying color enhancement…</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_61" xml:space="preserve">
+    <value>Failed to apply color enhancement</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_62" xml:space="preserve">
+    <value>Color enhancement profile: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_63" xml:space="preserve">
+    <value>Failed to apply color enhancement profile</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_64" xml:space="preserve">
+    <value>Backend not connected; cannot edit color enhancement</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_65" xml:space="preserve">
+    <value>Backend not connected; cannot edit keyboard lighting</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_66" xml:space="preserve">
+    <value>Keyboard RGB device not connected; cannot open keyboard lighting editor</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_67" xml:space="preserve">
+    <value>Backend not connected; cannot edit Logo lighting</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_68" xml:space="preserve">
+    <value>Light strip write failed; switch reverted</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_69" xml:space="preserve">
+    <value>Light strip state applied</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_70" xml:space="preserve">
+    <value>Backend not connected; cannot edit light strip</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_71" xml:space="preserve">
+    <value>Keyboard RGB initialization failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_72" xml:space="preserve">
+    <value>Hinge light write failed; switch reverted</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_73" xml:space="preserve">
+    <value>Hinge light state applied</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_74" xml:space="preserve">
+    <value>Backend not connected; cannot edit hinge light</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_75" xml:space="preserve">
+    <value>Sync light write failed; switch reverted</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_76" xml:space="preserve">
+    <value>Sync light state applied</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_77" xml:space="preserve">
+    <value>Backend not connected; cannot edit sync light</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_78" xml:space="preserve">
+    <value>Keyboard lighting write failed; switch reverted</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_79" xml:space="preserve">
+    <value>Keyboard RGB device not connected</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_80" xml:space="preserve">
+    <value>Keyboard HID not connected; failed to turn off lighting: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_81" xml:space="preserve">
+    <value>Keyboard lighting turned off</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_82" xml:space="preserve">
+    <value>Keyboard HID connection failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_83" xml:space="preserve">
+    <value>Keyboard HID effect applied: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_84" xml:space="preserve">
+    <value>Keyboard HID apply failed: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_85" xml:space="preserve">
+    <value>Failed to power on keyboard lighting</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_86" xml:space="preserve">
+    <value>Logo light write failed; switch reverted</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_87" xml:space="preserve">
+    <value>Backend not connected; Logo effect remembered</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Title" xml:space="preserve">
+    <value>Export diagnostics</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_88" xml:space="preserve">
+    <value>Diagnostic pack exported: </value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Text_89" xml:space="preserve">
+    <value>Diagnostic pack export failed: </value>
+  </data>
+  <data name="QuickTilePickerWindow_xaml_Text" xml:space="preserve">
+    <value>Up to </value>
+  </data>
+  <data name="QuickTilePickerWindow_xaml_Text_2" xml:space="preserve">
+    <value>You can select at most </value>
+  </data>
+  <data name="SettingsWindow_xaml_Title" xml:space="preserve">
+    <value>Export settings backup</value>
+  </data>
+  <data name="SettingsWindow_xaml_Title_2" xml:space="preserve">
+    <value>Import settings backup</value>
+  </data>
+  <data name="SettingsWindow_xaml_MessageBoxShowthis" xml:space="preserve">
+    <value>Importing will overwrite current settings and automatically back them up first. Continue?</value>
+  </data>
+  <data name="UpdateWindow_xaml_Title" xml:space="preserve">
+    <value>Check for updates · </value>
+  </data>
+  <data name="UpdateWindow_xaml_Text" xml:space="preserve">
+    <value>Current version: </value>
+  </data>
+  <data name="UpdateWindow_xaml_Text_2" xml:space="preserve">
+    <value>No download link to copy</value>
+  </data>
+  <data name="UpdateWindow_xaml_Text_3" xml:space="preserve">
+    <value>Download link copied</value>
+  </data>
+  <data name="UpdateWindow_xaml_Text_4" xml:space="preserve">
+    <value>No download link to open</value>
+  </data>
+  <data name="UpdateWindow_xaml_Text_5" xml:space="preserve">
+    <value>Download page opened in the browser</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Content_4" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="OriginalStyleWindow_xaml_Content_5" xml:space="preserve">
+    <value>Custom calibration</value>
+  </data>
+  <data name="SensorTemp" xml:space="preserve">
+    <value>Temperature</value>
+  </data>
+  <data name="SensorUsage" xml:space="preserve">
+    <value>Usage</value>
+  </data>
+  <data name="SensorPower" xml:space="preserve">
+    <value>Power</value>
+  </data>
+  <data name="SensorFrequency" xml:space="preserve">
+    <value>Frequency</value>
+  </data>
+  <data name="SensorCoreFrequency" xml:space="preserve">
+    <value>Core clock</value>
+  </data>
+  <data name="SensorVramFrequency" xml:space="preserve">
+    <value>Memory clock</value>
+  </data>
+  <data name="SensorDuty" xml:space="preserve">
+    <value>Duty</value>
+  </data>
+  <data name="ModeSilent" xml:space="preserve">
+    <value>Silent</value>
+  </data>
+  <data name="ModeBalanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="ModeTurbo" xml:space="preserve">
+    <value>Turbo</value>
+  </data>
+  <data name="ModeCustom" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="GpuHybrid" xml:space="preserve">
+    <value>Hybrid</value>
+  </data>
+  <data name="GpuDedicated" xml:space="preserve">
+    <value>Dedicated</value>
+  </data>
+  <data name="GpuIntegrated" xml:space="preserve">
+    <value>Integrated</value>
+  </data>
+  <data name="AutoRefresh" xml:space="preserve">
+    <value>Auto Refresh</value>
+  </data>
+  <data name="BatteryLong" xml:space="preserve">
+    <value>Long life</value>
+  </data>
+  <data name="BatteryBalanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="BatteryWorkstation" xml:space="preserve">
+    <value>Workstation</value>
+  </data>
+  <data name="ChargeExperimental" xml:space="preserve">
+    <value>Unlimited charge (experimental)</value>
+  </data>
+  <data name="EcDirectOff" xml:space="preserve">
+    <value>EC direct write off</value>
+  </data>
+  <data name="LiquidConnected" xml:space="preserve">
+    <value>Liquid cooling connected</value>
+  </data>
+  <data name="LiquidDisconnected" xml:space="preserve">
+    <value>Liquid cooling not connected</value>
+  </data>
+  <data name="QuickGroupInput" xml:space="preserve">
+    <value>Input devices</value>
+  </data>
+  <data name="QuickGroupKeyboard" xml:space="preserve">
+    <value>Keyboard &amp; hotkeys</value>
+  </data>
+  <data name="QuickGroupPower" xml:space="preserve">
+    <value>Power &amp; system</value>
+  </data>
+  <data name="QuickGroupSleep" xml:space="preserve">
+    <value>Sleep &amp; power saving</value>
+  </data>
+  <data name="QuickTouchpad" xml:space="preserve">
+    <value>Touchpad</value>
+  </data>
+  <data name="QuickWifi" xml:space="preserve">
+    <value>WiFi</value>
+  </data>
+  <data name="QuickBluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+  </data>
+  <data name="QuickWebcam" xml:space="preserve">
+    <value>Webcam</value>
+  </data>
+  <data name="QuickMicMute" xml:space="preserve">
+    <value>Mic mute</value>
+  </data>
+  <data name="QuickNumpad" xml:space="preserve">
+    <value>Numpad lock</value>
+  </data>
+  <data name="QuickTouchpadToggle" xml:space="preserve">
+    <value>Touchpad toggle</value>
+  </data>
+  <data name="QuickWinKey" xml:space="preserve">
+    <value>Win key lock</value>
+  </data>
+  <data name="QuickFnKey" xml:space="preserve">
+    <value>Fn key lock</value>
+  </data>
+  <data name="QuickCapsLock" xml:space="preserve">
+    <value>Caps lock</value>
+  </data>
+  <data name="QuickOsd" xml:space="preserve">
+    <value>OSD</value>
+  </data>
+  <data name="QuickCopilot" xml:space="preserve">
+    <value>Copilot key lock</value>
+  </data>
+  <data name="QuickUsb" xml:space="preserve">
+    <value>USB power off</value>
+  </data>
+  <data name="QuickAcRecovery" xml:space="preserve">
+    <value>AC recovery</value>
+  </data>
+  <data name="QuickHighPerf" xml:space="preserve">
+    <value>High performance</value>
+  </data>
+  <data name="QuickApuBoost" xml:space="preserve">
+    <value>APU anti-degrade</value>
+  </data>
+  <data name="QuickFanBoost" xml:space="preserve">
+    <value>Fan boost</value>
+  </data>
+  <data name="QuickDeepSleep" xml:space="preserve">
+    <value>Deep sleep</value>
+  </data>
+  <data name="QuickGameWhitelist" xml:space="preserve">
+    <value>Game whitelist</value>
+  </data>
+  <data name="QuickCpuAdvPerf" xml:space="preserve">
+    <value>Unlock BIOS menu</value>
+  </data>
+  <data name="QuickTaskbarAutoHide" xml:space="preserve">
+    <value>Taskbar auto-hide</value>
+  </data>
+  <data name="QuickTransparency" xml:space="preserve">
+    <value>Transparency</value>
+  </data>
+  <data name="QuickDarkTheme" xml:space="preserve">
+    <value>Dark theme</value>
+  </data>
+  <data name="QuickMonitorOff" xml:space="preserve">
+    <value>Turn off display</value>
+  </data>
+  <data name="QuickWinUpdate" xml:space="preserve">
+    <value>Disable Windows Update</value>
+  </data>
+  <data name="QuickSleepNetOff" xml:space="preserve">
+    <value>Network off in sleep</value>
+  </data>
+  <data name="QuickSleepAway" xml:space="preserve">
+    <value>Disable away mode</value>
+  </data>
+  <data name="QuickSleepSysReq" xml:space="preserve">
+    <value>Ignore system policy</value>
+  </data>
+  <data name="QuickSleepRtcWake" xml:space="preserve">
+    <value>Disable RTC wake</value>
+  </data>
+  <data name="QuickSleepDeep" xml:space="preserve">
+    <value>ACPI deep sleep</value>
+  </data>
+  <data name="QuickSleepHibernate" xml:space="preserve">
+    <value>Hibernate after 30 min</value>
+  </data>
+  <data name="LanguageRestartTitle" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="LanguageRestartPrompt" xml:space="preserve">
+    <value>Language changes require a restart of L-Mechrevo. Restart now?</value>
+  </data>
+  <data name="CurrentPrefix" xml:space="preserve">
+    <value>Current: </value>
+  </data>
+  <data name="GpuEcoMode" xml:space="preserve">
+    <value>Integrated mode</value>
+  </data>
+  <data name="GpuDirectMode" xml:space="preserve">
+    <value>Dedicated direct</value>
+  </data>
+  <data name="GpuHybridMode" xml:space="preserve">
+    <value>Hybrid mode</value>
+  </data>
+  <data name="BatteryCharging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+  <data name="BatteryFull" xml:space="preserve">
+    <value>Full</value>
+  </data>
+  <data name="BatteryNotCharging" xml:space="preserve">
+    <value>Not charging</value>
+  </data>
+  <data name="BatteryDischarging" xml:space="preserve">
+    <value>Discharging</value>
+  </data>
+  <data name="BatteryAbnormal" xml:space="preserve">
+    <value>Battery abnormal</value>
+  </data>
+  <data name="BatteryHealth" xml:space="preserve">
+    <value>Battery health</value>
+  </data>
+  <data name="StateOn" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="StateOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="StateAuto" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="StateUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="NavMoreSwitches" xml:space="preserve">
+    <value>More switches</value>
+  </data>
+  <data name="LightTheme" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="DarkTheme" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="ToggleLightTheme" xml:space="preserve">
+    <value>Switch to light</value>
+  </data>
+  <data name="ToggleDarkTheme" xml:space="preserve">
+    <value>Switch to dark</value>
+  </data>
+  <data name="ThemeWord" xml:space="preserve">
+    <value>theme</value>
+  </data>
+  <data name="DisplayVibrant" xml:space="preserve">
+    <value>Vibrant</value>
+  </data>
+  <data name="DisplayInternet" xml:space="preserve">
+    <value>Internet</value>
+  </data>
+  <data name="DisplayVideo" xml:space="preserve">
+    <value>Video</value>
+  </data>
+  <data name="DisplayLowBlue" xml:space="preserve">
+    <value>Low blue light</value>
+  </data>
+  <data name="DisplayCinema" xml:space="preserve">
+    <value>Cinema</value>
+  </data>
+  <data name="DisplayPhoto" xml:space="preserve">
+    <value>Photo</value>
+  </data>
+  <data name="Choose" xml:space="preserve">
+    <value>Choose...</value>
+  </data>
+  <data name="TrayMenu" xml:space="preserve">
+    <value>Tray menu</value>
+  </data>
+  <data name="IsolateOfficial" xml:space="preserve">
+    <value>Isolate official UI and tray</value>
+  </data>
+  <data name="CancelIsolation" xml:space="preserve">
+    <value>Cancel isolation</value>
+  </data>
+  <data name="TrayPerformance" xml:space="preserve">
+    <value>Performance mode</value>
+  </data>
+  <data name="TrayCustom" xml:space="preserve">
+    <value>Custom mode</value>
+  </data>
+  <data name="TrayGpu" xml:space="preserve">
+    <value>GPU mode</value>
+  </data>
+  <data name="TrayKeyboard" xml:space="preserve">
+    <value>Keyboard lighting</value>
+  </data>
+  <data name="TrayOverlay" xml:space="preserve">
+    <value>Overlay</value>
+  </data>
+  <data name="TrayMain" xml:space="preserve">
+    <value>Open main window</value>
+  </data>
+  <data name="TrayDiagnostics" xml:space="preserve">
+    <value>Export diagnostics</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="TraySilent" xml:space="preserve">
+    <value>Silent</value>
+  </data>
+  <data name="TrayBalanced" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="TraySilentTurbo" xml:space="preserve">
+    <value>Silent Turbo</value>
+  </data>
+  <data name="TrayTurbo" xml:space="preserve">
+    <value>Turbo</value>
+  </data>
+  <data name="TrayFanBoost" xml:space="preserve">
+    <value>Fan boost</value>
+  </data>
+  <data name="TrayGpuIntegrated" xml:space="preserve">
+    <value>Integrated</value>
+  </data>
+  <data name="TrayGpuHybrid" xml:space="preserve">
+    <value>Hybrid</value>
+  </data>
+  <data name="TrayGpuDirect" xml:space="preserve">
+    <value>Dedicated direct</value>
+  </data>
+  <data name="TrayNoCustom" xml:space="preserve">
+    <value>No custom modes</value>
+  </data>
+  <data name="TraySaved" xml:space="preserve">
+    <value>Tray menu saved</value>
+  </data>
+  <data name="OfficialRunning" xml:space="preserve">
+    <value>Official console is running</value>
+  </data>
+  <data name="OfficialInstalled" xml:space="preserve">
+    <value>Official console installed</value>
+  </data>
+  <data name="OfficialNotDetected" xml:space="preserve">
+    <value>Official console not detected</value>
+  </data>
+  <data name="IsolationFailed" xml:space="preserve">
+    <value>Isolation failed: </value>
+  </data>
+  <data name="PawnDriverInstalled" xml:space="preserve">
+    <value>PawnIO driver: installed</value>
+  </data>
+  <data name="PawnDriverNotInstalled" xml:space="preserve">
+    <value>PawnIO driver: not installed</value>
+  </data>
+  <data name="PawnInstallDone" xml:space="preserve">
+    <value>PawnIO installation completed</value>
+  </data>
+  <data name="PawnInstallReturn" xml:space="preserve">
+    <value>PawnIO installer returned </value>
+  </data>
+  <data name="PawnInstallFailed" xml:space="preserve">
+    <value>PawnIO installation failed: </value>
+  </data>
+  <data name="QuickTileToggled" xml:space="preserve">
+    <value>Quick switch toggled: </value>
+  </data>
+  <data name="QuickTileToggleFailed" xml:space="preserve">
+    <value>Quick switch failed: </value>
+  </data>
+  <data name="MoreSwitchToggled" xml:space="preserve">
+    <value>More switch toggled: </value>
+  </data>
+  <data name="MoreSwitchToggleFailed" xml:space="preserve">
+    <value>More switch failed: </value>
+  </data>
+  <data name="QuickSwitchedOnPrefix" xml:space="preserve">
+    <value>On: </value>
+  </data>
+  <data name="QuickSwitchedOffPrefix" xml:space="preserve">
+    <value>Off: </value>
+  </data>
+  <data name="QuickBackendOffline" xml:space="preserve">
+    <value>Backend not connected</value>
+  </data>
+  <data name="QuickUnsupported" xml:space="preserve">
+    <value>Not supported on this device: </value>
+  </data>
+  <data name="QuickFanBoostBackendUnavailable" xml:space="preserve">
+    <value>Fan boost channel unavailable on this device</value>
+  </data>
+  <data name="QuickFanBoostOnConfirmed" xml:space="preserve">
+    <value>Fan boost enabled (read-back confirmed)</value>
+  </data>
+  <data name="QuickFanBoostOffConfirmed" xml:space="preserve">
+    <value>Fan boost disabled (original curve restored)</value>
+  </data>
+  <data name="QuickFanBoostOnUnconfirmed" xml:space="preserve">
+    <value>Fan boost sent but read-back not confirmed</value>
+  </data>
+  <data name="QuickFanBoostOffUnconfirmed" xml:space="preserve">
+    <value>Fan boost disable not confirmed</value>
+  </data>
+  <data name="QuickResultOn" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="QuickResultOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="QuickUnconfirmed" xml:space="preserve">
+    <value>Apply not confirmed: </value>
+  </data>
+  <data name="QuickApplyFailed" xml:space="preserve">
+    <value>Apply failed: </value>
+  </data>
+  <data name="IgpuSavingCurrentOn" xml:space="preserve">
+    <value>Current: On</value>
+  </data>
+  <data name="IgpuSavingCurrentOff" xml:space="preserve">
+    <value>Current: Off</value>
+  </data>
+  <data name="IgpuSavingCurrentAuto" xml:space="preserve">
+    <value>Current: Auto</value>
+  </data>
+  <data name="IgpuSavingCurrentUnknown" xml:space="preserve">
+    <value>Current: Unknown</value>
+  </data>
+  <data name="IgpuSavingCurrentUnsupported" xml:space="preserve">
+    <value>Current: not supported on this model</value>
+  </data>
+  <data name="AutoOption" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="PageStatusHome" xml:space="preserve">
+    <value>Home · Sensors / Performance / GPU / Display</value>
+  </data>
+  <data name="PageStatusScreen" xml:space="preserve">
+    <value>Screen · Refresh rate / Brightness / Calibration / Color enhancement</value>
+  </data>
+  <data name="PageStatusLighting" xml:space="preserve">
+    <value>Lighting · Edit inline on this page</value>
+  </data>
+  <data name="PageStatusReady" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="ImageNotSelected" xml:space="preserve">
+    <value>Not selected</value>
+  </data>
+  <data name="BackendGcuConnecting" xml:space="preserve">
+    <value>● GCU connecting</value>
+  </data>
+  <data name="BackendGcuConnected" xml:space="preserve">
+    <value>● GCU connected</value>
+  </data>
+  <data name="BackendGcuDisconnected" xml:space="preserve">
+    <value>● GCU not connected</value>
+  </data>
+  <data name="BackendGcuConnectingTip" xml:space="preserve">
+    <value>Connecting to the GCU service (127.0.0.1:13688); usually ready a few seconds after login. Retrying automatically.</value>
+  </data>
+  <data name="BackendGcuConnectedTip" xml:space="preserve">
+    <value>GCU service connected (GCUBridge, MQTT 127.0.0.1:13688).</value>
+  </data>
+  <data name="BackendGcuDisconnectedTip" xml:space="preserve">
+    <value>GCU service not running or connection failed (127.0.0.1:13688); retrying automatically.</value>
+  </data>
+  <data name="BackendNonGcuReady" xml:space="preserve">
+    <value>● Ready</value>
+  </data>
+  <data name="BackendNonGcuNotReady" xml:space="preserve">
+    <value>● Not ready</value>
+  </data>
+  <data name="BackendNonGcuTip" xml:space="preserve">
+    <value>This model uses the legacy interface; only the three built-in performance modes are supported.</value>
+  </data>
+  <data name="QuickMoreSummaryFormat" xml:space="preserve">
+    <value>{0}/{1} on</value>
+  </data>
+  <data name="LightBreathingColor" xml:space="preserve">
+    <value>Breathing colors</value>
+  </data>
+  <data name="LightWhiteKeyboardHint" xml:space="preserve">
+    <value>White backlight keyboard: power and brightness levels only</value>
+  </data>
+  <data name="ColorRed" xml:space="preserve">
+    <value>Red</value>
+  </data>
+  <data name="ColorOrange" xml:space="preserve">
+    <value>Orange</value>
+  </data>
+  <data name="ColorYellow" xml:space="preserve">
+    <value>Yellow</value>
+  </data>
+  <data name="ColorGreen" xml:space="preserve">
+    <value>Green</value>
+  </data>
+  <data name="ColorCyan" xml:space="preserve">
+    <value>Cyan</value>
+  </data>
+  <data name="ColorBlue" xml:space="preserve">
+    <value>Blue</value>
+  </data>
+  <data name="ColorPurple" xml:space="preserve">
+    <value>Purple</value>
+  </data>
+  <data name="ColorWhite" xml:space="preserve">
+    <value>White</value>
+  </data>
+  <data name="OverlayCharging" xml:space="preserve">
+    <value>Charging</value>
+  </data>
+  <data name="OverlayBatteryFull" xml:space="preserve">
+    <value>Fully charged</value>
+  </data>
+  <data name="OverlayNotCharging" xml:space="preserve">
+    <value>Not charging</value>
+  </data>
+  <data name="OverlayDischarging" xml:space="preserve">
+    <value>Discharging</value>
+  </data>
+  <data name="OverlayBatteryLabel" xml:space="preserve">
+    <value>Battery </value>
+  </data>
+  <data name="OverlayBatteryDash" xml:space="preserve">
+    <value>Battery —</value>
+  </data>
+  <data name="OverlayBatteryPower" xml:space="preserve">
+    <value>Battery power</value>
+  </data>
+  <data name="OverlayAcPower" xml:space="preserve">
+    <value>AC power</value>
+  </data>
+  <data name="OverlayAcPowerEcHex" xml:space="preserve">
+    <value>AC power (EC 0x</value>
+  </data>
+  <data name="OverlayAcPowerEcWatt" xml:space="preserve">
+    <value>AC power (EC </value>
+  </data>
+  <data name="StatusCalibrationNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: calibration switch takes effect after connecting</value>
+  </data>
+  <data name="StatusEffectNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: color enhancement switch takes effect after connecting</value>
+  </data>
+  <data name="StatusCalibrationSettingsNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: calibration switch/level need a connection; local ICC settings still work</value>
+  </data>
+  <data name="StatusScreenEffectEditorNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: screen effect editor is unavailable</value>
+  </data>
+  <data name="StatusEffectResetNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: color enhancement reset is unavailable</value>
+  </data>
+  <data name="StatusLightEditorOpenFailed" xml:space="preserve">
+    <value>Failed to open lighting editor: {0}</value>
+  </data>
+  <data name="StatusHidEditorNeedsBackend" xml:space="preserve">
+    <value>Backend not connected: HID keyboard editor is unavailable</value>
+  </data>
+  <data name="StatusHidEditorOpenFailed" xml:space="preserve">
+    <value>Failed to open HID keyboard editor: {0}</value>
+  </data>
+  <data name="StatusLightSavedOffline" xml:space="preserve">
+    <value>Lighting settings saved (backend not connected)</value>
+  </data>
+  <data name="StatusLightEditFailed" xml:space="preserve">
+    <value>Lighting edit failed: {0}</value>
+  </data>
+  <data name="CustomUnsetMark" xml:space="preserve">
+    <value>(not set)</value>
+  </data>
+  <data name="CustomPowerWallUnsetHint" xml:space="preserve">
+    <value>The current power-wall value cannot be read back on this platform (write-only). A title marked &quot;(not set)&quot; means this run has not applied a value yet; it does not mean the machine never had one. After dragging the slider and pressing Apply, this shows the value we sent.</value>
+  </data>
+  <data name="CustomConfigSuffixFormat" xml:space="preserve">
+    <value> · Profile {0}</value>
+  </data>
+  <data name="CustomPowerPl1Label" xml:space="preserve">
+    <value>CPU power limit PL1 (W)</value>
+  </data>
+  <data name="CustomPowerPl2Label" xml:space="preserve">
+    <value>CPU power limit PL2 (W)</value>
+  </data>
+  <data name="CustomFailedSuffix" xml:space="preserve">
+    <value> · Failed: </value>
+  </data>
+  <data name="CustomRenameTitle" xml:space="preserve">
+    <value>Rename mode</value>
+  </data>
+  <data name="CustomRenamePrompt" xml:space="preserve">
+    <value>Enter a new mode name:</value>
+  </data>
+  <data name="CustomDeleteConfirmSuffix" xml:space="preserve">
+    <value>&quot;?</value>
+  </data>
+  <data name="QuickTilePickerMaxFormat" xml:space="preserve">
+    <value>Up to {0} items</value>
+  </data>
+  <data name="QuickTilePickerMaxCurrentFormat" xml:space="preserve">
+    <value>Up to {0} items (current {1})</value>
+  </data>
+  <data name="StatusReadbackSuffix" xml:space="preserve">
+    <value> · readback=</value>
+  </data>
+  <data name="UnitMinutesSuffix" xml:space="preserve">
+    <value> min</value>
+  </data>
+  <data name="UnitDevicesSuffix" xml:space="preserve">
+    <value> devices</value>
+  </data>
+  <data name="UnitSecondsSuffix" xml:space="preserve">
+    <value> s</value>
+  </data>
+  <data name="ChargeStartSeparator" xml:space="preserve">
+    <value>% / start </value>
+  </data>
+  <data name="ModeSeparatorSuffix" xml:space="preserve">
+    <value> (mode </value>
+  </data>
+  <data name="UpdateAvailableSuffix" xml:space="preserve">
+    <value>, check for updates in Settings</value>
+  </data>
+  <data name="ContinuePromptSuffix" xml:space="preserve">
+    <value>
+
+Continue?</value>
+  </data>
+  <data name="ChargeEcAuto" xml:space="preserve">
+    <value>EC direct write restored to automatic</value>
+  </data>
+  <data name="LightLogoFailed" xml:space="preserve">
+    <value>Failed to apply Logo lighting</value>
+  </data>
+  <data name="LightLogoSentPrefix" xml:space="preserve">
+    <value>Logo lighting applied: </value>
+  </data>
+  <data name="LightLogoOff" xml:space="preserve">
+    <value>Logo lighting off</value>
+  </data>
+  <data name="LightChannelLogo" xml:space="preserve">
+    <value>Logo lighting</value>
+  </data>
+  <data name="LightBdKeyboardAutoOffPrefix" xml:space="preserve">
+    <value>Baolongda keyboard auto-off: </value>
+  </data>
+  <data name="LightBdKeyboardAutoOffOff" xml:space="preserve">
+    <value>Baolongda keyboard auto-off: off</value>
+  </data>
+  <data name="ChargeUnsupported" xml:space="preserve">
+    <value>Charge threshold is not supported on this device</value>
+  </data>
+  <data name="LightChannelLightbar" xml:space="preserve">
+    <value>Lightbar lighting</value>
+  </data>
+  <data name="LightLightbarFailed" xml:space="preserve">
+    <value>Failed to apply lightbar effect</value>
+  </data>
+  <data name="LightLightbarSentPrefix" xml:space="preserve">
+    <value>Lightbar effect applied: </value>
+  </data>
+  <data name="LightPowerFailed" xml:space="preserve">
+    <value>Failed to switch light power</value>
+  </data>
+  <data name="LightPowerExceptionPrefix" xml:space="preserve">
+    <value>Light power error: </value>
+  </data>
+  <data name="LightLiquidFailed" xml:space="preserve">
+    <value>Failed to apply lighting</value>
+  </data>
+  <data name="LightPowerOff" xml:space="preserve">
+    <value>Lighting off</value>
+  </data>
+  <data name="LightPowerOn" xml:space="preserve">
+    <value>Lighting on</value>
+  </data>
+  <data name="LightLiquidSent" xml:space="preserve">
+    <value>Lighting applied</value>
+  </data>
+  <data name="LightAutoOffPrefix" xml:space="preserve">
+    <value>Lighting auto-off: </value>
+  </data>
+  <data name="LightAutoOffOff" xml:space="preserve">
+    <value>Lighting auto-off: off</value>
+  </data>
+  <data name="BatteryModeFailed" xml:space="preserve">
+    <value>Failed to apply battery mode</value>
+  </data>
+  <data name="BatteryModeSent" xml:space="preserve">
+    <value>Battery mode applied</value>
+  </data>
+  <data name="UpdateAvailablePrefix" xml:space="preserve">
+    <value>New version available: </value>
+  </data>
+  <data name="PeripheralCountPrefix" xml:space="preserve">
+    <value>Total </value>
+  </data>
+  <data name="ChargeDisableExceptionPrefix" xml:space="preserve">
+    <value>Disable error: </value>
+  </data>
+  <data name="DisplayOverdriveFailed" xml:space="preserve">
+    <value>Failed to apply overdrive</value>
+  </data>
+  <data name="DisplayOverdriveExceptionPrefix" xml:space="preserve">
+    <value>Overdrive error: </value>
+  </data>
+  <data name="DisplayOverdriveOff" xml:space="preserve">
+    <value>Overdrive off</value>
+  </data>
+  <data name="DisplayOverdriveOn" xml:space="preserve">
+    <value>Overdrive on</value>
+  </data>
+  <data name="IgpuOccupiedPrefix" xml:space="preserve">
+    <value>The following programs are using the discrete GPU:
+
+</value>
+  </data>
+  <data name="LightKeyboardPowerFailed" xml:space="preserve">
+    <value>Failed to switch keyboard light power</value>
+  </data>
+  <data name="LightKeyboardPowerExceptionPrefix" xml:space="preserve">
+    <value>Keyboard light power error: </value>
+  </data>
+  <data name="LightKeyboardFailed" xml:space="preserve">
+    <value>Failed to apply keyboard lighting</value>
+  </data>
+  <data name="LightKeyboardSentPrefix" xml:space="preserve">
+    <value>Keyboard lighting applied: </value>
+  </data>
+  <data name="LightKeyboardOff" xml:space="preserve">
+    <value>Keyboard lighting off</value>
+  </data>
+  <data name="LightKeyboardOn" xml:space="preserve">
+    <value>Keyboard lighting on</value>
+  </data>
+  <data name="IgpuKillListPrefix" xml:space="preserve">
+    <value>Will attempt to end the following programs:
+
+</value>
+  </data>
+  <data name="LightChannelHinge" xml:space="preserve">
+    <value>Hinge lighting</value>
+  </data>
+  <data name="LightHingeFailed" xml:space="preserve">
+    <value>Failed to apply hinge effect</value>
+  </data>
+  <data name="LightHingeSent" xml:space="preserve">
+    <value>Hinge effect applied</value>
+  </data>
+  <data name="IgpuKillFailedPrefix" xml:space="preserve">
+    <value>Failed to end process: </value>
+  </data>
+  <data name="QuickFailedPrefix" xml:space="preserve">
+    <value>Failed to switch: </value>
+  </data>
+  <data name="QuickSentPrefix" xml:space="preserve">
+    <value>Switched: </value>
+  </data>
+  <data name="LiquidBleDisconnected" xml:space="preserve">
+    <value>Bluetooth liquid cooling disconnected</value>
+  </data>
+  <data name="LightOffOnBatteryOff" xml:space="preserve">
+    <value>Turn off lighting on battery: off</value>
+  </data>
+  <data name="LightOffOnBatteryOn" xml:space="preserve">
+    <value>Turn off lighting on battery: on</value>
+  </data>
+  <data name="DisplayBrightnessExceptionPrefix" xml:space="preserve">
+    <value>Brightness error: </value>
+  </data>
+  <data name="DisplayBrightnessUnconfirmed" xml:space="preserve">
+    <value>Brightness write not confirmed</value>
+  </data>
+  <data name="DisplayBrightnessSet" xml:space="preserve">
+    <value>Brightness set</value>
+  </data>
+  <data name="IgpuNoSafeProcesses" xml:space="preserve">
+    <value>No discrete-GPU programs can be ended safely; canceled.</value>
+  </data>
+  <data name="PerfModeSuperseded" xml:space="preserve">
+    <value>Mode request was superseded by a newer request</value>
+  </data>
+  <data name="PerfModeFailed" xml:space="preserve">
+    <value>Failed to apply mode</value>
+  </data>
+  <data name="PerfModeExceptionPrefix" xml:space="preserve">
+    <value>Mode error: </value>
+  </data>
+  <data name="DisplayCalibrationModeFailed" xml:space="preserve">
+    <value>Failed to apply calibration profile</value>
+  </data>
+  <data name="DisplayCalibrationFailed" xml:space="preserve">
+    <value>Failed to apply calibration</value>
+  </data>
+  <data name="DisplayCalibrationOff" xml:space="preserve">
+    <value>Calibration off</value>
+  </data>
+  <data name="DisplayCalibrationOn" xml:space="preserve">
+    <value>Calibration on</value>
+  </data>
+  <data name="DisplayCalibrationExceptionPrefix" xml:space="preserve">
+    <value>Calibration error: </value>
+  </data>
+  <data name="ChargeEnableExceptionPrefix" xml:space="preserve">
+    <value>Enable error: </value>
+  </data>
+  <data name="ChargeRangeInvalid" xml:space="preserve">
+    <value>Start/stop thresholds must be 1-99</value>
+  </data>
+  <data name="ChargeOrderInvalid" xml:space="preserve">
+    <value>Start threshold must be lower than stop threshold</value>
+  </data>
+  <data name="FanBoostFailed" xml:space="preserve">
+    <value>Failed to apply fan boost</value>
+  </data>
+  <data name="FanBoostOff" xml:space="preserve">
+    <value>Fan boost off</value>
+  </data>
+  <data name="FanBoostOn" xml:space="preserve">
+    <value>Fan boost on</value>
+  </data>
+  <data name="FanBoostExceptionPrefix" xml:space="preserve">
+    <value>Fan boost error: </value>
+  </data>
+  <data name="SwitchFailedPrefix" xml:space="preserve">
+    <value>Switch failed: </value>
+  </data>
+  <data name="PerfCustomSwitchFailed" xml:space="preserve">
+    <value>Failed to switch custom mode</value>
+  </data>
+  <data name="PerfCustomSwitchFailedPrefix" xml:space="preserve">
+    <value>Failed to switch custom mode: </value>
+  </data>
+  <data name="IgpuForceConfirm" xml:space="preserve">
+    <value>Continue with forced switch?
+
+If the screen stays black, you will have to force shutdown and restart.</value>
+  </data>
+  <data name="DisplayColorProfileEmpty" xml:space="preserve">
+    <value>Color enhancement profile is empty</value>
+  </data>
+  <data name="DisplayColorProfileSwitched" xml:space="preserve">
+    <value>Color enhancement profile switched</value>
+  </data>
+  <data name="DisplayColorProfileExceptionPrefix" xml:space="preserve">
+    <value>Color enhancement profile error: </value>
+  </data>
+  <data name="DisplayColorEnhancementOff" xml:space="preserve">
+    <value>Color enhancement off</value>
+  </data>
+  <data name="DisplayColorEnhancementOn" xml:space="preserve">
+    <value>Color enhancement on</value>
+  </data>
+  <data name="DisplayColorEnhancementExceptionPrefix" xml:space="preserve">
+    <value>Color enhancement error: </value>
+  </data>
+  <data name="DisplayRefreshFailed" xml:space="preserve">
+    <value>Failed to apply refresh rate</value>
+  </data>
+  <data name="DisplayRefreshFailedPrefix" xml:space="preserve">
+    <value>Failed to apply refresh rate: </value>
+  </data>
+  <data name="DisplayRefreshExceptionPrefix" xml:space="preserve">
+    <value>Refresh rate error: </value>
+  </data>
+  <data name="DisplayRefreshSent" xml:space="preserve">
+    <value>Refresh rate applied</value>
+  </data>
+  <data name="DisplayRefreshAutoWarn" xml:space="preserve">
+    <value>Auto refresh is on; plugging/unplugging power may override this setting.</value>
+  </data>
+  <data name="DisplayRefreshSentPrefix" xml:space="preserve">
+    <value>Refresh rate applied: </value>
+  </data>
+  <data name="LiquidPumpFailed" xml:space="preserve">
+    <value>Failed to apply pump level</value>
+  </data>
+  <data name="LiquidPumpSent" xml:space="preserve">
+    <value>Pump level applied</value>
+  </data>
+  <data name="LiquidFanFailed" xml:space="preserve">
+    <value>Failed to apply liquid-cooling fan level</value>
+  </data>
+  <data name="LiquidFanSent" xml:space="preserve">
+    <value>Liquid-cooling fan level applied</value>
+  </data>
+  <data name="LightChannelSync" xml:space="preserve">
+    <value>Sync lighting</value>
+  </data>
+  <data name="LightSyncFailed" xml:space="preserve">
+    <value>Failed to apply sync effect</value>
+  </data>
+  <data name="LightSyncSent" xml:space="preserve">
+    <value>Sync effect applied</value>
+  </data>
+  <data name="IsEmptySuffix" xml:space="preserve">
+    <value> is empty</value>
+  </data>
+  <data name="IgpuListReadFailed" xml:space="preserve">
+    <value>Could not read the list of programs using the discrete GPU; forced switch canceled.</value>
+  </data>
+  <data name="ApplyFailedSuffix" xml:space="preserve">
+    <value>failed to apply</value>
+  </data>
+  <data name="GpuOverclockPrefix" xml:space="preserve">
+    <value>GPU overclock: </value>
+  </data>
+  <data name="GpuOverclockOffPending" xml:space="preserve">
+    <value>GPU overclock: off (applying...)</value>
+  </data>
+  <data name="GpuOverclockOnPending" xml:space="preserve">
+    <value>GPU overclock: on (applying...)</value>
+  </data>
+  <data name="GpuOverclockFailed" xml:space="preserve">
+    <value>Failed to apply GPU overclock (switch keeps its button state)</value>
+  </data>
+  <data name="GpuModeFailed" xml:space="preserve">
+    <value>Failed to apply GPU mode</value>
+  </data>
+  <data name="GpuModeExceptionPrefix" xml:space="preserve">
+    <value>GPU mode error: </value>
+  </data>
+  <data name="GpuModeSent" xml:space="preserve">
+    <value>GPU mode applied</value>
+  </data>
+  <data name="GpuModeSentRestart" xml:space="preserve">
+    <value>GPU mode applied; takes effect after restart</value>
+  </data>
+  <data name="OverlayOpened" xml:space="preserve">
+    <value>Overlay opened</value>
+  </data>
+  <data name="OverlayClosed" xml:space="preserve">
+    <value>Overlay closed</value>
+  </data>
+  <data name="LiquidColorFailed" xml:space="preserve">
+    <value>Failed to apply color</value>
+  </data>
+  <data name="LiquidColorSent" xml:space="preserve">
+    <value>Color applied</value>
+  </data>
+  <data name="SavedPrefix" xml:space="preserve">
+    <value>Saved: </value>
+  </data>
+  <data name="ChargeEcDirectOff" xml:space="preserve">
+    <value>EC direct charge limit disabled</value>
+  </data>
+  <data name="LightOffOnBatteryOffShort" xml:space="preserve">
+    <value>Turn off lighting on battery disabled</value>
+  </data>
+  <data name="ChargeSliderOff" xml:space="preserve">
+    <value>Unlimited charge slider disabled</value>
+  </data>
+  <data name="LightOffOnBatteryOnLong" xml:space="preserve">
+    <value>Turn off lighting on battery enabled (applied on next lighting reconcile)</value>
+  </data>
+  <data name="ChargeSliderOn" xml:space="preserve">
+    <value>Unlimited charge slider enabled</value>
+  </data>
+  <data name="GpuTargetModeRestart" xml:space="preserve">
+    <value>Switched to target mode; takes effect after restart</value>
+  </data>
+  <data name="SwitchedPrefix" xml:space="preserve">
+    <value>Switched: </value>
+  </data>
+  <data name="GpuSwitchUnconfirmed" xml:space="preserve">
+    <value>Switch requested; read-back not confirmed; will confirm after restart</value>
+  </data>
+  <data name="SentSuffix" xml:space="preserve">
+    <value>applied</value>
+  </data>
+  <data name="ExceptionPrefix" xml:space="preserve">
+    <value>error: </value>
+  </data>
+  <data name="GpuRestartExceptionPrefix" xml:space="preserve">
+    <value>Restart switch error: </value>
+  </data>
+  <data name="DisplayIccMissing" xml:space="preserve">
+    <value>Custom ICC file is missing or failed to apply</value>
+  </data>
+  <data name="LightAutoOffWriteExceptionPrefix" xml:space="preserve">
+    <value>Auto-off write error: </value>
+  </data>
+  <data name="LightAutoOffSaved" xml:space="preserve">
+    <value>Auto-off saved</value>
+  </data>
+  <data name="LightAutoOffWritten" xml:space="preserve">
+    <value>Auto-off written to keyboard settings</value>
+  </data>
+  <data name="DisplayAutoRefreshFailed" xml:space="preserve">
+    <value>Failed to apply auto refresh rate</value>
+  </data>
+  <data name="DisplayAutoRefreshExceptionPrefix" xml:space="preserve">
+    <value>Auto refresh rate error: </value>
+  </data>
+  <data name="DisplayAutoRefreshSent" xml:space="preserve">
+    <value>Auto refresh rate applied</value>
+  </data>
+  <data name="OverlayBarrelWattsFormat" xml:space="preserve">
+    <value>AC power (barrel {0} W)</value>
+  </data>
+  <data name="OverlayBarrelPower" xml:space="preserve">
+    <value>AC power (barrel)</value>
+  </data>
+  <data name="OverlayUsbCPower" xml:space="preserve">
+    <value>AC power (USB-C)</value>
+  </data>
+  <data name="OverlayExternalPower" xml:space="preserve">
+    <value>AC power (external)</value>
+  </data>
+  <data name="SettingsLoadExceptionPrefix" xml:space="preserve">
+    <value>Settings load error: </value>
+  </data>
+  <data name="OverlayStateToggled" xml:space="preserve">
+    <value>Overlay state toggled</value>
+  </data>
+  <data name="OverlayPositionReset" xml:space="preserve">
+    <value>Overlay position reset</value>
+  </data>
+  <data name="AccentSaved" xml:space="preserve">
+    <value>Accent color saved</value>
+  </data>
+  <data name="AccentReset" xml:space="preserve">
+    <value>Accent color restored to default</value>
+  </data>
+  <data name="LanguageSaved" xml:space="preserve">
+    <value>Language saved; takes effect after restart</value>
+  </data>
+  <data name="LogLevelSaved" xml:space="preserve">
+    <value>Log level saved</value>
+  </data>
+  <data name="StartupSettingFailed" xml:space="preserve">
+    <value>Failed to update startup setting</value>
+  </data>
+  <data name="StartupSettingExceptionPrefix" xml:space="preserve">
+    <value>Startup setting error: </value>
+  </data>
+  <data name="LiquidMenuSaved" xml:space="preserve">
+    <value>Liquid cooling menu setting saved</value>
+  </data>
+  <data name="IgpuModeDisplayPrefix" xml:space="preserve">
+    <value>iGPU mode display: </value>
+  </data>
+  <data name="LightStripRowPrefix" xml:space="preserve">
+    <value>Lightbar row: </value>
+  </data>
+  <data name="LogoRowPrefix" xml:space="preserve">
+    <value>Logo row: </value>
+  </data>
+  <data name="WideBackgroundAppliedPrefix" xml:space="preserve">
+    <value>Wide background applied: </value>
+  </data>
+  <data name="WideBackgroundCleared" xml:space="preserve">
+    <value>Wide background cleared</value>
+  </data>
+  <data name="BackgroundAppliedPrefix" xml:space="preserve">
+    <value>Background applied: </value>
+  </data>
+  <data name="BackgroundCleared" xml:space="preserve">
+    <value>Background cleared</value>
+  </data>
+  <data name="BackupExportedPrefix" xml:space="preserve">
+    <value>Exported </value>
+  </data>
+  <data name="BackupExportedSuffix" xml:space="preserve">
+    <value> files</value>
+  </data>
+  <data name="ExportFailedPrefix" xml:space="preserve">
+    <value>Export failed: </value>
+  </data>
+  <data name="SettingsImported" xml:space="preserve">
+    <value>Settings imported; restart L-Mechrevo to apply</value>
+  </data>
+  <data name="ImportFailedPrefix" xml:space="preserve">
+    <value>Import failed: </value>
+  </data>
+  <data name="DisplayResponseToggleFailed" xml:space="preserve">
+    <value>Failed to toggle display response acceleration</value>
+  </data>
+  <data name="DisplayResponseExceptionPrefix" xml:space="preserve">
+    <value>Display response acceleration error: </value>
+  </data>
+  <data name="OnlineUpdateDisabled" xml:space="preserve">
+    <value>Online update is disabled in this build by the original policy</value>
+  </data>
+  <data name="UpdateChecking" xml:space="preserve">
+    <value>Checking for updates...</value>
+  </data>
+  <data name="UpdateCheckNoResult" xml:space="preserve">
+    <value>Update check failed: no result returned</value>
+  </data>
+  <data name="UpdateLatestPrefix" xml:space="preserve">
+    <value>Already up to date: </value>
+  </data>
+  <data name="UpdateCheckFailedPrefix" xml:space="preserve">
+    <value>Update check failed: </value>
+  </data>
+  <data name="FeedbackOpenFailedPrefix" xml:space="preserve">
+    <value>Failed to open feedback: </value>
+  </data>
+  <data name="LinkOpenFailedPrefix" xml:space="preserve">
+    <value>Failed to open link: </value>
+  </data>
+  <data name="LicenseOpenFailedPrefix" xml:space="preserve">
+    <value>Failed to open licenses: </value>
+  </data>
+  <data name="PlaceholderDisplayDash" xml:space="preserve">
+    <value>Display —</value>
+  </data>
+  <data name="ModeNamePrefix" xml:space="preserve">
+    <value>Mode </value>
+  </data>
+  <data name="PowerSourceChangedReason" xml:space="preserve">
+    <value>Power source changed</value>
+  </data>
+  <data name="BatteryInfoDash" xml:space="preserve">
+    <value>Battery —</value>
+  </data>
+  <data name="LightTitleLogo" xml:space="preserve">
+    <value>Logo lighting</value>
+  </data>
+  <data name="LightTitleLightbar" xml:space="preserve">
+    <value>Lightbar lighting</value>
+  </data>
+  <data name="LightTitleHinge" xml:space="preserve">
+    <value>Hinge lighting</value>
+  </data>
+  <data name="LightTitleSync" xml:space="preserve">
+    <value>Sync lighting</value>
+  </data>
+  <data name="SwitchingEllipsis" xml:space="preserve">
+    <value>Switching…</value>
+  </data>
+  <data name="ChargeAppliedPrefix" xml:space="preserve">
+    <value>Charge limit applied (stop at </value>
+  </data>
+  <data name="ChargeNotEnabled" xml:space="preserve">
+    <value>Charge limit not enabled</value>
+  </data>
+  <data name="ChargeStartRangeError" xml:space="preserve">
+    <value>Start threshold must be 1-99</value>
+  </data>
+  <data name="ChargeStopRangeError" xml:space="preserve">
+    <value>Stop threshold must be 2-100</value>
+  </data>
+  <data name="IgpuBlockOnlyDgpu" xml:space="preserve">
+    <value>Only the discrete GPU is driving the display. Forced switch may cause a black screen; canceled.</value>
+  </data>
+  <data name="IgpuBlockSnapshotUnavailable" xml:space="preserve">
+    <value>Could not confirm discrete-GPU usage; canceled.</value>
+  </data>
+  <data name="IgpuBlockRouteUnavailable" xml:space="preserve">
+    <value>Could not read the current display route; canceled.</value>
+  </data>
+  <data name="IgpuBlockSafetyFailed" xml:space="preserve">
+    <value>iGPU saving safety check failed; canceled.</value>
+  </data>
+  <data name="IgpuWarningDgpuOnlyPrefix" xml:space="preserve">
+    <value>Warning: only the discrete GPU appears to be driving the display.
+A forced switch may cause a black screen and require a restart.
+
+</value>
+  </data>
+  <data name="IgpuWarningOccupiedPrefix" xml:space="preserve">
+    <value>The following programs are using the discrete GPU; they must be ended before switching to iGPU saving:
+
+</value>
+  </data>
+  <data name="IgpuConfirmContinueSuffix" xml:space="preserve">
+    <value>
+
+Switching to iGPU saving may require ending these programs. Continue?</value>
+  </data>
+  <data name="DisplayPowerEcHexFormat" xml:space="preserve">
+    <value>AC power (EC 0x{0})</value>
+  </data>
+  <data name="DisplayPowerEcWattFormat" xml:space="preserve">
+    <value>AC power (EC {0} W)</value>
+  </data>
+  <data name="UpdateTimeoutStatus" xml:space="preserve">
+    <value>Not completed within 15 s; the app will retry automatically. Click the status above to check again.</value>
+  </data>
+  <data name="ImageFileFilter" xml:space="preserve">
+    <value>Images|*.png;*.jpg;*.jpeg;*.bmp;*.webp|All files|*.*</value>
+  </data>
+  <data name="ZipFileFilter" xml:space="preserve">
+    <value>Zip archive (*.zip)|*.zip</value>
+  </data>
+  <data name="StartupEnabled" xml:space="preserve">
+    <value>Startup enabled</value>
+  </data>
+  <data name="StartupDisabled" xml:space="preserve">
+    <value>Startup disabled</value>
+  </data>
+  <data name="DisplayResponseOn" xml:space="preserve">
+    <value>Display response acceleration on</value>
+  </data>
+  <data name="DisplayResponseOff" xml:space="preserve">
+    <value>Display response acceleration off</value>
+  </data>
+  <data name="TraySensorOn" xml:space="preserve">
+    <value>Tray icon shows sensor readings</value>
+  </data>
+  <data name="TraySensorOff" xml:space="preserve">
+    <value>Tray icon sensor readings disabled; sensor polling pauses when no overlay is open</value>
+  </data>
+  <data name="LightSingleWhiteBacklight" xml:space="preserve">
+    <value>White backlight</value>
+  </data>
+  <data name="ClosingParen" xml:space="preserve">
+    <value>)</value>
+  </data>
+  <data name="CpuFmaxPrefix" xml:space="preserve">
+    <value>; FMax: </value>
+  </data>
+  <data name="CpuAutoApplyConfirm" xml:space="preserve">
+    <value>After enabling, the saved CPU tuning values will be written to the SMU at boot. Continue?</value>
+  </data>
+  <data name="CpuAutoApplyOn" xml:space="preserve">
+    <value>Auto-apply at boot enabled</value>
+  </data>
+  <data name="CpuAutoApplyOff" xml:space="preserve">
+    <value>Auto-apply at boot disabled</value>
+  </data>
+  <data name="HidExtraSmooth" xml:space="preserve">
+    <value>Smooth</value>
+  </data>
+  <data name="HidExtraDensity" xml:space="preserve">
+    <value>Density</value>
+  </data>
+  <data name="HidExtraDuration" xml:space="preserve">
+    <value>Duration</value>
+  </data>
+  <data name="HidExtraWidth" xml:space="preserve">
+    <value>Width</value>
+  </data>
+  <data name="HidExtraConcurrent" xml:space="preserve">
+    <value>Concurrent</value>
+  </data>
+  <data name="HidExtraLayout" xml:space="preserve">
+    <value>Layout</value>
+  </data>
+  <data name="HidExtraStyle" xml:space="preserve">
+    <value>Style</value>
+  </data>
+  <data name="LightLevelBright" xml:space="preserve">
+    <value>Bright</value>
+  </data>
+  <data name="LightLevelDim" xml:space="preserve">
+    <value>Dim</value>
+  </data>
+  <data name="LightSavedApplied" xml:space="preserve">
+    <value>Saved and applied</value>
+  </data>
+  <data name="LightSavedUnconfirmed" xml:space="preserve">
+    <value>Saved, but device did not confirm</value>
+  </data>
+  <data name="CommonUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="FeedbackSystemLabel" xml:space="preserve">
+    <value>OS: </value>
+  </data>
+  <data name="FeedbackGcuLineFormat" xml:space="preserve">
+    <value>
+GCU: {0} · Baolongda: {1} · Wujie: {2}</value>
+  </data>
+  <data name="FeedbackConnected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="FeedbackDisconnected" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="FeedbackYes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="FeedbackNo" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="UpdateLatestVersionLabel" xml:space="preserve">
+    <value>Latest version: </value>
+  </data>
+  <data name="UpdateChannelLabel" xml:space="preserve">
+    <value>Channel: </value>
+  </data>
+  <data name="UpdateReleaseDateLabel" xml:space="preserve">
+    <value>Release date: </value>
+  </data>
+  <data name="UpdateNoNotes" xml:space="preserve">
+    <value>This release does not provide update notes.</value>
+  </data>
+  <data name="EffectBrightness" xml:space="preserve">
+    <value>Brightness</value>
+  </data>
+  <data name="EffectColorTemp" xml:space="preserve">
+    <value>Color temperature</value>
+  </data>
+  <data name="EffectSaturation" xml:space="preserve">
+    <value>Saturation</value>
+  </data>
+  <data name="EffectGamma" xml:space="preserve">
+    <value>Gamma</value>
+  </data>
+  <data name="EffectContrast" xml:space="preserve">
+    <value>Contrast</value>
+  </data>
+  <data name="GpuRestartPromptMessage" xml:space="preserve">
+    <value>Switching to &quot;{0}&quot; requires a GPU mode restart.
+
+Yes: switch and request restart
+No: switch only and restart manually later
+Cancel: do not switch</value>
+  </data>
+  <data name="PeripheralSourceBluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+  </data>
+  <data name="PeripheralBluetoothDevice" xml:space="preserve">
+    <value>Bluetooth device</value>
+  </data>
+  <data name="PeripheralHidDeviceFormat" xml:space="preserve">
+    <value>HID device VID_{0} PID_{1}</value>
+  </data>
+  <data name="OsdPerformance" xml:space="preserve">
+    <value>Performance mode</value>
+  </data>
+  <data name="OsdLighting" xml:space="preserve">
+    <value>Lighting</value>
+  </data>
+  <data name="OsdBrightness" xml:space="preserve">
+    <value>Screen brightness</value>
+  </data>
+  <data name="QuickGcuOsd" xml:space="preserve">
+    <value>GCU-OSD</value>
+  </data>
+  <data name="LightInlineBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="GpuModeIntegrated" xml:space="preserve">
+    <value>Integrated mode</value>
+  </data>
+  <data name="GpuModeHybrid" xml:space="preserve">
+    <value>Hybrid mode</value>
+  </data>
+  <data name="GpuModeDedicated" xml:space="preserve">
+    <value>Dedicated mode</value>
+  </data>
+  <data name="SilentTurbo" xml:space="preserve">
+    <value>Silent Turbo</value>
+  </data>
+  <data name="TurboHighEnergy" xml:space="preserve">
+    <value>High Energy Turbo</value>
+  </data>
+  <data name="NucExtremeTurbo" xml:space="preserve">
+    <value>Extreme Turbo</value>
+  </data>
+  <data name="FanCurveBaolongdaEnable_Content" xml:space="preserve">
+    <value>Enable software closed loop</value>
+  </data>
+  <data name="FanSyncSharedHeatPipe_Content" xml:space="preserve">
+    <value>Link both fans</value>
+  </data>
+  <data name="FanCurveRestoreDefault_Content" xml:space="preserve">
+    <value>Restore default curve</value>
+  </data>
+</root>

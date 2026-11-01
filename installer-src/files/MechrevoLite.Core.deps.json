@@ -1,0 +1,198 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "MechrevoLite.Core/1.0.0": {
+        "dependencies": {
+          "LibreHardwareMonitorLib": "0.9.6.0",
+          "Microsoft.Win32.TaskScheduler": "2.12.2.0",
+          "MQTTnet": "5.2.0.1603",
+          "Newtonsoft.Json": "13.0.0.0",
+          "NvAPIWrapper": "0.8.1.100",
+          "Probe": "1.0.0.0",
+          "System.Management": "10.0.0.10",
+          "runtimepack.Microsoft.Windows.SDK.NET.Ref": "10.0.19041.57"
+        },
+        "runtime": {
+          "MechrevoLite.Core.dll": {}
+        },
+        "resources": {
+          "zh-CN/MechrevoLite.Core.resources.dll": {
+            "locale": "zh-CN"
+          }
+        }
+      },
+      "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.19041.57": {
+        "runtime": {
+          "Microsoft.Windows.SDK.NET.dll": {
+            "assemblyVersion": "10.0.19041.38",
+            "fileVersion": "10.0.19041.55"
+          },
+          "WinRT.Runtime.dll": {
+            "assemblyVersion": "2.2.0.0",
+            "fileVersion": "2.2.0.48161"
+          }
+        }
+      },
+      "LibreHardwareMonitorLib/0.9.6.0": {
+        "runtime": {
+          "LibreHardwareMonitorLib.dll": {
+            "assemblyVersion": "0.9.6.0",
+            "fileVersion": "0.9.6.0"
+          }
+        }
+      },
+      "Microsoft.Win32.TaskScheduler/2.12.2.0": {
+        "runtime": {
+          "Microsoft.Win32.TaskScheduler.dll": {
+            "assemblyVersion": "2.12.2.0",
+            "fileVersion": "2.12.2.0"
+          }
+        }
+      },
+      "MQTTnet/5.2.0.1603": {
+        "runtime": {
+          "MQTTnet.dll": {
+            "assemblyVersion": "5.2.0.1603",
+            "fileVersion": "5.2.0.1603"
+          }
+        }
+      },
+      "Newtonsoft.Json/13.0.0.0": {
+        "runtime": {
+          "Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.4.30916"
+          }
+        }
+      },
+      "NvAPIWrapper/0.8.1.100": {
+        "runtime": {
+          "NvAPIWrapper.dll": {
+            "assemblyVersion": "0.8.1.100",
+            "fileVersion": "0.8.1.100"
+          }
+        }
+      },
+      "Probe/1.0.0.0": {
+        "runtime": {
+          "Probe.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "System.Management/10.0.0.10": {
+        "runtime": {
+          "System.Management.dll": {
+            "assemblyVersion": "10.0.0.10",
+            "fileVersion": "10.0.1026.32716"
+          }
+        }
+      },
+      "RAMSPDToolkit-NDD/1.4.2.0": {
+        "runtime": {
+          "RAMSPDToolkit-NDD.dll": {
+            "assemblyVersion": "1.4.2.0",
+            "fileVersion": "1.4.2.0"
+          }
+        }
+      },
+      "HidSharp/2.6.4.0": {
+        "runtime": {
+          "HidSharp.dll": {
+            "assemblyVersion": "2.6.4.0",
+            "fileVersion": "2.6.4.0"
+          }
+        }
+      },
+      "DiskInfoToolkit/1.1.2.0": {
+        "runtime": {
+          "DiskInfoToolkit.dll": {
+            "assemblyVersion": "1.1.2.0",
+            "fileVersion": "1.1.2.0"
+          }
+        }
+      },
+      "BlackSharp.Core/1.0.7.0": {
+        "runtime": {
+          "BlackSharp.Core.dll": {
+            "assemblyVersion": "1.0.7.0",
+            "fileVersion": "1.0.7.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "MechrevoLite.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "runtimepack.Microsoft.Windows.SDK.NET.Ref/10.0.19041.57": {
+      "type": "runtimepack",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "LibreHardwareMonitorLib/0.9.6.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Win32.TaskScheduler/2.12.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "MQTTnet/5.2.0.1603": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Newtonsoft.Json/13.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "NvAPIWrapper/0.8.1.100": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Probe/1.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "System.Management/10.0.0.10": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "RAMSPDToolkit-NDD/1.4.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "HidSharp/2.6.4.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "DiskInfoToolkit/1.1.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "BlackSharp.Core/1.0.7.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

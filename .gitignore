@@ -1,0 +1,103 @@
+# L-Mechrevo 版本控制忽略表
+# ============================================================================
+# ⚠️ 目的：**只把"我们写的源码与文档"纳入版本控制**，
+#    ⛔ 排除 **生成物 / 下载物 / 大二进制 / 厂商载荷 / 备份**。
+#
+# ⭐ 判断标准（记住这一条就够）：
+#    「**这个文件是我们手写的吗？**」是 ⇒ 纳入；否（生成/下载/备份）⇒ 忽略。
+#
+# 建立日期：2026-10-16（首次初始化 git 时定稿）
+# ============================================================================
+
+# ── 一、编译与发布产物（生成物，随时可重建）────────────────────────────
+**/obj/
+**/bin/
+rebuild/
+dist/
+installer-src/Output/
+installer-src/_probe/
+installer-src/_v2900_extract/
+*.pdb
+*.user
+*.suo
+.vs/
+
+# ── 二、工具链（下载物，不是我们的代码）────────────────────────────────
+dotnet-sdk/
+tools/ghidra/
+tools/reagent/
+node_modules/
+npm-cache/
+# ⭐ 开发用小工具的**发布/下载产物**（含一整套 .NET 运行时 dll + procmon 等第三方工具）
+#    ≈ 200 MB ⚠️ —— 它们是"工具跑出来的"或"下载来的"，⛔ 不是我们的源码
+tools/dev/**/publish/
+tools/dev/procmon/
+tools/**/*.exe
+tools/**/*.zip
+tools/**/*.dll
+tools/**/*.ttf
+
+# ── 三、厂商载荷与大二进制（随包分发，但不属于源码）────────────────────
+# ⭐ GCU 五个变体 ≈ 67 MB；厂商服务端二进制 ≈ 14 MB/个
+installer-src/files/GCU/payload/
+installer-src/files/GCU/7za.exe
+lm_pkg_files/
+*_unpacked.7z
+GCUService_unpacked.7z
+
+# ⭐ `installer-src/files/L-Mechrevo.*` = ⭐ **我们自己的构建产物**（由 tools\merge_and_clean.py
+#    从 `rebuild\lm_fix_build\` 复制进来）⇒ 每次打包都会变、且能从源码重建 ⇒ ⛔ 不纳入。
+#    ⚠️ 其余 `installer-src/files/*.dll` 是**第三方依赖**（随包分发、不是我们生成的）
+#       ⇒ ⚠️ 体积不小（Microsoft.Windows.SDK.NET.dll 24 MB）但**必须能重建出安装包** ⇒ ⭐ 保留 ✅
+installer-src/files/L-Mechrevo.dll
+installer-src/files/MechrevoLite.Core.dll
+installer-src/files/L-Mechrevo.exe
+installer-src/files/L-Mechrevo.pdb
+installer-src/files/L-Mechrevo.deps.json
+installer-src/files/L-Mechrevo.runtimeconfig.json
+installer-src/files/zh-CN/
+installer-src/files/更新日志.txt.bak*
+installer-src/files/**/*.bak
+installer-src/*.bak*
+installer-src/_iscc_*.txt
+installer-src/_iss_check_*.txt
+
+# ── 四、备份 / 存档 / 快照（历史副本，git 本身就是干这个的）─────────────
+backup/
+archive/
+_upstream/
+work/
+diagnostics/
+交付/
+ppt_lm/
+
+# ── 五、运行时与临时 ───────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.bak_*
+*.bak-*
+~$*
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ⚠️ 例外：我们自己手写的"备份说明/清单"要保留（如果将来需要）——
+#    目前没有，等真有再加，格式：!backup/某个文件
+
+# ── 六、明确保留（写出来是为了防止将来误加规则）────────────────────────
+# ✅ source/            源码
+# ✅ installer-src/*.iss 与 installer-src/files/ 下**非** payload 的脚本/文档/字体
+# ✅ docs/              笔记与文档
+# ✅ LICENSES/          许可
+# ✅ 顶层 *.ps1 *.txt   脚本与说明
+# ✅ 修改日志.txt        手动维护的改动记录（⭐ 重要，必须纳入）
+
+# ── 七、第三方参考仓库（克隆下来的，⛔ 不进我们的版本控制）────────────────
+_refs/
+
+
+tools/dev/wpf-p0/bin-alt/
+
+
+tools/dev/nuc-perfkey-probe/perfkey-*.txt

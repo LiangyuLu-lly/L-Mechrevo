@@ -1,0 +1,562 @@
+<Window xmlns:loc="clr-namespace:L_Mechrevo.WpfP0.Resources" x:Class="L_Mechrevo.WpfP0.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{x:Static loc:WpfStrings.InlineOverlayTitle_Text}"
+        Width="500" Height="760"
+        MinWidth="500" MinHeight="420"
+        ResizeMode="CanResize"
+        WindowStartupLocation="Manual"
+        Background="{DynamicResource WindowBgBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        FontWeight="Normal"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextHintingMode="Fixed"
+        UseLayoutRounding="True"
+        Icon="Assets/Icons/app.png">
+    <Window.Resources>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RoundCombo" TargetType="ComboBox">
+            <Setter Property="Height" Value="25" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="7" />
+                            <ContentPresenter Margin="7,0,20,0" VerticalAlignment="Center"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              IsHitTestVisible="False" />
+                            <ToggleButton Focusable="False" ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent">
+                                            <Path Data="M 0 0 L 3 3 L 6 0" Stroke="{DynamicResource MutedBrush}"
+                                                  StrokeThickness="1.2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
+                                <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+                                        BorderThickness="1" CornerRadius="7" Margin="0,3,0,0" Padding="3"
+                                        Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ScrollViewer MaxHeight="220">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="HeaderSwitch" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="Track" Width="32" Height="18" CornerRadius="9"
+                                    Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
+                                <Grid>
+                                    <Ellipse x:Name="Knob" Width="16" Height="16" Fill="White"
+                                             VerticalAlignment="Top" HorizontalAlignment="Left" Margin="1,1,0,0" />
+                                </Grid>
+                            </Border>
+                            <ContentPresenter Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0,1,1,0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 复用主窗口的 RoundCombo / HeaderSwitch 样式 -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style x:Key="FlatButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ChoiceButton" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <Grid Margin="0,0,0,8">
+                    <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_35}" Style="{StaticResource CardTitle}" />
+                    <CheckBox x:Name="FollowSystemCheck" Content="{x:Static loc:WpfStrings.FollowSystemCheck_Content}" Style="{DynamicResource HeaderSwitch}"
+                              HorizontalAlignment="Right" VerticalAlignment="Center" Click="FollowSystem_Click" />
+                </Grid>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_34}" Style="{StaticResource CardTitle}" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ToggleButton x:Name="LightButton" Content="{x:Static loc:WpfStrings.ThemeButton_Content}" Style="{StaticResource ChoiceButton}" Click="Light_Click" />
+                                <ToggleButton x:Name="DarkButton" Content="{x:Static loc:WpfStrings.DarkButton_Content}" Style="{StaticResource ChoiceButton}" Click="Dark_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_33}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Border x:Name="AccentSwatch" Width="34" Height="22" CornerRadius="5" Background="{DynamicResource AccentBrush}" Margin="0,0,8,0" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_20}" Style="{StaticResource FlatButton}" Click="PickAccent_Click" />
+                                <Button Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_9}" Style="{StaticResource FlatButton}" Click="DefaultAccent_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <CheckBox x:Name="MicaBackdropCheck" Content="{x:Static loc:WpfStrings.SettingsWindow_MicaBackdrop}"
+                                      VerticalAlignment="Center" Click="MicaBackdrop_Click" />
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_MicaTint}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="MicaTintSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="100"
+                                        VerticalAlignment="Center" ValueChanged="MicaTint_Changed"
+                                        ToolTip="云母强度：100 = 云母最强，0 = 完全不透明" />
+                                <TextBlock x:Name="MicaTintText" Text="100%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_28}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="DockOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="70"
+                                        VerticalAlignment="Center" ValueChanged="DockOpacity_Changed" />
+                                <TextBlock x:Name="DockOpacityText" Text="70%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_27}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="CardOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="100"
+                                        VerticalAlignment="Center" ValueChanged="CardOpacity_Changed" />
+                                <TextBlock x:Name="CardOpacityText" Text="100%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_26}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="ButtonOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="100"
+                                        VerticalAlignment="Center" ValueChanged="ButtonOpacity_Changed" />
+                                <TextBlock x:Name="ButtonOpacityText" Text="100%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="迷你窗背景" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.BackgroundToggle_Content}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock x:Name="BackgroundPathText" Text="{x:Static loc:WpfStrings.WideBackgroundPathText_Text}" MaxWidth="170" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MutedBrush}" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_20}" Style="{StaticResource FlatButton}" Click="PickBackground_Click" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_19}" Style="{StaticResource FlatButton}" Click="ClearBackground_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_32}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="BackgroundOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="65"
+                                        VerticalAlignment="Center" ValueChanged="BackgroundOpacity_Changed" />
+                                <TextBlock x:Name="BackgroundOpacityText" Text="65%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_BackgroundBlur}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="BackgroundBlurSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="40" Value="12"
+                                        VerticalAlignment="Center" ValueChanged="BackgroundBlur_Changed" />
+                                <TextBlock x:Name="BackgroundBlurText" Text="12" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_31}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="BackgroundScrimSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="50"
+                                        VerticalAlignment="Center" ValueChanged="BackgroundScrim_Changed" />
+                                <TextBlock x:Name="BackgroundScrimText" Text="50%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="宽屏背景" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_30}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock x:Name="WideBackgroundPathText" Text="{x:Static loc:WpfStrings.WideBackgroundPathText_Text}" MaxWidth="170" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource MutedBrush}" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_20}" Style="{StaticResource FlatButton}" Click="PickWideBackground_Click" />
+                                <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_19}" Style="{StaticResource FlatButton}" Click="ClearWideBackground_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_29}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="WideBackgroundOpacitySlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="100" Value="78"
+                                        VerticalAlignment="Center" ValueChanged="WideBackgroundOpacity_Changed" />
+                                <TextBlock x:Name="WideBackgroundOpacityText" Text="78%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="宽屏背景模糊" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="WideBackgroundBlurSlider" Width="150" Style="{DynamicResource RoundSlider}" Minimum="0" Maximum="40" Value="12"
+                                        VerticalAlignment="Center" ValueChanged="WideBackgroundBlur_Changed" />
+                                <TextBlock x:Name="WideBackgroundBlurText" Text="12" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_25}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_24}" Style="{StaticResource Hint}" />
+                        <WrapPanel x:Name="TrayMenuPanel" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+                <Grid Margin="0,2,0,8">
+                    <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_23}" Style="{StaticResource CardTitle}" />
+                    <ComboBox x:Name="LanguageCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
+                              SelectionChanged="Language_Changed">
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_18}" Tag="zh-CN" />
+                        <ComboBoxItem Content="English" Tag="en-US" />
+                    </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,2,0,8">
+                    <TextBlock Text="{x:Static loc:WpfStrings.CustomModeWindow_Text_21}" Style="{StaticResource CardTitle}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_17}" Style="{StaticResource FlatButton}" Click="Hotkeys_Click" Margin="0,0,12,0" />
+                        <CheckBox x:Name="StartupCheck" Content="{x:Static loc:WpfStrings.StartupCheck_Content}" Style="{DynamicResource HeaderSwitch}"
+                                  Margin="0,0,12,0" Click="Startup_Click" />
+                        <CheckBox x:Name="WaterCoolingCheck" Content="{x:Static loc:WpfStrings.WaterCoolingCheck_Content}" Style="{DynamicResource HeaderSwitch}" Click="WaterCooling_Click" />
+                    </StackPanel>
+                </Grid>
+
+                <Border x:Name="DisplayCard" Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="{x:Static loc:WpfStrings.TraySensorTooltipCheck_Content}" Style="{StaticResource CardTitle}" />
+                            <CheckBox x:Name="OverdriveCheck" Content="{x:Static loc:WpfStrings.OverdriveCheck_Content}"
+                                      Style="{DynamicResource HeaderSwitch}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Click="Overdrive_Click" />
+                        </Grid>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_22}" Style="{StaticResource Hint}" />
+                        <Grid x:Name="MiniledRow" Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_21}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="MiniledCheck" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" Click="Miniled_Click" />
+                        </Grid>
+                        <Grid x:Name="HdrControlRow" Margin="0,6,0,0">
+                            <TextBlock Text="HDR Color Control" VerticalAlignment="Center" />
+                            <CheckBox x:Name="HdrControlCheck" Content="{x:Static loc:WpfStrings.CustomModeWindow_Content_3}" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" Click="HdrControl_Click" />
+                        </Grid>
+                        <Grid x:Name="FhdRow" Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_20}" VerticalAlignment="Center" />
+                            <Button x:Name="FhdButton" Content="FHD" Style="{StaticResource FlatButton}"
+                                    HorizontalAlignment="Right" Click="Fhd_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_19}" Style="{StaticResource CardTitle}" />
+                            <Button x:Name="IsolationButton" Content="{x:Static loc:WpfStrings.IsolationButton_Content}" Style="{StaticResource FlatButton}"
+                                    HorizontalAlignment="Right" Click="Isolation_Click" />
+                        </Grid>
+                        <TextBlock x:Name="OfficialStatus" Text="{x:Static loc:WpfStrings.OfficialStatus_Text}" Style="{StaticResource Hint}" />
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_18}" VerticalAlignment="Center" />
+                            <Button x:Name="ReinstallPawnButton" Content="{x:Static loc:WpfStrings.ReinstallPawnButton_Content}" Style="{StaticResource FlatButton}"
+                                    HorizontalAlignment="Right" Click="ReinstallPawnIO_Click" />
+                        </Grid>
+                        <TextBlock x:Name="PawnStatus" Text="{x:Static loc:WpfStrings.PawnStatus_Text}" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static loc:WpfStrings.SettingsWindow_Text_17}" Style="{StaticResource CardTitle}" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ToggleButton x:Name="IgpuAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
+                                <ToggleButton x:Name="IgpuShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" />
+                                <ToggleButton x:Name="IgpuHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="IgpuRow_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_16}" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static loc:WpfStrings.SettingsWindow_Text_15}" Style="{StaticResource CardTitle}" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ToggleButton x:Name="StripAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
+                                <ToggleButton x:Name="StripShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" />
+                                <ToggleButton x:Name="StripHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightStripRow_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_14}" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static loc:WpfStrings.SettingsWindow_Text_13}" Style="{StaticResource CardTitle}" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ToggleButton x:Name="LogoAutoButton" Content="{x:Static loc:WpfStrings.LogoAutoButton_Content}" Tag="auto" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
+                                <ToggleButton x:Name="LogoShowButton" Content="{x:Static loc:WpfStrings.LogoShowButton_Content}" Tag="show" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" />
+                                <ToggleButton x:Name="LogoHideButton" Content="{x:Static loc:WpfStrings.LogoHideButton_Content}" Tag="hide" Style="{StaticResource ChoiceButton}" Click="LightLogoRow_Click" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_12}" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Grid Margin="0,2,0,8">
+                    <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_11}" Style="{StaticResource CardTitle}" />
+                    <ComboBox x:Name="LogLevelCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
+                              SelectionChanged="LogLevel_Changed">
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_5}" Tag="off" />
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_16}" Tag="error" />
+                        <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_15}" Tag="all" />
+                    </ComboBox>
+                </Grid>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_10}" Style="{StaticResource CardTitle}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_14}" Style="{StaticResource FlatButton}" Click="ExportBackup_Click" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_13}" Style="{StaticResource FlatButton}" Click="ImportBackup_Click" Margin="0" />
+                        </StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_9}" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="PeripheralBatteryCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="{x:Static loc:WpfStrings.ExternalBatteryCard_Title}" Style="{StaticResource CardTitle}" />
+                            <TextBlock x:Name="PeripheralBatteryStatus" Text="" Style="{StaticResource Hint}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0" />
+                        </Grid>
+                        <StackPanel x:Name="PeripheralBatteryPanel" Margin="0,8,0,0" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.ExternalBatteryCard_Description}"
+                                   Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.MainWindow_Text_4}" Style="{StaticResource CardTitle}" />
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_8}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="OverlayModeCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
+                                      SelectionChanged="OverlayMode_Changed">
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_12}" Tag="0" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.OriginalStyleWindow_Content_8}" Tag="1" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_11}" Tag="2" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_7}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Slider x:Name="OverlayOpacitySlider" Width="130" Style="{DynamicResource RoundSlider}" Minimum="30" Maximum="100" Value="100"
+                                        VerticalAlignment="Center" ValueChanged="OverlayOpacity_Changed" />
+                                <TextBlock x:Name="OverlayOpacityText" Text="100%" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_6}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="TraySensorTooltipCheck" Content="{x:Static loc:WpfStrings.TraySensorTooltipCheck_Content}" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Click="TraySensorTooltip_Click" />
+                        </Grid>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_5}"
+                                   Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_4}" VerticalAlignment="Center" />
+                            <ComboBox x:Name="OverlayIntervalCombo" Width="150" HorizontalAlignment="Right" Style="{DynamicResource RoundCombo}"
+                                      SelectionChanged="OverlayInterval_Changed">
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_10}" Tag="500" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_9}" Tag="1000" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_8}" Tag="2000" />
+                                <ComboBoxItem Content="{x:Static loc:WpfStrings.SettingsWindow_Content_7}" Tag="5000" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock Text="锁定悬浮窗（鼠标穿透）" VerticalAlignment="Center" />
+                            <CheckBox x:Name="OverlayLockCheck" Style="{DynamicResource HeaderSwitch}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Click="OverlayLock_Click" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_6}" Style="{StaticResource FlatButton}" Click="OverlayToggle_Click" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_5}" Style="{StaticResource FlatButton}" Click="OverlayReset_Click" Margin="0" />
+                        </StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_3}" Style="{StaticResource Hint}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text_2}" Style="{StaticResource CardTitle}" />
+                        <TextBlock x:Name="AboutVersionText" Text="L-Mechrevo" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{x:Static loc:WpfStrings.SettingsWindow_Text}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                        <StackPanel x:Name="FeedbackButtonsPanel" Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button x:Name="CheckUpdateButton" Content="{x:Static loc:WpfStrings.CheckUpdateButton_Content}" Style="{StaticResource FlatButton}" Click="CheckUpdate_Click" Margin="0,0,8,0" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_4}" Style="{StaticResource FlatButton}" Click="OpenFeedback_Click" Margin="0,0,8,0" />
+                            <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_3}" Style="{StaticResource FlatButton}" Click="OpenIssues_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Grid Margin="0,4,0,0">
+                    <TextBlock x:Name="StatusText" Text="0.293.6 beta23.6" Style="{StaticResource Hint}" Margin="0" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content_2}" Style="{StaticResource FlatButton}" Click="OpenLicenses_Click" Margin="0,0,8,0" />
+                        <Button Content="{x:Static loc:WpfStrings.SettingsWindow_Content}" Style="{StaticResource FlatButton}" Click="OpenFolder_Click" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

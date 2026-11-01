@@ -1,0 +1,17 @@
+LMechrevo.RyzenSMU.bin
+======================
+
+This file is the PawnIO RyzenSMU module, embedded into L-Mechrevo as a managed resource
+(L-Mechrevo.csproj) and therefore redistributed as part of L-Mechrevo.
+
+Upstream : https://github.com/namazso/PawnIO.Modules
+Licence  : GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later)
+Copyright: (C) 2025 namazso <admin@namazso.eu>
+Licence text: ../LICENSES/LGPL-2.1.txt  (= upstream COPYING, byte-identical)
+Module source: see the upstream repository at the tag matching this binary.
+
+This copy is unmodified. SHA-256 of this file:
+  B84ECA7F32C63B3D8C14B2C6D45482706DF8683AA6F43EB8BEAD9DC62181D38F
+
+FMax / SMU command tables in ../source/PawnIO/RyzenSmuService.cs additionally derive from
+irusanov/ZenStates-Core and irusanov/SMUDebugTool (GPL-3.0). See ../THIRD-PARTY-NOTICES.md.

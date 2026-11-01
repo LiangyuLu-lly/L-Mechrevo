@@ -1,0 +1,2 @@
+238c9fa8-0aad-41ed-83f4-97be242c8f20|9d7815a6-7ee4-497e-8888-515a05f02364|@%SystemRoot%\system32\powrprof.dll,-107,Hibernate after
+238c9fa8-0aad-41ed-83f4-97be242c8f20|a4b195f5-8225-47d8-8012-9d41369786e2|@%SystemRoot%\system32\powrprof.dll,-561,Allow system required policy

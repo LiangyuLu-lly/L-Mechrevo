@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LmLauncherStub 应用清单（2026-10-13 新增）
+     ⚠️ 2026-10-13（r24）：这里从 requireAdministrator 改成 asInvoker。
+        理由：本壳不做任何需要管理员权限的事 —— 只【只读】检测 .NET 桌面运行时，然后启动同目录的
+        L-Mechrevo.exe；而 L-Mechrevo.exe 自己的清单（source\app.manifest:7）本来就是
+        requireAdministrator，它会自己弹一次 UAC 提权 => 用户看到的提权次数【不变】
+        （快捷方式 -> 壳[不提权] -> 主程序[提权，弹一次 UAC]）。
+        ⚠️ 反面：requireAdministrator 会让「用 shell 关联打开浏览器」在提权上下文里静默失败
+        （用户报的「点下载没拉起浏览器」根因之一）；改成 asInvoker 后浏览器以用户身份打开。 -->
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="LmLauncherStub.app"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+    </application>
+  </compatibility>
+
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+    </windowsSettings>
+  </application>
+
+  <!-- 启用视觉样式（按钮/文本框跟随系统主题） -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+          type="win32"
+          name="Microsoft.Windows.Common-Controls"
+          version="6.0.0.0"
+          processorArchitecture="*"
+          publicKeyToken="6595b64144ccf1df"
+          language="*"
+        />
+    </dependentAssembly>
+  </dependency>
+</assembly>
