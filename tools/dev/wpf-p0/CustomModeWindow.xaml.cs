@@ -46,7 +46,15 @@ public partial class CustomModeWindow : Window
         AddHandler(CheckBox.UncheckedEvent,
             new RoutedEventHandler((_, _) => MarkDirty()), true);
         AddHandler(ComboBox.SelectionChangedEvent,
-            new SelectionChangedEventHandler((_, _) => MarkDirty()), true);
+            new SelectionChangedEventHandler((_, e) =>
+            {
+                // 配置选择器本身不是参数修改；同步选中项时也不能把配置标脏。
+                if (e.OriginalSource is ComboBox combo && ReferenceEquals(combo, ModeCombo))
+                {
+                    return;
+                }
+                MarkDirty();
+            }), true);
         _powerWallTimer.Tick += async (_, _) => await UpdatePowerWallStatusAsync();
         Loaded += (_, _) => _powerWallTimer.Start();
         Closed += (_, _) => _powerWallTimer.Stop();
@@ -165,7 +173,8 @@ public partial class CustomModeWindow : Window
     private void MarkDirty()
     {
         // 2 秒功耗墙刷新会程序化写 PL4 滑块；那不算用户修改，否则迷你窗会误报“未应用”。
-        if (_loadingUi || _firmwareMode || _syncingPowerWalls || _syncingPl4Unit || _current == null)
+        if (_loadingUi || _firmwareMode || _syncingPowerWalls || _syncingPl4Unit
+            || _modeComboSyncDepth > 0 || _current == null)
         {
             return;
         }
