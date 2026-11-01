@@ -107,7 +107,10 @@ internal static class UpdateChecker
 		if (string.IsNullOrWhiteSpace(version)) return "";
 		string text = version.Trim().TrimStart('v', 'V');
 		int idx = text.IndexOf("-beta", StringComparison.OrdinalIgnoreCase);
-		return idx >= 0 ? text[(idx + 5)..] : "";
+		if (idx >= 0) return text[(idx + 5)..];
+		// 以后 tag 可以只写 beta23.6.9，不再带 0.293.x 主版本。
+		if (text.StartsWith("beta", StringComparison.OrdinalIgnoreCase)) return text[4..];
+		return "";
 	}
 
 	private static bool IsNewerGitHub(string? candidate, string? current)
