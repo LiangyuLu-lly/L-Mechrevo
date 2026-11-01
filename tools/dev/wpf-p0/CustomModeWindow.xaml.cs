@@ -313,7 +313,7 @@ public partial class CustomModeWindow : Window
         }
     }
 
-    private async void ModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_firmwareMode || _modeComboSyncDepth > 0)
         {
@@ -327,31 +327,49 @@ public partial class CustomModeWindow : Window
         {
             return;
         }
-        _modeComboSyncDepth++;
         long seq = ++_modeSwitchSeq;
         _requestedModeId = id;
+        // 先同步加载新配置，完全不等旧的后端激活；旧请求由 PerfModeService 的
+        // _activationCts 取消，这里只保证界面立即显示最后一次选择。
+        _modeComboSyncDepth++;
         try
         {
-            await SelectModeAsync(id);
-            if (seq == _modeSwitchSeq)
-            {
-                // 快速连续切换时，旧激活可能晚到并改掉界面；以最后一次请求为准重载一次。
-                string latest = _requestedModeId ?? id;
-                if (_modes.Any(m => string.Equals(m.Id, latest, StringComparison.Ordinal)))
-                {
-                    ApplyMode(latest);
-                }
-                SyncModeComboToCurrent();
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_2 + ex.Message;
+            ApplyMode(id);
         }
         finally
         {
             _modeComboSyncDepth--;
         }
+        _ = ActivateAndRefreshAsync(id, seq);
+    }
+
+    private async Task ActivateAndRefreshAsync(string id, long seq)
+    {
+        try
+        {
+            await SelectModeAsync(id).ConfigureAwait(true);
+        }
+        catch
+        {
+        }
+        if (seq != _modeSwitchSeq)
+        {
+            return;
+        }
+        string latest = _requestedModeId ?? id;
+        if (_modes.Any(m => string.Equals(m.Id, latest, StringComparison.Ordinal)))
+        {
+            ApplyMode(latest);
+        }
+        SyncModeComboToCurrent();
+        QueueModeComboSync();
+    }
+
+    private void QueueModeComboSync()
+    {
+        // ComboBox 在 SelectionChanged 返回后还会提交一次选中项；这里延后到本次事件结束再对齐，
+        // 否则快速切换时会出现“当前模式 2、下拉框仍显示 1”。
+        Dispatcher.BeginInvoke(new Action(SyncModeComboToCurrent), DispatcherPriority.Background);
     }
 
     private void SyncModeComboToCurrent()
@@ -454,6 +472,7 @@ public partial class CustomModeWindow : Window
         StatusText.Text = WpfStrings.CustomModeWindow_xaml_Text_5 + ModeName(mode);
         UpdateRouteHint(mode);
         SyncModeComboToCurrent();
+        QueueModeComboSync();
     }
 
     private void LoadSettingsToUi(MechrevoLite.Mode.PerfModeSettings s)
