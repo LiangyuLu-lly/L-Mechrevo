@@ -484,6 +484,34 @@ public partial class LightEditorWindow : Window
         }
     }
 
+    private ColorPickerWindow CreateColorPicker(System.Drawing.Color initial)
+    {
+        ColorPickerWindow picker = new(initial);
+        // 宽屏内嵌时 this 是一个从未 Show 过的 Window，直接设 Owner 会抛
+        // “无法将 Owner 设置为之前未显示的 Window”。给当前可见窗口当 Owner。
+        Window? owner = null;
+        if (IsVisible)
+        {
+            owner = this;
+        }
+        else if (Application.Current != null)
+        {
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (!ReferenceEquals(window, this) && window.IsVisible)
+                {
+                    owner = window;
+                    break;
+                }
+            }
+        }
+        if (owner != null)
+        {
+            picker.Owner = owner;
+        }
+        return picker;
+    }
+
     private void ManualColor_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: int index })
@@ -492,7 +520,7 @@ public partial class LightEditorWindow : Window
         }
         System.Drawing.Color current = System.Drawing.Color.FromArgb(
             LightChannelSettings.ManualPalette[Math.Clamp(_manualIndexes[index], 1, 29) - 1]);
-        ColorPickerWindow picker = new(current) { Owner = this };
+        ColorPickerWindow picker = CreateColorPicker(current);
         if (picker.ShowDialog() != true || picker.Result is not System.Drawing.Color picked)
         {
             return;
@@ -585,7 +613,7 @@ public partial class LightEditorWindow : Window
         {
             return;
         }
-        ColorPickerWindow picker = new(System.Drawing.Color.FromArgb(_mixColors[index])) { Owner = this };
+        ColorPickerWindow picker = CreateColorPicker(System.Drawing.Color.FromArgb(_mixColors[index]));
         if (picker.ShowDialog() != true || picker.Result is not System.Drawing.Color picked)
         {
             return;
@@ -607,7 +635,7 @@ public partial class LightEditorWindow : Window
 
     private void Color_Click(object sender, RoutedEventArgs e)
     {
-        ColorPickerWindow picker = new(System.Drawing.Color.FromArgb(_colorArgb)) { Owner = this };
+        ColorPickerWindow picker = CreateColorPicker(System.Drawing.Color.FromArgb(_colorArgb));
         if (picker.ShowDialog() == true && picker.Result is System.Drawing.Color picked)
         {
             _colorArgb = picked.ToArgb();
