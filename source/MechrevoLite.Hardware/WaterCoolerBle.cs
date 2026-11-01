@@ -737,7 +737,6 @@ public class WaterCoolerBle : IDisposable
 		StopKeepAlive();
 		_keepAliveTimer = new Timer(async _ => await KeepAliveTickAsync(), null, 3000, 3000);
 	}
-
 	private void StopKeepAlive()
 	{
 		try
@@ -758,9 +757,9 @@ public class WaterCoolerBle : IDisposable
 		}
 		try
 		{
-			// GattSession.MaintainConnection 在部分适配器上不可用；用轻量查询维持连接，
-			// 避免 Windows BLE 空闲超时把设备断开。
-			await WriteRawAsync(Encoding.ASCII.GetBytes("sw"), "keepalive");
+			// GattSession.MaintainConnection 在部分适配器上不可用；发送流量查询心跳维持连接，
+			// 同时让水冷箱持续回报流量状态。
+			await WriteRawAsync(new byte[] { 0xFE, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0xEF }, "flow heartbeat");
 		}
 		catch
 		{
