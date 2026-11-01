@@ -164,7 +164,8 @@ public partial class CustomModeWindow : Window
 
     private void MarkDirty()
     {
-        if (_loadingUi || _firmwareMode || _current == null)
+        // 2 秒功耗墙刷新会程序化写 PL4 滑块；那不算用户修改，否则迷你窗会误报“未应用”。
+        if (_loadingUi || _firmwareMode || _syncingPowerWalls || _syncingPl4Unit || _current == null)
         {
             return;
         }
