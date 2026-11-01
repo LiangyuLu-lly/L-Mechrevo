@@ -13,10 +13,11 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBgBrush}"
         Foreground="{DynamicResource TextBrush}"
-        FontFamily="Segoe UI Variable Text, Segoe UI"
-        TextOptions.TextFormattingMode="Display"
+        FontFamily="{DynamicResource AppFontFamily}"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True"
         Icon="Assets/Icons/app.png">
 
     <shell:WindowChrome.WindowChrome>
