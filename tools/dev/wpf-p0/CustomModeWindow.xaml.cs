@@ -148,8 +148,15 @@ public partial class CustomModeWindow : Window
         {
             return;
         }
-        // 鼠标在 Slider / ComboBox 上时，子控件会把滚轮吃掉；这里统一转发给外层页面，
-        // 保证自定义界面任意位置滚轮都能上下滚动。
+        // 鼠标在 Slider / ComboBox 上时，子控件会把滚轮吃掉；这里统一转发给内部滚动区。
+        // 已经滚到边界时不要标记 Handled，让外层宽屏页面继续滚动。
+        bool canScroll = e.Delta > 0
+            ? ContentScroll.VerticalOffset > 0
+            : ContentScroll.VerticalOffset < ContentScroll.ScrollableHeight;
+        if (!canScroll)
+        {
+            return;
+        }
         ContentScroll.ScrollToVerticalOffset(ContentScroll.VerticalOffset - e.Delta);
         e.Handled = true;
     }
