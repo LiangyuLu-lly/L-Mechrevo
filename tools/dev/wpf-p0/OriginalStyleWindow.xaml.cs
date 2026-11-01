@@ -149,6 +149,7 @@ public partial class OriginalStyleWindow : Window
     private string _customWindowModeId = "";
     private bool _perfConfigBuilt;
     private bool _moreSwitchesHasGcuOsd;
+    private bool _moreSwitchesHasCopilot;
     private bool _gpuPromptOpen;
     private bool _syncingDisplayEffect;
     private bool _syncingBatteryLimit;
@@ -5588,7 +5589,10 @@ public partial class OriginalStyleWindow : Window
         // 迷你窗「更多开关」只在首次构建；GCU 能力若晚到（后端刚连上），
         // 原来的 Children.Count>0 提前返回会让 GCU-OSD 永久缺失。
         bool gcuOsdSupported = _services?.QuickSwitches.Supports("gcuosd") == true;
-        if (MoreGroupsPanel.Children.Count > 0 && (!gcuOsdSupported || _moreSwitchesHasGcuOsd))
+        bool copilotSupported = _services?.QuickSwitches.Supports("copilot") == true;
+        if (MoreGroupsPanel.Children.Count > 0
+            && (!gcuOsdSupported || _moreSwitchesHasGcuOsd)
+            && (!copilotSupported || _moreSwitchesHasCopilot))
         {
             return;
         }
@@ -5640,6 +5644,10 @@ public partial class OriginalStyleWindow : Window
                 if (string.Equals(key, "gcuosd", StringComparison.OrdinalIgnoreCase))
                 {
                     _moreSwitchesHasGcuOsd = true;
+                }
+                if (string.Equals(key, "copilot", StringComparison.OrdinalIgnoreCase))
+                {
+                    _moreSwitchesHasCopilot = true;
                 }
                 visible.Add(new CheckBox
                 {

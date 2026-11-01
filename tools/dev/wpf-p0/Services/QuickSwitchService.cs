@@ -208,6 +208,14 @@ internal sealed class QuickSwitchService : IQuickSwitchService
         {
             return IsGcuMachine();
         }
+        // Copilot 键锁在部分 GCU 固件里不回 Status 字段，但命令仍可下发；
+        // 只要 GCU 机型存在就保留入口，星耀本地通道也单独放行。
+        if (string.Equals(key, "copilot", StringComparison.OrdinalIgnoreCase))
+        {
+            return probe.SupportsQuick(key)
+                || IsGcuMachine()
+                || MechrevoLite.Hardware.XingyaoQuickSwitch.IsApplicable(_backend.Hw);
+        }
         return probe.SupportsQuick(key) || IsBaolongdaFanBoost(key);
     }
 
