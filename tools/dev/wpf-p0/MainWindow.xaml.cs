@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -106,6 +106,7 @@ public partial class MainWindow : Window
         EnsureHomeView();
         _owner = owner;
         _probe = probe;
+        _dark = owner?.IsDark ?? (AppConfig.Get("ui_dark_theme", 1) != 0);
         SourceInitialized += (_, _) =>
         {
             ApplyRoundedWindowChrome();
@@ -113,7 +114,9 @@ public partial class MainWindow : Window
             ReloadWideBackground();
         };
         RootContent.Opacity = 1;
-        AppTheme.Apply(true);
+        AppTheme.Apply(_dark);
+        ApplyDarkTitleBar(_dark);
+        ThemeButton.Content = _dark ? WpfStrings.ToggleLightTheme : WpfStrings.ToggleDarkTheme;
         ReloadWideBackground();
         BuildSensorBlocks();
         BuildQuickTiles();
@@ -801,10 +804,31 @@ public partial class MainWindow : Window
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _dark = !_dark;
+        AppConfig.Set("ui_dark_theme", _dark ? 1 : 0);
+        AppConfig.Set("ui_theme_follow_system", 0);
+        AppConfig.Flush();
+        if (_owner != null)
+        {
+            _owner.ApplyThemeFromSettings(_dark);
+        }
+        else
+        {
+            ApplyThemeFromOwner(_dark);
+        }
+        StatusText.Text = "L-Mechrevo · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme) + WpfStrings.ThemeWord;
+    }
+
+    internal void ApplyThemeFromOwner(bool dark)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action(() => ApplyThemeFromOwner(dark)));
+            return;
+        }
+        _dark = dark;
         AppTheme.Apply(_dark);
         ApplyDarkTitleBar(_dark);
         ThemeButton.Content = _dark ? WpfStrings.ToggleLightTheme : WpfStrings.ToggleDarkTheme;
-        StatusText.Text = "L-Mechrevo · " + (_dark ? WpfStrings.DarkTheme : WpfStrings.LightTheme) + WpfStrings.ThemeWord;
     }
 
     private void AccentButton_Click(object sender, RoutedEventArgs e)
