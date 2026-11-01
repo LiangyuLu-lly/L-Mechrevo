@@ -23,6 +23,8 @@ internal sealed class WaterCoolerRoutingService : IDisposable
     private int _connecting;
     private SystemBluetoothConnectionObservation _observation;
     private int _disposed;
+    private int _manualDisconnect;
+    private int _reconnectQueued;
     private Timer? _curveTimer;
     private int _curveBusy;
     private int _lastCurveDuty = -1;
@@ -288,6 +290,10 @@ internal sealed class WaterCoolerRoutingService : IDisposable
                 {
                     Route = LiquidCoolingControlRoute.None;
                 }
+                if (!connected)
+                {
+                    ScheduleReconnect();
+                }
                 RouteChanged?.Invoke();
             };
             try
@@ -343,8 +349,37 @@ internal sealed class WaterCoolerRoutingService : IDisposable
         }
     }
 
+    private void ScheduleReconnect()
+    {
+        if (_ble?.HasSavedDevice != true
+            || Volatile.Read(ref _manualDisconnect) != 0
+            || Volatile.Read(ref _disposed) != 0
+            || Interlocked.Exchange(ref _reconnectQueued, 1) != 0)
+        {
+            return;
+        }
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(3000).ConfigureAwait(false);
+                if (_ble?.IsConnected != true
+                    && Volatile.Read(ref _manualDisconnect) == 0
+                    && Volatile.Read(ref _disposed) == 0)
+                {
+                    await ConnectSavedAsync().ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _reconnectQueued, 0);
+            }
+        });
+    }
+
     private async Task ConnectSavedAsync()
     {
+        Volatile.Write(ref _manualDisconnect, 0);
         if (_ble == null || Interlocked.Exchange(ref _connecting, 1) != 0 || Volatile.Read(in _disposed) != 0)
         {
             return;
@@ -421,6 +456,7 @@ internal sealed class WaterCoolerRoutingService : IDisposable
 
     internal void Disconnect()
     {
+        Volatile.Write(ref _manualDisconnect, 1);
         if (_ble == null)
         {
             return;

@@ -93,6 +93,10 @@ public class WaterCoolerBle : IDisposable
 
 	private TaskCompletionSource<string>? _firmwareReply;
 
+	private Timer? _keepAliveTimer;
+
+	private int _keepAliveBusy;
+
 	private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
 
 	private readonly CancellationTokenSource _disposeCts = new CancellationTokenSource();
@@ -716,6 +720,7 @@ public class WaterCoolerBle : IDisposable
 			}
 			_lastAutomaticPump = (_lastAutomaticFan = -1);
 			Logger.WriteLine($"BLE connected: {name} ({address:X12}) fw={FirmwareVersion} fanLed={SupportsFanLed}");
+			StartKeepAlive();
 			ConnectionChanged?.Invoke(obj: true);
 			return true;
 		}
@@ -727,8 +732,48 @@ public class WaterCoolerBle : IDisposable
 		}
 	}
 
+	private void StartKeepAlive()
+	{
+		StopKeepAlive();
+		_keepAliveTimer = new Timer(async _ => await KeepAliveTickAsync(), null, 3000, 3000);
+	}
+
+	private void StopKeepAlive()
+	{
+		try
+		{
+			_keepAliveTimer?.Dispose();
+		}
+		catch
+		{
+		}
+		_keepAliveTimer = null;
+	}
+
+	private async Task KeepAliveTickAsync()
+	{
+		if (!IsConnected || Interlocked.CompareExchange(ref _keepAliveBusy, 1, 0) != 0)
+		{
+			return;
+		}
+		try
+		{
+			// GattSession.MaintainConnection 在部分适配器上不可用；用轻量查询维持连接，
+			// 避免 Windows BLE 空闲超时把设备断开。
+			await WriteRawAsync(Encoding.ASCII.GetBytes("sw"), "keepalive");
+		}
+		catch
+		{
+		}
+		finally
+		{
+			Interlocked.Exchange(ref _keepAliveBusy, 0);
+		}
+	}
+
 	public void Disconnect()
 	{
+		StopKeepAlive();
 		bool isConnected = IsConnected;
 		_txChar = null;
 		if ((object)_rxChar != null)
@@ -785,6 +830,7 @@ public class WaterCoolerBle : IDisposable
 	{
 		if (sender.ConnectionStatus == BluetoothConnectionStatus.Disconnected)
 		{
+			StopKeepAlive();
 			_txChar = null;
 			IsConnected = false;
 			IsMeterNormal = null;
