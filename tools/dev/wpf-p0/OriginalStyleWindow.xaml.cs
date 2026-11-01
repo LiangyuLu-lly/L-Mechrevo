@@ -2306,11 +2306,12 @@ public partial class OriginalStyleWindow : Window
             == System.Windows.Forms.PowerLineStatus.Online;
         Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
         Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         if (Application.Current != null)
         {
             Application.Current.SessionEnding += OnAppSessionEnding;
         }
-        Logger.WriteLine("[power] 已挂载 PowerModeChanged/SessionSwitch/SessionEnding");
+        Logger.WriteLine("[power] 已挂载 PowerModeChanged/SessionSwitch/UserPreferenceChanged/SessionEnding");
     }
 
     private void UnhookPowerSessionEvents()
@@ -2322,6 +2323,7 @@ public partial class OriginalStyleWindow : Window
         _powerSessionEventsHooked = false;
         try { Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged; } catch { }
         try { Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch; } catch { }
+        try { Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged; } catch { }
         try
         {
             if (Application.Current != null)
@@ -2355,6 +2357,28 @@ public partial class OriginalStyleWindow : Window
         }
         // StatusChange / Resume 都走同一套 2s 电源稳定检查（旧 Program.SchedulePowerCheck）
         SchedulePowerSettle();
+    }
+
+    private void OnUserPreferenceChanged(object? sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+    {
+        if (!AppConfig.Is("ui_theme_follow_system"))
+        {
+            return;
+        }
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            // 事件到达时用户可能刚刚关掉“跟随系统”，再确认一次。
+            if (!AppConfig.Is("ui_theme_follow_system"))
+            {
+                return;
+            }
+            bool dark = ResolveStartupDarkTheme();
+            if (dark != _dark)
+            {
+                ApplyThemeFromSettings(dark);
+                Logger.WriteLine("[theme] 跟随系统：UserPreferenceChanged ⇒ " + (dark ? "深色" : "浅色"));
+            }
+        }));
     }
 
     private void OnSessionSwitch(object? sender, Microsoft.Win32.SessionSwitchEventArgs e)
