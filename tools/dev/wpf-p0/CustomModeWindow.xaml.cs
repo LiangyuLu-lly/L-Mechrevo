@@ -276,7 +276,11 @@ public partial class CustomModeWindow : Window
     public void BindMode(string id)
     {
         // 已加载过列表时只切当前配置，不再清空/重建下拉框；重建会让快速切换看起来回弹。
+        // 但列表里找不到该 id（例如宽屏页先建成了内置档列表）时必须重建，否则会停在“平衡”等旧项。
+        bool inCombo = ModeCombo.Items.OfType<ComboBoxItem>()
+            .Any(item => item.Tag is string tag && string.Equals(tag, id, StringComparison.Ordinal));
         if (!_firmwareMode
+            && inCombo
             && _modes.Any(m => string.Equals(m.Id, id, StringComparison.Ordinal)))
         {
             ApplyMode(id);

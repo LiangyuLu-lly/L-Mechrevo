@@ -144,6 +144,7 @@ public partial class FanCurveWindow : Window
     {
         TitleText.Visibility = Visibility.Collapsed;
         HintText.Visibility = Visibility.Collapsed;
+        CloseButton.Visibility = Visibility.Collapsed;
         if (CpuSection.Children.Count > 0 && CpuSection.Children[0] is TextBlock cpuTitle)
         {
             cpuTitle.Visibility = Visibility.Collapsed;

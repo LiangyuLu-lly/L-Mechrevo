@@ -9,6 +9,39 @@
         FontFamily="{DynamicResource AppFontFamily}"
         Icon="Assets/Icons/app.png">
     <Window.Resources>
+        <Style x:Key="HeaderSwitch" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="Track" Width="24" Height="14" CornerRadius="7"
+                                    Background="{DynamicResource TrackBrush}" VerticalAlignment="Center">
+                                <Grid>
+                                    <Ellipse x:Name="Knob" Width="12" Height="12" Fill="White"
+                                             VerticalAlignment="Center" HorizontalAlignment="Left" Margin="1,0,0,0" />
+                                </Grid>
+                            </Border>
+                            <ContentPresenter Margin="5,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0,1,1,0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="MiniButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
             <Setter Property="Padding" Value="10,4" />
             <Setter Property="FontSize" Value="11" />
