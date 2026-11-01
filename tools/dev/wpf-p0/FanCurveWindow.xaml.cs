@@ -152,6 +152,11 @@ public partial class FanCurveWindow : Window
         {
             return;
         }
+        // 有未应用的拖动修改时，模式/激活事件不能把曲线重载回去，否则点位会回弹。
+        if (_dirty)
+        {
+            return;
+        }
         // 宽屏内联时模式事件可能在拖动过程中到达；拖动期间不重载，避免点位回弹。
         if (CpuCurve.IsDragging || GpuCurve.IsDragging)
         {
